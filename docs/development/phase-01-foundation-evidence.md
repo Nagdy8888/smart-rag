@@ -333,3 +333,14 @@ Create tiered CI and documentation index, C4 skeleton, ADRs, governance drafts, 
 ### Packet 6 checkbox
 
 **Checked** with local verification evidence. Awaiting user acceptance to mark phase complete.
+
+## Phase 1 exit acceptance
+
+| Field | Value |
+| --- | --- |
+| Exact user decision | `accept` |
+| Date | 2026-08-12 |
+| Approver | user (Cursor chat; no legal name provided) |
+| Interpretation | Accept Phase 1 foundation exit record; Phase 2 may start |
+| Phase status | `complete` |
+
