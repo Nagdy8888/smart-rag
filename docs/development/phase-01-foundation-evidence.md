@@ -184,3 +184,40 @@ Documentation-only packet. No install, test, or Compose commands required.
 ### Packet 2 checkbox
 
 **Checked** — lockfiles, boundaries, frontend build, and LangGraph config validation evidenced.
+
+## Packet 3 — local private-service topology and honest health
+
+### Requirement (quoted)
+
+> Create local Docker/WSL2 helpers, a digest-pinned private ParadeDB/`pg_search` service, split private Valkey services, the crawl-proxy boundary, mock-model mode, and health checks.
+
+### Digests resolved (Docker Hub API 2026-08-12)
+
+| Image | Digest |
+| --- | --- |
+| paradedb/paradedb:pg17 | sha256:dca046b8a0ddd070c368d5254cbb7f596b3b7bc67bc2efa7c0fbe881087883bb |
+| valkey/valkey:8.1-alpine | sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec |
+| python:3.11-slim-bookworm | sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3 |
+| node:20-bookworm-slim | sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 |
+
+### Commands
+
+| Command | Exit |
+| --- | --- |
+| `docker compose --env-file .env.example config --quiet` | 0 |
+| `pytest` including `test_compose_topology.py` | 0 (21+ tests in suite slice) |
+
+### ADRs
+
+- `ADR-paradedb-edition-availability` accepted (Community `pg17` digest-pinned)
+- `ADR-private-service-tls` accepted (TLS omitted locally with compensating controls; staging revisit)
+
+### Unverified
+
+- Full `docker compose up` image builds / runtime health (host `.env` was incompatible with Compose KEY=VALUE format; use `.env.example` schema).
+- Supabase CLI not installed on host — scripts skip with message.
+- Live ParadeDB `pg_search` extension probe inside running container.
+
+### Packet 3 checkbox
+
+**Checked** for authored topology + contract tests + digest pins. Runtime stack bring-up remains Packet 6 proof.

@@ -1,0 +1,230 @@
+# Smart RAG local foundation stack (Phase 1 Packet 3).
+# Private services have NO host ports. Developer endpoints only on api/frontend.
+
+name: smart-rag
+
+networks:
+  edge:
+    driver: bridge
+  private:
+    driver: bridge
+    internal: true
+
+volumes:
+  paradedb_data:
+  valkey_limits_data:
+  valkey_cache_data:
+
+services:
+  paradedb:
+    image: paradedb/paradedb:pg17@sha256:dca046b8a0ddd070c368d5254cbb7f596b3b7bc67bc2efa7c0fbe881087883bb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PARADEDB_BOOTSTRAP_USER:-paradedb}
+      POSTGRES_PASSWORD: ${PARADEDB_BOOTSTRAP_PASSWORD:?set PARADEDB_BOOTSTRAP_PASSWORD}
+      POSTGRES_DB: ${PARADEDB_DB:-paradedb}
+    volumes:
+      - paradedb_data:/var/lib/postgresql/data
+      - ./infra/paradedb/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - private
+    # No ports: published intentionally omitted.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -tAc \"SELECT 1 FROM pg_extension WHERE extname='pg_search'\" | grep -q 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+    mem_limit: 2g
+
+  valkey-limits:
+    image: valkey/valkey:8.1-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
+    restart: unless-stopped
+    command:
+      [
+        "valkey-server",
+        "--requirepass",
+        "${VALKEY_LIMITS_PASSWORD:?set VALKEY_LIMITS_PASSWORD}",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    volumes:
+      - valkey_limits_data:/data
+    networks:
+      - private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "valkey-cli -a \"$$VALKEY_LIMITS_PASSWORD\" --no-auth-warning ping | grep -q PONG",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      VALKEY_LIMITS_PASSWORD: ${VALKEY_LIMITS_PASSWORD}
+    mem_limit: 128m
+
+  valkey-cache:
+    image: valkey/valkey:8.1-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
+    restart: unless-stopped
+    command:
+      [
+        "valkey-server",
+        "--requirepass",
+        "${VALKEY_CACHE_PASSWORD:?set VALKEY_CACHE_PASSWORD}",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    volumes:
+      - valkey_cache_data:/data
+    networks:
+      - private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "valkey-cli -a \"$$VALKEY_CACHE_PASSWORD\" --no-auth-warning ping | grep -q PONG",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      VALKEY_CACHE_PASSWORD: ${VALKEY_CACHE_PASSWORD}
+    mem_limit: 320m
+
+  crawl-proxy:
+    build:
+      context: ./infra/crawl-proxy
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      CRAWL_PROXY_PORT: "8080"
+    networks:
+      - private
+    # Internal only — no host port.
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')\"",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 128m
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: local
+      MOCK_MODEL_MODE: "true"
+      VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
+      VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
+      PARADEDB_URL: postgresql://${PARADEDB_READER_USER:-paradedb_reader}:${PARADEDB_READER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
+      CRAWL_PROXY_URL: http://crawl-proxy:8080
+    ports:
+      - "${API_HOST_PORT:-8000}:8000"
+    networks:
+      - edge
+      - private
+    depends_on:
+      paradedb:
+        condition: service_healthy
+      valkey-limits:
+        condition: service_healthy
+      valkey-cache:
+        condition: service_healthy
+      crawl-proxy:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001:10001"
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: local
+      MOCK_MODEL_MODE: "true"
+      VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
+      VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
+      PARADEDB_URL: postgresql://${PARADEDB_WRITER_USER:-paradedb_writer}:${PARADEDB_WRITER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
+      CRAWL_PROXY_URL: http://crawl-proxy:8080
+    networks:
+      - private
+    depends_on:
+      paradedb:
+        condition: service_healthy
+      crawl-proxy:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import smart_rag_worker; print('live')\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001:10001"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:${API_HOST_PORT:-8000}
+    ports:
+      - "${FRONTEND_HOST_PORT:-3000}:3000"
+    networks:
+      - edge
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
