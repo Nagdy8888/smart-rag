@@ -1,0 +1,56 @@
+---
+name: hybrid-graph-rag-phase-06-shared-contracts
+phase: 6
+status: active
+wrapper: ../06-phase-agent-intelligence.md
+---
+
+# Phase 6 shared contracts
+
+Read the [global contract](../00-global-contracts.md), [Phase 6 wrapper](../06-phase-agent-intelligence.md), this file, and exactly one packet. These contracts apply to every packet and are not separate implementation authorization.
+
+## Runtime Hybrid dependency
+
+- Phase 4 must supply the frozen typed profile/filter, Hybrid, reranker, citation, table-provenance, temporal, contradiction, ACL/current-version, refusal, and evaluation artifacts. Missing or incompatible artifacts stop Phase 6; Phase 6 never guesses defaults, retunes Phase 4 thresholds, or reads/tunes against the immutable holdout.
+- Hybrid accepts only authorized typed profiles and returns canonical Supabase passage IDs, original citation text/coordinates, parent/neighbor references, per-channel ranks, fused/rerank scores, coverage inputs, index/profile versions, and explicit fallback reasons. BM25 snippets and graph prose are never evidence.
+- Candidate generation is bounded after variant deduplication to 100 canonical dense, 75 authorized private-ParadeDB BM25 survivors, and 30 canonical exact/trigram/search-term candidates, with at most 205 unique pre-fusion passage IDs. BM25 may inspect at most 300 IDs over three keyset pages before batched Supabase authorization/current-version recheck. Variant contributions use the per-channel maximum; incompatible raw vector/BM25/trigram scores are never added.
+- Weighted RRF uses `rrf_k=60` and frozen allow-listed per-query-class vector/BM25/term weights. Metadata/authority/temporal multipliers have a total product clamped to `[1.0, 1.15]`; authorization and current version remain hard Supabase filters. Final ties resolve by authority, effective date, published date, then document ID.
+- Temporal behavior is UTC-anchored unless [`QUALITY_TARGETS.md`](../../../../docs/QUALITY_TARGETS.md) signs one company timezone: `latest` chooses the greatest authoritative effective/published date after topical relevance and excludes unknown dates from winning; `current` requires effective, unexpired records; `recent` uses only the evaluated bounded decay; `as_of` hard-filters validity at the target date; no temporal intent adds no freshness factor. Equally authoritative current contradictions return both dated citations.
+- Form one authorized top-20 rerank pool with at most five passages per document. Every non-trivial query with at least two candidates gets exactly one schema-validated OpenAI rerank. Only a complete trivial exact-code/quoted-phrase lookup independently supported by at least two applicable signals may skip it. Invalid, unavailable, cancelled, timed-out, or over-budget reranking records the reason and falls back to deterministic RRF; no local reranker is allowed.
+- Apply frozen per-query-class MMR and document/section quotas after rerank/fallback, load only bounded required parents/neighbors, and return approximately 8–12 evidence units within the token budget.
+- `coverage_score` is the minimum of required term/entity coverage, subquestion coverage, bounded distinct-evidence coverage, and support confidence. Use the frozen query-class threshold, provisionally `0.65`. Whole-document summaries require deterministic `section_coverage_ratio=1.0` within the bounded evidence budget; otherwise return uncovered headings/page ranges and scoped guidance. V1 has no map-reduce or recursive summary route.
+- Negation/exclusion never infers a closed-set complement from top-k evidence; clarify scope, use deterministic table/enumeration proof, or refuse. Media-dependent figure/chart/diagram questions return the signed v1 limitation unless adjacent caption/OCR text satisfies ordinary Hybrid evidence.
+- Explicit past/`as_of` relationship or multi-hop profiles route to Hybrid with `temporal_graph_limitation`; current-only LightRAG paths are never used.
+- ParadeDB remains a private derived `Bm25Retriever` candidate source, never evidence or authority. Recheck every ID in Supabase. Unavailability, version mismatch, or timeout records `bm25_unavailable` and visibly degrades to dense plus exact/trigram term retrieval; native graph prose and unverified BM25 snippets are forbidden fallbacks.
+- One global correction covers rewrite/retrieval correction. Weak evidence without a retained relationship/multi-hop signal may use one same-route correction; weak Hybrid with such a signal may instead escalate once to Combined while reusing Hybrid candidates. A run never receives both, and exhaustion returns verified partial/insufficient evidence.
+
+## Route, budget, and deadline invariants
+
+- Core route families are deterministic `Hybrid`, `Combined`, `StructuredTable`, `GraphOnlyInspection`, `NoRetrieval`, `ScopedRefusal`, and composed `Composite`; optional catalog discovery never selects core retrieval, source lookup, answer generation, or verification.
+- Hard deadlines are 25 seconds for Hybrid, 45 for Combined, 30 for StructuredTable, 50 for Composite, and 10 for graph inspection. LangGraph uses `recursion_limit=24`, at most one correction, and at most three subquestions. Exhaustion emits verified partial/insufficient evidence rather than uncited success.
+- Count every gateway call: at most seven for Hybrid, eight for Combined, six for StructuredTable, nine for Composite, and three for inspection. Hybrid normally targets six; call seven is only for a correction rerank or a due summary that cannot safely be deferred. Query preparation combines profile and rewrite when both are needed.
+- Permit at most four tool executions, five for Composite, one optional discovery/selection round, one side-effecting tool, and three optional manifests. Every candidate, row, byte, token, call, tool, retry, hop, branch, pool queue, and concurrency limit is server-controlled.
+- Rate limiting and spend control are independent. Admission reserves the route's maximum approved token/cost envelope once in durable Supabase state; all profiling, rewriting, LightRAG, reranking, answer, summary, and verification calls consume that run-local reservation under hard per-call caps and write immutable usage. Completion/crash reconciliation true-ups without repeatedly locking shared company/user budget rows.
+- Every branch, subquestion, checkpoint, resume, event, tool, citation, cache entry, and persisted diagnostic inherits the same authorized principal, company, document scope, run ownership, reservation, deadline, and cancellation context.
+
+## Security, evidence, and failure invariants
+
+- FastAPI derives current authorization from the verified Supabase JWT and authoritative database state. Client claims, Valkey, cache contents, graph state, BM25 state, and model output never authorize access.
+- Final answers use only rechecked canonical Supabase passages and deterministic table values. Every graph lead resolves through active-workspace, mapping, current-version, deletion, graph-eligibility, and ACL checks. Graph-only remains inspection and cannot answer by fallback.
+- Retrieval cache keys include principal/ACL-scope hash, profile/index versions, and document-visibility generation; cache values contain IDs/ranks only. Every hit receives authoritative Postgres current-version/deletion/ACL recheck before evidence assembly.
+- Source, OCR, crawl, entity/relation, graph, and tool text is untrusted data. Keep it in uniquely delimited source-ID records, never follow embedded instructions, schema-validate every profile/mode/limit/plan/reference/tool argument, cite only supplied IDs, and output-encode browser content without raw HTML or dangerous DOM insertion.
+- Persist requested/effective/corrected route, fallback/deadline/limitation reasons, original/rewrite/profile, coverage and uncovered sections, negation/media/historical flags, BM25 index/normalization/lag/recheck counts, degradation state, graph mode/survival/readiness, authorized ACL-blindness, cache status, fusion scores, canonical chunk/table IDs, inference citations, tools, latency, steps, usage, and feedback handle.
+- Approved degradation is explicit: ParadeDB to dense+term Hybrid; rejected/unavailable LightRAG or Combined branch to Hybrid while retaining requested route and reason; weak/deadline/budget exhaustion to verified partial/refusal. Hybrid/table failure never falls back to graph prose.
+- Authorization, budget, deadline, idempotency, audit, privacy, event-sequence, and usage state is durable and independently testable. No fake/skipped integration result closes a packet.
+
+## Cross-packet ownership
+
+- Packet 1 owns authenticated idempotent admission, authorized runtime context, route ceilings, reserve-once/true-up accounting, and restricted-read audit admission.
+- Packet 2 owns bounded memory-aware preparation, rewrite fidelity, typed profiling, the complete deterministic route/limitation matrix, branch composition, and the single correction decision.
+- Packet 3 owns Combined execution/fusion/ablation, deterministic table composition, canonical answer generation, inference citations, and layered verification.
+- Packet 4 owns optional registry/disclosure and executor reauthorization; core tools remain outside catalog discovery.
+- Packet 5 owns thin routers/services, endpoint authorization, provider-versus-FastAPI rate ownership, Valkey/cache behavior, event-loop offload, prompt/data isolation, and local audit-export interfaces.
+- Packet 6 owns additive OpenAPI/SSE compatibility, authenticated fetch streaming, sequence persistence/resume, heartbeat, cancellation, reconnect, sanitized terminal events, and local timeout/proxy contract proof.
+- Packet 7 owns checkpoint/store memory persistence, idempotency/event reaping, prompts/traces/governance, usage/feedback/evaluation, and immediate conversation deletion.
+- Packet 8 owns only the authenticated thin developer UI and integrated Phase 6 proof. Phase 7 owns Stitch review/fallback; Phase 8 owns production UI; Phase 10 owns managed CDN/AWS proof.
+- All packets append evidence to [`docs/development/phase-06-agent-intelligence-evidence.md`](../../../../docs/development/phase-06-agent-intelligence-evidence.md). Packet completion and phase status remain pending until the wrapper's final gate is proven and accepted.

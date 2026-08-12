@@ -1,0 +1,26 @@
+---
+description: Container, CI, AWS, Vercel, and operational safety requirements
+globs: "Dockerfile*,docker-compose*.yml,infra/**/*,.github/workflows/**/*"
+alwaysApply: false
+---
+
+# Infrastructure and Operations
+
+- Local development must work without AWS. Promote the same immutable application images through staging and production.
+- Containers run non-root, have health checks, bounded resources, read-only filesystems where practical, and no embedded secrets.
+- Parser/OCR execution has no network or application secrets, uses a constrained sandbox, and preserves the shared-kernel risk/upgrade ADR.
+- Production API traffic passes through CloudFront/WAF and hardened Caddy; EC2 origin, private ParadeDB, both Valkey instances, and egress proxies are not publicly reachable.
+- Pin ParadeDB image digest and `pg_search`/schema/index versions. Use separate bootstrap/writer/read-only credentials, an encrypted working volume, no browser/provider egress, explicit CPU/memory/statement limits, health/lag/rebuild alarms, and the signed Community/Enterprise plus same-host TLS/availability ADR.
+- Split Valkey rate/cache instances, disable `nopass`, use named ACL users, explicit memory/eviction policies, and hard container limits. Test auth-limit fallback/fail-closed behavior when limits Valkey is unavailable; omitting TLS on same-host isolated networks requires the plan's explicit ADR and credential-rotation controls.
+- Deny direct container egress: API/agents use provider allowlists, only the crawl proxy reaches public web destinations, and ParadeDB/parser/OCR have no route.
+- Preserve SSE flushing, 15-second heartbeats, explicit 90-second Caddy/CloudFront origin read and keep-alive timeouts, event resume, and connection limits; stage-test a 50-second run.
+- Managed deployments use GitHub OIDC and protected production environments. Migration credentials stay in Secrets Manager and are fetched by the one-shot SSM job, never stored in GitHub.
+- Use schema-scoped database credentials from managed secrets. Never place secrets in Git, image layers, frontend variables, command output, or logs.
+- Deploy health-gated blue/green API slots on EC2. Keep the old slot active until the new slot is ready; support immutable rollback.
+- Treat Supabase as durable authority. Treat Valkey as ephemeral and ParadeDB as a derived projection that must rebuild from reconciled Supabase state; an EBS snapshot may accelerate but never replace that path. Verify backup, restore, clean BM25 rebuild/parity, instance rebuild, and RTO/RPO.
+- Staging must exercise managed Supabase pooling, private ParadeDB projection/recheck/outage/rebuild, asymmetric JWKS rollover, Auth/SES, Storage, CloudFront/WAF, origin-secret dual rotation, egress, audit-chain mutation and KMS/S3 Object Lock anchors/export, alert routing, Vercel, restore, and rollback before production.
+- CI has no failure-swallowing commands and runs the test tiers defined in the plan.
+
+## Change proof
+
+- Validate Compose/IaC, build and scan images, test health/readiness including ParadeDB projection lag/version/fallback, and document ports, canonical-versus-derived state, credentials, rebuild/rollback, and monitoring impact.

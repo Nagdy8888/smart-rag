@@ -1,0 +1,30 @@
+---
+description: Enforces evidence-based implementation against the approved RAG plan
+alwaysApply: true
+---
+
+# Plan and Evidence First
+
+- Treat `.cursor/plans/hybrid-graph-rag_ab5281ef.plan.md` as the canonical index and architecture/acceptance source of truth.
+- Before coding, read `.cursor/plans/hybrid-graph-rag/00-global-contracts.md` and exactly one active phase wrapper completely. For inline Phases 1–5, use the selected embedded packet contract. For a wrapper with `split_source: true`, also read its phase shared contract, exactly one linked active packet, and only the additional shared concern contracts named by that packet. Never implement from the index, coverage manifest, audit, todo summary, sibling packets, or an inferred cross-phase summary.
+- Load `.cursor/skills/implement-plan-phase/SKILL.md` when beginning/closing a phase and every workspace skill named by the active phase before its related work packet.
+- Execute exactly one unchecked work packet per model run unless the user explicitly requests a narrower subset. Quote the packet and state its concrete acceptance checks before editing.
+- After loading the global contract, active wrapper, and selected packet contract, inspect the actual files, schemas, tests, and dependency versions involved.
+- Never invent an existing module, table, endpoint, environment variable, library API, or test result. Search or read it first.
+- This is a greenfield build. Preserve `prev_review/` and weakness reports as requirements, but never copy implementation that those reports only describe.
+- For external libraries, verify the pinned version and current primary documentation before using an API. Add a contract test for unstable integrations such as LightRAG, LangGraph, Supabase, pgvector, and OpenAI.
+- Preserve plan invariants: canonical Supabase evidence, deterministic core routing, ACL/RLS enforcement, durable budgets, bounded work, idempotency, and safe degradation.
+- Do not silently replace a planned method with an easier one. Record a deliberate deviation in an ADR and obtain user approval when it changes security, data semantics, cost, or acceptance criteria.
+- Do not leave placeholder implementations, fake success paths, disabled security checks, `TODO` core behavior, swallowed errors, or tests that pass without exercising the integration.
+- Make the smallest complete change for the active phase. Do not implement speculative later-phase infrastructure.
+- After each packet, write the required evidence handoff. Do not check the packet, mark the phase complete, or advance phases until the exit record proves every `Done when` item and the user accepts it.
+
+## Required completion loop
+
+1. State the plan requirement and concrete acceptance checks.
+2. Inspect existing implementation and migrations.
+3. Verify dependency APIs from current documentation.
+4. Implement typed, bounded, observable behavior.
+5. Add positive, failure, authorization, idempotency, and fallback tests as applicable.
+6. Run relevant lint, types, tests, and build.
+7. Report what is proven, what remains unverified, and any plan deviation.

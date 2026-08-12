@@ -1,0 +1,31 @@
+---
+description: Supabase, private ParadeDB, RLS, migration, and PostgreSQL safety rules
+globs: "supabase/**/*.{sql,toml},infra/paradedb/**/*.{sql,toml,yml,yaml},packages/core/**/*.py,apps/backend/**/*.py,apps/worker/**/*.py"
+alwaysApply: false
+---
+
+# Database and RLS Safety
+
+- All schema changes are forward migrations under `supabase/migrations/`; never mutate production schema ad hoc.
+- Enable RLS on every exposed table and test owner, admin, member, viewer, disabled user, and cross-user negative cases.
+- Use server-controlled roles or trusted `app_metadata`; never authorize from editable `user_metadata`.
+- Use `security_invoker` views. Privileged functions live in a private schema with fixed `search_path`, schema-qualified objects, validated arguments, and minimal grants.
+- Runtime API/worker roles are schema-scoped. Reserve Supabase `service_role` and migration roles for controlled bootstrap only.
+- API/RPC traffic may use transaction pooling; LangGraph checkpointers and LightRAG require session mode or direct connections. Prove all service pools remain below 70% of the selected Supabase tier limit.
+- Apply role-specific statement/lock/idle-transaction timeouts and bounded `work_mem`; maintenance HNSW/ParadeDB/graph work pauses under foreground pressure. Replica and BM25 candidates require authoritative Supabase ACL/current-version revalidation.
+- Audit writers use the private hash-chain insert path and may not update/delete; periodically KMS-anchor chain heads. Spend reservations and usage are durable PostgreSQL records, never Valkey-only.
+- Preserve one transactional `documents.current_version_id`; retrieval must never expose two document versions.
+- Only company-visible documents may be `graph_eligible`. ACL downgrade and deletion atomically invalidate graph source mappings.
+- ACL expansion never auto-enables graph indexing; an authorized admin must approve a new graph-index job.
+- Vector RPCs enforce authorization/current-version filters and pgvector 0.8+ iterative HNSW scans; exact fallback is bounded.
+- Managed Supabase is canonical and does not receive `pg_search`. It stores versioned normalized projection text, `bm25_index_jobs`, active BM25 index/normalization versions, vectors, and term indexes. The private digest-pinned ParadeDB service contains only a rebuildable projection keyed by canonical chunk/version IDs.
+- ParadeDB uses separate bootstrap, writer, and read-only roles, no public/browser port or provider egress, typed parameterized allow-listed queries, bounded pages/IDs/timeouts, and hard resource limits. Every BM25 ID is batch-rechecked in Supabase for current version, deletion, and ACL before fusion/evidence; BM25 snippets are never authoritative evidence.
+- Arabic uses the same schema-qualified immutable versioned normalizer for canonical projection and byte-identical core/ParadeDB query forms, with conformance tests and untouched raw citation text.
+- Queue claims use `FOR UPDATE SKIP LOCKED`, leases, heartbeats, attempts, and crash reclamation.
+- Reserve query route maximum once against shared company/user budgets. Calls consume the run-local reservation; completion/heartbeat/expiry/reaper true-up actual usage without shared-row relocking per call.
+- Conversation deletion immediately removes all private application/checkpoint/store state; ordinary retention windows apply only to undeleted data.
+- Migrations must be reversible through restore/forward-fix procedures and safe to reapply from a clean local database.
+
+## Required tests
+
+- Migration reset/reapply, RLS isolation, function privilege, JWKS/rate-limit fallback tables, reserve/true-up contention, audit-chain mutation, conversation cascade deletion, current-version atomicity, primary replica/BM25 revalidation, BM25 role/query/replay/purge/rebuild/outage tests, queue lease recovery, and selective-filter retrieval.

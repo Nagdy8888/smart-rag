@@ -1,0 +1,23 @@
+---
+description: Enforces the approved uv/pnpm monorepo layout and dependency direction
+globs: "pyproject.toml,uv.lock,package.json,pnpm-workspace.yaml,pnpm-lock.yaml,apps/**/*,packages/**/*,supabase/**/*,infra/**/*,tests/**/*"
+alwaysApply: false
+---
+
+# Monorepo Boundaries
+
+- Follow Plan Section 3 exactly; the historical restructure plan supplies the separation pattern, not reusable implementation.
+- Keep one root `uv.lock`, one root `pnpm-lock.yaml`, and one `apps/agents/langgraph.json`.
+- Python uv members are `apps/agents`, `apps/backend`, `apps/worker`, and `packages/core`; Node application code lives in `apps/frontend`.
+- `apps/agents` owns query/ingestion graphs, typed graph state/nodes, and prompts.
+- `apps/backend` owns FastAPI HTTP/SSE transport, auth dependencies, routers, middleware, schemas, and request/auth-scoped services; routers contain no domain/persistence logic.
+- `apps/worker` owns durable job polling, leases, process lifecycle, and invocation of ingestion/indexing work.
+- `packages/core` owns shared domain models, repositories, gateways, parsers, retrieval, tools, security, settings, and accounting.
+- Direct distribution dependencies are `smart-rag-agents → smart-rag-core`, `smart-rag-backend → smart-rag-agents + smart-rag-core`, and `smart-rag-worker → smart-rag-agents + smart-rag-core`. Core never imports apps; frontend uses network contracts only.
+- Core ingestion contains framework-independent adapters/helpers; agents ingestion contains StateGraph orchestration only. Poll/claim/lease/heartbeat/release are worker-only; the graph fetches the durable Storage reference through core and never receives worker-local paths.
+- Core owns tool registry/catalog logic; all LangGraph node wrappers stay in agents.
+- Do not put FastAPI in agents/core, queue SQL/lifecycle in backend/agents, graph nodes in core/worker, or provider/domain logic in routers.
+- ParadeDB/SQL client usage is confined to core `Bm25Retriever`/`Bm25Indexer` adapters and versioned `infra/paradedb` assets; LightRAG classes are confined to the core graph adapter. Original uploads and table artifacts use Supabase Storage, not a runtime `uploads/` directory.
+- Python images build from root metadata and run `uv sync --locked --package <distribution-name> --no-dev`; never regenerate or copy a second lockfile.
+- Do not add speculative `shared`, `common`, or `utils` packages or another top-level app without an approved ADR/plan update.
+- Add architecture tests for forbidden imports, duplicate lock/project files, package imports, and workspace membership.

@@ -1,0 +1,122 @@
+---
+name: hybrid-graph-rag-phase-06-agent-intelligence
+phase: 6
+status: pending
+split_source: true
+depends_on: [1, 2, 3, 4, 5]
+source_plan: ../hybrid-graph-rag_ab5281ef.plan.md
+global_contract: ./00-global-contracts.md
+---
+
+# Phase 6: Agent intelligence
+
+## Mandatory model loading contract
+
+1. Read [`00-global-contracts.md`](./00-global-contracts.md) first, then this wrapper, then [`00-shared-contracts.md`](./06-phase-agent-intelligence/00-shared-contracts.md), then exactly one linked packet below.
+2. Treat that four-file set as the only implementation scope for the active Phase 6 packet. Do not load or implement another Phase 6 packet in the same model run; later-phase files may clarify an interface but do not authorize later-phase implementation.
+3. Inspect the current repository, schemas, migrations, tests, and pinned dependency versions before editing. This plan describes targets, not proof that a file or API already exists.
+4. Load the relevant workspace skill files listed below before implementation.
+5. Before the active work packet, quote its linked checkbox label, state the requirement and concrete acceptance checks, and implement the smallest complete packet.
+6. Verify unstable external APIs against current primary documentation and add contract tests. Never guess a library method, schema, environment variable, command, or provider behavior.
+7. Add positive, failure, authorization, idempotency, bounded-resource, and fallback tests whenever applicable.
+8. Run repository-defined format, lint, strict type, test, build, migration, and integration commands relevant to changed files. Phase 1 must define these commands; later phases must inspect rather than invent them.
+9. Update documentation in the same change. Do not leave placeholders, fake success paths, swallowed errors, disabled security, or `TODO` core behavior.
+10. Record proof in [`docs/development/phase-06-agent-intelligence-evidence.md`](../../../docs/development/phase-06-agent-intelligence-evidence.md). If security, data semantics, cost, or acceptance criteria must change, stop and obtain approval through an ADR/plan update.
+
+## Prerequisites
+
+[Phase 1: Foundation](./01-phase-foundation.md), [Phase 2: Identity and data](./02-phase-identity-data.md), [Phase 3: Ingestion](./03-phase-ingestion.md), [Phase 4: Hybrid RAG](./04-phase-hybrid-rag.md), [Phase 5: GraphRAG](./05-phase-graphrag.md)
+
+## Relevant workspace skills
+
+- [`.cursor/skills/implement-query-agent/SKILL.md`](../../../.cursor/skills/implement-query-agent/SKILL.md)
+- [`.cursor/skills/implement-api-security/SKILL.md`](../../../.cursor/skills/implement-api-security/SKILL.md)
+- [`.cursor/skills/implement-observability-evals/SKILL.md`](../../../.cursor/skills/implement-observability-evals/SKILL.md)
+- [`.cursor/skills/implement-rag-frontend/SKILL.md`](../../../.cursor/skills/implement-rag-frontend/SKILL.md)
+
+## Scope lock
+
+**In scope:** Query LangGraph, deterministic route composition, grounding and verification, progressive optional tools, FastAPI/SSE, durable budgets, rate-limit degradation, observability, conversation privacy, and the thin developer UI.
+
+**Out of scope:** Stitch production design, complete production frontend, release-candidate qualification, and managed deployment.
+
+The scope lock controls implementation sequencing; it does not weaken any security, authorization, durability, budget, grounding, bounded-work, or documentation invariant in the global contract.
+
+## Ordered work packets
+
+Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
+
+1. [ ] [Implement authenticated, idempotent run admission with server-derived database authorization, deadlines, recursion/model/tool ceilings, durable reservations, read-access auditing, and authorized runtime context.](./06-phase-agent-intelligence/packets/01-admission-budgets.md)
+2. [ ] [Implement memory rewrite, extended typed profiling, the complete deterministic route/limitation matrix, one global correction, and bounded parallel branches.](./06-phase-agent-intelligence/packets/02-profiling-routing.md)
+3. [ ] [Implement resolved-path Combined fusion and ablation, deterministic table composition, canonical answer evidence, inference-link citations, and layered verification.](./06-phase-agent-intelligence/packets/03-combined-fusion.md)
+4. [ ] [Implement the optional-tool registry/disclosure contract while keeping core retrieval and verification outside catalog discovery.](./06-phase-agent-intelligence/packets/04-optional-tools.md)
+5. [ ] [Implement thin FastAPI routers/services, Supabase-Auth/FastAPI rate ownership, authorization-safe retrieval caching, endpoint-specific authorization, CPU offload, and prompt/data isolation.](./06-phase-agent-intelligence/packets/05-fastapi-security.md)
+6. [ ] [Implement versioned additive API/SSE contracts, compatibility handshake, resumable fetch SSE with persisted sequence IDs, heartbeats, cancellation, reconnect, sanitized errors, and deadline/partial events.](./06-phase-agent-intelligence/packets/06-sse-compatibility-resume.md)
+7. [ ] [Implement Supabase checkpoints/store memory, idempotency/run-event GC, full governance enforcement, trace redaction, prompt versions, usage accounting, feedback, and immediate conversation deletion.](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md)
+8. [ ] [Ship the thin authenticated developer UI and prove route, fallback, injection, idempotency, budget, outage, event-loop, and privacy gates.](./06-phase-agent-intelligence/packets/08-thin-developer-ui.md)
+
+## Phase sequence requirement
+
+**Program sequence item 6:** Agent intelligence covers deadline-bounded LangGraph, complete composable route matrix, escalation, deterministic Combined fusion/ablation, inference verification, optional-tool disclosure, memory, resumable streaming, reserve-once durable budgets, Valkey-down rate behavior, bounded CPU offload/event-loop telemetry, conversation deletion, traces, and thin UI.
+
+## Stop conditions
+
+Stop this phase and report the blocker instead of improvising when:
+
+- a prerequisite phase or required sign-off is incomplete;
+- the actual repository contradicts the plan and the difference changes security, data, cost, or acceptance semantics;
+- a required dependency contract cannot be verified from its pinned version and primary documentation;
+- an authorization, idempotency, deadline, budget, provenance, or fallback test cannot exercise the real boundary;
+- a required integration is unavailable and only a fake or skipped test would pass;
+- any launch-blocking check fails after bounded repair attempts.
+
+## Required exit record
+
+Create or update [`docs/development/phase-06-agent-intelligence-evidence.md`](../../../docs/development/phase-06-agent-intelligence-evidence.md), linked from the repository documentation index, with:
+
+- plan requirement and work-packet number;
+- files, migrations, APIs, environment variables, and documentation changed;
+- exact verification commands discovered from the repository;
+- test/build/lint/type/migration results and relevant measured metrics;
+- authorization, failure, idempotency, fallback, and bounded-resource evidence;
+- unverified external assumptions or unavailable managed-environment checks;
+- deviations, ADR approval, and rollback notes;
+- explicit handoff inputs and open blockers for the next phase.
+
+Do not set `status: complete` until every `Done when` item below is proven.
+
+## Canonical detailed requirements
+
+The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight ordered packets. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
+
+### Phase 6 runtime Hybrid dependency contract
+
+See [`00-shared-contracts.md`](./06-phase-agent-intelligence/00-shared-contracts.md).
+
+### 8. Query LangGraph and answer contract
+
+See [packet 1](./06-phase-agent-intelligence/packets/01-admission-budgets.md), [packet 2](./06-phase-agent-intelligence/packets/02-profiling-routing.md), [packet 3](./06-phase-agent-intelligence/packets/03-combined-fusion.md), [packet 6](./06-phase-agent-intelligence/packets/06-sse-compatibility-resume.md), and [packet 7](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md).
+
+### 8.1 Combined evidence-fusion algorithm
+
+See [packet 3](./06-phase-agent-intelligence/packets/03-combined-fusion.md).
+
+### 9. Progressive tool disclosure and token control
+
+See [packet 4](./06-phase-agent-intelligence/packets/04-optional-tools.md).
+
+### 10. FastAPI contract, streaming, and security
+
+See [packet 1](./06-phase-agent-intelligence/packets/01-admission-budgets.md), [packet 5](./06-phase-agent-intelligence/packets/05-fastapi-security.md), [packet 6](./06-phase-agent-intelligence/packets/06-sse-compatibility-resume.md), and [packet 7](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md).
+
+### 11. LangSmith, prompts, cost, and evaluation
+
+See [packet 7](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md) and [packet 8](./06-phase-agent-intelligence/packets/08-thin-developer-ui.md).
+
+## Phase deliver, review, and done gate
+
+### Phase 6 — Agent intelligence
+
+- Deliver: deadlines/ceilings, server-derived authorization, frozen ParadeDB BM25 runtime contract/recheck/degradation, rewrite fidelity, extended type-to-composable-plan/limitation matrix, routing correction, resolved-path fusion and naive-union ablation, table composition, inference verifier, memory, deterministic core tools, optional disclosure, additive API/SSE version handshake, resumable SSE, authorization-safe cache, idempotency/event GC, reserve-once/true-up budgets, provider-versus-FastAPI rate ownership, endpoint-specific Valkey-down limits, restricted read auditing, event-loop/CPU-offload controls, immediate conversation deletion, full governance enforcement, defenses, traces, and thin UI.
+- Review: every route type and mixed example, BM25 index/version/typed query/authorization recheck/outage, historical relationship, whole-document coverage, negation/media/refusal, ACL graph blindness, escalation, global steering, fusion weights/caps/ablation, inference labels, deadline output, verifier cost, cache invalidation/recheck, API/SSE deploy compatibility, direct Auth versus application rate ownership, injection, reconnect, rate-store outage, budget contention/crashes, reaper boundaries, event-loop/heartbeat jitter, restricted read/deletion coverage, and early feedback.
+- Done when: rewrite/profile fidelity and the complete direct, current relationship/multi-hop, historical relationship→Hybrid, broad/global, coverage-proven single-document summary, negation/media scoped-refusal, comparison, structured-table, graph-inspection, no-retrieval, multi-part, and Composite route matrix meet signed routing/correction targets; the local runtime Hybrid contract is enforced without retuning Phase 4, every BM25 candidate is bounded and Supabase-rechecked, and a killed/incompatible ParadeDB visibly degrades to dense+term without stale/unauthorized evidence or BM25 snippets; full-document summaries refuse unless section coverage is `1.0`, negation never asserts an unproved complement, media-only questions show the signed limitation, and ACL graph-blindness is visible only to authorized users; resolved-path fusion beats naive union or is removed; on the disjoint relationship/multi-hop evaluation the complete Combined answer path improves success by at least 10 percentage points over Hybrid alone while meeting global citation correctness/completeness, faithfulness, latency, model-call, tool, and cost ceilings; graph-only remains inspection and every graph lead resolves to authorized canonical evidence; table values and every material atomic inference link are grounded and verified; query retries create one paid run, the idempotency/event reaper preserves replay boundaries, additive API/SSE schema and version handshake pass, SSE sequence resume/heartbeat/cancel work, and every route terminates within deadline/recursion/correction ceilings with safe partial/refusal; retrieval-cache ACL downgrade/deletion tests yield zero stale evidence after Postgres recheck; all profiling, rerank, LightRAG, answer, summary, and verifier calls consume one durable reservation without hot shared-row relocking or overspend; provider-owned Auth controls and FastAPI-owned limits are independently proven, while endpoint-specific application cost/mutation limits survive or fail safely during Valkey loss; restricted evidence/downloads create append-only audit events; five-run event-loop/CPU-offload/heartbeat gates pass locally; prompt/BM25-query/graph/tool/XSS injection fixtures fail; deleted conversations leave no application/checkpoint/store/private-feedback state; traces are versioned, costed, redacted, and permitted by the signed governance packet; optional schemas remain outside unrelated prompts; and the thin developer UI proves authenticated upload/status, streaming/reconnect, BM25/limitation/route diagnostics, citations, and early feedback.

@@ -1,0 +1,29 @@
+---
+description: Test rigor and evidence requirements for all project tests
+globs: "tests/**/*,**/test_*.py,**/*_test.py,**/*.{test,spec}.{ts,tsx}"
+alwaysApply: false
+---
+
+# Tests Must Prove Behavior
+
+- Test public contracts and security invariants, not implementation trivia.
+- Every bug fix adds a failing regression test first or documents why reproduction requires an integration fixture.
+- Do not mock the boundary under test. RLS, migrations, pgvector, LightRAG storage contracts, streaming resume, and container health require real integration tests.
+- Frozen LLM fixtures are default; live-model tests are explicit, cost-capped, and never required for fast unit feedback.
+- Assert positive behavior plus authorization denial, malformed input, timeout, budget exhaustion, cancellation, retry, idempotency, and fallback.
+- Retrieval tests record ranked IDs and metrics; do not assert only that an answer string is non-empty.
+- Chunk tests prove typed-element/heading/reading-order preservation, boilerplate decisions, 200–400-token distribution, atomic table/list handling, parent reconstruction, overlap bounds, citation coordinates, and exact/near-duplicate provenance.
+- Hybrid tests separately score query-profile fields, Arabic index/query normalization, seeded code/alias recall, candidate-depth recall, always-versus-conditional top-20 OpenAI reranking with skipped-case counterfactuals, and query-class coverage/refusal curves.
+- Keep embedding qualification, tuning/development, immutable launch holdout, and post-launch regression sets disjoint.
+- Graph tests prove mapping coverage, current-version filtering, deletion/ACL suppression, no hidden keyword call, and bounded query work.
+- Prompt-injection fixtures cover PDFs, crawled HTML, OCR, forged citations, tool instructions, graph poisoning, and frontend XSS.
+- Security fixtures cover asymmetric JWKS rollover, upload MFA, stale malware signatures/re-scan, category/URL approval, egress denial, Valkey outage fallback, protected migration credentials, conversation deletion, audit-chain anchors, and origin-secret rotation.
+- Load fixtures measure shared budget-row wait, event-loop lag/heartbeat jitter, maintenance-vs-query contention, embedding/index memory, and graph-writer throughput/ETA—not only request latency.
+- A skipped required integration test is a failure. Jobs must fail when zero matching tests execute.
+- Never use `|| true`, blanket exception suppression, arbitrary sleeps, or production auth bypasses.
+
+## Test tiers
+
+- PR: lint, types, unit/component, contracts, build.
+- Main: migrations, RLS, integration, containers, focused E2E.
+- Nightly/release: full E2E, retrieval evaluations, load, restart, deletion, restore, security, and live tests when explicitly enabled.

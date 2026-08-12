@@ -279,3 +279,24 @@ Initial focused gates returned 1 for Ruff, Pyright, unit, and contract while the
 AST exclusions are caches/build output, `prev_review/`, and explicit vendor paths; the negative fixture uses the non-source `.py.fixture` suffix. Docs allow only the two Packet-5-planned ADR links already named by Packet 1. Real OpenAI, auth/RLS, retrieval, ingestion, LightRAG, and BM25 behavior remain unimplemented. Full container startup/runtime health and the live ParadeDB extension probe remain Packet 6 evidence.
 
 **Packet 4 checked** â€” all Packet 4 gates pass; proceed only to Packet 5 in a fresh run.
+
+## Packet 5 — CI tiers and documentation foundation
+
+### Requirement
+Create tiered CI and documentation index, C4 skeleton, ADRs, governance drafts, migration/API policies, admin-alert contract.
+
+### Commands
+| Command | Exit |
+| --- | --- |
+| verify_plan_integrity.py | 0 (82 files) |
+| check_migrations.py | 0 |
+| check_openapi.py | 0 (snapshot committed) |
+| check.py --tier fast | 0 (Packet 4 baseline) |
+
+### Notes
+- Governance docs remain `draft` (unsigned).
+- Remote GitHub Actions execution unverified until first workflow run on GitHub.
+- `.cursor/plans|rules|skills` committed for CI; other `.cursor/*` still ignored.
+
+### Packet 5 checkbox
+**Checked** for authored docs/CI. Remote CI run pending.

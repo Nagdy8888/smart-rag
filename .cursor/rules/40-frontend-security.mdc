@@ -1,0 +1,24 @@
+---
+description: Next.js frontend authentication, streaming, and untrusted-content rules
+globs: "apps/frontend/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Frontend Safety and Contracts
+
+- Use Next.js App Router, TypeScript strict mode, `@supabase/ssr`, generated API types, and TanStack Query for server state.
+- Server/API authorization is authoritative. Never rely on hidden controls or client role checks for security.
+- Send Bearer-authenticated fetch SSE with a client idempotency key; persist run ID and resume by event sequence after disconnect.
+- Handle heartbeat, deadline, correction, fallback, partial, completion, and sanitized error events explicitly.
+- Display requested/effective retrieval mode, BM25 projection/index/recheck/degradation, graph readiness/fallback, original/rewritten query diagnostics, canonical citations, and inference links accurately.
+- When authorized relevant versions are not Graph Ready, display “N relevant recent documents are not yet represented in the graph”; never reveal restricted/ineligible counts.
+- Treat filenames, passages, OCR/web text, entity/relation labels, tool metadata, and model output as untrusted text.
+- Never use `dangerouslySetInnerHTML` for retrieved or generated content. Sanitize any separately approved rich-text renderer and enforce CSP.
+- Citation links must reference server-authorized IDs; request short-lived source URLs only after an authorization check.
+- Do not expose OpenAI keys, privileged Supabase credentials, internal database URLs, prompts, or raw traces in client bundles.
+- Implement loading, empty, permission, rate-limit, reconnect, deleted-source, BM25-projection-or-outage, graph-ineligible, and degraded-mode states.
+- Preserve keyboard navigation, focus management, WCAG AA contrast, and mobile behavior.
+
+## Verification
+
+- Add component tests and Playwright coverage for auth, role changes, upload/BM25 projection, streaming resume/idempotency, route and BM25 degradation diagnostics, citations, graph inspection, table results, XSS payloads, and errors.

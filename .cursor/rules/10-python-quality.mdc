@@ -1,0 +1,23 @@
+---
+description: Python quality and service-boundary requirements
+globs: **/*.py
+alwaysApply: false
+---
+
+# Python Implementation Standards
+
+- Use Python strict typing throughout; avoid `Any`, unchecked casts, and untyped dictionaries at service boundaries.
+- Use Pydantic models for API, job, graph-state, retrieval, tool, and configuration contracts.
+- Keep FastAPI routers thin. Put authorization-aware behavior in injected services and persistence in repositories.
+- Access OpenAI only through the shared budgeted/traced gateway. LightRAG callbacks, embeddings, reranking, summaries, and verification cannot bypass it.
+- Use Pydantic Settings per deployable. Do not scatter `os.getenv` calls or load production secrets into parser subprocesses.
+- Every LangGraph node documents inputs, outputs, side effects, retries, idempotency key, timeout, and failure route.
+- Use explicit domain exceptions and sanitized client errors. Never swallow exceptions or continue after an invariant fails.
+- Put blocking parser/OCR/database work behind appropriate async boundaries; do not block the FastAPI event loop.
+- Bound lists, concurrency, retries, tokens, rows, paths, crawl depth, and file expansion at server-controlled values.
+- Use structured logs with request/run/job IDs and no raw secrets or unrestricted source text.
+
+## Verification
+
+- Run Ruff format/lint, Pyright strict, and focused pytest suites.
+- Add tests for timeout, cancellation, duplicate submission, restart/retry, and degraded dependency behavior.

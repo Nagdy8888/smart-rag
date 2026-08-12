@@ -1,0 +1,32 @@
+---
+description: Requires complete code documentation and detailed topic-split project documentation
+alwaysApply: true
+---
+
+# Documentation Is Part of the Change
+
+- Every authored Python module, class, function, async function, and method has a Google-style docstring. Only generated/vendor code may be excluded explicitly.
+- Docstrings explain purpose and behavior, then document arguments, returns/yields, raised exceptions, side effects, authorization, idempotency, retries/timeouts, units/provenance, and examples when relevant.
+- Every LangGraph node additionally documents state inputs/outputs, persistence writes, external/model calls, budget/deadline behavior, and failure/fallback route.
+- Exported TypeScript functions, hooks, components, server actions, and non-obvious types use TSDoc/JSDoc covering contract, errors, side effects, security, and usage.
+- Comments and docstrings explain why and constraints; do not restate syntax, claim unimplemented behavior, hide uncertainty, or duplicate secrets/private source text.
+- Update code documentation in the same change as behavior. Stale documentation is a failing defect.
+
+## Project documentation
+
+- Keep the root `README.md` concise: purpose, prerequisites, quick start, common commands, and links into `docs/`.
+- Create `docs/README.md` as the maintained documentation index with owner/status/last-reviewed metadata and links to every document.
+- Write detailed Markdown by concern under `docs/architecture`, `development`, `api`, `ingestion`, `retrieval`, `graph`, `agent`, `frontend`, `security`, `evaluation`, `deployment`, `runbooks`, and `adr`.
+- Use one primary topic per file, descriptive ordered names, relative links, examples, failure modes, limits, security implications, verification commands, and troubleshooting.
+- Architecture, component, data-flow, auth, ingestion, retrieval, agent-routing, state-machine, deployment, database, and operational-workflow documents include Mermaid diagrams in their Markdown source.
+- Select the fitting Mermaid form: `flowchart`, `sequenceDiagram`, `stateDiagram-v2`, or `erDiagram`. Diagrams supplement detailed prose; they never replace contracts, limits, or failure explanations.
+- Keep diagrams readable and synchronized with code. Split dense diagrams by concern, use stable descriptive IDs/quoted labels, and avoid explicit colors/styles that break themes.
+- Split a document when it mixes audiences/concerns or grows beyond roughly 300 lines; do not create a single catch-all design or operations file.
+- Record durable decisions and alternatives in ADRs. Put operational procedures with prerequisites, rollback, verification, and escalation in runbooks.
+- Document every public API, environment variable, migration, job/state machine, external integration, prompt/model policy, configuration default, deployment change, and user-visible workflow.
+- Commands, paths, schemas, versions, and examples must be verified against the repository/current primary docs. Mark planned or unverified material explicitly.
+- Prefer links to one canonical explanation over copied sections. Add reciprocal links and update/remove affected docs in the same change.
+
+## Enforcement
+
+- Phase 1 adds Ruff pydocstyle plus an AST test for required Python docstrings, Markdown link/lint and Mermaid syntax/render checks, and CI detection of undocumented public/config/API changes.

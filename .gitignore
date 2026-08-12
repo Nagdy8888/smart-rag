@@ -4,8 +4,15 @@
 !.env.example
 !.env.*.example
 
-# Cursor / local agent state (plans live in repo docs when published)
-.cursor/
+# Cursor local agent state — keep plans/rules/skills committed for CI integrity
+.cursor/*
+!.cursor/plans/
+!.cursor/plans/**
+!.cursor/rules/
+!.cursor/rules/**
+!.cursor/skills/
+!.cursor/skills/**
+.cursor/plans/hybrid-graph-rag/scripts/__pycache__/
 
 # Historical review and Stitch design exports (local reference only)
 prev_review/

@@ -1,0 +1,28 @@
+---
+description: Retrieval, GraphRAG, routing, and citation invariants
+globs: "apps/agents/**/*.py,apps/backend/**/*.py,apps/worker/**/*.py,packages/core/**/*.py"
+alwaysApply: false
+---
+
+# RAG Correctness Invariants
+
+- Final prose may use canonical Supabase passages or deterministic table values with exact provenance. ParadeDB BM25 snippets and native LightRAG summaries are never evidence.
+- Follow the full route matrix: facts/ordinary synthesis use `Hybrid`; confident relationships/multi-hop use `Combined`; ambiguous classification starts Hybrid and may spend the sole correction to escalate; corpus themes use `GlobalSteering + Hybrid`; comparisons decompose; numeric aggregation uses `StructuredTable`; inspection uses `GraphOnlyInspection`; mixed subquestions use `Composite`.
+- Bind Hybrid, LightRAG, StructuredTable, and citation lookup deterministically. Progressive disclosure is only for genuinely ambiguous optional capabilities.
+- Hybrid uses byte-identical canonical-projection/core-query Arabic normalization plus private ParadeDB BM25, bounded 100 dense/75 authorized-BM25-survivor/30 exact-term depths, at most 300 BM25 IDs over three pages, mandatory batched Supabase ACL/current-version recheck, filtered iterative HNSW, SME-seeded search terms/aliases, max-per-variant RRF, bounded metadata factors, and accuracy-first top-20 OpenAI reranking exactly as Plan Section 6 specifies; v1 has no local reranker.
+- Preserve the structure-aware chunking/cleaning/dedup contract and original citation provenance. Never replace it with naive fixed-size splitting or discard cross-document variants solely as duplicates.
+- Application and LangGraph nodes depend on project-owned `Bm25Retriever`/`Bm25Indexer` and `GraphRetriever`/`GraphIndexer` protocols, never direct ParadeDB or LightRAG classes.
+- LightRAG must receive precomputed `hl_keywords` and `ll_keywords`; a hidden query keyword-extraction call is a contract failure.
+- `Graph Ready` requires precomputed `lightrag_chunk_map` and `graph_evidence_map` support. Never perform N statement-to-passage searches during a query.
+- Resolve graph candidates through active workspace, mapping threshold, current version, deletion, graph eligibility, and ACL before use or display.
+- If `graph_survival_ratio < 0.50`, relabel Combined to Hybrid with `graph_survival_below_threshold`; alert below 0.80 across 20 Combined queries.
+- Global graph output is steering only: at most three Hybrid expansions, never direct evidence.
+- Combined uses Plan Section 8.1 rank fusion, at most a `1.10` agreement factor, and at most 40% graph-discovered-only evidence. Keep it only if its ablation beats naive union.
+- One shared correction only: coverage below the frozen query-class threshold (provisional `0.65`) without relationship signals may retry the same route; Hybrid below that threshold with a retained relationship/multi-hop signal may instead escalate to Combined. Never do both.
+- `NoRetrieval` is only for greetings/product help or transformations of user-provided text and cannot make company-knowledge claims.
+- Multi-hop answers cite every atomic link and label the composed conclusion as an inference.
+- Missing support, deadline, budget, mapping, or dependency health yields a verified partial/refusal or documented fallback—not fabricated completion. ParadeDB outage/version mismatch visibly degrades Hybrid to dense plus exact/trigram term search and never bypasses Supabase evidence revalidation.
+
+## Required observability
+
+- Persist profile fields/confidences, requested/effective route, correction/fallback, per-channel candidate/component ranks, BM25 index/normalization version/projection lag/recheck/degradation, rerank decision/counterfactual metadata, coverage/refusal, mapping/survival, evidence IDs, model/tool counts, latency, tokens, and cost.
