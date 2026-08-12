@@ -92,9 +92,14 @@ def sha256_file(path: Path) -> str:
 
     Returns:
         Lowercase hexadecimal SHA-256 digest.
+
+    Notes:
+        Digests use LF-normalized bytes so Windows CRLF working trees match
+        Linux CI checkouts of the same Git blob.
     """
 
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    payload = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def phase_path(number: int) -> Path:
