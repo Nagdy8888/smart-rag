@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 import pytest
 from openai import BadRequestError, OpenAI
-
 from smart_rag_core.settings.base import SharedSettings, load_settings
 
 

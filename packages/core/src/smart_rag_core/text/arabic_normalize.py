@@ -18,26 +18,27 @@ _WHITESPACE = re.compile(r"\s+")
 _PUNCT_TO_SPACE = re.compile(r"[^\w\s-]+", flags=re.UNICODE)
 
 # Alef/hamza variants, ya/alef-maqsura, ta-marbuta, Arabic-Indic digits.
+# Unicode escapes keep Ruff RUF001 from treating intentional Arabic as typos.
 _TRANSLATE = str.maketrans(
     {
-        "أ": "ا",
-        "إ": "ا",
-        "آ": "ا",
-        "ٱ": "ا",
-        "ؤ": "و",
-        "ئ": "ي",
-        "ى": "ي",
-        "ة": "ه",
-        "٠": "0",
-        "١": "1",
-        "٢": "2",
-        "٣": "3",
-        "٤": "4",
-        "٥": "5",
-        "٦": "6",
-        "٧": "7",
-        "٨": "8",
-        "٩": "9",
+        "\u0623": "\u0627",  # alef with hamza above -> alef
+        "\u0625": "\u0627",  # alef with hamza below -> alef
+        "\u0622": "\u0627",  # alef with madda -> alef
+        "\u0671": "\u0627",  # alef wasla -> alef
+        "\u0624": "\u0648",  # waw with hamza -> waw
+        "\u0626": "\u064a",  # yeh with hamza -> yeh
+        "\u0649": "\u064a",  # alef maqsura -> yeh
+        "\u0629": "\u0647",  # teh marbuta -> heh
+        "\u0660": "0",
+        "\u0661": "1",
+        "\u0662": "2",
+        "\u0663": "3",
+        "\u0664": "4",
+        "\u0665": "5",
+        "\u0666": "6",
+        "\u0667": "7",
+        "\u0668": "8",
+        "\u0669": "9",
     }
 )
 
