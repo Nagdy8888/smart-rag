@@ -7,9 +7,10 @@ foundation graph is unconfigured for business work.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, TypeAlias, TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 
 class IngestionFoundationState(TypedDict):
@@ -22,6 +23,20 @@ class IngestionFoundationState(TypedDict):
 
     status: Literal["unconfigured"]
     detail: str
+
+
+IngestionStateGraph: TypeAlias = StateGraph[
+    IngestionFoundationState,
+    None,
+    IngestionFoundationState,
+    IngestionFoundationState,
+]
+CompiledIngestionGraph: TypeAlias = CompiledStateGraph[
+    IngestionFoundationState,
+    None,
+    IngestionFoundationState,
+    IngestionFoundationState,
+]
 
 
 def mark_unconfigured(state: IngestionFoundationState) -> IngestionFoundationState:
@@ -50,7 +65,7 @@ def mark_unconfigured(state: IngestionFoundationState) -> IngestionFoundationSta
     }
 
 
-def build_ingestion_graph() -> StateGraph:
+def build_ingestion_graph() -> IngestionStateGraph:
     """Construct the foundation ingestion ``StateGraph`` (not yet compiled).
 
     Returns:
@@ -65,12 +80,19 @@ def build_ingestion_graph() -> StateGraph:
         Failure/fallback route: always marks unconfigured.
     """
 
-    builder: StateGraph = StateGraph(IngestionFoundationState)
-    builder.add_node("mark_unconfigured", mark_unconfigured)
+    builder: IngestionStateGraph = StateGraph(
+        IngestionFoundationState,
+        input_schema=IngestionFoundationState,
+        output_schema=IngestionFoundationState,
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType] - upstream optional hooks use Any
+        "mark_unconfigured",
+        mark_unconfigured,
+    )
     builder.add_edge(START, "mark_unconfigured")
     builder.add_edge("mark_unconfigured", END)
     return builder
 
 
-graph = build_ingestion_graph().compile()
+graph: CompiledIngestionGraph = build_ingestion_graph().compile()  # pyright: ignore[reportUnknownMemberType] - upstream optional hooks use Any
 """Compiled foundation ingestion graph for ``langgraph.json`` registration."""

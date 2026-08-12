@@ -10,6 +10,7 @@ from tests.contract.boundary_scanner import (
     assert_frontend_has_no_python_workspace_imports,
     scan_repository_boundaries,
     scan_tree_for_forbidden_imports,
+    scan_unique_workspace_artifacts,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -19,12 +20,9 @@ def test_workspace_source_trees_have_no_forbidden_imports() -> None:
     """Production source trees must satisfy Section 3 dependency directions."""
 
     violations = scan_repository_boundaries(REPO_ROOT)
-    assert violations == [], (
-        "Forbidden imports detected:\n"
-        + "\n".join(
-            f"{item.path}:{item.line} imports {item.module} (rule {item.rule_root})"
-            for item in violations
-        )
+    assert violations == [], "Forbidden imports detected:\n" + "\n".join(
+        f"{item.path}:{item.line} imports {item.module} (rule {item.rule_root})"
+        for item in violations
     )
 
 
@@ -60,29 +58,29 @@ def test_boundary_scanner_fails_on_intentional_negative_fixture(
 def test_exactly_one_langgraph_json_and_lockfiles() -> None:
     """Repository must contain exactly one LangGraph project and one lockfile each."""
 
-    langgraph_files = list(REPO_ROOT.rglob("langgraph.json"))
-    langgraph_files = [
-        path
-        for path in langgraph_files
-        if ".venv" not in path.parts and "node_modules" not in path.parts
-    ]
-    assert len(langgraph_files) == 1
-    assert langgraph_files[0] == REPO_ROOT / "apps" / "agents" / "langgraph.json"
+    assert scan_unique_workspace_artifacts(REPO_ROOT) == []
 
-    uv_locks = [
-        path
-        for path in REPO_ROOT.rglob("uv.lock")
-        if ".venv" not in path.parts
-    ]
-    pnpm_locks = [
-        path
-        for path in REPO_ROOT.rglob("pnpm-lock.yaml")
-        if "node_modules" not in path.parts
-    ]
-    assert len(uv_locks) == 1
-    assert uv_locks[0] == REPO_ROOT / "uv.lock"
-    assert len(pnpm_locks) == 1
-    assert pnpm_locks[0] == REPO_ROOT / "pnpm-lock.yaml"
+
+def test_unique_artifact_scanner_rejects_duplicate_lockfile(
+    tmp_path: Path,
+) -> None:
+    """The artifact checker must fail when a second root lockfile exists."""
+
+    (tmp_path / "apps" / "agents").mkdir(parents=True)
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "uv.lock").touch()
+    (tmp_path / "nested" / "uv.lock").touch()
+    (tmp_path / "pnpm-lock.yaml").touch()
+    (tmp_path / "apps" / "agents" / "langgraph.json").write_text(
+        "{}",
+        encoding="utf-8",
+    )
+
+    violations = scan_unique_workspace_artifacts(tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].name == "uv.lock"
+    assert violations[0].discovered == ("nested/uv.lock", "uv.lock")
 
 
 @pytest.mark.parametrize(

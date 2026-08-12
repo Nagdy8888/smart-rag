@@ -1,0 +1,5 @@
+"""Intentional negative fixture for AST docstring enforcement."""
+
+
+def undocumented_function() -> None:
+    pass

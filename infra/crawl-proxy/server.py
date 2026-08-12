@@ -8,7 +8,6 @@ Approved destination policy is owned by Phase 3 ingestion.
 from __future__ import annotations
 
 import json
-import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import ClassVar
 from urllib.error import URLError
@@ -39,10 +38,8 @@ class DenyByDefaultHandler(BaseHTTPRequestHandler):
         """
 
         sys_stderr = __import__("sys").stderr
-        sys_stderr.write(
-            "%s - %s\n"
-            % (self.address_string(), format % args)
-        )
+        rendered = format % args
+        sys_stderr.write(f"{self.address_string()} - {rendered}\n")
 
     def _send_json(self, code: int, payload: dict[str, str]) -> None:
         """Write a JSON response.
@@ -59,7 +56,7 @@ class DenyByDefaultHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+    def do_GET(self) -> None:
         """Handle health checks and deny every other GET."""
 
         if self.path.split("?", 1)[0] in {"/health", "/health/live"}:
@@ -73,7 +70,7 @@ class DenyByDefaultHandler(BaseHTTPRequestHandler):
             },
         )
 
-    def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+    def do_POST(self) -> None:
         """Deny POST fetch attempts used by workers."""
 
         length = int(self.headers.get("Content-Length", "0"))
@@ -85,7 +82,7 @@ class DenyByDefaultHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(self.DENY_BODY)
 
-    def do_CONNECT(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+    def do_CONNECT(self) -> None:
         """Refuse CONNECT tunneling."""
 
         self.send_response(403)
@@ -96,11 +93,14 @@ def main() -> None:
     """Start the deny-by-default crawl proxy.
 
     Side Effects:
-        Binds an HTTP server on ``CRAWL_PROXY_PORT`` (default 8080).
+        Binds an HTTP server on the container-internal fixed port 8080.
     """
 
-    port = int(os.environ.get("CRAWL_PROXY_PORT", "8080"))
-    server = ThreadingHTTPServer(("0.0.0.0", port), DenyByDefaultHandler)
+    port = 8080
+    server = ThreadingHTTPServer(
+        ("0.0.0.0", port),  # noqa: S104 - private container listener
+        DenyByDefaultHandler,
+    )
     print(f"crawl-proxy listening on {port} (deny-by-default)", flush=True)
     server.serve_forever()
 
@@ -121,14 +121,17 @@ def probe_denied_fetch(url: str, timeout_s: float = 2.0) -> int:
         tests call the in-process handler contract instead.
     """
 
-    req = Request(
+    req = Request(  # noqa: S310 - deny-proxy contract test helper
         url,
         data=b"{}",
         headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urlopen(req, timeout=timeout_s) as resp:  # noqa: S310 - test helper
+        with urlopen(  # noqa: S310 - deny-proxy contract test helper
+            req,
+            timeout=timeout_s,
+        ) as resp:
             return int(resp.status)
     except URLError:
         raise

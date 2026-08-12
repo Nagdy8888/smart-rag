@@ -221,3 +221,61 @@ Documentation-only packet. No install, test, or Compose commands required.
 ### Packet 3 checkbox
 
 **Checked** for authored topology + contract tests + digest pins. Runtime stack bring-up remains Packet 6 proof.
+
+## Packet 4 — settings, observability, and hard-failing quality gates
+
+### Requirement (quoted)
+
+> Add typed settings, structured logging, non-root images, import-boundary checks, docstring enforcement, and hard-failing quality commands.
+
+### Acceptance evidence
+
+- Pydantic Settings 2.15.0 resolved with Pydantic 2.13.4; backend, worker, and agent settings load only at explicit startup boundaries. Every variable/default/security classification is documented in [CONFIGURATION.md](./CONFIGURATION.md).
+- JSON logs include UTC timestamp, level, service, environment, event, and bound request/run/job IDs. Messages are bounded and credentials/exceptions are redacted.
+- Mock model output is deterministic, bounded, marked `fixture://smart-rag/mock-model/phase-1-foundation-v1`, states that no retrieval occurred, and runs under an `api.openai.com` DNS guard.
+- Ruff 0.16.2, Pyright 1.1.411 strict, pytest 9.1.1, pre-commit 4.6.2, Vitest 4.1.10, Playwright 1.62.1, markdownlint-cli2 0.23.2, and Mermaid CLI 11.16.0 are pinned.
+- `scripts/check.py` exposes `format`, `lint`, `types`, `unit`, `contract`, `docs`, `frontend`, and `fast`; every child is shell-free, stops on failure, and returns the child exit code.
+- Existing non-root Docker users remain `10001:10001`; Compose rendering and topology contracts pass.
+
+### Files and configuration changed
+
+- Core: `settings/{base,backend,worker,agents}.py`, `observability/logging.py`, and `gateways/model.py` plus package exports.
+- Backend: lifespan settings/logging/mock guard, correlation middleware, typed bind settings, and honest unchanged readiness.
+- Quality: root Python tool config, pre-commit, `scripts/check.py`, docs checker, Markdown config, frontend Vitest/Playwright config, one honest capability test, and root scripts.
+- Tests: settings, logging, gateway/network denial, middleware/import safety, AST docstrings, environment centralization, duplicate artifacts, and zero-test exit preservation.
+- Locks/docs: `uv.lock`, `pnpm-lock.yaml`, `.env.example`, tool versions, configuration contract, and this evidence record.
+
+### Commands and exit codes
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `uv lock --python 3.11` | 0 | 68 packages resolved |
+| `uv sync --all-packages --group dev --python 3.11` | 0 | four workspace packages installed |
+| `uv run python scripts/check.py --tier unit` | 0 | 16 passed; empty-selection proof separately returns 5 |
+| `uv run python scripts/check.py --tier contract` | 0 | 22 passed |
+| `uv run ruff check .` | 0 | all checks passed |
+| `uv run ruff format --check .` | 0 | 61 files formatted (via `fast`) |
+| `uv run pyright` | 0 | 0 errors/warnings |
+| `uv run python scripts/check.py --tier docs` | 0 | 10 Markdown files; links and Mermaid render pass |
+| `uv run python scripts/check.py --tier frontend` | 0 | ESLint, TypeScript, 1 Vitest, build, Playwright contract |
+| `uv run python scripts/check.py --tier fast` | 0 | all required Packet 4 tiers passed |
+| `pnpm install --frozen-lockfile` | 0 | both Node workspace projects locked |
+| `docker compose --env-file .env.example config --quiet` | 0 | configuration remains valid |
+| Plan integrity `--update`, then verify | 0 / 0 | 82 canonical files locked and verified |
+
+Initial focused gates returned 1 for Ruff, Pyright, unit, and contract while they exposed import ordering, upstream generic typing, two test assumptions, and four missing fixture-method docstrings. Those Phase-1-owned defects were repaired; no lint/type/test suppression was added except narrow Pyright annotations for LangGraph's typed state wrapper where optional upstream hooks expose `Any`.
+
+### Negative and failure proof
+
+- The intentional `.py.fixture` produces exactly one missing-function-docstring finding; every authored `.py` passes.
+- A temporary second `uv.lock` produces one artifact-count violation; the repository count is one for each lockfile and `langgraph.json`.
+- An empty temporary unit directory returns pytest/check-runner exit code 5.
+- Redaction tests prove fake API key/password/bearer/DSN values and private exception source are absent.
+- Socket monkeypatches prove fixture generation performs no resolution; the lifecycle guard raises `MockModelNetworkDeniedError` for `api.openai.com`.
+- Fresh subprocess imports succeed with trap OpenAI constructors and denied DNS/connection functions.
+
+### Exclusions, unresolved work, and handoff
+
+AST exclusions are caches/build output, `prev_review/`, and explicit vendor paths; the negative fixture uses the non-source `.py.fixture` suffix. Docs allow only the two Packet-5-planned ADR links already named by Packet 1. Real OpenAI, auth/RLS, retrieval, ingestion, LightRAG, and BM25 behavior remain unimplemented. Full container startup/runtime health and the live ParadeDB extension probe remain Packet 6 evidence.
+
+**Packet 4 checked** — all Packet 4 gates pass; proceed only to Packet 5 in a fresh run.

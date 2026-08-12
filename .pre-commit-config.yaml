@@ -1,0 +1,28 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: Ruff format check
+        entry: uv run ruff format --check .
+        language: system
+        pass_filenames: false
+      - id: ruff-lint
+        name: Ruff lint
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+      - id: pyright
+        name: Pyright strict
+        entry: uv run pyright
+        language: system
+        pass_filenames: false
+      - id: unit
+        name: Python unit tests
+        entry: uv run python scripts/check.py --tier unit
+        language: system
+        pass_filenames: false
+      - id: contract
+        name: Python contract tests
+        entry: uv run python scripts/check.py --tier contract
+        language: system
+        pass_filenames: false

@@ -9,6 +9,10 @@ dependencies = []
 dev = [
     "pytest==9.1.1",
     "langgraph-cli==0.4.31",
+    "ruff==0.16.2",
+    "pyright==1.1.411",
+    "pre-commit==4.6.2",
+    "pyyaml==6.0.3",
 ]
 
 [tool.uv]
@@ -31,4 +35,69 @@ smart-rag-core = { workspace = true }
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-q"
+addopts = "-q --strict-config --strict-markers"
+xfail_strict = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = [
+    ".venv",
+    "node_modules",
+    "prev_review",
+]
+
+[tool.ruff.lint]
+ignore = ["D202"]
+select = [
+    "B",
+    "D",
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "I",
+    "RUF",
+    "S",
+    "UP",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+venvPath = "."
+venv = ".venv"
+include = [
+    "apps/agents/src",
+    "apps/backend/src",
+    "apps/worker/src",
+    "infra/crawl-proxy",
+    "packages/core/src",
+    "scripts",
+    "tests",
+]
+exclude = [
+    "**/__pycache__",
+    ".venv",
+    "node_modules",
+    "prev_review",
+]
+reportMissingTypeStubs = false
+executionEnvironments = [
+    { root = ".", extraPaths = [
+        "apps/agents/src",
+        "apps/backend/src",
+        "apps/worker/src",
+        "packages/core/src",
+    ] },
+]

@@ -7,9 +7,10 @@ is unconfigured for business work.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, TypeAlias, TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 
 class QueryFoundationState(TypedDict):
@@ -22,6 +23,20 @@ class QueryFoundationState(TypedDict):
 
     status: Literal["unconfigured"]
     detail: str
+
+
+QueryStateGraph: TypeAlias = StateGraph[
+    QueryFoundationState,
+    None,
+    QueryFoundationState,
+    QueryFoundationState,
+]
+CompiledQueryGraph: TypeAlias = CompiledStateGraph[
+    QueryFoundationState,
+    None,
+    QueryFoundationState,
+    QueryFoundationState,
+]
 
 
 def mark_unconfigured(state: QueryFoundationState) -> QueryFoundationState:
@@ -50,7 +65,7 @@ def mark_unconfigured(state: QueryFoundationState) -> QueryFoundationState:
     }
 
 
-def build_query_graph() -> StateGraph:
+def build_query_graph() -> QueryStateGraph:
     """Construct the foundation query ``StateGraph`` (not yet compiled).
 
     Returns:
@@ -65,12 +80,19 @@ def build_query_graph() -> StateGraph:
         Failure/fallback route: always marks unconfigured.
     """
 
-    builder: StateGraph = StateGraph(QueryFoundationState)
-    builder.add_node("mark_unconfigured", mark_unconfigured)
+    builder: QueryStateGraph = StateGraph(
+        QueryFoundationState,
+        input_schema=QueryFoundationState,
+        output_schema=QueryFoundationState,
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType] - upstream optional hooks use Any
+        "mark_unconfigured",
+        mark_unconfigured,
+    )
     builder.add_edge(START, "mark_unconfigured")
     builder.add_edge("mark_unconfigured", END)
     return builder
 
 
-graph = build_query_graph().compile()
+graph: CompiledQueryGraph = build_query_graph().compile()  # pyright: ignore[reportUnknownMemberType] - upstream optional hooks use Any
 """Compiled foundation query graph for ``langgraph.json`` registration."""

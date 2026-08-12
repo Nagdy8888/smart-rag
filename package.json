@@ -4,9 +4,21 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "build:frontend": "pnpm --filter smart-rag-frontend build",
+    "check:contract": "uv run python scripts/check.py --tier contract",
+    "check:docs": "uv run python scripts/check.py --tier docs",
+    "check:fast": "uv run python scripts/check.py --tier fast",
+    "check:format": "uv run python scripts/check.py --tier format",
+    "check:frontend": "uv run python scripts/check.py --tier frontend",
+    "check:lint": "uv run python scripts/check.py --tier lint",
+    "check:types": "uv run python scripts/check.py --tier types",
+    "check:unit": "uv run python scripts/check.py --tier unit",
     "lint:frontend": "pnpm --filter smart-rag-frontend lint"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "11.16.0",
+    "markdownlint-cli2": "0.23.2"
   }
 }

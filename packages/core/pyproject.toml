@@ -5,6 +5,7 @@ description = "Shared domain, gateways, retrieval interfaces, and settings for S
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "pydantic==2.13.4",
+    "pydantic-settings==2.15.0",
     "typing-extensions==4.16.0",
 ]
 

@@ -11,7 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 FORBIDDEN_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("packages/core/src", ("smart_rag_api", "smart_rag_worker", "smart_rag_agents", "apps.")),
+    (
+        "packages/core/src",
+        ("smart_rag_api", "smart_rag_worker", "smart_rag_agents", "apps."),
+    ),
     ("apps/agents/src", ("smart_rag_api", "smart_rag_worker", "fastapi")),
     ("apps/worker/src", ("smart_rag_api", "fastapi")),
     ("apps/backend/src", ()),
@@ -33,6 +36,61 @@ class BoundaryViolation:
     module: str
     rule_root: str
     line: int
+
+
+@dataclass(frozen=True)
+class ArtifactCountViolation:
+    """Describe a missing, duplicate, or misplaced unique workspace artifact.
+
+    Attributes:
+        name: Artifact filename.
+        expected: Required repository-relative location.
+        discovered: Sorted repository-relative paths that were found.
+    """
+
+    name: str
+    expected: str
+    discovered: tuple[str, ...]
+
+
+def scan_unique_workspace_artifacts(
+    repo_root: Path,
+) -> list[ArtifactCountViolation]:
+    """Check the one-lockfile and one-LangGraph-project invariant.
+
+    Args:
+        repo_root: Repository root to inspect.
+
+    Returns:
+        Missing, duplicate, or misplaced artifact findings.
+    """
+
+    expectations = {
+        "uv.lock": "uv.lock",
+        "pnpm-lock.yaml": "pnpm-lock.yaml",
+        "langgraph.json": "apps/agents/langgraph.json",
+    }
+    violations: list[ArtifactCountViolation] = []
+    for name, expected in expectations.items():
+        discovered = tuple(
+            sorted(
+                path.relative_to(repo_root).as_posix()
+                for path in repo_root.rglob(name)
+                if not any(
+                    part in {".venv", "node_modules", "__pycache__"}
+                    for part in path.parts
+                )
+            )
+        )
+        if discovered != (expected,):
+            violations.append(
+                ArtifactCountViolation(
+                    name=name,
+                    expected=expected,
+                    discovered=discovered,
+                )
+            )
+    return violations
 
 
 def _iter_python_files(root: Path) -> list[Path]:
@@ -99,7 +157,9 @@ def scan_tree_for_forbidden_imports(
         tree = ast.parse(source, filename=str(path))
         for module, lineno in _imported_modules(tree):
             if any(
-                module == prefix or module.startswith(f"{prefix}.") or module.startswith(prefix)
+                module == prefix
+                or module.startswith(f"{prefix}.")
+                or module.startswith(prefix)
                 for prefix in forbidden_prefixes
                 if prefix
             ):

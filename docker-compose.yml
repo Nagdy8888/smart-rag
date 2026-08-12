@@ -111,8 +111,6 @@ services:
       context: ./infra/crawl-proxy
       dockerfile: Dockerfile
     restart: unless-stopped
-    environment:
-      CRAWL_PROXY_PORT: "8080"
     networks:
       - private
     # Internal only — no host port.

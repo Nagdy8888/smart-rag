@@ -15,7 +15,7 @@ decision_text: "approved"
 
 This document is the Phase 1 canonical record of provisional launch gates copied from the [global contracts](../.cursor/plans/hybrid-graph-rag/00-global-contracts.md) without changing values or meaning. On 2026-08-12 the user approved all provisional defaults with the exact message `approved` (no replacements). Rows below are `accepted` for Phase 1 sign-off; measurement and later-phase verification remain required where noted.
 
-**How to read a row**
+## How to read a row
 
 | Column | Meaning |
 | --- | --- |
@@ -203,7 +203,7 @@ The following require explicit user approval before Packet 1 and Phase 1 can adv
 5. RTO/RPO and availability/isolation triggers.
 6. Dated Hybrid Pilot decision criteria in [ADR-hybrid-pilot-release-cut.md](./adr/ADR-hybrid-pilot-release-cut.md).
 
-**Decision record**
+## Decision record
 
 | Field | Value |
 | --- | --- |

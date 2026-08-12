@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import textwrap
+
 
 def test_core_import() -> None:
     """Core package imports without constructing providers."""
@@ -27,3 +31,41 @@ def test_worker_main_returns_zero_without_claiming_jobs() -> None:
     from smart_rag_worker.main import main
 
     assert main() == 0
+
+
+def test_entrypoints_import_without_network_or_provider_construction() -> None:
+    """Fresh entrypoint imports neither open sockets nor instantiate OpenAI clients."""
+
+    probe = textwrap.dedent(
+        """
+        import socket
+        import sys
+        import types
+
+        class Trap:
+            def __init__(self, *args, **kwargs):
+                raise AssertionError("provider client constructed during import")
+
+        def denied_socket(*args, **kwargs):
+            raise AssertionError("socket constructed during import")
+
+        fake_openai = types.ModuleType("openai")
+        fake_openai.OpenAI = Trap
+        fake_openai.AsyncOpenAI = Trap
+        sys.modules["openai"] = fake_openai
+        socket.create_connection = denied_socket
+        socket.getaddrinfo = denied_socket
+
+        import smart_rag_api.main
+        import smart_rag_worker.main
+        import smart_rag_agents.query.graph
+        import smart_rag_agents.ingestion.graph
+        """
+    )
+    completed = subprocess.run(  # noqa: S603 - fixed interpreter and probe
+        (sys.executable, "-c", probe),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr

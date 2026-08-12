@@ -15,10 +15,7 @@ def test_langgraph_json_matches_verified_schema_contract() -> None:
     payload = json.loads(LANGGRAPH_JSON.read_text(encoding="utf-8"))
     assert payload["dependencies"] == ["."]
     assert set(payload["graphs"]) == {"query", "ingestion"}
-    assert (
-        payload["graphs"]["query"]
-        == "./src/smart_rag_agents/query/graph.py:graph"
-    )
+    assert payload["graphs"]["query"] == "./src/smart_rag_agents/query/graph.py:graph"
     assert (
         payload["graphs"]["ingestion"]
         == "./src/smart_rag_agents/ingestion/graph.py:graph"
@@ -31,8 +28,11 @@ def test_langgraph_cli_validate_config_file() -> None:
     from langgraph_cli.config import validate_config_file
 
     validated = validate_config_file(LANGGRAPH_JSON)
-    assert validated["dependencies"] == ["."]
-    assert set(validated["graphs"]) == {"query", "ingestion"}
+    dependencies = validated.get("dependencies")
+    graphs = validated.get("graphs")
+    assert dependencies == ["."]
+    assert graphs is not None
+    assert set(graphs) == {"query", "ingestion"}
 
 
 def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
@@ -41,8 +41,10 @@ def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
     from smart_rag_agents.ingestion.graph import graph as ingestion_graph
     from smart_rag_agents.query.graph import graph as query_graph
 
-    query_result = query_graph.invoke({"status": "unconfigured", "detail": ""})
-    ingestion_result = ingestion_graph.invoke(
+    query_result = query_graph.invoke(  # pyright: ignore[reportUnknownMemberType] - upstream optional command uses Unknown
+        {"status": "unconfigured", "detail": ""}
+    )
+    ingestion_result = ingestion_graph.invoke(  # pyright: ignore[reportUnknownMemberType] - upstream optional command uses Unknown
         {"status": "unconfigured", "detail": ""}
     )
     assert query_result["status"] == "unconfigured"
