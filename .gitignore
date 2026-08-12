@@ -1,0 +1,62 @@
+# Secrets and local env
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Cursor / local agent state (plans live in repo docs when published)
+.cursor/
+
+# Historical review and Stitch design exports (local reference only)
+prev_review/
+stitch_smart_rag_enterprise_console/
+stitch*/
+
+# Python
+.venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Node
+node_modules/
+apps/frontend/.next/
+apps/frontend/out/
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+*.local
+
+# Tooling caches
+.turbo/
+.pnpm-store/
+dist/
+build/
+.cache/
+
+# Test / coverage artifacts
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# Docker / local data volumes dumps
+*.log
+supabase/.temp/
+supabase/.branches/
+
+# OS / editor backups
+*~

@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "query": "./src/smart_rag_agents/query/graph.py:graph",
+    "ingestion": "./src/smart_rag_agents/ingestion/graph.py:graph"
+  }
+}

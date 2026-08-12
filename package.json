@@ -1,0 +1,12 @@
+{
+  "name": "smart-rag-workspace",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build:frontend": "pnpm --filter smart-rag-frontend build",
+    "lint:frontend": "pnpm --filter smart-rag-frontend lint"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

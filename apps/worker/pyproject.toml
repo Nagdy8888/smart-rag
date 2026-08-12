@@ -1,0 +1,19 @@
+[project]
+name = "smart-rag-worker"
+version = "0.1.0"
+description = "Durable job consumer process boundary for Smart RAG ingestion."
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "smart-rag-agents",
+    "smart-rag-core",
+]
+
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/smart_rag_worker"]
+
+[project.scripts]
+smart-rag-worker = "smart_rag_worker.main:main"

@@ -1,0 +1,34 @@
+[project]
+name = "smart-rag-workspace"
+version = "0.1.0"
+description = "Non-distributable uv workspace root for Smart RAG deployables."
+requires-python = ">=3.11,<3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "langgraph-cli==0.4.31",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+    "apps/agents",
+    "apps/backend",
+    "apps/worker",
+    "packages/core",
+]
+
+[tool.uv.sources]
+smart-rag-agents = { workspace = true }
+smart-rag-backend = { workspace = true }
+smart-rag-worker = { workspace = true }
+smart-rag-core = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
