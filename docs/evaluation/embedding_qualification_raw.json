@@ -1,0 +1,154 @@
+{
+  "slice_id": "embedding-qual-v1",
+  "documents": 33,
+  "queries": 22,
+  "candidates": [
+    {
+      "candidate_id": "text-embedding-3-small-default",
+      "model": "text-embedding-3-small",
+      "dimensions": 1536,
+      "metrics_by_language": {
+        "ar": {
+          "recall_at_10": 1.0,
+          "mrr": 0.9166666666666666,
+          "ndcg_at_10": 0.9375,
+          "query_count": 8
+        },
+        "mixed": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "query_count": 9
+        },
+        "en": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "query_count": 5
+        },
+        "all": {
+          "recall_at_10": 1.0,
+          "mrr": 0.9696969696969696,
+          "ndcg_at_10": 0.9772727272727273,
+          "query_count": 22
+        }
+      },
+      "latency_ms": {
+        "documents": 2325,
+        "queries": 729,
+        "total": 3054
+      },
+      "usage_tokens": {
+        "documents": 1201,
+        "queries": 286,
+        "total": 1487
+      },
+      "estimated_usd": 2.974e-05,
+      "pricing_source": "https://openai.com/api/pricing/ (2026-08-12 list rates)",
+      "batching": {
+        "max_workers": 4,
+        "embed_batch_size": 16,
+        "document_batches": 3,
+        "query_batches": 2
+      }
+    },
+    {
+      "candidate_id": "text-embedding-3-large-1536",
+      "model": "text-embedding-3-large",
+      "dimensions": 1536,
+      "metrics_by_language": {
+        "ar": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "query_count": 8
+        },
+        "mixed": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9833716561705282,
+          "query_count": 9
+        },
+        "en": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "query_count": 5
+        },
+        "all": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9931974957061253,
+          "query_count": 22
+        }
+      },
+      "latency_ms": {
+        "documents": 1038,
+        "queries": 674,
+        "total": 1712
+      },
+      "usage_tokens": {
+        "documents": 1201,
+        "queries": 286,
+        "total": 1487
+      },
+      "estimated_usd": 0.00019331,
+      "pricing_source": "https://openai.com/api/pricing/ (2026-08-12 list rates)",
+      "batching": {
+        "max_workers": 4,
+        "embed_batch_size": 16,
+        "document_batches": 3,
+        "query_batches": 2
+      }
+    },
+    {
+      "candidate_id": "text-embedding-3-large-1024",
+      "model": "text-embedding-3-large",
+      "dimensions": 1024,
+      "metrics_by_language": {
+        "ar": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "query_count": 8
+        },
+        "mixed": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9812838477315134,
+          "query_count": 9
+        },
+        "en": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0,
+          "query_count": 5
+        },
+        "all": {
+          "recall_at_10": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.992343392253801,
+          "query_count": 22
+        }
+      },
+      "latency_ms": {
+        "documents": 906,
+        "queries": 685,
+        "total": 1591
+      },
+      "usage_tokens": {
+        "documents": 1201,
+        "queries": 286,
+        "total": 1487
+      },
+      "estimated_usd": 0.00019331,
+      "pricing_source": "https://openai.com/api/pricing/ (2026-08-12 list rates)",
+      "batching": {
+        "max_workers": 4,
+        "embed_batch_size": 16,
+        "document_batches": 3,
+        "query_batches": 2
+      }
+    }
+  ]
+}

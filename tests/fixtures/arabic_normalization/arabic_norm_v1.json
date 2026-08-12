@@ -1,0 +1,179 @@
+{
+  "normalization_version": "arabic_norm_v1",
+  "provenance": {
+    "created": "2026-08-12",
+    "purpose": "Phase 2 Packet 1 SQL/core/ParadeDB byte-identical conformance",
+    "citation_policy": "Raw source and citation offsets never use search form"
+  },
+  "cases": [
+    {
+      "id": "diacritics_fatha",
+      "raw": "مَدْرَسَة",
+      "search": "مدرسه",
+      "tags": [
+        "diacritics"
+      ]
+    },
+    {
+      "id": "tatweel",
+      "raw": "مـــدرسة",
+      "search": "مدرسه",
+      "tags": [
+        "tatweel"
+      ]
+    },
+    {
+      "id": "alef_hamza_above",
+      "raw": "أحمد",
+      "search": "احمد",
+      "tags": [
+        "alef",
+        "hamza"
+      ]
+    },
+    {
+      "id": "alef_hamza_below",
+      "raw": "إبراهيم",
+      "search": "ابراهيم",
+      "tags": [
+        "alef",
+        "hamza"
+      ]
+    },
+    {
+      "id": "alef_madda",
+      "raw": "آمن",
+      "search": "امن",
+      "tags": [
+        "alef"
+      ]
+    },
+    {
+      "id": "alef_wasla",
+      "raw": "ٱلكتاب",
+      "search": "الكتاب",
+      "tags": [
+        "alef"
+      ]
+    },
+    {
+      "id": "ya_alef_maqsura",
+      "raw": "على",
+      "search": "علي",
+      "tags": [
+        "ya",
+        "alef_maqsura"
+      ]
+    },
+    {
+      "id": "hamza_waw",
+      "raw": "مؤمن",
+      "search": "مومن",
+      "tags": [
+        "hamza"
+      ]
+    },
+    {
+      "id": "hamza_ya",
+      "raw": "سئل",
+      "search": "سيل",
+      "tags": [
+        "hamza"
+      ]
+    },
+    {
+      "id": "ta_marbuta",
+      "raw": "شركة",
+      "search": "شركه",
+      "tags": [
+        "ta_marbuta"
+      ]
+    },
+    {
+      "id": "arabic_digits",
+      "raw": "بند رقم ١٢٣",
+      "search": "بند رقم 123",
+      "tags": [
+        "digits"
+      ]
+    },
+    {
+      "id": "latin_digits_passthrough",
+      "raw": "بند رقم 456",
+      "search": "بند رقم 456",
+      "tags": [
+        "digits"
+      ]
+    },
+    {
+      "id": "punctuation_collapse",
+      "raw": "عقد، توريد؟ (نهائي)",
+      "search": "عقد توريد نهايي",
+      "tags": [
+        "punctuation"
+      ]
+    },
+    {
+      "id": "whitespace_collapse",
+      "raw": "  نص   متعدد\tالمسافات  ",
+      "search": "نص متعدد المسافات",
+      "tags": [
+        "whitespace"
+      ]
+    },
+    {
+      "id": "mixed_ar_en_code",
+      "raw": "طلب شراء PO-7781 لِلْمعدات",
+      "search": "طلب شراء po-7781 للمعدات",
+      "tags": [
+        "mixed",
+        "code"
+      ]
+    },
+    {
+      "id": "english_casefold",
+      "raw": "Invoice INV-9A",
+      "search": "invoice inv-9a",
+      "tags": [
+        "english",
+        "code"
+      ]
+    },
+    {
+      "id": "already_normalized",
+      "raw": "مدرسه احمد",
+      "search": "مدرسه احمد",
+      "tags": [
+        "idempotence"
+      ]
+    },
+    {
+      "id": "combined_diacritics_alef",
+      "raw": "إِنْشَاءُ مَبْنًى",
+      "search": "انشاء مبني",
+      "tags": [
+        "diacritics",
+        "alef",
+        "ya"
+      ]
+    },
+    {
+      "id": "empty",
+      "raw": "",
+      "search": "",
+      "tags": [
+        "edge"
+      ]
+    },
+    {
+      "id": "mixed_digits_punct",
+      "raw": "فاتورة رقم: ٤٢-أ",
+      "search": "فاتوره رقم 42-ا",
+      "tags": [
+        "digits",
+        "punctuation",
+        "alef"
+      ]
+    }
+  ]
+}

@@ -19,6 +19,9 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [architecture/03-components.md](./architecture/03-components.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [architecture/04-deployment.md](./architecture/04-deployment.md) | engineering-lead | draft | 2026-08-12 | eng, ops |
 | [development/phase-01-foundation-evidence.md](./development/phase-01-foundation-evidence.md) | engineering-lead | draft | 2026-08-12 | eng, reviewers |
+| [development/phase-02-identity-data-evidence.md](./development/phase-02-identity-data-evidence.md) | engineering-lead | draft | 2026-08-12 | eng, reviewers |
+| [architecture/07-bm25-projection.md](./architecture/07-bm25-projection.md) | engineering-lead | draft | 2026-08-12 | eng |
+| [evaluation/EMBEDDING_QUALIFICATION_REPORT.md](./evaluation/EMBEDDING_QUALIFICATION_REPORT.md) | engineering-lead | draft | 2026-08-12 | eng, reviewers |
 | [development/TOOL_VERSIONS.md](./development/TOOL_VERSIONS.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
@@ -34,9 +37,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-expand-contract-migrations.md](./adr/ADR-expand-contract-migrations.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-api-sse-compatibility.md](./adr/ADR-api-sse-compatibility.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-vision-captioning.md](./adr/ADR-vision-captioning.md) | product-owner | proposed | 2026-08-12 | client, eng |
-| [adr/ADR-embedding-model-dimension.md](./adr/ADR-embedding-model-dimension.md) | engineering-lead | proposed | 2026-08-12 | eng |
-| [retrieval/BM25_PROJECTION_CONTRACT.md](./retrieval/BM25_PROJECTION_CONTRACT.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [retrieval/ARABIC_NORMALIZATION.md](./retrieval/ARABIC_NORMALIZATION.md) | engineering-lead | planned | 2026-08-12 | eng |
+| [adr/ADR-embedding-model-dimension.md](./adr/ADR-embedding-model-dimension.md) | engineering-lead | accepted | 2026-08-12 | eng |
+| [retrieval/ARABIC_NORMALIZATION.md](./retrieval/ARABIC_NORMALIZATION.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | planned | 2026-08-12 | eng |
 | [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | planned | 2026-08-12 | eng |
 | [evaluation/QUERY_PROFILE_EVAL.md](./evaluation/QUERY_PROFILE_EVAL.md) | engineering-lead | planned | 2026-08-12 | eng |

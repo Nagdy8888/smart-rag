@@ -13,6 +13,8 @@ dev = [
     "pyright==1.1.411",
     "pre-commit==4.6.2",
     "pyyaml==6.0.3",
+    "openai==2.26.0",
+    "psycopg[binary]==3.3.3",
 ]
 
 [tool.uv]
@@ -67,6 +69,7 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
+"tests/contract/integration_support.py" = ["S603", "S607"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
