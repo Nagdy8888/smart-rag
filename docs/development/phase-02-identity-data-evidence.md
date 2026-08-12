@@ -157,3 +157,59 @@ npx supabase gen types typescript --local > packages/core/src/smart_rag_core/gen
 ### Next packet
 
 Packet 3 — least-privilege roles, RLS, ACL, and identity propagation.
+
+## Packet 3 — least-privilege roles, RLS, ACL, identity propagation
+
+### Requirement
+
+Create runtime roles (`app_api`, `app_worker`, `app_checkpointer`, `app_lightrag`, `app_audit_writer`), RLS policies, ACL semantics, authorization-version triggers, security-invoker RPCs, core `CallerContext`, FastAPI identity stub, RLS matrix tests, and security docs.
+
+### Artifacts
+
+| Area | Path |
+| --- | --- |
+| Migration | `supabase/migrations/20260812135916_roles_rls_identity_v1.sql` |
+| Core identity | `packages/core/src/smart_rag_core/security/identity.py` |
+| FastAPI stub | `apps/backend/src/smart_rag_api/dependencies/identity.py` |
+| RLS tests | `tests/contract/test_rls_matrix.py` |
+| Authorization model | `docs/security/AUTHORIZATION_MODEL.md` |
+| Identity propagation | `docs/security/IDENTITY_PROPAGATION.md` |
+
+### Commands and results
+
+```text
+npx supabase db reset --yes
+→ Applied 14 migrations including 20260812135916_roles_rls_identity_v1.sql; exit 0
+
+uv run python scripts/ci/check_migrations.py
+→ Phase 2 migration policy OK (14 reviewed files); exit 0
+
+uv run pytest tests/contract/test_rls_matrix.py tests/contract/test_schema_reset.py -q
+→ 4 passed; exit 0
+```
+
+### Acceptance mapping
+
+| Check | Evidence |
+| --- | --- |
+| Runtime roles created NOLOGIN | migration `CREATE ROLE` |
+| anon/authenticated revoked on app tables | migration REVOKE + `test_browser_roles_denied_direct_app_access` |
+| Forged/stale RPC context → zero rows | `test_rls_matrix_documents_conversations_and_audit` |
+| Restricted doc hidden without ACL | same |
+| Creator-private conversations | `list_user_conversations` RPC test |
+| audit writer cannot UPDATE | trigger + `test_rls_matrix_*` |
+| Visibility/ACL bumps authorization_version | `test_visibility_change_bumps_authorization_and_bm25_job` |
+| Restricted graph job rejected | `test_rls_matrix_*` |
+| No session GUC identity | `CallerContext` + RPC args; docs |
+| SECURITY INVOKER RPCs fixed search_path | migration functions |
+
+### Gaps / deferred
+
+- Packet 4 JWKS verification replaces FastAPI header stub.
+- authenticated RLS policies exist but grants remain revoked until Auth wiring.
+- Supavisor concurrent pool reuse test deferred to Packet 6.
+- Storage RLS deferred to Packet 5.
+
+### Next packet
+
+Packet 4 — asymmetric JWT/JWKS, PKCE Auth, invitations, MFA.
