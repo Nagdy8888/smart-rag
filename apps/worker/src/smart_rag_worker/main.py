@@ -7,16 +7,20 @@ tests only.
 
 from __future__ import annotations
 
+import os
+import time
+
 
 def main() -> int:
     """Start the foundation worker process contract.
 
     Returns:
-        Process exit code ``0`` after printing that the worker is unconfigured.
-        Does not claim jobs, process ingestion, or connect to external systems.
+        Process exit code ``0`` after a one-shot run when ``WORKER_ONCE=1``.
+        Otherwise blocks forever so the container stays healthy without claiming
+        queue processing (Phase 3 owns claiming).
 
     Side Effects:
-        Writes a single status line to stdout.
+        Writes a status line to stdout. Sleeps indefinitely unless ``WORKER_ONCE``.
     """
 
     print(
@@ -24,7 +28,10 @@ def main() -> int:
         "queue processing is unconfigured.",
         flush=True,
     )
-    return 0
+    if os.environ.get("WORKER_ONCE", "").lower() in {"1", "true", "yes"}:
+        return 0
+    while True:
+        time.sleep(3600)
 
 
 if __name__ == "__main__":

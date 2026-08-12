@@ -268,9 +268,9 @@ def validate_split_packets(errors: list[str]) -> None:
             f"Phase {number} lacks a packets directory",
             errors,
         )
-        ordered_section = wrapper_text.split(
-            "## Ordered work packets", maxsplit=1
-        )[-1].split("## Phase sequence requirement", maxsplit=1)[0]
+        ordered_section = wrapper_text.split("## Ordered work packets", maxsplit=1)[
+            -1
+        ].split("## Phase sequence requirement", maxsplit=1)[0]
         links = PACKET_LINK_PATTERN.findall(ordered_section)
         require(
             bool(links),
@@ -456,13 +456,15 @@ def validate_ownership(errors: list[str]) -> None:
         errors,
     )
     for path, text in (
-        (PLAN_DIR / "00-global-contracts.md", (PLAN_DIR / "00-global-contracts.md").read_text(encoding="utf-8")),
+        (
+            PLAN_DIR / "00-global-contracts.md",
+            (PLAN_DIR / "00-global-contracts.md").read_text(encoding="utf-8"),
+        ),
         (phase_path(1), phase_1),
         (phase_path(11), phase_11),
     ):
         require(
-            "follows Section 10" not in text
-            and "described in Section 10" not in text,
+            "follows Section 10" not in text and "described in Section 10" not in text,
             f"Ambiguous bare legacy Section 10 reference: {path.relative_to(ROOT)}",
             errors,
         )
@@ -633,9 +635,7 @@ def main() -> int:
             print(f"ERROR: {error}")
         return 1
     action = "updated" if args.update else "verified"
-    print(
-        f"Split plan integrity {action}: {len(canonical_files())} canonical files"
-    )
+    print(f"Split plan integrity {action}: {len(canonical_files())} canonical files")
     return 0
 
 

@@ -10,9 +10,14 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
-if (-not (Test-Path "$Root\.env")) {
-  Copy-Item "$Root\.env.example" "$Root\.env"
-  Write-Host "Created .env from .env.example — update passwords before shared use."
+$EnvFile = if (Test-Path "$Root\.env.compose") {
+  "$Root\.env.compose"
+} elseif (Test-Path "$Root\.env") {
+  "$Root\.env"
+} else {
+  Copy-Item "$Root\.env.example" "$Root\.env.compose"
+  Write-Host "Created .env.compose from .env.example — update passwords before shared use."
+  "$Root\.env.compose"
 }
 
 $supabase = Get-Command supabase -ErrorAction SilentlyContinue
@@ -24,8 +29,8 @@ if ($supabase) {
   Write-Host "Pin guidance: use the current Supabase CLI release documented at https://supabase.com/docs/guides/local-development"
 }
 
-Write-Host "Starting Docker Compose foundation stack..."
-docker compose --env-file .env up --build -d
+Write-Host "Starting Docker Compose foundation stack with $EnvFile ..."
+docker compose --env-file $EnvFile up --build -d
 
 Write-Host ""
 Write-Host "Developer endpoints (when healthy):"

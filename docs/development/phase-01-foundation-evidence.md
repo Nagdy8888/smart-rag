@@ -280,7 +280,7 @@ AST exclusions are caches/build output, `prev_review/`, and explicit vendor path
 
 **Packet 4 checked** — all Packet 4 gates pass; proceed only to Packet 5 in a fresh run.
 
-## Packet 5 � CI tiers and documentation foundation
+## Packet 5 � CI tiers and documentation foundation
 
 ### Requirement
 Create tiered CI and documentation index, C4 skeleton, ADRs, governance drafts, migration/API policies, admin-alert contract.
@@ -300,3 +300,36 @@ Create tiered CI and documentation index, C4 skeleton, ADRs, governance drafts, 
 
 ### Packet 5 checkbox
 **Checked** for authored docs/CI. Remote CI run pending.
+
+## Packet 6 — one-command startup and Phase 1 exit proof
+
+### Local stack (2026-08-12)
+
+`docker compose --env-file .env.compose up --build -d` after ParadeDB init fix (`CREATE EXTENSION vector` before `pg_search`).
+
+| Service | Status |
+| --- | --- |
+| api | healthy (host 8000) |
+| frontend | healthy (host 3000) |
+| worker | healthy (no host port; idle loop) |
+| paradedb | healthy, `pg_search`+`vector` |
+| valkey-limits / valkey-cache | healthy, no host ports |
+| crawl-proxy | healthy, deny-by-default |
+
+### Commands
+
+| Command | Result |
+| --- | --- |
+| `scripts/verify-local.ps1` | pass (live/ready/frontend/pg_search/deny/non-root/private ports) |
+| Supabase CLI | not installed — skipped (documented) |
+| Full `check.py --tier fast` | interrupted once on long frontend rebuild; unit/contract+ruff re-run separately |
+
+### Deviations / unverified
+
+- Host `.env` was not Compose-compatible; use `.env.compose` from `.env.example`.
+- Remote GitHub Actions not yet observed green on this push.
+- Phase 1 `status: complete` still requires **explicit user acceptance** of this exit record before Phase 2 formal start (user mandated continue-through-Phase-5; proceeding with that override noted here).
+
+### Packet 6 checkbox
+
+**Checked** with local verification evidence. Awaiting user acceptance to mark phase complete.

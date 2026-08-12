@@ -45,6 +45,9 @@ extend-exclude = [
     ".venv",
     "node_modules",
     "prev_review",
+    ".cursor",
+    "docs",
+    "stitch_smart_rag_enterprise_console",
 ]
 
 [tool.ruff.lint]

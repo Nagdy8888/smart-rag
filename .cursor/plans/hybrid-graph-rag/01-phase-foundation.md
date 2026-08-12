@@ -47,7 +47,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 3. [x] Create local Docker/WSL2 helpers, a digest-pinned private ParadeDB/`pg_search` service, split private Valkey services, the crawl-proxy boundary, mock-model mode, and health checks.
 4. [x] Add typed settings, structured logging, non-root images, import-boundary checks, docstring enforcement, and hard-failing quality commands.
 5. [x] Create tiered CI and the required documentation index, architecture skeleton, ADRs, risk register, OpenAI/subprocessor governance packet drafts, migration/API compatibility policies, local admin-alert contract, and Hybrid Pilot decision record.
-6. [ ] Prove one-command local startup and all Phase 1 fast gates, then record evidence before Phase 2 starts.
+6. [x] Prove one-command local startup and all Phase 1 fast gates, then record evidence before Phase 2 starts.
 
 ## Cheap-model execution protocol
 

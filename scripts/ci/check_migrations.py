@@ -25,7 +25,9 @@ def main() -> int:
         return 0
     files = sorted(p for p in MIGRATIONS.glob("*.sql") if p.is_file())
     if not files:
-        print("Phase 1: zero application migrations — OK (expand/contract starts Phase 2)")
+        print(
+            "Phase 1: zero application migrations — OK (expand/contract starts Phase 2)"
+        )
         return 0
     print(
         "Application migrations present before Phase 2 documentation — "

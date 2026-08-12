@@ -1,7 +1,7 @@
 {
   "files": {
     ".cursor/plans/hybrid-graph-rag/00-global-contracts.md": "be603b6cdc5309271c36e825ca0d9d126d8421942f3c0fd352f2e510321ad426",
-    ".cursor/plans/hybrid-graph-rag/01-phase-foundation.md": "8990cb31533bbca327d5cc5df39a6c59d3af4233a8c11fdab549a60b38e6e52d",
+    ".cursor/plans/hybrid-graph-rag/01-phase-foundation.md": "44c5a4848756a70c0fa3c8fbff122bfc3c597de0c5c3291edd1233679ceff5c3",
     ".cursor/plans/hybrid-graph-rag/02-phase-identity-data.md": "db6635c378517d514ac203b31b13643b07117ea08954099eff53d6d645d6eebe",
     ".cursor/plans/hybrid-graph-rag/03-phase-ingestion.md": "32816d487622ccb8b87e6139cf9bb26a5635f0465f724abf6b165186c1996be1",
     ".cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md": "a6171ef02c79fc4ff2a9922b7be20d34c651b8803a2157c7c7053843f93f3cfd",
@@ -60,7 +60,7 @@
     ".cursor/plans/hybrid-graph-rag/11-phase-production/packets/06-hand-off-operational-ownership.md": "b111e3738d981f23d58617d3b894b553c0ec75172391ad671da1b0d6b5605039",
     ".cursor/plans/hybrid-graph-rag/98-split-plan-completeness-audit.md": "73ddcf3cb0d36a9f08a0ca247f9c9403d767301edf206bde06f233169957afc7",
     ".cursor/plans/hybrid-graph-rag/99-source-coverage.md": "75fbd6e22a61350651b785ed3fdf534f408457e7aa27e838344c4adc7f53fe7a",
-    ".cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py": "546d265e571574d6f39c5b6f759660f5aaf5601b6a17c136d157b2ec4da058d9",
+    ".cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py": "b4f376e9277e1629704f3016c5c1b5c14747c40e2dc4d21c1ed93023cabec25b",
     ".cursor/plans/hybrid-graph-rag/shared/frontend/stitch-nextjs-contract.md": "1991df4cd0e936d2d63be89caa8dea024e0f5c2943e0adac9c5ac7869ae3b872",
     ".cursor/plans/hybrid-graph-rag/shared/release/01-local-release-gates.md": "796c918f6f2a729140448268d66f3d97a9aa470fa4fec1cf2d4cc961404ef220",
     ".cursor/plans/hybrid-graph-rag/shared/release/02-managed-gates.md": "c0e9259e553e2a24197307b219a43c38da939a2147eb90c6027c758f91486920",
@@ -83,6 +83,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "c104b02d5fb5e7549cd5224e4b9cd150895a87ee283b5f3a6cc49883dc9246cc",
     ".cursor/skills/verify-release-gates/SKILL.md": "29c1821403b4d2c3f50d7935c9d9149301b610ffcc81da429fbb3d6cb6747943"
   },
-  "generated_at": "2026-08-12T12:05:54.910440+00:00",
+  "generated_at": "2026-08-12T12:43:16.837933+00:00",
   "schema_version": 1
 }

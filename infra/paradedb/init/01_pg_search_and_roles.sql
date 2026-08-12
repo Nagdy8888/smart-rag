@@ -1,6 +1,7 @@
--- ParadeDB bootstrap: enable pg_search and prepare least-privilege roles.
+-- ParadeDB bootstrap: enable pg_search (and required vector) plus least-privilege roles.
 -- Application BM25 projection DDL remains Phase 2/4-owned.
 
+CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_search;
 
 DO $$
