@@ -1,7 +1,7 @@
 {
   "files": {
     ".cursor/plans/hybrid-graph-rag/00-global-contracts.md": "be603b6cdc5309271c36e825ca0d9d126d8421942f3c0fd352f2e510321ad426",
-    ".cursor/plans/hybrid-graph-rag/01-phase-foundation.md": "44c5a4848756a70c0fa3c8fbff122bfc3c597de0c5c3291edd1233679ceff5c3",
+    ".cursor/plans/hybrid-graph-rag/01-phase-foundation.md": "79f528c1ea8c929406406ece5442fdc2e05252e69b99e63feaf33e3a3bb191a8",
     ".cursor/plans/hybrid-graph-rag/02-phase-identity-data.md": "db6635c378517d514ac203b31b13643b07117ea08954099eff53d6d645d6eebe",
     ".cursor/plans/hybrid-graph-rag/03-phase-ingestion.md": "32816d487622ccb8b87e6139cf9bb26a5635f0465f724abf6b165186c1996be1",
     ".cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md": "a6171ef02c79fc4ff2a9922b7be20d34c651b8803a2157c7c7053843f93f3cfd",
@@ -68,7 +68,7 @@
     ".cursor/plans/hybrid-graph-rag/shared/release/04-production-promotion-delta.md": "4ffa38f05bdc1d1a71fede6081d24b45b4dfd94d29ee6cbb5d42f9fd79f0bd08",
     ".cursor/plans/hybrid-graph-rag/shared/release/05-sizing-envelope.md": "7b72b6dba46f10526e87d1766b3752af34a0b58af8f642ef5f1c65be760451f2",
     ".cursor/plans/hybrid-graph-rag/shared/release/06-documentation-operational-handoff.md": "418b81588a3eb965e890ad41e47b1da7148ca84a8fe0c91ea6750aca9c6db54a",
-    ".cursor/plans/hybrid-graph-rag_ab5281ef.plan.md": "b3fef613e0bca2bbe3e2f55c343e48a7bd94f9f008749c4e723d9ac5a594cce3",
+    ".cursor/plans/hybrid-graph-rag_ab5281ef.plan.md": "33cb4d283fd11c339a03cc61aeb909c763ead20bac9671e53b84ef20cf9428c4",
     ".cursor/rules/00-plan-source-of-truth.mdc": "def4a9f448b1109b2e0d67a099a6ba7ea20d6381c89cfe0566615ce6c0989576",
     ".cursor/skills/implement-api-security/SKILL.md": "2f62264e6c5e5c33a85a7f7cf71b0bf98c20fce738e7b88c135161af5ba7432e",
     ".cursor/skills/implement-hybrid-retrieval/SKILL.md": "c0039dc871e39ab2aa75c2980eed25932626d957e95bf7c0b73f60a9471eade5",
@@ -83,6 +83,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "c104b02d5fb5e7549cd5224e4b9cd150895a87ee283b5f3a6cc49883dc9246cc",
     ".cursor/skills/verify-release-gates/SKILL.md": "29c1821403b4d2c3f50d7935c9d9149301b610ffcc81da429fbb3d6cb6747943"
   },
-  "generated_at": "2026-08-12T12:43:16.837933+00:00",
+  "generated_at": "2026-08-12T13:28:55.480518+00:00",
   "schema_version": 1
 }
