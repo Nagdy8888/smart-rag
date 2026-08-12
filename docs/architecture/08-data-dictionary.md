@@ -1,0 +1,130 @@
+---
+title: Data dictionary
+owner: engineering-lead
+status: draft
+last-reviewed: 2026-08-12
+audience: engineering, reviewers
+---
+
+# Data dictionary (Phase 2 Packet 2)
+
+Authoritative Supabase schema in `app`, server-only internals in `private`, search normalizer in `search`, LangGraph checkpoints in `langgraph`, deferred LightRAG vendor storage in `lightrag`. ParadeDB holds derived `bm25_chunks` only.
+
+## Legend
+
+| Column | Meaning |
+| --- | --- |
+| Authority | `authority` = canonical source of truth; `derived` = rebuildable projection |
+| Phase | Owning implementation phase for primary writers |
+
+## Core entity diagram
+
+```mermaid
+erDiagram
+  profiles ||--o{ documents : creates
+  documents ||--|{ document_versions : has
+  documents ||--o| document_versions : current_version
+  document_versions ||--|{ document_chunks : contains
+  document_chunks ||--o{ document_search_terms : indexes
+  documents ||--o{ document_acl : grants
+  documents ||--o{ lightrag_source_map : maps
+  document_chunks ||--o| lightrag_chunk_map : maps
+  conversations ||--|{ messages : contains
+  conversations ||--|{ runs : executes
+  runs ||--o{ citations : cites
+  runs ||--o{ user_feedback : receives
+  ingestion_jobs }o--|| document_versions : targets
+  bm25_index_jobs }o--|| document_chunks : projects
+  lightrag_index_jobs }o--|| document_versions : indexes
+  company_settings ||--|| profiles : governs
+```
+
+## Identity and policy
+
+| Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `profiles` | `app` | authority | Auth bootstrap (Pkt 3), admin APIs | API RLS, worker read | life of membership | ≤ active users | cascade on auth user delete | upsert by `user_id` | 2 schema / 3 RLS |
+| `company_settings` | `app` | authority | owner/admin APIs | all roles read policy fields | indefinite singleton | 1 row | none (singleton) | singleton upsert | 2 schema / 3 RLS |
+| `allowed_email_domains` | `app` | authority | owner/admin | invitation/auth checks | until removed | small list | hard delete | domain unique | 2 schema / 3 auth |
+| `team_invitations` | `app` | authority | owner/admin invite API | invite accept flow | 24h TTL + audit | bounded active invites | revoke/accept | `token_hash` unique | 2 schema / 3 auth |
+| `auth_rate_limit_buckets` | `private` | authority | FastAPI degraded limiter | FastAPI only | rolling windows | bounded keys | window expiry GC | `(bucket_key, window_start)` PK | 2 schema / 6 runtime |
+
+## Documents and evidence
+
+| Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `documents` | `app` | authority | ingestion/API | Hybrid RPC, UI | until deleted + policy | ≤ 10k versions env | soft `deleted_at`; graph/BM25 enqueue | document `id` | 2 schema / 3 ingest |
+| `document_versions` | `app` | authority | ingestion worker | retrieval recheck | version history | multiple per doc | soft delete; blocks current pointer | `(document_id, version_number)` | 3 ingestion |
+| `document_sources` | `app` | authority | upload/crawl | audit, ingestion | with version | few per version | cascade on document | source `id` | 3 ingestion |
+| `document_acl` | `app` | authority | owner/admin ACL API | Hybrid RPC | while grant active | per restricted user | revoke timestamp | active grant unique | 2 schema / 3 RLS |
+| `source_approval_requests` | `app` | authority | member request; admin review | admin UI | audit window | pending crawls | status transition | request `id` | 2 schema / 3 crawl |
+| `document_scan_events` | `app` | authority | scanner worker | audit, promotion gate | scan evidence | many per version | cascade | append-only insert | 3 ingestion |
+| `document_chunks` | `app` | authority | ingestion embed worker | Hybrid/graph resolver | corpus lifetime | ≤ 1M chunks env | soft delete + BM25 remove job | `(version_id, chunk_index)` | 3 ingestion / 4 retrieval |
+| `document_tables` | `app` | authority | table parser | structured tool | with version | sheets/tables | cascade | table `id` | 3 ingestion |
+| `document_table_columns` | `app` | authority | table parser | structured tool | with table | columns per table | cascade | `(table_id, ordinal)` | 3 ingestion |
+| `document_search_terms` | `app` | authority | ingestion indexer | Hybrid term search | with chunk | many | cascade | term row `id` | 4 retrieval |
+| `search_aliases` | `app` | authority | admin seed/eval | Hybrid alias recall | until removed | glossary size | hard delete | normalized alias unique | 4 retrieval |
+
+## Jobs and projections
+
+| Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `ingestion_jobs` | `app` | authority | API admit; worker lease | worker, admin | completed + DLQ policy | queue depth | archive/DLQ | `idempotency_key` UNIQUE | 3 ingestion |
+| `bm25_index_jobs` | `app` | authority | ingestion/delete paths | BM25 worker | until projected | outbox depth | completed/DLQ | `idempotency_key` UNIQUE | 3 ingest / 4 query |
+| `bm25_index_versions` | `app` | authority | ops/admin activate | BM25 worker/reader | all versions metadata | small | deactivate only | version_number unique | 2 schema / 4 BM25 |
+| `lightrag_index_jobs` | `app` | authority | graph eligibility changes | graph worker | until indexed | queue depth | completed/DLQ | `idempotency_key` UNIQUE | 5 graph |
+| `dead_letter_jobs` | `app` | authority | workers | admin replay | admin retention | failed jobs | manual archive | `idempotency_key` UNIQUE | 3 ingestion |
+| `bm25_chunks` | ParadeDB `public` | derived | BM25 writer | BM25 reader | rebuildable | ≤ canonical chunks | purge/rebuild | chunk_id PK | 2 schema / 3 projection |
+| `bm25_index_meta` | ParadeDB `public` | derived | BM25 writer | reader | with index | singleton | rebuild | singleton row | 2 schema / 4 BM25 |
+
+## Graph mapping (canonical side)
+
+| Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `lightrag_source_map` | `app` | authority | graph worker | resolver | while graph indexed | ≤ graph docs | cascade on document | document_id PK | 5 graph |
+| `lightrag_chunk_map` | `app` | authority | graph worker | resolver | while mapped | graph chunks | cascade | chunk_id PK | 5 graph |
+| `graph_evidence_map` | `app` | authority | graph indexer | Combined fusion | while valid | many-to-many | cascade | object+chunk unique | 5 graph |
+| `graph_entity_rules` | `app` | authority | admin curation | graph indexer | until deactivated | small ruleset | soft deactivate | rule `id` | 5 graph |
+| `lightrag.*` vendor tables | `lightrag` | derived | LightRAG runtime | worker/API adapters | rebuildable | vendor-defined | workspace rebuild | vendor keys | 5 capture |
+
+## Conversations and tools
+
+| Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `conversations` | `app` | authority | chat API | creator (+ audit) | 90d undeleted | per user | immediate delete path Pkt 6 | conversation `id` | 2 schema / 6 agent |
+| `messages` | `app` | authority | chat API | creator (+ audit) | with conversation | many | cascade | message `id` | 6 agent |
+| `runs` | `app` | authority | LangGraph/API | creator (+ audit) | 30d payloads | concurrent runs cap | cascade | optional idempotency | 6 agent |
+| `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade | `(run_id, citation_index)` | 6 agent |
+| `user_feedback` | `app` | authority | chat UI | eval pipelines | 12 months | sparse | cascade | feedback `id` | 6 agent |
+| `tool_catalog` / `tool_versions` / `tool_permissions` / `tool_usage_events` | `app` | authority | admin/catalog | progressive disclosure | catalog lifetime | small | deactivate/delete | tool_key unique | 6 agent |
+
+## Usage, audit, checkpoints
+
+| Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `llm_usage` | `app` | authority | model gateway | dashboards | 24mo aggregates | high append | none (aggregate) | usage row `id` | 6 agent |
+| `budget_reservations` | `app` | authority | API reserve/commit | gateway | until settled | active reservations | release/commit | reservation `id` | 6 agent |
+| `upload_quota_reservations` | `app` | authority | upload API | Storage admit | ≤15m effective | active uploads | expire/release | reservation `id` | 2 schema / 5 storage |
+| `audit_events` | `app` | authority | audit writer fn | admin/chain export | 7 years | append-only | **blocked** | event `id` | 2 schema / 6 chain |
+| `audit_chain_anchors` | `app` | authority | anchor job | compliance | 7 years | daily anchors | none | anchor_date unique | 6 chain |
+| `restricted_read_events` | `app` | authority | evidence/download RPC | audit | 7 years | sparse | none | event `id` | 2 schema / 3 ACL |
+| `admin_notifications` | `app` | authority | anomaly detectors | admin UI | until ack | bounded | ack only | notification `id` | 2 schema / 6 alerts |
+| `langgraph.checkpoints*` | `langgraph` | authority | checkpointer | agents/worker | 30d undeleted runs | thread keyed | GC job | vendor PKs | 2 placeholder / 3 grants |
+
+## Key invariants (schema-enforced)
+
+- `documents.current_version_id` must reference a version belonging to the same document (trigger `app.enforce_document_current_version`).
+- `documents.graph_eligible` requires `company_visible`, non-null current version, and no soft delete.
+- Restricted visibility uses per-user `document_acl` grants only.
+- `document_chunks.embedding` is `vector(1024)` per [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md).
+- `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
+- Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
+- `audit_events` rejects UPDATE/DELETE (append-only trigger).
+- RLS is enabled on all exposed tables; policies are deny-by-default until Packet 3.
+
+## Related docs
+
+- [05-database-connections.md](./05-database-connections.md)
+- [06-database-workload-isolation.md](./06-database-workload-isolation.md)
+- [07-bm25-projection.md](./07-bm25-projection.md)
+- [ADR-expand-contract-migrations](../adr/ADR-expand-contract-migrations.md)

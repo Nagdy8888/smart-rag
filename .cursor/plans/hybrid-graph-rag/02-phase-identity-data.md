@@ -42,7 +42,7 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
-1. [ ] Prove selected Supabase/pgvector and private ParadeDB/`pg_search` BM25 capabilities, then freeze the disjoint embedding/lexical qualification slice before bulk ingestion.
+1. [x] Prove selected Supabase/pgvector and private ParadeDB/`pg_search` BM25 capabilities, then freeze the disjoint embedding/lexical qualification slice before bulk ingestion.
 2. [ ] Implement expand/contract-safe migrations for canonical data, BM25 projection outbox/version state, jobs, graph mappings, conversations, tools, budgets, audit/read-access events, upload quotas/notifications, and private schemas.
 3. [ ] Create least-privilege Supabase, Storage, BM25 reader/writer/bootstrap roles, explicit v1 document ACL semantics, server-derived identity propagation, RLS/RPC boundaries, and forged/missing-context tests.
 4. [ ] Implement asymmetric JWT/JWKS verification and rollover, PKCE Auth, direct-Supabase-Auth rate-limit ownership, invitations, MFA/recovery, session revocation, and upload-capability controls.

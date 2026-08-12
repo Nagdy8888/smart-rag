@@ -78,3 +78,82 @@ MOCK_MODEL_MODE=false uv run python scripts/embedding_qualification_bakeoff.py
 ### Next packet
 
 Packet 2 — expand/contract-safe authoritative schema (after Packet 1 accept).
+
+## Packet 2 — expand/contract-safe authoritative schema
+
+### Requirement
+
+Forward-only Supabase migrations for the full v1 authoritative schema, ParadeDB `bm25_chunks` projection DDL, expand/contract migration lint, schema contract tests, connection/isolation docs, data dictionary, and core Pydantic mirrors. RLS policies deferred to Packet 3.
+
+### Artifacts
+
+| Area | Path |
+| --- | --- |
+| Migrations (13 files) | `supabase/migrations/20260812135034_*` … `20260812135115_*` |
+| ParadeDB projection | `infra/paradedb/migrations/20260812170000_bm25_projection.sql` |
+| Data dictionary | `docs/architecture/08-data-dictionary.md` |
+| Connection budgets | `docs/architecture/05-database-connections.md` |
+| Workload isolation | `docs/architecture/06-database-workload-isolation.md` |
+| Migration lint | `scripts/ci/check_migrations.py` |
+| Schema contract tests | `tests/contract/test_schema_reset.py` |
+| Domain models | `packages/core/src/smart_rag_core/schema/` |
+
+### Migration files (ordered)
+
+1. `20260812131227_pgvector_gate_and_arabic_norm_v1.sql` (Packet 1)
+2. `20260812135034_app_schemas_enums_job_columns_v1.sql`
+3. `20260812135038_profiles_company_invitations_v1.sql`
+4. `20260812135041_documents_sources_acl_v1.sql`
+5. `20260812135045_document_chunks_tables_search_v1.sql`
+6. `20260812135049_durable_jobs_v1.sql`
+7. `20260812135053_lightrag_maps_v1.sql`
+8. `20260812135056_conversations_messages_runs_v1.sql`
+9. `20260812135100_tools_catalog_v1.sql`
+10. `20260812135104_llm_usage_budgets_v1.sql`
+11. `20260812135107_audit_events_v1.sql`
+12. `20260812135111_langgraph_lightrag_private_v1.sql`
+13. `20260812135115_indexes_rls_grants_v1.sql`
+
+### Commands and results
+
+```text
+uv run python scripts/ci/check_migrations.py
+→ Phase 2 migration policy OK (13 reviewed files); exit 0
+
+npx supabase db reset --yes
+→ Applied all 13 migrations; exit 0
+
+uv run pytest tests/contract/test_schema_reset.py -q
+→ 1 passed; exit 0
+
+npx supabase gen types typescript --local > packages/core/src/smart_rag_core/generated/database.ts
+→ generated (includes app/langgraph/lightrag schemas)
+```
+
+### Acceptance mapping
+
+| Check | Evidence |
+| --- | --- |
+| Every canonical object documented | `08-data-dictionary.md` |
+| Expand/contract lint | `check_migrations.py` |
+| Clean reset + invariants | `test_schema_reset.py` |
+| `vector(1024)` on chunks | migration + contract test |
+| Current-version cross-doc trigger | migration + contract test |
+| Audit append-only | trigger + contract test |
+| Graph eligibility CHECK | contract test |
+| Job idempotency UNIQUE | contract test |
+| RLS enabled, no policies yet | `indexes_rls_grants_v1.sql` |
+| LangGraph checkpoints reviewed | `langgraph_lightrag_private_v1.sql` |
+| LightRAG vendor DDL deferred | `lightrag.schema_capture_status` |
+| ParadeDB projection only derived IDs | `20260812170000_bm25_projection.sql` |
+
+### Blockers / deferred
+
+- LightRAG vendor table DDL awaits Phase 5 pinned `initialize_storages()` capture (documented stub only).
+- Runtime role grants and RLS policies: Packet 3.
+- HNSW index on `document_chunks.embedding`: after RAM gate / Phase 3 ingest.
+- Generated Supabase TypeScript types: produced by CLI after successful reset.
+
+### Next packet
+
+Packet 3 — least-privilege roles, RLS, ACL, and identity propagation.

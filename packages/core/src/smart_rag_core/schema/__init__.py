@@ -1,0 +1,51 @@
+"""Domain schema models mirroring authoritative Postgres enums and tables."""
+
+from smart_rag_core.schema.enums import (
+    ApprovalStatus,
+    Bm25JobOperation,
+    BudgetReservationStatus,
+    DocumentStatus,
+    DocumentVisibility,
+    JobErrorCategory,
+    JobPriority,
+    JobStatus,
+    LightragJobOperation,
+    RunStatus,
+    ScanResult,
+    SourceType,
+    ToolPermissionLevel,
+    UserRole,
+)
+from smart_rag_core.schema.tables import (
+    AuditEventRecord,
+    CompanySettingsRecord,
+    DocumentChunkRecord,
+    DocumentRecord,
+    DurableJobColumns,
+    IngestionJobRecord,
+    ProfileRecord,
+)
+
+__all__ = [
+    "ApprovalStatus",
+    "AuditEventRecord",
+    "Bm25JobOperation",
+    "BudgetReservationStatus",
+    "CompanySettingsRecord",
+    "DocumentChunkRecord",
+    "DocumentRecord",
+    "DocumentStatus",
+    "DocumentVisibility",
+    "DurableJobColumns",
+    "IngestionJobRecord",
+    "JobErrorCategory",
+    "JobPriority",
+    "JobStatus",
+    "LightragJobOperation",
+    "ProfileRecord",
+    "RunStatus",
+    "ScanResult",
+    "SourceType",
+    "ToolPermissionLevel",
+    "UserRole",
+]
