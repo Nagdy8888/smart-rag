@@ -12,9 +12,7 @@ import unicodedata
 
 ARABIC_NORMALIZATION_VERSION = "arabic_norm_v1"
 
-_DIACRITICS_AND_TATWEEL = re.compile(
-    "[\u064b-\u065f\u0670\u0640\u06d6-\u06ed]"
-)
+_DIACRITICS_AND_TATWEEL = re.compile("[\u064b-\u065f\u0670\u0640\u06d6-\u06ed]")
 _WHITESPACE = re.compile(r"\s+")
 # Preserve hyphen so codes like PO-7781 stay contiguous for lexical match.
 _PUNCT_TO_SPACE = re.compile(r"[^\w\s-]+", flags=re.UNICODE)
