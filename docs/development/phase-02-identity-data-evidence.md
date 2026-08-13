@@ -265,10 +265,33 @@ uv run ruff check/format on touched Python files
 | Auth Admin secret isolated | `PrivilegedAuthSettings` + secret scan test |
 | Rate ownership documented | `AUTH_RATE_LIMIT_OWNERSHIP.md`; `local_auth_throttling_proven=False` |
 
+### Managed Supabase sync (MCP, 2026-08-13)
+
+Connected to account project `smart-rag` (`qsjivtwtmlmtksufqjik`) via
+`plugin-supabase-supabase` MCP (same OAuth path used to create the project).
+
+Applied Packet 2–4 schema migrations onto managed (Packet 1 already present):
+
+- `app_schemas_enums_job_columns_v1` … `indexes_rls_grants_v1`
+- `roles_rls_identity_v1` (history row + remainder via `execute_sql` after truncated
+  first payload)
+- `auth_jwks_invitations_v1`
+
+Verified on managed: schemas `app`/`private`/`search`/`langgraph`/`lightrag`;
+`app.team_invitations.upload_enabled`; `app.revoked_sessions`; roles `app_api` /
+`app_worker` (`NOLOGIN`); managed JWKS publishes ES256 only
+(`kid` `37b8d1b0-4217-4feb-becd-a986437dc994` at probe time).
+
+MCP tool surface covers SQL/migrations/advisors/keys listing — **not**
+`POST/PATCH /v1/projects/{ref}/config/auth/signing-keys` (requires Management API
+OAuth scope `secrets:write` / permission `auth_signing_keys_write`). CLI
+`supabase login` cannot complete in this non-TTY agent shell without `--token`.
+
 ### Blockers / honest gates
 
-- **JWKS rollover not proven**: Management API key rotate unavailable without
-  `SUPABASE_ACCESS_TOKEN`. Verifier + runbook implemented; gate deferred to Phase 10.
+- **JWKS standby→active→retired rollover still not proven**: needs a personal access
+  token (or dashboard rotate while agent polls JWKS). Verifier + runbook + managed
+  schema sync are done; Packet 4 checkbox stays unchecked until lifecycle proof.
 - **Hosted Auth throttling not proven locally**: `local_auth_throttling_proven=False`.
 - **PKCE**: enforced by Supabase client `flowType: 'pkce'` at frontend (Phase 8); local
   Auth stack supports PKCE flow per Supabase docs.

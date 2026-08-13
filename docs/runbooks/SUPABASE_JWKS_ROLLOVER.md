@@ -44,8 +44,8 @@ Local `jwt_expiry = 3600` in `supabase/config.toml`.
 
 | Environment | Rollover API | Packet 4 gate |
 | --- | --- | --- |
-| Local CLI (`127.0.0.1:54321`) | No Management API token in env | **Blocked** — implement verifier + this runbook; prove in Phase 10 |
-| Managed `qsjivtwtmlmtksufqjik` | Requires `SUPABASE_ACCESS_TOKEN` | **Blocked** without token — probe ES256 JWKS presence only |
+| Local CLI (`127.0.0.1:54321`) | No Management API token in env | **Blocked** for provider lifecycle — ES256 JWKS present |
+| Managed `qsjivtwtmlmtksufqjik` | `POST/PATCH …/config/auth/signing-keys` needs PAT with `auth_signing_keys_write` | Schema synced via MCP; **rollover still blocked** — MCP has no signing-keys tool |
 
 ## Operator procedure (managed)
 
