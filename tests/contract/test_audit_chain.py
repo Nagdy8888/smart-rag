@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 
 import psycopg
 import pytest
@@ -15,7 +16,7 @@ from tests.contract.integration_support import resolve_supabase_db_url, try_conn
 
 
 @pytest.fixture
-def db_connection() -> psycopg.Connection:
+def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
     url = resolve_supabase_db_url()
@@ -47,8 +48,10 @@ def test_redact_audit_payload_strips_sensitive_keys() -> None:
     assert redacted["refresh_token"] == marker
     assert redacted["api_secret"] == marker
     assert redacted["client_raw_ip"] == marker
-    assert redacted["nested"]["access_token"] == marker
-    assert redacted["nested"]["path"] == "/a"
+    nested = redacted["nested"]
+    assert isinstance(nested, dict)
+    assert nested["access_token"] == marker
+    assert nested["path"] == "/a"
     assert len(AUDIT_CHAIN_GENESIS_HASH) == 64
 
 
@@ -90,7 +93,9 @@ def test_append_chain_redaction_and_immutability(
             (actor,),
         )
         cursor.execute("SELECT app.current_authorization_version()")
-        auth_version = int(cursor.fetchone()[0])
+        auth_version_row = cursor.fetchone()
+        assert auth_version_row is not None
+        auth_version = int(auth_version_row[0])
 
         cursor.execute("SET ROLE app_audit_writer")
         cursor.execute(
@@ -111,7 +116,9 @@ def test_append_chain_redaction_and_immutability(
             """,
             (actor, actor, auth_version, actor),
         )
-        first_id = cursor.fetchone()[0]
+        first_id_row = cursor.fetchone()
+        assert first_id_row is not None
+        first_id = first_id_row[0]
         cursor.execute(
             """
             SELECT app.append_audit_event(
@@ -126,7 +133,9 @@ def test_append_chain_redaction_and_immutability(
             """,
             (actor, actor, auth_version),
         )
-        second_id = cursor.fetchone()[0]
+        second_id_row = cursor.fetchone()
+        assert second_id_row is not None
+        second_id = second_id_row[0]
 
         cursor.execute("RESET ROLE")
         cursor.execute(
@@ -137,7 +146,9 @@ def test_append_chain_redaction_and_immutability(
             """,
             (first_id,),
         )
-        first_hash, first_prev, first_payload = cursor.fetchone()
+        first_event = cursor.fetchone()
+        assert first_event is not None
+        first_hash, first_prev, first_payload = first_event
         assert first_prev == AUDIT_CHAIN_GENESIS_HASH
         assert first_hash and len(first_hash) == 64
         assert first_payload["password"] == marker
@@ -151,12 +162,16 @@ def test_append_chain_redaction_and_immutability(
             """,
             (second_id,),
         )
-        second_prev, second_payload = cursor.fetchone()
+        second_event = cursor.fetchone()
+        assert second_event is not None
+        second_prev, second_payload = second_event
         assert second_prev == first_hash
         assert second_payload["token"] == marker
 
         cursor.execute("SELECT app.verify_audit_chain(100)")
-        assert cursor.fetchone()[0] is None
+        verification = cursor.fetchone()
+        assert verification is not None
+        assert verification[0] is None
 
         cursor.execute("SET ROLE app_audit_writer")
         with pytest.raises(
@@ -190,7 +205,9 @@ def test_append_chain_redaction_and_immutability(
         )
         cursor.execute("ALTER TABLE app.audit_events ENABLE TRIGGER USER")
         cursor.execute("SELECT app.verify_audit_chain(100)")
-        broken_at = cursor.fetchone()[0]
+        broken_row = cursor.fetchone()
+        assert broken_row is not None
+        broken_at = broken_row[0]
         assert broken_at == second_id
 
 
@@ -214,7 +231,9 @@ def test_verify_detects_reordered_previous_hash(
             """
         )
         # append as security definer via postgres (superuser) is fine
-        first_id = cursor.fetchone()[0]
+        first_id_row = cursor.fetchone()
+        assert first_id_row is not None
+        first_id = first_id_row[0]
         cursor.execute(
             """
             SELECT app.append_audit_event(
@@ -228,12 +247,16 @@ def test_verify_detects_reordered_previous_hash(
             )
             """
         )
-        second_id = cursor.fetchone()[0]
+        second_id_row = cursor.fetchone()
+        assert second_id_row is not None
+        second_id = second_id_row[0]
         cursor.execute(
             "SELECT event_hash FROM app.audit_events WHERE id = %s",
             (first_id,),
         )
-        first_hash = cursor.fetchone()[0]
+        first_hash_row = cursor.fetchone()
+        assert first_hash_row is not None
+        first_hash = first_hash_row[0]
 
         cursor.execute("ALTER TABLE app.audit_events DISABLE TRIGGER USER")
         cursor.execute(
@@ -256,6 +279,8 @@ def test_verify_detects_reordered_previous_hash(
         cursor.execute("ALTER TABLE app.audit_events ENABLE TRIGGER USER")
 
         cursor.execute("SELECT app.verify_audit_chain(100)")
-        broken_at = cursor.fetchone()[0]
+        broken_row = cursor.fetchone()
+        assert broken_row is not None
+        broken_at = broken_row[0]
         assert broken_at == second_id
         assert first_hash

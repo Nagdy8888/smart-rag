@@ -32,7 +32,7 @@ retirement, old tokens must fail closed.
 
 Total acceptance window for a retired key:
 
-```
+```text
 retain_old_key_seconds >= jwt_expiry
                         + app_jwks_cache_seconds (<= 600)
                         + supabase_edge_cache_margin (managed: assume 600)

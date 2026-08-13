@@ -6,7 +6,13 @@
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
-$EnvFile = if (Test-Path "$Root\.env.compose") { "$Root\.env.compose" } else { "$Root\.env.example" }
+$EnvFile = if (Test-Path "$Root\.env.compose") {
+  "$Root\.env.compose"
+} elseif (Test-Path "$Root\.env") {
+  "$Root\.env"
+} else {
+  throw "No Compose environment file found. Run .\scripts\dev.ps1 first."
+}
 
 Write-Host "Using env file: $EnvFile"
 
@@ -19,6 +25,30 @@ function Assert-HttpOk([string]$Url, [string]$ExpectSubstring) {
   Write-Host "OK $Url"
 }
 
+function Assert-ValkeyPolicy(
+  [string]$Service,
+  [string]$AuthenticatedCommand,
+  [string]$ExpectedPolicy
+) {
+  $ping = docker compose --env-file $EnvFile exec -T $Service sh -c "$AuthenticatedCommand ping"
+  if ($LASTEXITCODE -ne 0 -or (($ping -join "`n").Trim()) -ne "PONG") {
+    throw "$Service authenticated ping failed."
+  }
+
+  $policy = docker compose --env-file $EnvFile exec -T $Service sh -c "$AuthenticatedCommand config get maxmemory-policy"
+  $policyLines = @(($policy -join "`n").Trim() -split "\r?\n")
+  if ($LASTEXITCODE -ne 0 -or $policyLines[-1].Trim() -ne $ExpectedPolicy) {
+    throw "$Service policy mismatch: expected $ExpectedPolicy, received '$($policyLines[-1])'."
+  }
+
+  $unauthenticated = docker compose --env-file $EnvFile exec -T $Service valkey-cli --raw ping 2>&1
+  if (($unauthenticated -join "`n") -notmatch "NOAUTH") {
+    throw "$Service accepted an unauthenticated ping."
+  }
+
+  Write-Host "OK $Service authenticated with $ExpectedPolicy policy"
+}
+
 # Published endpoints
 Assert-HttpOk "http://127.0.0.1:8000/health/live" "live"
 Assert-HttpOk "http://127.0.0.1:8000/health/ready" "unconfigured"
@@ -29,7 +59,7 @@ $ports = docker compose --env-file $EnvFile ps --format json | ConvertFrom-Json
 $private = @("paradedb", "valkey-limits", "valkey-cache", "crawl-proxy")
 foreach ($name in $private) {
   $svc = $ports | Where-Object { $_.Service -eq $name -or $_.Name -match $name }
-  if (-not $svc) { Write-Host "WARN missing service in ps: $name"; continue }
+  if (-not $svc) { throw "Required private service missing from Compose: $name" }
   $publish = @($svc.Publishers)
   $hostPublished = @($publish | Where-Object { $_.PublishedPort -and ([int]$_.PublishedPort) -gt 0 })
   if ($hostPublished.Count -gt 0) {
@@ -37,6 +67,10 @@ foreach ($name in $private) {
   }
   Write-Host "OK private (no host publish): $name"
 }
+
+# Authenticated Valkey behavior and independent eviction policies
+Assert-ValkeyPolicy "valkey-limits" 'valkey-cli -a "$VALKEY_LIMITS_PASSWORD" --no-auth-warning --raw' "noeviction"
+Assert-ValkeyPolicy "valkey-cache" 'valkey-cli -a "$VALKEY_CACHE_PASSWORD" --no-auth-warning --raw' "allkeys-lru"
 
 # ParadeDB pg_search via exec
 $ext = docker compose --env-file $EnvFile exec -T paradedb psql -U paradedb -d paradedb -tAc "SELECT extname FROM pg_extension WHERE extname='pg_search'"
@@ -54,9 +88,18 @@ except urllib.error.HTTPError as e:
 if ($deny.Trim() -ne "403") { throw "crawl proxy did not deny: $deny" }
 Write-Host "OK crawl-proxy deny-by-default"
 
-# Non-root api user
-$user = docker compose --env-file $EnvFile exec -T api python -c "import os; print(os.getuid())"
-if ($user.Trim() -ne "10001") { throw "api not running as uid 10001: $user" }
-Write-Host "OK api non-root uid 10001"
+# Non-root application users
+foreach ($service in @("api", "worker", "frontend")) {
+  $user = docker compose --env-file $EnvFile exec -T $service id -u
+  if ($user.Trim() -ne "10001") { throw "$service not running as uid 10001: $user" }
+  Write-Host "OK $service non-root uid 10001"
+}
 
-Write-Host "Local foundation verification passed (readiness remains unconfigured for business deps)."
+# Runtime profile must select the deterministic no-provider adapter.
+$mockMode = docker compose --env-file $EnvFile exec -T api sh -c 'test "$MOCK_MODEL_MODE" = "true" && printf true'
+if ($LASTEXITCODE -ne 0 -or $mockMode.Trim() -ne "true") {
+  throw "API container is not running with MOCK_MODEL_MODE=true."
+}
+Write-Host "OK API mock-model profile"
+
+Write-Host "Local foundation verification passed; business readiness remains intentionally unconfigured."

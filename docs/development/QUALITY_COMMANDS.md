@@ -2,7 +2,7 @@
 title: Quality commands
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-13
 audience: engineering
 ---
 
@@ -22,5 +22,19 @@ uv run python scripts/ci/check_migrations.py
 ```
 
 Tiers hard-fail (no `|| true`). Zero collected tests fail the unit/contract tiers.
+Markdown checks cover maintained documentation. Preserved historical reviews in
+`docs/prev_review/` and generated Stitch source exports in
+`docs/stitch_smart_rag_enterprise_console/` are explicitly excluded and must
+not be cited as current implementation evidence.
+
+Dependency and secret scans use the locked Python/Node graphs and the same Gitleaks version as PR CI:
+
+```powershell
+uv export --frozen --all-packages --group dev --no-emit-workspace --format requirements.txt --output-file .tmp-audit-requirements.txt
+uv run pip-audit --strict --requirement .tmp-audit-requirements.txt
+Remove-Item .tmp-audit-requirements.txt
+pnpm audit --audit-level high
+docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f detect --source=/repo --no-banner --redact
+```
 
 [docs index](../README.md) · [CI tiers](./CI_TIERS.md)

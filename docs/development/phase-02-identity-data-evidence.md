@@ -509,4 +509,3 @@ faking.
 Please review Packet 6 evidence and the Phase 2 Done-when map above. If you
 **accept**, reply that Phase 2 is accepted so the wrapper `status` may be set to
 `complete` in a follow-up. Do **not** start Phase 3 until that acceptance.
-

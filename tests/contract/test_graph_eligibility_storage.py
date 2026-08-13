@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 
 import psycopg
 import pytest
@@ -40,11 +41,13 @@ def _auth_version(cursor: psycopg.Cursor) -> int:
     """Return the live company authorization_version."""
 
     cursor.execute("SELECT app.current_authorization_version()")
-    return int(cursor.fetchone()[0])
+    row = cursor.fetchone()
+    assert row is not None
+    return int(row[0])
 
 
 @pytest.fixture
-def db_connection() -> psycopg.Connection:
+def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
     url = resolve_supabase_db_url()
@@ -107,7 +110,9 @@ def test_assert_graph_index_rejects_restricted_non_current_deleted(
             "SELECT app.assert_graph_index_allowed(%s, %s)",
             (doc_id, version_a),
         )
-        assert cursor.fetchone()[0] is True
+        allowed = cursor.fetchone()
+        assert allowed is not None
+        assert allowed[0] is True
 
         cursor.execute("SAVEPOINT non_current")
         with pytest.raises(psycopg.Error):
@@ -153,7 +158,9 @@ def test_assert_graph_index_rejects_restricted_non_current_deleted(
             """,
             (doc_id,),
         )
-        assert cursor.fetchone()[0] >= 1
+        cleanup_jobs = cursor.fetchone()
+        assert cleanup_jobs is not None
+        assert cleanup_jobs[0] >= 1
 
         cursor.execute(
             """
@@ -236,7 +243,9 @@ def test_admin_notification_helper_and_fixtures(
             )
             """
         )
-        note_id = cursor.fetchone()[0]
+        note_id_row = cursor.fetchone()
+        assert note_id_row is not None
+        note_id = note_id_row[0]
         assert note_id is not None
         cursor.execute("RESET ROLE")
         cursor.execute(

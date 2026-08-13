@@ -19,20 +19,23 @@ from typing import Any
 import httpx
 import jwt
 from smart_rag_core.security.jwks import JwksVerificationError, JwksVerifier
+from smart_rag_core.settings import load_jwks_rollover_settings
 
 ROOT = Path(__file__).resolve().parents[2]
 MANAGEMENT = "https://api.supabase.com/v1"
 STATE_PATH = ROOT / ".tmp-jwks-rollover-state.json"
 
 
-def _require(name: str) -> str:
-    value = os.environ.get(name, "").strip()
-    if not value:
-        raise SystemExit(f"missing required env {name}")
-    return value
-
-
 def _mgmt_headers(token: str) -> dict[str, str]:
+    """Build authenticated Supabase Management API request headers.
+
+    Args:
+        token: Short-lived Supabase access token.
+
+    Returns:
+        JSON request headers carrying the bearer token.
+    """
+
     return {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
@@ -41,6 +44,20 @@ def _mgmt_headers(token: str) -> dict[str, str]:
 
 
 def _list_keys(client: httpx.Client, ref: str, token: str) -> list[dict[str, Any]]:
+    """Fetch signing-key records for one managed Supabase project.
+
+    Args:
+        client: Bounded HTTP client.
+        ref: Supabase project reference.
+        token: Supabase Management API access token.
+
+    Returns:
+        Signing-key records returned by the management endpoint.
+
+    Raises:
+        httpx.HTTPStatusError: If the management request fails.
+    """
+
     response = client.get(
         f"{MANAGEMENT}/projects/{ref}/config/auth/signing-keys",
         headers=_mgmt_headers(token),
@@ -51,6 +68,19 @@ def _list_keys(client: httpx.Client, ref: str, token: str) -> list[dict[str, Any
 
 
 def _jwks_kids(client: httpx.Client, managed_url: str) -> set[str]:
+    """Fetch currently published JWKS key identifiers.
+
+    Args:
+        client: Bounded HTTP client.
+        managed_url: Managed Supabase project URL.
+
+    Returns:
+        Non-empty key identifiers in the public JWKS.
+
+    Raises:
+        httpx.HTTPStatusError: If the JWKS request fails.
+    """
+
     response = client.get(f"{managed_url.rstrip('/')}/auth/v1/.well-known/jwks.json")
     response.raise_for_status()
     return {
@@ -59,6 +89,15 @@ def _jwks_kids(client: httpx.Client, managed_url: str) -> set[str]:
 
 
 def _decode_header(token: str) -> dict[str, Any]:
+    """Decode an unverified JWT header for rollover assertions.
+
+    Args:
+        token: JWT returned by managed Supabase Auth.
+
+    Returns:
+        Header fields without treating them as verified authorization data.
+    """
+
     return dict(jwt.get_unverified_header(token))
 
 
@@ -69,10 +108,11 @@ def main() -> int:
         Process exit code ``0`` on success.
     """
 
-    access_token = _require("SUPABASE_ACCESS_TOKEN")
-    ref = _require("SUPABASE_PROJECT_REF")
-    managed_url = _require("SUPABASE_MANAGED_URL").rstrip("/")
-    anon_key = _require("SUPABASE_ANON_KEY")
+    settings = load_jwks_rollover_settings()
+    access_token = settings.supabase_access_token.get_secret_value()
+    ref = settings.supabase_project_ref
+    managed_url = str(settings.supabase_managed_url).rstrip("/")
+    anon_key = settings.supabase_anon_key.get_secret_value()
 
     with httpx.Client(timeout=30.0) as client:
         keys = _list_keys(client, ref, access_token)
@@ -217,6 +257,7 @@ def main() -> int:
         print(f"revoked={old_id}")
 
         # Edge caches JWKS for ~10 minutes; poll until old kid disappears.
+        kids: set[str] = set()
         for attempt in range(90):
             kids = _jwks_kids(client, managed_url)
             if old_id not in kids and new_id in kids:

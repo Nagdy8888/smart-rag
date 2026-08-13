@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
@@ -39,7 +40,7 @@ def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) ->
 
 
 @pytest.fixture
-def db_connection() -> psycopg.Connection:
+def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
     url = resolve_supabase_db_url()
@@ -146,12 +147,16 @@ def test_list_never_finalized_and_over_limit_candidates(
             "SELECT app.release_expired_upload_reservations(%s)",
             (as_of,),
         )
-        first_release = cursor.fetchone()[0]
+        first_release_row = cursor.fetchone()
+        assert first_release_row is not None
+        first_release = first_release_row[0]
         cursor.execute(
             "SELECT app.release_expired_upload_reservations(%s)",
             (as_of,),
         )
-        second_release = cursor.fetchone()[0]
+        second_release_row = cursor.fetchone()
+        assert second_release_row is not None
+        second_release = second_release_row[0]
         assert first_release >= 1
         assert second_release == 0  # idempotent
 
@@ -185,25 +190,66 @@ def test_cleanup_uses_storage_api_not_sql_delete(
     calls: list[tuple[str, str]] = []
 
     def _fake_delete(settings: object, *, bucket: str, object_path: str) -> None:
+        """Record one Storage deletion without performing network I/O.
+
+        Args:
+            settings: Unused Storage administration settings.
+            bucket: Restricted Storage bucket name.
+            object_path: Object path selected for cleanup.
+        """
+
         calls.append((bucket, object_path))
 
     monkeypatch.setattr(qc, "delete_object", _fake_delete)
 
     # Avoid real DB: patch mark path by short-circuiting psycopg.connect
     class _Conn:
+        """Minimal context-managed connection used after Storage deletion."""
+
         def __enter__(self) -> _Conn:
+            """Return the fake connection for the cleanup context."""
+
             return self
 
         def __exit__(self, *args: object) -> None:
+            """Leave the fake connection without suppressing exceptions.
+
+            Args:
+                *args: Context-manager exception details, if any.
+            """
+
             return None
 
         def execute(self, *args: object, **kwargs: object) -> None:
+            """Accept the cleanup completion statement without persistence.
+
+            Args:
+                *args: Positional query arguments.
+                **kwargs: Keyword query arguments.
+            """
+
             return None
 
         def commit(self) -> None:
+            """Accept the completion commit without persistence."""
+
             return None
 
-    monkeypatch.setattr(qc.psycopg, "connect", lambda *a, **k: _Conn())
+    def _fake_connect(*args: object, **kwargs: object) -> _Conn:
+        """Return a fake connection for any psycopg connection arguments.
+
+        Args:
+            *args: Ignored positional connection arguments.
+            **kwargs: Ignored keyword connection arguments.
+
+        Returns:
+            Context-managed fake connection.
+        """
+
+        del args, kwargs
+        return _Conn()
+
+    monkeypatch.setattr(qc.psycopg, "connect", _fake_connect)
 
     candidate = CleanupCandidate(
         reservation_id=uuid.uuid4(),

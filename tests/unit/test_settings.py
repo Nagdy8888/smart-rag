@@ -7,9 +7,12 @@ from smart_rag_core.settings import (
     AgentSettings,
     BackendSettings,
     Environment,
+    JwksRolloverSettings,
     SettingsValidationError,
     WorkerSettings,
     load_backend_settings,
+    load_jwks_rollover_settings,
+    load_worker_settings,
 )
 
 
@@ -76,3 +79,32 @@ def test_real_model_mode_requires_provider_credential(
 
     with pytest.raises(SettingsValidationError):
         load_backend_settings()
+
+
+def test_worker_one_shot_flag_loads_through_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The worker smoke-test switch is parsed only by its typed loader."""
+
+    monkeypatch.setenv("WORKER_ONCE", "true")
+    assert load_worker_settings().worker_once is True
+
+
+def test_jwks_operation_settings_validate_and_redact_secrets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Managed rollover settings validate endpoints without exposing tokens."""
+
+    access_token = "local-management-proof-token"  # noqa: S105 - inert fixture
+    anon_key = "local-publishable-proof-key"
+    monkeypatch.setenv("SUPABASE_ACCESS_TOKEN", access_token)
+    monkeypatch.setenv("SUPABASE_PROJECT_REF", "abcdefghijklmnopqrst")
+    monkeypatch.setenv("SUPABASE_MANAGED_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", anon_key)
+
+    settings = load_jwks_rollover_settings()
+
+    assert isinstance(settings, JwksRolloverSettings)
+    assert settings.supabase_project_ref == "abcdefghijklmnopqrst"
+    assert access_token not in repr(settings)
+    assert anon_key not in repr(settings)

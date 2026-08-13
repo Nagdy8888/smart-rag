@@ -6,6 +6,8 @@ import subprocess
 import sys
 import textwrap
 
+import pytest
+
 
 def test_core_import() -> None:
     """Core package imports without constructing providers."""
@@ -25,11 +27,14 @@ def test_backend_app_import_exposes_unconfigured_readiness() -> None:
     assert payload["status"] == "unconfigured"
 
 
-def test_worker_main_returns_zero_without_claiming_jobs() -> None:
+def test_worker_main_returns_zero_without_claiming_jobs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Worker main is callable and does not claim queue success."""
 
     from smart_rag_worker.main import main
 
+    monkeypatch.setenv("WORKER_ONCE", "1")
     assert main() == 0
 
 

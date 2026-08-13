@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 
 import psycopg
@@ -15,10 +16,27 @@ INVITATION_WINDOW_HOURS = 24
 
 
 def _token_hash(raw: str) -> str:
+    """Hash one raw invitation token for database comparison.
+
+    Args:
+        raw: Unhashed single-use invitation token.
+
+    Returns:
+        Lowercase SHA-256 hexadecimal digest.
+    """
+
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) -> None:
+    """Insert one minimal Auth user needed by invitation foreign keys.
+
+    Args:
+        cursor: Open test transaction cursor.
+        user_id: Stable test user identifier.
+        email: Test user email address.
+    """
+
     cursor.execute(
         """
         INSERT INTO auth.users (
@@ -43,7 +61,7 @@ def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) ->
 
 
 @pytest.fixture
-def db_connection() -> psycopg.Connection:
+def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
     url = resolve_supabase_db_url()
     connection = try_connect(url)
@@ -80,21 +98,27 @@ def test_accept_invitation_idempotent_and_rejects_replay(
             """,
             (email, digest, expires_at),
         )
-        invitation_id = cursor.fetchone()[0]
+        invitation_row = cursor.fetchone()
+        assert invitation_row is not None
+        invitation_id = invitation_row[0]
 
         cursor.execute("SET ROLE app_api")
         cursor.execute(
             "SELECT app.accept_invitation(%s, %s, %s)",
             (digest, invitee, email),
         )
-        first = cursor.fetchone()[0]
+        first_row = cursor.fetchone()
+        assert first_row is not None
+        first = first_row[0]
         assert first == invitation_id
 
         cursor.execute(
             "SELECT app.accept_invitation(%s, %s, %s)",
             (digest, invitee, email),
         )
-        second = cursor.fetchone()[0]
+        second_row = cursor.fetchone()
+        assert second_row is not None
+        second = second_row[0]
         assert second == invitation_id
 
         with pytest.raises(psycopg.errors.RaiseException, match="already accepted"):
@@ -140,6 +164,10 @@ def test_bootstrap_owner_race_safe_once(db_connection: psycopg.Connection) -> No
         cursor.execute("DELETE FROM app.profiles WHERE role = 'owner'::app.user_role")
         cursor.execute("SET ROLE app_api")
         cursor.execute("SELECT app.bootstrap_owner(%s)", (owner,))
-        assert cursor.fetchone()[0] is True
+        first_bootstrap = cursor.fetchone()
+        assert first_bootstrap is not None
+        assert first_bootstrap[0] is True
         cursor.execute("SELECT app.bootstrap_owner(%s)", (uuid.uuid4(),))
-        assert cursor.fetchone()[0] is False
+        second_bootstrap = cursor.fetchone()
+        assert second_bootstrap is not None
+        assert second_bootstrap[0] is False

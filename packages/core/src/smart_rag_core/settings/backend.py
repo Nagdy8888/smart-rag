@@ -45,7 +45,7 @@ class BackendSettings(SharedSettings):
         json_schema_extra={"security": "public"},
     )
     supabase_url: AnyHttpUrl = Field(
-        default="http://127.0.0.1:54321",
+        default=AnyHttpUrl("http://127.0.0.1:54321"),
         validation_alias="SUPABASE_URL",
         description="Supabase project URL for JWKS discovery.",
         json_schema_extra={"security": "public"},

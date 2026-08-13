@@ -2,7 +2,7 @@
 title: Tool and dependency versions (Phase 1)
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-13
 audience: engineering
 ---
 
@@ -29,6 +29,9 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | Pydantic Settings | [Pydantic Settings documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) |
 | Ruff format/lint/pydocstyle | [Ruff documentation](https://docs.astral.sh/ruff/) |
 | Pyright strict configuration | [Pyright configuration](https://github.com/microsoft/pyright/blob/main/docs/configuration.md) |
+| Python dependency audit | [pip-audit](https://github.com/pypa/pip-audit) |
+| Supabase local CLI | [Supabase CLI](https://supabase.com/docs/reference/cli/introduction) |
+| Secret scan | [Gitleaks Action](https://github.com/gitleaks/gitleaks-action) |
 | Vitest | [Vitest guide](https://vitest.dev/guide/) |
 | Playwright | [Playwright test documentation](https://playwright.dev/docs/intro) |
 | Markdown lint | [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) |
@@ -51,6 +54,8 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | Pyright (dev) | 1.1.411 |
 | pre-commit (dev) | 4.6.2 |
 | PyYAML (dev) | 6.0.3 |
+| pip-audit (dev) | 2.10.1 |
+| PyJWT[crypto] | 2.13.0 |
 
 ## Direct Node pins
 
@@ -64,6 +69,14 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | Playwright Test | 1.62.1 |
 | markdownlint-cli2 (root) | 0.23.2 |
 | Mermaid CLI (root) | 11.16.0 |
+| Supabase CLI (root) | 2.114.0 |
+
+## Security scan pins
+
+| Scanner | Pin |
+| --- | --- |
+| Gitleaks Action | v3.0.0 commit `e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e` |
+| Gitleaks CLI | 8.30.1 / image index `sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f` |
 
 Frontend application package name: `smart-rag-frontend`.
 

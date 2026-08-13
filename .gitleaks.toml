@@ -1,0 +1,28 @@
+title = "Smart RAG secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Canonical plan prose that names token and API concepts without values"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)\.cursor/plans/hybrid-graph-rag/02-phase-identity-data\.md$''',
+  '''(?:^|/)\.cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/00-shared-contracts\.md$''',
+]
+regexes = [
+  '''invented narrow service tokens, ClamAV/freshclam execution''',
+  '''visible diagnostic, state family, API mapping, Arabic/bidirectional fixture''',
+]
+
+[[allowlists]]
+description = "SHA-256 values in generated plan-integrity manifests"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)(?:\.cursor/plans/hybrid-graph-rag|scripts/plan_integrity)/plan-integrity-lock\.json$''',
+]
+regexes = [
+  '''^\s*".+\.md": "[0-9a-f]{64}",?\s*$''',
+]

@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-13
 audience: developers, operators
 ---
 
@@ -36,9 +36,26 @@ Validation errors list field paths and categories but omit source values.
 | `API_BIND_HOST` | non-empty string; `0.0.0.0` | public | Uvicorn bind address used only by the console entrypoint |
 | `API_BIND_PORT` | integer 1–65,535; `8000` | public | Uvicorn container port |
 
-Worker and agent settings currently add only a stable, non-environment service
-name. Queue, ingestion, retrieval, auth, RLS, and graph settings are not
-implemented in this packet.
+## Worker-only variables
+
+| Variable | Type / default | Security | Contract |
+| --- | --- | --- | --- |
+| `WORKER_ONCE` | boolean; `false` | public | Exit after one honest foundation startup probe; used by tests and smoke checks |
+
+Agent settings currently add only a stable, non-environment service name.
+Queue, ingestion, retrieval, and graph settings remain owned by later phases.
+
+## Managed proof-operation variables
+
+The destructive JWKS rollover script loads its values through
+`JwksRolloverSettings`, not direct process-environment reads:
+
+| Variable | Type / default | Security | Contract |
+| --- | --- | --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | required secret | secret | Short-lived Management API token |
+| `SUPABASE_PROJECT_REF` | required safe identifier | internal | Explicit managed project target |
+| `SUPABASE_MANAGED_URL` | required HTTP URL | internal | Managed Auth/JWKS origin |
+| `SUPABASE_ANON_KEY` | required key | secret | Publishable Auth key redacted from settings representations |
 
 ## Local Compose-only variables
 

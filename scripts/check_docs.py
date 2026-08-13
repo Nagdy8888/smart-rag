@@ -14,6 +14,10 @@ from urllib.parse import unquote
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = REPO_ROOT / "docs"
+EXCLUDED_DOC_ROOTS = (
+    DOCS_ROOT / "prev_review",
+    DOCS_ROOT / "stitch_smart_rag_enterprise_console",
+)
 LINK_PATTERN = re.compile(r"!?\[[^\]]*]\(([^)]+)\)")
 MERMAID_PATTERN = re.compile(r"```mermaid\s*\n(.*?)```", flags=re.DOTALL)
 ALLOWED_MERMAID_KINDS = {
@@ -42,10 +46,11 @@ class LinkFailure:
 
 
 def documentation_files() -> list[Path]:
-    """Return maintained Markdown documents in stable order.
+    """Return maintained, non-historical Markdown documents in stable order.
 
     Returns:
-        Sorted documentation paths.
+        Sorted documentation paths excluding preserved review history and
+        generated Stitch source exports.
 
     Raises:
         FileNotFoundError: If the required ``docs`` directory is absent.
@@ -53,7 +58,11 @@ def documentation_files() -> list[Path]:
 
     if not DOCS_ROOT.is_dir():
         raise FileNotFoundError("Required docs directory is missing")
-    files = sorted(DOCS_ROOT.rglob("*.md"))
+    files = sorted(
+        path
+        for path in DOCS_ROOT.rglob("*.md")
+        if not any(path.is_relative_to(root) for root in EXCLUDED_DOC_ROOTS)
+    )
     if not files:
         raise FileNotFoundError("Docs tier collected zero Markdown documents")
     return files

@@ -2,7 +2,7 @@
 title: ADR index and backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-13
 audience: engineering
 ---
 
@@ -16,7 +16,7 @@ audience: engineering
 | Expand/contract migrations | accepted | 1 | [ADR-expand-contract-migrations.md](./ADR-expand-contract-migrations.md) |
 | API/SSE compatibility | accepted | 1 | [ADR-api-sse-compatibility.md](./ADR-api-sse-compatibility.md) |
 | Vision captioning trigger | proposed | 1 | [ADR-vision-captioning.md](./ADR-vision-captioning.md) |
-| Embedding model/dimension | proposed | 2 gate | [ADR-embedding-model-dimension.md](./ADR-embedding-model-dimension.md) |
+| Embedding model/dimension | accepted | 2 gate | [ADR-embedding-model-dimension.md](./ADR-embedding-model-dimension.md) |
 | Privileged Auth administration boundary | accepted | 2 | [ADR-privileged-auth-administration-boundary.md](./ADR-privileged-auth-administration-boundary.md) |
 | Upload capability / Storage privilege | accepted | 2 | [ADR-upload-capability-and-storage-privilege.md](./ADR-upload-capability-and-storage-privilege.md) |
 | Graph eligibility / ACL isolation | planned | 2/5 | TBD |

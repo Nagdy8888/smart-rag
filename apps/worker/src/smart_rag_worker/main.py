@@ -7,8 +7,9 @@ tests only.
 
 from __future__ import annotations
 
-import os
 import time
+
+from smart_rag_core.settings import load_worker_settings
 
 
 def main() -> int:
@@ -28,7 +29,8 @@ def main() -> int:
         "queue processing is unconfigured.",
         flush=True,
     )
-    if os.environ.get("WORKER_ONCE", "").lower() in {"1", "true", "yes"}:
+    settings = load_worker_settings()
+    if settings.worker_once:
         return 0
     while True:
         time.sleep(3600)

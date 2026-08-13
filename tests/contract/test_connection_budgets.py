@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import psycopg
@@ -79,7 +80,7 @@ def _parse_rolconfig(raw: list[str] | None) -> dict[str, str]:
 
 
 @pytest.fixture
-def db_connection() -> psycopg.Connection:
+def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
     url = resolve_supabase_db_url()
@@ -160,7 +161,9 @@ def test_app_api_can_connect_and_validate_without_session_gucs(
 
         cursor.execute("SET ROLE app_api")
         cursor.execute("SELECT app.validate_caller_context(NULL, NULL, NULL)")
-        assert cursor.fetchone()[0] is False
+        validation = cursor.fetchone()
+        assert validation is not None
+        assert validation[0] is False
 
         cursor.execute("RESET ROLE")
         cursor.execute("SELECT current_setting('role', true)")

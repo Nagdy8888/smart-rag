@@ -7,6 +7,8 @@
     "MD025": false
   },
   "globs": [
+    "!docs/prev_review/**",
+    "!docs/stitch_smart_rag_enterprise_console/**",
     "!prev_review/**",
     "!node_modules/**"
   ]

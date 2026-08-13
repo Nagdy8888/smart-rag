@@ -99,7 +99,9 @@ def test_schema_objects_exist_and_invariants_hold() -> None:
                 RETURNING id
                 """
             )
-            audit_id = cursor.fetchone()[0]
+            audit_row = cursor.fetchone()
+            assert audit_row is not None
+            audit_id = audit_row[0]
 
             with pytest.raises(psycopg.errors.RaiseException, match="append-only"):
                 cursor.execute("SAVEPOINT audit_update")

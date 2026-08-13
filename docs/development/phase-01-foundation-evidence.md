@@ -1,8 +1,8 @@
 ---
 title: Phase 1 foundation — packet evidence
 owner: engineering-lead
-status: in_progress
-last-reviewed: 2026-08-12
+status: accepted
+last-reviewed: 2026-08-13
 audience: engineering, reviewers
 ---
 
@@ -280,12 +280,14 @@ AST exclusions are caches/build output, `prev_review/`, and explicit vendor path
 
 **Packet 4 checked** — all Packet 4 gates pass; proceed only to Packet 5 in a fresh run.
 
-## Packet 5 � CI tiers and documentation foundation
+## Packet 5 — CI tiers and documentation foundation
 
 ### Requirement
+
 Create tiered CI and documentation index, C4 skeleton, ADRs, governance drafts, migration/API policies, admin-alert contract.
 
 ### Commands
+
 | Command | Exit |
 | --- | --- |
 | verify_plan_integrity.py | 0 (82 files) |
@@ -294,11 +296,13 @@ Create tiered CI and documentation index, C4 skeleton, ADRs, governance drafts, 
 | check.py --tier fast | 0 (Packet 4 baseline) |
 
 ### Notes
+
 - Governance docs remain `draft` (unsigned).
 - Remote GitHub Actions execution unverified until first workflow run on GitHub.
 - `.cursor/plans|rules|skills` committed for CI; other `.cursor/*` still ignored.
 
 ### Packet 5 checkbox
+
 **Checked** for authored docs/CI. Remote CI run pending.
 
 ## Packet 6 — one-command startup and Phase 1 exit proof
@@ -344,3 +348,100 @@ Create tiered CI and documentation index, C4 skeleton, ADRs, governance drafts, 
 | Interpretation | Accept Phase 1 foundation exit record; Phase 2 may start |
 | Phase status | `complete` |
 
+## Packet 6 audit-clean re-verification — 2026-08-13
+
+### Requirement
+
+> Prove one-command local startup and all Phase 1 fast gates, then record
+> evidence before Phase 2 starts.
+
+This re-verification repairs stale Phase 1 evidence without changing the
+accepted phase scope or the canonical plan.
+
+### Files and behavior repaired
+
+- `dev.ps1`, `stop.ps1`, `reset.ps1`, and `verify-local.ps1` now use the same
+  `.env.compose` then `.env` precedence and the workspace-pinned Supabase CLI.
+  Startup suppresses CLI credential output, stop preserves data, and reset
+  returns exit code 2 unless `-ConfirmReset` is explicit.
+- Runtime verification now fails on a missing private service and proves both
+  authenticated Valkey policies, unauthenticated denial, ParadeDB `pg_search`,
+  crawl-proxy denial, private ports, non-root application users, and the
+  mock-model runtime profile.
+- PR CI now runs SHA-pinned Gitleaks v3 with scanner 8.30.1, strict pip-audit,
+  and pnpm audit. Checkout uses the current Node 24 action runtime pin in all
+  workflows. Narrow `.gitleaks.toml` rules allow only canonical plan prose and
+  generated SHA-256 manifest lines that were demonstrated as false positives.
+- The initial dependency scan found vulnerable `PyJWT 2.10.1`; the direct pin
+  is now `2.13.0`. PyJWT exception handling remains fail closed.
+- Strict typing, centralized environment settings, documentation lint scope,
+  and the worker one-shot smoke contract were repaired without ignores,
+  disabled gates, or changes to authorization behavior.
+
+### Passed
+
+| Command or proof | Exit | Result |
+| --- | ---: | --- |
+| `.\scripts\dev.ps1` | 0 | Pinned Supabase CLI plus all Compose services started; no AWS or OpenAI credential required |
+| `.\scripts\verify-local.ps1` before and after restart | 0 / 0 | All Phase 1 runtime, private-network, policy, denial, extension, UID, and mock-profile assertions passed |
+| Set and save `phase1:volume-proof`, `.\scripts\stop.ps1`, restart, then `GET` | 0 | Returned `preserved`; stop/restart retained the Valkey volume |
+| `uv run python scripts/check.py --tier fast` | 0 | 18 unit passed; 100 contract passed; maintained docs, frontend lint/types/Vitest/build, and Playwright version passed |
+| `uv run pyright` | 0 | 0 errors, 0 warnings |
+| Split-plan integrity verifier | 0 | 82 canonical files verified |
+| `scripts/ci/check_migrations.py` | 0 | 17 reviewed migrations passed policy |
+| `scripts/ci/check_openapi.py` | 0 | Foundation OpenAPI snapshot matched |
+| `docker compose --env-file .env.compose config --quiet` | 0 | Compose rendered successfully |
+| Frozen uv and pnpm installs | 0 / 0 | 95 Python packages checked; Node lockfile current |
+| `pip-audit --strict` over frozen uv export | 0 | No known vulnerabilities |
+| `pnpm audit --audit-level high` | 0 | No known vulnerabilities |
+| Gitleaks 8.30.1 pinned image over repository history | 0 | 19 commits and about 2.09 MB scanned; no leaks |
+| `.\scripts\reset.ps1` without confirmation | 2 | Destructive reset refused before any data removal |
+| Intentional missing-docstring fixture through the scanner | 1 expected | One violation detected; clean tree remained enabled |
+
+The six contract skips are not Phase 1 gates: four require an explicitly paid
+OpenAI embedding run, one requires a managed Supabase access token for signing
+key rollover, and one requires a managed database URL. Their existing Phase 2
+evidence and ownership remain unchanged.
+
+### Failed and repaired during this run
+
+- The first strict audit found 12 PyJWT advisories for one vulnerable pin.
+  Upgrading to 2.13.0 removed all findings.
+- The first fast attempt exposed 105 strict-type errors. Precise JSON
+  narrowing, typed fixtures, row assertions, and the supported PyJWT exception
+  contract reduced the result to zero without weakening Pyright.
+- A later unit run hung because the worker smoke test called its intentionally
+  long-running process without `WORKER_ONCE`. The flag is now typed in
+  `WorkerSettings`; the complete unit suite finishes normally.
+- The environment boundary rejected direct reads in the worker and rollover
+  script. Both now load through `smart_rag_core.settings`.
+- Markdown lint initially included preserved historical reviews and generated
+  Stitch source exports. Those non-maintained inputs are explicitly excluded;
+  all 48 maintained documents pass lint, links, and Mermaid rendering.
+- Gitleaks initially reported eight plan prose/hash false positives. No broad
+  path exclusion was added; exact path-and-line allowlists were verified
+  against a second full-history scan.
+
+### Blocked
+
+- Updated remote CI cannot be observed until these uncommitted changes are
+  committed and pushed. The latest visible
+  [PR fast run](https://github.com/Nagdy8888/smart-rag/actions/runs/31681831140)
+  failed on older commit `42b7c711cb42821559fb5baa0b33963dffb6a26e`;
+  its paired Main run was cancelled. Local workflow-equivalent gates pass, but
+  this record does not claim a green remote run.
+
+### Not run
+
+- The confirmed destructive reset was not run against the current Phase 2
+  local database. Packet 2's deterministic double-reset proof owns that
+  disposable reset and schema comparison. The required fail-closed confirmation
+  route is proven above.
+
+### Handoff and rollback
+
+Phase 1 remains accepted and locally re-verified. Remote CI is the only Phase 1
+audit blocker. Dependency rollback would reintroduce known PyJWT advisories and
+is prohibited; script/workflow rollback is ordinary source reversion after
+preserving this evidence. Proceed to Phase 2 Packet 2 only in a fresh model run,
+where two confirmed disposable resets are required.

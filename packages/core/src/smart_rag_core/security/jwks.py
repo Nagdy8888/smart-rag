@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
 
 import httpx
 import jwt
-from jwt import PyJWK, PyJWKSet, algorithms
+from cryptography.exceptions import UnsupportedAlgorithm
+from jwt import PyJWK, PyJWKSet
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ class VerifiedAccessToken:
     assurance_level: str | None
     expires_at: int
     issued_at: int | None
-    raw_claims: dict[str, Any]
+    raw_claims: dict[str, object]
 
 
 @dataclass
@@ -44,6 +45,77 @@ class _JwksCache:
 
     jwks: PyJWKSet
     fetched_at: float
+
+
+def _string_keyed_object(value: object, *, error_message: str) -> dict[str, object]:
+    """Validate and narrow one decoded JSON object.
+
+    Args:
+        value: Untrusted value returned by a JSON or JWT decoder.
+        error_message: Sanitized verification error for an invalid shape.
+
+    Returns:
+        A mapping whose keys are all strings.
+
+    Raises:
+        JwksVerificationError: If ``value`` is not a string-keyed object.
+    """
+
+    if not isinstance(value, dict):
+        raise JwksVerificationError(error_message)
+    untyped = cast(dict[object, object], value)
+    if not all(isinstance(key, str) for key in untyped):
+        raise JwksVerificationError(error_message)
+    return cast(dict[str, object], untyped)
+
+
+def _jwks_document(value: object) -> dict[str, object]:
+    """Validate the object and key-list shape required by ``PyJWKSet``.
+
+    Args:
+        value: Untrusted JSON value returned by the JWKS endpoint.
+
+    Returns:
+        A string-keyed JWKS object containing string-keyed key objects.
+
+    Raises:
+        JwksVerificationError: If the document shape is invalid.
+    """
+
+    document = _string_keyed_object(value, error_message="invalid jwks payload")
+    raw_keys = document.get("keys")
+    if not isinstance(raw_keys, list):
+        raise JwksVerificationError("invalid jwks payload")
+    key_values = cast(list[object], raw_keys)
+    keys = [
+        _string_keyed_object(item, error_message="invalid jwks payload")
+        for item in key_values
+    ]
+    narrowed = dict(document)
+    narrowed["keys"] = keys
+    return narrowed
+
+
+def _numeric_date(value: object, *, claim: str) -> int:
+    """Convert one already-verified JWT NumericDate claim to an integer.
+
+    Args:
+        value: Decoded JSON value accepted by PyJWT's NumericDate validation.
+        claim: Claim name used only in the sanitized failure message.
+
+    Returns:
+        Integer epoch seconds.
+
+    Raises:
+        JwksVerificationError: If the decoded value is not numeric.
+    """
+
+    if not isinstance(value, str | int | float):
+        raise JwksVerificationError(f"invalid {claim}")
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise JwksVerificationError(f"invalid {claim}") from exc
 
 
 class JwksVerifier:
@@ -129,7 +201,7 @@ class JwksVerifier:
             raise JwksVerificationError("unknown kid after refresh")
 
         try:
-            claims = jwt.decode(
+            decoded_claims: object = jwt.decode(
                 token,
                 signing_key.key,
                 algorithms=[algorithm],
@@ -142,6 +214,10 @@ class JwksVerifier:
             )
         except jwt.PyJWTError as exc:
             raise JwksVerificationError("token verification failed") from exc
+        claims = _string_keyed_object(
+            decoded_claims,
+            error_message="invalid token claims",
+        )
 
         subject = str(claims.get("sub", ""))
         if not subject:
@@ -153,7 +229,7 @@ class JwksVerifier:
         amr_raw = claims.get("amr")
         methods: tuple[str, ...]
         if isinstance(amr_raw, list):
-            methods = tuple(str(item) for item in amr_raw)
+            methods = tuple(str(item) for item in cast(list[object], amr_raw))
         else:
             methods = ()
 
@@ -169,8 +245,10 @@ class JwksVerifier:
             session_id=session_text,
             authentication_methods=methods,
             assurance_level=assurance,
-            expires_at=int(claims["exp"]),
-            issued_at=int(claims["iat"]) if "iat" in claims else None,
+            expires_at=_numeric_date(claims["exp"], claim="exp"),
+            issued_at=(
+                _numeric_date(claims["iat"], claim="iat") if "iat" in claims else None
+            ),
             raw_claims=claims,
         )
 
@@ -202,7 +280,7 @@ class JwksVerifier:
             with httpx.Client(timeout=self._http_timeout_seconds) as client:
                 response = client.get(self._jwks_url)
                 response.raise_for_status()
-                payload = response.json()
+                decoded_payload: object = response.json()
         except (httpx.HTTPError, ValueError) as exc:
             LOGGER.warning(
                 "JWKS fetch failed",
@@ -210,9 +288,10 @@ class JwksVerifier:
             )
             raise JwksVerificationError("jwks fetch failed") from exc
 
+        payload = _jwks_document(decoded_payload)
         try:
             jwks = PyJWKSet.from_dict(payload)
-        except (TypeError, jwt.PyJWTError, algorithms.AlgorithmError) as exc:
+        except (TypeError, ValueError, jwt.PyJWTError, UnsupportedAlgorithm) as exc:
             raise JwksVerificationError("invalid jwks payload") from exc
 
         for jwk in jwks.keys:

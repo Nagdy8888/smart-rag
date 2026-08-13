@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+from pydantic import BaseModel
+from smart_rag_api.auth_admin.settings import load_privileged_auth_settings
+from smart_rag_api.storage_admin.settings import load_privileged_storage_settings
 from smart_rag_core.settings import BackendSettings, SharedSettings, WorkerSettings
 from smart_rag_core.settings.agents import AgentSettings
 
@@ -24,13 +28,13 @@ FORBIDDEN_ENV_FRAGMENTS = (
 )
 
 
-def _field_names(settings_cls: type) -> set[str]:
+def _field_names(settings_cls: type[BaseModel]) -> set[str]:
     """Return lowercased model field names for one settings class."""
 
     return {name.lower() for name in settings_cls.model_fields}
 
 
-def _alias_names(settings_cls: type) -> set[str]:
+def _alias_names(settings_cls: type[BaseModel]) -> set[str]:
     """Return uppercased validation aliases for one settings class."""
 
     aliases: set[str] = set()
@@ -76,3 +80,24 @@ def test_backend_settings_dump_omits_privileged_env_names() -> None:
         "BOOTSTRAP_MIGRATION",
     ):
         assert fragment not in dumped
+
+
+def test_privileged_loaders_read_their_isolated_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Load each privileged secret only through its dedicated settings boundary."""
+
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_AUTH_ADMIN_SECRET", "auth-admin-test-value")
+    monkeypatch.setenv("SUPABASE_STORAGE_ADMIN_SECRET", "storage-admin-test-value")
+
+    auth = load_privileged_auth_settings()
+    storage = load_privileged_storage_settings()
+
+    assert str(auth.supabase_url).rstrip("/") == "https://example.supabase.co"
+    assert auth.supabase_auth_admin_secret.get_secret_value() == "auth-admin-test-value"
+    assert str(storage.supabase_url).rstrip("/") == "https://example.supabase.co"
+    assert (
+        storage.supabase_storage_admin_secret.get_secret_value()
+        == "storage-admin-test-value"
+    )

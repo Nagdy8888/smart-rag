@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import time
 import uuid
 
@@ -19,6 +21,8 @@ DEFAULT_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 
 def _supabase_reachable() -> bool:
+    """Return whether local Supabase Auth answers its bounded health request."""
+
     try:
         with httpx.Client(timeout=3.0) as client:
             response = client.get(f"{LOCAL_SUPABASE_URL}/auth/v1/health")
@@ -28,6 +32,12 @@ def _supabase_reachable() -> bool:
 
 
 def _anon_key() -> str:
+    """Load the local publishable key or use the documented CLI default.
+
+    Returns:
+        Public local Auth API key used only by disposable contract users.
+    """
+
     from tests.contract.integration_support import read_process_env
 
     status = read_process_env("ANON_KEY")
@@ -41,6 +51,12 @@ def _anon_key() -> str:
 
 
 def _jwt_secret() -> str:
+    """Load the local legacy JWT secret used for HS256 rejection tests.
+
+    Returns:
+        Local test secret; never a managed or production credential.
+    """
+
     from tests.contract.integration_support import read_process_env
 
     return (
@@ -169,7 +185,7 @@ def test_expired_token_fail_closed(verifier: JwksVerifier) -> None:
             "iss": LOCAL_ISSUER,
             "exp": int(time.time()) - 10,
         },
-        "unused",
+        "unused-test-key-with-at-least-32-bytes",
         algorithm="HS256",
     )
     with pytest.raises(JwksVerificationError, match="forbidden symmetric"):
@@ -182,8 +198,6 @@ def test_unknown_kid_after_refresh_fails_closed(verifier: JwksVerifier) -> None:
 
     _user_id, token = _signup_and_token()
     parts = token.split(".")
-    import base64
-    import json
 
     header = json.loads(base64.urlsafe_b64decode(parts[0] + "=="))
     header["kid"] = "00000000-0000-0000-0000-000000000000"
@@ -193,6 +207,44 @@ def test_unknown_kid_after_refresh_fails_closed(verifier: JwksVerifier) -> None:
     tampered = ".".join(parts)
     with pytest.raises(JwksVerificationError, match="unknown kid"):
         verifier.verify_access_token(tampered)
+
+
+def test_malformed_jwks_key_shape_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject non-object JWK entries before PyJWT key construction."""
+
+    def _get_malformed_jwks(
+        _client: httpx.Client,
+        url: str | httpx.URL,
+    ) -> httpx.Response:
+        """Return a successful HTTP response containing an invalid JWK entry.
+
+        Args:
+            _client: Patched bounded HTTP client instance.
+            url: Requested JWKS URL.
+
+        Returns:
+            HTTP 200 response with a non-object key-list item.
+        """
+
+        request = httpx.Request("GET", url)
+        return httpx.Response(200, json={"keys": [42]}, request=request)
+
+    monkeypatch.setattr(httpx.Client, "get", _get_malformed_jwks)
+    header = base64.urlsafe_b64encode(
+        json.dumps({"alg": "ES256", "kid": "malformed-key"}).encode()
+    ).decode()
+    payload = base64.urlsafe_b64encode(b"{}").decode()
+    token = f"{header.rstrip('=')}.{payload.rstrip('=')}.AA"
+    strict = JwksVerifier(
+        supabase_url=LOCAL_SUPABASE_URL,
+        audience="authenticated",
+        cache_seconds=600,
+    )
+
+    with pytest.raises(JwksVerificationError, match="invalid jwks payload"):
+        strict.verify_access_token(token)
 
 
 def test_shared_settings_and_health_do_not_expose_auth_admin_secret() -> None:

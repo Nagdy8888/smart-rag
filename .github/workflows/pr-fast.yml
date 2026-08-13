@@ -18,7 +18,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_VERSION: "8.30.1"
 
       - name: Setup uv
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
@@ -50,11 +60,19 @@ jobs:
       - name: pnpm install frozen
         run: pnpm install --frozen-lockfile
 
+      - name: Python dependency audit
+        run: |
+          uv export --frozen --all-packages --group dev --no-emit-workspace --format requirements.txt --output-file "${RUNNER_TEMP}/requirements.txt"
+          uv run pip-audit --strict --requirement "${RUNNER_TEMP}/requirements.txt"
+
+      - name: Node dependency audit
+        run: pnpm audit --audit-level high
+
       - name: Fast quality tier
         run: uv run python scripts/check.py --tier fast
 
       - name: OpenAPI foundation snapshot
         run: uv run python scripts/ci/check_openapi.py
 
-      - name: Migration policy (Phase 1 zero migrations)
+      - name: Migration policy
         run: uv run python scripts/ci/check_migrations.py

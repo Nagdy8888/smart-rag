@@ -153,14 +153,15 @@ class SharedSettings(BaseSettings):
         return self
 
 
-SettingsT = TypeVar("SettingsT", bound=SharedSettings)
+SettingsT = TypeVar("SettingsT", bound=BaseSettings)
 
 
 def load_settings(settings_type: type[SettingsT]) -> SettingsT:
-    """Load and validate one deployable's environment configuration.
+    """Load and validate one centralized environment configuration model.
 
     Args:
-        settings_type: Concrete settings class for the starting deployable.
+        settings_type: Concrete settings class for a deployable or bounded
+            administrative operation.
 
     Returns:
         A validated settings instance.

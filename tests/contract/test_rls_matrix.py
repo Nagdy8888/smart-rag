@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 
 import psycopg
 import pytest
@@ -44,6 +45,15 @@ def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) ->
 
 
 def _auth_version(cursor: psycopg.Cursor) -> int:
+    """Read the current server-owned authorization generation.
+
+    Args:
+        cursor: Open test transaction cursor.
+
+    Returns:
+        Current monotonically increasing authorization version.
+    """
+
     cursor.execute("SELECT app.current_authorization_version()")
     row = cursor.fetchone()
     assert row is not None
@@ -51,7 +61,7 @@ def _auth_version(cursor: psycopg.Cursor) -> int:
 
 
 @pytest.fixture
-def db_connection() -> psycopg.Connection:
+def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
     url = resolve_supabase_db_url()
@@ -140,7 +150,9 @@ def test_rls_matrix_documents_conversations_and_audit(
             """,
             (user_b, auth_version),
         )
-        assert cursor.fetchone()[0] == 0
+        forged_role_count = cursor.fetchone()
+        assert forged_role_count is not None
+        assert forged_role_count[0] == 0
 
         cursor.execute(
             """
@@ -149,7 +161,9 @@ def test_rls_matrix_documents_conversations_and_audit(
             """,
             (user_a, auth_version - 1),
         )
-        assert cursor.fetchone()[0] == 0
+        stale_context_count = cursor.fetchone()
+        assert stale_context_count is not None
+        assert stale_context_count[0] == 0
 
         cursor.execute("RESET ROLE")
         cursor.execute(
@@ -210,7 +224,9 @@ def test_rls_matrix_documents_conversations_and_audit(
             """,
             (user_a, visible_doc, auth_version),
         )
-        audit_id = cursor.fetchone()[0]
+        audit_row = cursor.fetchone()
+        assert audit_row is not None
+        audit_id = audit_row[0]
 
         with pytest.raises(
             (psycopg.errors.RaiseException, psycopg.errors.InsufficientPrivilege)
@@ -235,9 +251,7 @@ def test_rls_matrix_documents_conversations_and_audit(
             (version_id, restricted_doc),
         )
 
-        with pytest.raises(
-            psycopg.errors.RaiseException, match="graph index rejected"
-        ):
+        with pytest.raises(psycopg.errors.RaiseException, match="graph index rejected"):
             cursor.execute("SAVEPOINT restricted_graph_job")
             cursor.execute(
                 """
@@ -359,7 +373,9 @@ def test_visibility_change_bumps_authorization_and_bm25_job(
             """,
             (str(document_id), "visibility:%"),
         )
-        assert cursor.fetchone()[0] >= 1
+        bm25_job_count = cursor.fetchone()
+        assert bm25_job_count is not None
+        assert bm25_job_count[0] >= 1
 
         cursor.execute(
             """
@@ -369,4 +385,6 @@ def test_visibility_change_bumps_authorization_and_bm25_job(
             """,
             (document_id,),
         )
-        assert cursor.fetchone()[0] >= 2
+        generation = cursor.fetchone()
+        assert generation is not None
+        assert generation[0] >= 2

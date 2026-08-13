@@ -154,6 +154,15 @@ def ndcg_at_k(relevant_ids: set[str], ranked_ids: list[str], *, k: int = 10) -> 
     """
 
     def dcg(ids: list[str]) -> float:
+        """Compute binary discounted cumulative gain at the enclosing cutoff.
+
+        Args:
+            ids: Ranked document identifiers.
+
+        Returns:
+            Discounted gain for relevant identifiers in the top ``k``.
+        """
+
         score = 0.0
         for index, doc_id in enumerate(ids[:k], start=1):
             if doc_id in relevant_ids:

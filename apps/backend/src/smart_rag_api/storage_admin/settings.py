@@ -54,7 +54,7 @@ def load_privileged_storage_settings() -> PrivilegedStorageSettings:
     from pydantic import ValidationError
 
     try:
-        return PrivilegedStorageSettings()
+        return PrivilegedStorageSettings.model_validate({})
     except ValidationError as error:
         issues = sorted(
             {

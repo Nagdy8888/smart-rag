@@ -16,17 +16,19 @@ $EnvFile = if (Test-Path "$Root\.env.compose") {
   "$Root\.env"
 } else {
   Copy-Item "$Root\.env.example" "$Root\.env.compose"
-  Write-Host "Created .env.compose from .env.example — update passwords before shared use."
+  Write-Host "Created .env.compose from .env.example; update passwords before shared use."
   "$Root\.env.compose"
 }
 
-$supabase = Get-Command supabase -ErrorAction SilentlyContinue
-if ($supabase) {
-  Write-Host "Starting local Supabase (stock Phase 1 config)..."
-  & supabase start
-} else {
-  Write-Host "Supabase CLI not found — skipping local Supabase. Install and re-run for Auth/Studio/Inbucket."
-  Write-Host "Pin guidance: use the current Supabase CLI release documented at https://supabase.com/docs/guides/local-development"
+$SupabaseCli = "$Root\node_modules\.bin\supabase.cmd"
+if (-not (Test-Path $SupabaseCli)) {
+  throw "Pinned Supabase CLI is unavailable. Run pnpm install --frozen-lockfile first."
+}
+
+Write-Host "Starting local Supabase with the workspace-pinned CLI..."
+& pnpm exec supabase start | Out-Null
+if ($LASTEXITCODE -ne 0) {
+  throw "Supabase CLI failed to start the local stack."
 }
 
 Write-Host "Starting Docker Compose foundation stack with $EnvFile ..."

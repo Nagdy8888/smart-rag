@@ -11,14 +11,17 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from typing import Any
+from typing import TypeAlias
 from uuid import UUID
 
 AUDIT_CHAIN_GENESIS_HASH = "0" * 64
 _SENSITIVE_KEY_FRAGMENTS = ("password", "token", "secret", "raw_ip")
+_JsonScalar: TypeAlias = str | int | float | bool | None
+_JsonValue: TypeAlias = _JsonScalar | list["_JsonValue"] | dict[str, "_JsonValue"]
+_JsonObject: TypeAlias = dict[str, _JsonValue]
 
 
-def redact_audit_payload(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+def redact_audit_payload(payload: Mapping[str, _JsonValue] | None) -> _JsonObject:
     """Redact sensitive keys from an audit payload mapping.
 
     Keys whose lowercased name contains ``password``, ``token``, ``secret``, or
@@ -34,21 +37,41 @@ def redact_audit_payload(payload: Mapping[str, Any] | None) -> dict[str, Any]:
 
     if payload is None:
         return {}
-    return _redact_value(dict(payload))  # type: ignore[arg-type]
+    return _redact_mapping(payload)
 
 
-def _redact_value(value: Any) -> Any:
-    """Recursively redact one JSON-compatible value."""
+def _redact_mapping(value: Mapping[str, _JsonValue]) -> _JsonObject:
+    """Redact every value in one string-keyed JSON object.
 
-    if isinstance(value, Mapping):
-        result: dict[str, Any] = {}
-        for key, child in value.items():
-            lower = str(key).lower()
-            if any(fragment in lower for fragment in _SENSITIVE_KEY_FRAGMENTS):
-                result[str(key)] = "[REDACTED]"
-            else:
-                result[str(key)] = _redact_value(child)
-        return result
+    Args:
+        value: JSON object whose nested values may contain sensitive fields.
+
+    Returns:
+        A recursively copied and redacted JSON object.
+    """
+
+    result: _JsonObject = {}
+    for key, child in value.items():
+        lower = key.lower()
+        if any(fragment in lower for fragment in _SENSITIVE_KEY_FRAGMENTS):
+            result[key] = "[REDACTED]"
+        else:
+            result[key] = _redact_value(child)
+    return result
+
+
+def _redact_value(value: _JsonValue) -> _JsonValue:
+    """Recursively redact one JSON-compatible value.
+
+    Args:
+        value: Scalar, object, or array from an audit payload.
+
+    Returns:
+        A copied value with sensitive nested object fields redacted.
+    """
+
+    if isinstance(value, dict):
+        return _redact_mapping(value)
     if isinstance(value, list):
         return [_redact_value(item) for item in value]
     return value
@@ -67,7 +90,7 @@ def canonical_audit_material(
     purpose: str | None,
     resource_type: str | None,
     resource_id: UUID | None,
-    payload: Mapping[str, Any],
+    payload: Mapping[str, _JsonValue],
     previous_hash: str,
     created_at_iso: str,
 ) -> str:

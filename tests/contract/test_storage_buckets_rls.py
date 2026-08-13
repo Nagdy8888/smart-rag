@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 
 import psycopg
 import pytest
@@ -37,7 +38,7 @@ def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) ->
 
 
 @pytest.fixture
-def db_connection() -> psycopg.Connection:
+def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
     url = resolve_supabase_db_url()
@@ -197,7 +198,9 @@ def test_quarantine_select_list_denied_and_wrong_bucket_denied(
             WHERE bucket_id = 'documents-quarantine'
             """
         )
-        assert cursor.fetchone()[0] == 0
+        visible_quarantine_objects = cursor.fetchone()
+        assert visible_quarantine_objects is not None
+        assert visible_quarantine_objects[0] == 0
 
         with pytest.raises(psycopg.Error):
             cursor.execute(

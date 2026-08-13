@@ -6,14 +6,17 @@ Greenfield monorepo for an authorized company RAG system: Hybrid retrieval (Supa
 
 - Windows 10/11 with Docker Desktop (WSL2 backend recommended): 16 GB RAM / 4 cores / 40 GB free minimum
 - [uv](https://docs.astral.sh/uv/) 0.11+, Node.js 20+, pnpm 9.15+
-- Optional: [Supabase CLI](https://supabase.com/docs/guides/local-development) for local Auth/Studio/Inbucket
+- The workspace-pinned [Supabase CLI](https://supabase.com/docs/guides/local-development), installed by pnpm
 - OpenAI key only for real-model evaluation; mock-model mode needs none
 
 ## Quick start
 
 ```powershell
-Copy-Item .env.example .env   # if you do not already have a KEY=VALUE .env
+uv sync --all-packages --group dev --python 3.11 --frozen
+pnpm install --frozen-lockfile
+Copy-Item .env.example .env.compose   # if no KEY=VALUE Compose env exists
 .\scripts\dev.ps1
+.\scripts\verify-local.ps1
 ```
 
 Developer endpoints (when healthy):
@@ -48,4 +51,4 @@ Full index (owner / status / last-reviewed): [docs/README.md](docs/README.md)
 
 ## Status
 
-Phase 1 foundation in progress. Later phases (identity, ingestion, Hybrid RAG, GraphRAG, agent intelligence, UI, release) are planned — see docs index.
+Phase 1 foundation was accepted on 2026-08-12 and passed local re-verification on 2026-08-13; the updated remote CI run is still pending. Phase 2 identity/data is pending final acceptance, and later phases remain planned. See the docs index for current evidence.

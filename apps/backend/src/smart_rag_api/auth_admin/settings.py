@@ -54,7 +54,7 @@ def load_privileged_auth_settings() -> PrivilegedAuthSettings:
     from pydantic import ValidationError
 
     try:
-        return PrivilegedAuthSettings()
+        return PrivilegedAuthSettings.model_validate({})
     except ValidationError as error:
         issues = sorted(
             {
