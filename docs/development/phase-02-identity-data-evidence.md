@@ -259,7 +259,7 @@ uv run ruff check/format on touched Python files
 | --- | --- |
 | No HS256/shared-secret verification path | `jwks.py` + `test_rejects_hs256_token_signed_with_local_jwt_secret` |
 | iss/aud/alg/exp/sub/kid; cache ≤600s; one refresh | `JwksVerifier` + contract tests |
-| Provider rollover | **BLOCKED** — no `SUPABASE_ACCESS_TOKEN`; `test_jwks_rollover.py` skips lifecycle; managed ES256 JWKS probe only |
+| Provider rollover | **PROVEN** on managed `qsjivtwtmlmtksufqjik` (standby→in_use→revoked); postcondition contract test |
 | Owner bootstrap + invitations | migration RPCs + `test_invitations_auth.py` |
 | MFA recovery privileged boundary | `auth_admin/mfa_recovery.py` + ADR |
 | Auth Admin secret isolated | `PrivilegedAuthSettings` + secret scan test |
@@ -279,22 +279,33 @@ Applied Packet 2–4 schema migrations onto managed (Packet 1 already present):
 
 Verified on managed: schemas `app`/`private`/`search`/`langgraph`/`lightrag`;
 `app.team_invitations.upload_enabled`; `app.revoked_sessions`; roles `app_api` /
-`app_worker` (`NOLOGIN`); managed JWKS publishes ES256 only
-(`kid` `37b8d1b0-4217-4feb-becd-a986437dc994` at probe time).
+`app_worker` (`NOLOGIN`).
 
-MCP tool surface covers SQL/migrations/advisors/keys listing — **not**
-`POST/PATCH /v1/projects/{ref}/config/auth/signing-keys` (requires Management API
-OAuth scope `secrets:write` / permission `auth_signing_keys_write`). CLI
-`supabase login` cannot complete in this non-TTY agent shell without `--token`.
+### Managed JWKS rollover proof (2026-08-13)
+
+Using `SUPABASE_ACCESS_TOKEN` (gitignored `.env`) against Management API
+`/v1/projects/qsjivtwtmlmtksufqjik/config/auth/signing-keys`:
+
+| Step | Key id | Result |
+| --- | --- | --- |
+| Standby create | `caa0e22b-cd04-4ee8-9701-a75aa682da78` | ES256 `standby`; JWKS published both kids |
+| Pre-rotate token | signed by `37b8d1b0-4217-4feb-becd-a986437dc994` | `JwksVerifier` OK |
+| Rotate → `in_use` | `caa0e22b-…` | prior ES256 → `previously_used` |
+| Post-rotate token | signed by `caa0e22b-…` | overlap: both tokens verify |
+| Revoke prior | `37b8d1b0-…` → `revoked` | after edge JWKS drain (~10 min), old token fail-closed (`unknown kid after refresh`); new token still valid |
+
+Final Management API state: `caa0e22b-…` `in_use` ES256; `37b8d1b0-…` `revoked` ES256; legacy HS256 remains `previously_used` (not in JWKS). Public JWKS kids: `caa0e22b-…` only.
+
+Ops helper: `scripts/ops/prove_jwks_rollover.py` (destructive; do not run in CI). Contract gate:
+`tests/contract/test_jwks_rollover.py` asserts durable postconditions when the token is present.
 
 ### Blockers / honest gates
 
-- **JWKS standby→active→retired rollover still not proven**: needs a personal access
-  token (or dashboard rotate while agent polls JWKS). Verifier + runbook + managed
-  schema sync are done; Packet 4 checkbox stays unchecked until lifecycle proof.
 - **Hosted Auth throttling not proven locally**: `local_auth_throttling_proven=False`.
 - **PKCE**: enforced by Supabase client `flowType: 'pkce'` at frontend (Phase 8); local
   Auth stack supports PKCE flow per Supabase docs.
+- Production retention before revoke should still honor `jwt_exp + app cache + edge cache`;
+  this packet proved the lifecycle with an accelerated revoke after throttle windows.
 - Restart local Supabase after `config.toml` Auth changes: `npx supabase stop && npx supabase start`.
 
 ### Next packet
