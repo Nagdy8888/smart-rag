@@ -56,19 +56,41 @@ class Command:
     arguments: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class CheckOptions:
+    """Validated quality-runner options.
+
+    Attributes:
+        tier: Required quality tier.
+        mermaid_puppeteer_config: Optional explicit Puppeteer config forwarded
+            only to the maintained-documentation renderer.
+    """
+
+    tier: Tier
+    mermaid_puppeteer_config: Path | None
+
+
 class CheckRunner:
     """Execute repository checks and preserve the first child failure code."""
 
-    def __init__(self, repo_root: Path) -> None:
+    def __init__(
+        self,
+        repo_root: Path,
+        *,
+        mermaid_puppeteer_config: Path | None = None,
+    ) -> None:
         """Initialize a runner rooted at the repository.
 
         Args:
             repo_root: Directory from which every child command runs.
+            mermaid_puppeteer_config: Optional Puppeteer config forwarded to
+                Mermaid rendering. Local runs retain the sandbox by default.
         """
 
         self._repo_root = repo_root
         self._python = sys.executable
         self._pnpm = shutil.which("pnpm") or "pnpm"
+        self._mermaid_puppeteer_config = mermaid_puppeteer_config
 
     def run_tier(self, tier: Tier) -> int:
         """Run one tier, stopping at its first required failure.
@@ -122,6 +144,12 @@ class CheckRunner:
         """
 
         python_module = (self._python, "-m")
+        docs_arguments = (self._python, "scripts/check_docs.py")
+        if self._mermaid_puppeteer_config is not None:
+            docs_arguments += (
+                "--puppeteer-config",
+                str(self._mermaid_puppeteer_config),
+            )
         commands: dict[Tier, tuple[Command, ...]] = {
             "format": (
                 Command(
@@ -160,7 +188,7 @@ class CheckRunner:
                 ),
                 Command(
                     "Markdown links and Mermaid rendering",
-                    (self._python, "scripts/check_docs.py"),
+                    docs_arguments,
                 ),
             ),
             "frontend": (
@@ -206,14 +234,14 @@ class CheckRunner:
         return commands[tier]
 
 
-def parse_tier(argv: Sequence[str] | None = None) -> Tier:
-    """Parse the required tier from command-line arguments.
+def parse_options(argv: Sequence[str] | None = None) -> CheckOptions:
+    """Parse the required tier and optional Mermaid renderer configuration.
 
     Args:
         argv: Optional argument sequence, excluding the program name.
 
     Returns:
-        Validated tier name.
+        Validated quality-runner options.
     """
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -223,8 +251,29 @@ def parse_tier(argv: Sequence[str] | None = None) -> Tier:
         choices=TIERS,
         help="Quality tier to execute.",
     )
+    parser.add_argument(
+        "--mermaid-puppeteer-config",
+        help="Explicit Puppeteer JSON config forwarded to Mermaid CLI.",
+    )
     parsed = parser.parse_args(argv)
-    return cast(Tier, parsed.tier)
+    raw_config = cast(str | None, parsed.mermaid_puppeteer_config)
+    return CheckOptions(
+        tier=cast(Tier, parsed.tier),
+        mermaid_puppeteer_config=Path(raw_config).resolve() if raw_config else None,
+    )
+
+
+def parse_tier(argv: Sequence[str] | None = None) -> Tier:
+    """Parse and return only the required quality tier.
+
+    Args:
+        argv: Optional argument sequence, excluding the program name.
+
+    Returns:
+        Validated tier name.
+    """
+
+    return parse_options(argv).tier
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -238,7 +287,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
 
     repo_root = Path(__file__).resolve().parents[1]
-    return CheckRunner(repo_root).run_tier(parse_tier(argv))
+    options = parse_options(argv)
+    return CheckRunner(
+        repo_root,
+        mermaid_puppeteer_config=options.mermaid_puppeteer_config,
+    ).run_tier(options.tier)
 
 
 if __name__ == "__main__":

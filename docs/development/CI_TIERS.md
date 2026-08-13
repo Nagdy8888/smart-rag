@@ -18,4 +18,11 @@ audience: engineering
 
 Actions are pinned by commit SHA. The workflows use `permissions: contents: read`; the secret scanner disables PR comments and artifact upload. A local workflow definition is not remote execution evidence, so a GitHub run URL and conclusion must be recorded separately.
 
+GitHub-hosted Ubuntu runners block the Chromium sandbox required by Mermaid
+CLI. PR and nightly jobs therefore pass the official
+`--puppeteerConfigFile` workaround in
+`scripts/ci/puppeteer-no-sandbox.json`. This exception is limited to
+least-privilege ephemeral CI jobs; local documentation checks retain the
+browser sandbox.
+
 [docs index](../README.md)

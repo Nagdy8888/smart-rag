@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
+import argparse
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 from urllib.parse import unquote
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +46,41 @@ class LinkFailure:
 
     document: Path
     destination: str
+
+
+@dataclass(frozen=True)
+class CheckDocsOptions:
+    """Validated documentation-check command-line options.
+
+    Attributes:
+        puppeteer_config: Optional explicit Puppeteer launch configuration.
+            CI may supply the repository's no-sandbox workaround because
+            GitHub-hosted Linux runners disable the required browser sandbox.
+    """
+
+    puppeteer_config: Path | None
+
+
+def parse_options(argv: Sequence[str] | None = None) -> CheckDocsOptions:
+    """Parse optional browser-rendering configuration.
+
+    Args:
+        argv: Optional argument sequence excluding the program name.
+
+    Returns:
+        Validated documentation-check options.
+    """
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--puppeteer-config",
+        help="Explicit Puppeteer JSON config passed to Mermaid CLI.",
+    )
+    parsed = parser.parse_args(argv)
+    raw_config = cast(str | None, parsed.puppeteer_config)
+    return CheckDocsOptions(
+        puppeteer_config=Path(raw_config).resolve() if raw_config else None
+    )
 
 
 def documentation_files() -> list[Path]:
@@ -127,11 +165,16 @@ def mermaid_blocks(document: Path) -> list[str]:
     return blocks
 
 
-def render_mermaid_blocks(documents: list[Path]) -> int:
+def render_mermaid_blocks(
+    documents: list[Path],
+    puppeteer_config: Path | None = None,
+) -> int:
     """Render every Mermaid block with the pinned CLI.
 
     Args:
         documents: Markdown documents that may contain diagrams.
+        puppeteer_config: Optional Puppeteer launch configuration supplied by
+            the caller. Local runs retain the browser sandbox by default.
 
     Returns:
         Zero when every diagram renders; otherwise the exact Mermaid child exit
@@ -145,6 +188,10 @@ def render_mermaid_blocks(documents: list[Path]) -> int:
     if pnpm is None:
         print("ERROR: pnpm is required for Mermaid rendering", file=sys.stderr)
         return 127
+    if puppeteer_config is not None and not puppeteer_config.is_file():
+        raise FileNotFoundError(
+            f"Puppeteer configuration is missing: {puppeteer_config}"
+        )
     with tempfile.TemporaryDirectory(prefix="smart-rag-mermaid-") as temp_name:
         temp_dir = Path(temp_name)
         diagram_number = 0
@@ -154,17 +201,20 @@ def render_mermaid_blocks(documents: list[Path]) -> int:
                 source = temp_dir / f"diagram-{diagram_number}.mmd"
                 output = temp_dir / f"diagram-{diagram_number}.svg"
                 source.write_text(block, encoding="utf-8")
+                command = [
+                    pnpm,
+                    "exec",
+                    "mmdc",
+                    "--input",
+                    str(source),
+                    "--output",
+                    str(output),
+                    "--quiet",
+                ]
+                if puppeteer_config is not None:
+                    command.extend(("--puppeteerConfigFile", str(puppeteer_config)))
                 completed = subprocess.run(  # noqa: S603 - pinned local pnpm tool
-                    (
-                        pnpm,
-                        "exec",
-                        "mmdc",
-                        "--input",
-                        str(source),
-                        "--output",
-                        str(output),
-                        "--quiet",
-                    ),
+                    tuple(command),
                     cwd=REPO_ROOT,
                     check=False,
                 )
@@ -179,13 +229,17 @@ def render_mermaid_blocks(documents: list[Path]) -> int:
     return 0
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run documentation contract checks.
+
+    Args:
+        argv: Optional argument sequence excluding the program name.
 
     Returns:
         Zero on success; otherwise a hard failure code.
     """
 
+    options = parse_options(argv)
     try:
         documents = documentation_files()
         failures = check_local_links(documents)
@@ -198,7 +252,7 @@ def main() -> int:
                     file=sys.stderr,
                 )
             return 1
-        return render_mermaid_blocks(documents)
+        return render_mermaid_blocks(documents, options.puppeteer_config)
     except (FileNotFoundError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1

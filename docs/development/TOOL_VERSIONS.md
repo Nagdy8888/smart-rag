@@ -78,6 +78,16 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | Gitleaks Action | v3.0.0 commit `e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e` |
 | Gitleaks CLI | 8.30.1 / image index `sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f` |
 
+## GitHub Action runtime pins
+
+| Action | Release / commit |
+| --- | --- |
+| `actions/checkout` | v7.0.1 / `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| `actions/setup-node` | v7.0.0 / `820762786026740c76f36085b0efc47a31fe5020` |
+| `actions/setup-python` | v7.0.0 / `5fda3b95a4ea91299a34e894583c3862153e4b97` |
+| `astral-sh/setup-uv` | v10.0.0 / `ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d` |
+| `pnpm/action-setup` | v6.0.10 / `ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3` |
+
 Frontend application package name: `smart-rag-frontend`.
 
 ## Workspace members
