@@ -133,6 +133,49 @@ class StorageGateway:
                 f"storage upload failed status={response.status_code}"
             )
 
+    def upload_object(
+        self,
+        *,
+        bucket: str,
+        object_path: str,
+        data: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> None:
+        """Upload one immutable object via the Storage HTTP API.
+
+        Args:
+            bucket: Destination bucket id.
+            object_path: Destination object key.
+            data: Exact bytes to store.
+            content_type: Provider content type header.
+
+        Raises:
+            StorageGatewayError: On transport or non-success HTTP responses.
+            ValueError: When bucket/path is empty.
+        """
+
+        normalized_bucket = bucket.strip()
+        normalized_path = object_path.lstrip("/")
+        if not normalized_bucket or not normalized_path:
+            raise ValueError("bucket and object_path are required")
+        upload_url = self._object_url(normalized_bucket, normalized_path)
+        headers = {
+            **self._headers(),
+            "Content-Type": content_type,
+            "x-upsert": "false",
+        }
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = client.post(upload_url, headers=headers, content=data)
+        except httpx.HTTPError as exc:
+            raise StorageGatewayError(
+                f"storage upload transport failure: {exc}"
+            ) from exc
+        if response.status_code not in {200, 201}:
+            raise StorageGatewayError(
+                f"storage upload failed status={response.status_code}"
+            )
+
     def delete_object(self, *, bucket: str, object_path: str) -> None:
         """Delete one object via the Storage HTTP API.
 

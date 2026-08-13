@@ -12,6 +12,10 @@ from typing import Any
 from uuid import UUID
 
 import psycopg
+from smart_rag_agents.ingestion.crawl_graph import (
+    IngestionCrawlState,
+    build_crawl_ingestion_graph,
+)
 from smart_rag_agents.ingestion.graph import (
     IngestionProbeState,
     build_probe_ingestion_graph,
@@ -39,6 +43,7 @@ class WorkerLifecycle:
         self._stop_event = threading.Event()
         self._probe_graph = build_probe_ingestion_graph()
         self._scan_graph = build_scan_promote_ingestion_graph()
+        self._crawl_graph = build_crawl_ingestion_graph()
 
     def run_forever(self) -> None:
         """Poll and process jobs until stopped."""
@@ -88,6 +93,11 @@ class WorkerLifecycle:
             if self._settings.supabase_storage_admin_secret is not None
             else None
         )
+        crawl_proxy = (
+            str(self._settings.crawl_proxy_url)
+            if self._settings.crawl_proxy_url is not None
+            else None
+        )
         return {
             "postgres_url": self._require_postgres_url(),
             "lease_owner": self._lease_owner(),
@@ -96,6 +106,7 @@ class WorkerLifecycle:
             "storage_admin_secret": storage_secret,
             "clamav_host": self._settings.clamav_host,
             "clamav_port": self._settings.clamav_port,
+            "crawl_proxy_url": crawl_proxy,
         }
 
     def _claim_one(self) -> IngestionJobRecord | None:
@@ -155,6 +166,14 @@ class WorkerLifecycle:
                 )
                 success = result.get("status") == "promoted"
                 detail = str(result.get("detail", "scan_promote_failed"))
+            elif job.job_kind == "website_crawl":
+                graph_input = _crawl_graph_input_from_job(job)
+                result = self._crawl_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+                    graph_input,
+                    config={"configurable": self._graph_config()},
+                )
+                success = result.get("status") == "crawl_completed"
+                detail = str(result.get("detail", "website_crawl_failed"))
             else:
                 graph_input = _probe_graph_input_from_job(job)
                 result = self._probe_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
@@ -336,5 +355,26 @@ def _scan_graph_input_from_job(job: IngestionJobRecord) -> IngestionScanState:
         ),
         "status": "scan_pending",
         "scan_result": None,
+        "detail": "",
+    }
+
+
+def _crawl_graph_input_from_job(job: IngestionJobRecord) -> IngestionCrawlState:
+    """Build crawl graph input from durable job payload."""
+
+    payload = job.payload_ref
+    return {
+        "job_id": str(job.id),
+        "lease_token": job.lease_token or "",
+        "source_id": (
+            str(payload["source_id"])
+            if isinstance(payload.get("source_id"), str)
+            else None
+        ),
+        "version_id": str(job.version_id) if job.version_id else None,
+        "operation_key": str(payload.get("operation_key", job.job_kind)),
+        "status": "crawl_pending",
+        "pages_fetched": 0,
+        "crawl_run_id": None,
         "detail": "",
     }

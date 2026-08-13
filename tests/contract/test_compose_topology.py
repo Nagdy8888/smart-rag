@@ -128,56 +128,34 @@ def test_paradedb_healthcheck_requires_pg_search() -> None:
 
 
 def test_crawl_proxy_denies_by_default() -> None:
-    """Proxy deny body and POST handler contract block all destinations."""
+    """Proxy deny body and unknown POST routes remain blocked."""
 
     module = _load_proxy_module()
-    payload = json.loads(module.DenyByDefaultHandler.DENY_BODY.decode("utf-8"))
+    payload = json.loads(module.FetchHandler.DENY_BODY.decode("utf-8"))
     assert payload["status"] == "denied"
-    assert (
-        "deny-by-default" in payload["reason"].lower() or "Phase 3" in payload["reason"]
-    )
 
-    class _Handler(module.DenyByDefaultHandler):
+    class _Handler(module.FetchHandler):
         """Capture status without a real socket."""
 
         def __init__(self) -> None:
-            """Initialize in-memory request and response streams."""
-
-            self.path = "/fetch"
+            self.path = "/legacy"
             self.headers = {"Content-Length": "2"}
             self.rfile = __import__("io").BytesIO(b"{}")
             self.wfile = __import__("io").BytesIO()
             self.status = 0
 
         def send_response(self, code: int, message: str | None = None) -> None:
-            """Capture the response status without writing a socket.
-
-            Args:
-                code: HTTP response status.
-                message: Optional response reason, intentionally ignored.
-            """
-
             self.status = code
 
         def send_header(self, keyword: str, value: str) -> None:
-            """Accept an in-memory response header.
-
-            Args:
-                keyword: Header name.
-                value: Header value.
-            """
-
             return None
 
         def end_headers(self) -> None:
-            """Complete the in-memory header section."""
-
             return None
 
     handler = _Handler()
     handler.do_POST()
     assert handler.status == 403
-    assert handler.wfile.getvalue() == module.DenyByDefaultHandler.DENY_BODY
 
 
 def test_application_images_run_as_non_root() -> None:

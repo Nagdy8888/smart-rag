@@ -211,12 +211,79 @@ Primary docs: <https://docs.clamav.net/manual/Installing/Docker.html>
 
 Packet 4 implements approved URL crawling through the restricted proxy only. Parser/OCR nodes remain unavailable; promoted objects may reach `parsing` status but must not claim Hybrid/graph readiness.
 
+## Packet 4 — approved bounded crawling through restricted proxy
+
+### Quoted requirement
+
+> Implement approved-URL crawling only through the restricted proxy with redirect, DNS, peer-IP, scope, byte, page, and time bounds.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `infra/crawl-proxy/server.py` | POST `/fetch`, peer pin, bounded decode |
+| `infra/crawl-proxy/requirements.txt` | `brotli==1.1.0` |
+| `packages/core/src/smart_rag_core/ingestion/crawl/*` | policy, DNS, robots, adapter |
+| `packages/core/src/smart_rag_core/gateways/crawl_proxy.py` | proxy client (httpx 0.28.1) |
+| `packages/core/src/smart_rag_core/repositories/crawl.py` | runs/snapshots/events |
+| `apps/agents/.../ingestion/crawl_graph.py` | crawl graph nodes |
+| `apps/worker/.../lifecycle.py` | `website_crawl` job routing |
+| `supabase/migrations/20260813190000_crawl_snapshots_provenance_v1.sql` | schema + approval RPC |
+| `docker-compose.yml` | `egress` network; crawl-proxy dual-homed |
+| `docs/ingestion/CRAWL_POLICY.md` | policy + sequence diagram |
+| `docs/runbooks/CRAWL_EGRESS_AND_PROXY.md` | ops runbook |
+
+### Library / RFC verification
+
+| Capability | Pin / source |
+| --- | --- |
+| URL parsing | Python 3.11 `urllib.parse` |
+| DNS | `socket.getaddrinfo` + `ipaddress` |
+| HTTP client (core→proxy) | `httpx==0.28.1` (no auto-redirect to origin) |
+| Proxy fetch | stdlib `socket`/`ssl` pinned connect |
+| robots.txt | Python 3.11 `urllib.robotparser` (RFC 9309) |
+| Decompression bounds | gzip/zlib/brotli 1.1.0 in proxy image |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run ruff check packages/core/src/smart_rag_core/ingestion/crawl packages/core/src/smart_rag_core/gateways/crawl_proxy.py infra/crawl-proxy/server.py tests/unit/test_crawl_policy.py tests/unit/test_crawl_proxy.py tests/contract/test_crawl_ssrf.py` | pending |
+| `uv run pytest tests/unit/test_crawl_policy.py tests/unit/test_crawl_proxy.py tests/contract/test_crawl_ssrf.py tests/contract/test_compose_topology.py -q` | pending |
+| `uv run python scripts/check.py --tier docs` | pending |
+
+### Negative fixture matrix (unit + contract)
+
+| Fixture | Expected |
+| --- | --- |
+| localhost / 127.0.0.1 / ::1 | fail closed |
+| private / link-local / metadata / CGNAT | fail closed |
+| decimal / octal / hex IP literals | fail closed |
+| mixed DNS answers | fail closed |
+| userinfo / fragment / disallowed port | fail closed |
+| redirect loop / redirect-to-private | fail closed |
+| robots disallow | fail closed |
+| decompression ratio bomb | fail closed |
+| proxy bypass (non-/fetch POST) | 403 |
+| worker on egress network | absent |
+| missing peer_ip in proxy response | CrawlProxyError |
+
+### Unverified assumptions
+
+- End-to-end `website_crawl` job against live public fixture through Compose egress network (requires stack rebuild).
+- Full Storage upload of snapshots in integrated worker run (gateway implemented; live secrets required).
+- Parser sandbox egress denial (Packet 5 owns parser network namespace).
+
+### Next-packet handoff
+
+Packet 5 implements no-network parser/OCR isolation and typed format adapters. Crawl snapshots in `web-snapshots` are inputs; do not implement chunking, embeddings, or Hybrid readiness in Packet 5 until parser contracts pass.
+
 ## Packet checklist
 
 1. [x] External-processing governance sign-off (this section)
 2. [x] Durable leased jobs, checkpoints, admission, dead letters (this section)
 3. [x] Quarantine, ClamAV, governance hold, promotion saga, alerts
-4. [ ] Approved bounded crawling through restricted proxy
+4. [x] Approved bounded crawling through restricted proxy
 5. [ ] Parser/OCR sandbox and typed format adapters
 6. [ ] Chunking, deduplication, typed Parquet artifacts
 7. [ ] Embeddings, BM25 projection, lifecycle, graph handoff

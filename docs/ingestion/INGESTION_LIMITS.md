@@ -77,11 +77,42 @@ When `COUNT(*) FROM app.lightrag_index_jobs WHERE status = 'pending' AND operati
 
 Daily ingestion spend uses durable `app.budget_reservations` with `reservation_kind = 'ingestion_daily'`. Enqueue reserves an estimated USD amount against `app.company_settings.daily_ingestion_budget_usd` (default from QT-COST-002). Completion/failure true-ups adjust committed/released amounts without bypassing the daily cap.
 
+## Crawl bounds (Packet 4)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Allowed schemes | policy | http, https | http, https | Plan Packet 4 | worker | `policy_denied` | New scheme request |
+| Allowed ports | ports | 80, 443 | 80, 443 | Plan Packet 4 | worker | `policy_denied` | Owner approves alt port |
+| Max URL length | chars | 2048 | 2048 | Conservative | worker | `invalid_url` | Crawl fixture exceeds |
+| Max redirects | hops | 5 | 5 | Plan Packet 4 | worker | `limit_exceeded` | Redirect chain fixtures |
+| Max depth | levels | 2 | 5 | Approval + hard cap | worker | stop enqueue/deeper links | Owner approves depth |
+| Max pages | pages | 50 | 200 | Approval + hard cap | worker | stop crawl | Owner approves pages |
+| Max wire bytes / page | bytes | 2097152 | 2097152 | 2 MiB measured | proxy | `wire_bytes_exceeded` | Large page fixtures |
+| Max decoded bytes / page | bytes | 5242880 | 5242880 | 5 MiB measured | proxy | `decoded_bytes_exceeded` | Compression fixtures |
+| Max decompression ratio | ratio | 50 | 50 | Plan Packet 4 | proxy | `decompression_ratio_exceeded` | Zip/gzip bomb fixtures |
+| Max wire bytes / crawl | bytes | 52428800 | 52428800 | 50 MiB measured | worker | `limit_exceeded` | Site-wide crawl |
+| Max decoded bytes / crawl | bytes | 104857600 | 104857600 | 100 MiB measured | worker | `limit_exceeded` | Site-wide crawl |
+| DNS timeout | seconds | 5 | 5 | Measured local | worker | `dns_failure` | Resolver latency |
+| Connect timeout | seconds | 10 | 10 | Measured local | proxy | `read_timeout` | Slow origins |
+| Read timeout | seconds | 30 | 30 | Measured local | proxy | `read_timeout` | Large pages |
+| Total crawl timeout | seconds | 300 | 300 | Plan Packet 4 | worker | `limit_exceeded` | Long crawls |
+| Concurrent fetches | count | 2 | 2 | Worker concurrency /2 | worker | queue | CPU saturation |
+| Robots.txt max bytes | bytes | 524288 | 524288 | RFC 9309 guidance | worker | `robots_denied` | Large robots files |
+| Robots fetch timeout | seconds | 15 | 15 | Measured | worker | `robots_denied` | Slow robots hosts |
+| Max header block | bytes | 32768 | 32768 | Measured | proxy | fail closed | Header abuse |
+| Allowed content types | MIME | html/plain/xhtml | same | Plan Packet 4 | worker | skip/fail page | New MIME request |
+| Crawl policy version | text | `crawl_v1` | — | Packet 4 sign-off | worker | deny crawl | Policy drift |
+| Egress path | policy | crawl-proxy only | — | ADR deny-by-default | infra | block job | Direct egress probe |
+
+Crawl proxy image: built from `infra/crawl-proxy` (Python 3.11 slim + `brotli==1.1.0`). Only `crawl-proxy` joins the non-internal `egress` Compose network; API/worker/parser remain on `private` without public routes.
+
+Primary references: [RFC 9309 robots](https://www.rfc-editor.org/rfc/rfc9309.html), [Python urllib.robotparser](https://docs.python.org/3/library/urllib.robotparser.html), [httpx redirects](https://www.python-httpx.org/compatibility/#redirects) (disabled; manual hop revalidation), [ipaddress](https://docs.python.org/3/library/ipaddress.html).
+
 ## Verification commands
 
 ```bash
-uv run pytest tests/unit/test_job_backoff_admission.py -q
-uv run pytest tests/contract/test_job_leases.py -q
+uv run pytest tests/unit/test_crawl_policy.py tests/unit/test_crawl_proxy.py -q
+uv run pytest tests/contract/test_crawl_ssrf.py tests/contract/test_compose_topology.py -q
 ```
 
 When local Supabase is running, apply migrations and run the SKIP LOCKED contract test:

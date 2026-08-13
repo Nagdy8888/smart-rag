@@ -5,6 +5,8 @@ RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
     && chown -R appuser:appuser /app
 
 WORKDIR /app
+COPY --chown=appuser:appuser requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY --chown=appuser:appuser server.py /app/server.py
 
 USER 10001:10001

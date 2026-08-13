@@ -50,6 +50,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-08-13 | eng, ops |
 | [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-08-13 | eng |
 | [runbooks/CLAMAV_SCAN_AND_PROMOTION.md](./runbooks/CLAMAV_SCAN_AND_PROMOTION.md) | engineering-lead | draft | 2026-08-13 | eng, ops |
+| [ingestion/CRAWL_POLICY.md](./ingestion/CRAWL_POLICY.md) | engineering-lead | draft | 2026-08-13 | eng, security |
+| [runbooks/CRAWL_EGRESS_AND_PROXY.md](./runbooks/CRAWL_EGRESS_AND_PROXY.md) | engineering-lead | draft | 2026-08-13 | eng, ops |
 | [evaluation/QUERY_PROFILE_EVAL.md](./evaluation/QUERY_PROFILE_EVAL.md) | engineering-lead | planned | 2026-08-12 | eng |
 | [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-12 | eng, ops |
 | [security/AUTHORIZATION_MODEL.md](./security/AUTHORIZATION_MODEL.md) | engineering-lead | draft | 2026-08-12 | eng, security |

@@ -9,6 +9,8 @@ networks:
   private:
     driver: bridge
     internal: true
+  egress:
+    driver: bridge
 
 volumes:
   paradedb_data:
@@ -114,7 +116,8 @@ services:
     restart: unless-stopped
     networks:
       - private
-    # Internal only — no host port.
+      - egress
+    # Internal worker reachability on private; egress network for public web only.
     expose:
       - "8080"
     healthcheck:
