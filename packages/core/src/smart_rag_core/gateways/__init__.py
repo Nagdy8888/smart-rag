@@ -1,5 +1,11 @@
 """External integration boundaries owned by the Smart RAG core package."""
 
+from smart_rag_core.gateways.embedding import (
+    EmbeddingGateway,
+    EmbeddingRequest,
+    EmbeddingResponse,
+    create_embedding_gateway,
+)
 from smart_rag_core.gateways.model import (
     MockModelAdapter,
     MockModelNetworkDeniedError,
@@ -12,6 +18,9 @@ from smart_rag_core.gateways.model import (
 )
 
 __all__ = [
+    "EmbeddingGateway",
+    "EmbeddingRequest",
+    "EmbeddingResponse",
     "MockModelAdapter",
     "MockModelNetworkDeniedError",
     "ModelGateway",
@@ -19,5 +28,6 @@ __all__ = [
     "ModelRequest",
     "ModelResponse",
     "block_openai_network",
+    "create_embedding_gateway",
     "create_model_gateway",
 ]

@@ -180,18 +180,50 @@ Arrow / Parquet / tokenizer library pins (uv workspace `packages/core`):
 
 Primary references: [tiktoken](https://github.com/openai/tiktoken), [Apache Arrow Parquet](https://arrow.apache.org/docs/python/parquet.html), [DuckDB read_parquet](https://duckdb.org/docs/data/parquet/overview.html).
 
+## Embedding bounds (Packet 7)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Embedding model | id | `text-embedding-3-large` | — | ADR-embedding-model-dimension | gateway | reject batch | Model change without ADR |
+| Embedding dimensions | count | 1024 | 1024 | ADR-embedding-model-dimension | gateway | reject batch | Dimension mismatch |
+| Contextual policy version | text | `contextual_v1` | — | Packet 7 sign-off | worker | reject stale replay | Policy drift |
+| Batch size | inputs/request | 64 | 2048 | OpenAI documented tier + measured dev | gateway | split/reject | Provider 413/limit errors |
+| Request timeout | seconds | 120 | 300 | OpenAI guidance + measured dev | gateway | retry once | p95 timeout breaches |
+| Gateway retries | count | 2 | 2 | Packet 7 bounded repair | gateway | fail batch | Retry storm |
+| Gateway concurrency | workers | 1 | 2 | Worker concurrency /2 | gateway | queue | Provider 429 sustained |
+| Ledger idempotency | key | `(version_id, operation_key)` UNIQUE | — | Packet 7 | worker | replay no-op | Duplicate canonical rows |
+| Budget reservation | USD/job | 0.05 | 1.00 | QT-COST-002 provisional | admission | `JobAdmissionError` | Budget leak >0.1%/day |
+
+Primary references: [OpenAI embeddings](https://platform.openai.com/docs/guides/embeddings), [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md).
+
+## BM25 projection bounds (Packet 7)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Upsert batch size | rows | 250 | 250 | Measured ParadeDB writer | worker | split batch | Writer timeout/OOM |
+| Delete batch size | rows | 500 | 500 | Measured ParadeDB writer | worker | split batch | Long delete tail |
+| Verify sample queries | count | 5 | 10 | Packet 7 cross-system gate | worker | remain pre-Hybrid | False Hybrid Ready |
+| Verify query limit | rows | 10 | 10 | Packet 7 tie-break check | worker | fail verify | Non-deterministic rank |
+| Index schema version | text | `bm25_v1` | — | BM25 projection contract | worker | fail closed | Schema drift |
+| Normalization version | text | `arabic_norm_v1` | — | Phase 2 SQL fixture | worker | fail closed | Parity regression |
+| Projection lag SLO | minutes p95 | 5 | 5 | QT-BM25-003 | ops | diagnostic only | Sustained lag |
+| Deletion cleanup priority | band | `high` | `critical` | Plan Packet 7 | worker | immediate enqueue | Stale candidate leak |
+
+ParadeDB writer credentials: `PARADEDB_URL` on worker only (Compose `paradedb_writer`). Supabase remains authoritative; ParadeDB holds rebuildable projection rows keyed by canonical chunk IDs.
+
 ## Verification commands
 
 ```bash
 uv run pytest tests/unit/test_parser_adapters.py tests/unit/test_parser_governance.py tests/unit/test_parser_sandbox.py -q
 uv run pytest tests/contract/test_parser_sandbox.py tests/contract/test_compose_topology.py -q
 uv run pytest tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py -q
+uv run pytest tests/unit/test_embedding_service.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_ingestion_status_openapi.py -q
 docker compose --profile parser-build build parser-sandbox
 ```
 
-When local Supabase is running, apply migrations and run the SKIP LOCKED contract test:
+When local Supabase and ParadeDB are running, apply migrations and run integration contracts:
 
 ```bash
 pnpm exec supabase db reset --yes
-uv run pytest tests/contract/test_job_leases.py -q
+uv run pytest tests/contract/test_job_leases.py tests/contract/test_hybrid_lifecycle.py -q
 ```

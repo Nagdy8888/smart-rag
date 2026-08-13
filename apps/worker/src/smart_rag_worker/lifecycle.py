@@ -20,6 +20,10 @@ from smart_rag_agents.ingestion.graph import (
     IngestionProbeState,
     build_probe_ingestion_graph,
 )
+from smart_rag_agents.ingestion.index_graph import (
+    IngestionIndexState,
+    build_index_ingestion_graph,
+)
 from smart_rag_agents.ingestion.scan_graph import (
     IngestionScanState,
     build_scan_promote_ingestion_graph,
@@ -29,6 +33,8 @@ from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.schema.enums import JobErrorCategory
 from smart_rag_core.schema.tables import IngestionJobRecord
 from smart_rag_core.settings.worker import WorkerSettings
+
+from smart_rag_worker.bm25_runner import Bm25WorkerLoop
 
 LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +50,8 @@ class WorkerLifecycle:
         self._probe_graph = build_probe_ingestion_graph()
         self._scan_graph = build_scan_promote_ingestion_graph()
         self._crawl_graph = build_crawl_ingestion_graph()
+        self._index_graph = build_index_ingestion_graph()
+        self._bm25_loop = Bm25WorkerLoop(settings)
 
     def run_forever(self) -> None:
         """Poll and process jobs until stopped."""
@@ -64,6 +72,7 @@ class WorkerLifecycle:
                     continue
                 job = self._claim_one()
                 if job is None:
+                    self._bm25_loop.process_once()
                     if self._settings.worker_once:
                         break
                     time.sleep(self._settings.job_poll_interval_seconds)
@@ -107,6 +116,7 @@ class WorkerLifecycle:
             "clamav_host": self._settings.clamav_host,
             "clamav_port": self._settings.clamav_port,
             "crawl_proxy_url": crawl_proxy,
+            "mock_model_mode": self._settings.mock_model_mode,
         }
 
     def _claim_one(self) -> IngestionJobRecord | None:
@@ -174,6 +184,14 @@ class WorkerLifecycle:
                 )
                 success = result.get("status") == "crawl_completed"
                 detail = str(result.get("detail", "website_crawl_failed"))
+            elif job.job_kind == "hybrid_index":
+                graph_input = _index_graph_input_from_job(job)
+                result = self._index_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+                    graph_input,
+                    config={"configurable": self._graph_config()},
+                )
+                success = result.get("status") == "indexed"
+                detail = str(result.get("detail", "hybrid_index_failed"))
             else:
                 graph_input = _probe_graph_input_from_job(job)
                 result = self._probe_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
@@ -376,5 +394,70 @@ def _crawl_graph_input_from_job(job: IngestionJobRecord) -> IngestionCrawlState:
         "status": "crawl_pending",
         "pages_fetched": 0,
         "crawl_run_id": None,
+        "detail": "",
+    }
+
+
+def _index_graph_input_from_job(job: IngestionJobRecord) -> IngestionIndexState:
+    """Build hybrid indexing graph input from durable job payload."""
+
+    payload = job.payload_ref
+    return {
+        "job_id": str(job.id),
+        "lease_token": job.lease_token or "",
+        "document_id": str(job.document_id) if job.document_id else None,
+        "version_id": str(job.version_id) if job.version_id else None,
+        "operation_key": str(payload.get("operation_key", job.job_kind)),
+        "storage_bucket": (
+            str(payload["storage_bucket"])
+            if isinstance(payload.get("storage_bucket"), str)
+            else None
+        ),
+        "storage_path": (
+            str(payload["storage_path"])
+            if isinstance(payload.get("storage_path"), str)
+            else None
+        ),
+        "content_hash": (
+            str(payload["content_hash"])
+            if isinstance(payload.get("content_hash"), str)
+            else None
+        ),
+        "byte_size": (
+            int(payload["byte_size"])
+            if isinstance(payload.get("byte_size"), int)
+            else None
+        ),
+        "media_type": (
+            str(payload["media_type"])
+            if isinstance(payload.get("media_type"), str)
+            else None
+        ),
+        "filename": (
+            str(payload["filename"])
+            if isinstance(payload.get("filename"), str)
+            else None
+        ),
+        "document_title": (
+            str(payload["document_title"])
+            if isinstance(payload.get("document_title"), str)
+            else None
+        ),
+        "declared_category": (
+            str(payload["declared_category"])
+            if isinstance(payload.get("declared_category"), str)
+            else None
+        ),
+        "attestation_policy_version": (
+            str(payload["attestation_policy_version"])
+            if isinstance(payload.get("attestation_policy_version"), str)
+            else None
+        ),
+        "review_approved": bool(payload.get("review_approved", False)),
+        "content_class": str(payload.get("content_class", "synthetic")),
+        "graph_eligible": bool(payload.get("graph_eligible", False)),
+        "status": "index_pending",
+        "chunk_set_hash": None,
+        "bm25_job_id": None,
         "detail": "",
     }

@@ -125,6 +125,9 @@ def create_app() -> FastAPI:
     application.middleware("http")(add_correlation_context)
     application.get("/health/live", tags=["health"])(live)
     application.get("/health/ready", tags=["health"])(ready)
+    from smart_rag_api.routers.ingestion_status import router as ingestion_status_router
+
+    application.include_router(ingestion_status_router)
     return application
 
 

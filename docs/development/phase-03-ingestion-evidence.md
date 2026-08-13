@@ -409,5 +409,57 @@ Adversarial comparison rejected ad-hoc `pdfplumber`/unpinned OCR stacks due to w
 4. [x] Approved bounded crawling through restricted proxy
 5. [x] Parser/OCR sandbox and typed format adapters
 6. [x] Chunking, deduplication, typed Parquet artifacts
-7. [ ] Embeddings, BM25 projection, lifecycle, graph handoff
+7. [x] Embeddings, BM25 projection, lifecycle, graph handoff
 8. [ ] Adversarial, crash, throughput, and exit proof
+
+## Packet 7 — embeddings, BM25 projection, Hybrid lifecycle, graph handoff, status APIs
+
+### Implemented
+
+- `packages/core/src/smart_rag_core/ingestion/embeddings/` — contextual input, mock/policy vectors, governed batch service with durable ledger.
+- `packages/core/src/smart_rag_core/gateways/embedding.py` — shared `EmbeddingGateway` (mock-only until provider settings verified).
+- `packages/core/src/smart_rag_core/ingestion/canonical/repository.py` — transactional canonical chunk/term/table writes + BM25 outbox enqueue.
+- `packages/core/src/smart_rag_core/retrieval/bm25_indexer.py` — core `Bm25Indexer` ParadeDB writer adapter.
+- `packages/core/src/smart_rag_core/retrieval/bm25_verifier.py` — cross-system row/hash/sample-query verification.
+- `packages/core/src/smart_rag_core/ingestion/bm25_projection.py` — worker projection service + Hybrid Ready finalization RPC.
+- `apps/agents/src/smart_rag_agents/ingestion/index_graph.py` — parse/chunk/embed/persist indexing graph (`hybrid_index` job kind).
+- `apps/worker/src/smart_rag_worker/bm25_runner.py` — leased BM25 job loop with heartbeat.
+- `apps/backend/src/smart_rag_api/routers/ingestion_status.py` — lifecycle/diagnostics + role-scoped retry.
+- `supabase/migrations/20260813200000_hybrid_embedding_lifecycle_v1.sql` — embedding ledger, lifecycle RPCs, graph handoff idempotency.
+
+### Policy pins
+
+| Component | Pin |
+| --- | --- |
+| Embedding model | `text-embedding-3-large` @ 1024 dims |
+| Contextual policy | `contextual_v1` |
+| BM25 schema | `bm25_v1` |
+| Graph pipeline handoff | `graph_pipeline_v1` / `lightrag_v1` |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run ruff check packages/core/src/smart_rag_core/ingestion/embeddings packages/core/src/smart_rag_core/retrieval apps/agents/src/smart_rag_agents/ingestion/index_graph.py apps/worker/src/smart_rag_worker/bm25_runner.py apps/backend/src/smart_rag_api/routers/ingestion_status.py tests/unit/test_embedding_service.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_ingestion_status_openapi.py` | 0 |
+| `uv run pytest tests/unit/test_embedding_service.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_ingestion_status_openapi.py -q` | 0 (6 passed) |
+| `uv run pytest tests/contract/test_hybrid_lifecycle.py -q` | 0 (3 passed, 1 skipped without PARADEDB_URL) |
+
+### Negative / scope guards
+
+| Fixture | Expected |
+| --- | --- |
+| Real company content without verified provider settings | embedding gate denies (`unverified_provider_settings`) |
+| Duplicate graph handoff replay | one `lightrag_index_jobs` row |
+| Phase 3 repo search for Graph Ready / mapping writes | fails guard test |
+| Unauthorized retry | HTTP 403 for member role |
+
+### Unverified assumptions
+
+- End-to-end `hybrid_index` job on live Storage object through verified Hybrid Ready (requires local stack + synthetic fixture upload path).
+- Real OpenAI embedding adapter (blocked until provider matrix verified; mock gateway only).
+
+### Next-packet handoff (Packet 8)
+
+- Full adversarial/crash matrix across scan→embed→BM25→handoff with real ClamAV/Storage/Postgres/ParadeDB boundaries.
+- Throughput/lag measurement to signed 500 text / 100 OCR pages/hour gates.
+- Apply migration on local Supabase before integration contracts.

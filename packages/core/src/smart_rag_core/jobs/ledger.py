@@ -76,3 +76,34 @@ class JobOperationLedger:
             if row is None or row[0] is None:
                 raise JobRepositoryError("ledger_write_missing_id")
             return UUID(str(row[0]))
+
+    def fetch_result(
+        self,
+        *,
+        job_table: str,
+        job_id: UUID,
+        operation_key: str,
+    ) -> dict[str, Any] | None:
+        """Return a completed ledger result payload when present."""
+
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT result_ref
+                FROM app.job_operation_ledger
+                WHERE job_table = %s
+                  AND job_id = %s
+                  AND operation_key = %s
+                  AND status = 'completed'
+                """,
+                (job_table, job_id, operation_key),
+            )
+            row = cursor.fetchone()
+            if row is None or row[0] is None:
+                return None
+            payload = row[0]
+            if isinstance(payload, dict):
+                return payload
+            if isinstance(payload, str):
+                return json.loads(payload)
+            return dict(payload)

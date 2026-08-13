@@ -1,4 +1,4 @@
-"""Model gateway boundary with deterministic, network-denied mock behavior."""
+"""Model and embedding gateway boundaries with deterministic mock behavior."""
 
 from __future__ import annotations
 
