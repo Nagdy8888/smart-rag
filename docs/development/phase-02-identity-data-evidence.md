@@ -312,3 +312,74 @@ Ops helper: `scripts/ops/prove_jwks_rollover.py` (destructive; do not run in CI)
 
 Packet 5 — private Storage, quota capabilities, graph eligibility, retention.
 
+## Packet 5 — private Storage, quotas, scan foundations, graph eligibility, retention
+
+### Requirement
+
+Private Storage buckets, upload quotas, quarantine cleanup, scan foundations,
+graph eligibility, retention structures, admin notifications. ADR: user JWT +
+Storage RLS INSERT (not signed upload URL); 15-minute admission;
+effective capability `min(reservation_expires_at, access_token_exp)`;
+privileged Storage Admin boundary for delete/list.
+
+### Artifacts
+
+| Area | Path |
+| --- | --- |
+| Migration | `supabase/migrations/20260813140000_storage_quotas_graph_retention_v1.sql` |
+| ADR | `docs/adr/ADR-upload-capability-and-storage-privilege.md` |
+| Storage Admin boundary | `apps/backend/src/smart_rag_api/storage_admin/` |
+| Quota / cleanup services | `apps/backend/src/smart_rag_api/services/upload_quota.py`, `quarantine_cleanup.py` |
+| Core model | `UploadQuotaReservationRecord` in `packages/core/.../schema/tables.py` |
+| Docs | data dictionary Storage section; QUALITY_TARGETS QT-RET-*; docs index |
+| Contract tests | `tests/contract/test_{storage_buckets_rls,upload_quota,quarantine_cleanup,graph_eligibility_storage}.py` |
+| CI allowlist | `scripts/ci/check_migrations.py` |
+
+### Commands and results
+
+```text
+npx supabase db reset --yes
+→ Applied 16 migrations including 20260813140000_storage_quotas_graph_retention_v1.sql; exit 0
+
+uv run python scripts/ci/check_migrations.py
+→ Phase 2 migration policy OK (16 reviewed files); exit 0
+
+uv run ruff check on Packet 5 Python paths
+→ All checks passed; exit 0
+
+uv run pytest tests/contract/test_storage_buckets_rls.py \
+             tests/contract/test_upload_quota.py \
+             tests/contract/test_quarantine_cleanup.py \
+             tests/contract/test_graph_eligibility_storage.py -q
+→ 13 passed; exit 0
+```
+
+### Managed sync (2026-08-13)
+
+Applied `storage_quotas_graph_retention_v1` to `qsjivtwtmlmtksufqjik` via MCP
+`apply_migration`. Verified five private buckets (`public=false`),
+`upload_quota_reservations.idempotency_key`, and
+`app.reserve_upload_quota` / `app.emit_admin_notification`.
+
+### Acceptance mapping
+
+| Check | Evidence |
+| --- | --- |
+| Private buckets; quarantine non-listable; own-path only | `test_storage_buckets_rls.py` |
+| Effective capability truthful; ADR documents JWT vs 15m | ADR + `test_effective_capability_lifetime_label` |
+| Declared/actual bytes, caps, expiry, over-limit, idempotent | `test_upload_quota.py`, `test_quarantine_cleanup.py` |
+| Storage API delete (not SQL metadata delete); retry-safe | `storage_admin/objects.py` + `test_cleanup_uses_storage_api_not_sql_delete` |
+| No fake clean scan without Phase 3 worker | `test_scan_events_block_fake_clean_for_app_api` |
+| Restricted/non-current/deleted not graph eligible; ACL emits `graph_acl_remove` | `test_graph_eligibility_storage.py` |
+| Admin notification fixtures + helper | `test_admin_notification_helper_and_fixtures` |
+| Secret scan: Storage Admin secret not in SharedSettings | `test_shared_settings_reject_storage_admin_secret` |
+
+### Forbidden scope respected
+
+No ClamAV, MIME validation, promotion/parsing/OCR/embedding, crawling, graph
+indexing execution, public buckets, or invented narrow service tokens.
+
+### Next packet
+
+Packet 6 — connection isolation, protected credentials, audit integrity, and exit.
+

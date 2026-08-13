@@ -24,6 +24,7 @@ from smart_rag_core.schema.tables import (
     DurableJobColumns,
     IngestionJobRecord,
     ProfileRecord,
+    UploadQuotaReservationRecord,
 )
 
 __all__ = [
@@ -47,5 +48,6 @@ __all__ = [
     "ScanResult",
     "SourceType",
     "ToolPermissionLevel",
+    "UploadQuotaReservationRecord",
     "UserRole",
 ]

@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from smart_rag_core.schema.enums import (
+    BudgetReservationStatus,
     DocumentVisibility,
     JobErrorCategory,
     JobPriority,
@@ -70,7 +71,33 @@ class CompanySettingsRecord(BaseModel):
     daily_ingestion_budget_usd: float | None = None
     upload_quota_bytes: int | None = None
     quarantine_byte_cap: int | None = None
+    retention_days: int = Field(default=365, ge=1)
+    quarantine_ttl_hours: int = Field(default=24, ge=1)
+    legal_hold_enabled: bool = False
     timezone: str = "UTC"
+    created_at: datetime
+    updated_at: datetime
+
+
+class UploadQuotaReservationRecord(BaseModel):
+    """Durable per-upload byte reservation against user/company caps."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    user_id: UUID
+    reserved_bytes: int = Field(ge=1, description="Declared bytes at admission.")
+    status: BudgetReservationStatus = BudgetReservationStatus.RESERVED
+    expires_at: datetime
+    storage_bucket: str | None = None
+    storage_path: str | None = None
+    idempotency_key: str | None = None
+    session_id: str | None = None
+    actual_bytes: int | None = Field(default=None, ge=0)
+    finalized_at: datetime | None = None
+    cleanup_status: str | None = None
+    committed_at: datetime | None = None
+    released_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

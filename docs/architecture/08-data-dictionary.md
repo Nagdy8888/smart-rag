@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-13
 audience: engineering, reviewers
 ---
 
@@ -104,7 +104,23 @@ erDiagram
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `llm_usage` | `app` | authority | model gateway | dashboards | 24mo aggregates | high append | none (aggregate) | usage row `id` | 6 agent |
 | `budget_reservations` | `app` | authority | API reserve/commit | gateway | until settled | active reservations | release/commit | reservation `id` | 6 agent |
-| `upload_quota_reservations` | `app` | authority | upload API | Storage admit | ≤15m effective | active uploads | expire/release | reservation `id` | 2 schema / 5 storage |
+| `upload_quota_reservations` | `app` | authority | upload API (`reserve`/`finalize`) | Storage admit + cleanup | 15m admission; effective capability `min(reservation, JWT exp)` | active uploads | expire/release + Storage API cleanup | `(user_id, idempotency_key)` unique when key set | 2 schema / 5 storage |
+| `retention_holds` | `app` | authority | admin/compliance | purge planners | until released | sparse | release only | hold `id` | 2 structure / later purge |
+| `offboarding_requests` | `app` | authority | admin | ops | until completed | per subject | status machine | request `id` | 2 structure / later execution |
+
+## Private Storage buckets (Packet 5)
+
+All buckets `public=false`. Browser JWT may `INSERT` only into `documents-quarantine` under `{auth.uid()}/{reservation_id}/{safe_filename}` with an active reservation; quarantine has **no** authenticated `SELECT`/`LIST`. Originals, web snapshots, table artifacts, and exports are privileged Storage Admin / worker only.
+
+| Bucket | Path contract |
+| --- | --- |
+| `documents-quarantine` | `{auth.uid()}/{reservation_id}/{safe_filename}` |
+| `documents-originals` | `documents/{document_id}/versions/{version_id}/{safe_filename}` |
+| `web-snapshots` | `sources/{source_id}/crawls/{crawl_version}/{safe_filename}` |
+| `table-artifacts` | `documents/{document_id}/versions/{version_id}/tables/{sheet}/{safe_filename}` |
+| `exports` | `exports/{user_id}/{export_id}/{safe_filename}` |
+
+See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capability-and-storage-privilege.md).
 | `audit_events` | `app` | authority | audit writer fn | admin/chain export | 7 years | append-only | **blocked** | event `id` | 2 schema / 6 chain |
 | `audit_chain_anchors` | `app` | authority | anchor job | compliance | 7 years | daily anchors | none | anchor_date unique | 6 chain |
 | `restricted_read_events` | `app` | authority | evidence/download RPC | audit | 7 years | sparse | none | event `id` | 2 schema / 3 ACL |
@@ -120,7 +136,10 @@ erDiagram
 - `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
 - `audit_events` rejects UPDATE/DELETE (append-only trigger).
-- RLS is enabled on all exposed tables; policies are deny-by-default until Packet 3.
+- RLS is enabled on all exposed tables; Storage quarantine INSERT is reservation-scoped; no authenticated SELECT on quarantine.
+- `document_scan_events` is append-only; `result=clean` inserts are blocked for non-`app_worker` roles until Phase 3.
+- ACL/visibility downgrade clears `graph_eligible` and atomically enqueues `graph_acl_remove`.
+- Company retention defaults: `retention_days=365`, `quarantine_ttl_hours=24`, `legal_hold_enabled=false` (Phase 1 signed defaults).
 
 ## Related docs
 

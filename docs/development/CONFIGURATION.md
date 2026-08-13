@@ -54,7 +54,11 @@ These placeholders are consumed by Docker Compose rather than Python settings:
   local credentials.
 
 `LANGSMITH_API_KEY`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY` remain commented,
-planned placeholders. Packet 4 does not read them or claim their integrations.
+planned placeholders for Compose. Backend Packet 4+ reads `SUPABASE_URL` /
+JWKS settings through `BackendSettings`. Privileged secrets
+`SUPABASE_AUTH_ADMIN_SECRET` and `SUPABASE_STORAGE_ADMIN_SECRET` load only
+inside `smart_rag_api.auth_admin` and `smart_rag_api.storage_admin`
+respectively—never through `SharedSettings`.
 
 ## Failure and security behavior
 

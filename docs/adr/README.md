@@ -17,6 +17,8 @@ audience: engineering
 | API/SSE compatibility | accepted | 1 | [ADR-api-sse-compatibility.md](./ADR-api-sse-compatibility.md) |
 | Vision captioning trigger | proposed | 1 | [ADR-vision-captioning.md](./ADR-vision-captioning.md) |
 | Embedding model/dimension | proposed | 2 gate | [ADR-embedding-model-dimension.md](./ADR-embedding-model-dimension.md) |
+| Privileged Auth administration boundary | accepted | 2 | [ADR-privileged-auth-administration-boundary.md](./ADR-privileged-auth-administration-boundary.md) |
+| Upload capability / Storage privilege | accepted | 2 | [ADR-upload-capability-and-storage-privilege.md](./ADR-upload-capability-and-storage-privilege.md) |
 | Graph eligibility / ACL isolation | planned | 2/5 | TBD |
 | PGTableGraphStorage | planned | 5 | TBD |
 | Canonical vs inference grounding | planned | 5/6 | TBD |

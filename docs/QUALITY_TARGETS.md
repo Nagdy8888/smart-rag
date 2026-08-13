@@ -203,6 +203,14 @@ The following require explicit user approval before Packet 1 and Phase 1 can adv
 5. RTO/RPO and availability/isolation triggers.
 6. Dated Hybrid Pilot decision criteria in [ADR-hybrid-pilot-release-cut.md](./adr/ADR-hybrid-pilot-release-cut.md).
 
+## 13. Retention defaults (Phase 2 Packet 5)
+
+| ID | Target | Unit | Provenance | Approval | Approver | Approval date | Measure in | On failure |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| QT-RET-001 | Undeleted corpus retention default 365 days (`company_settings.retention_days`) | days | Phase 2 Packet 5 / global contracts | accepted as Phase 1 default | engineering-lead | 2026-08-13 | Phase 2 schema; purge later | Do not invent alternate without client sign-off |
+| QT-RET-002 | Never-finalized quarantine TTL default 24 hours (`quarantine_ttl_hours`) | hours | Phase 2 Packet 5 | accepted as Phase 1 default | engineering-lead | 2026-08-13 | Packet 5 cleanup | Raise only via company_settings |
+| QT-RET-003 | Company legal hold flag default false (`legal_hold_enabled`); holds table is Phase 2 structure only | policy | Phase 2 Packet 5 | accepted | engineering-lead | 2026-08-13 | Later purge/offboarding | Purge must honor holds when implemented |
+
 ## Decision record
 
 | Field | Value |
