@@ -16,6 +16,7 @@ dev = [
     "openai==2.26.0",
     "psycopg[binary]==3.3.3",
     "pip-audit>=2.10.1",
+    "duckdb==1.2.1",
 ]
 
 [tool.uv]

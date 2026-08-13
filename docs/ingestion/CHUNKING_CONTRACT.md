@@ -1,22 +1,53 @@
 ---
 title: Chunking contract
 owner: engineering-lead
-status: planned
-last-reviewed: 2026-08-12
+status: accepted
+last-reviewed: 2026-08-13
 owning_phase: 3
 audience: engineering
 ---
 
-# Chunking contract (planned)
+# Chunking contract
 
-**Owning phase:** 3 (ingestion). No implementation or measurements yet.
+**Owning phase:** 3 (ingestion). **Policy version:** `chunking_v1`. **Tokenizer:** `cl100k_base_v1` (OpenAI `text-embedding-3-large` sizing).
 
-## Purpose
+## Hierarchy
 
-Typed elements, cleaning, 200–400 token passages, atomic table/list rules, parent reconstruction, dedup, provenance.
+Typed parser elements become **document → section (parent) → passage** chunks. Parents aggregate ordered child passage references and are bounded to **1,500 tokens** for expansion context; they are not embedding targets.
 
-## Required future evidence
+## Passage sizing
 
-Structure fixtures, token distribution, fuzzy-dedup precision/recall (QT-CHK-*).
+| Rule | Value |
+| --- | --- |
+| Ordinary prose target | **200–400 tokens** (≥90% of ordinary prose fixtures) |
+| Adjacent prose-sibling overlap | **40–60 tokens** |
+| Normal hard cap | **600 tokens** |
+| Parent section cap | **1,500 tokens** |
 
-[docs index](../README.md)
+## Atomicity
+
+- **Tables:** split only between rows; repeat header row on each row-chunk.
+- **Lists:** split only between top-level items; retain list introduction on each item-chunk.
+- **Code/captions:** never split silently. Oversized atomics use a documented fragment fallback sharing one `atomic_element_id`, full locators, order, `fragment_ordinal`, and `is_atomic_exception`.
+
+## Stable IDs
+
+Chunk IDs are UUID5 values derived from document/version namespace, element IDs/path, normalized content hash, parser/cleaning/chunking/tokenizer/dedup versions, and fragment ordinal. Identical inputs/config replay to identical IDs.
+
+## Deduplication
+
+- **Exact:** normalized SHA-256 within a version; keep one searchable representative plus every duplicate locator and `duplicate_of_chunk_id`.
+- **Near (intra-version only):** 5-word-shingle Jaccard ≥ **0.92** when fuzzy policy meets **≥99% precision** and **≥85% recall** on fixtures; otherwise **exact-only** fallback (`dedup_v1`). Current fixture evaluation: precision **1.0**, recall **0.5** → **exact-only active**.
+- **Cross-document:** never hard-delete; authority/date may differ.
+
+## Typed tables
+
+CSV/XLSX cells materialize to private **`table-artifacts`** Parquet (`table_parquet_v1`) with explicit Arrow schema, provenance JSON per row, manifest hash linkage, and no flatten-only prose substitution.
+
+## Verification
+
+```bash
+uv run pytest tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py -q
+```
+
+Related: [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [docs index](../README.md)

@@ -150,11 +150,42 @@ Parser sandbox image: built from `infra/parser-sandbox` (`smart-rag-parser-sandb
 
 Primary references: [PyMuPDF docs](https://pymupdf.readthedocs.io/), [python-docx](https://python-docx.readthedocs.io/), [python-pptx](https://python-pptx.readthedocs.io/), [openpyxl](https://openpyxl.readthedocs.io/), [Tesseract](https://tesseract-ocr.github.io/).
 
+## Chunking / dedup / table artifact bounds (Packet 6)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Chunking policy version | text | `chunking_v1` | — | Packet 6 sign-off | worker | reject stale replay | Policy drift |
+| Tokenizer version | text | `cl100k_base_v1` | — | ADR `text-embedding-3-large` sizing | worker | reject stale replay | Embedding model change |
+| Dedup policy version | text | `dedup_v1` | — | Packet 6 sign-off | worker | exact-only fallback | Fuzzy gate miss |
+| Passage target tokens | tokens | 200–400 | — | CHUNKING_CONTRACT | worker | split/merge | <90% ordinary prose in band |
+| Passage overlap | tokens | 50 | 40–60 | CHUNKING_CONTRACT | worker | metric fail | Overlap drift |
+| Passage hard cap | tokens | 600 | 600 | CHUNKING_CONTRACT | worker | atomic exception only | Silent split defect |
+| Parent cap | tokens | 1500 | 1500 | CHUNKING_CONTRACT | worker | truncate child refs | Parent reconstruction fail |
+| Near-dup threshold | ratio | 0.92 | 0.92 | Packet 6 provisional | worker | exact-only fallback | Precision/recall gate |
+| Near-dup precision gate | ratio | 0.99 | 0.99 | QT-CHK dedup | worker | exact-only fallback | Fixture regression |
+| Near-dup recall gate | ratio | 0.85 | 0.85 | QT-CHK dedup | worker | exact-only fallback | Fixture regression |
+| Table schema version | text | `table_parquet_v1` | — | Packet 6 sign-off | worker | reject write | Schema drift |
+| Parquet compression | codec | zstd | zstd | Arrow 19 pin | worker | fail closed | Round-trip loss |
+| Parquet row group size | rows | 65536 | 65536 | Arrow 19 pin | worker | fail closed | Read latency review |
+| Timestamp unit/timezone | policy | `us` / UTC | — | Packet 6 | worker | fail closed | TZ coercion defect |
+| DuckDB sandbox | policy | read-only fixture | — | Phase 4 prep | tests | block query | Escape probe |
+
+Arrow / Parquet / tokenizer library pins (uv workspace `packages/core`):
+
+| Library | Pin | License | Role |
+| --- | --- | --- | --- |
+| tiktoken | 0.9.0 | MIT | Embedding token counting (`cl100k_base`) |
+| pyarrow | 19.0.1 | Apache-2.0 | Typed Parquet read/write |
+| duckdb | 1.2.1 | MIT | Dev-only sandbox contract tests |
+
+Primary references: [tiktoken](https://github.com/openai/tiktoken), [Apache Arrow Parquet](https://arrow.apache.org/docs/python/parquet.html), [DuckDB read_parquet](https://duckdb.org/docs/data/parquet/overview.html).
+
 ## Verification commands
 
 ```bash
 uv run pytest tests/unit/test_parser_adapters.py tests/unit/test_parser_governance.py tests/unit/test_parser_sandbox.py -q
 uv run pytest tests/contract/test_parser_sandbox.py tests/contract/test_compose_topology.py -q
+uv run pytest tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py -q
 docker compose --profile parser-build build parser-sandbox
 ```
 

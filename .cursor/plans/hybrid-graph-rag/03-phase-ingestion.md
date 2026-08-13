@@ -48,7 +48,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 3. [x] Implement quota-bounded quarantine, orphan TTL cleanup, fresh-signature malware scanning, category approval, safe promotion, append-only provenance, and durable local admin alerts.
 4. [x] Implement approved-URL crawling only through the restricted proxy with redirect, DNS, peer-IP, scope, byte, page, and time bounds.
 5. [x] Implement no-network parser/OCR isolation and typed format adapters with deterministic cleaning, format-specific source locators, and explicit media-only figure/chart diagnostics.
-6. [ ] Implement hierarchical chunking, bounded parents/overlap, exact and near-duplicate provenance, typed Parquet artifacts, and stable replay IDs.
+6. [x] Implement hierarchical chunking, bounded parents/overlap, exact and near-duplicate provenance, typed Parquet artifacts, and stable replay IDs.
 7. [ ] Implement governed embeddings, durable idempotent ParadeDB BM25 projection, verified `Hybrid Ready`, graph eligibility plus idempotent `Graph Pending` handoff, canonical/Hybrid version transitions, immediate deletion exclusion, and status APIs.
 8. [ ] Exercise positive, failure, authorization, idempotency, crash-recovery, resource-limit, malware, sensitive-data, and SSRF fixtures.
 

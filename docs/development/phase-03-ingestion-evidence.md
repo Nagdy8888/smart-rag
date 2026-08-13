@@ -347,6 +347,60 @@ Adversarial comparison rejected ad-hoc `pdfplumber`/unpinned OCR stacks due to w
 - Do not re-parse from raw bytes in Packet 6; chunking reads typed element trees only.
 - Parquet/table artifact schema must preserve XLSX/CSV typed metadata already emitted by parser adapters.
 
+## Packet 6 — chunking, deduplication, and typed Parquet artifacts
+
+### Implemented
+
+- `packages/core/src/smart_rag_core/ingestion/chunking/` — hierarchical builder, tokenizer (`cl100k_base_v1`), stable UUID5 IDs, exact/near dedup (`dedup_v1`), metrics.
+- `packages/core/src/smart_rag_core/ingestion/tables/` — Arrow schema (`table_parquet_v1`), Parquet I/O, manifests, Storage path helper, DuckDB read-only sandbox contract.
+- Final [CHUNKING_CONTRACT.md](../ingestion/CHUNKING_CONTRACT.md) and Arrow/Parquet pins in [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md).
+
+### Policy versions
+
+| Component | Version |
+| --- | --- |
+| Chunking | `chunking_v1` |
+| Tokenizer | `cl100k_base_v1` |
+| Dedup | `dedup_v1` |
+| Table schema | `table_parquet_v1` |
+
+### Measured fuzzy dedup (fixtures)
+
+| Metric | Value | Gate |
+| --- | --- | --- |
+| Precision | 1.000 | ≥ 0.99 |
+| Recall | 0.500 | ≥ 0.85 |
+| Mode | `exact_only` | fuzzy disabled; exact SHA-256 only |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv lock` + `uv sync --all-packages` | 0 |
+| `uv run ruff check packages/core/src/smart_rag_core/ingestion/chunking packages/core/src/smart_rag_core/ingestion/tables tests/unit/test_chunking_*.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py` | 0 |
+| `uv run pytest tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_table_parquet.py tests/contract/test_duckdb_parquet_sandbox.py -q` | 0 (17 passed) |
+
+### Negative / bounded fixtures
+
+| Fixture | Expected |
+| --- | --- |
+| Mid-row/code split without exception | code atomic; table row chunks |
+| Duplicate prose separated by code | representative + `duplicate_of_chunk_id` |
+| XLSX formula cell | formula string preserved in Parquet |
+| CSV duplicate headers | unique column names + original header manifest |
+| DuckDB ATTACH/COPY/URL/traversal | blocked by sandbox validator |
+
+### Unverified assumptions
+
+- Live Supabase `table-artifacts` upload/hash verify through worker graph node (Storage gateway helper implemented; end-to-end job not run).
+- Production-scale fuzzy dedup corpus beyond labeled fixture pairs.
+
+### Next-packet handoff (Packet 7)
+
+- Consume `ChunkingResult.chunks` with stable IDs, provenance, parent links, and dedup representatives.
+- Use `table_artifacts` manifests/paths for canonical `document_tables` rows; no re-chunking from raw bytes.
+- Wire governed embeddings + BM25 projection only after external-processing approval and budget reservation (Packet 7 scope).
+
 ## Packet checklist
 
 1. [x] External-processing governance sign-off (this section)
@@ -354,6 +408,6 @@ Adversarial comparison rejected ad-hoc `pdfplumber`/unpinned OCR stacks due to w
 3. [x] Quarantine, ClamAV, governance hold, promotion saga, alerts
 4. [x] Approved bounded crawling through restricted proxy
 5. [x] Parser/OCR sandbox and typed format adapters
-6. [ ] Chunking, deduplication, typed Parquet artifacts
+6. [x] Chunking, deduplication, typed Parquet artifacts
 7. [ ] Embeddings, BM25 projection, lifecycle, graph handoff
 8. [ ] Adversarial, crash, throughput, and exit proof
