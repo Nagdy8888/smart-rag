@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import cast
 
 import psycopg
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SUPABASE_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -57,23 +58,24 @@ def resolve_supabase_db_url() -> str:
 
 
 def local_supabase_status() -> dict[str, str]:
-    """Return sanitized local Supabase status values for integration clients.
+    """Return local Supabase status or skip when the live stack is unavailable.
 
     Returns:
         String-keyed URLs and ephemeral local credentials reported by the pinned
         CLI. Callers must never print or persist the returned credential values.
 
     Raises:
-        RuntimeError: If ``pnpm`` is missing, local status fails, or the CLI
-            response is not a string-keyed object.
+        RuntimeError: If the available CLI returns malformed status data.
 
     Side Effects:
         Executes the workspace-pinned Supabase CLI without mutating the stack.
+        Skips the current test when ``pnpm`` or local Supabase is unavailable;
+        the dedicated integration gate rejects such mandatory skips.
     """
 
     pnpm = shutil.which("pnpm")
     if pnpm is None:
-        raise RuntimeError("pnpm is required for local Supabase status")
+        pytest.skip("pnpm is unavailable; local Supabase contract not run")
     completed = subprocess.run(
         [pnpm, "exec", "supabase", "status", "-o", "json"],
         cwd=REPO_ROOT,
@@ -85,7 +87,7 @@ def local_supabase_status() -> dict[str, str]:
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError("local Supabase status is unavailable")
+        pytest.skip("local Supabase stack is unavailable")
     try:
         payload: object = json.loads(completed.stdout)
     except json.JSONDecodeError as exc:

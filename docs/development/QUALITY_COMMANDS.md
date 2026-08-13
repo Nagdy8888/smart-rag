@@ -32,11 +32,13 @@ types:
 uv run python scripts/ci/check_schema_determinism.py
 ```
 
-The Phase 2 integration gate requires or starts local Supabase and the private
-ParadeDB service, then runs the mandatory schema/RLS/Auth/Storage/audit/BM25
-suite. Any skipped mandatory test fails the gate. Managed pgvector and JWKS
-rollover checks are deliberately reported as separate, not silently skipped as
-local proof:
+The ordinary contract and fast tiers may skip live integration checks when their
+local Supabase or ParadeDB prerequisites are unavailable, which keeps
+dependency-only CI deterministic. The Phase 2 integration gate requires or
+starts local Supabase and the private ParadeDB service, then runs the mandatory
+schema/RLS/Auth/Storage/audit/BM25 suite. Any skipped mandatory test fails the
+gate. Managed pgvector and JWKS rollover checks are deliberately reported as
+separate, not silently skipped as local proof:
 
 ```powershell
 uv run python scripts/ci/check_phase2_integration.py

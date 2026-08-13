@@ -759,6 +759,12 @@ policy was added merely to silence an informational finding.
 - The managed advisor search-path warning was reproduced against the deployed
   schema and repaired forward-only in local canonical migrations as described
   above.
+- The first GitHub runs after closeout collected live Auth/Storage tests in the
+  dependency-only contract tier without starting local Supabase. Missing
+  `pnpm`, an unavailable CLI stack, and unreachable port `54322` caused three
+  environment failures. Live tests now declare skips when those prerequisites
+  are absent from the ordinary contract tier; the dedicated Phase 2 integration
+  gate still starts the services and rejects every mandatory skip.
 
 No failing local gate remains.
 
