@@ -1,98 +1,226 @@
-"""Foundation ingestion graph scaffold for LangGraph configuration qualification.
-
-This module intentionally does not parse files, embed content, update indexes,
-or claim ingestion completion. Invocation only records that the Phase 1
-foundation graph is unconfigured for business work.
-"""
+"""Phase 3 ingestion probe graph: lease validation and ledger boundary only."""
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias, TypedDict
+from typing import Literal, TypeAlias, TypedDict, cast
+from uuid import UUID
 
+import psycopg
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from smart_rag_core.jobs.exceptions import JobLeaseError
+from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
+from smart_rag_core.jobs.ledger import JobOperationLedger
 
 
-class IngestionFoundationState(TypedDict):
-    """Minimal state for the Phase 1 ingestion graph scaffold.
+class IngestionProbeState(TypedDict):
+    """Compact ingestion graph state without raw bytes or local paths.
 
     Attributes:
-        status: Always ``unconfigured`` for foundation qualification.
-        detail: Human-readable explanation that business ingestion is absent.
+        job_id: Claimed ingestion job identifier.
+        lease_token: Opaque lease token from the worker claim RPC.
+        document_id: Canonical document identifier when present.
+        version_id: Canonical version identifier when present.
+        operation_key: Stable side-effect/idempotency key for the probe.
+        storage_bucket: Durable Storage bucket reference from ``payload_ref``.
+        storage_path: Durable Storage object path from ``payload_ref``.
+        status: Probe lifecycle marker.
+        ledger_written: Whether the boundary ledger row was recorded.
+        detail: Safe diagnostic text for operators/tests.
     """
 
-    status: Literal["unconfigured"]
+    job_id: str
+    lease_token: str
+    document_id: str | None
+    version_id: str | None
+    operation_key: str
+    storage_bucket: str | None
+    storage_path: str | None
+    status: Literal["probe_pending", "probe_validated", "lease_invalid"]
+    ledger_written: bool
     detail: str
 
 
 IngestionStateGraph: TypeAlias = StateGraph[
-    IngestionFoundationState,
+    IngestionProbeState,
     None,
-    IngestionFoundationState,
-    IngestionFoundationState,
+    IngestionProbeState,
+    IngestionProbeState,
 ]
 CompiledIngestionGraph: TypeAlias = CompiledStateGraph[
-    IngestionFoundationState,
+    IngestionProbeState,
     None,
-    IngestionFoundationState,
-    IngestionFoundationState,
+    IngestionProbeState,
+    IngestionProbeState,
 ]
 
 
-def mark_unconfigured(state: IngestionFoundationState) -> IngestionFoundationState:
-    """Return an honest unconfigured status without claiming ingestion success.
+def validate_lease(
+    state: IngestionProbeState,
+    config: RunnableConfig,
+) -> IngestionProbeState:
+    """Validate the claimed ingestion lease before any side effect.
 
-    Args:
-        state: Incoming foundation state (ignored for business fields).
+    State inputs:
+        ``job_id``, ``lease_token``.
 
-    Returns:
-        State with ``status`` set to ``unconfigured`` and an explanatory detail.
+    State outputs:
+        ``status`` becomes ``probe_pending`` or ``lease_invalid``; ``detail``
+        explains lease failures.
 
-    Side Effects:
-        None. No queue claims, Storage I/O, model calls, or index writes.
+    Persistence writes:
+        None.
 
-    Failure / Fallback:
-        This node cannot fail for missing infrastructure; it is the degraded
-        foundation path until later phases implement real ingestion nodes.
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        None.
+
+    Failure/fallback route:
+        Invalid/expired leases set ``status=lease_invalid`` and stop the probe
+        path before ledger writes.
     """
 
+    configurable = cast(dict[str, object], config.get("configurable", {}))
+    postgres_url = configurable.get("postgres_url")
+    lease_owner = configurable.get("lease_owner")
+    lease_seconds_raw = configurable.get("job_lease_seconds", 300)
+    lease_seconds = (
+        int(lease_seconds_raw)
+        if isinstance(lease_seconds_raw, int)
+        else 300
+    )
+    if not isinstance(postgres_url, str) or not isinstance(lease_owner, str):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "missing postgres configuration",
+        }
+    with psycopg.connect(postgres_url) as connection:
+        connection.execute("SET ROLE app_worker")
+        repository = IngestionJobRepository(
+            connection,
+            lease_owner=lease_owner,
+            lease_seconds=lease_seconds,
+        )
+        try:
+            repository.validate_active_lease(
+                job_id=UUID(state["job_id"]),
+                lease_token=state["lease_token"],
+            )
+        except JobLeaseError:
+            connection.rollback()
+            return {
+                **state,
+                "status": "lease_invalid",
+                "detail": "lease validation failed",
+            }
+        connection.rollback()
     return {
-        "status": "unconfigured",
-        "detail": (
-            "Phase 1 ingestion graph scaffold only; parsing and indexing are "
-            "not implemented."
-        ),
+        **state,
+        "status": "probe_pending",
+        "detail": "lease validated",
     }
 
 
-def build_ingestion_graph() -> IngestionStateGraph:
-    """Construct the foundation ingestion ``StateGraph`` (not yet compiled).
+def boundary_probe(
+    state: IngestionProbeState,
+    config: RunnableConfig,
+) -> IngestionProbeState:
+    """Write one idempotent ledger row keyed by ``operation_key``.
 
-    Returns:
-        An uncompiled ``StateGraph`` with a single unconfigured marker node.
+    State inputs:
+        Validated ``job_id``, ``lease_token``, ``operation_key``.
 
-    Notes:
-        State inputs: ``IngestionFoundationState``.
-        State outputs: same shape with ``status=unconfigured``.
-        Persistence writes: none.
-        External/model calls: none.
-        Budget/deadline behavior: none (foundation only).
-        Failure/fallback route: always marks unconfigured.
+    State outputs:
+        ``ledger_written`` and ``status=probe_validated`` on success.
+
+    Persistence writes:
+        One ``app.job_operation_ledger`` row via
+        ``app.record_job_operation_ledger``.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        None.
+
+    Failure/fallback route:
+        Lease loss raises and marks the run failed upstream; duplicate replays
+        leave a single ledger row.
     """
 
+    if state["status"] != "probe_pending":
+        return state
+    configurable = cast(dict[str, object], config.get("configurable", {}))
+    postgres_url = configurable.get("postgres_url")
+    if not isinstance(postgres_url, str):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "missing postgres configuration",
+        }
+    job_id = UUID(state["job_id"])
+    with psycopg.connect(postgres_url) as connection:
+        connection.execute("SET ROLE app_worker")
+        ledger = JobOperationLedger(connection)
+        ledger.record_completed(
+            job_table="ingestion_jobs",
+            job_id=job_id,
+            operation_key=state["operation_key"],
+            lease_token=state["lease_token"],
+            result_ref={
+                "probe": "phase3_packet2",
+                "storage_bucket": state["storage_bucket"],
+                "storage_path": state["storage_path"],
+            },
+        )
+        connection.commit()
+    return {
+        **state,
+        "status": "probe_validated",
+        "ledger_written": True,
+        "detail": "boundary probe ledger recorded",
+    }
+
+
+def route_after_validation(state: IngestionProbeState) -> str:
+    """Route invalid leases directly to graph end."""
+
+    if state["status"] == "lease_invalid":
+        return END
+    return "boundary_probe"
+
+
+def build_ingestion_graph() -> IngestionStateGraph:
+    """Construct the Phase 3 probe ``StateGraph`` (not yet compiled)."""
+
     builder: IngestionStateGraph = StateGraph(
-        IngestionFoundationState,
-        input_schema=IngestionFoundationState,
-        output_schema=IngestionFoundationState,
+        IngestionProbeState,
+        input_schema=IngestionProbeState,
+        output_schema=IngestionProbeState,
     )
-    builder.add_node(  # pyright: ignore[reportUnknownMemberType] - upstream optional hooks use Any
-        "mark_unconfigured",
-        mark_unconfigured,
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "validate_lease",
+        validate_lease,
     )
-    builder.add_edge(START, "mark_unconfigured")
-    builder.add_edge("mark_unconfigured", END)
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "boundary_probe",
+        boundary_probe,
+    )
+    builder.add_edge(START, "validate_lease")
+    builder.add_conditional_edges("validate_lease", route_after_validation)
+    builder.add_edge("boundary_probe", END)
     return builder
 
 
-graph: CompiledIngestionGraph = build_ingestion_graph().compile()  # pyright: ignore[reportUnknownMemberType] - upstream optional hooks use Any
-"""Compiled foundation ingestion graph for ``langgraph.json`` registration."""
+def build_probe_ingestion_graph() -> CompiledIngestionGraph:
+    """Compile the probe graph without a checkpointer (Phase 3 boundary only)."""
+
+    return build_ingestion_graph().compile()  # pyright: ignore[reportUnknownMemberType]
+
+
+graph: CompiledIngestionGraph = build_probe_ingestion_graph()
+"""Compiled probe ingestion graph for ``langgraph.json`` registration."""

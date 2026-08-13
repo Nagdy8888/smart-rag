@@ -1,39 +1,39 @@
-"""Worker process entrypoint.
-
-Importing this module must not construct provider clients, database pools, or
-queue consumers. The ``main`` callable exists for console-script and smoke
-tests only.
-"""
+"""Worker process entrypoint."""
 
 from __future__ import annotations
 
-import time
-
+from smart_rag_core.observability.logging import configure_json_logging
 from smart_rag_core.settings import load_worker_settings
+
+from smart_rag_worker.job_runner import run_worker
 
 
 def main() -> int:
-    """Start the foundation worker process contract.
+    """Start the worker process.
 
     Returns:
-        Process exit code ``0`` after a one-shot run when ``WORKER_ONCE=1``.
-        Otherwise blocks forever so the container stays healthy without claiming
-        queue processing (Phase 3 owns claiming).
+        Process exit code from :func:`run_worker`, or ``0`` when queue
+        processing is unconfigured and ``WORKER_ONCE`` is set.
 
     Side Effects:
-        Writes a status line to stdout. Sleeps indefinitely unless ``WORKER_ONCE``.
+        Configures structured logging and runs the poll/claim lifecycle when
+        ``SUPABASE_DB_URL`` is configured.
     """
 
-    print(
-        "smart-rag-worker: Phase 1 foundation scaffold; "
-        "queue processing is unconfigured.",
-        flush=True,
-    )
     settings = load_worker_settings()
-    if settings.worker_once:
-        return 0
-    while True:
-        time.sleep(3600)
+    configure_json_logging(
+        service=settings.service_name,
+        environment=settings.app_env.value,
+        level=settings.log_level.value,
+    )
+    if settings.supabase_db_url is None:
+        print(
+            "smart-rag-worker: SUPABASE_DB_URL unset; queue processing idle",
+            flush=True,
+        )
+        if settings.worker_once:
+            return 0
+    return run_worker()
 
 
 if __name__ == "__main__":

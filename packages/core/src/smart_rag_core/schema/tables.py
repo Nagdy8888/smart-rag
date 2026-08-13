@@ -29,6 +29,7 @@ class DurableJobColumns(BaseModel):
     priority: JobPriority = JobPriority.NORMAL
     idempotency_key: str
     lease_owner: str | None = None
+    lease_token: str | None = None
     lease_expires_at: datetime | None = None
     heartbeat_at: datetime | None = None
     attempt_count: int = Field(default=0, ge=0)
@@ -36,6 +37,7 @@ class DurableJobColumns(BaseModel):
     next_attempt_at: datetime | None = None
     error_category: JobErrorCategory | None = None
     payload_ref: dict[str, Any] = Field(default_factory=dict)
+    estimated_size_bytes: int = Field(default=0, ge=0)
 
 
 class ProfileRecord(BaseModel):

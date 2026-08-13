@@ -5,6 +5,7 @@ description = "Shared domain, gateways, retrieval interfaces, and settings for S
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "httpx==0.28.1",
+    "psycopg[binary]==3.3.3",
     "pydantic==2.13.4",
     "pydantic-settings==2.15.0",
     "pyjwt[crypto]==2.13.0",

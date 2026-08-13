@@ -1178,12 +1178,14 @@ version = "0.1.0"
 source = { editable = "apps/agents" }
 dependencies = [
     { name = "langgraph" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "smart-rag-core" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "langgraph", specifier = "==1.2.11" },
+    { name = "psycopg", extras = ["binary"], specifier = "==3.3.3" },
     { name = "smart-rag-core", editable = "packages/core" },
 ]
 
@@ -1214,6 +1216,7 @@ version = "0.1.0"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "httpx" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pyjwt", extra = ["crypto"] },
@@ -1223,6 +1226,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = "==0.28.1" },
+    { name = "psycopg", extras = ["binary"], specifier = "==3.3.3" },
     { name = "pydantic", specifier = "==2.13.4" },
     { name = "pydantic-settings", specifier = "==2.15.0" },
     { name = "pyjwt", extras = ["crypto"], specifier = "==2.13.0" },

@@ -1,0 +1,63 @@
+---
+title: Ingestion operational limits
+owner: engineering-lead
+status: draft
+last-reviewed: 2026-08-13
+audience: engineering, ops
+---
+
+# Ingestion operational limits
+
+Single source of truth for Phase 3 durable job, worker, admission, and graph-handoff bounds. Values fixed by [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) or the global contract require ADR approval to change. Unspecified defaults are conservative placeholders with explicit review triggers.
+
+Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md)
+
+## Limit registry
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Job lease duration | seconds | 300 | 3600 | Plan Packet 2; 5× heartbeat interval | worker | Reclaim after expiry; graph writes denied | Heartbeat renewals fail >1% under longest qualified node |
+| Heartbeat interval | seconds | 60 | 900 | Plan Packet 2; ≤ lease/5 | worker | Lease expires; job reclaims | p95 node runtime exceeds 4× heartbeat |
+| Lease reclaim grace | seconds | 0 | 60 | Measured: reclaim on `lease_expires_at < now()` | worker | Competing worker claims expired row | Duplicate side effects without ledger dedupe |
+| Worker poll interval | seconds | 5 | 60 | Measured local dev idle CPU | worker | Slower dequeue only | Pending p95 wait >15m at envelope |
+| Worker concurrency | jobs | 2 | 8 | Plan Packet 2; provisional single-host | worker | Poll/claim bounded | CPU/memory saturation on launch hardware |
+| Pending ingestion cap | jobs | 100 | 100 | Plan Packet 2 backpressure | admission | `JobAdmissionError` on enqueue | Sustained cap hits >1h/day |
+| Graph index handoff pause | pending `index` jobs | 50 | 50 | Plan Packet 2 graph-handoff pause | admission/claim | Block new `index` claims; allow remove/ACL/rebuild | Pending handoffs >50 for >30m |
+| Max job attempts | count | 8 | 8 | Phase 2 schema default | worker | Dead-letter after exhaustion | >5% jobs exhaust attempts |
+| Retry backoff base | seconds | 30 | 300 | Measured conservative | worker | `next_attempt_at` scheduling | Retry storm under outage |
+| Retry backoff ceiling | seconds | 3600 | 86400 | Measured conservative | worker | Caps delay before reclaim | Oldest pending retry >24h |
+| Retry jitter | fraction | 0.25 | 0.5 | Measured anti-thundering-herd | worker | Randomized delay | Synchronized retry spikes |
+| Daily ingestion budget | USD/day | 20 | 20 | QT-COST-002 | admission | `JobAdmissionError` budget | Owner sign-off in QUALITY_TARGETS |
+| Per-job budget reservation TTL | minutes | 120 | 480 | Measured reserve-once pattern | admission | Reservation expires; true-up on complete/fail | Reservation leak >0.1%/day |
+| Estimated job size default | bytes | 0 | — | Unknown until scan (Packet 3) | enqueue | Ordering tie-break only | Size estimates diverge >2× from measured |
+| Estimated job size hard cap | bytes | 536870912 | 536870912 | 512 MiB conservative | admission | Reject enqueue | Owner approves larger uploads |
+| Dead-letter replay idempotency | policy | new `idempotency_key` suffix | — | Plan Packet 2 traceability | dead-letter | Preserves original DL row | Replay duplicates without audit link |
+| Ledger operation dedupe | key | `(job_table, job_id, operation_key)` UNIQUE | — | Plan Packet 2 | graph/worker | Second write is no-op | Duplicate ledger rows |
+| Checkpointer retention | days | 30 | 30 | Data dictionary / Phase 2 | ops | GC job (later) | Undeleted runs exceed policy |
+| Checkpointer runtime wiring | policy | no checkpointer on probe graph | — | `langgraph-checkpoint-postgres` not pinned | agents | compile-only probe; no runtime migrate | Pin + bootstrap path approved |
+
+## Priority ordering
+
+Claim ordering is deterministic: `critical` → `high` → `normal` → `low`, then `created_at ASC`, then `estimated_size_bytes ASC`. Deletion/ACL/security cleanup jobs must enqueue at `critical` or `high` (Packet 7+).
+
+## Graph-handoff pause
+
+When `COUNT(*) FROM app.lightrag_index_jobs WHERE status = 'pending' AND operation = 'index'` exceeds **50**, `app.claim_lightrag_index_job` skips new `index` operations while still claiming `remove`, `graph_acl_remove`, and `rebuild`.
+
+## Budget admission
+
+Daily ingestion spend uses durable `app.budget_reservations` with `reservation_kind = 'ingestion_daily'`. Enqueue reserves an estimated USD amount against `app.company_settings.daily_ingestion_budget_usd` (default from QT-COST-002). Completion/failure true-ups adjust committed/released amounts without bypassing the daily cap.
+
+## Verification commands
+
+```bash
+uv run pytest tests/unit/test_job_backoff_admission.py -q
+uv run pytest tests/contract/test_job_leases.py -q
+```
+
+When local Supabase is running, apply migrations and run the SKIP LOCKED contract test:
+
+```bash
+pnpm exec supabase db reset --yes
+uv run pytest tests/contract/test_job_leases.py -q
+```
