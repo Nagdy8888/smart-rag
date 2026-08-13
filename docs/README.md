@@ -59,6 +59,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [security/AUTH_RATE_LIMIT_OWNERSHIP.md](./security/AUTH_RATE_LIMIT_OWNERSHIP.md) | engineering-lead | draft | 2026-08-13 | eng, security |
 | [adr/ADR-privileged-auth-administration-boundary.md](./adr/ADR-privileged-auth-administration-boundary.md) | engineering-lead | accepted | 2026-08-13 | eng, security |
 | [adr/ADR-upload-capability-and-storage-privilege.md](./adr/ADR-upload-capability-and-storage-privilege.md) | engineering-lead | accepted | 2026-08-13 | eng, security |
+| [adr/ADR-parser-isolation.md](./adr/ADR-parser-isolation.md) | engineering-lead | accepted | 2026-08-13 | eng, security, ops |
 | [runbooks/SUPABASE_JWKS_ROLLOVER.md](./runbooks/SUPABASE_JWKS_ROLLOVER.md) | engineering-lead | draft | 2026-08-13 | ops, security |
 | [security/OPENAI_DATA_GOVERNANCE.md](./security/OPENAI_DATA_GOVERNANCE.md) | product-owner | accepted | 2026-08-13 | client, security |
 | [security/SUBPROCESSOR_GOVERNANCE.md](./security/SUBPROCESSOR_GOVERNANCE.md) | product-owner | accepted | 2026-08-13 | client, security |

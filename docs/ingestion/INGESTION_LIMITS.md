@@ -108,11 +108,54 @@ Crawl proxy image: built from `infra/crawl-proxy` (Python 3.11 slim + `brotli==1
 
 Primary references: [RFC 9309 robots](https://www.rfc-editor.org/rfc/rfc9309.html), [Python urllib.robotparser](https://docs.python.org/3/library/urllib.robotparser.html), [httpx redirects](https://www.python-httpx.org/compatibility/#redirects) (disabled; manual hop revalidation), [ipaddress](https://docs.python.org/3/library/ipaddress.html).
 
+## Parser / OCR bounds (Packet 5)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Parser input bytes | bytes | 104857600 | 104857600 | Align scan max | worker | `failed` disposition | Owner approves larger uploads |
+| Parser expanded bytes | bytes | 524288000 | 524288000 | Measured zip/archive guard | worker | `failed` disposition | Archive bomb fixtures |
+| Parser sandbox memory | MiB | 512 | 1024 | Local Docker Desktop measure | worker | kill + `failed` | OOM in parser container |
+| Parser sandbox CPUs | cores | 1.0 | 2.0 | Single-host envelope | worker | throttle/kill | p95 parse > timeout |
+| Parser sandbox PIDs | count | 64 | 128 | fork bomb fixtures | worker | kill + `failed` | fork storm fixtures |
+| Parser kill timeout | seconds | 120 | 300 | Plan Packet 5 | worker | kill grace 5s | p95 parse > timeout |
+| Parser concurrency | jobs | 2 | 2 | Worker concurrency /2 | worker | queue | CPU saturation |
+| PDF max pages | pages | 500 | 500 | Plan Packet 5 | parser | `limit_exceeded:pages` | Large PDF fixtures |
+| XLSX max sheets | sheets | 50 | 50 | Plan Packet 5 | parser | `limit_exceeded:sheets` | Workbook fixtures |
+| CSV/XLSX max rows | rows | 200000 | 200000 | Plan Packet 5 | parser | `limit_exceeded:rows` | Spreadsheet fixtures |
+| OCR max pixels | pixels | 50000000 | 50000000 | 200 DPI letter page estimate | parser | skip OCR / `media_only` | Scanned PDF fixtures |
+| OCR DPI | dpi | 200 | 300 | Tesseract guidance | parser | downgrade quality | OCR quality review |
+| OCR languages | codes | eng+ara | eng+ara | Phase 1 multilingual gate | parser | `media_only`/diagnostic | Language coverage gap |
+| OCR min confidence | percent | 30 | 30 | Measured dev fixtures | parser | omit low-conf boxes | OCR recall review |
+| Parser config version | text | `parser_v1` | — | Packet 5 sign-off | parser | reject stale replay | Policy drift |
+| Cleaning policy version | text | `cleaning_v1` | — | Packet 5 sign-off | parser | reject stale replay | Cleaning rule change |
+| Parser network | policy | none | none | ADR parser isolation | infra | block job | Egress probe from parser |
+| Parser secrets | policy | none | none | ADR parser isolation | infra | block launch | Secret mount detected |
+
+Parser/OCR library pins (uv workspace `packages/core`):
+
+| Library | Pin | License | Role |
+| --- | --- | --- | --- |
+| PyMuPDF | 1.25.5 | AGPL-3.0 | PDF text/boxes/scanned render |
+| python-docx | 1.1.2 | MIT | DOCX logical structure |
+| python-pptx | 1.0.2 | MIT | PPTX slides/shapes/order |
+| openpyxl | 3.1.5 | MIT | XLSX typed cells/formulas |
+| beautifulsoup4 | 4.13.3 | MIT | HTML DOM + boilerplate |
+| lxml | 5.3.1 | BSD | HTML parser backend |
+| markdown-it-py | 3.0.0 | MIT | Markdown token paths |
+| pytesseract | 0.3.13 | Apache-2.0 | OCR wrapper |
+| Pillow | 11.1.0 | HPND | OCR/image buffers |
+| Tesseract (image) | distro package | Apache-2.0 | OCR engine + eng/ara traineddata |
+
+Parser sandbox image: built from `infra/parser-sandbox` (`smart-rag-parser-sandbox:local`). Compose profile `parser-build` only; service stays on `private` network and is **not** attached to `egress`.
+
+Primary references: [PyMuPDF docs](https://pymupdf.readthedocs.io/), [python-docx](https://python-docx.readthedocs.io/), [python-pptx](https://python-pptx.readthedocs.io/), [openpyxl](https://openpyxl.readthedocs.io/), [Tesseract](https://tesseract-ocr.github.io/).
+
 ## Verification commands
 
 ```bash
-uv run pytest tests/unit/test_crawl_policy.py tests/unit/test_crawl_proxy.py -q
-uv run pytest tests/contract/test_crawl_ssrf.py tests/contract/test_compose_topology.py -q
+uv run pytest tests/unit/test_parser_adapters.py tests/unit/test_parser_governance.py tests/unit/test_parser_sandbox.py -q
+uv run pytest tests/contract/test_parser_sandbox.py tests/contract/test_compose_topology.py -q
+docker compose --profile parser-build build parser-sandbox
 ```
 
 When local Supabase is running, apply migrations and run the SKIP LOCKED contract test:

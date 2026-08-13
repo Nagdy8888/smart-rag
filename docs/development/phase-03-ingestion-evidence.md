@@ -248,9 +248,9 @@ Packet 4 implements approved URL crawling through the restricted proxy only. Par
 
 | Command | Exit |
 | --- | --- |
-| `uv run ruff check packages/core/src/smart_rag_core/ingestion/crawl packages/core/src/smart_rag_core/gateways/crawl_proxy.py infra/crawl-proxy/server.py tests/unit/test_crawl_policy.py tests/unit/test_crawl_proxy.py tests/contract/test_crawl_ssrf.py` | pending |
-| `uv run pytest tests/unit/test_crawl_policy.py tests/unit/test_crawl_proxy.py tests/contract/test_crawl_ssrf.py tests/contract/test_compose_topology.py -q` | pending |
-| `uv run python scripts/check.py --tier docs` | pending |
+| `uv run ruff check packages/core/src/smart_rag_core/ingestion/crawl infra/crawl-proxy/server.py tests/unit/test_crawl_policy.py tests/unit/test_crawl_proxy.py tests/contract/test_crawl_ssrf.py` | 0 |
+| `uv run pytest tests/unit/test_crawl_policy.py tests/unit/test_crawl_proxy.py tests/contract/test_crawl_ssrf.py tests/contract/test_compose_topology.py -q` | 0 (40 passed) |
+| `uv run python scripts/check.py --tier docs` | 0 |
 
 ### Negative fixture matrix (unit + contract)
 
@@ -278,13 +278,82 @@ Packet 4 implements approved URL crawling through the restricted proxy only. Par
 
 Packet 5 implements no-network parser/OCR isolation and typed format adapters. Crawl snapshots in `web-snapshots` are inputs; do not implement chunking, embeddings, or Hybrid readiness in Packet 5 until parser contracts pass.
 
+## Packet 5 — parser/OCR sandbox and typed format adapters
+
+### Quoted requirement
+
+> Implement no-network parser/OCR isolation and typed format adapters with deterministic cleaning, format-specific source locators, and explicit media-only figure/chart diagnostics.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/ingestion/parser/` | typed contracts, adapters, cleaning, sandbox launcher |
+| `packages/core/src/smart_rag_core/ingestion/governance.py` | extracted-text detectors + `decide_external_processing` |
+| `apps/agents/.../ingestion/parse_graph.py` | parse + govern graph nodes |
+| `infra/parser-sandbox/` | immutable no-network parser image + runner |
+| `docs/adr/ADR-parser-isolation.md` | shared-kernel blast radius + upgrade triggers |
+| `docs/ingestion/INGESTION_LIMITS.md` | parser/OCR resource bounds + license matrix |
+
+### Library / license matrix
+
+| Library | Pin | License | Selected for |
+| --- | --- | --- | --- |
+| PyMuPDF | 1.25.5 | AGPL-3.0 | PDF text/boxes + scanned render |
+| python-docx | 1.1.2 | MIT | DOCX logical block/table paths |
+| python-pptx | 1.0.2 | MIT | PPTX slides/shapes/reading-order |
+| openpyxl | 3.1.5 | MIT | XLSX typed cells/formulas/cache state |
+| beautifulsoup4 + lxml | 4.13.3 / 5.3.1 | MIT / BSD | HTML boilerplate cleaning |
+| markdown-it-py | 3.0.0 | MIT | Markdown token/line spans |
+| pytesseract + Tesseract | 0.3.13 / distro | Apache-2.0 | OCR boxes/confidence |
+| Pillow | 11.1.0 | HPND | OCR image buffers |
+
+Adversarial comparison rejected ad-hoc `pdfplumber`/unpinned OCR stacks due to weaker box fidelity (PDF), non-deterministic HTML recovery, and missing OOXML structure coverage relative to the pinned set above.
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv lock` + `uv sync --all-packages` | 0 |
+| `uv run ruff check packages/core/src/smart_rag_core/ingestion/parser apps/agents/src/smart_rag_agents/ingestion/parse_graph.py tests/unit/test_parser_*.py tests/contract/test_parser_sandbox.py tests/fixtures/parser` | 0 |
+| `uv run pyright packages/core/src/smart_rag_core/ingestion/parser/types.py packages/core/src/smart_rag_core/ingestion/parser/service.py packages/core/src/smart_rag_core/ingestion/parser/sandbox/launcher.py packages/core/src/smart_rag_core/ingestion/governance.py apps/agents/src/smart_rag_agents/ingestion/parse_graph.py` | 0 |
+| `uv run pytest tests/unit/test_parser_adapters.py tests/unit/test_parser_governance.py tests/unit/test_parser_sandbox.py tests/contract/test_parser_sandbox.py -q` | 0 (20 passed, 1 skipped — parser image not built) |
+| `uv run python scripts/check.py --tier docs` | 0 |
+| `docker compose --profile parser-build build parser-sandbox` | not run (optional local proof) |
+
+### Negative / bounded fixtures
+
+| Fixture | Expected |
+| --- | --- |
+| Oversize input bytes | `failed`, zero elements |
+| Hash mismatch | `failed`, no promotion |
+| Positive extracted secret detector | promotion denied |
+| PDF repeated header/footer | removal diagnostics |
+| HTML nav/cookie boilerplate | removed + diagnostics |
+| XLSX formula cell | formula text preserved, not recalculated |
+| PPTX slide/text | slide break + reading-order locator |
+| Encrypted PDF/workbook | `encrypted` / `failed` bounded |
+| Docker `--network none` proof | contract skip when image not built |
+
+### Unverified assumptions
+
+- End-to-end `parse` job through worker + Storage download on live Compose stack.
+- Real Docker Desktop `--network none` run with built `smart-rag-parser-sandbox:local` image (contract test skips when image absent).
+- Full OCR Arabic/English quality on scanned PDF production fixtures (Tesseract present in image; local unit tests tolerate missing binary).
+
+### Next-packet handoff (Packet 6)
+
+- Consume `ParseResult.elements` with stable `element_id`, format-specific locators, `media_only`, removal/coverage diagnostics, and version hashes (`parser_v1`, `cleaning_v1`).
+- Do not re-parse from raw bytes in Packet 6; chunking reads typed element trees only.
+- Parquet/table artifact schema must preserve XLSX/CSV typed metadata already emitted by parser adapters.
+
 ## Packet checklist
 
 1. [x] External-processing governance sign-off (this section)
 2. [x] Durable leased jobs, checkpoints, admission, dead letters (this section)
 3. [x] Quarantine, ClamAV, governance hold, promotion saga, alerts
 4. [x] Approved bounded crawling through restricted proxy
-5. [ ] Parser/OCR sandbox and typed format adapters
+5. [x] Parser/OCR sandbox and typed format adapters
 6. [ ] Chunking, deduplication, typed Parquet artifacts
 7. [ ] Embeddings, BM25 projection, lifecycle, graph handoff
 8. [ ] Adversarial, crash, throughput, and exit proof

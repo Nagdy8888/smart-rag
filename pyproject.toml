@@ -71,6 +71,8 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
 "tests/contract/integration_support.py" = ["S603", "S607"]
+"tests/contract/test_parser_sandbox.py" = ["S607"]
+"packages/core/src/smart_rag_core/ingestion/parser/sandbox/launcher.py" = ["S108", "S603", "S607"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
