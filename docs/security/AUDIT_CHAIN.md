@@ -51,8 +51,18 @@ fields, redacted payload, `previous_hash`, and `created_at`.
 | Function | Privilege | Notes |
 | --- | --- | --- |
 | `app.append_audit_event(...)` | `SECURITY DEFINER`; `EXECUTE` for `app_api`, `app_audit_writer` | Fixed `search_path`; PUBLIC revoked |
+| `app.authorize_restricted_read(...)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` only | Revalidates typed context, ACL, restricted visibility, and current version; atomically appends purpose/resource/session metadata |
 | `app.verify_audit_chain(limit_n)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` | Returns first broken `id` or `NULL` |
 | `app.redact_audit_payload(jsonb)` | internal helper | PUBLIC revoked |
+
+Restricted evidence, preview, and download admission creates both an
+`audit_events` chain row and an append-only `restricted_read_events` row in one
+transaction. Allowed purposes are exactly `evidence`, `preview`, and `download`.
+Download admission requires a future signed-URL expiry; non-download surfaces
+must not provide one. Stored data is limited to actor/document/version IDs,
+purpose, session ID, expiry, and access-surface metadata. Passage text, preview
+content, object bytes, raw tokens, and URLs are never persisted in either row.
+Denied/stale/forged/non-current calls roll back without an audit success event.
 
 Python mirror for redaction/helpers:
 `packages/core/src/smart_rag_core/security/audit_chain.py` (SQL remains

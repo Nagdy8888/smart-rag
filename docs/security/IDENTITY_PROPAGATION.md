@@ -60,6 +60,25 @@ Privileged Auth Admin (`service_role`) lives only in
 `apps/backend/src/smart_rag_api/auth_admin/` per
 [ADR-privileged-auth-administration-boundary.md](../adr/ADR-privileged-auth-administration-boundary.md).
 
+## Revocation and lifecycle changes
+
+MFA recovery and offboarding both update `profiles.session_revoked_at`. A token
+whose verified `iat` is at or before that timestamp is rejected even if provider
+access-token expiry has not elapsed. Exact `session_id` rows remain an additional
+denial path. Provider global logout revokes refresh sessions but is not treated
+as immediate access-token invalidation by itself.
+
+Security-sensitive profile changes (`role`, `disabled_at`, `upload_enabled`, or
+`mfa_enrolled`) bump `company_settings.authorization_version`. Previously loaded
+caller snapshots then fail inside typed RPC validation. Lost-factor initiation
+sets `mfa_enrolled=false` and `upload_enabled=false`; provider factor deletion
+and global logout must succeed before the request is marked complete. Restoring
+upload capability still requires a newly enrolled factor and an AAL2 session.
+
+Offboarding performs only Phase 2 security effects: provider logout, disabled
+profile, capability removal, session timestamp, authorization-version bump, and
+audit. Export and purge remain later-phase work.
+
 ## Transaction pooling rules
 
 | Path | Pool mode | Identity mechanism |
@@ -95,9 +114,16 @@ Live version is always read inside the RPC transaction from `app.company_setting
 
 ## Pool reuse safety test (Packet 3)
 
-Contract tests connect as `postgres`, `SET ROLE app_api`, invoke RPCs with forged/stale context, and assert zero rows. They do **not** rely on session GUCs surviving across calls.
+The local contract reuses one physical PostgreSQL backend across two committed
+transactions. Request A deliberately leaves a `request.jwt.claims` GUC naming
+user A on the session. Request B then passes user B through the typed RPC
+arguments and proves user A's restricted document remains hidden; missing,
+forged, disabled, and stale arguments also return zero rows. This is a local
+driver/SQL boundary proof, not a production Supavisor load claim.
 
-Packet 6 adds concurrent connection reuse tests under Supavisor transaction mode.
+Phase 9 owns concurrent Supavisor load testing. It must preserve the same
+argument-bound behavior and cannot replace this deterministic local denial
+contract with a session-GUC convention.
 
 ## Audit writer path
 

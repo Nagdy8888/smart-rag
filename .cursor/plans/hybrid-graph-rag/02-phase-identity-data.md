@@ -1,7 +1,7 @@
 ---
 name: hybrid-graph-rag-phase-02-identity-data
 phase: 2
-status: pending
+status: complete
 depends_on: [1]
 source_plan: ../hybrid-graph-rag_ab5281ef.plan.md
 global_contract: ./00-global-contracts.md

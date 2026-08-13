@@ -2,7 +2,7 @@
   "files": {
     ".cursor/plans/hybrid-graph-rag/00-global-contracts.md": "be603b6cdc5309271c36e825ca0d9d126d8421942f3c0fd352f2e510321ad426",
     ".cursor/plans/hybrid-graph-rag/01-phase-foundation.md": "79f528c1ea8c929406406ece5442fdc2e05252e69b99e63feaf33e3a3bb191a8",
-    ".cursor/plans/hybrid-graph-rag/02-phase-identity-data.md": "faaf9393c9a152cb33ebc6f02f1c460ae87325451865c01a558d97dc9a88f731",
+    ".cursor/plans/hybrid-graph-rag/02-phase-identity-data.md": "f62d9b9bdf3e0ae6eda0d9a773f3f2983fb62744ee27259065da3b0e7225329c",
     ".cursor/plans/hybrid-graph-rag/03-phase-ingestion.md": "32816d487622ccb8b87e6139cf9bb26a5635f0465f724abf6b165186c1996be1",
     ".cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md": "a6171ef02c79fc4ff2a9922b7be20d34c651b8803a2157c7c7053843f93f3cfd",
     ".cursor/plans/hybrid-graph-rag/05-phase-graphrag.md": "12a4f6870cd39721190ab3fef90a994e52b68fcf035e83846d3f4546a9f54b5d",
@@ -68,7 +68,7 @@
     ".cursor/plans/hybrid-graph-rag/shared/release/04-production-promotion-delta.md": "4ffa38f05bdc1d1a71fede6081d24b45b4dfd94d29ee6cbb5d42f9fd79f0bd08",
     ".cursor/plans/hybrid-graph-rag/shared/release/05-sizing-envelope.md": "7b72b6dba46f10526e87d1766b3752af34a0b58af8f642ef5f1c65be760451f2",
     ".cursor/plans/hybrid-graph-rag/shared/release/06-documentation-operational-handoff.md": "418b81588a3eb965e890ad41e47b1da7148ca84a8fe0c91ea6750aca9c6db54a",
-    ".cursor/plans/hybrid-graph-rag_ab5281ef.plan.md": "5c5a7fc7cbca2ca571489ab7c617e03d9a6ce3b1b95a2b6af85092c888813236",
+    ".cursor/plans/hybrid-graph-rag_ab5281ef.plan.md": "285af0372c7971f36d2f5eb2a60431d446f4f8596df29690561ecd42b829583c",
     ".cursor/rules/00-plan-source-of-truth.mdc": "7f43b0c881d0b3d311c48c883cb237c43fd1cbf1df034ae480d9dd75e38b6b0c",
     ".cursor/skills/implement-api-security/SKILL.md": "f6cd25bde08e310049546224662d1b1597997af19d657f5284a640b2cf7c88d2",
     ".cursor/skills/implement-hybrid-retrieval/SKILL.md": "29981dfa61d0cd3439e318596d3c9f1659d4de2e8e9eb7cebf553db4048d2d03",
@@ -83,6 +83,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-08-13T08:20:55.048136+00:00",
+  "generated_at": "2026-08-13T12:13:40.248374+00:00",
   "schema_version": 1
 }

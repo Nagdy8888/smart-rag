@@ -20,7 +20,16 @@ class InvitationServiceError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class CreatedInvitation:
-    """Invitation record returned once to the privileged caller."""
+    """Invitation record returned once to the privileged caller.
+
+    Attributes:
+        invitation_id: Durable application invitation identifier.
+        email: Normalized recipient address.
+        role: Role assigned on acceptance.
+        upload_enabled: Capability assigned on acceptance.
+        expires_at: Absolute 24-hour expiry.
+        raw_token: One-time secret returned only by this call.
+    """
 
     invitation_id: uuid.UUID
     email: str
@@ -44,9 +53,8 @@ def create_invitation(
     role: str,
     invited_by: uuid.UUID,
     upload_enabled: bool = False,
-    allowed_domains: tuple[str, ...] = (),
 ) -> CreatedInvitation:
-    """Create a 24-hour single-use invitation and optionally send provider email.
+    """Create and deliver a domain-authorized 24-hour invitation.
 
     Args:
         settings: Privileged Auth Admin settings with service-role secret.
@@ -55,22 +63,37 @@ def create_invitation(
         role: Target ``app.user_role`` text.
         invited_by: Owner/admin user creating the invite.
         upload_enabled: Whether upload capability is granted on accept.
-        allowed_domains: When non-empty, reject emails outside the allow-list.
 
     Returns:
         Created invitation including the one-time raw token.
 
     Raises:
-        InvitationServiceError: On domain policy violation or persistence errors.
+        InvitationServiceError: On authorization, domain, role, persistence, or
+            provider delivery failure.
+
+    Side Effects:
+        Persists and audits the application invitation, then asks Supabase Auth to
+        deliver mail. Provider failure revokes the application token.
+
+    Security:
+        Actor role and allowed domains are always loaded from authoritative rows;
+        callers cannot provide either policy input.
     """
 
     normalized_email = email.strip().lower()
-    if not normalized_email or "@" not in normalized_email:
+    if (
+        not normalized_email
+        or normalized_email.count("@") != 1
+        or normalized_email.startswith("@")
+        or normalized_email.endswith("@")
+    ):
         raise InvitationServiceError("invalid invitation email")
 
     domain = normalized_email.split("@", maxsplit=1)[1]
-    if allowed_domains and domain not in allowed_domains:
-        raise InvitationServiceError("email domain not allowed")
+    if role not in {"owner", "admin", "member", "viewer"}:
+        raise InvitationServiceError("invalid invitation role")
+    if role == "viewer" and upload_enabled:
+        raise InvitationServiceError("viewer invitations cannot grant upload")
 
     raw_token = secrets.token_urlsafe(32)
     digest = _token_hash(raw_token)
@@ -79,6 +102,32 @@ def create_invitation(
 
     with psycopg.connect(postgres_url) as connection:
         with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT role::text
+                FROM app.profiles
+                WHERE user_id = %s
+                  AND disabled_at IS NULL
+                FOR SHARE
+                """,
+                (invited_by,),
+            )
+            actor_row = cursor.fetchone()
+            if actor_row is None or str(actor_row[0]) not in {"owner", "admin"}:
+                raise InvitationServiceError("invitation actor authorization rejected")
+            actor_role = str(actor_row[0])
+
+            cursor.execute(
+                """
+                SELECT 1
+                FROM app.allowed_email_domains
+                WHERE domain = %s
+                """,
+                (domain,),
+            )
+            if cursor.fetchone() is None:
+                raise InvitationServiceError("email domain not allowed")
+
             cursor.execute(
                 """
                 INSERT INTO app.team_invitations (
@@ -102,13 +151,47 @@ def create_invitation(
                     upload_enabled,
                 ),
             )
+            cursor.execute(
+                """
+                SELECT app.append_audit_event(
+                  'invitation.created',
+                  %s,
+                  %s::app.user_role,
+                  'team_invitation',
+                  %s,
+                  app.current_authorization_version(),
+                  jsonb_build_object(
+                    'domain', %s::text,
+                    'role', %s::text,
+                    'upload_enabled', %s::boolean
+                  )
+                )
+                """,
+                (
+                    invited_by,
+                    actor_role,
+                    invitation_id,
+                    domain,
+                    role,
+                    upload_enabled,
+                ),
+            )
         connection.commit()
 
-    _send_provider_invite_email(
-        settings,
-        email=normalized_email,
-        raw_token=raw_token,
-    )
+    try:
+        send_provider_invite_email(
+            settings,
+            email=normalized_email,
+            raw_token=raw_token,
+        )
+    except InvitationServiceError:
+        _revoke_failed_invitation(
+            postgres_url,
+            invitation_id=invitation_id,
+            actor_user_id=invited_by,
+            actor_role=actor_role,
+        )
+        raise
 
     return CreatedInvitation(
         invitation_id=invitation_id,
@@ -120,13 +203,69 @@ def create_invitation(
     )
 
 
-def _send_provider_invite_email(
+def _revoke_failed_invitation(
+    postgres_url: str,
+    *,
+    invitation_id: uuid.UUID,
+    actor_user_id: uuid.UUID,
+    actor_role: str,
+) -> None:
+    """Revoke and audit an application token after provider delivery failure.
+
+    Args:
+        postgres_url: Isolated privileged PostgreSQL URL.
+        invitation_id: Invitation whose token must become unusable.
+        actor_user_id: Original invitation actor.
+        actor_role: Authoritative actor role captured during creation.
+
+    Raises:
+        InvitationServiceError: If compensation cannot be persisted.
+
+    Side Effects:
+        Sets ``revoked_at`` and appends a purpose-limited failure audit event.
+    """
+
+    try:
+        with psycopg.connect(postgres_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE app.team_invitations
+                    SET revoked_at = timezone('utc', now())
+                    WHERE id = %s
+                      AND accepted_at IS NULL
+                      AND revoked_at IS NULL
+                    """,
+                    (invitation_id,),
+                )
+                cursor.execute(
+                    """
+                    SELECT app.append_audit_event(
+                      'invitation.delivery_failed',
+                      %s,
+                      %s::app.user_role,
+                      'team_invitation',
+                      %s,
+                      app.current_authorization_version(),
+                      jsonb_build_object('token_revoked', true)
+                    )
+                    """,
+                    (actor_user_id, actor_role, invitation_id),
+                )
+            connection.commit()
+    except psycopg.Error as exc:
+        raise InvitationServiceError(
+            "failed invitation delivery compensation could not be persisted"
+        ) from exc
+
+
+def send_provider_invite_email(
     settings: PrivilegedAuthSettings,
     *,
     email: str,
     raw_token: str,
 ) -> None:
-    """Best-effort Auth Admin invite email; local dev uses Inbucket SMTP.
+    """Send an Auth Admin invite email; local development uses Inbucket SMTP.
 
     Args:
         settings: Privileged settings containing Auth Admin secret.
@@ -154,7 +293,6 @@ def _send_provider_invite_email(
                     "data": {"invitation_token": raw_token, "invite_url": invite_url},
                 },
             )
-            if response.status_code >= 400 and response.status_code != 422:
-                raise InvitationServiceError("auth admin invite call failed")
+            response.raise_for_status()
     except httpx.HTTPError as exc:
-        raise InvitationServiceError("auth admin invite transport failed") from exc
+        raise InvitationServiceError("auth admin invite call failed") from exc

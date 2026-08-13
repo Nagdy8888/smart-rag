@@ -96,6 +96,18 @@ def test_append_chain_redaction_and_immutability(
         auth_version_row = cursor.fetchone()
         assert auth_version_row is not None
         auth_version = int(auth_version_row[0])
+        cursor.execute(
+            """
+            SELECT event_hash
+            FROM app.audit_events
+            ORDER BY chain_seq DESC NULLS LAST
+            LIMIT 1
+            """
+        )
+        prior_event = cursor.fetchone()
+        expected_previous_hash = (
+            str(prior_event[0]) if prior_event is not None else AUDIT_CHAIN_GENESIS_HASH
+        )
 
         cursor.execute("SET ROLE app_audit_writer")
         cursor.execute(
@@ -149,7 +161,7 @@ def test_append_chain_redaction_and_immutability(
         first_event = cursor.fetchone()
         assert first_event is not None
         first_hash, first_prev, first_payload = first_event
-        assert first_prev == AUDIT_CHAIN_GENESIS_HASH
+        assert first_prev == expected_previous_hash
         assert first_hash and len(first_hash) == 64
         assert first_payload["password"] == marker
         assert first_payload["note"] == "ok"

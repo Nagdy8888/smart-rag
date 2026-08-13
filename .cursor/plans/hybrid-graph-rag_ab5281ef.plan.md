@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: phase-02-identity-data
     content: Execute Phase 2: Identity and data from its dedicated plan file.
-    status: pending
+    status: completed
   - id: phase-03-ingestion
     content: Execute Phase 3: Ingestion from its dedicated plan file.
     status: pending

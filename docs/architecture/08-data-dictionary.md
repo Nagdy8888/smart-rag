@@ -47,6 +47,9 @@ erDiagram
 | `company_settings` | `app` | authority | owner/admin APIs | all roles read policy fields | indefinite singleton | 1 row | none (singleton) | singleton upsert | 2 schema / 3 RLS |
 | `allowed_email_domains` | `app` | authority | owner/admin | invitation/auth checks | until removed | small list | hard delete | domain unique | 2 schema / 3 auth |
 | `team_invitations` | `app` | authority | owner/admin invite API | invite accept flow | 24h TTL + audit | bounded active invites | revoke/accept | `token_hash` unique | 2 schema / 3 auth |
+| `mfa_recovery_requests` | `app` | authority | isolated Auth Admin boundary | security operations | workflow lifetime | sparse active requests | status transition | request `id` | 2 auth |
+| `mfa_recovery_verifications` | `app` | authority | isolated Auth Admin boundary | security operations | durable recovery proof | one per request | append-only | `recovery_request_id` PK | 2 auth |
+| `revoked_sessions` | `app` | authority | isolated Auth Admin / API RPC | request identity gate | session lifetime | bounded revoked sessions | auth-user cascade | `session_id` PK | 2 auth |
 | `auth_rate_limit_buckets` | `private` | authority | FastAPI degraded limiter | FastAPI only | rolling windows | bounded keys | window expiry GC | `(bucket_key, window_start)` PK | 2 schema / 6 runtime |
 
 ## Documents and evidence
@@ -106,7 +109,7 @@ erDiagram
 | `budget_reservations` | `app` | authority | API reserve/commit | gateway | until settled | active reservations | release/commit | reservation `id` | 6 agent |
 | `upload_quota_reservations` | `app` | authority | upload API (`reserve`/`finalize`) | Storage admit + cleanup | 15m admission; effective capability `min(reservation, JWT exp)` | active uploads | expire/release + Storage API cleanup | `(user_id, idempotency_key)` unique when key set | 2 schema / 5 storage |
 | `retention_holds` | `app` | authority | admin/compliance | purge planners | until released | sparse | release only | hold `id` | 2 structure / later purge |
-| `offboarding_requests` | `app` | authority | admin | ops | until completed | per subject | status machine | request `id` | 2 structure / later execution |
+| `offboarding_requests` | `app` | authority | isolated Auth Admin boundary | ops | until completed | per subject | status machine | request `id` | 2 security effects / later export-purge |
 
 ## Private Storage buckets (Packet 5)
 

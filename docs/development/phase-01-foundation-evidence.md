@@ -421,15 +421,23 @@ evidence and ownership remain unchanged.
 - Gitleaks initially reported eight plan prose/hash false positives. No broad
   path exclusion was added; exact path-and-line allowlists were verified
   against a second full-history scan.
+- The first updated PR-fast run exposed a clean-checkout ordering defect:
+  standalone TypeScript ran before Next.js generated global `LayoutProps`.
+  The frontend tier now runs `next typegen` first; the same tier passed locally
+  and in remote CI without relying on a stale `.next` directory.
+
+### Remote CI
+
+- [Main run 31692522152](https://github.com/Nagdy8888/smart-rag/actions/runs/31692522152)
+  passed on commit `2f4f3ec9624adfd010d1954fb3a8668eb2ec95ca`.
+- [PR fast run 31692522176](https://github.com/Nagdy8888/smart-rag/actions/runs/31692522176)
+  passed on the same commit, including secret scanning, frozen installs,
+  dependency audits, plan integrity, fast quality, OpenAPI drift, and migration
+  policy.
 
 ### Blocked
 
-- Updated remote CI cannot be observed until these uncommitted changes are
-  committed and pushed. The latest visible
-  [PR fast run](https://github.com/Nagdy8888/smart-rag/actions/runs/31681831140)
-  failed on older commit `42b7c711cb42821559fb5baa0b33963dffb6a26e`;
-  its paired Main run was cancelled. Local workflow-equivalent gates pass, but
-  this record does not claim a green remote run.
+- None for Phase 1.
 
 ### Not run
 
@@ -438,10 +446,30 @@ evidence and ownership remain unchanged.
   disposable reset and schema comparison. The required fail-closed confirmation
   route is proven above.
 
+### Final Phase 1–2 closeout revalidation — 2026-08-13
+
+- **Passed:** the uninterrupted fast tier passed again with 32 unit tests,
+  118 contract tests, maintained-document lint/link/Mermaid checks, strict
+  frontend lint/types/Vitest/build, and Playwright discovery. Compose startup
+  and `verify-local.ps1` passed all public-health, private-network, Valkey,
+  ParadeDB, crawl-denial, non-root, and mock-model assertions.
+- **Passed:** frozen Python and Node dependency audits reported no known
+  vulnerabilities; the SHA-pinned Gitleaks 8.30.1 image scanned 22 commits and
+  about 2.17 MB with no leaks. Plan integrity, migration policy, and OpenAPI
+  snapshot checks passed.
+- **Failed:** none remain. The first closeout health probe correctly failed
+  while the developer-facing Compose services were stopped; `dev.ps1` started
+  the documented stack and both subsequent health proofs passed.
+- **Blocked:** none for Phase 1.
+- **Not run:** no new destructive Phase 1 negative fixture was introduced.
+  Phase 2's dedicated gate owns the final clean-reset and mandatory integration
+  proofs; paid embedding and managed signing-key mutations were intentionally
+  not repeated.
+
 ### Handoff and rollback
 
-Phase 1 remains accepted and locally re-verified. Remote CI is the only Phase 1
-audit blocker. Dependency rollback would reintroduce known PyJWT advisories and
-is prohibited; script/workflow rollback is ordinary source reversion after
-preserving this evidence. Proceed to Phase 2 Packet 2 only in a fresh model run,
-where two confirmed disposable resets are required.
+Phase 1 remains accepted and is audit-clean locally and in remote CI. Dependency
+rollback would reintroduce known PyJWT advisories and is prohibited;
+script/workflow rollback is ordinary source reversion after preserving this
+evidence. Phase 2 Packet 2 owns the next destructive proof, requiring two
+confirmed disposable resets.

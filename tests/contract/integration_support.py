@@ -6,9 +6,12 @@ contract tests remain compliant with the centralized environment-access rule.
 
 from __future__ import annotations
 
+import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import psycopg
 
@@ -51,6 +54,51 @@ def resolve_supabase_db_url() -> str:
     """
 
     return read_process_env("SUPABASE_DB_URL") or DEFAULT_SUPABASE_DB_URL
+
+
+def local_supabase_status() -> dict[str, str]:
+    """Return sanitized local Supabase status values for integration clients.
+
+    Returns:
+        String-keyed URLs and ephemeral local credentials reported by the pinned
+        CLI. Callers must never print or persist the returned credential values.
+
+    Raises:
+        RuntimeError: If ``pnpm`` is missing, local status fails, or the CLI
+            response is not a string-keyed object.
+
+    Side Effects:
+        Executes the workspace-pinned Supabase CLI without mutating the stack.
+    """
+
+    pnpm = shutil.which("pnpm")
+    if pnpm is None:
+        raise RuntimeError("pnpm is required for local Supabase status")
+    completed = subprocess.run(
+        [pnpm, "exec", "supabase", "status", "-o", "json"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("local Supabase status is unavailable")
+    try:
+        payload: object = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("local Supabase status returned invalid JSON") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("local Supabase status returned an invalid object")
+    untyped = cast(dict[object, object], payload)
+    if not all(
+        isinstance(key, str) and isinstance(value, str)
+        for key, value in untyped.items()
+    ):
+        raise RuntimeError("local Supabase status values are invalid")
+    return cast(dict[str, str], untyped)
 
 
 def try_connect(url: str, *, connect_timeout: int = 3) -> psycopg.Connection | None:

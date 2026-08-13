@@ -19,6 +19,27 @@ uv run python scripts/check.py --tier frontend
 uv run python scripts/check.py --tier fast
 uv run python scripts/ci/check_openapi.py
 uv run python scripts/ci/check_migrations.py
+uv run python scripts/ci/check_phase2_integration.py
+```
+
+The schema determinism gate is intentionally destructive and local-only. With
+the pinned Supabase stack running, it resets the local database exactly twice,
+runs the authoritative schema contract after each reset, and compares roles,
+extensions, tables, columns, constraints, private-schema exposure, and generated
+types:
+
+```powershell
+uv run python scripts/ci/check_schema_determinism.py
+```
+
+The Phase 2 integration gate requires or starts local Supabase and the private
+ParadeDB service, then runs the mandatory schema/RLS/Auth/Storage/audit/BM25
+suite. Any skipped mandatory test fails the gate. Managed pgvector and JWKS
+rollover checks are deliberately reported as separate, not silently skipped as
+local proof:
+
+```powershell
+uv run python scripts/ci/check_phase2_integration.py
 ```
 
 Tiers hard-fail (no `|| true`). Zero collected tests fail the unit/contract tiers.

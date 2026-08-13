@@ -24,9 +24,13 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260812135111_langgraph_lightrag_private_v1.sql",
     "20260812135115_indexes_rls_grants_v1.sql",
     "20260812135916_roles_rls_identity_v1.sql",
+    "20260813110152_authorization_acl_pool_safety_v1.sql",
+    "20260813110914_auth_recovery_verification_v1.sql",
+    "20260813112729_restricted_read_audit_v1.sql",
     "20260813120000_auth_jwks_invitations_v1.sql",
     "20260813140000_storage_quotas_graph_retention_v1.sql",
     "20260813150000_audit_chain_role_timeouts_v1.sql",
+    "20260813160000_security_advisor_search_path_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -77,6 +81,27 @@ def _validate_security_definer(sql: str, path: Path, violations: list[str]) -> N
             )
 
 
+def find_migration_violations(raw_sql: str, path: Path) -> list[str]:
+    """Return expand/contract and privileged-function policy violations.
+
+    Args:
+        raw_sql: Migration SQL including comments.
+        path: Migration path used in bounded diagnostics.
+
+    Returns:
+        Ordered policy violations found in the migration.
+    """
+
+    sql = _strip_sql_comments(raw_sql)
+    violations = [
+        f"{path.name}: forbidden {label}"
+        for pattern, label in DESTRUCTIVE_PATTERNS
+        if pattern.search(sql)
+    ]
+    _validate_security_definer(sql, path, violations)
+    return violations
+
+
 def main() -> int:
     """Validate Phase 2 migration expand/contract policy.
 
@@ -107,11 +132,7 @@ def main() -> int:
     violations: list[str] = []
     for path in files:
         raw = path.read_text(encoding="utf-8")
-        sql = _strip_sql_comments(raw)
-        for pattern, label in DESTRUCTIVE_PATTERNS:
-            if pattern.search(sql):
-                violations.append(f"{path.name}: forbidden {label}")
-        _validate_security_definer(sql, path, violations)
+        violations.extend(find_migration_violations(raw, path))
 
     if violations:
         for item in violations:

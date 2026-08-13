@@ -6,6 +6,7 @@ Deletes must go through the Supabase Storage HTTP API. Direct SQL mutation of
 
 from __future__ import annotations
 
+from typing import cast
 from urllib.parse import quote
 
 import httpx
@@ -15,6 +16,35 @@ from smart_rag_api.storage_admin.settings import PrivilegedStorageSettings
 
 class StorageAdminError(Exception):
     """Raised when a privileged Storage Admin HTTP operation fails."""
+
+
+def _is_missing_object(response: httpx.Response) -> bool:
+    """Recognize current Storage API missing-object responses.
+
+    Args:
+        response: Supabase Storage HTTP response.
+
+    Returns:
+        ``True`` for HTTP 404 or the current HTTP 400 envelope whose internal
+        status/code explicitly identify ``NoSuchKey``.
+    """
+
+    if response.status_code == 404:
+        return True
+    if response.status_code != 400:
+        return False
+    try:
+        payload: object = response.json()
+    except ValueError:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    error = cast(dict[object, object], payload)
+    return (
+        error.get("statusCode") in {404, "404"}
+        and error.get("error") == "not_found"
+        and error.get("code") == "NoSuchKey"
+    )
 
 
 def delete_object(
@@ -33,10 +63,12 @@ def delete_object(
         timeout_seconds: HTTP timeout bound in seconds.
 
     Returns:
-        None when the provider accepts the delete (including idempotent 404).
+        None when the provider accepts the delete, including its validated
+        missing-object response.
 
     Raises:
-        StorageAdminError: On non-success HTTP responses other than 404.
+        StorageAdminError: On non-success responses other than a validated
+            missing-object envelope.
         ValueError: When bucket or path is empty.
 
     Side Effects:
@@ -69,7 +101,7 @@ def delete_object(
     except httpx.HTTPError as exc:
         raise StorageAdminError(f"storage delete transport failure: {exc}") from exc
 
-    if response.status_code in {200, 204, 404}:
+    if response.status_code in {200, 204} or _is_missing_object(response):
         return
     raise StorageAdminError(f"storage delete failed status={response.status_code}")
 

@@ -87,7 +87,7 @@ def _hnsw_selective_filter_smoke(connection: psycopg.Connection) -> None:
 
 
 def test_local_pgvector_capabilities_and_selective_filter() -> None:
-    """Local Supabase Postgres passes the gate and selective-filter HNSW smoke."""
+    """Local vector/search contracts pass capability, filter, and path checks."""
 
     url = resolve_supabase_db_url()
     connection = try_connect(url)
@@ -98,6 +98,14 @@ def test_local_pgvector_capabilities_and_selective_filter() -> None:
         version = _assert_pgvector_capabilities(connection)
         assert version
         _hnsw_selective_filter_smoke(connection)
+        search_path_row = connection.execute(
+            """
+            SELECT 'search_path=pg_catalog' = ANY(proconfig)
+            FROM pg_proc
+            WHERE oid = 'search.arabic_normalization_version()'::regprocedure
+            """
+        ).fetchone()
+        assert search_path_row == (True,)
 
 
 def test_managed_pgvector_capabilities_when_configured() -> None:

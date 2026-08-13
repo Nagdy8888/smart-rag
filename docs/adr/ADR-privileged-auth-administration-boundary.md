@@ -32,8 +32,17 @@ frontend, health, or `SharedSettings` paths.
 
 ## Consequences
 
-- Invitation delivery, MFA recovery completion, and Auth Admin REST calls are
-  implemented only under `auth_admin/`.
+- Invitation delivery, MFA factor reset, global session revocation, and the
+  immediate security subset of offboarding are implemented only under
+  `auth_admin/`.
+- Invitation actors and domains are re-resolved from authoritative database
+  rows. Provider delivery failure revokes the application invitation token.
+- Lost-factor recovery requires a distinct active owner/admin at AAL2 and a
+  bounded external verification reference. Completion deletes every provider
+  factor and globally logs out the subject before committing completion.
+- Offboarding immediately disables the profile, removes upload capability,
+  revokes sessions, and bumps the authorization snapshot. Export/purge remains
+  explicitly deferred to its later owner.
 - Contract tests scan `SharedSettings`, health handlers, and general settings
   loaders for `service_role` / Auth Admin secret exposure.
 - Managed key rollover remains a runbook + staging gate; local CLI cannot rotate

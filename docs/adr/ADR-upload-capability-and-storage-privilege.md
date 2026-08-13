@@ -37,6 +37,18 @@ provide is forbidden, and general runtime must never load `service_role`.
 5. **Object deletion:** always via Storage HTTP API; never SQL delete of
    `storage.objects` metadata as a substitute for provider byte removal.
 
+### Operation matrix
+
+| Operation | Browser user JWT | API / worker database role | Isolated Storage Admin |
+| --- | --- | --- | --- |
+| List quarantine | Denied | Denied | Bounded API operation only |
+| Read quarantine | Denied | Denied | Bounded API operation only |
+| Insert quarantine | Own active reserved path only | Denied | Operational recovery only |
+| Update / overwrite | Denied | Denied | Not implemented in Phase 2 |
+| Delete | Denied | SQL metadata DML denied | Storage HTTP API only |
+| Move / copy | Denied | Denied | Deferred until promotion implementation |
+| Other private buckets | Denied | Denied | Exact bucket/path operation only |
+
 ## Consequences
 
 ```mermaid
@@ -57,6 +69,10 @@ sequenceDiagram
 ```
 
 - Quarantine remains non-browseable (no authenticated `SELECT` policy).
+- Live local proof uploads and reads real bytes, deletes them through the
+  Storage API, retries the missing-object response safely, and confirms the
+  `storage.objects` row is gone. Arbitrary HTTP 400 responses remain failures;
+  only the provider's explicit `not_found` / `NoSuchKey` envelope is idempotent.
 - Contract tests prove SharedSettings/BackendSettings omit
   `SUPABASE_STORAGE_ADMIN_SECRET`.
 - Phase 3 owns ClamAV/MIME/promotion; Phase 2 only provides scan schema and

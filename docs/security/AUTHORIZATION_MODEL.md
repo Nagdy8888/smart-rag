@@ -93,9 +93,15 @@ Packet 3 **revokes** all `app`/`private`/`langgraph`/`lightrag` grants from `ano
 | `app.list_visible_documents` | caller_user_id, caller_role, authorization_version | Zero rows when context invalid; ACL-aware listing |
 | `app.list_user_conversations` | caller_user_id, caller_role, authorization_version | Creator-private; owner/admin audit |
 | `app.validate_caller_context` | caller_user_id, caller_role, authorization_version | Boolean membership + snapshot check |
+| `private.set_document_acl` | caller context, document, grantee, grant/revoke | Idempotent owner/admin-only ACL mutation with audit |
+| `app.set_document_visibility` | caller context, document, visibility | Owner/admin-only flip; restricted downgrade clears graph eligibility |
 | `app.append_audit_event` | event metadata | **SECURITY DEFINER** single insert path for `app_audit_writer` (fixed `search_path`) |
 
-All RPCs use `SECURITY INVOKER`, fixed `search_path`, and `REVOKE EXECUTE FROM PUBLIC, anon, authenticated`.
+Read RPCs use `SECURITY INVOKER`. Mutating RPCs that must cross the deliberately
+minimal `app_api` table grants use `SECURITY DEFINER`, a fixed search path,
+schema-qualified objects, live typed-context validation, and explicit
+`REVOKE EXECUTE FROM PUBLIC, anon, authenticated`. The ACL mutation function
+lives in the unexposed `private` schema.
 
 ## Negative guarantees
 
@@ -105,6 +111,10 @@ All RPCs use `SECURITY INVOKER`, fixed `search_path`, and `REVOKE EXECUTE FROM P
 - `app_audit_writer` cannot UPDATE or DELETE audit rows (trigger + grants).
 - `app_worker` cannot SELECT conversations.
 - `app_api` cannot INSERT/UPDATE canonical tables directly.
+- Member, upload-capable member, viewer, disabled, forged, missing, and stale
+  contexts cannot mutate ACLs.
+- Reusing one physical connection across transactions cannot make a retained
+  `request.jwt.claims` GUC override the next call's typed RPC arguments.
 
 ## Related documents
 
