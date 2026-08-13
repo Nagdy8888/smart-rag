@@ -69,6 +69,7 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | Playwright Test | 1.62.1 |
 | markdownlint-cli2 (root) | 0.23.2 |
 | Mermaid CLI (root) | 11.16.0 |
+| Puppeteer (root) | 25.6.0 |
 | Supabase CLI (root) | 2.114.0 |
 
 ## Security scan pins

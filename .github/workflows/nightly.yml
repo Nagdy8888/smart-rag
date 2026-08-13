@@ -29,6 +29,8 @@ jobs:
           cache: pnpm
       - run: uv sync --all-packages --group dev --python 3.11 --frozen
       - run: pnpm install --frozen-lockfile
+      - name: Install Mermaid browser
+        run: pnpm exec puppeteer browsers install chrome-headless-shell
       - name: Fast tier
         run: uv run python scripts/check.py --tier fast --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json
       - name: OpenAPI and migration static checks

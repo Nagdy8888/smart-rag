@@ -60,6 +60,9 @@ jobs:
       - name: pnpm install frozen
         run: pnpm install --frozen-lockfile
 
+      - name: Install Mermaid browser
+        run: pnpm exec puppeteer browsers install chrome-headless-shell
+
       - name: Python dependency audit
         run: |
           uv export --frozen --all-packages --group dev --no-emit-workspace --format requirements.txt --output-file "${RUNNER_TEMP}/requirements.txt"
