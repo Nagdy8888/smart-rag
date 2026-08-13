@@ -8,6 +8,7 @@ dependencies = [
     "smart-rag-core",
     "fastapi==0.141.1",
     "uvicorn[standard]==0.52.1",
+    "psycopg[binary]==3.3.3",
 ]
 
 [build-system]

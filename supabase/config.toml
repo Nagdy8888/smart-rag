@@ -1,5 +1,5 @@
-# Local Supabase CLI configuration (Phase 1 stock foundation).
-# Application schema, RLS, Storage buckets, and Auth policy remain Phase 2.
+# Local Supabase CLI configuration (Phase 2 Packet 4 Auth policy).
+# Restart local stack after Auth changes: `npx supabase stop && npx supabase start`
 
 project_id = "smart-rag-local"
 
@@ -25,9 +25,14 @@ enabled = true
 enabled = true
 port = 54323
 
+# Inbucket UI remains under [inbucket]; SMTP for Auth uses [auth.email.smtp].
 [inbucket]
 enabled = true
 port = 54324
+smtp_port = 54325
+pop3_port = 54326
+admin_email = "admin@example.com"
+sender_name = "Smart RAG Local"
 
 [storage]
 enabled = true
@@ -36,12 +41,33 @@ file_size_limit = "50MiB"
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["http://localhost:3000"]
+additional_redirect_urls = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000/auth/callback",
+  "http://localhost:3000/auth/callback",
+]
 enable_signup = true
+enable_anonymous_sign_ins = false
+jwt_expiry = 3600
+minimum_password_length = 8
+password_requirements = "lower_upper_letters_digits"
 
 [auth.email]
 enable_signup = true
 enable_confirmations = false
+
+[auth.email.smtp]
+host = "inbucket"
+port = 2500
+user = "supabase"
+pass = "supabase"
+admin_email = "admin@example.com"
+sender_name = "Smart RAG"
+
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 
 [analytics]
 enabled = false

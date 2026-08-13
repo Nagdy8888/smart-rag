@@ -213,3 +213,68 @@ uv run pytest tests/contract/test_rls_matrix.py tests/contract/test_schema_reset
 ### Next packet
 
 Packet 4 — asymmetric JWT/JWKS, PKCE Auth, invitations, MFA.
+
+## Packet 4 — Auth, JWKS, MFA, invitations, rate-limit ownership
+
+### Requirement
+
+Asymmetric JWKS verification (no HS256/shared secret), Auth config (PKCE client-side,
+password policy, Inbucket SMTP), invitations/bootstrap/MFA recovery via privileged
+boundary, Postgres degraded rate limits, tests, ADR, runbooks.
+
+### Artifacts
+
+| Area | Path |
+| --- | --- |
+| ADR | `docs/adr/ADR-privileged-auth-administration-boundary.md` |
+| JWKS verifier | `packages/core/src/smart_rag_core/security/jwks.py` |
+| FastAPI identity | `apps/backend/src/smart_rag_api/dependencies/identity.py` |
+| Privileged boundary | `apps/backend/src/smart_rag_api/auth_admin/` |
+| Migration | `supabase/migrations/20260813120000_auth_jwks_invitations_v1.sql` |
+| Auth config | `supabase/config.toml` |
+| Rate ownership doc | `docs/security/AUTH_RATE_LIMIT_OWNERSHIP.md` |
+| JWKS rollover runbook | `docs/runbooks/SUPABASE_JWKS_ROLLOVER.md` |
+| Contract tests | `tests/contract/test_{jwks_auth,invitations_auth,auth_rate_limits,jwks_rollover}.py` |
+
+### Commands and results
+
+```text
+npx supabase db reset --yes
+→ Applied 15 migrations including 20260813120000_auth_jwks_invitations_v1.sql; exit 0
+
+uv run python scripts/ci/check_migrations.py
+→ Phase 2 migration policy OK (15 reviewed files); exit 0
+
+uv run pytest tests/contract/test_jwks_auth.py tests/contract/test_invitations_auth.py \
+             tests/contract/test_auth_rate_limits.py tests/contract/test_jwks_rollover.py -q
+→ 15 passed, 1 skipped; exit 0
+
+uv run ruff check/format on touched Python files
+→ clean after fixes; exit 0
+```
+
+### Acceptance mapping
+
+| Check | Evidence |
+| --- | --- |
+| No HS256/shared-secret verification path | `jwks.py` + `test_rejects_hs256_token_signed_with_local_jwt_secret` |
+| iss/aud/alg/exp/sub/kid; cache ≤600s; one refresh | `JwksVerifier` + contract tests |
+| Provider rollover | **BLOCKED** — no `SUPABASE_ACCESS_TOKEN`; `test_jwks_rollover.py` skips lifecycle; managed ES256 JWKS probe only |
+| Owner bootstrap + invitations | migration RPCs + `test_invitations_auth.py` |
+| MFA recovery privileged boundary | `auth_admin/mfa_recovery.py` + ADR |
+| Auth Admin secret isolated | `PrivilegedAuthSettings` + secret scan test |
+| Rate ownership documented | `AUTH_RATE_LIMIT_OWNERSHIP.md`; `local_auth_throttling_proven=False` |
+
+### Blockers / honest gates
+
+- **JWKS rollover not proven**: Management API key rotate unavailable without
+  `SUPABASE_ACCESS_TOKEN`. Verifier + runbook implemented; gate deferred to Phase 10.
+- **Hosted Auth throttling not proven locally**: `local_auth_throttling_proven=False`.
+- **PKCE**: enforced by Supabase client `flowType: 'pkce'` at frontend (Phase 8); local
+  Auth stack supports PKCE flow per Supabase docs.
+- Restart local Supabase after `config.toml` Auth changes: `npx supabase stop && npx supabase start`.
+
+### Next packet
+
+Packet 5 — private Storage, quota capabilities, graph eligibility, retention.
+

@@ -21,10 +21,11 @@ sequenceDiagram
   participant RPC as app.list_visible_documents
 
   Browser->>FastAPI: Authorization Bearer JWT
-  FastAPI->>JWKS: Verify iss/aud/exp/kid/signature
+  FastAPI->>JWKS: Verify iss/aud/alg/exp/sub/kid (ES256/RS256 only)
   JWKS-->>FastAPI: Valid subject + session claims
-  FastAPI->>DB: SELECT profiles + company_settings
-  DB-->>FastAPI: role, disabled, authorization_version
+  FastAPI->>DB: SELECT profiles + company_settings (app_api)
+  DB-->>FastAPI: role, disabled, MFA, authorization_version
+  FastAPI->>FastAPI: Session revocation + MFA gate
   FastAPI->>RPC: caller_user_id, caller_role, authorization_version
   Note over RPC: validate_caller_context inside RPC
   RPC-->>FastAPI: ACL-filtered rows or zero rows
@@ -45,7 +46,19 @@ sequenceDiagram
 | `upload_enabled` | `app.profiles.upload_enabled` | **Never** |
 | `mfa_enrolled` | `app.profiles.mfa_enrolled` | **Never** |
 
-FastAPI dependency stub: `apps/backend/src/smart_rag_api/dependencies/identity.py`. Packet 4 replaces header simulation with JWKS + live profile reads.
+FastAPI dependency: `apps/backend/src/smart_rag_api/dependencies/identity.py`.
+
+- Reads `Authorization: Bearer` and verifies through
+  `packages/core/src/smart_rag_core/security/jwks.py`.
+- Loads profile + company settings via `app_api` Postgres reads.
+- Rejects disabled users, revoked sessions, and missing MFA for
+  owner/admin/upload-capable members.
+- `APP_ENV=test` may use `X-Test-*` headers; production never trusts client role
+  metadata.
+
+Privileged Auth Admin (`service_role`) lives only in
+`apps/backend/src/smart_rag_api/auth_admin/` per
+[ADR-privileged-auth-administration-boundary.md](../adr/ADR-privileged-auth-administration-boundary.md).
 
 ## Transaction pooling rules
 

@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from smart_rag_core.gateways import block_openai_network, create_model_gateway
 from smart_rag_core.observability import configure_json_logging, correlation_context
+from smart_rag_core.security.jwks import JwksVerifier
 from smart_rag_core.settings import BackendSettings, load_backend_settings
 
 from smart_rag_api.middleware import normalized_request_id
@@ -48,8 +49,13 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         environment=settings.app_env.value,
         level=settings.log_level.value,
     )
+    application.state.settings = settings
+    application.state.jwks_verifier = JwksVerifier(
+        supabase_url=str(settings.supabase_url),
+        audience=settings.supabase_jwt_audience,
+        cache_seconds=settings.jwks_cache_seconds,
+    )
     async with block_openai_network(settings.mock_model_mode):
-        application.state.settings = settings
         application.state.model_gateway = create_model_gateway(settings)
         LOGGER.info(
             "Backend foundation startup is unconfigured",

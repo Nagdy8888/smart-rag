@@ -24,6 +24,7 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260812135111_langgraph_lightrag_private_v1.sql",
     "20260812135115_indexes_rls_grants_v1.sql",
     "20260812135916_roles_rls_identity_v1.sql",
+    "20260813120000_auth_jwks_invitations_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "Shared domain, gateways, retrieval interfaces, and settings for Smart RAG."
 requires-python = ">=3.11,<3.13"
 dependencies = [
+    "httpx==0.28.1",
     "pydantic==2.13.4",
     "pydantic-settings==2.15.0",
+    "pyjwt[crypto]==2.10.1",
     "typing-extensions==4.16.0",
 ]
 
