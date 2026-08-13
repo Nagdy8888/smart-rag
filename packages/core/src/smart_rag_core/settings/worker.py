@@ -83,6 +83,32 @@ class WorkerSettings(SharedSettings):
         description="Stable lease owner identifier for queue claims.",
         json_schema_extra={"security": "internal"},
     )
+    supabase_url: str | None = Field(
+        default=None,
+        validation_alias="SUPABASE_URL",
+        description="Supabase project URL for privileged Storage operations.",
+        json_schema_extra={"security": "internal"},
+    )
+    supabase_storage_admin_secret: SecretStr | None = Field(
+        default=None,
+        validation_alias="SUPABASE_STORAGE_ADMIN_SECRET",
+        description="Storage Admin secret for worker promotion/copy/delete.",
+        json_schema_extra={"security": "secret"},
+    )
+    clamav_host: str = Field(
+        default="clamav",
+        validation_alias="CLAMAV_HOST",
+        description="Private ClamAV daemon hostname.",
+        json_schema_extra={"security": "internal"},
+    )
+    clamav_port: int = Field(
+        default=3310,
+        validation_alias="CLAMAV_PORT",
+        ge=1,
+        le=65535,
+        description="ClamAV daemon TCP port.",
+        json_schema_extra={"security": "internal"},
+    )
 
 
 def load_worker_settings() -> WorkerSettings:

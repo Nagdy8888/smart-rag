@@ -50,6 +50,7 @@ class ScanResult(StrEnum):
     UNSCANNABLE = "unscannable"
     STALE_SIGNATURE = "stale_signature"
     OVER_LIMIT = "over_limit"
+    HASH_MISMATCH = "hash_mismatch"
 
 
 class ApprovalStatus(StrEnum):

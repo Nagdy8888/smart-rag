@@ -36,6 +36,35 @@ Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](..
 | Checkpointer retention | days | 30 | 30 | Data dictionary / Phase 2 | ops | GC job (later) | Undeleted runs exceed policy |
 | Checkpointer runtime wiring | policy | no checkpointer on probe graph | — | `langgraph-checkpoint-postgres` not pinned | agents | compile-only probe; no runtime migrate | Pin + bootstrap path approved |
 
+## ClamAV / scan bounds (Packet 3)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Scan max bytes | bytes | 104857600 | 104857600 | 100 MiB conservative | worker | `over_limit`; remain quarantined | Owner approves larger uploads |
+| Scan timeout | seconds | 120 | 300 | Measured local dev | worker | `unscannable`; retry transient | p95 scan > timeout |
+| Signature max age | hours | 24 | 24 | Global contract QT-RET-002 | worker | `stale_signature`; block promotion | Signatures stale >1h in prod |
+| Scan max recursion | levels | 16 | 32 | ClamAV default guidance | worker | `over_limit` | Archive bomb fixtures fail open |
+| Scan max files | count | 10000 | 10000 | ClamAV default guidance | worker | `over_limit` | Nested archive fixtures |
+| Scan max embedded PE | count | 40 | 40 | ClamAV default guidance | worker | `over_limit` | — |
+| Archive max expansion ratio | ratio | 250 | 250 | Plan Packet 3 | worker | `over_limit` | Zip bomb fixtures |
+| Scan concurrent streams | count | 2 | 4 | Worker concurrency /2 | worker | queue/backpressure | CPU saturation |
+| Signature reload memory | MiB | 512 | 1024 | ClamAV docs + local measure | ops | fail closed until reload completes | OOM during freshclam |
+| Quarantine TTL | hours | 24 | 168 | QT-RET-002 | cleanup | Storage API delete + quota release | Owner via company_settings |
+| Promotion copy timeout | seconds | 300 | 600 | Measured Storage copy | worker | saga retry; admin alert | Large object promotion lag |
+| Promotion verify timeout | seconds | 120 | 300 | Measured hash verify | worker | remain quarantined | Hash mismatch alerts |
+| Orphan cleanup batch | rows | 100 | 1000 | Phase 2 RPC cap | worker | next poll cycle | Backlog >24h |
+
+ClamAV engine image pin (local Compose): `clamav/clamav:stable@sha256:78810772a92b4a9168115bc6b2e0ffd702640893b9577f8c3d0432762d2655c4` (GPL-2.0; upstream Cisco Talos ClamAV).
+
+## Promotion / cleanup bounds (Packet 3)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Promotion saga idempotency | key | `{operation_key}:promotion` | — | Plan Packet 3 | worker | resume from ledger step | Duplicate destination objects |
+| Authoritative object reference | policy | one destination path post-DB-switch | — | Plan Packet 3 | worker | reconciler; no parse success | Orphan accepted object detected |
+| Admin notification kinds | policy | byte_spike, quarantine_accumulation, repeated_scan_failure | — | Phase 2 seeds | worker/api | durable row + Inbucket locally | Missing alert on anomaly fixture |
+| Metadata governance policy version | text | `2026-08-13` | — | Packet 1 sign-off | worker | deny promotion | Policy drift without sign-off |
+
 ## Priority ordering
 
 Claim ordering is deterministic: `critical` → `high` → `normal` → `low`, then `created_at ASC`, then `estimated_size_bytes ASC`. Deletion/ACL/security cleanup jobs must enqueue at `critical` or `high` (Packet 7+).

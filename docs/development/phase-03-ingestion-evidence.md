@@ -145,11 +145,77 @@ Packet 2 may implement leased jobs against Phase 2 schema. Real company content 
 
 Packet 3 owns quarantine, ClamAV, category gate, Storage promotion saga, and admin alerts. Do not parse, scan, or embed in Packet 3 until quarantine promotion boundaries are proven.
 
+Packet 4 owns approved bounded crawling through the restricted proxy. Do not enable parser/OCR/chunking/graph indexing in Packet 4 scope beyond crawl handoff interfaces.
+
+## Packet 3 — quarantine, ClamAV, governance hold, promotion saga, alerts
+
+### Quoted requirement
+
+> Implement quota-bounded quarantine, orphan TTL cleanup, fresh-signature malware scanning, category approval, safe promotion, append-only provenance, and durable local admin alerts.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `supabase/migrations/20260813180000_quarantine_scan_promotion_v1.sql` | promotion saga, finalize RPC, scan columns |
+| `packages/core/src/smart_rag_core/gateways/clamav.py` | INSTREAM client; PING health-only |
+| `packages/core/src/smart_rag_core/gateways/storage.py` | download/copy/verify/delete gateway |
+| `packages/core/src/smart_rag_core/ingestion/*` | scan, governance, promotion |
+| `apps/agents/.../ingestion/scan_graph.py` | scan/promote graph nodes |
+| `apps/worker/.../lifecycle.py` | routes `scan_promote` jobs |
+| `apps/backend/.../upload_finalize.py` | finalize RPC wrapper |
+| `docker-compose.yml` | pinned ClamAV service |
+| `docs/runbooks/CLAMAV_SCAN_AND_PROMOTION.md` | ops runbook |
+
+### ClamAV pin
+
+| Item | Value |
+| --- | --- |
+| Image | `clamav/clamav:stable@sha256:78810772a92b4a9168115bc6b2e0ffd702640893b9577f8c3d0432762d2655c4` |
+| License | GPL-2.0 (upstream ClamAV) |
+| Engine | `stable` track (Alpine-based official image) |
+| Signatures | persistent volume `clamav_db:/var/lib/clamav` + container entrypoint `freshclam` |
+| Health | `clamdcheck.sh` (not scan readiness) |
+
+Primary docs: <https://docs.clamav.net/manual/Installing/Docker.html>
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `docker pull clamav/clamav:stable` + inspect RepoDigests | 0 |
+| `pnpm exec supabase db reset --yes` | 0 |
+| `uv run ruff check` (touched Python) | 0 |
+| `uv run pyright apps/agents/src/smart_rag_agents/ingestion/scan_graph.py` | 0 |
+| `uv run pytest tests/unit/test_clamav_client.py tests/contract/test_clamav_scan.py tests/contract/test_promotion_saga.py tests/contract/test_upload_finalize.py tests/contract/test_quarantine_cleanup.py -q` | 0 (9 passed, 2 skipped — ClamAV not on host `127.0.0.1:3310`) |
+| `uv run python scripts/check.py --tier docs` | 0 |
+
+### Negative / crash tests
+
+| Fixture | Result |
+| --- | --- |
+| EICAR | `infected` (contract when ClamAV reachable) |
+| Oversize scan payload | `over_limit` without INSTREAM |
+| Fake clean via `app_api` | blocked (Phase 2 trigger retained) |
+| Promotion crash after each saga step | replay completes once (contract) |
+| Cross-user finalize | denied |
+| Orphan cleanup retry | idempotent (`test_quarantine_cleanup`) |
+
+### Unverified assumptions
+
+- Full end-to-end scan/promote against live Storage + ClamAV in one worker invocation (requires local stack secrets).
+- Inbucket email delivery hook for every admin notification (durable DB rows implemented; SMTP bridge deferred to existing Phase 2 mail helpers).
+- Archive-bomb and encrypted fixtures at real ClamAV boundary (Packet 8 matrix).
+
+### Next-packet handoff
+
+Packet 4 implements approved URL crawling through the restricted proxy only. Parser/OCR nodes remain unavailable; promoted objects may reach `parsing` status but must not claim Hybrid/graph readiness.
+
 ## Packet checklist
 
 1. [x] External-processing governance sign-off (this section)
 2. [x] Durable leased jobs, checkpoints, admission, dead letters (this section)
-3. [ ] Quarantine, ClamAV, governance hold, promotion saga, alerts
+3. [x] Quarantine, ClamAV, governance hold, promotion saga, alerts
 4. [ ] Approved bounded crawling through restricted proxy
 5. [ ] Parser/OCR sandbox and typed format adapters
 6. [ ] Chunking, deduplication, typed Parquet artifacts

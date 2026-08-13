@@ -1,4 +1,4 @@
-"""Worker lifecycle: poll, claim, heartbeat, invoke ingestion probe graph."""
+"""Worker lifecycle: poll, claim, heartbeat, invoke ingestion graphs."""
 
 from __future__ import annotations
 
@@ -8,10 +8,18 @@ import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 import psycopg
-from smart_rag_agents.ingestion.graph import IngestionProbeState, build_probe_ingestion_graph
+from smart_rag_agents.ingestion.graph import (
+    IngestionProbeState,
+    build_probe_ingestion_graph,
+)
+from smart_rag_agents.ingestion.scan_graph import (
+    IngestionScanState,
+    build_scan_promote_ingestion_graph,
+)
 from smart_rag_core.jobs.exceptions import JobLeaseError, JobRepositoryError
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.schema.enums import JobErrorCategory
@@ -22,14 +30,15 @@ LOGGER = logging.getLogger(__name__)
 
 
 class WorkerLifecycle:
-    """Polls ingestion jobs and executes the Phase 3 probe graph only."""
+    """Polls ingestion jobs and executes probe or scan/promote graphs."""
 
     def __init__(self, settings: WorkerSettings) -> None:
         """Capture immutable worker settings for one process lifetime."""
 
         self._settings = settings
         self._stop_event = threading.Event()
-        self._graph = build_probe_ingestion_graph()
+        self._probe_graph = build_probe_ingestion_graph()
+        self._scan_graph = build_scan_promote_ingestion_graph()
 
     def run_forever(self) -> None:
         """Poll and process jobs until stopped."""
@@ -70,6 +79,24 @@ class WorkerLifecycle:
         if postgres_url is None:
             raise JobRepositoryError("supabase_db_url_unconfigured")
         return postgres_url.get_secret_value()
+
+    def _graph_config(self) -> dict[str, object]:
+        """Build configurable graph settings from worker env."""
+
+        storage_secret = (
+            self._settings.supabase_storage_admin_secret.get_secret_value()
+            if self._settings.supabase_storage_admin_secret is not None
+            else None
+        )
+        return {
+            "postgres_url": self._require_postgres_url(),
+            "lease_owner": self._lease_owner(),
+            "job_lease_seconds": self._settings.job_lease_seconds,
+            "storage_url": self._settings.supabase_url,
+            "storage_admin_secret": storage_secret,
+            "clamav_host": self._settings.clamav_host,
+            "clamav_port": self._settings.clamav_port,
+        }
 
     def _claim_one(self) -> IngestionJobRecord | None:
         postgres_url = self._require_postgres_url()
@@ -120,17 +147,23 @@ class WorkerLifecycle:
         )
         heartbeat_thread.start()
         try:
-            graph_input = _graph_input_from_job(job)
-            result = self._graph.invoke(  # pyright: ignore[reportUnknownMemberType]
-                graph_input,
-                config={
-                    "configurable": {
-                        "postgres_url": postgres_url,
-                        "lease_owner": self._lease_owner(),
-                        "job_lease_seconds": self._settings.job_lease_seconds,
-                    }
-                },
-            )
+            if job.job_kind == "scan_promote":
+                graph_input = _scan_graph_input_from_job(job)
+                result = self._scan_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+                    graph_input,
+                    config={"configurable": self._graph_config()},
+                )
+                success = result.get("status") == "promoted"
+                detail = str(result.get("detail", "scan_promote_failed"))
+            else:
+                graph_input = _probe_graph_input_from_job(job)
+                result = self._probe_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+                    graph_input,
+                    config={"configurable": self._graph_config()},
+                )
+                success = result.get("status") == "probe_validated"
+                detail = str(result.get("detail", "probe_failed"))
+
             with psycopg.connect(postgres_url) as connection:
                 connection.execute("SET ROLE app_worker")
                 repository = IngestionJobRepository(
@@ -138,7 +171,7 @@ class WorkerLifecycle:
                     lease_owner=self._lease_owner(),
                     lease_seconds=self._settings.job_lease_seconds,
                 )
-                if result.get("status") == "probe_validated":
+                if success:
                     completed = repository.complete(job.id, lease_token)
                     self._true_up_budget(connection, completed)
                 else:
@@ -146,7 +179,7 @@ class WorkerLifecycle:
                         job.id,
                         lease_token,
                         error_category=JobErrorCategory.VALIDATION,
-                        last_error=str(result.get("detail", "probe_failed")),
+                        last_error=detail,
                     )
                 connection.commit()
         except (JobLeaseError, JobRepositoryError, psycopg.Error) as exc:
@@ -201,8 +234,8 @@ class WorkerLifecycle:
         return f"{self._settings.worker_instance_id}@{hostname}"
 
 
-def _graph_input_from_job(job: IngestionJobRecord) -> IngestionProbeState:
-    """Build graph input containing IDs/tokens and durable Storage refs only."""
+def _probe_graph_input_from_job(job: IngestionJobRecord) -> IngestionProbeState:
+    """Build probe graph input containing IDs/tokens and durable Storage refs only."""
 
     payload = job.payload_ref
     return {
@@ -223,5 +256,85 @@ def _graph_input_from_job(job: IngestionJobRecord) -> IngestionProbeState:
         ),
         "status": "probe_pending",
         "ledger_written": False,
+        "detail": "",
+    }
+
+
+def _scan_graph_input_from_job(job: IngestionJobRecord) -> IngestionScanState:
+    """Build scan/promote graph input from durable job payload."""
+
+    payload: dict[str, Any] = job.payload_ref
+    content_class = str(payload.get("content_class", "real_company"))
+    review_approved = bool(payload.get("review_approved", False))
+    return {
+        "job_id": str(job.id),
+        "lease_token": job.lease_token or "",
+        "document_id": str(job.document_id) if job.document_id else None,
+        "version_id": str(job.version_id) if job.version_id else None,
+        "operation_key": str(payload.get("operation_key", job.job_kind)),
+        "storage_bucket": (
+            str(payload["storage_bucket"])
+            if isinstance(payload.get("storage_bucket"), str)
+            else None
+        ),
+        "storage_path": (
+            str(payload["storage_path"])
+            if isinstance(payload.get("storage_path"), str)
+            else None
+        ),
+        "content_hash": (
+            str(payload["content_hash"])
+            if isinstance(payload.get("content_hash"), str)
+            else None
+        ),
+        "byte_size": (
+            int(payload["byte_size"])
+            if isinstance(payload.get("byte_size"), int)
+            else None
+        ),
+        "media_type": (
+            str(payload["media_type"])
+            if isinstance(payload.get("media_type"), str)
+            else None
+        ),
+        "destination_bucket": (
+            str(payload["destination_bucket"])
+            if isinstance(payload.get("destination_bucket"), str)
+            else None
+        ),
+        "destination_path": (
+            str(payload["destination_path"])
+            if isinstance(payload.get("destination_path"), str)
+            else None
+        ),
+        "reservation_id": (
+            str(payload["reservation_id"])
+            if isinstance(payload.get("reservation_id"), str)
+            else None
+        ),
+        "declared_category": (
+            str(payload["declared_category"])
+            if isinstance(payload.get("declared_category"), str)
+            else None
+        ),
+        "attestation_policy_version": (
+            str(payload["attestation_policy_version"])
+            if isinstance(payload.get("attestation_policy_version"), str)
+            else None
+        ),
+        "uploader_user_id": (
+            str(payload["uploader_user_id"])
+            if isinstance(payload.get("uploader_user_id"), str)
+            else None
+        ),
+        "review_approved": review_approved,
+        "content_class": content_class,
+        "crash_after": (
+            str(payload["crash_after"])
+            if isinstance(payload.get("crash_after"), str)
+            else None
+        ),
+        "status": "scan_pending",
+        "scan_result": None,
         "detail": "",
     }

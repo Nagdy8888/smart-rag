@@ -206,3 +206,24 @@ def ensure_paradedb_arabic_normalizer() -> None:
     completed = paradedb_psql(bootstrap)
     if completed.returncode != 0:
         raise RuntimeError(completed.stderr or completed.stdout)
+
+
+def clamav_reachable(host: str = "127.0.0.1", port: int = 3310) -> bool:
+    """Return whether ClamAV ``clamd`` responds to ``PING`` on the host port.
+
+    Args:
+        host: ClamAV hostname. Defaults to localhost for contract tests that
+            publish the private service port during CI.
+        port: ClamAV TCP port.
+
+    Returns:
+        ``True`` when ``PING`` returns ``PONG``.
+    """
+
+    from smart_rag_core.gateways.clamav import ClamAvClient
+
+    client = ClamAvClient(host=host, port=port, timeout_seconds=5.0)
+    try:
+        return client.ping()
+    except Exception:
+        return False

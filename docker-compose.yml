@@ -14,6 +14,7 @@ volumes:
   paradedb_data:
   valkey_limits_data:
   valkey_cache_data:
+  clamav_db:
 
 services:
   paradedb:
@@ -130,6 +131,28 @@ services:
     tmpfs:
       - /tmp
 
+  clamav:
+    image: clamav/clamav:stable@sha256:78810772a92b4a9168115bc6b2e0ffd702640893b9577f8c3d0432762d2655c4
+    restart: unless-stopped
+    networks:
+      - private
+    expose:
+      - "3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    mem_limit: 2g
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+
   api:
     build:
       context: .
@@ -189,12 +212,18 @@ services:
       VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
       PARADEDB_URL: postgresql://${PARADEDB_WRITER_USER:-paradedb_writer}:${PARADEDB_WRITER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
       CRAWL_PROXY_URL: http://crawl-proxy:8080
+      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
+      SUPABASE_STORAGE_ADMIN_SECRET: ${SUPABASE_STORAGE_ADMIN_SECRET:-}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
     networks:
       - private
     depends_on:
       paradedb:
         condition: service_healthy
       crawl-proxy:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     healthcheck:
       test:
