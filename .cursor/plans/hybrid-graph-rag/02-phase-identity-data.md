@@ -47,7 +47,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 3. [x] Create least-privilege Supabase, Storage, BM25 reader/writer/bootstrap roles, explicit v1 document ACL semantics, server-derived identity propagation, RLS/RPC boundaries, and forged/missing-context tests.
 4. [x] Implement asymmetric JWT/JWKS verification and rollover, PKCE Auth, direct-Supabase-Auth rate-limit ownership, invitations, MFA/recovery, session revocation, and upload-capability controls.
 5. [x] Create private Storage buckets, enforceable upload/quarantine quotas and TTL cleanup, scan metadata foundations, graph eligibility, and retention structures.
-6. [ ] Document and prove connection budgets, pooling compatibility, workload-isolation triggers, protected migration credentials, generated types, read/audit-chain integrity, and local admin notifications.
+6. [x] Document and prove connection budgets, pooling compatibility, workload-isolation triggers, protected migration credentials, generated types, read/audit-chain integrity, and local admin notifications.
 
 ## Cheap-model execution protocol
 

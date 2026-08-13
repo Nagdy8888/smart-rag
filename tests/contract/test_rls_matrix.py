@@ -236,7 +236,7 @@ def test_rls_matrix_documents_conversations_and_audit(
         )
 
         with pytest.raises(
-            psycopg.errors.RaiseException, match="graph index job rejected"
+            psycopg.errors.RaiseException, match="graph index rejected"
         ):
             cursor.execute("SAVEPOINT restricted_graph_job")
             cursor.execute(

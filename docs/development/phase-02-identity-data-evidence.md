@@ -2,7 +2,7 @@
 title: Phase 2 identity/data evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-13
 audience: engineering, reviewers
 ---
 
@@ -382,4 +382,131 @@ indexing execution, public buckets, or invented narrow service tokens.
 ### Next packet
 
 Packet 6 — connection isolation, protected credentials, audit integrity, and exit.
+
+## Packet 6 — connection isolation, protected credentials, audit integrity, exit
+
+### Requirement
+
+Prove Supabase/ParadeDB connection budgets against Compose inventory; apply role
+timeouts/work_mem/application_name; implement hash-chained audit with redaction
+and tamper verification; document protected credential custody; regenerate types;
+map every Phase 2 `Done when` item; **request user acceptance** without setting
+phase wrapper `status: complete`.
+
+### Artifacts
+
+| Area | Path |
+| --- | --- |
+| Migration | `supabase/migrations/20260813150000_audit_chain_role_timeouts_v1.sql` (renamed from empty `20260813081133_*` stub) |
+| Core helpers | `packages/core/src/smart_rag_core/security/audit_chain.py` |
+| Schema model | `AuditEventRecord` hash/purpose/resource fields |
+| Generated types | `packages/core/src/smart_rag_core/generated/database.ts` |
+| Docs | `05`/`06`/`07` architecture; `PROTECTED_MIGRATION_CREDENTIALS.md`; `AUDIT_CHAIN.md` |
+| Contracts | `test_connection_budgets.py`, `test_audit_chain.py`, `test_privileged_secrets_absent.py` |
+| CI allowlist | `scripts/ci/check_migrations.py` |
+
+### Connection math (proven inventory)
+
+| Item | Value |
+| --- | --- |
+| Compose API / worker replicas | 1 / 1 (no `deploy.replicas`) |
+| Caps | API txn 10 + sess 4+4 + worker txn 6 + sess 4 + ops 2 |
+| Worst-case sum | **30** |
+| Managed Free/Nano hard limit | **60** |
+| 70% ceiling | **42** |
+| Gate | **30 < 42** |
+
+ParadeDB independent: reader 4 + writer 2 + ops 1 = 7; no host ports published.
+
+### Commands and results
+
+```text
+npx supabase db reset --yes
+→ Applied 17 migrations including 20260813150000_audit_chain_role_timeouts_v1.sql; exit 0
+
+uv run python scripts/ci/check_migrations.py
+→ Phase 2 migration policy OK (17 reviewed files); exit 0
+
+uv run ruff check/format on Packet 6 Python paths
+→ All checks passed; exit 0
+
+uv run pytest tests/contract/test_connection_budgets.py \
+             tests/contract/test_audit_chain.py \
+             tests/contract/test_privileged_secrets_absent.py -q
+→ 8 passed; exit 0
+
+npx supabase gen types typescript --local --schema app,public,storage,auth
+→ Wrote packages/core/src/smart_rag_core/generated/database.ts (includes audit_events.event_hash/chain_seq)
+
+uv run pytest tests/contract/test_rls_matrix.py \
+             tests/contract/test_schema_reset.py \
+             tests/contract/test_compose_topology.py -q
+→ passed after aligning RLS matrix graph-reject message match with Packet 5 assert text
+
+uv run python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py --update
+→ Split plan integrity updated: 82 canonical files; exit 0
+```
+
+### Managed sync (2026-08-13)
+
+Applied `audit_chain_role_timeouts_v1` to `qsjivtwtmlmtksufqjik` via MCP.
+Verified `app_*` role timeout/`work_mem`/`application_name` settings,
+`audit_events` chain columns, and `app.append_audit_event` / `app.verify_audit_chain`.
+
+### Acceptance mapping (Packet 6)
+
+| Check | Evidence |
+| --- | --- |
+| Worst-case < 70% with process multiplication + ops | `05-database-connections.md` + `test_connection_budgets.py` |
+| Custom roles / no session-GUC identity leak | `validate_caller_context` source assert + SET ROLE app_api |
+| Role timeouts/memory/tags introspected; pause triggers documented | `pg_roles.rolconfig` test + `06-database-workload-isolation.md` |
+| ParadeDB independent budget + no public port | `07-bm25-projection.md` + Compose |
+| Audit mutation/deletion/reorder detected; no writer update/delete; redaction | `test_audit_chain.py` |
+| Privileged secrets absent from general runtime settings | `test_privileged_secrets_absent.py` |
+| Managed custody | Documented as **Phase 10 unverified** in `PROTECTED_MIGRATION_CREDENTIALS.md` |
+| Generated types match schema | `npx supabase gen types typescript --local` |
+
+### Forbidden scope respected
+
+No AWS Secrets Manager/OIDC/KMS/S3 Object Lock implementation, no read replicas,
+no production pool changes, no load claims, no SES/on-call, no Phase 9/10 evidence
+faking.
+
+## Phase 2 exit record (pending user acceptance)
+
+**Phase wrapper status remains `pending` until explicit user acceptance.**
+
+### Done when → evidence map
+
+| Done when clause (summary) | Evidence | Managed limitation |
+| --- | --- | --- |
+| Local + managed pgvector 0.8+/iterative-scan | Packet 1 evidence + MCP managed gate | Managed selective HNSW via direct DSN optional |
+| Arabic SQL/core/ParadeDB byte-identical | Packet 1 parity tests | — |
+| ParadeDB BM25 contracts; no pg_search on Supabase | Packet 1 + Compose private | — |
+| Embedding ADR + qualification report | Packet 1 ADR/report | Full-envelope RAM ≥16 GB before bulk embed |
+| Expand/contract migrations, reset, types | Packets 2–6 migrations + lint | — |
+| Roles, RLS, ACL, identity RPCs, transaction-pool safe | Packets 3–6 | Supavisor mode on managed pooler Phase 9 |
+| Asymmetric JWKS + managed rollover | Packet 4 managed proof | Local Auth cannot prove full lifecycle alone |
+| Owner/invite/MFA/recovery/session revocation | Packet 4 | Hosted Auth throttle **not** proven locally |
+| Auth Admin / Storage Admin isolated; no general runtime secrets | Packets 4–6 secret tests | Managed secret custody Phase 10 |
+| Storage quotas, cleanup, graph eligibility, notifications | Packet 5 | ClamAV/promotion Phase 3 |
+| Connection/ParadeDB budgets + isolation triggers | Packet 6 docs + tests | Production pool load Phase 9 |
+| Audit-chain tamper detectable | Packet 6 `verify_audit_chain` | KMS/Object Lock anchoring Phase 10 |
+| Protected migration credentials design | `PROTECTED_MIGRATION_CREDENTIALS.md` | OIDC/Secrets Manager **unverified** until Phase 10 |
+| Generated types reviewed | Packet 6 regen | — |
+
+### Unverified managed / deferred items (honest)
+
+- AWS Secrets Manager + GitHub OIDC one-shot migration job
+- KMS / S3 Object Lock audit anchoring
+- Hosted Supabase Auth rate-limit enforcement proof
+- Production Supavisor pool sizing under load (Phase 9)
+- Read-replica candidate path (design only)
+- SES / on-call alert routing
+
+### Acceptance request
+
+Please review Packet 6 evidence and the Phase 2 Done-when map above. If you
+**accept**, reply that Phase 2 is accepted so the wrapper `status` may be set to
+`complete` in a follow-up. Do **not** start Phase 3 until that acceptance.
 

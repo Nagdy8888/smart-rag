@@ -159,7 +159,7 @@ class IngestionJobRecord(DurableJobColumns):
 
 
 class AuditEventRecord(BaseModel):
-    """Append-only audit ledger row."""
+    """Append-only audit ledger row with hash-chain fields."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -172,5 +172,11 @@ class AuditEventRecord(BaseModel):
     authorization_version: int | None = None
     visibility_generation: int | None = None
     session_id: str | None = None
+    purpose: str | None = None
+    resource_type: str | None = None
+    resource_id: UUID | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
+    event_hash: str | None = None
+    previous_hash: str | None = None
+    chain_seq: int | None = None
     created_at: datetime
