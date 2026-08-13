@@ -197,6 +197,17 @@ class CheckRunner:
                     (self._pnpm, "--filter", "smart-rag-frontend", "lint"),
                 ),
                 Command(
+                    "Frontend route type generation",
+                    (
+                        self._pnpm,
+                        "--filter",
+                        "smart-rag-frontend",
+                        "exec",
+                        "next",
+                        "typegen",
+                    ),
+                ),
+                Command(
                     "Frontend TypeScript strict",
                     (
                         self._pnpm,

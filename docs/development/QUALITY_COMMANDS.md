@@ -22,6 +22,8 @@ uv run python scripts/ci/check_migrations.py
 ```
 
 Tiers hard-fail (no `|| true`). Zero collected tests fail the unit/contract tiers.
+The frontend tier runs `next typegen` before standalone `tsc --noEmit`, so
+route-aware `PageProps` and `LayoutProps` are available on a clean checkout.
 Markdown checks cover maintained documentation. Preserved historical reviews in
 `docs/prev_review/` and generated Stitch source exports in
 `docs/stitch_smart_rag_enterprise_console/` are explicitly excluded and must
