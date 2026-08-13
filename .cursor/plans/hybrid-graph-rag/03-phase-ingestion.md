@@ -43,7 +43,7 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
-1. [ ] Finalize and sign the OpenAI/LangSmith/Supabase/Vercel external-processing governance packet before any real company content reaches an external processor.
+1. [x] Finalize and sign the OpenAI/LangSmith/Supabase/Vercel external-processing governance packet before any real company content reaches an external processor.
 2. [ ] Implement leased, idempotent, priority-aware jobs with heartbeat, reclaim, retry, backpressure, spend admission, and dead-letter handling.
 3. [ ] Implement quota-bounded quarantine, orphan TTL cleanup, fresh-signature malware scanning, category approval, safe promotion, append-only provenance, and durable local admin alerts.
 4. [ ] Implement approved-URL crawling only through the restricted proxy with redirect, DNS, peer-IP, scope, byte, page, and time bounds.

@@ -33,6 +33,12 @@ PLANNED_MISSING_LINKS = {
     "docs/adr/ADR-embedding-model-dimension.md",
     "docs/adr/ADR-vision-captioning.md",
 }
+GOVERNANCE_DOCUMENTS = (
+    DOCS_ROOT / "security" / "OPENAI_DATA_GOVERNANCE.md",
+    DOCS_ROOT / "security" / "SUBPROCESSOR_GOVERNANCE.md",
+)
+CLAIMED_GOVERNANCE_STATUSES = frozenset({"signed", "verified", "accepted"})
+FRONTMATTER_PATTERN = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", flags=re.DOTALL)
 
 
 @dataclass(frozen=True)
@@ -135,6 +141,79 @@ def check_local_links(documents: list[Path]) -> list[LinkFailure]:
             if relative_target not in PLANNED_MISSING_LINKS:
                 failures.append(LinkFailure(document, destination))
     return failures
+
+
+def _frontmatter_fields(document: Path) -> dict[str, str]:
+    """Parse simple YAML frontmatter key/value pairs from a Markdown file.
+
+    Args:
+        document: Markdown path with optional frontmatter.
+
+    Returns:
+        Mapping of frontmatter keys to stripped string values. Quoted values
+        keep their inner text only.
+
+    Raises:
+        ValueError: If claimed governance status lacks required evidence fields.
+    """
+
+    text = document.read_text(encoding="utf-8")
+    match = FRONTMATTER_PATTERN.match(text)
+    if match is None:
+        return {}
+    fields: dict[str, str] = {}
+    for raw_line in match.group(1).splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, value = line.split(":", maxsplit=1)
+        fields[key.strip()] = value.strip().strip("\"'")
+    return fields
+
+
+def check_governance_signoff() -> list[str]:
+    """Reject signed/verified/accepted governance docs without approver evidence.
+
+    Returns:
+        Human-readable error strings. Empty when both governance documents carry
+        approver, approval date, policy version, and real-content posture.
+
+    Side Effects:
+        None.
+    """
+
+    errors: list[str] = []
+    required = (
+        "approver",
+        "approval_date",
+        "policy_version",
+        "real_company_content_external_processing",
+    )
+    for document in GOVERNANCE_DOCUMENTS:
+        try:
+            relative = document.relative_to(REPO_ROOT).as_posix()
+        except ValueError:
+            relative = document.as_posix()
+        if not document.is_file():
+            errors.append(f"missing governance document {relative}")
+            continue
+        fields = _frontmatter_fields(document)
+        status = fields.get("status", "").lower()
+        if status not in CLAIMED_GOVERNANCE_STATUSES:
+            continue
+        for key in required:
+            if not fields.get(key):
+                errors.append(
+                    f"{relative} claims status={status!r} without required "
+                    f"frontmatter field {key!r}"
+                )
+        posture = fields.get("real_company_content_external_processing", "").lower()
+        if posture not in {"prohibited", "allowed"}:
+            errors.append(
+                f"{relative} must set real_company_content_external_processing "
+                "to prohibited or allowed"
+            )
+    return errors
 
 
 def mermaid_blocks(document: Path) -> list[str]:
@@ -242,6 +321,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     options = parse_options(argv)
     try:
         documents = documentation_files()
+        governance_errors = check_governance_signoff()
+        if governance_errors:
+            for message in governance_errors:
+                print(f"ERROR: {message}", file=sys.stderr)
+            return 1
         failures = check_local_links(documents)
         if failures:
             for failure in failures:
