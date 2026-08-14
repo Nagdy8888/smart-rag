@@ -2,7 +2,7 @@
 title: BM25 projection contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-14
 audience: engineering
 ---
 
@@ -20,6 +20,10 @@ See [ADR-paradedb-edition-availability.md](../adr/ADR-paradedb-edition-availabil
 
 ## Outage
 
-ParadeDB failure → Hybrid visibly degrades to dense + exact/trigram term search.
+ParadeDB failure → Hybrid visibly degrades to dense + exact/trigram term search
+(`bm25_unavailable`). See [HYBRID_RETRIEVAL_CONTRACT.md](./HYBRID_RETRIEVAL_CONTRACT.md).
+
+Packet 2 creates `bm25_chunks_search_idx` with `pdb.unicode_words` over
+title/heading/alias/body plus filter fields. Queries return `chunk_id` only.
 
 [docs index](../README.md)

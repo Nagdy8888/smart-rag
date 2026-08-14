@@ -13,4 +13,6 @@ audience: engineering
 
 Will record immutable profiles, candidate/rerank/MMR/RRF search space, per-query-class curves, rollback.
 
+Channel bounds and HNSW profiles now live in [HYBRID_RETRIEVAL_CONTRACT.md](./HYBRID_RETRIEVAL_CONTRACT.md).
+
 [docs index](../README.md)

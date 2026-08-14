@@ -8,6 +8,7 @@ from uuid import UUID
 
 import psycopg
 from psycopg.rows import dict_row
+
 from smart_rag_core.ingestion.limits import (
     DEFAULT_BM25_VERIFY_QUERY_LIMIT,
     DEFAULT_BM25_VERIFY_SAMPLE_COUNT,
@@ -69,7 +70,9 @@ class Bm25ProjectionVerifier:
         for row in supabase_rows:
             parade_hash = self._parade_content_hash(UUID(str(row["id"])))
             expected = str(row["content_hash"] or "")
-            body_hash = hashlib.sha256(str(row["search_normalized"]).encode()).hexdigest()
+            body_hash = hashlib.sha256(
+                str(row["search_normalized"]).encode()
+            ).hexdigest()
             actual = parade_hash or body_hash
             if expected and actual == expected:
                 hash_matches += 1

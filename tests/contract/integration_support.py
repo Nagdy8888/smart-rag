@@ -210,7 +210,10 @@ def ensure_paradedb_arabic_normalizer() -> None:
 
 
 def ensure_paradedb_bm25_index() -> None:
-    """Create the pg_search BM25 index when missing (bootstrap role).
+    """Create or rebuild the pg_search BM25 index (bootstrap role).
+
+    Rebuilds when the index is missing alias/language/is_current fields so
+    Packet 2 typed queries can run. Derived-index DDL only.
 
     Raises:
         RuntimeError: When index DDL fails.
@@ -218,26 +221,20 @@ def ensure_paradedb_bm25_index() -> None:
 
     sql = """
 ALTER TABLE public.bm25_chunks ADD COLUMN IF NOT EXISTS content_hash text;
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_indexes WHERE indexname = 'bm25_chunks_search_idx'
-  ) THEN
-    EXECUTE $idx$
-      CREATE INDEX bm25_chunks_search_idx ON public.bm25_chunks
-      USING bm25 (
-        chunk_id,
-        (body_search::pdb.unicode_words),
-        (coalesce(title_search, '')::pdb.unicode_words),
-        (coalesce(heading_search, '')::pdb.unicode_words),
-        acl_scope_id,
-        visibility_generation
-      )
-      WITH (key_field = 'chunk_id');
-    $idx$;
-  END IF;
-END
-$$;
+DROP INDEX IF EXISTS public.bm25_chunks_search_idx;
+CREATE INDEX bm25_chunks_search_idx ON public.bm25_chunks
+USING bm25 (
+  chunk_id,
+  (body_search::pdb.unicode_words),
+  (coalesce(title_search, '')::pdb.unicode_words),
+  (coalesce(heading_search, '')::pdb.unicode_words),
+  (coalesce(alias_search, '')::pdb.unicode_words),
+  language,
+  acl_scope_id,
+  is_current,
+  visibility_generation
+)
+WITH (key_field = 'chunk_id');
 """
     completed = paradedb_psql(sql)
     if completed.returncode != 0:

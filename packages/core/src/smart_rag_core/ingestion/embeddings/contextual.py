@@ -7,9 +7,15 @@ from uuid import UUID
 
 from smart_rag_core.ingestion.chunking.types import CanonicalChunk
 
-_CODE_PATTERN = re.compile(
-    r"\b(?:PO|INV|TKT|REF|SKU|SN|ID)[-_#: ]?[A-Z0-9]{3,32}\b",
-    re.IGNORECASE,
+_CODE_PATTERNS = (
+    re.compile(
+        r"\b(?:PO|INV|TKT|REF|SKU|SN|ID)[-_#: ]?[A-Z0-9]{3,32}\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bINV-SR-\d{4}\b"),
+    re.compile(r"\bSKU-P4-[A-Z0-9]{3}\b"),
+    re.compile(r"\bPRJ-[A-Z]{5,12}\b"),
+    re.compile(r"\bP4-[A-Z]{2}-\d{3}\b"),
 )
 
 
@@ -44,6 +50,9 @@ def extract_deterministic_search_terms(
 ) -> dict[UUID, tuple[str, ...]]:
     """Populate search terms from title, headings, filename, and code patterns.
 
+    Phase 4 identifier rules INV-SR-####, SKU-P4-xxx, PRJ- names, and P4-xx-###
+    are included alongside the original PO/INV/TKT/REF/SKU/SN/ID extractor.
+
     Args:
         document_title: Document title.
         filename: Original filename when available.
@@ -69,7 +78,8 @@ def extract_deterministic_search_terms(
         for heading in chunk.section_path:
             if heading.strip():
                 terms.add(heading.strip())
-        for match in _CODE_PATTERN.findall(chunk.raw_text):
-            terms.add(match.strip())
+        for pattern in _CODE_PATTERNS:
+            for match in pattern.findall(chunk.raw_text):
+                terms.add(match.strip())
         result[chunk.chunk_id] = tuple(sorted(terms))
     return result

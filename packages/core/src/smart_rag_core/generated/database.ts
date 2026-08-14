@@ -2904,6 +2904,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      count_authorized_retrievable_chunks: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_language?: string
+        }
+        Returns: number
+      }
       current_authorization_version: { Args: never; Returns: number }
       emit_admin_notification: {
         Args: {
@@ -3163,6 +3172,19 @@ export type Database = {
         Args: { object_name: string }
         Returns: boolean
       }
+      recheck_retrieval_candidates: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_chunk_ids: string[]
+        }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          version_id: string
+        }[]
+      }
       record_embedding_ledger: {
         Args: {
           p_actual_usd?: number
@@ -3212,6 +3234,43 @@ export type Database = {
           reserved_bytes: number
           reserved_storage_path: string
           storage_bucket: string
+          version_id: string
+        }[]
+      }
+      retrieval_exact_row_cap: { Args: never; Returns: number }
+      retrieve_dense_candidates: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_candidate_limit: number
+          p_language?: string
+          p_mode: string
+          p_profile: string
+          p_query_embedding: string
+        }
+        Returns: {
+          chunk_id: string
+          distance: number
+          document_id: string
+          retrieval_mode: string
+          version_id: string
+        }[]
+      }
+      retrieve_term_candidates: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_candidate_limit: number
+          p_language?: string
+          p_query_normalized: string
+        }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          match_kind: string
+          similarity: number
           version_id: string
         }[]
       }

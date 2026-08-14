@@ -2,7 +2,7 @@
 title: Identity propagation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-14
 audience: engineering, security, reviewers
 ---
 
@@ -94,6 +94,23 @@ audit. Export and purge remain later-phase work.
 - trusting client-supplied role, ACL, or authorization snapshot headers in production
 - prepared statements that bind identity at prepare time without per-call validation
 
+## Hybrid retrieval transactions (Phase 4 Packet 2)
+
+Dense and term retrieval open one Postgres transaction through
+`retrieval_transaction` in `packages/core/src/smart_rag_core/retrieval/session.py`:
+
+1. Require an idle connection (no leftover in-transaction GUCs).
+2. `BEGIN`, then `SET LOCAL ROLE app_api`.
+3. `SET LOCAL` HNSW, `work_mem`, statement timeout, and trigram threshold.
+4. Call `SECURITY INVOKER` RPCs with server-derived `CallerContext` only.
+5. `COMMIT` or `ROLLBACK` so role and GUCs cannot leak to pooled reuse.
+
+Caller IDs are never client parameters. PostgREST/`anon`/`authenticated`/
+`service_role` are not granted retrieval `EXECUTE`. ParadeDB BM25 IDs are
+rechecked in the same authorization transaction before they can leave the
+adapter. Tunables and negatives live in
+[HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md).
+
 ## RPC validation flow
 
 ```mermaid
@@ -141,5 +158,7 @@ sequenceDiagram
 ## Related documents
 
 - [AUTHORIZATION_MODEL.md](./AUTHORIZATION_MODEL.md)
+- [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
 - [05-database-connections.md](../architecture/05-database-connections.md)
 - [Phase 2 evidence](../development/phase-02-identity-data-evidence.md)
+- [Phase 4 evidence](../development/phase-04-hybrid-rag-evidence.md)

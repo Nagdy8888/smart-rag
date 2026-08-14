@@ -157,4 +157,118 @@ versioned dense/BM25/term retrieval. It must not read holdout labels, must not
 install `pg_search` on managed Supabase, and must not treat this synthetic
 corpus as a named-SME launch seal.
 
+## Packet 2 — versioned dense, BM25, term, normalization, and authorization
+
+### Quoted requirement
+
+> Implement versioned indexed representations, Arabic normalization parity,
+> private ParadeDB BM25 queries, filtered HNSW iterative scans, and populated
+> trigram terms.
+
+### Acceptance checks restated
+
+- Data API/direct protocol fixtures return identical authorized IDs and zero
+  rows for missing, forged, expired, disabled, revoked, cross-scope,
+  stale-snapshot, service-role, and table-owner misuse.
+- Filtered HNSW meets fixture candidate recall against an exact authorized
+  oracle; HNSW settings are transaction-local; exact fallback cannot exceed
+  10,000 authorized rows.
+- ParadeDB typed queries return canonical IDs only; injection cannot alter
+  fields/operators; Arabic/mixed parity is byte-identical.
+- Populated term channel meets exact-code/alias gates; raw citation text is
+  unchanged.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `supabase/migrations/20260814130000_hybrid_retrieval_v1.sql` | HNSW/trigram indexes, `GRANT USAGE ON SCHEMA search TO app_api`, security-invoker RPCs |
+| `infra/paradedb/migrations/20260814130000_bm25_search_index.sql` | Typed BM25 index (`pdb.unicode_words`, no stemmer) |
+| `packages/core/src/smart_rag_core/retrieval/` | Session, dense, term, BM25, recheck, profiles |
+| `docs/retrieval/HYBRID_RETRIEVAL_CONTRACT.md` | Frozen Packet 2 tunables |
+| `tests/contract/test_hybrid_retrieval.py` | Auth, ANN vs exact, EXPLAIN, BM25, terms, parity |
+| `tests/unit/test_hybrid_retrieval_foundations.py` | Caps, typed query constructor, exact-admission |
+
+Live local extensions after `pnpm exec supabase db reset --yes` (exit 0):
+`vector` **0.8.0**, `pg_trgm` **1.6**. Indexes:
+`document_chunks_embedding_hnsw_idx`, `document_search_terms_term_trgm_idx`,
+`search_aliases_alias_trgm_idx`. `app_api` has `USAGE` on `search`.
+
+ParadeDB image remains
+`paradedb/paradedb:pg17@sha256:dca046b8a0ddd070c368d5254cbb7f596b3b7bc67bc2efa7c0fbe881087883bb`
+(`pg_search` 0.25.2 per Phase 2 evidence). Compose API uses `paradedb_reader`;
+tests may SELECT as writer login and must not `SET ROLE paradedb_reader` from
+that login.
+
+HNSW profiles (fixture-measured, **not** holdout-tuned): `iterative_scan=strict_order`;
+`ef_search` 40/80/120; `max_scan_tuples` 8000/16000/20000; `scan_mem_multiplier` 2;
+`work_mem` 32MB SET LOCAL; statement timeout 8000 ms.
+
+### Primary documentation sources (2026-08-14)
+
+- pgvector iterative scan: <https://github.com/pgvector/pgvector#iterative-index-scans>
+- pgvector HNSW: <https://github.com/pgvector/pgvector#hnsw>
+- ParadeDB match/phrase operators: <https://docs.paradedb.com/documentation/full-text/overview>
+- psycopg 3 `SET LOCAL`: <https://www.psycopg.org/psycopg3/docs/basic/usage.html>
+- PostgreSQL `set_config(..., is_local)`: <https://www.postgresql.org/docs/current/functions-admin.html>
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run ruff check` (Packet 2 retrieval + contract tests) | 0 |
+| `uv run pyright packages/core/src/smart_rag_core/retrieval` | 0 |
+| `uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/contract/test_hybrid_retrieval.py -q` | 0 (25 passed) after auth-version, unique seed text, search USAGE, BM25 role, GUC leak fixes |
+| `uv run python scripts/ci/check_migrations.py` | 0 (35 reviewed files) |
+| `pnpm exec supabase db reset --yes` | 0; applied `20260814130000_hybrid_retrieval_v1.sql` |
+| `npx supabase gen types typescript --local --schema app,public,storage,auth` | 0; UTF-8 write of `packages/core/src/smart_rag_core/generated/database.ts` includes `retrieve_dense_candidates` |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (60 markdown files, 0 lint issues) |
+
+`strict_order` is **not** treated as exact recall. Fixture ANN top-5 IDs matched
+the exact authorized oracle (`test_ann_matches_exact_oracle_on_fixture`).
+`EXPLAIN` of cosine order with `enable_seqscan=off` uses
+`document_chunks_embedding_hnsw_idx`. After `retrieval_transaction(..., HIGH)`,
+`hnsw.ef_search` and `current_user` return to the pre-transaction values.
+
+### Negative tests
+
+| Fixture | Result |
+| --- | --- |
+| Missing / forged / disabled caller | zero rows or `RetrievalSessionError` |
+| Stale `authorization_version` | zero rows |
+| Cross-scope member vs restricted | restricted chunk absent |
+| Soft-deleted / non-current version | absent |
+| `service_role` EXECUTE | denied |
+| PostgREST/anon Data API RPC | HTTP error / no EXECUTE |
+| Exact fallback when authorized count > 10,000 | `weak_evidence`; no seqscan disable |
+| BM25 injection / `pdb.parse` | typed constructor rejects; bound parameter cannot change operators |
+| Writer DSN `SET ROLE paradedb_reader` | aborted txn; adapter uses reader DSN or SELECT-as-login |
+| Cold term channel | `empty_channel` |
+| Raw citation vs search form | `raw_text` unchanged; `search.normalize_arabic_v1` matches core hash |
+
+### Deviations
+
+- BM25 scan uses one bounded top-N query (cap 300). Relevance-preserving
+  keyset pagination is **not** qualified on `pg_search` 0.25.2.
+- HNSW profile numbers are fixture-measured, not development-set calibrated
+  (Packet 6). Holdout was not read.
+- Managed Supabase has no `pg_search`. Local ParadeDB remains private Compose.
+
+### Rollback
+
+- Drop forward via a later expand/contract migration replacing
+  `20260814130000_hybrid_retrieval_v1.sql`. Do not `DROP TYPE` in place.
+- ParadeDB index rebuild from
+  `infra/paradedb/migrations/20260814130000_bm25_search_index.sql`.
+- HNSW rollback values are in
+  [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md).
+
+### Packet 3 handoff
+
+Packet 3 may start after this Packet 2 evidence is accepted in-repo (checkbox).
+It implements typed query profiling and first-stage attribution. It must not
+implement fusion/RRF, rerank, coverage calibration, DuckDB tables, or holdout
+tuning. It must not add a second Arabic normalizer or install `pg_search` on
+managed Supabase.
+
 [docs index](../README.md)

@@ -141,7 +141,8 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - `documents.current_version_id` must reference a version belonging to the same document (trigger `app.enforce_document_current_version`).
 - `documents.graph_eligible` requires `company_visible`, non-null current version, and no soft delete.
 - Restricted visibility uses per-user `document_acl` grants only.
-- `document_chunks.embedding` is `vector(1024)` per [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md).
+- `document_chunks.embedding` is `vector(1024)` per [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md). Packet 2 adds HNSW cosine index `document_chunks_embedding_hnsw_idx` and trigram GIN indexes on `term_normalized` / `alias_normalized`.
+- Retrieval RPCs `retrieve_dense_candidates`, `retrieve_term_candidates`, and `recheck_retrieval_candidates` are `SECURITY INVOKER` for `app_api` only. Authorization predicates run before rank/limit.
 - `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
 - Pending glossary imports never write `search_aliases`; approval projects aliases; rollback deletes that projection.
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
@@ -156,5 +157,6 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [05-database-connections.md](./05-database-connections.md)
 - [06-database-workload-isolation.md](./06-database-workload-isolation.md)
 - [07-bm25-projection.md](./07-bm25-projection.md)
+- [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
 - [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md)
 - [ADR-expand-contract-migrations](../adr/ADR-expand-contract-migrations.md)

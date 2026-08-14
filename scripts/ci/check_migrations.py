@@ -44,6 +44,7 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260814103300_hybrid_ready_requires_bm25_job_v1.sql",
     "20260814103400_app_worker_extensions_usage_v1.sql",
     "20260814120000_glossary_import_v1.sql",
+    "20260814130000_hybrid_retrieval_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

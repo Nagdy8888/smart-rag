@@ -8,6 +8,7 @@ from uuid import UUID
 
 import psycopg
 from psycopg.rows import dict_row
+
 from smart_rag_core.ingestion.limits import DEFAULT_BM25_UPSERT_BATCH_SIZE
 
 
@@ -109,7 +110,10 @@ class Bm25Indexer:
                         (body_search::pdb.unicode_words),
                         (coalesce(title_search, '')::pdb.unicode_words),
                         (coalesce(heading_search, '')::pdb.unicode_words),
+                        (coalesce(alias_search, '')::pdb.unicode_words),
+                        language,
                         acl_scope_id,
+                        is_current,
                         visibility_generation
                       )
                       WITH (key_field = 'chunk_id');
@@ -192,6 +196,27 @@ class Bm25Indexer:
                 (version_id,),
             )
             return int(cursor.rowcount)
+
+    def search_index_exists(self) -> bool:
+        """Return whether the pg_search BM25 index is present.
+
+        Returns:
+            True when ``bm25_chunks_search_idx`` exists.
+
+        Side Effects:
+            Read-only catalog lookup.
+        """
+
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1
+                FROM pg_indexes
+                WHERE indexname = 'bm25_chunks_search_idx'
+                LIMIT 1
+                """
+            )
+            return cursor.fetchone() is not None
 
     def fetch_meta(self) -> dict[str, Any]:
         """Return active ParadeDB projection metadata."""
