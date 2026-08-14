@@ -17,6 +17,9 @@ Packet 1 creates this file; later packets append. Phase status remains
 Related: [DATASET_SPEC.md](../evaluation/DATASET_SPEC.md) ·
 [QUERY_PROFILE_LABELING.md](../evaluation/QUERY_PROFILE_LABELING.md) ·
 [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) ·
+[COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) ·
+[COVERAGE_QUALIFICATION.md](../evaluation/COVERAGE_QUALIFICATION.md) ·
+[HYBRID_TUNING.md](../retrieval/HYBRID_TUNING.md) ·
 [docs index](../README.md)
 
 ## Prerequisites
@@ -672,6 +675,127 @@ called (`LANGSMITH_TRACING` default false, `MOCK_MODEL_MODE=true`).
 - Real OpenAI embedding adapter remains unimplemented; mock `embed` is traced.
 - Phase 6 still owns agent/SSE production tracing and feedback taxonomy.
 
+## Packet 6 — coverage/refusal calibration and frozen retrieval profiles
+
+### Quoted requirement
+
+> Calibrate coverage/refusal by query class before the immutable holdout and
+> prohibit unsupported advanced methods.
+
+### Acceptance checks restated
+
+- Per-class answer/refusal curves support frozen thresholds; every tightened
+  depth/skip has recall/counterfactual evidence.
+- Qualification confirms once without holdout access; config is
+  immutable/version-addressed with rollback.
+- First-failing-stage reports prevent ranking claims when
+  profile/candidate/authorization/context failed.
+- Dependency lock proves prohibited methods are absent.
+
+### Negative tests restated
+
+Tuning script holdout read, config mutation after freeze, unknown runtime
+profile, hardcoded untethered threshold, unsupported method import, or failed
+qualification relabeled pass fails.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/retrieval/coverage_score.py` | Formula, support feature, first-failing stage |
+| `packages/core/src/smart_rag_core/retrieval/frozen/hybrid_default_v1.json` | Immutable profile artifact |
+| `packages/core/src/smart_rag_core/retrieval/frozen_profile.py` | Hash pin and unknown-id refusal |
+| `packages/core/src/smart_rag_core/retrieval/prohibited.py` | v1 method lock scan |
+| `packages/core/src/smart_rag_core/evaluation/calibration.py` | Development-only `load_tuning_cases` |
+| `packages/core/src/smart_rag_core/evaluation/coverage_eval.py` | Occupancy metrics; holdout-blind |
+| `scripts/eval_coverage_calibration.py` | Development sweep report |
+| `scripts/eval_coverage_qualification.py` | One-shot qualification confirm |
+| `FROZEN_HYBRID_PROFILE_SHA256` | `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` |
+
+### Primary documentation sources (2026-08-14)
+
+- Plan Packet 6 formula and class minima in
+  [04-phase-hybrid-rag.md](../../.cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md)
+- Pydantic frozen models:
+  <https://docs.pydantic.dev/latest/concepts/models/#frozen-models>
+
+### Frozen values
+
+| Field | Value |
+| --- | --- |
+| Profile id | `hybrid_default_v1` |
+| Rollback id | `hybrid_packet5_v1` (not a live runtime profile) |
+| Coverage threshold | `0.65` every labeled class |
+| `rrf_k` / channel weights | `60` / equal `1.0`; unequal weights not selected |
+| Channel depths / rerank skip | Packet 5 values retained |
+| Qualification | **PASS**, false supported `0` on `77` cases |
+| Development occupancy n | `216`; weighted loss `0.4583` at frozen `0.65` |
+
+Rejected occupancy sweep values below `0.65` (single-channel
+`support_confidence=0.60` or one gold link versus a two-unit minimum) are in
+[COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md). They were
+not written into the frozen artifact.
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run ruff check` (Packet 6 modules, scripts, tests) | 0 |
+| `uv run pyright` (coverage, frozen_profile, prohibited, eval, scripts, tests) | 0 |
+| `uv run pytest tests/unit/test_hybrid_coverage.py tests/unit/test_phase4_dataset.py tests/unit/test_hybrid_fusion.py tests/contract/test_hybrid_fusion.py -q` | 0 (43 passed) |
+| `uv run python scripts/eval_coverage_calibration.py` | 0 |
+| `uv run python scripts/eval_coverage_qualification.py` | 0 (`PASS`, false supported 0) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (65 markdown files, 0 lint issues) |
+
+Holdout manifests were not materialized. Live Hybrid ranked IDs were not used;
+occupancy uses visible gold evidence links.
+
+### Negative tests
+
+| Fixture | Result |
+| --- | --- |
+| `load_tuning_cases()` | development IDs only; disjoint from qualification |
+| Calibration/eval AST | no `HOLDOUT` / `load_holdout` |
+| `load_frozen_profile("hybrid_packet5_v1")` | `UnknownRetrievalProfileError` |
+| Mutated JSON hash | `FrozenProfileMutationError` |
+| Threshold source | hashed profile, not a bare literal |
+| Qualification script | records `FAIL` when false-supported is non-zero; does not sweep |
+| ACL occupancy | first-failing stage `authorization`; ranking claim blocked |
+| `uv.lock` / pyproject / imports | prohibited methods absent |
+| Single-channel factual | score `0.60`, refuse at `0.65` |
+| Two-channel exact | support `1.0`, answer |
+| BM25 degraded + score `0.60` | signal stays `BM25_DEGRADED`, still refuses |
+
+### Deviations
+
+- Occupancy is not a live ranked-ID ablation. Channel depths, rerank skip,
+  MMR, and `rrf_k` were **not** retuned.
+- Unnecessary-refusal on occupancy for non-exact Hybrid classes is expected:
+  unknown channel mix yields `support_confidence=0.60`, which is below the
+  weak-coverage floor.
+- Combined, structured-table, and graph-inspection labels are not Hybrid
+  gold answers. Packet 7 owns table calculation.
+- Live LangSmith/OpenAI remain **unverified**. SME 12–20 hours remain
+  **unverified**. Holdout stays sealed.
+
+### Rollback
+
+- Restore Packet 5 signal-only coverage (omit numeric attach) and delete
+  `retrieval/frozen/hybrid_default_v1.json`.
+- Runtime rollback id `hybrid_packet5_v1` is documented only; it is not a
+  second executable profile.
+
+### Packet 7 handoff
+
+Packet 7 may start after this Packet 6 evidence is accepted in-repo (checkbox).
+It implements sandboxed DuckDB structured tables with exact workbook/sheet/
+range provenance. It must not read holdout, add LightRAG, or install a
+prohibited retrieval method.
+
 [docs index](../README.md)
 [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md)
 [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md)
+[COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md)
+[COVERAGE_QUALIFICATION.md](../evaluation/COVERAGE_QUALIFICATION.md)
+[HYBRID_TUNING.md](../retrieval/HYBRID_TUNING.md)
+[PROHIBITED_V1_METHODS.md](../retrieval/PROHIBITED_V1_METHODS.md)

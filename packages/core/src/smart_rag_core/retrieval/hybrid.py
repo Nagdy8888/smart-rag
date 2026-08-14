@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
+from smart_rag_core.evaluation.classes import QueryClass
+from smart_rag_core.evaluation.schema import QueryType
 from smart_rag_core.retrieval.cache_key import hybrid_cache_key
 from smart_rag_core.retrieval.coverage import (
     CoverageSignal,
@@ -18,6 +20,8 @@ from smart_rag_core.retrieval.coverage import (
     media_limitation_coverage,
     negation_coverage,
 )
+from smart_rag_core.retrieval.coverage_score import attach_numeric_coverage
+from smart_rag_core.retrieval.frozen_profile import load_frozen_profile
 from smart_rag_core.retrieval.fusion import RetrievalChannel, cap_channel, fuse_channels
 from smart_rag_core.retrieval.profiles import (
     BM25_SCAN_ID_CAP,
@@ -78,6 +82,18 @@ def assemble_hybrid(
     metadata_factors: dict[UUID, float] | None = None,
     scanned_bm25: tuple[UUID, ...] = (),
     now: datetime | None = None,
+    query_type: QueryType = QueryType.FACTUAL,
+    query_class: QueryClass | None = None,
+    required_terms: tuple[str, ...] = (),
+    matched_terms: tuple[str, ...] = (),
+    subquestion_count: int = 1,
+    supported_subquestions: int | None = None,
+    rerank_top_support: float | None = None,
+    exact_phrase_or_code: bool = False,
+    profile_ok: bool = True,
+    pre_recheck_count: int | None = None,
+    authorized_count: int | None = None,
+    context_ok: bool = True,
 ) -> HybridRetrievalResult:
     """Fuse capped channel lists and attach coverage diagnostics.
 
@@ -102,11 +118,28 @@ def assemble_hybrid(
         metadata_factors: Optional multiplicative factors.
         scanned_bm25: BM25 IDs scanned before recheck (≤ 300).
         now: Optional frozen UTC clock.
+        query_type: Profile query type for coverage minima.
+        query_class: Evaluation class for the frozen threshold.
+        required_terms: Required codes/entities/terms.
+        matched_terms: Required terms found in authorized evidence.
+        subquestion_count: Decomposition size.
+        supported_subquestions: Supported subquestions.
+        rerank_top_support: Optional rerank support feature.
+        exact_phrase_or_code: Exact lookup winner.
+        profile_ok: Query profile succeeded.
+        pre_recheck_count: Channel IDs before authorization recheck.
+        authorized_count: Recheck survivors.
+        context_ok: Parent/context expansion stayed authorized.
 
     Returns:
         Hybrid result with at most 205 unique IDs.
+
+    Raises:
+        UnknownRetrievalProfileError: If the frozen default profile is missing.
+        FrozenProfileMutationError: If the frozen artifact hash drifted.
     """
 
+    load_frozen_profile(HYBRID_DEFAULT_PROFILE_ID)
     dense_capped = tuple(
         cap_channel(variant, RetrievalChannel.DENSE) for variant in dense_variants
     )
@@ -187,6 +220,23 @@ def assemble_hybrid(
         for item in variant:
             hits[item.chunk_id].add("term")
     channel_hits = {chunk_id: frozenset(names) for chunk_id, names in hits.items()}
+    coverage = attach_numeric_coverage(
+        coverage,
+        fused=fused,
+        channel_hits=channel_hits,
+        query_type=query_type,
+        query_class=query_class,
+        required_terms=required_terms,
+        matched_terms=matched_terms,
+        subquestion_count=subquestion_count,
+        supported_subquestions=supported_subquestions,
+        rerank_top_support=rerank_top_support,
+        exact_phrase_or_code=exact_phrase_or_code,
+        profile_ok=profile_ok,
+        pre_recheck_count=pre_recheck_count,
+        authorized_count=authorized_count,
+        context_ok=context_ok,
+    )
     return HybridRetrievalResult(
         fused=fused,
         coverage=coverage,
@@ -221,9 +271,7 @@ def run_channels_parallel(
         return {}, tuple(jobs), True
     executor = ThreadPoolExecutor(max_workers=max(1, len(jobs)))
     try:
-        futures = {
-            executor.submit(job): name for name, job in jobs.items()
-        }
+        futures = {executor.submit(job): name for name, job in jobs.items()}
         done, pending = wait(futures, timeout=deadline_seconds)
         timed_out = tuple(futures[item] for item in pending)
         for item in pending:

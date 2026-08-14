@@ -4,7 +4,8 @@ Packet 2 froze channel caps and HNSW. Packet 4 freezes ``rrf_k=60``, equal
 channel weights, the 205 pre-fusion union cap, metadata clamp ``[1.0, 1.15]``,
 the 90-day ``recent`` window, and the 25-second Hybrid deadline. Packet 5 freezes
 the top-20 rerank pool, max five passages per document, MMR lambda 0.7, and
-parent/context bounds. Coverage/refusal thresholds belong to Packet 6.
+parent/context bounds. Packet 6 freezes per-class ``coverage_score`` thresholds
+at ``0.65`` in ``retrieval/frozen/hybrid_default_v1.json``.
 """
 
 from __future__ import annotations

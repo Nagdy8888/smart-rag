@@ -10,7 +10,7 @@ from smart_rag_core.evaluation.calibration import load_tuning_cases
 from smart_rag_core.evaluation.classes import CLASS_MINIMUMS, TOTAL_MINIMUM_CASES
 from smart_rag_core.evaluation.generator import generate_corpus
 from smart_rag_core.evaluation.holdout import HoldoutAccess, HoldoutSealedError
-from smart_rag_core.evaluation.loader import load_cases, load_open_splits
+from smart_rag_core.evaluation.loader import load_cases
 from smart_rag_core.evaluation.schema import (
     DATASET_SCHEMA_VERSION,
     AdjudicationStatus,
@@ -99,17 +99,20 @@ def test_holdout_denied_by_default() -> None:
 
 
 def test_calibration_cannot_reach_holdout() -> None:
-    """Tuning entrypoints return only development and qualification cases."""
+    """Tuning entrypoints return only development cases."""
 
     cases = load_tuning_cases()
     assert cases
-    assert all(case.split is not DatasetSplit.HOLDOUT for case in cases)
+    assert all(case.split is DatasetSplit.DEVELOPMENT for case in cases)
     source = CALIBRATION_SOURCE.read_text(encoding="utf-8").lower()
     assert "load_cases" not in source
     assert "dataset_seal_verify" not in source
     assert "packet8_immutable" not in source
-    open_cases = load_open_splits()
-    assert {case.case_id for case in open_cases} == {case.case_id for case in cases}
+    development = load_cases(
+        splits=(DatasetSplit.DEVELOPMENT,),
+        holdout_access=HoldoutAccess.denied(),
+    )
+    assert {case.case_id for case in development} == {case.case_id for case in cases}
 
 
 def test_malformed_class_is_rejected() -> None:

@@ -49,7 +49,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 3. [x] Implement typed query profiling including negation, document scope, media dependence, and historical-relationship signals; independently score every field before attributing misses to retrieval.
 4. [x] Implement bounded parallel channels and query variants, normalized weighted RRF, UTC-anchored temporal policies, whole-document coverage/refusal, and conflict behavior.
 5. [x] Implement the accuracy-first top-20 OpenAI reranker contract, deterministic fallback, skipped-case counterfactuals, MMR, quotas, and parent expansion.
-6. [ ] Calibrate coverage/refusal by query class before the immutable holdout and prohibit unsupported advanced methods.
+6. [x] Calibrate coverage/refusal by query class before the immutable holdout and prohibit unsupported advanced methods.
 7. [ ] Implement the declarative, sandboxed structured-table path with exact workbook/sheet/range provenance.
 8. [ ] Publish ablations, quality, latency, cost, citation, ACL, and fallback evidence; freeze winning versioned profiles.
 

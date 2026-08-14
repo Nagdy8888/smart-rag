@@ -4,7 +4,7 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-14
 audience: engineering, reviewers
-phase_packet: Phase 4 Packets 2-5
+phase_packet: Phase 4 Packets 2-6
 ---
 
 # Hybrid retrieval contract
@@ -15,14 +15,19 @@ BM25, term, HNSW, and authorization foundations. Packet 3 freezes
 RRF, channel weights, the 205 pre-fusion union, UTC temporal policies, coverage
 signals, and the versioned cache-key/recheck interface. Packet 5 freezes the
 top-20 OpenAI rerank contract, skip policy, MMR/quotas, and parent expansion.
-Calibrated coverage/refusal thresholds remain **not selected** until Packet 6
-measures them on development/qualification data. Holdout is never used for
-tuning.
+Packet 6 freezes per-class ``coverage_score`` thresholds at ``0.65`` in the
+hashed artifact ``retrieval/frozen/hybrid_default_v1.json``. Holdout is never
+used for tuning. Unequal RRF weights and a different ``rrf_k`` were **not**
+selected.
 
 Related: [ARABIC_NORMALIZATION.md](./ARABIC_NORMALIZATION.md) ·
 [BM25_PROJECTION_CONTRACT.md](./BM25_PROJECTION_CONTRACT.md) ·
+[HYBRID_TUNING.md](./HYBRID_TUNING.md) ·
+[PROHIBITED_V1_METHODS.md](./PROHIBITED_V1_METHODS.md) ·
 [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
 [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md) ·
+[COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) ·
+[COVERAGE_QUALIFICATION.md](../evaluation/COVERAGE_QUALIFICATION.md) ·
 [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md) ·
 [phase-04 evidence](../development/phase-04-hybrid-rag-evidence.md)
 
@@ -120,16 +125,16 @@ flowchart TD
 
 | Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| RRF `k` | dimensionless | Plan Packet 4 | 60 only until Packet 6 | **60** | `phase4-dataset-v1` | Unit `1/(60+rank)`; other `k` raises | retrieval | 60 | Packet 6 ablation |
-| Channel weights dense/BM25/term | weight | Equal until measured | >0 allow-listed | **1.0 / 1.0 / 1.0** | `hybrid_default_v1` | Weighted sum after max-across-variants | retrieval | 1.0 | Packet 6 |
+| RRF `k` | dimensionless | Plan Packet 4 | 60 | **60** | `hybrid_default_v1` | No ranked-ID evidence to retune | retrieval | 60 | Packet 8 live ablation |
+| Channel weights dense/BM25/term | weight | Equal until measured | >0 allow-listed | **1.0 / 1.0 / 1.0** | `hybrid_default_v1` | Unequal weights not selected | retrieval | 1.0 | Packet 8 |
 | Variant credit | rule | Plan | max, never sum | **max per ID** | unit tests | Order/duplicate invariant | retrieval | max | Packet 6 |
 | Pre-fusion unique IDs | IDs / query | Plan | 1–205 | **205** | unit overflow | Truncate after fused sort | retrieval | 205 | Packet 6 depths |
 | Metadata product | multiplier | Plan | `[1.0, 1.15]` | **clamp 1.15** | unit clamp | ACL/current-version are hard filters | retrieval | 1.15 | Packet 6 |
 | Hybrid deadline | seconds | Global contract | ≤25 | **25** | `HYBRID_DEADLINE_SECONDS` | Parallel channels cancel; timeout ≠ empty | retrieval | 25 | Latency miss |
 | `recent` window | days | Plan UTC | positive | **90** provisional | QT-TZ-001 | Unknown dates excluded | retrieval | 90 | Packet 6 |
 | Temporal intents | enum | Plan / QT-TZ-001 | `none` `latest` `current` `recent` `as_of` | **UTC only** | temporal unit tests | Naive/Hijri timestamps rejected | retrieval | UTC | Signed company TZ |
-| Coverage signals | enum | Plan Packet 4 | listed enums | **signals, not thresholds** | unit fixtures | Full-summary refused when headings missing | retrieval | same | Packet 6 thresholds |
-| Cache key | SHA-256 | Plan Packet 4 | versioned material | **IDs/ranks only** | `hybrid_cache_key` | Must recheck before evidence; no Valkey yet | retrieval | same | Packet 6 TTL |
+| Coverage signals | enum | Plan Packet 4 | listed enums | **signals plus numeric score** | unit fixtures | Full-summary refused when headings missing | retrieval | same | Packet 8 |
+| Cache key | SHA-256 | Plan Packet 4 | versioned material | **IDs/ranks only** | `hybrid_cache_key` | Must recheck before evidence; no Valkey yet | retrieval | same | Packet 8 TTL |
 | BM25 degradation | reason | Plan | `bm25_unavailable` / version / timeout | **visible dense+term** | assemble tests | Never labeled three-channel Hybrid | retrieval | same | Circuit breaker |
 
 Raw channel scores never mix. Equal fused scores break ties by effective date,
@@ -172,14 +177,57 @@ Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.
 | MMR lambda | mix | Plan | (0, 1] | **0.7** provisional | Jaccard on `arabic_norm_v1` | Unit diversity test | retrieval | 0.7 | Packet 6 |
 | Document / section quota | passages | Plan | ≥1 | **2 / 2** | unit quota | Stable ID tie-break | retrieval | 2 | Packet 6 |
 | Final evidence | units / tokens | Plan ~8–12 | ≤12 / ≤3500 | **12 / 3500** | trim after parents | Recheck after expansion | retrieval | 12 / 3500 | Packet 6 |
-| Skip policy | rule | Plan | trivial exact only | **two-channel exact/quote** | counterfactual script | No score-gap skip | retrieval | same | Live always-rerank |
+| Skip policy | rule | Plan | trivial exact only | **two-channel exact/quote** | counterfactual script | No score-gap skip; Packet 6 did not retune | retrieval | same | Live always-rerank |
+
+## Frozen Packet 6 values
+
+Runtime loads only ``hybrid_default_v1``. Unknown ids, including the documented
+rollback id ``hybrid_packet5_v1``, fail closed. Mutating the JSON after the
+pinned SHA-256 is a runtime error.
+
+```text
+coverage_score = min(
+  required_term_entity_coverage,
+  subquestion_coverage,
+  min(1, distinct_evidence_count / profile_minimum),
+  support_confidence
+)
+```
+
+Simple queries use subquestion coverage 1 and profile minimum 1. Relationship
+needs two units. Broad synthesis needs three. Multi-part needs one unit per
+subquestion. ``support_confidence`` is rerank support when rerank ran, else
+``1.0`` for exact or two-channel winners, else ``0.60``. It is not a
+probability. Weak coverage is the development baseline ``<0.65``. False
+supported answers carry loss weight 2; unnecessary refusals carry weight 1.
+
+```mermaid
+flowchart TD
+  signals["Packet 4 coverage signals"] --> score["coverage_score min formula"]
+  score --> threshold["Frozen per-class 0.65"]
+  threshold --> decision{"score below threshold?"}
+  decision -->|yes and signal none or full| weak["WEAK_EVIDENCE refuse"]
+  decision -->|yes keep media negation conflict scoped BM25| keep["Keep signal. Refuse if refusal class"]
+  decision -->|no| answer["ANSWER when no refusal signal"]
+```
+
+| Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Coverage threshold (all classes) | score | Development baseline 0.65 | 0.50–0.90 | **0.65** | `hybrid_default_v1` SHA-256 `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` | [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) | retrieval | 0.65 | Packet 8 holdout |
+| False-supported loss weight | weight | Plan | >0 | **2** | occupancy eval | Qualification confirm | retrieval | 2 | Label revision |
+| Unnecessary-refusal loss weight | weight | Plan | >0 | **1** | occupancy eval | Qualification confirm | retrieval | 1 | Label revision |
+| Profile id | id | Packet 3 | allow-listed | **`hybrid_default_v1`** | hashed JSON | Unknown id fails closed | retrieval | `hybrid_packet5_v1` docs-only | Hash mismatch |
+
+Channel depths, rerank skip, MMR, and quotas were **not** retuned. Packet 5
+counterfactuals remain the recall evidence for those values. Occupancy
+calibration is not a live ranked-ID ablation.
 
 ## Not selected (later packets)
 
 | Tunable | Owner packet | Status |
 | --- | --- | --- |
-| Coverage / refusal numeric thresholds | 6 | not applied |
-| Cache TTLs / Valkey store | 6 | interface only |
+| Cache TTLs / Valkey store | 8 | interface only |
+| Unequal RRF channel weights | 8 | not selected; no ranked-ID evidence |
 
 ## Authorization negatives
 
@@ -198,7 +246,9 @@ must read `document_chunks.raw_text`. BM25 `body_search` and
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/unit/test_hybrid_rerank.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py tests/contract/test_hybrid_rerank.py -q
+uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/unit/test_hybrid_rerank.py tests/unit/test_hybrid_coverage.py tests/unit/test_phase4_dataset.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py tests/contract/test_hybrid_rerank.py -q
+uv run python scripts/eval_coverage_calibration.py
+uv run python scripts/eval_coverage_qualification.py
 uv run python scripts/eval_rerank_counterfactual.py
 uv run python scripts/ci/check_migrations.py
 ```

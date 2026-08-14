@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
 
+from smart_rag_core.evaluation.schema import FailureStage
 from smart_rag_core.retrieval.types import RetrievalCandidate
 
 
@@ -22,6 +23,13 @@ class CoverageSignal(StrEnum):
     BM25_DEGRADED = "bm25_degraded"
 
 
+class CoverageDecision(StrEnum):
+    """Whether Hybrid may support an answer from the selected evidence."""
+
+    ANSWER = "answer"
+    REFUSE = "refuse"
+
+
 @dataclass(frozen=True, slots=True)
 class HybridCoverage:
     """Coverage and refusal diagnostics for one Hybrid retrieval.
@@ -31,12 +39,32 @@ class HybridCoverage:
         uncovered_headings: Major headings not represented in fused evidence.
         conflict_chunk_ids: Equally authoritative contradictory current IDs.
         notes: Safe machine-readable reasons. No BM25 snippets.
+        coverage_score: Packet 6 ``min`` formula, or None before scoring.
+        decision: Answer versus refuse after class thresholding.
+        threshold: Frozen per-class threshold that produced ``decision``.
+        query_class: Evaluation class id when known.
+        term_coverage: Required term/entity coverage component.
+        subquestion_coverage: Subquestion coverage component.
+        evidence_ratio: Distinct-evidence / profile-minimum component.
+        support_confidence: Bounded support feature, not a probability.
+        first_failing_stage: Attribution; ranking is not blamed earlier.
+        baseline: Development baseline ``0.65``.
     """
 
     signal: CoverageSignal
     uncovered_headings: tuple[str, ...] = ()
     conflict_chunk_ids: tuple[UUID, ...] = ()
     notes: tuple[str, ...] = ()
+    coverage_score: float | None = None
+    decision: CoverageDecision | None = None
+    threshold: float | None = None
+    query_class: str | None = None
+    term_coverage: float | None = None
+    subquestion_coverage: float | None = None
+    evidence_ratio: float | None = None
+    support_confidence: float | None = None
+    first_failing_stage: FailureStage = FailureStage.NONE
+    baseline: float | None = None
 
 
 def coverage_for_summary(

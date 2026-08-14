@@ -8,7 +8,12 @@ from smart_rag_core.evaluation.classes import (
 )
 from smart_rag_core.evaluation.generator import generate_corpus
 from smart_rag_core.evaluation.holdout import HoldoutAccess, HoldoutSealedError
-from smart_rag_core.evaluation.loader import load_cases, load_open_splits
+from smart_rag_core.evaluation.loader import (
+    load_cases,
+    load_development_cases,
+    load_open_splits,
+    load_qualification_cases,
+)
 from smart_rag_core.evaluation.schema import (
     DATASET_SCHEMA_VERSION,
     LABEL_REVISION,
@@ -29,7 +34,9 @@ __all__ = [
     "QueryClass",
     "generate_corpus",
     "load_cases",
+    "load_development_cases",
     "load_open_splits",
+    "load_qualification_cases",
     "load_tuning_cases",
     "validate_corpus",
 ]

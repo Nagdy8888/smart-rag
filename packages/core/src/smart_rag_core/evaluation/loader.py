@@ -53,11 +53,37 @@ def load_cases(
     return [case for case in corpus if case.split in requested]
 
 
+def load_development_cases() -> list[EvaluationCase]:
+    """Load development cases only. Qualification and holdout stay sealed.
+
+    Returns:
+        Development-split labeled cases for threshold tuning.
+    """
+
+    return load_cases(
+        splits=(DatasetSplit.DEVELOPMENT,),
+        holdout_access=HoldoutAccess.denied(),
+    )
+
+
+def load_qualification_cases() -> list[EvaluationCase]:
+    """Load qualification cases only. Holdout stays sealed.
+
+    Returns:
+        Qualification-split labeled cases for one frozen confirmation.
+    """
+
+    return load_cases(
+        splits=(DatasetSplit.QUALIFICATION,),
+        holdout_access=HoldoutAccess.denied(),
+    )
+
+
 def load_open_splits() -> list[EvaluationCase]:
     """Load development and qualification cases only.
 
     Returns:
-        Holdout-blind cases for tuning and qualification.
+        Holdout-blind cases for profiling and open-split reports.
 
     Raises:
         HoldoutSealedError: Never, because holdout is not requested.

@@ -10,7 +10,7 @@ audience: engineering, SME, reviewers
 
 Canonical labeled-corpus contract for Hybrid RAG. Runtime retrieval is Packet 2+. This file freezes schema, class minima, split isolation, holdout access, and synthetic SME posture.
 
-Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
+Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Schema version
 
@@ -80,7 +80,13 @@ Default access is denied. Authorized materialization requires:
 - `SMART_RAG_HOLDOUT_ACCESS_PURPOSE` in `{packet8_immutable_holdout, dataset_seal_verify}`
 - `SMART_RAG_HOLDOUT_ACCESS_ACTOR` non-empty
 
-`smart_rag_core.evaluation.calibration.load_tuning_cases` never requests holdout, even when those variables are set.
+`smart_rag_core.evaluation.calibration.load_tuning_cases` returns **development
+cases only**. Qualification is a separate one-shot confirmation after freeze.
+Neither entrypoint requests holdout, even when holdout environment variables
+are set.
+
+Related calibration reports: [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md)
+· [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md).
 
 ## Adjudication
 
@@ -101,7 +107,9 @@ This Packet 1 corpus is synthetic and provisionally accepted so later Hybrid pac
 ```powershell
 uv run python scripts/seal_phase4_dataset.py
 uv run python scripts/validate_phase4_dataset.py
-uv run pytest tests/unit/test_phase4_dataset.py tests/unit/test_glossary_validation.py tests/unit/test_glossary_openapi.py -q
+uv run python scripts/eval_coverage_calibration.py
+uv run python scripts/eval_coverage_qualification.py
+uv run pytest tests/unit/test_phase4_dataset.py tests/unit/test_hybrid_coverage.py tests/unit/test_glossary_validation.py tests/unit/test_glossary_openapi.py -q
 ```
 
 [docs index](../README.md)

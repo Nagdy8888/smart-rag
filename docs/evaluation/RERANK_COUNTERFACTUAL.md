@@ -14,7 +14,8 @@ Conditional skips apply MMR/quotas only. Live OpenAI deltas are **unverified**.
 Latency and token cost are 0 under the mock identity adapter.
 
 Term/subquestion coverage uses labeled gold chunk IDs as a proxy for citation
-support. Packet 6 may retune skip triggers after a live always-rerank reference.
+support. Packet 6 did **not** retune skip triggers, channel depths, or RRF
+weights; those still need live ranked-ID evidence.
 
 | Field | Value |
 | --- | --- |

@@ -1,20 +1,19 @@
-"""Open-split calibration entrypoint. Packet 6 owns actual tuning."""
+"""Development-only calibration entrypoint. Qualification is a separate confirm."""
 
 from __future__ import annotations
 
-from smart_rag_core.evaluation.loader import load_open_splits
+from smart_rag_core.evaluation.loader import load_development_cases
 from smart_rag_core.evaluation.schema import EvaluationCase
 
 
 def load_tuning_cases() -> list[EvaluationCase]:
-    """Return development and qualification cases for calibration.
+    """Return development cases for threshold calibration.
 
-    The sealed launch split is unreachable from this module. Packet 6 may
-    tune thresholds using these cases only.
+    Qualification is confirmed once after freeze and is not a tuning set.
+    The sealed launch split is unreachable from this module.
 
     Returns:
-        Open-split labeled cases. No sealed-split case is included even when
-        process environment would authorize that access.
+        Development-split labeled cases only.
     """
 
-    return load_open_splits()
+    return load_development_cases()
