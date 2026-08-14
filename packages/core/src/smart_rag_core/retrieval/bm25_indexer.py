@@ -41,9 +41,17 @@ class Bm25Indexer:
         self._connection = connection
 
     def ensure_projection_schema(self) -> None:
-        """Ensure derived projection table and BM25 index exist."""
+        """Ensure derived projection table and BM25 index exist.
+
+        When tables were provisioned by ParadeDB init migrations, skip DDL.
+        ``paradedb_writer`` has DML only; CREATE remains a bootstrap privilege.
+        """
 
         with self._connection.cursor() as cursor:
+            cursor.execute("SELECT to_regclass('public.bm25_chunks')")
+            existing = cursor.fetchone()
+            if existing is not None and existing[0] is not None:
+                return
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS bm25_index_meta (

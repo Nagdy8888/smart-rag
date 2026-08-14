@@ -85,7 +85,7 @@ class ClamAvClient:
         """
 
         response = self._command(b"zPING\0")
-        return response.strip() == b"PONG"
+        return _clamd_text(response) == "PONG"
 
     def read_engine_info(self) -> ClamAvEngineInfo:
         """Read engine version and signature database metadata.
@@ -97,10 +97,8 @@ class ClamAvClient:
             ClamAvError: When daemon responses cannot be parsed.
         """
 
-        version_raw = (
-            self._command(b"zVERSION\0").decode("utf-8", errors="replace").strip()
-        )
-        stats_raw = self._command(b"zSTATS\0").decode("utf-8", errors="replace")
+        version_raw = _clamd_text(self._command(b"zVERSION\0"))
+        stats_raw = _clamd_text(self._command(b"zSTATS\0"))
         databases = _parse_stats(stats_raw)
         functionality = _parse_functionality(version_raw)
         return ClamAvEngineInfo(
@@ -127,6 +125,10 @@ class ClamAvClient:
             for db in engine_info.signature_databases
             if db.timestamp is not None
         ]
+        if not timestamps and engine_info.engine_version:
+            parsed = _parse_version_signature_timestamp(engine_info.engine_version)
+            if parsed is not None:
+                timestamps = [parsed]
         if not timestamps:
             raise ClamAvError("signature database timestamps unavailable")
         newest = max(timestamps)
@@ -237,6 +239,43 @@ class ClamAvClient:
         return b"".join(chunks)
 
 
+def _clamd_text(raw: bytes) -> str:
+    """Decode a ``clamd`` z-protocol payload, dropping trailing NULs.
+
+    Args:
+        raw: Bytes returned by ``clamd``.
+
+    Returns:
+        Unicode text without surrounding whitespace or NUL terminators.
+    """
+
+    return raw.decode("utf-8", errors="replace").strip("\x00 \t\r\n")
+
+
+def _parse_version_signature_timestamp(version_raw: str) -> datetime | None:
+    """Parse the CVD date from a ``clamd`` ``VERSION`` string.
+
+    Args:
+        version_raw: Example ``ClamAV 1.5.4/28087/Sun Aug  9 06:24:56 2026``.
+
+    Returns:
+        Timezone-aware UTC timestamp, or ``None`` when the date is absent.
+    """
+
+    from email.utils import parsedate_to_datetime
+
+    parts = version_raw.split("/")
+    if len(parts) < 3:
+        return None
+    try:
+        parsed = parsedate_to_datetime(parts[2].strip())
+    except (TypeError, ValueError, IndexError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def _parse_stats(raw: str) -> tuple[SignatureDatabaseInfo, ...]:
     """Parse ``STATS`` lines of the form ``name:version:timestamp``."""
 
@@ -268,7 +307,7 @@ def _parse_functionality(version_raw: str) -> str | None:
 def _parse_scan_response(raw: bytes) -> tuple[ScanDisposition, str | None, str]:
     """Map ``clamd`` ``INSTREAM`` response text to disposition."""
 
-    text = raw.decode("utf-8", errors="replace").strip()
+    text = _clamd_text(raw)
     upper = text.upper()
     if not text:
         return ScanDisposition.UNSCANNABLE, None, "empty clamd response"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -10,7 +11,11 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
-from smart_rag_core.jobs.exceptions import JobNotFoundError, JobRepositoryError
+from smart_rag_core.jobs.exceptions import (
+    JobNotFoundError,
+    JobRepositoryError,
+    JobRetryNotAllowedError,
+)
 from smart_rag_core.schema.enums import JobErrorCategory, JobPriority, JobStatus
 from smart_rag_core.schema.tables import IngestionJobRecord
 
@@ -19,9 +24,62 @@ class DeadLetterService:
     """Requeue traceable replay attempts from ``app.dead_letter_jobs``."""
 
     def __init__(self, connection: psycopg.Connection) -> None:
-        """Bind one worker-role Postgres connection."""
+        """Bind one worker-role or API-role Postgres connection.
+
+        Args:
+            connection: Active connection entitled to execute
+                ``app.retry_ingestion_job`` and, for direct DL-id replay,
+                ``SELECT`` on ``app.dead_letter_jobs``.
+        """
 
         self._connection = connection
+
+    def retry_ingestion(self, job_id: UUID) -> IngestionRetryResult:
+        """Retry one ingestion job through the SECURITY DEFINER RPC.
+
+        Dead-letter jobs create a **new** pending row with a fresh
+        ``idempotency_key``; the original dead-letter evidence is retained.
+        Backoff-pending and explicit ``failed`` rows only clear
+        ``next_attempt_at`` (and restore ``pending`` for ``failed``).
+        ``last_error`` and ``attempt_count`` are never wiped.
+
+        Args:
+            job_id: Source ingestion job identifier (the dead-letter or
+                backoff/failed row, not the replay child).
+
+        Returns:
+            Replay or requeue result including the job that should run next.
+
+        Raises:
+            JobNotFoundError: When the source job or DL row is missing.
+            JobRetryNotAllowedError: When the job is not retryable.
+            JobRepositoryError: When the RPC fails unexpectedly.
+        """
+
+        with self._connection.cursor(row_factory=dict_row) as cursor:
+            try:
+                cursor.execute(
+                    "SELECT * FROM app.retry_ingestion_job(%s)",
+                    (job_id,),
+                )
+            except psycopg.errors.RaiseException as exc:
+                message = str(exc)
+                if "ingestion_job_not_found" in message or "dead_letter_row_not_found" in message:
+                    raise JobNotFoundError(str(job_id)) from exc
+                if "retry_not_allowed" in message:
+                    raise JobRetryNotAllowedError("retry_not_allowed") from exc
+                raise JobRepositoryError("retry_ingestion_failed") from exc
+            row = cursor.fetchone()
+            if row is None:
+                raise JobRepositoryError("retry_ingestion_missing_row")
+            detail = str(row["detail"])
+            original_job_id = UUID(str(row["original_job_id"]))
+            job = _row_to_ingestion_job(row)
+            return IngestionRetryResult(
+                job=job,
+                detail=detail,
+                original_job_id=original_job_id,
+            )
 
     def replay_ingestion(
         self,
@@ -120,6 +178,21 @@ class DeadLetterService:
                 ),
             )
             return _row_to_ingestion_job(replay_row)
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionRetryResult:
+    """Outcome of ``app.retry_ingestion_job``.
+
+    Attributes:
+        job: Job row that should be processed next (new row for DL replay).
+        detail: Stable machine-readable result code.
+        original_job_id: Source job identifier passed to retry.
+    """
+
+    job: IngestionJobRecord
+    detail: str
+    original_job_id: UUID
 
 
 def _row_to_ingestion_job(row: dict[str, Any]) -> IngestionJobRecord:

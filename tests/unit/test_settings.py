@@ -90,6 +90,34 @@ def test_worker_one_shot_flag_loads_through_settings(
     assert load_worker_settings().worker_once is True
 
 
+def test_worker_checkpoint_url_falls_back_to_database_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Checkpointer DSN reuses ``SUPABASE_DB_URL`` when the dedicated var is unset."""
+
+    monkeypatch.setenv(
+        "SUPABASE_DB_URL",
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    )
+    monkeypatch.delenv("LANGGRAPH_CHECKPOINT_URL", raising=False)
+    settings = load_worker_settings()
+    assert settings.langgraph_checkpoint_url is None
+    assert settings.resolved_checkpoint_dsn() == (
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    )
+
+    monkeypatch.setenv(
+        "LANGGRAPH_CHECKPOINT_URL",
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    )
+    dedicated = load_worker_settings()
+    assert dedicated.langgraph_checkpoint_url is not None
+    assert (
+        dedicated.resolved_checkpoint_dsn()
+        == "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    )
+
+
 def test_jwks_operation_settings_validate_and_redact_secrets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

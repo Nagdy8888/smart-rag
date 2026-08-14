@@ -1,0 +1,27 @@
+# Packet 8 local-proof overlay. Never use in staging/production.
+# Production compose keeps ParadeDB/ClamAV on the internal `private` network
+# with no host ports. This overlay attaches those services to a non-internal
+# bridge so host pytest can reach them. Restrict with the host firewall.
+#
+#   docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --wait clamav paradedb crawl-proxy
+
+networks:
+  packet8-host:
+    driver: bridge
+
+services:
+  paradedb:
+    networks:
+      - private
+      - packet8-host
+    ports:
+      - "54329:5432"
+  clamav:
+    networks:
+      - private
+      - packet8-host
+    ports:
+      - "13310:3310"
+  crawl-proxy:
+    ports:
+      - "18080:8080"

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Literal, TypeAlias, TypedDict, cast
 from uuid import UUID
 
 import psycopg
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from smart_rag_core.gateways.crawl_proxy import CrawlProxyGateway
@@ -17,8 +19,11 @@ from smart_rag_core.ingestion.crawl.exceptions import (
     CrawlPolicyError,
 )
 from smart_rag_core.jobs.exceptions import JobLeaseError
+from smart_rag_core.jobs.hybrid_enqueue import enqueue_hybrid_index_job
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.repositories.crawl import CrawlRepository
+
+from smart_rag_agents.ingestion.checkpointer import compile_ingestion_graph
 
 
 class IngestionCrawlState(TypedDict):
@@ -29,6 +34,9 @@ class IngestionCrawlState(TypedDict):
     source_id: str | None
     version_id: str | None
     operation_key: str
+    content_class: str
+    graph_eligible: bool
+    attestation_policy_version: str | None
     status: Literal["crawl_pending", "crawl_completed", "crawl_failed", "lease_invalid"]
     pages_fetched: int
     crawl_run_id: str | None
@@ -188,16 +196,71 @@ def execute_approved_crawl(
             source_id=source_id,
             result=result,
         )
+        if result.failure_reason or not result.snapshots:
+            connection.commit()
+            return {
+                **state,
+                "status": "crawl_failed",
+                "crawl_run_id": str(crawl_run_id),
+                "pages_fetched": result.pages_fetched,
+                "detail": result.failure_reason or "no_snapshots",
+            }
+        version_id = UUID(state["version_id"]) if state["version_id"] else None
+        document_id = None
+        document_title = "website"
+        if version_id is not None:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT d.id, d.title
+                    FROM app.document_versions AS dv
+                    JOIN app.documents AS d ON d.id = dv.document_id
+                    WHERE dv.id = %s
+                    """,
+                    (version_id,),
+                )
+                meta = cursor.fetchone()
+                if meta is not None:
+                    document_id = UUID(str(meta[0]))
+                    document_title = str(meta[1])
+        if document_id is None or version_id is None:
+            connection.rollback()
+            return {
+                **state,
+                "status": "crawl_failed",
+                "crawl_run_id": str(crawl_run_id),
+                "pages_fetched": result.pages_fetched,
+                "detail": "missing document/version for hybrid_index enqueue",
+            }
+        snapshots = [
+            {
+                "storage_bucket": snapshot.storage_bucket,
+                "storage_path": snapshot.storage_path,
+                "content_hash": snapshot.content_hash,
+                "canonical_url": snapshot.canonical_url,
+            }
+            for snapshot in result.snapshots
+        ]
+        enqueue_hybrid_index_job(
+            connection,
+            document_id=document_id,
+            version_id=version_id,
+            estimated_size_bytes=int(result.decoded_bytes_total),
+            payload_ref={
+                "crawl_run_id": str(crawl_run_id),
+                "snapshots": snapshots,
+                "filename": "website.html",
+                "document_title": document_title,
+                "media_type": "text/html",
+                "content_class": state["content_class"],
+                "graph_eligible": state["graph_eligible"],
+                "attestation_policy_version": state["attestation_policy_version"],
+                "review_approved": True,
+                "declared_category": "website",
+            },
+        )
         connection.commit()
 
-    if result.failure_reason or not result.snapshots:
-        return {
-            **state,
-            "status": "crawl_failed",
-            "crawl_run_id": str(crawl_run_id),
-            "pages_fetched": result.pages_fetched,
-            "detail": result.failure_reason or "no_snapshots",
-        }
     return {
         **state,
         "status": "crawl_completed",
@@ -237,7 +300,24 @@ def build_crawl_graph() -> IngestionCrawlGraph:
     return builder
 
 
-def build_crawl_ingestion_graph() -> CompiledIngestionCrawlGraph:
-    """Compile crawl graph without checkpointer."""
+def build_crawl_ingestion_graph(
+    *,
+    checkpointer: BaseCheckpointSaver | None = None,
+    interrupt_after: Sequence[str] | None = None,
+) -> CompiledIngestionCrawlGraph:
+    """Compile crawl graph.
 
-    return build_crawl_graph().compile()  # pyright: ignore[reportUnknownMemberType]
+    Args:
+        checkpointer: Optional Postgres checkpointer used by the worker.
+        interrupt_after: Test-only interrupt points.
+
+    Returns:
+        Compiled crawl graph.
+    """
+
+    compiled = compile_ingestion_graph(
+        build_crawl_graph(),
+        checkpointer=checkpointer,
+        interrupt_after=interrupt_after,
+    )
+    return compiled  # pyright: ignore[reportReturnType]

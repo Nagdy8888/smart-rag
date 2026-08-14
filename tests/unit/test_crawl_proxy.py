@@ -78,3 +78,37 @@ def test_post_fetch_route_denies_unknown_paths() -> None:
     handler = _Handler()
     handler.do_POST()
     assert handler.status == 403
+
+
+def test_proxy_peer_mismatch_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Live execute_fetch fails closed when the connected peer is not the pin."""
+
+    module = _load_proxy_module()
+
+    class _MismatchedSocket:
+        def getpeername(self) -> tuple[str, int]:
+            return ("10.0.0.9", 80)
+
+        def close(self) -> None:
+            return None
+
+        def settimeout(self, _value: float) -> None:
+            return None
+
+    monkeypatch.setattr(
+        module.socket,
+        "create_connection",
+        lambda *_args, **_kwargs: _MismatchedSocket(),
+    )
+    with pytest.raises(module.FetchError) as exc:
+        module.execute_fetch(
+            {
+                "url": "http://example.com/",
+                "host_header": "example.com",
+                "pin_ip": "127.0.0.1",
+                "port": 80,
+                "use_tls": False,
+            }
+        )
+    assert exc.value.reason == "peer_ip_mismatch"
+    assert exc.value.peer_ip == "10.0.0.9"

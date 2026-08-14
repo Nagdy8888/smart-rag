@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-14
 audience: engineering, reviewers
 ---
 
@@ -57,7 +57,7 @@ erDiagram
 | Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `documents` | `app` | authority | ingestion/API | Hybrid RPC, UI | until deleted + policy | ≤ 10k versions env | soft `deleted_at`; graph/BM25 enqueue | document `id` | 2 schema / 3 ingest |
-| `document_versions` | `app` | authority | ingestion worker | retrieval recheck | version history | multiple per doc | soft delete; blocks current pointer | `(document_id, version_number)` | 3 ingestion |
+| `document_versions` | `app` | authority | ingestion worker / quota reserve | retrieval recheck, status API | version history | multiple per doc | uploading shells hard-deleted on quota expiry; later statuses soft delete | `(document_id, version_number)` | 3 ingestion |
 | `document_sources` | `app` | authority | upload/crawl | audit, ingestion | with version | few per version | cascade on document | source `id` | 3 ingestion |
 | `document_acl` | `app` | authority | owner/admin ACL API | Hybrid RPC | while grant active | per restricted user | revoke timestamp | active grant unique | 2 schema / 3 RLS |
 | `source_approval_requests` | `app` | authority | member request; admin review | admin UI | audit window | pending crawls | status transition | request `id` | 2 schema / 3 crawl |

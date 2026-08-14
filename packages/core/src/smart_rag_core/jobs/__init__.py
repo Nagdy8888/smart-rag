@@ -8,6 +8,11 @@ from smart_rag_core.jobs.exceptions import (
     JobLeaseError,
     JobNotFoundError,
     JobRepositoryError,
+    JobRetryNotAllowedError,
+)
+from smart_rag_core.jobs.hybrid_enqueue import (
+    enqueue_hybrid_index_job,
+    hybrid_index_idempotency_key,
 )
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.jobs.ledger import JobOperationLedger
@@ -31,5 +36,8 @@ __all__ = [
     "JobNotFoundError",
     "JobOperationLedger",
     "JobRepositoryError",
+    "JobRetryNotAllowedError",
     "compute_retry_delay_seconds",
+    "enqueue_hybrid_index_job",
+    "hybrid_index_idempotency_key",
 ]

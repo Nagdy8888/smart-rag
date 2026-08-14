@@ -25,6 +25,8 @@ class UploadReservation:
         storage_bucket: Always ``documents-quarantine`` for browser uploads.
         storage_path: Prefix ``{user_id}/{reservation_id}/``.
         access_token_exp: Optional JWT ``exp`` for truthful capability labeling.
+        document_id: Document shell created at reserve (Uploading).
+        version_id: Version created at reserve as ``uploading``.
     """
 
     reservation_id: UUID
@@ -33,6 +35,8 @@ class UploadReservation:
     storage_bucket: str
     storage_path: str
     access_token_exp: datetime | None = None
+    document_id: UUID | None = None
+    version_id: UUID | None = None
 
     @property
     def effective_capability_expires_at(self) -> datetime:
@@ -131,6 +135,8 @@ def reserve_upload_quota(
         storage_bucket=row["storage_bucket"],
         storage_path=row["reserved_storage_path"],
         access_token_exp=access_token_exp,
+        document_id=row.get("document_id"),
+        version_id=row.get("version_id"),
     )
 
 

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Literal, TypeAlias, TypedDict, cast
 from uuid import UUID
 
 import psycopg
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from smart_rag_core.gateways.clamav import ClamAvClient
@@ -23,6 +25,7 @@ from smart_rag_core.ingestion.promotion import (
 )
 from smart_rag_core.ingestion.scan import ObjectScanInput, scan_object_bytes
 from smart_rag_core.jobs.exceptions import JobLeaseError
+from smart_rag_core.jobs.hybrid_enqueue import enqueue_hybrid_index_job
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.repositories.notifications import AdminNotificationRepository
 from smart_rag_core.repositories.scan_events import ScanEventRepository
@@ -30,6 +33,8 @@ from smart_rag_core.schema.enums import ScanResult
 from smart_rag_core.security.external_processing import (
     ContentClass as GovernanceContentClass,
 )
+
+from smart_rag_agents.ingestion.checkpointer import compile_ingestion_graph
 
 
 class IngestionScanState(TypedDict):
@@ -367,6 +372,53 @@ def promote_object(
             )
             connection.commit()
             return {**state, "status": "promotion_failed", "detail": str(exc)}
+        document_id = UUID(str(state["document_id"])) if state["document_id"] else None
+        version_id = UUID(str(state["version_id"]))
+        graph_eligible = False
+        document_title = "document"
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT d.title, dv.graph_eligible
+                FROM app.document_versions AS dv
+                JOIN app.documents AS d ON d.id = dv.document_id
+                WHERE dv.id = %s
+                """,
+                (version_id,),
+            )
+            meta = cursor.fetchone()
+            if meta is not None:
+                document_title = str(meta[0])
+                graph_eligible = bool(meta[1])
+        if document_id is None:
+            connection.rollback()
+            return {
+                **state,
+                "status": "promotion_failed",
+                "detail": "missing document_id for hybrid_index enqueue",
+            }
+        destination_path = str(state["destination_path"])
+        filename = destination_path.rsplit("/", 1)[-1]
+        enqueue_hybrid_index_job(
+            connection,
+            document_id=document_id,
+            version_id=version_id,
+            estimated_size_bytes=promote_bytes,
+            payload_ref={
+                "storage_bucket": str(state["destination_bucket"]),
+                "storage_path": destination_path,
+                "content_hash": str(state["content_hash"]),
+                "byte_size": promote_bytes,
+                "media_type": state["media_type"],
+                "filename": filename,
+                "document_title": document_title,
+                "declared_category": state["declared_category"],
+                "attestation_policy_version": state["attestation_policy_version"],
+                "review_approved": state["review_approved"],
+                "content_class": state["content_class"],
+                "graph_eligible": graph_eligible,
+            },
+        )
         connection.commit()
     return {**state, "status": "promoted", "detail": "promotion completed"}
 
@@ -407,7 +459,24 @@ def build_scan_promote_graph() -> IngestionScanGraph:
     return builder
 
 
-def build_scan_promote_ingestion_graph() -> CompiledIngestionScanGraph:
-    """Compile scan/promote graph without checkpointer."""
+def build_scan_promote_ingestion_graph(
+    *,
+    checkpointer: BaseCheckpointSaver | None = None,
+    interrupt_after: Sequence[str] | None = None,
+) -> CompiledIngestionScanGraph:
+    """Compile scan/promote graph.
 
-    return build_scan_promote_graph().compile()  # pyright: ignore[reportUnknownMemberType]
+    Args:
+        checkpointer: Optional Postgres checkpointer used by the worker.
+        interrupt_after: Test-only interrupt points.
+
+    Returns:
+        Compiled scan/promote graph.
+    """
+
+    compiled = compile_ingestion_graph(
+        build_scan_promote_graph(),
+        checkpointer=checkpointer,
+        interrupt_after=interrupt_after,
+    )
+    return compiled  # pyright: ignore[reportReturnType]

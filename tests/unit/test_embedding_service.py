@@ -123,3 +123,67 @@ def test_embedding_gateway_sync_wrapper() -> None:
     )
     assert len(response.vectors) == 1
     assert response.estimated_cost_usd == Decimal("0")
+
+
+def test_embedding_timeout_after_provider_success_records_failed_ledger() -> None:
+    """Timeout after the mock provider returns still records a failed ledger row."""
+
+    class _TimeoutAdapter:
+        async def embed(self, request: EmbeddingRequest):
+            raise TimeoutError("client timed out after provider success")
+
+    class _Cursor:
+        def __init__(self) -> None:
+            self.statements: list[str] = []
+
+        def __enter__(self) -> _Cursor:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def execute(self, sql: str, _params: object = None) -> None:
+            self.statements.append(sql)
+
+        def fetchone(self) -> tuple[object, ...]:
+            if "record_embedding_ledger" in self.statements[-1]:
+                return (uuid4(),)
+            if "attempt_count" in self.statements[-1]:
+                return (2,)
+            return (None,)
+
+    class _Connection:
+        def __init__(self) -> None:
+            self.cursor_obj = _Cursor()
+
+        def cursor(self) -> _Cursor:
+            return self.cursor_obj
+
+        def execute(self, sql: str, params: object = None) -> _Cursor:
+            self.cursor_obj.execute(sql, params)
+            return self.cursor_obj
+
+    gateway = EmbeddingGateway(_TimeoutAdapter())
+    connection = _Connection()
+    service = EmbeddingService(connection, gateway=gateway)  # type: ignore[arg-type]
+    service._admission.assert_can_enqueue_ingestion = lambda **_kwargs: None  # type: ignore[method-assign]
+    batch = EmbeddingBatchInput(
+        version_id=uuid4(),
+        document_title="Policy",
+        chunks=(_chunk("annual leave policy"),),
+        chunking_config_hash="cfg",
+        operation_key="embed:timeout",
+        governance=ExternalProcessingDecisionInput(
+            attestation_present=True,
+            category=CategoryDisposition.ALLOWED,
+            review_approved=True,
+            scan_evidence_current=True,
+            provider_settings_verified=True,
+            policy_version_matches=True,
+            content_class=ContentClass.SYNTHETIC,
+        ),
+    )
+    with pytest.raises(Exception, match="embedding_timeout_after_provider"):
+        service.embed_version(batch)
+    joined = " ".join(connection.cursor_obj.statements)
+    assert "record_embedding_ledger" in joined

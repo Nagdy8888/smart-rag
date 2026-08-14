@@ -1,10 +1,14 @@
-"""No-network parser sandbox contracts and format adapters."""
+"""No-network parser sandbox contracts and format adapters.
+
+This package init must stay importable inside ``smart-rag-parser-sandbox``
+without governance, JWKS, or database dependencies. Import ``ParserService``
+from ``smart_rag_core.ingestion.parser.service`` in worker/agent code.
+"""
 
 from smart_rag_core.ingestion.parser.limits import (
     CLEANING_POLICY_VERSION,
     PARSER_CONFIG_VERSION,
 )
-from smart_rag_core.ingestion.parser.service import ParserService, parse_object_bytes
 from smart_rag_core.ingestion.parser.types import (
     CoverageAccounting,
     ElementKind,
@@ -20,7 +24,5 @@ __all__ = [
     "ElementKind",
     "ParseDisposition",
     "ParseResult",
-    "ParserService",
     "TypedElement",
-    "parse_object_bytes",
 ]

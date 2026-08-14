@@ -12,8 +12,8 @@ from smart_rag_core.ingestion.bm25_projection import Bm25ProjectionService
 from smart_rag_core.retrieval.bm25_indexer import Bm25Indexer
 
 from tests.contract.integration_support import (
+    packet8_paradedb_url,
     paradedb_reachable,
-    read_process_env,
     resolve_supabase_db_url,
     try_connect,
 )
@@ -25,9 +25,11 @@ pytestmark = pytest.mark.skipif(
 
 
 def _parade_url() -> str:
-    return read_process_env("PARADEDB_URL") or (
-        "postgresql://paradedb_writer:change-me-paradedb-writer@127.0.0.1:5432/paradedb"
-    )
+    """Return the Packet 8 host ParadeDB writer URL."""
+
+    url = packet8_paradedb_url()
+    assert url is not None
+    return url
 
 
 def test_graph_pending_handoff_is_idempotent() -> None:
@@ -89,6 +91,110 @@ def test_graph_pending_handoff_is_idempotent() -> None:
     assert count == 1
 
 
+def test_graph_ineligible_replacement_may_flip_current() -> None:
+    """Phase 3 may switch current for graph-ineligible verified versions."""
+
+    document_id = uuid4()
+    first_id = uuid4()
+    second_id = uuid4()
+    with psycopg.connect(resolve_supabase_db_url()) as connection:
+        connection.execute("SET ROLE postgres")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO app.documents (id, title, visibility, graph_eligible)
+                VALUES (%s, 'Ineligible Replacement', 'restricted', false)
+                """,
+                (document_id,),
+            )
+            cursor.execute(
+                """
+                INSERT INTO app.document_versions (
+                  id, document_id, version_number, status, graph_eligible, is_current
+                )
+                VALUES
+                  (%s, %s, 1, 'hybrid_ready', false, true),
+                  (%s, %s, 2, 'hybrid_ready', false, false)
+                """,
+                (first_id, document_id, second_id, document_id),
+            )
+            cursor.execute(
+                "UPDATE app.documents SET current_version_id = %s WHERE id = %s",
+                (first_id, document_id),
+            )
+        connection.execute("SET ROLE app_worker")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT current_version_id FROM app.activate_graph_ineligible_version(%s)",
+                (second_id,),
+            )
+            current = cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT is_current FROM app.document_versions WHERE id = %s",
+                (second_id,),
+            )
+            second_current = cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT is_current FROM app.document_versions WHERE id = %s",
+                (first_id,),
+            )
+            first_current = cursor.fetchone()[0]
+        connection.rollback()
+    assert current == second_id
+    assert second_current is True
+    assert first_current is False
+
+
+def test_graph_eligible_replacement_stays_non_current() -> None:
+    """Graph-eligible replacements wait for Phase 5 and must not flip current."""
+
+    document_id = uuid4()
+    version_id = uuid4()
+    with psycopg.connect(resolve_supabase_db_url()) as connection:
+        connection.execute("SET ROLE postgres")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO app.documents (id, title, visibility, graph_eligible)
+                VALUES (%s, 'Eligible Replacement', 'company_visible', false)
+                """,
+                (document_id,),
+            )
+            cursor.execute(
+                """
+                INSERT INTO app.document_versions (
+                  id, document_id, version_number, status, graph_eligible, is_current
+                )
+                VALUES (%s, %s, 1, 'hybrid_ready', true, false)
+                """,
+                (version_id, document_id),
+            )
+            cursor.execute(
+                """
+                UPDATE app.documents
+                SET current_version_id = %s, graph_eligible = true
+                WHERE id = %s
+                """,
+                (version_id, document_id),
+            )
+        connection.execute("SET ROLE app_worker")
+        with connection.cursor() as cursor:
+            cursor.execute("SAVEPOINT deny_eligible")
+            with pytest.raises(psycopg.errors.RaiseException):
+                cursor.execute(
+                    "SELECT app.activate_graph_ineligible_version(%s)",
+                    (version_id,),
+                )
+            cursor.execute("ROLLBACK TO SAVEPOINT deny_eligible")
+            cursor.execute(
+                "SELECT is_current FROM app.document_versions WHERE id = %s",
+                (version_id,),
+            )
+            is_current = cursor.fetchone()[0]
+        connection.rollback()
+    assert is_current is False
+
+
 def test_deletion_excludes_retrieval_and_enqueues_bm25_cleanup() -> None:
     """Deletion/ACL exclusion is immediate in Supabase with high-priority cleanup."""
 
@@ -146,8 +252,9 @@ def test_deletion_excludes_retrieval_and_enqueues_bm25_cleanup() -> None:
 
 
 @pytest.mark.skipif(
-    read_process_env("PARADEDB_URL") is None,
-    reason="PARADEDB_URL required for host-side ParadeDB psycopg contracts",
+    packet8_paradedb_url() is None
+    or try_connect(packet8_paradedb_url() or "") is None,
+    reason="Packet 8 ParadeDB overlay required for host-side psycopg contracts",
 )
 def test_bm25_delete_job_clears_parade_projection() -> None:
     """High-priority delete jobs remove ParadeDB rows for a version."""
@@ -212,3 +319,46 @@ def test_paradedb_delete_sql_clears_version_rows() -> None:
     completed = paradedb_psql(count, user="paradedb_writer")
     assert completed.returncode == 0
     assert completed.stdout.strip() == "0"
+
+
+def test_hybrid_ready_blocked_without_processing_bm25_job() -> None:
+    """finalize_hybrid_ready cannot flip Hybrid Ready before BM25 verify."""
+
+    version_id = uuid4()
+    document_id = uuid4()
+    with psycopg.connect(resolve_supabase_db_url()) as connection:
+        connection.execute("SET ROLE postgres")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO app.documents (id, title) VALUES (%s, 'Hybrid gate')",
+                (document_id,),
+            )
+            cursor.execute(
+                """
+                INSERT INTO app.document_versions (
+                  id, document_id, version_number, status, chunk_set_hash
+                )
+                VALUES (%s, %s, 1, 'parsing', 'hash-gate')
+                """,
+                (version_id, document_id),
+            )
+        connection.execute("SET ROLE app_worker")
+        with connection.cursor() as cursor:
+            cursor.execute("SAVEPOINT deny_hybrid")
+            with pytest.raises(psycopg.Error):
+                cursor.execute(
+                    "SELECT app.finalize_hybrid_ready(%s, 'hash-gate', NULL)",
+                    (version_id,),
+                )
+            cursor.execute("ROLLBACK TO SAVEPOINT deny_hybrid")
+            cursor.execute(
+                "SELECT status, hybrid_verified_at, bm25_verified_at "
+                "FROM app.document_versions WHERE id = %s",
+                (version_id,),
+            )
+            row = cursor.fetchone()
+            assert row is not None
+            assert row[0] == "parsing"
+            assert row[1] is None
+            assert row[2] is None
+        connection.rollback()

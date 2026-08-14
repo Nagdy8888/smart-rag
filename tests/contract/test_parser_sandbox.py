@@ -65,6 +65,40 @@ def test_docker_run_uses_network_none() -> None:
     assert result.disposition in {ParseDisposition.SUPPORTED, ParseDisposition.FAILED}
 
 
+@pytest.mark.skipif(not _docker_available(), reason="Docker unavailable")
+def test_sandbox_ocr_scanned_pdf_emits_searchable_text() -> None:
+    """Rebuilt parser sandbox image OCRs the image-only scanned PDF fixture."""
+
+    from tests.fixtures.parser import build_ocr_scanned_pdf
+
+    if shutil.which("docker") is None:
+        pytest.skip("docker missing")
+    image_exists = (
+        subprocess.run(
+            ["docker", "image", "inspect", "smart-rag-parser-sandbox:local"],
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+    if not image_exists:
+        pytest.skip("parser sandbox image not built")
+    payload, digest = build_ocr_scanned_pdf()
+    launcher = ParserSandboxLauncher(
+        config=SandboxLaunchConfig(image="smart-rag-parser-sandbox:local", use_docker=True)
+    )
+    result = launcher.run(
+        payload=payload,
+        content_hash=digest,
+        filename="scanned.pdf",
+        format_key="pdf",
+    )
+    assert result.disposition is ParseDisposition.SUPPORTED, result.detail
+    texts = " ".join(element.text or "" for element in result.elements)
+    assert "Scanned" in texts or "fixture" in texts.lower()
+    assert result.resource_metrics.ocr_pages >= 1
+
+
 def test_sandbox_escape_fixture_rejected_inprocess(tmp_path) -> None:
     """Path traversal filename does not escape temp directory."""
 

@@ -141,16 +141,27 @@ class EmbeddingService:
             estimated_cost_usd=batch.estimated_cost_usd,
         )
 
-        response = asyncio.run(
-            self._gateway.embed(
-                EmbeddingRequest(
-                    operation_key=batch.operation_key,
-                    inputs=tuple(contextual_inputs),
-                    model=EMBEDDING_MODEL,
-                    dimensions=EMBEDDING_DIMENSIONS,
+        try:
+            response = asyncio.run(
+                self._gateway.embed(
+                    EmbeddingRequest(
+                        operation_key=batch.operation_key,
+                        inputs=tuple(contextual_inputs),
+                        model=EMBEDDING_MODEL,
+                        dimensions=EMBEDDING_DIMENSIONS,
+                    )
                 )
             )
-        )
+        except TimeoutError as exc:
+            self._record_ledger(
+                version_id=batch.version_id,
+                operation_key=batch.operation_key,
+                policy_hash=policy_hash,
+                input_count=len(representatives),
+                status="failed",
+                result_ref={"reason": "timeout_after_provider"},
+            )
+            raise EmbeddingGateError("embedding_timeout_after_provider") from exc
 
         if len(response.vectors) != len(representatives):
             self._record_ledger(
@@ -179,7 +190,7 @@ class EmbeddingService:
                 EmbeddedChunk(
                     chunk=chunk,
                     contextual_text=contextual_text,
-                    embedding=vector,
+                    embedding=list(vector),
                 )
             )
 

@@ -2,7 +2,7 @@
 title: Durable job state machine
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-14
 audience: engineering
 ---
 
@@ -31,7 +31,7 @@ stateDiagram-v2
   failed --> pending: bounded replay
   failed --> dead_letter: max attempts exhausted
   processing --> dead_letter: max attempts on terminal fail
-  dead_letter --> pending: admin replay new idempotency key
+  dead_letter --> pending: admin retry inserts new job; original DL retained
   completed --> [*]
   cancelled --> [*]
   dead_letter --> [*]: evidence retained
@@ -117,4 +117,31 @@ stateDiagram-v2
 
 ## Checkpointer boundary
 
-LangGraph checkpoints store compact IDs/tokens/hashes only—never raw bytes, local paths, or secrets. Phase 3 probe graph uses in-memory checkpointer because `langgraph-checkpoint-postgres` is not yet pinned; production wiring follows the Phase 2 bootstrap migration in `langgraph` schema without runtime auto-migrate.
+LangGraph checkpoints store compact IDs/tokens/hashes only—never raw bytes, local paths, or secrets. The worker compiles scan/crawl/index/probe graphs with `langgraph-checkpoint-postgres==3.1.2` (`PostgresSaver`) against schema `langgraph` as role `app_checkpointer`. Thread id equals the ingestion `job_id` so a crashed worker resumes the same thread. Runtime never calls `PostgresSaver.setup()`; Phase 2 seeded versions 0–8 and Phase 3 records version 9 (`task_path`, already present). `langgraph.json` module-level graphs remain checkpointer-free so Studio import does not open Postgres.
+
+Dead-letter **retry** (owner/admin `POST /ingestion/jobs/{id}/retry`) creates a **new** ingestion job via `app.retry_ingestion_job`. The original dead-letter row is retained. Failed-but-not-dead-letter jobs (backoff `pending` with `next_attempt_at`, or explicit `failed`) only clear `next_attempt_at` and never wipe `last_error` or `attempt_count`. Members receive 403.
+
+## Public document-version lifecycle
+
+Public `app.document_status` values are orthogonal to queue `job_status`. Internal nodes (normalize, chunk, embed, BM25 verify) are not new public enums.
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> uploading: quota reserve
+  uploading --> uploaded: finalize quarantine object
+  uploading --> [*]: expired quota deletes shell
+  uploaded --> scanning: scan_promote claim
+  scanning --> parsing: promotion plus hybrid_index
+  parsing --> hybrid_ready: canonical plus BM25 verify
+  parsing --> failed: terminal ingest failure
+  hybrid_ready --> graph_pending: company-visible graph eligible
+  hybrid_ready --> graph_ineligible: restricted or ineligible
+  hybrid_ready --> deletion_pending: delete or ACL downgrade
+  graph_pending --> deletion_pending: delete or ACL downgrade
+  graph_ineligible --> deletion_pending: delete or ACL downgrade
+  scanning --> failed: malware or scan deny
+  uploaded --> failed: admission deny after bytes
+```
+
+`GET /ingestion/versions/{version_id}/status` returns the public `status` plus nested diagnostics: scan evidence/age, review/governance, OCR pages, chunk/table counts, embedding ledger, BM25 index version/lag/retry/dead-letter, queue age, and graph-handoff counts. Owner/admin may retry; members receive 403.

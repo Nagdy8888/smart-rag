@@ -6,11 +6,92 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ScanDiagnostics(BaseModel):
+    """Latest append-only scan evidence for one version.
+
+    Orthogonal to public lifecycle; never introduces a new status enum.
+    """
+
+    result: str | None = None
+    evidence_id: UUID | None = None
+    scanned_at: datetime | None = None
+    age_seconds: float | None = None
+    engine_version: str | None = None
+    signature_version: str | None = None
+    object_hash: str | None = None
+
+
+class ReviewDiagnostics(BaseModel):
+    """Category attestation and URL-approval diagnostics."""
+
+    declared_category: str | None = None
+    source_type: str | None = None
+    approval_status: str | None = None
+    attestation_policy_version: str | None = None
+
+
+class OcrDiagnostics(BaseModel):
+    """Page and OCR counts derived from canonical chunks."""
+
+    page_count: int = 0
+    ocr_pages: int = 0
+
+
+class ChunkTableDiagnostics(BaseModel):
+    """Canonical chunk and structured-table counts."""
+
+    chunk_count: int = 0
+    table_count: int = 0
+
+
+class EmbeddingDiagnostics(BaseModel):
+    """Durable embedding ledger counts and policy identity."""
+
+    ledger_count: int = 0
+    completed_count: int = 0
+    failed_count: int = 0
+    model: str | None = None
+    policy_hash: str | None = None
+
+
+class Bm25Diagnostics(BaseModel):
+    """BM25 projection index version, lag, retry, and dead-letter counts."""
+
+    active_index_version: int | None = None
+    index_schema_version: str | None = None
+    lag_seconds: float | None = None
+    pending: int = 0
+    processing: int = 0
+    failed: int = 0
+    dead_letter: int = 0
+    retry_attempts: int = 0
+    verified_at: datetime | None = None
+
+
+class QueueAgeDiagnostics(BaseModel):
+    """Oldest pending ingestion job age for this version."""
+
+    oldest_pending_job_age_seconds: float | None = None
+    oldest_pending_job_kind: str | None = None
+
+
+class GraphHandoffDiagnostics(BaseModel):
+    """LightRAG index-job handoff counts (Phase 3 stops at Graph Pending)."""
+
+    pending: int = 0
+    processing: int = 0
+    completed: int = 0
+    failed: int = 0
+    dead_letter: int = 0
 
 
 class IngestionStatusResponse(BaseModel):
-    """Public lifecycle plus diagnostics for one document version."""
+    """Public lifecycle plus nested diagnostics for one document version."""
+
+    model_config = ConfigDict(extra="ignore")
 
     version_id: UUID
     document_id: UUID
@@ -32,6 +113,14 @@ class IngestionStatusResponse(BaseModel):
     embedding_ledger_count: int = 0
     bm25_jobs: dict[str, Any] = Field(default_factory=dict)
     graph_handoff_jobs: dict[str, Any] = Field(default_factory=dict)
+    scan: ScanDiagnostics = Field(default_factory=ScanDiagnostics)
+    review: ReviewDiagnostics = Field(default_factory=ReviewDiagnostics)
+    ocr: OcrDiagnostics = Field(default_factory=OcrDiagnostics)
+    chunks_tables: ChunkTableDiagnostics = Field(default_factory=ChunkTableDiagnostics)
+    embedding: EmbeddingDiagnostics = Field(default_factory=EmbeddingDiagnostics)
+    bm25: Bm25Diagnostics = Field(default_factory=Bm25Diagnostics)
+    queue_age: QueueAgeDiagnostics = Field(default_factory=QueueAgeDiagnostics)
+    graph_handoff: GraphHandoffDiagnostics = Field(default_factory=GraphHandoffDiagnostics)
     retry_allowed: bool = False
 
 
@@ -54,7 +143,9 @@ class DocumentIngestionStatusResponse(BaseModel):
     """Document-scoped ingestion status envelope."""
 
     version: IngestionStatusResponse
-    recent_jobs: list[IngestionJobSummary] = Field(default_factory=list)
+    recent_jobs: list[IngestionJobSummary] = Field(
+        default_factory=lambda: []
+    )
 
 
 class RetryIngestionJobResponse(BaseModel):

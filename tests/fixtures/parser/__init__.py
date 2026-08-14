@@ -135,3 +135,50 @@ def build_encrypted_zip_bomb_attempt() -> bytes:
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("bomb.txt", b"0" * 1000)
     return buffer.getvalue()
+
+
+def build_archive_bomb() -> tuple[bytes, str]:
+    """Build a ZIP whose uncompressed size/ratio trips parser expansion limits.
+
+    Compressed payload stays well under ``PARSER_SANDBOX_MAX_INPUT_BYTES``;
+    declared uncompressed size exceeds the 250x expansion ratio.
+    """
+
+    buffer = io.BytesIO()
+    zeros = b"\x00" * (2 * 1024 * 1024)
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("bomb.bin", zeros)
+    payload = buffer.getvalue()
+    return payload, sha256_bytes(payload)
+
+
+def build_ocr_scanned_pdf() -> tuple[bytes, str]:
+    """Build an image-only scanned PDF with no selectable text layer."""
+
+    source = fitz.open()
+    source_page = source.new_page()
+    source_page.insert_text((72, 120), "Scanned OCR fixture line", fontsize=28)
+    pixmap = source_page.get_pixmap(dpi=150)
+    source.close()
+
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_image(page.rect, pixmap=pixmap)
+    payload = document.tobytes()
+    document.close()
+    return payload, sha256_bytes(payload)
+
+
+def build_encrypted_pdf() -> tuple[bytes, str]:
+    """Build a password-protected PDF that parsers must reject."""
+
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "secret body")
+    payload = document.tobytes(
+        encryption=fitz.PDF_ENCRYPT_AES_256,
+        user_pw="secret",
+        owner_pw="owner",
+    )
+    document.close()
+    return payload, sha256_bytes(payload)

@@ -28,3 +28,7 @@ class JobAdmissionError(JobRepositoryError):
 
         super().__init__(reason)
         self.reason = reason
+
+
+class JobRetryNotAllowedError(JobRepositoryError):
+    """Raised when a job is not in a retryable dead-letter, failed, or backoff state."""

@@ -1,6 +1,6 @@
 {
   "manifest_version": "phase3_packet8_v1",
-  "manifest_sha256": "90be29404a3fb73fb34ab357631c22a59cda6cf95adffbf7c80bc5cbfc893414",
+  "manifest_sha256": "349d1174fadb1087dabd3785fd9be0350d87ec9dd9ffc3873a8eb804779c2078",
   "created": "2026-08-13",
   "description": "Immutable Phase 3 adversarial, format, security, crash, and throughput fixture registry for Packet 8 exit proof.",
   "fixtures": [
@@ -240,6 +240,62 @@
       "owning_test": "tests/unit/test_clamav_client.py::test_oversize_stream_fails_closed_without_scan"
     },
     {
+      "id": "malware_stale_signatures",
+      "category": "malware",
+      "source": "synthetic:signature databases older than 24h",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "stale_signature",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "clamav_client",
+      "owning_test": "tests/unit/test_clamav_client.py::test_stale_signatures_fail_closed_without_instream"
+    },
+    {
+      "id": "malware_incompatible_signatures",
+      "category": "malware",
+      "source": "synthetic:clamd STATS without usable timestamps",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "stale_signature",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "clamav_client",
+      "owning_test": "tests/unit/test_clamav_client.py::test_incompatible_signatures_without_timestamps_fail_closed"
+    },
+    {
+      "id": "malware_encrypted_unscannable",
+      "category": "malware",
+      "source": "synthetic:clamd Encrypted.PDF ERROR",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "unscannable",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "clamav_client",
+      "owning_test": "tests/unit/test_clamav_client.py::test_encrypted_scan_response_is_unscannable"
+    },
+    {
+      "id": "fmt_encrypted_pdf",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser.build_encrypted_pdf",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "encrypted",
+      "expected_elements": [],
+      "expected_locators": [],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_encrypted_pdf_fails_closed"
+    },
+    {
       "id": "malware_fake_clean_app_api",
       "category": "authorization",
       "source": "synthetic:app_api role scan_events insert",
@@ -308,6 +364,34 @@
       "external_processing_mode": "deny",
       "boundary": "crawl_policy",
       "owning_test": "tests/unit/test_crawl_policy.py::test_normalize_url_ssrf_vectors_fail_closed"
+    },
+    {
+      "id": "crawl_dns_rebinding",
+      "category": "ssrf",
+      "source": "synthetic:getaddrinfo pin-list change",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "policy_denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "crawl_policy",
+      "owning_test": "tests/unit/test_crawl_policy.py::test_dns_rebinding_pin_list"
+    },
+    {
+      "id": "crawl_peer_mismatch_proxy",
+      "category": "ssrf",
+      "source": "live execute_fetch with mismatched getpeername",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "proxy_denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "crawl_proxy",
+      "owning_test": "tests/unit/test_crawl_proxy.py::test_proxy_peer_mismatch_fails_closed"
     },
     {
       "id": "crawl_redirect_to_private",
@@ -522,37 +606,39 @@
     {
       "id": "fmt_ocr_scanned_pdf",
       "category": "format",
-      "source": "programmatic:scanned PDF render path (Tesseract when present)",
+      "source": "programmatic:tests.fixtures.parser.build_ocr_scanned_pdf",
       "license": "MIT (repository test harness; Tesseract Apache-2.0)",
       "sha256": null,
       "expected_status": "supported_or_media_only",
       "expected_elements": [
         "page_break",
-        "paragraph"
+        "paragraph",
+        "figure"
       ],
       "expected_locators": [
-        "pdf:page_box"
+        "pdf:page_box",
+        "ocr:page_box"
       ],
       "sensitivity_class": "synthetic",
       "external_processing_mode": "mock_allowed",
       "boundary": "parser_inprocess",
-      "owning_test": "tests/unit/test_parser_adapters.py::test_adapter_emits_deterministic_elements[build_pdf_text_fixture-sample.pdf-pdf]",
-      "notes": "Selectable-text PDF exercises text path; full OCR page benchmark uses throughput script."
+      "owning_test": "tests/unit/test_parser_adapters.py::test_ocr_scanned_pdf_has_no_selectable_text",
+      "notes": "Image-only PDF with no selectable text layer; OCR path or media-only figure when Tesseract is absent."
     },
     {
       "id": "archive_zip_bomb_guard",
       "category": "resource_limit",
-      "source": "programmatic:tests.fixtures.parser.build_encrypted_zip_bomb_attempt",
+      "source": "programmatic:tests.fixtures.parser.build_archive_bomb",
       "license": "MIT (repository test harness)",
-      "sha256": "7395703ccdd3698d5ee955073380f7575139f3c0fd0ff73a4149b9a80651b971",
+      "sha256": null,
       "expected_status": "failed_or_over_limit",
       "expected_elements": [],
       "expected_locators": [],
       "sensitivity_class": "synthetic",
       "external_processing_mode": "deny",
       "boundary": "parser_sandbox",
-      "owning_test": "tests/unit/test_parser_sandbox.py::test_oversize_input_fails_without_partial_elements",
-      "notes": "Full ClamAV archive-bomb boundary requires live clamd; deferred to managed stack."
+      "owning_test": "tests/unit/test_parser_sandbox.py::test_archive_bomb_hits_expansion_limit",
+      "notes": "Compressed ZIP stays under PARSER_SANDBOX_MAX_INPUT_BYTES; expansion ratio 250 and ClamAV LIMIT EXCEEDED own the bomb path."
     }
   ]
 }

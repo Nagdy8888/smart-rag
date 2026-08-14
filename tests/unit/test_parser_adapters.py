@@ -62,6 +62,41 @@ def test_adapter_emits_deterministic_elements(
     assert all(element.reading_order >= 0 for element in first.elements)
 
 
+def test_ocr_scanned_pdf_has_no_selectable_text(tmp_path) -> None:
+    """Image-only scanned PDF has no text layer and takes the OCR path."""
+
+    import fitz
+
+    from tests.fixtures.parser import build_ocr_scanned_pdf
+
+    payload, digest = build_ocr_scanned_pdf()
+    rendered = fitz.open(stream=payload, filetype="pdf")
+    try:
+        assert not rendered[0].get_text("text").strip()
+    finally:
+        rendered.close()
+    path = tmp_path / "scanned.pdf"
+    path.write_bytes(payload)
+    result = parse_file(path, digest, "pdf")
+    assert result.resource_metrics.ocr_pages >= 1
+    kinds = {element.kind.value for element in result.elements}
+    assert kinds & {"figure", "paragraph", "page_break"}
+
+
+def test_encrypted_pdf_fails_closed(tmp_path) -> None:
+    """Password-protected PDFs fail closed without partial elements."""
+
+    from smart_rag_core.ingestion.parser.exceptions import ParserEncryptedError
+
+    from tests.fixtures.parser import build_encrypted_pdf
+
+    payload, digest = build_encrypted_pdf()
+    path = tmp_path / "secret.pdf"
+    path.write_bytes(payload)
+    with pytest.raises(ParserEncryptedError):
+        parse_file(path, digest, "pdf")
+
+
 def test_pdf_header_footer_removed(tmp_path) -> None:
     """Repeated PDF header/footer lines produce removal diagnostics."""
 

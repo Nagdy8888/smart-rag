@@ -7,7 +7,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import psycopg
 
-from smart_rag_core.ingestion.chunking.types import ChunkingResult
+from smart_rag_core.ingestion.chunking.types import CanonicalChunk, ChunkingResult
 from smart_rag_core.ingestion.embeddings.contextual import (
     extract_deterministic_search_terms,
 )
@@ -71,7 +71,7 @@ class CanonicalRepository:
             chunks=chunking.chunks,
         )
 
-        for chunk in chunking.chunks:
+        for chunk in _chunks_in_fk_order(chunking.chunks):
             embedded_row = embedded_by_id.get(chunk.chunk_id)
             vector_literal = None
             contextual_text = None
@@ -239,6 +239,45 @@ class CanonicalRepository:
                     json.dumps(manifest.model_dump(mode="json")),
                 ),
             )
+
+
+def _chunks_in_fk_order(
+    chunks: tuple[CanonicalChunk, ...],
+) -> tuple[CanonicalChunk, ...]:
+    """Order chunks so parent and duplicate FKs resolve during insert.
+
+    Args:
+        chunks: Chunking output in builder order.
+
+    Returns:
+        The same chunks with parents and duplicate representatives first.
+    """
+
+    remaining = list(chunks)
+    inserted: set[UUID] = set()
+    ordered: list[CanonicalChunk] = []
+    while remaining:
+        progressed = False
+        blocked: list[CanonicalChunk] = []
+        for chunk in remaining:
+            parent_ok = (
+                chunk.parent_chunk_id is None or chunk.parent_chunk_id in inserted
+            )
+            duplicate_ok = (
+                chunk.duplicate_of_chunk_id is None
+                or chunk.duplicate_of_chunk_id in inserted
+            )
+            if parent_ok and duplicate_ok:
+                ordered.append(chunk)
+                inserted.add(chunk.chunk_id)
+                progressed = True
+            else:
+                blocked.append(chunk)
+        if not progressed:
+            ordered.extend(blocked)
+            break
+        remaining = blocked
+    return tuple(ordered)
 
 
 def _vector_literal(values: list[float]) -> str:

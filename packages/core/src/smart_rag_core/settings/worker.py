@@ -28,6 +28,8 @@ class WorkerSettings(SharedSettings):
         job_poll_interval_seconds: Idle delay between queue polls.
         worker_concurrency: Maximum concurrently processed ingestion jobs.
         worker_instance_id: Stable lease owner identifier for this process.
+        langgraph_checkpoint_url: Optional dedicated checkpointer DSN. When
+            unset, the worker reuses ``SUPABASE_DB_URL``.
     """
 
     service_name: ClassVar[Literal["worker"]] = "worker"
@@ -109,6 +111,29 @@ class WorkerSettings(SharedSettings):
         description="ClamAV daemon TCP port.",
         json_schema_extra={"security": "internal"},
     )
+    langgraph_checkpoint_url: SecretStr | None = Field(
+        default=None,
+        validation_alias="LANGGRAPH_CHECKPOINT_URL",
+        description=(
+            "Optional Postgres DSN for LangGraph checkpoints. Defaults to "
+            "SUPABASE_DB_URL. Must use the session/direct port; runtime never "
+            "auto-migrates the langgraph schema."
+        ),
+        json_schema_extra={"security": "secret"},
+    )
+
+    def resolved_checkpoint_dsn(self) -> str | None:
+        """Return the checkpointer DSN, falling back to the worker database URL.
+
+        Returns:
+            Postgres URL string, or ``None`` when both checkpoint and worker
+            database URLs are unset (idle worker).
+        """
+
+        secret = self.langgraph_checkpoint_url or self.supabase_db_url
+        if secret is None:
+            return None
+        return secret.get_secret_value()
 
 
 def load_worker_settings() -> WorkerSettings:

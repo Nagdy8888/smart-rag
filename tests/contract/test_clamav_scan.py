@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 from smart_rag_core.gateways.clamav import ClamAvClient, ScanDisposition
 
-from tests.contract.integration_support import clamav_reachable, read_process_env
+from tests.contract.integration_support import (
+    clamav_reachable,
+    packet8_clamav,
+    read_process_env,
+)
 
 EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 
@@ -13,8 +17,7 @@ EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 def _require_clamav() -> ClamAvClient:
     """Return a ClamAV client or skip/xfail based on gate flags."""
 
-    host = read_process_env("CLAMAV_HOST") or "127.0.0.1"
-    port = int(read_process_env("CLAMAV_PORT") or "3310")
+    host, port = packet8_clamav()
     if not clamav_reachable(host=host, port=port):
         require = read_process_env("SMART_RAG_REQUIRE_CLAMAV")
         if require == "1":

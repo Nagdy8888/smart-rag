@@ -2,7 +2,7 @@
 title: C4 — Containers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-14
 audience: engineering
 ---
 
@@ -31,7 +31,9 @@ flowchart TB
   worker --> cp
 ```
 
-Published developer ports only: frontend and API. ParadeDB, both Valkey instances, and crawl-proxy have **no host ports**.
+Published developer ports only: frontend and API. ParadeDB, both Valkey instances, ClamAV, and crawl-proxy have **no host ports** in `docker-compose.yml`.
+
+Packet 8 local proof uses the optional overlay [`docker-compose.packet8.yml`](../../docker-compose.packet8.yml). It attaches ClamAV and ParadeDB to a non-internal `packet8-host` bridge and publishes ClamAV `:13310`, ParadeDB `:54329`, and crawl-proxy `:18080` so host pytest can reach them. The default `private` network stays `internal: true`. Do not apply that overlay in staging or production.
 
 ## Staging / production (planned)
 

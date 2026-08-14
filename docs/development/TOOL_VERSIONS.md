@@ -2,7 +2,7 @@
 title: Tool and dependency versions (Phase 1)
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-14
 audience: engineering
 ---
 
@@ -43,6 +43,7 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | --- | --- |
 | hatchling (build-system) | 1.32.0 |
 | langgraph | 1.2.11 |
+| langgraph-checkpoint-postgres | 3.1.2 |
 | langgraph-cli (dev) | 0.4.31 |
 | fastapi | 0.141.1 |
 | uvicorn[standard] | 0.52.1 |

@@ -24,6 +24,7 @@ class DocumentVisibility(StrEnum):
 class DocumentStatus(StrEnum):
     """Ingestion/index lifecycle for a document version."""
 
+    UPLOADING = "uploading"
     UPLOADED = "uploaded"
     SCANNING = "scanning"
     PARSING = "parsing"

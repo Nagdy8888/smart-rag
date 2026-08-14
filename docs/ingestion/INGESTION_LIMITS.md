@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-14
 audience: engineering, ops
 ---
 
@@ -34,7 +34,7 @@ Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](..
 | Dead-letter replay idempotency | policy | new `idempotency_key` suffix | — | Plan Packet 2 traceability | dead-letter | Preserves original DL row | Replay duplicates without audit link |
 | Ledger operation dedupe | key | `(job_table, job_id, operation_key)` UNIQUE | — | Plan Packet 2 | graph/worker | Second write is no-op | Duplicate ledger rows |
 | Checkpointer retention | days | 30 | 30 | Data dictionary / Phase 2 | ops | GC job (later) | Undeleted runs exceed policy |
-| Checkpointer runtime wiring | policy | no checkpointer on probe graph | — | `langgraph-checkpoint-postgres` not pinned | agents | compile-only probe; no runtime migrate | Pin + bootstrap path approved |
+| Checkpointer runtime wiring | policy | PostgresSaver on schema `langgraph` | — | `langgraph-checkpoint-postgres==3.1.2` for `langgraph==1.2.11` | agents/worker | `thread_id=job_id`; no runtime `setup()` | Library migrations beyond seeded 0–9 |
 
 ## ClamAV / scan bounds (Packet 3)
 
@@ -46,7 +46,7 @@ Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](..
 | Scan max recursion | levels | 16 | 32 | ClamAV default guidance | worker | `over_limit` | Archive bomb fixtures fail open |
 | Scan max files | count | 10000 | 10000 | ClamAV default guidance | worker | `over_limit` | Nested archive fixtures |
 | Scan max embedded PE | count | 40 | 40 | ClamAV default guidance | worker | `over_limit` | — |
-| Archive max expansion ratio | ratio | 250 | 250 | Plan Packet 3 | worker | `over_limit` | Zip bomb fixtures |
+| Archive max expansion ratio | ratio | 250 | 250 | Plan Packet 3/8; parser ZIP inspect + ClamAV | parser/scan | `over_limit` / failed parse, zero elements | Zip bomb fixtures |
 | Scan concurrent streams | count | 2 | 4 | Worker concurrency /2 | worker | queue/backpressure | CPU saturation |
 | Signature reload memory | MiB | 512 | 1024 | ClamAV docs + local measure | ops | fail closed until reload completes | OOM during freshclam |
 | Quarantine TTL | hours | 24 | 168 | QT-RET-002 | cleanup | Storage API delete + quota release | Owner via company_settings |
@@ -144,6 +144,7 @@ Parser/OCR library pins (uv workspace `packages/core`):
 | markdown-it-py | 3.0.0 | MIT | Markdown token paths |
 | pytesseract | 0.3.13 | Apache-2.0 | OCR wrapper |
 | Pillow | 11.1.0 | HPND | OCR/image buffers |
+| pydantic | 2.13.4 | MIT | ParseResult JSON in sandbox runner |
 | Tesseract (image) | distro package | Apache-2.0 | OCR engine + eng/ara traineddata |
 
 Parser sandbox image: built from `infra/parser-sandbox` (`smart-rag-parser-sandbox:local`). Compose profile `parser-build` only; service stays on `private` network and is **not** attached to `egress`.
@@ -225,5 +226,8 @@ When local Supabase and ParadeDB are running, apply migrations and run integrati
 
 ```bash
 pnpm exec supabase db reset --yes
-uv run pytest tests/contract/test_job_leases.py tests/contract/test_hybrid_lifecycle.py -q
+docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --wait clamav paradedb crawl-proxy
+docker compose --env-file .env.compose --profile parser-build build parser-sandbox
+uv run pytest tests/contract/test_job_leases.py tests/contract/test_hybrid_lifecycle.py tests/contract/test_hybrid_ready_e2e.py tests/contract/test_crawl_proxy_live.py tests/contract/test_clamav_scan.py -q
+uv run python scripts/phase3_throughput_benchmark.py --iterations 10
 ```

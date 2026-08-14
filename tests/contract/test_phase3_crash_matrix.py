@@ -7,8 +7,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Plan Packet 8 ordered crash points → owning evidence tests.
-# Entries marked ``pending_e2e`` require live Storage/worker Compose and remain
-# documented blockers in phase-03 evidence until measured.
 CRASH_MATRIX: dict[str, str] = {
     "claim_skip_locked_exclusive": (
         "tests/contract/test_job_leases.py::test_skip_locked_claim_is_exclusive"
@@ -49,19 +47,42 @@ CRASH_MATRIX: dict[str, str] = {
         "tests/unit/test_embedding_service.py::"
         "test_embedding_service_denies_real_company_without_provider_verification"
     ),
+    "storage_download_mid_crash": (
+        "tests/unit/test_phase3_crash_injection.py::"
+        "test_storage_download_mid_crash_does_not_scan"
+    ),
+    "scan_mid_crash_before_scan_event": (
+        "tests/unit/test_phase3_crash_injection.py::"
+        "test_scan_mid_crash_before_scan_event"
+    ),
+    "parser_sandbox_kill_timeout_mid_job": (
+        "tests/unit/test_parser_sandbox.py::"
+        "test_parser_sandbox_kill_timeout_returns_failed"
+    ),
+    "langgraph_checkpoint_superstep_interrupt": (
+        "tests/contract/test_checkpoint_postgres.py::"
+        "test_probe_interrupt_resume_does_not_duplicate_ledger"
+    ),
+    "canonical_transaction_rollback_mid_batch": (
+        "tests/contract/test_phase3_crash_canonical.py::"
+        "test_canonical_transaction_rollback_mid_batch"
+    ),
+    "embedding_timeout_after_provider_success": (
+        "tests/unit/test_embedding_service.py::"
+        "test_embedding_timeout_after_provider_success_records_failed_ledger"
+    ),
+    "bm25_mid_batch_crash_before_verify": (
+        "tests/unit/test_phase3_crash_injection.py::"
+        "test_bm25_mid_batch_crash_before_verify"
+    ),
+    "hybrid_ready_flip_before_bm25_verify": (
+        "tests/unit/test_phase3_crash_injection.py::"
+        "test_hybrid_ready_flip_blocked_before_bm25_verify"
+    ),
 }
 
 
-PENDING_E2E_CRASH_POINTS: tuple[str, ...] = (
-    "storage_download_mid_crash",
-    "scan_mid_crash_before_scan_event",
-    "parser_sandbox_kill_timeout_mid_job",
-    "langgraph_checkpoint_superstep_interrupt",
-    "canonical_transaction_rollback_mid_batch",
-    "embedding_timeout_after_provider_success",
-    "bm25_mid_batch_crash_before_verify",
-    "hybrid_ready_flip_before_bm25_verify",
-)
+PENDING_E2E_CRASH_POINTS: tuple[str, ...] = ()
 
 
 def test_crash_matrix_owning_tests_exist() -> None:
@@ -76,11 +97,19 @@ def test_crash_matrix_owning_tests_exist() -> None:
         assert f"def {test_name}(" in text, f"{label}: missing {test_name}"
 
 
-def test_pending_e2e_crash_points_are_explicit() -> None:
-    """Unimplemented live-stack crash injections remain an explicit pending set."""
+def test_pending_e2e_crash_points_are_empty() -> None:
+    """Packet 8 crash points now have owning fault-injection tests."""
 
-    assert len(PENDING_E2E_CRASH_POINTS) >= 5
-    assert "bm25_mid_batch_crash_before_verify" in PENDING_E2E_CRASH_POINTS
-    # Proven matrix must not claim these pending IDs.
-    for pending in PENDING_E2E_CRASH_POINTS:
-        assert pending not in CRASH_MATRIX
+    assert PENDING_E2E_CRASH_POINTS == ()
+    required = {
+        "storage_download_mid_crash",
+        "scan_mid_crash_before_scan_event",
+        "parser_sandbox_kill_timeout_mid_job",
+        "langgraph_checkpoint_superstep_interrupt",
+        "canonical_transaction_rollback_mid_batch",
+        "embedding_timeout_after_provider_success",
+        "bm25_mid_batch_crash_before_verify",
+        "hybrid_ready_flip_before_bm25_verify",
+    }
+    missing = required - set(CRASH_MATRIX)
+    assert not missing, missing

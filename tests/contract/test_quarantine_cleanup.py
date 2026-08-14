@@ -176,6 +176,69 @@ def test_list_never_finalized_and_over_limit_candidates(
         assert done[1] == "released"
 
 
+def test_expired_quota_deletes_uploading_version(
+    db_connection: psycopg.Connection,
+) -> None:
+    """Never-finalized 24h/expiry cleanup removes the uploading version shell."""
+
+    user_id = uuid.uuid4()
+    as_of = datetime.now(tz=UTC)
+    with db_connection.cursor() as cursor:
+        _insert_auth_user(cursor, user_id, f"{user_id}@example.com")
+        cursor.execute(
+            """
+            INSERT INTO app.profiles (user_id, role, upload_enabled, mfa_enrolled)
+            VALUES (%s, 'member', true, true)
+            """,
+            (user_id,),
+        )
+        cursor.execute("SELECT app.current_authorization_version()")
+        auth_row = cursor.fetchone()
+        assert auth_row is not None
+        cursor.execute("SET ROLE app_api")
+        cursor.execute(
+            """
+            SELECT reservation_id, document_id, version_id
+            FROM app.reserve_upload_quota(
+              %s, 'member', %s, 100, 'expire-upload', 'sess', NULL
+            )
+            """,
+            (user_id, int(auth_row[0])),
+        )
+        reserved = cursor.fetchone()
+        assert reserved is not None
+        reservation_id, document_id, version_id = reserved
+        cursor.execute("RESET ROLE")
+        cursor.execute(
+            """
+            UPDATE app.upload_quota_reservations
+            SET expires_at = %s - interval '1 minute'
+            WHERE id = %s
+            """,
+            (as_of, reservation_id),
+        )
+        cursor.execute("SET ROLE app_worker")
+        cursor.execute("SELECT app.release_expired_upload_reservations(%s)", (as_of,))
+        released = cursor.fetchone()
+        assert released is not None
+        assert released[0] >= 1
+        cursor.execute("RESET ROLE")
+        cursor.execute(
+            "SELECT count(*) FROM app.document_versions WHERE id = %s",
+            (version_id,),
+        )
+        versions = cursor.fetchone()
+        assert versions is not None
+        assert versions[0] == 0
+        cursor.execute(
+            "SELECT count(*) FROM app.documents WHERE id = %s",
+            (document_id,),
+        )
+        documents = cursor.fetchone()
+        assert documents is not None
+        assert documents[0] == 0
+
+
 def test_cleanup_uses_storage_api_not_sql_delete(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

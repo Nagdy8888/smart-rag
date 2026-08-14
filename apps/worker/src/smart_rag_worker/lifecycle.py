@@ -12,6 +12,10 @@ from typing import Any
 from uuid import UUID
 
 import psycopg
+from smart_rag_agents.ingestion.checkpointer import (
+    IngestionCheckpointer,
+    open_ingestion_checkpointer,
+)
 from smart_rag_agents.ingestion.crawl_graph import (
     IngestionCrawlState,
     build_crawl_ingestion_graph,
@@ -43,14 +47,31 @@ class WorkerLifecycle:
     """Polls ingestion jobs and executes probe or scan/promote graphs."""
 
     def __init__(self, settings: WorkerSettings) -> None:
-        """Capture immutable worker settings for one process lifetime."""
+        """Capture immutable worker settings and compile durable graphs.
+
+        Args:
+            settings: Validated worker settings for this process.
+
+        Side Effects:
+            Opens a Postgres checkpointer pool when a database URL is
+            configured. Runtime never calls ``PostgresSaver.setup()``.
+        """
 
         self._settings = settings
         self._stop_event = threading.Event()
-        self._probe_graph = build_probe_ingestion_graph()
-        self._scan_graph = build_scan_promote_ingestion_graph()
-        self._crawl_graph = build_crawl_ingestion_graph()
-        self._index_graph = build_index_ingestion_graph()
+        self._checkpointer: IngestionCheckpointer | None = None
+        saver = None
+        checkpoint_dsn = settings.resolved_checkpoint_dsn()
+        if checkpoint_dsn is not None:
+            self._checkpointer = open_ingestion_checkpointer(
+                checkpoint_dsn,
+                max_size=settings.worker_concurrency,
+            )
+            saver = self._checkpointer.saver
+        self._probe_graph = build_probe_ingestion_graph(checkpointer=saver)
+        self._scan_graph = build_scan_promote_ingestion_graph(checkpointer=saver)
+        self._crawl_graph = build_crawl_ingestion_graph(checkpointer=saver)
+        self._index_graph = build_index_ingestion_graph(checkpointer=saver)
         self._bm25_loop = Bm25WorkerLoop(settings)
 
     def run_forever(self) -> None:
@@ -84,9 +105,12 @@ class WorkerLifecycle:
                     break
 
     def stop(self) -> None:
-        """Signal the poll loop to exit."""
+        """Signal the poll loop to exit and close the checkpointer pool."""
 
         self._stop_event.set()
+        if self._checkpointer is not None:
+            self._checkpointer.close()
+            self._checkpointer = None
 
     def _require_postgres_url(self) -> str:
         postgres_url = self._settings.supabase_db_url
@@ -118,6 +142,65 @@ class WorkerLifecycle:
             "crawl_proxy_url": crawl_proxy,
             "mock_model_mode": self._settings.mock_model_mode,
         }
+
+    def _run_config(self, job: IngestionJobRecord) -> dict[str, object]:
+        """Build LangGraph runnable config keyed by ingestion ``job_id``.
+
+        Args:
+            job: Claimed ingestion job. ``thread_id`` equals ``job.id`` so a
+                crashed worker resumes the same checkpoint thread.
+
+        Returns:
+            ``{"configurable": ...}`` mapping for ``graph.invoke`` / ``get_state``.
+        """
+
+        return {
+            "configurable": {
+                "thread_id": str(job.id),
+                **self._graph_config(),
+            }
+        }
+
+    def _invoke_graph(
+        self,
+        graph: Any,
+        initial_input: dict[str, Any],
+        config: dict[str, object],
+        *,
+        success_statuses: tuple[str, ...],
+    ) -> dict[str, Any]:
+        """Invoke or resume one compiled graph using checkpoint thread id.
+
+        Args:
+            graph: Compiled ingestion graph.
+            initial_input: Fresh-run state payload (IDs/hashes/Storage refs).
+            config: Runnable config including ``thread_id``.
+            success_statuses: Terminal success markers. If a prior run already
+                reached one of these and ``next`` is empty, skip re-invoke so a
+                crash after graph success but before ``complete()`` does not
+                start a new superstep.
+
+        Returns:
+            Graph result mapping.
+
+        Side Effects:
+            Writes checkpoints when a PostgresSaver is bound. Ledgered node
+            side effects remain idempotent under replay.
+        """
+
+        if self._checkpointer is None:
+            result = graph.invoke(initial_input, config)  # pyright: ignore[reportUnknownMemberType]
+            return dict(result)
+        snapshot = graph.get_state(config)  # pyright: ignore[reportUnknownMemberType]
+        next_nodes = tuple(snapshot.next or ())
+        values = snapshot.values if isinstance(snapshot.values, dict) else {}
+        if next_nodes:
+            result = graph.invoke(None, config)  # pyright: ignore[reportUnknownMemberType]
+        elif values.get("status") in success_statuses:
+            result = values
+        else:
+            result = graph.invoke(initial_input, config)  # pyright: ignore[reportUnknownMemberType]
+        return dict(result)
 
     def _claim_one(self) -> IngestionJobRecord | None:
         postgres_url = self._require_postgres_url()
@@ -168,35 +251,44 @@ class WorkerLifecycle:
         )
         heartbeat_thread.start()
         try:
+            config = self._run_config(job)
             if job.job_kind == "scan_promote":
                 graph_input = _scan_graph_input_from_job(job)
-                result = self._scan_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+                result = self._invoke_graph(  # pyright: ignore[reportUnknownMemberType]
+                    self._scan_graph,
                     graph_input,
-                    config={"configurable": self._graph_config()},
+                    config,
+                    success_statuses=("promoted",),
                 )
                 success = result.get("status") == "promoted"
                 detail = str(result.get("detail", "scan_promote_failed"))
             elif job.job_kind == "website_crawl":
                 graph_input = _crawl_graph_input_from_job(job)
-                result = self._crawl_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+                result = self._invoke_graph(  # pyright: ignore[reportUnknownMemberType]
+                    self._crawl_graph,
                     graph_input,
-                    config={"configurable": self._graph_config()},
+                    config,
+                    success_statuses=("crawl_completed",),
                 )
                 success = result.get("status") == "crawl_completed"
                 detail = str(result.get("detail", "website_crawl_failed"))
             elif job.job_kind == "hybrid_index":
                 graph_input = _index_graph_input_from_job(job)
-                result = self._index_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+                result = self._invoke_graph(  # pyright: ignore[reportUnknownMemberType]
+                    self._index_graph,
                     graph_input,
-                    config={"configurable": self._graph_config()},
+                    config,
+                    success_statuses=("indexed",),
                 )
                 success = result.get("status") == "indexed"
                 detail = str(result.get("detail", "hybrid_index_failed"))
             else:
                 graph_input = _probe_graph_input_from_job(job)
-                result = self._probe_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+                result = self._invoke_graph(  # pyright: ignore[reportUnknownMemberType]
+                    self._probe_graph,
                     graph_input,
-                    config={"configurable": self._graph_config()},
+                    config,
+                    success_statuses=("probe_validated",),
                 )
                 success = result.get("status") == "probe_validated"
                 detail = str(result.get("detail", "probe_failed"))
@@ -391,6 +483,13 @@ def _crawl_graph_input_from_job(job: IngestionJobRecord) -> IngestionCrawlState:
         ),
         "version_id": str(job.version_id) if job.version_id else None,
         "operation_key": str(payload.get("operation_key", job.job_kind)),
+        "content_class": str(payload.get("content_class", "synthetic")),
+        "graph_eligible": bool(payload.get("graph_eligible", False)),
+        "attestation_policy_version": (
+            str(payload["attestation_policy_version"])
+            if isinstance(payload.get("attestation_policy_version"), str)
+            else None
+        ),
         "status": "crawl_pending",
         "pages_fetched": 0,
         "crawl_run_id": None,
@@ -456,6 +555,11 @@ def _index_graph_input_from_job(job: IngestionJobRecord) -> IngestionIndexState:
         "review_approved": bool(payload.get("review_approved", False)),
         "content_class": str(payload.get("content_class", "synthetic")),
         "graph_eligible": bool(payload.get("graph_eligible", False)),
+        "crawl_run_id": (
+            str(payload["crawl_run_id"])
+            if isinstance(payload.get("crawl_run_id"), str)
+            else None
+        ),
         "status": "index_pending",
         "chunk_set_hash": None,
         "bm25_job_id": None,

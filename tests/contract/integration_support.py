@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import cast
+from urllib.parse import quote
 
 import psycopg
 import pytest
@@ -208,7 +209,126 @@ def ensure_paradedb_arabic_normalizer() -> None:
         raise RuntimeError(completed.stderr or completed.stdout)
 
 
-def clamav_reachable(host: str = "127.0.0.1", port: int = 3310) -> bool:
+def ensure_paradedb_bm25_index() -> None:
+    """Create the pg_search BM25 index when missing (bootstrap role).
+
+    Raises:
+        RuntimeError: When index DDL fails.
+    """
+
+    sql = """
+ALTER TABLE public.bm25_chunks ADD COLUMN IF NOT EXISTS content_hash text;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes WHERE indexname = 'bm25_chunks_search_idx'
+  ) THEN
+    EXECUTE $idx$
+      CREATE INDEX bm25_chunks_search_idx ON public.bm25_chunks
+      USING bm25 (
+        chunk_id,
+        (body_search::pdb.unicode_words),
+        (coalesce(title_search, '')::pdb.unicode_words),
+        (coalesce(heading_search, '')::pdb.unicode_words),
+        acl_scope_id,
+        visibility_generation
+      )
+      WITH (key_field = 'chunk_id');
+    $idx$;
+  END IF;
+END
+$$;
+"""
+    completed = paradedb_psql(sql)
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr or completed.stdout)
+
+
+def load_compose_env() -> dict[str, str]:
+    """Parse gitignored ``.env.compose`` KEY=VALUE pairs without logging values.
+
+    Returns:
+        Environment mapping used by local Compose. Empty when the file is absent.
+    """
+
+    values: dict[str, str] = {}
+    if not COMPOSE_ENV_FILE.is_file():
+        return values
+    for raw_line in COMPOSE_ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def packet8_paradedb_url() -> str | None:
+    """Return the host-side ParadeDB writer URL for Packet 8 localhost overlay.
+
+    Returns:
+        ``PARADEDB_URL`` when set, otherwise a loopback URL on port ``54329``
+        built from ``.env.compose`` writer credentials. ``None`` when credentials
+        are unavailable.
+    """
+
+    explicit = read_process_env("PARADEDB_URL")
+    if explicit:
+        return explicit
+    env = load_compose_env()
+    password = env.get("PARADEDB_WRITER_PASSWORD")
+    if not password:
+        return None
+    user = env.get("PARADEDB_WRITER_USER", "paradedb_writer")
+    database = env.get("PARADEDB_DB", "paradedb")
+    host = read_process_env("PARADEDB_HOST") or "127.0.0.1"
+    port = read_process_env("PARADEDB_PORT") or "54329"
+    return (
+        f"postgresql://{quote(user, safe='')}:"
+        f"{quote(password, safe='')}@{host}:{port}/{database}"
+    )
+
+
+def packet8_crawl_proxy_url() -> str:
+    """Return the host-side crawl-proxy base URL for Packet 8 localhost overlay.
+
+    Returns:
+        ``CRAWL_PROXY_URL`` when set, otherwise ``http://127.0.0.1:18080``.
+    """
+
+    return read_process_env("CRAWL_PROXY_URL") or "http://127.0.0.1:18080"
+
+
+def paradedb_host_reachable() -> bool:
+    """Return whether host pytest can open ParadeDB via the Packet 8 overlay.
+
+    Returns:
+        ``True`` when ``psycopg`` connects to the loopback writer URL.
+    """
+
+    url = packet8_paradedb_url()
+    if url is None:
+        return False
+    connection = try_connect(url)
+    if connection is None:
+        return False
+    connection.close()
+    return True
+
+
+def packet8_clamav() -> tuple[str, int]:
+    """Return host ClamAV coordinates for the Packet 8 overlay.
+
+    Returns:
+        ``(host, port)`` defaulting to ``127.0.0.1:13310``.
+    """
+
+    host = read_process_env("CLAMAV_HOST") or "127.0.0.1"
+    port = int(read_process_env("CLAMAV_PORT") or "13310")
+    return host, port
+
+
+def clamav_reachable(host: str = "127.0.0.1", port: int = 13310) -> bool:
     """Return whether ClamAV ``clamd`` responds to ``PING`` on the host port.
 
     Args:

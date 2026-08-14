@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-14
 audience: engineering, reviewers, client-approver
 ---
 
@@ -15,12 +15,12 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-12 | client, engineering |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-08-12 | eng |
+| [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [architecture/03-components.md](./architecture/03-components.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [architecture/04-deployment.md](./architecture/04-deployment.md) | engineering-lead | draft | 2026-08-12 | eng, ops |
 | [architecture/05-database-connections.md](./architecture/05-database-connections.md) | engineering-lead | proven | 2026-08-13 | eng, ops |
 | [architecture/06-database-workload-isolation.md](./architecture/06-database-workload-isolation.md) | engineering-lead | proven | 2026-08-13 | eng, ops |
-| [architecture/08-data-dictionary.md](./architecture/08-data-dictionary.md) | engineering-lead | draft | 2026-08-12 | eng |
+| [architecture/08-data-dictionary.md](./architecture/08-data-dictionary.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [development/phase-01-foundation-evidence.md](./development/phase-01-foundation-evidence.md) | engineering-lead | accepted | 2026-08-13 | eng, reviewers |
 | [development/phase-02-identity-data-evidence.md](./development/phase-02-identity-data-evidence.md) | engineering-lead | accepted | 2026-08-13 | eng, reviewers |
 | [development/phase-03-ingestion-evidence.md](./development/phase-03-ingestion-evidence.md) | engineering-lead | pending | 2026-08-14 | eng, reviewers |
@@ -28,8 +28,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [security/PROTECTED_MIGRATION_CREDENTIALS.md](./security/PROTECTED_MIGRATION_CREDENTIALS.md) | engineering-lead | proven-local | 2026-08-13 | eng, security, ops |
 | [security/AUDIT_CHAIN.md](./security/AUDIT_CHAIN.md) | engineering-lead | proven | 2026-08-13 | eng, security |
 | [evaluation/EMBEDDING_QUALIFICATION_REPORT.md](./evaluation/EMBEDDING_QUALIFICATION_REPORT.md) | engineering-lead | draft | 2026-08-12 | eng, reviewers |
-| [development/TOOL_VERSIONS.md](./development/TOOL_VERSIONS.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-08-12 | eng |
+| [development/TOOL_VERSIONS.md](./development/TOOL_VERSIONS.md) | engineering-lead | draft | 2026-08-14 | eng |
+| [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
 | [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/WORKSPACE_BOUNDARIES.md](./development/WORKSPACE_BOUNDARIES.md) | engineering-lead | draft | 2026-08-12 | eng |
@@ -47,13 +47,13 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [retrieval/ARABIC_NORMALIZATION.md](./retrieval/ARABIC_NORMALIZATION.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | planned | 2026-08-12 | eng |
 | [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-08-13 | eng |
-| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-08-13 | eng, ops |
-| [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-08-13 | eng |
+| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-08-14 | eng, ops |
+| [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [runbooks/CLAMAV_SCAN_AND_PROMOTION.md](./runbooks/CLAMAV_SCAN_AND_PROMOTION.md) | engineering-lead | draft | 2026-08-13 | eng, ops |
 | [ingestion/CRAWL_POLICY.md](./ingestion/CRAWL_POLICY.md) | engineering-lead | draft | 2026-08-13 | eng, security |
 | [runbooks/CRAWL_EGRESS_AND_PROXY.md](./runbooks/CRAWL_EGRESS_AND_PROXY.md) | engineering-lead | draft | 2026-08-13 | eng, ops |
 | [evaluation/QUERY_PROFILE_EVAL.md](./evaluation/QUERY_PROFILE_EVAL.md) | engineering-lead | planned | 2026-08-12 | eng |
-| [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-12 | eng, ops |
+| [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, ops |
 | [security/AUTHORIZATION_MODEL.md](./security/AUTHORIZATION_MODEL.md) | engineering-lead | draft | 2026-08-12 | eng, security |
 | [security/IDENTITY_PROPAGATION.md](./security/IDENTITY_PROPAGATION.md) | engineering-lead | draft | 2026-08-13 | eng, security |
 | [security/AUTH_RATE_LIMIT_OWNERSHIP.md](./security/AUTH_RATE_LIMIT_OWNERSHIP.md) | engineering-lead | draft | 2026-08-13 | eng, security |

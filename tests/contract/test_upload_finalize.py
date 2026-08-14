@@ -128,6 +128,19 @@ def test_finalize_quarantine_upload_idempotent_and_wrong_path_denied(
         second = cursor.fetchone()
         assert second == first
 
+        cursor.execute("RESET ROLE")
+        cursor.execute(
+            """
+            SELECT dv.status
+            FROM app.document_versions AS dv
+            WHERE dv.id = %s
+            """,
+            (first[1],),
+        )
+        status_row = cursor.fetchone()
+        assert status_row is not None
+        assert status_row[0] == "uploaded"
+
         cursor.execute("SAVEPOINT wrong_user")
         with pytest.raises(psycopg.Error):
             cursor.execute(
@@ -149,3 +162,56 @@ def test_finalize_quarantine_upload_idempotent_and_wrong_path_denied(
             )
         cursor.execute("ROLLBACK TO SAVEPOINT wrong_user")
         cursor.execute("RELEASE SAVEPOINT wrong_user")
+
+
+def test_reserve_creates_uploading_version_before_finalize(
+    db_connection: psycopg.Connection,
+) -> None:
+    """Quota reserve creates an observable ``uploading`` version before bytes land."""
+
+    user_id = uuid.uuid4()
+    with db_connection.cursor() as cursor:
+        _insert_auth_user(cursor, user_id, f"{user_id}@example.com")
+        cursor.execute(
+            """
+            INSERT INTO app.profiles (user_id, role, upload_enabled, mfa_enrolled)
+            VALUES (%s, 'member', true, true)
+            """,
+            (user_id,),
+        )
+        auth_version = _auth_version(cursor)
+        cursor.execute("SET ROLE app_api")
+        cursor.execute(
+            """
+            SELECT reservation_id, document_id, version_id
+            FROM app.reserve_upload_quota(
+              %s, 'member', %s, 512, 'upload-status', 'sess', NULL
+            )
+            """,
+            (user_id, auth_version),
+        )
+        reserved = cursor.fetchone()
+        assert reserved is not None
+        reservation_id, document_id, version_id = reserved
+        assert document_id is not None
+        assert version_id is not None
+        cursor.execute("RESET ROLE")
+        cursor.execute(
+            "SELECT status FROM app.document_versions WHERE id = %s",
+            (version_id,),
+        )
+        status_row = cursor.fetchone()
+        assert status_row is not None
+        assert status_row[0] == "uploading"
+        cursor.execute("SET ROLE app_api")
+        cursor.execute(
+            """
+            SELECT reservation_id, document_id, version_id
+            FROM app.reserve_upload_quota(
+              %s, 'member', %s, 512, 'upload-status', 'sess', NULL
+            )
+            """,
+            (user_id, auth_version),
+        )
+        replay = cursor.fetchone()
+        assert replay == (reservation_id, document_id, version_id)

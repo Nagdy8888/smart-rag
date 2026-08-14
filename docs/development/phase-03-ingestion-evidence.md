@@ -546,3 +546,161 @@ Categories present: `format`, `malware`, `governance`, `sensitive_data`, `ssrf`,
 ### Explicit acceptance request
 
 Please review this Packet 8 exit record and reply with acceptance or required blockers. Until accepted, Phase 3 stays pending and Phase 4 must not begin.
+
+The 2026-08-13 Packet 8 snapshot above recorded Hybrid Ready / OCR gates as `not_run`. The [Phase 3 gap close-out](#phase-3-gap-close-out) section supersedes that throughput/crash/Inbucket posture with later live-boundary commands. Phase wrapper status remains `pending`.
+
+## Phase 3 gap close-out
+
+Reopened Packets 2, 7, and 8 in evidence (checked boxes were not proof). Four implementation runs. Out of scope: LightRAG/`Graph Ready`, Hybrid ranking, real OpenAI embeddings, Phase 4. Stage graphs stay split (`scan_graph`, `crawl_graph`, `index_graph`) plus the BM25 worker loop.
+
+### Run 1 — durability (Packet 2 repair)
+
+Quoted requirement: leased jobs with heartbeat, reclaim, retry, checkpoints, dead-letter handling.
+
+| Path | Role |
+| --- | --- |
+| `apps/agents/pyproject.toml` | `langgraph-checkpoint-postgres==3.1.2` for `langgraph==1.2.11` |
+| `apps/agents/src/smart_rag_agents/ingestion/checkpointer.py` | PostgresSaver, schema `langgraph`, role `app_checkpointer`, no `setup()` |
+| `apps/worker/src/smart_rag_worker/lifecycle.py` | `thread_id` = ingestion `job_id`; resume after crash |
+| `packages/core/src/smart_rag_core/jobs/dead_letter.py` | `DeadLetterService.replay_ingestion` / `retry_ingestion` |
+| `apps/backend/src/smart_rag_api/routers/ingestion_status.py` | Retry API uses dead-letter service |
+| `supabase/migrations/20260814100000_langgraph_checkpoint_v9.sql` | Seeded checkpoint version 9; runtime does not auto-migrate |
+| `supabase/migrations/20260814101000_retry_ingestion_job_v1.sql` | New job + new idempotency key; original DL row retained |
+| `docs/ingestion/JOB_STATE_MACHINE.md` | Checkpointer / retry contract |
+| `docs/ingestion/INGESTION_LIMITS.md` | Checkpointer pin row |
+
+Acceptance proven on local Postgres: SKIP LOCKED claim, lease-loss cancel, checkpoint interrupt/resume without duplicate ledger rows, DL replay creates a second job, member retry 403. Failed-but-not-DL jobs only clear `next_attempt_at`.
+
+Owning tests (all passed in the Run 4 suite below): `tests/contract/test_checkpoint_postgres.py`, `tests/contract/test_job_leases.py`, `tests/contract/test_ingestion_retry.py`, `tests/unit/test_ingestion_status_openapi.py::test_member_retry_is_forbidden`.
+
+### Run 2 — pipeline chaining (Packet 7 repair)
+
+Quoted requirement: complete ingestion through verified Hybrid Ready and Graph Pending/Ineligible; representative file and website fixtures.
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/jobs/hybrid_enqueue.py` | Idempotent `hybrid_index` enqueue after scan/crawl |
+| `apps/agents/src/smart_rag_agents/ingestion/scan_graph.py` | Enqueue after successful promotion |
+| `apps/agents/src/smart_rag_agents/ingestion/crawl_graph.py` | Enqueue after successful crawl (`crawl_run_id` + snapshot refs) |
+| `apps/agents/src/smart_rag_agents/ingestion/index_graph.py` | Merge crawl snapshots into one website version |
+| `apps/backend/src/smart_rag_api/routers/ingestion_crawl.py` | Owner/admin approved-URL crawl enqueue; members cannot broaden |
+| `supabase/migrations/20260814102000_enqueue_approved_website_crawl_v1.sql` | `website_crawl` job + `document_sources` |
+| `supabase/migrations/20260814103300_hybrid_ready_requires_bm25_job_v1.sql` | Hybrid Ready blocked without BM25 job |
+| `supabase/migrations/20260814103400_app_worker_extensions_usage_v1.sql` | Worker grants for `search`/`extensions` + RLS on search tables |
+
+File and website fixtures reach BM25 outbox and verified Hybrid Ready without hand-inserted `hybrid_index` rows. Embeddings stay on the mock gateway with `ContentClass.SYNTHETIC`. Graph-ineligible replacements may become current in Phase 3; graph-eligible replacements stay non-current / `Graph Pending`.
+
+Owning tests: `tests/contract/test_hybrid_index_enqueue.py`, `tests/contract/test_hybrid_ready_e2e.py`, `tests/contract/test_hybrid_lifecycle.py`, `tests/unit/test_ingestion_crawl_openapi.py`.
+
+### Run 3 — lifecycle and status contract (Packet 7 repair)
+
+Quoted requirement: public lifecycle plus orthogonal diagnostics; status APIs; `Uploading`.
+
+| Path | Role |
+| --- | --- |
+| `supabase/migrations/20260814103000_document_status_uploading.sql` | Expand-only `'uploading'` enum |
+| `supabase/migrations/20260814103100_reserve_uploading_version_v1.sql` | Quota reserve creates `uploading` version |
+| `supabase/migrations/20260814103200_finalize_uploading_status_grants_v1.sql` | Finalize `uploading` → `uploaded` + scan enqueue |
+| `packages/core/src/smart_rag_core/schema/enums.py` | `DocumentStatus.UPLOADING` |
+| `apps/backend/src/smart_rag_api/schemas/ingestion_status.py` | Nested diagnostics (not new enums) |
+| `packages/core/src/smart_rag_core/repositories/ingestion_status.py` | Scan/review/OCR/chunk/embed/BM25/queue/handoff fields |
+
+`Uploading` is observable before finalize. Never-finalized 24h cleanup still deletes the uploading version + quota. OpenAPI registers nested diagnostic fields. Member retry remains 403.
+
+Owning tests: `tests/unit/test_ingestion_status_openapi.py`, `tests/contract/test_upload_finalize.py`, `tests/contract/test_quarantine_cleanup.py`.
+
+### Run 4 — Packet 8 proof
+
+Quoted requirement: adversarial/crash/throughput/exit proof on real local boundaries. Mocks only for provider-cost embeddings.
+
+#### Live stack (this developer machine, 2026-08-14)
+
+| Boundary | Evidence |
+| --- | --- |
+| Local Supabase Postgres | `127.0.0.1:54322` |
+| Packet 8 overlay | `docker-compose.yml` + `docker-compose.packet8.yml` (not for staging/production) |
+| ClamAV | `127.0.0.1:13310`; ping `PONG`; `ClamAV 1.5.4/28092/Fri Aug 14 06:27:02 2026`; `assert_scan_ready` newest signature `2026-08-14 06:27:02+00:00` |
+| ParadeDB | host overlay `:54329`; BM25 index bootstrapped by `ensure_paradedb_bm25_index()` |
+| Crawl-proxy | `http://127.0.0.1:18080` |
+| Parser sandbox | image `smart-rag-parser-sandbox:local` digest `sha256:b947d3428b048fc753e47fb4bb12bb6ad9ffbce9ef9b3a15d985a1f4671de827` (rebuilt 2026-08-14T11:29:14Z) |
+| Inbucket/Mailpit SMTP | `127.0.0.1:54325` via `tests/contract/test_admin_alert_smtp.py` |
+
+Parser sandbox repair required for QT-ING-002: `packages/core/src/smart_rag_core/ingestion/parser/__init__.py` no longer imports `ParserService` (which pulled JWKS/httpx into the no-network image). `infra/parser-sandbox/requirements.txt` pins `pydantic==2.13.4` for `ParseResult`. Rebuilt image OCRs `build_ocr_scanned_pdf()` to words `Scanned OCR fixture line`.
+
+ClamAV z-protocol: `_clamd_text` strips NUL so `PING`/`PONG` and VERSION dates parse. Canonical persist inserts parent/duplicate chunks first (`_chunks_in_fk_order`).
+
+`PENDING_E2E_CRASH_POINTS` is empty; owning tests exist for Storage mid-download, scan mid-crash, parser kill timeout, checkpoint interrupt, canonical rollback, embedding timeout-after-success (mock), BM25 mid-batch before verify, and Hybrid Ready flip blocked before verify.
+
+#### Commands and results
+
+Require-flags: `SMART_RAG_REQUIRE_JOB_INTEGRATION=1`, `SMART_RAG_REQUIRE_CLAMAV=1`, `SMART_RAG_REQUIRE_CRAWL_PROXY=1`.
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `docker compose --env-file .env.compose --profile parser-build build parser-sandbox` | 0 | Image rebuilt with pydantic + slim parser init |
+| `uv run ruff check` (parser init, sandbox tests, throughput, clamav, canonical, BM25, hybrid-ready driver, enqueue/lifecycle/e2e tests) | 0 | |
+| `uv run pyright` (parser init, clamav, canonical repository, bm25_indexer, hybrid_ready_driver) | 0 | 0 errors |
+| `uv run pytest` (Packet 8 close-out modules listed below) | 0 | 119 passed, 0 failed, 0 skipped |
+| `uv run python scripts/phase3_throughput_benchmark.py --iterations 10` | 0 | See throughput table |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 | markdownlint 55 files, 0 issues; links + Mermaid render |
+
+Packet 8 close-out pytest modules: `tests/unit/test_parser_sandbox.py`, `tests/unit/test_parser_adapters.py::test_ocr_scanned_pdf_has_no_selectable_text`, `tests/unit/test_clamav_client.py`, `tests/unit/test_ingestion_status_openapi.py`, `tests/unit/test_phase3_crash_injection.py`, `tests/unit/test_ingestion_crawl_openapi.py`, `tests/contract/test_parser_sandbox.py`, `tests/contract/test_hybrid_ready_e2e.py`, `tests/contract/test_hybrid_index_enqueue.py`, `tests/contract/test_hybrid_lifecycle.py`, `tests/contract/test_crawl_proxy_live.py`, `tests/contract/test_clamav_scan.py`, `tests/contract/test_checkpoint_postgres.py`, `tests/contract/test_ingestion_retry.py`, `tests/contract/test_admin_alert_smtp.py`, `tests/contract/test_upload_finalize.py`, `tests/contract/test_quarantine_cleanup.py`, `tests/contract/test_phase3_crash_canonical.py`, `tests/contract/test_phase3_crash_matrix.py`, `tests/contract/test_phase3_fixture_manifest.py`, `tests/contract/test_job_leases.py`.
+
+#### Throughput vs QT-ING-001 / QT-ING-002
+
+Hardware: local Windows 10 dev host. Embeddings: mock only (`mock_cost_usd=0.0`). Report: `.pytest_cache/phase3_throughput_report.json`.
+
+| Stage | Iterations | Pages | Elapsed s | Pages/hour | Gate | Met |
+| --- | --- | --- | --- | --- | --- | --- |
+| parse→chunk→mock-embed text PDF | 10 | 20 | 0.0618 | 1,165,643 | QT-ING-001 ≥500 | yes |
+| parse→chunk OCR scanned PDF (sandbox Tesseract) | 5 | 5 | 10.781 | 1,670 | QT-ING-002 ≥100 | yes |
+
+| Hybrid Ready field | Value |
+| --- | --- |
+| `hybrid_ready_gate` | `passed` (text + OCR fixtures through mock embed → canonical → BM25 verify) |
+| `projection_lag_seconds` | 1.005 |
+| `queue_fairness_note` | single-worker synthetic job; fairness not load-tested |
+| `resource_peaks_note` | not sampled; Phase 9 launch-hardware remeasure required |
+| `blockers` | `[]` |
+
+QT-BM25-003 p95 lag &lt;5 minutes: this synthetic drive measured 1.005s projection lag on the developer host; not a 1e6-chunk envelope and not launch hardware.
+
+#### Done when mapping (Phase 3)
+
+| Done-when theme | Evidence | Posture |
+| --- | --- | --- |
+| Governance packet signed; real company content blocked | Packet 1 evidence; deny-by-default tests | Proven (real content still prohibited) |
+| RLS upload, MFA/category/URL approval, quarantine quota/TTL, promotion saga, provenance | Packets 2–3 + Run 2 crawl enqueue + Run 3 uploading | Proven on local Postgres |
+| Anomaly → local admin notifications + Inbucket mail | `tests/contract/test_admin_alert_smtp.py` (DB row + Mailpit `54325`) | Proven locally |
+| Malware/stale/oversize/sensitive/SSRF/egress fail-closed | Manifest + live ClamAV EICAR + live crawl-proxy + archive-bomb expansion test | Proven with require-flags; overlay ports |
+| Leased SKIP LOCKED, heartbeat, dead-letter, checkpoint resume | Run 1 tests on local Postgres | Proven |
+| Parser sandbox + format/chunk matrix | Packets 5–6 + rebuilt sandbox OCR contract | Proven |
+| File + website to Hybrid Ready only after BM25 verify; Graph Pending/Ineligible only | `test_hybrid_ready_e2e.py`, `test_hybrid_lifecycle.py` | Proven (mock embeddings) |
+| Deletion/ACL immediate exclusion + BM25 cleanup | hybrid lifecycle tests | Proven |
+| Signed 500 text / 100 OCR pages/hour through Hybrid Ready | Throughput script exit 0 | Proven on this developer host only |
+| Status APIs for ingestion/review/retry/BM25/handoff + Uploading | Run 3 OpenAPI + reserve/finalize | Proven |
+
+#### Managed / production-only gaps
+
+- Named client DPA/ZDR/region verification; live OpenAI embedding adapter (Packet 1 stop route).
+- Managed Supabase / Vercel / LangSmith provider matrix before real company content.
+- Queue fairness under concurrent workers; CPU/RAM/IO peaks on launch hardware (Phase 9).
+- Production ClamAV/ParadeDB/proxy topology (do not ship `docker-compose.packet8.yml` overlay).
+- Phase 4 Hybrid ranking; Phase 5 LightRAG / `Graph Ready`.
+
+#### Deviations / rollback
+
+- Host overlay publishes ClamAV `:13310`, ParadeDB `:54329`, crawl-proxy `:18080` because Compose `private` is `internal: true`.
+- Parser sandbox image must be rebuilt after parser package changes; stale images fail import (`sandbox_nonzero` via `security.jwks`).
+- PDF fixture hashes remain `null` when PyMuPDF metadata is nondeterministic.
+- Rollback: revert close-out commits; `pnpm exec supabase db reset --yes`; rebuild parser sandbox from the reverted Dockerfile/requirements.
+
+### Phase status
+
+- Phase wrapper `status`: remains `pending`.
+- Do **not** start Phase 4 in this run.
+- **User acceptance required** before marking Phase 3 `complete`.
+
+### Explicit acceptance request
+
+Please review this Phase 3 gap close-out exit record (Runs 1–4) and reply with acceptance or required blockers. Until you accept it, Phase 3 stays pending and Phase 4 must not begin.

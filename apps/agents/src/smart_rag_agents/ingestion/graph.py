@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Literal, TypeAlias, TypedDict, cast
 from uuid import UUID
 
 import psycopg
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from smart_rag_core.jobs.exceptions import JobLeaseError
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.jobs.ledger import JobOperationLedger
+
+from smart_rag_agents.ingestion.checkpointer import compile_ingestion_graph
 
 
 class IngestionProbeState(TypedDict):
@@ -216,10 +220,31 @@ def build_ingestion_graph() -> IngestionStateGraph:
     return builder
 
 
-def build_probe_ingestion_graph() -> CompiledIngestionGraph:
-    """Compile the probe graph without a checkpointer (Phase 3 boundary only)."""
+def build_probe_ingestion_graph(
+    *,
+    checkpointer: BaseCheckpointSaver | None = None,
+    interrupt_after: Sequence[str] | None = None,
+) -> CompiledIngestionGraph:
+    """Compile the probe graph.
 
-    return build_ingestion_graph().compile()  # pyright: ignore[reportUnknownMemberType]
+    The module-level ``graph`` used by ``langgraph.json`` stays checkpointer-free
+    so Studio import does not open Postgres. The worker compiles a second
+    instance with ``PostgresSaver`` and ``thread_id=job_id``.
+
+    Args:
+        checkpointer: Optional durable Postgres checkpointer.
+        interrupt_after: Test-only interrupt points; omitted in production.
+
+    Returns:
+        Compiled probe graph.
+    """
+
+    compiled = compile_ingestion_graph(
+        build_ingestion_graph(),
+        checkpointer=checkpointer,
+        interrupt_after=interrupt_after,
+    )
+    return compiled  # pyright: ignore[reportReturnType]
 
 
 graph: CompiledIngestionGraph = build_probe_ingestion_graph()

@@ -11,8 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from smart_rag_core.ingestion.parser.adapters import infer_format, parse_file
+from smart_rag_core.ingestion.parser.archive import reject_archive_bomb
 from smart_rag_core.ingestion.parser.exceptions import (
     ParserError,
+    ParserLimitExceeded,
     ParserSandboxError,
 )
 from smart_rag_core.ingestion.parser.limits import (
@@ -87,6 +89,15 @@ class ParserSandboxLauncher:
                 format_key=format_key or "unknown",
                 code="limit_exceeded:input_bytes",
                 detail=f"input bytes {len(payload)} exceed max",
+            )
+        try:
+            reject_archive_bomb(payload)
+        except ParserLimitExceeded as exc:
+            return _failed_result(
+                content_hash=content_hash,
+                format_key=format_key or "zip",
+                code=exc.code,
+                detail=exc.detail,
             )
         if not self._config.use_docker:
             return self._run_inprocess(
