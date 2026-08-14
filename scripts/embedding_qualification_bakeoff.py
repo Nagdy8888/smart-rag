@@ -18,6 +18,11 @@ from pathlib import Path
 from typing import Any
 
 from openai import OpenAI
+from smart_rag_core.observability.langsmith_tracing import (
+    configure_langsmith,
+    traced_embeddings_create,
+    traced_openai_client,
+)
 from smart_rag_core.settings.base import SharedSettings, load_settings
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -262,17 +267,27 @@ def embed_texts(
     def embed_batch(
         batch_index: int, batch_texts: list[str]
     ) -> tuple[int, list[list[float]], int, float]:
-        """Embed one batch and return its index and vectors."""
+        """Embed one batch through the traced OpenAI factory.
+
+        Args:
+            batch_index: Offset of this batch in the original text list.
+            batch_texts: Bounded strings sent in one embeddings request.
+
+        Returns:
+            Batch index, vectors, token count, and latency in milliseconds.
+        """
 
         started = time.perf_counter()
         if candidate.model == "text-embedding-3-large":
-            response = client.embeddings.create(
+            response = traced_embeddings_create(
+                client,
                 model=candidate.model,
                 input=batch_texts,
                 dimensions=candidate.dimensions,
             )
         else:
-            response = client.embeddings.create(
+            response = traced_embeddings_create(
+                client,
                 model=candidate.model,
                 input=batch_texts,
             )
@@ -446,8 +461,9 @@ def main() -> int:
         print("OPENAI_API_KEY is required for live bakeoff.", file=sys.stderr)
         return 1
 
+    configure_langsmith(settings)
     slice_data = load_slice()
-    client = OpenAI(api_key=settings.openai_api_key.get_secret_value())
+    client = traced_openai_client(api_key=settings.openai_api_key.get_secret_value())
     report = run_bakeoff(client, slice_data)
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(

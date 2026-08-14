@@ -9,6 +9,10 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from smart_rag_core.ingestion.embeddings.mock_vectors import mock_embedding_vector
+from smart_rag_core.observability.langsmith_tracing import (
+    configure_langsmith,
+    model_call_traceable,
+)
 from smart_rag_core.settings import SharedSettings
 
 
@@ -79,21 +83,43 @@ class EmbeddingGateway:
 
         self._adapter = adapter
 
+    @model_call_traceable(name="embedding.embed", run_type="embedding")
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
-        """Delegate one validated batch to the configured adapter."""
+        """Delegate one validated batch to the configured adapter.
+
+        Args:
+            request: Bounded embedding batch.
+
+        Returns:
+            Provenance-marked vectors plus usage metadata.
+
+        Side Effects:
+            Creates a LangSmith span when tracing is enabled. Exported
+            fields are hashes and counts, never input text or vectors.
+        """
 
         return await self._adapter.embed(request)
 
 
 def create_embedding_gateway(settings: SharedSettings) -> EmbeddingGateway:
-    """Create the lifecycle-scoped embedding gateway."""
+    """Create the lifecycle-scoped embedding gateway.
 
+    Args:
+        settings: Validated deployable settings.
+
+    Returns:
+        Mock embedding gateway while ``MOCK_MODEL_MODE`` is true.
+
+    Raises:
+        ModelGatewayUnavailableError: If real-model embeddings are requested
+            before the verified OpenAI adapter exists.
+    """
+
+    configure_langsmith(settings)
     if not settings.mock_model_mode:
         from smart_rag_core.gateways.model import ModelGatewayUnavailableError
 
         raise ModelGatewayUnavailableError(
             "Real OpenAI embedding adapter requires verified provider settings"
         )
-    return EmbeddingGateway(
-        MockEmbeddingAdapter(fixture_id=settings.mock_fixture_id)
-    )
+    return EmbeddingGateway(MockEmbeddingAdapter(fixture_id=settings.mock_fixture_id))

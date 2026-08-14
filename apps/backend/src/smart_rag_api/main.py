@@ -39,7 +39,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
             the provider adapter is implemented.
 
     Side Effects:
-        Configures process logging and, in mock mode, denies OpenAI DNS access.
+        Configures process logging, LangSmith hide/tracing flags via the model
+        gateway factory, and, in mock mode, denies OpenAI DNS access.
         No provider or database client is constructed.
     """
 

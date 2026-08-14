@@ -621,5 +621,57 @@ It calibrates coverage/refusal by query class on development then
 qualification, never holdout, and freezes retrieval profiles. It must not
 implement DuckDB structured tables, LightRAG, or a local rerank model.
 
+## LangSmith gateway tracing (user gate, 2026-08-14)
+
+User instruction: every LLM/embedding call must be traced in LangSmith before
+further Phase 4 packets. This is not a Phase 4 plan packet. Phase 6 still owns
+production query-graph feedback and online evaluators.
+
+### Acceptance restated
+
+- `OpenAI()` construction in packages/apps/scripts exists only in
+  `traced_openai_client`.
+- Gateway `generate` / `generate_query_profile` / `generate_rerank` / `embed`
+  emit redacted spans when `LANGSMITH_TRACING=true`.
+- Exported payloads omit prompts, queries, excerpts, vectors, and API keys.
+- Tracing defaults off; `LANGSMITH_API_KEY` is required when tracing is on.
+- `LANGSMITH_HIDE_INPUTS` and `LANGSMITH_HIDE_OUTPUTS` are forced true.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/observability/langsmith_tracing.py` | Redacting `@traceable` helpers and OpenAI factory |
+| `packages/core/src/smart_rag_core/settings/base.py` | Typed `LANGSMITH_*` settings and SDK flag writes |
+| `packages/core/src/smart_rag_core/gateways/openai_rerank.py` | `traced_openai_client` plus `openai.responses.rerank` span |
+| `docs/development/LANGSMITH_TRACING.md` | Operator contract |
+| `langsmith==0.10.18` | Pinned SDK |
+| `openai==2.26.0` | Pinned on `smart-rag-core` |
+
+Primary docs: Context7 `/websites/langchain_langsmith` (`wrap_openai`,
+`LANGSMITH_TRACING`, `LANGSMITH_HIDE_INPUTS` /
+`LANGSMITH_HIDE_OUTPUTS`, `tracing_context`) and
+<https://docs.langchain.com/langsmith/mask-inputs-outputs>.
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run ruff check` (tracing/gateway/settings/tests listed above) | 0 |
+| `uv run pyright` (langsmith_tracing, openai_rerank, model, embedding, settings.base) | 0 |
+| `uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_openai_rerank.py tests/unit/test_model_gateway.py tests/unit/test_settings.py tests/unit/test_hybrid_rerank.py tests/unit/test_query_profile.py -q` | 0 (48 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (62 markdown files, 0 lint issues) |
+
+Holdout manifests were not read. Live LangSmith and live OpenAI were not
+called (`LANGSMITH_TRACING` default false, `MOCK_MODEL_MODE=true`).
+
+### Deviations
+
+- Live LangSmith project visibility is **unverified** until a real
+  `LANGSMITH_API_KEY` is used.
+- Real OpenAI embedding adapter remains unimplemented; mock `embed` is traced.
+- Phase 6 still owns agent/SSE production tracing and feedback taxonomy.
+
 [docs index](../README.md)
+[LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md)
 [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md)

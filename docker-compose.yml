@@ -164,6 +164,9 @@ services:
     environment:
       APP_ENV: local
       MOCK_MODEL_MODE: "true"
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-smart-rag}
       VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
       VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
       PARADEDB_URL: postgresql://${PARADEDB_READER_USER:-paradedb_reader}:${PARADEDB_READER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
@@ -204,6 +207,9 @@ services:
     environment:
       APP_ENV: local
       MOCK_MODEL_MODE: "true"
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-smart-rag}
       SUPABASE_DB_URL: ${SUPABASE_DB_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}
       WORKER_INSTANCE_ID: ${WORKER_INSTANCE_ID:-worker-local}
       JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-300}

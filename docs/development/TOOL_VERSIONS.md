@@ -49,6 +49,8 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | uvicorn[standard] | 0.52.1 |
 | pydantic | 2.13.4 |
 | pydantic-settings | 2.15.0 |
+| langsmith | 0.10.18 |
+| openai (core) | 2.26.0 |
 | typing-extensions | 4.16.0 |
 | pytest (dev) | 9.1.1 |
 | Ruff (dev) | 0.16.2 |

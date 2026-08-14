@@ -7,6 +7,11 @@ from dataclasses import dataclass
 
 import pytest
 from openai import BadRequestError, OpenAI
+from smart_rag_core.observability.langsmith_tracing import (
+    configure_langsmith,
+    traced_embeddings_create,
+    traced_openai_client,
+)
 from smart_rag_core.settings.base import SharedSettings, load_settings
 
 
@@ -52,7 +57,8 @@ def openai_client() -> OpenAI:
     if settings is None:
         pytest.skip("OPENAI_API_KEY missing or MOCK_MODEL_MODE enabled")
     assert settings.openai_api_key is not None
-    return OpenAI(api_key=settings.openai_api_key.get_secret_value())
+    configure_langsmith(settings)
+    return traced_openai_client(api_key=settings.openai_api_key.get_secret_value())
 
 
 @pytest.mark.parametrize("case", _CANDIDATES, ids=lambda case: case.case_id)
@@ -64,12 +70,14 @@ def test_supported_embedding_dimensions(
 
     expected_dim = case.dimensions or 1536
     if case.dimensions is None:
-        response = openai_client.embeddings.create(
+        response = traced_embeddings_create(
+            openai_client,
             input="Smart RAG embedding qualification probe.",
             model=case.model,
         )
     else:
-        response = openai_client.embeddings.create(
+        response = traced_embeddings_create(
+            openai_client,
             input="Smart RAG embedding qualification probe.",
             model=case.model,
             dimensions=case.dimensions,
@@ -87,7 +95,8 @@ def test_unsupported_embedding_dimension_raises(openai_client: OpenAI) -> None:
     """Unsupported dimensions fail explicitly instead of silently changing models."""
 
     with pytest.raises(BadRequestError):
-        openai_client.embeddings.create(
+        traced_embeddings_create(
+            openai_client,
             model="text-embedding-3-large",
             input="dimension contract failure probe",
             dimensions=99999,

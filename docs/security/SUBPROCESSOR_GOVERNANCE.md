@@ -37,12 +37,16 @@ Sources (2026-08-13): [Usage and billing / retention](https://docs.langchain.com
 | --- | --- | --- | --- | --- |
 | Trace retention tiers | Base 14 days; extended 400 days (Enterprise customizable) | unverified | unverified | product-owner |
 | Input/output logging | Configurable; can hide/mask/anonymize client-side | require hide or anonymizer before real content | unverified org enablement | engineering-lead |
-| Secrets redaction | SDK `create_anonymizer` | mandatory when tracing enabled | policy accepted; runtime Phase 6 | engineering-lead |
+| Secrets redaction | SDK hide I/O plus application `process_inputs` hashes | mandatory when tracing enabled | policy accepted; gateway runtime live; org anonymizer unverified | engineering-lead |
 | DPA | Available via LangChain enterprise process | not attached in-repo | unverified | product-owner |
 | Region / residency | Cloud vs self-hosted options | unverified | unverified | product-owner |
 | Incident / deletion | API delete by trace ID/metadata; retention purge | unverified contacts | unverified | product-owner |
 
-**Application rule:** Until verified, production-like runs keep LangSmith disabled or send only synthetic traces. Raw private source content is disabled or sampled only under an explicit development setting (global contracts).
+**Application rule:** Until org rows are `verified`, keep `LANGSMITH_TRACING`
+false for real company content. Gateway tracing may be enabled against
+synthetic fixtures; exported spans are hashes/counts/usage only. See
+[LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md). Raw private source
+content is never copied into traces.
 
 ## 3. Supabase settings matrix
 

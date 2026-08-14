@@ -13,6 +13,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from smart_rag_core.gateways.openai_rerank import (
     execute_openai_rerank,
 )
+from smart_rag_core.observability.langsmith_tracing import (
+    configure_langsmith,
+    model_call_traceable,
+)
 from smart_rag_core.query_profile.models import ModelInferredProfile
 from smart_rag_core.query_profile.versions import (
     PROFILE_PROMPT_SHA256,
@@ -441,6 +445,7 @@ class ModelGateway:
 
         self._adapter = adapter
 
+    @model_call_traceable(name="model.generate")
     async def generate(self, request: ModelRequest) -> ModelResponse:
         """Delegate one validated request to the configured adapter.
 
@@ -457,6 +462,7 @@ class ModelGateway:
 
         return await self._adapter.generate(request)
 
+    @model_call_traceable(name="model.query_profile")
     async def generate_query_profile(
         self, request: QueryProfileModelRequest
     ) -> QueryProfileModelResponse:
@@ -475,6 +481,7 @@ class ModelGateway:
 
         return await self._adapter.generate_query_profile(request)
 
+    @model_call_traceable(name="model.rerank")
     async def generate_rerank(self, request: RerankModelRequest) -> RerankModelResponse:
         """Delegate one structured rerank request. Never a hidden retry.
 
@@ -505,8 +512,12 @@ def create_model_gateway(settings: SharedSettings) -> ModelGateway:
 
     Raises:
         ModelGatewayUnavailableError: If real mode has no API key.
+
+    Side Effects:
+        Configures LangSmith hide/tracing flags from ``settings``.
     """
 
+    configure_langsmith(settings)
     if settings.mock_model_mode:
         return ModelGateway(
             MockModelAdapter(
@@ -516,7 +527,9 @@ def create_model_gateway(settings: SharedSettings) -> ModelGateway:
         )
     secret = settings.openai_api_key
     if secret is None:
-        raise ModelGatewayUnavailableError("OPENAI_API_KEY is required outside mock mode")
+        raise ModelGatewayUnavailableError(
+            "OPENAI_API_KEY is required outside mock mode"
+        )
     return ModelGateway(
         OpenAIRerankAdapter(
             api_key=secret.get_secret_value(),

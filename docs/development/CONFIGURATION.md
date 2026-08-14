@@ -22,6 +22,10 @@ Validation errors list field paths and categories but omit source values.
 | `MOCK_MODEL_MODE` | boolean; `true` | public | Secure default; selects frozen fixtures and denies DNS access to `api.openai.com` |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; `INFO` | public | Root JSON log threshold |
 | `OPENAI_API_KEY` | optional secret in mock mode | secret | Required when `MOCK_MODEL_MODE=false`; never logged or represented in plaintext |
+| `LANGSMITH_TRACING` | boolean; `false` | public | Off by default. When true, every gateway model/embedding call emits a redacted LangSmith span. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) |
+| `LANGSMITH_API_KEY` | optional secret | secret | Required when `LANGSMITH_TRACING=true`; never logged or represented in plaintext |
+| `LANGSMITH_PROJECT` | safe identifier; `smart-rag` | public | LangSmith project that receives redacted traces |
+| `LANGSMITH_ENDPOINT` | optional HTTP URL | internal | Override for a non-default LangSmith API; unset uses the hosted default |
 | `MOCK_MODEL_FIXTURE_ID` | safe identifier; `phase-1-foundation-v1` | internal | Included in fixture provenance; does not imply retrieval |
 | `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 16,384 | public | Deployable gateway input bound |
 | `VALKEY_LIMITS_URL` | optional URL | secret | May contain credentials; not connected during Packet 4 |
@@ -88,8 +92,9 @@ These placeholders are consumed by Docker Compose rather than Python settings:
 - `VALKEY_LIMITS_PASSWORD` and `VALKEY_CACHE_PASSWORD` are distinct private
   local credentials.
 
-`LANGSMITH_API_KEY`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY` remain commented,
-planned placeholders for Compose. Backend Packet 4+ reads `SUPABASE_URL` /
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` remain commented Compose placeholders.
+`LANGSMITH_API_KEY` is a typed SharedSettings secret, still optional while
+tracing is off. Backend Packet 4+ reads `SUPABASE_URL` /
 JWKS settings through `BackendSettings`. Privileged secrets
 `SUPABASE_AUTH_ADMIN_SECRET` and `SUPABASE_STORAGE_ADMIN_SECRET` load only
 inside `smart_rag_api.auth_admin` and `smart_rag_api.storage_admin`
@@ -98,6 +103,7 @@ respectively—never through `SharedSettings`.
 ## Failure and security behavior
 
 - Real-model mode without `OPENAI_API_KEY` fails startup.
+- Tracing enabled without `LANGSMITH_API_KEY` fails startup.
 - Invalid values fail startup with a sanitized `SettingsValidationError`.
 - Mock responses are deterministic, bounded, provenance-marked, and explicitly
   state that no retrieval or provider work occurred.

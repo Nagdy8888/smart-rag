@@ -35,6 +35,26 @@ _SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 )
 
 
+def current_correlation_ids() -> dict[str, str]:
+    """Return bound correlation identifiers that are safe to export.
+
+    Returns:
+        Mapping of present ``request_id``, ``run_id``, and ``job_id`` values.
+        Absent bindings are omitted. Values are already application-issued
+        identifiers, not user content.
+    """
+
+    payload: dict[str, str] = {}
+    for field, value in (
+        ("request_id", _REQUEST_ID.get()),
+        ("run_id", _RUN_ID.get()),
+        ("job_id", _JOB_ID.get()),
+    ):
+        if value is not None:
+            payload[field] = value
+    return payload
+
+
 def redact_text(value: str, *, max_length: int = 2_048) -> str:
     """Redact common credential forms and bound logged text.
 

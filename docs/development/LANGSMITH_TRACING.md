@@ -1,0 +1,109 @@
+---
+title: LangSmith tracing for model and embedding calls
+owner: engineering-lead
+status: draft
+last-reviewed: 2026-08-14
+audience: engineering, operators, security
+---
+
+# LangSmith tracing for model and embedding calls
+
+Every application OpenAI call goes through `ModelGateway`, `EmbeddingGateway`,
+or `traced_embeddings_create`. Those boundaries emit a LangSmith span when
+`LANGSMITH_TRACING=true`. Tracing is **off by default**, including mock-model
+mode. This is gateway-level tracing, not the Phase 6 production query-graph
+feedback loop.
+
+Related: [CONFIGURATION.md](./CONFIGURATION.md) ·
+[SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) ·
+[OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) ·
+[docs index](../README.md)
+
+## Data that is exported
+
+Exported fields are limited to:
+
+- Stable run names (`model.generate`, `model.query_profile`, `model.rerank`,
+  `embedding.embed`, `openai.responses.rerank`, `openai.embeddings`)
+- Operation, model id, prompt version, prompt SHA-256, candidate/excerpt
+  counts, character counts
+- SHA-256 prefixes of query/prompt/excerpt/input text (16 hex chars)
+- Token usage, provider request id, mode, ranking count
+- Correlation ids (`request_id`, `run_id`, `job_id`) when bound
+
+Never exported: raw prompts, user queries, canonical excerpts, embedding
+vectors, API keys, JWTs, emails, signed URLs, or file bytes.
+
+`LANGSMITH_HIDE_INPUTS` and `LANGSMITH_HIDE_OUTPUTS` are forced `true` at
+startup so `wrap_openai` child spans cannot send Responses `input` /
+`instructions` bodies. Application `process_inputs` / `process_outputs`
+hooks are the first control; hide flags are the second.
+
+## Runtime flow
+
+```mermaid
+flowchart LR
+  settings["SharedSettings"] --> configure["apply_langsmith_sdk_flags"]
+  configure --> hide["HideInputsAndOutputs"]
+  gateway["ModelOrEmbeddingGateway"] --> span["traceableRedactedSpan"]
+  span --> openaiCall["traced_openai_client"]
+  openaiCall --> openai["OpenAI"]
+  span --> langsmith["LangSmith"]
+  hide --> langsmith
+```
+
+```mermaid
+sequenceDiagram
+  participant Caller
+  participant Gateway
+  participant LangSmith
+  participant OpenAI
+  Caller->>Gateway: generate or embed
+  Gateway->>LangSmith: redacted span start
+  Gateway->>OpenAI: Responses or embeddings
+  OpenAI-->>Gateway: usage plus payload
+  Gateway->>LangSmith: redacted span end
+  Gateway-->>Caller: typed response
+```
+
+## Enablement
+
+1. Set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in the ignored env
+   file. Startup fails if tracing is true without a key.
+2. Optional: `LANGSMITH_PROJECT` (default `smart-rag`) and
+   `LANGSMITH_ENDPOINT` for a non-default API URL.
+3. Keep `MOCK_MODEL_MODE=true` for zero OpenAI cost. Mock gateway calls still
+   emit redacted spans when tracing is on, which is useful to confirm wiring
+   without sending company text to OpenAI.
+4. Real company content remains prohibited on LangSmith until org
+   retention/DPA/hide settings in
+   [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) are
+   `verified`. Use synthetic fixtures until then.
+
+## Failure modes
+
+| Condition | Behavior |
+| --- | --- |
+| Tracing off (default) | No LangSmith export. Model calls still go through the gateway. |
+| Tracing on, missing key | Settings validation fails at process start. |
+| LangSmith unreachable | SDK records a local tracing error; the OpenAI call is not retried for tracing. **unverified** live network failure until a key is used. |
+| `wrap_openai` child span | I/O hidden by forced env flags; parent span has hashes/counts only. |
+| Direct `OpenAI()` in packages/apps/scripts | Unit AST test fails. Use `traced_openai_client`. |
+
+`block_openai_network` still denies only `api.openai.com`. It does not block
+`api.smith.langchain.com`.
+
+## Verification
+
+```powershell
+uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_openai_rerank.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
+uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py tests/unit/test_langsmith_tracing.py
+```
+
+Live LangSmith project visibility is **unverified** until
+`LANGSMITH_TRACING=true` is used with a real key.
+
+## Rollback
+
+Set `LANGSMITH_TRACING=false` (the default) and restart API/worker. No
+database migration is involved.

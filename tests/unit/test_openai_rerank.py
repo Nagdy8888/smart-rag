@@ -112,7 +112,9 @@ def test_create_omits_tools_and_disables_retries() -> None:
             captured["client"] = kwargs
             self.responses = FakeResponses()
 
-    with patch("smart_rag_core.gateways.openai_rerank.OpenAI", FakeOpenAI):
+    with patch(
+        "smart_rag_core.gateways.openai_rerank.traced_openai_client", FakeOpenAI
+    ):
         payload, request_id, input_tokens, output_tokens = execute_openai_rerank(
             api_key="sk-test",
             prompt_text=PROMPT,
@@ -171,7 +173,7 @@ def test_timeout_maps_to_typed_fallback() -> None:
             self.responses = FakeResponses()
 
     with (
-        patch("smart_rag_core.gateways.openai_rerank.OpenAI", FakeOpenAI),
+        patch("smart_rag_core.gateways.openai_rerank.traced_openai_client", FakeOpenAI),
         pytest.raises(OpenAIRerankError, match="rerank_timeout"),
     ):
         _run(first, second)
@@ -214,7 +216,7 @@ def test_http_429_maps_to_budget_denied() -> None:
             self.responses = FakeResponses()
 
     with (
-        patch("smart_rag_core.gateways.openai_rerank.OpenAI", FakeOpenAI),
+        patch("smart_rag_core.gateways.openai_rerank.traced_openai_client", FakeOpenAI),
         pytest.raises(OpenAIRerankError, match="rerank_budget_denied"),
     ):
         _run(first, second)
@@ -258,7 +260,7 @@ def test_incomplete_status_after_success_falls_back() -> None:
             self.responses = FakeResponses()
 
     with (
-        patch("smart_rag_core.gateways.openai_rerank.OpenAI", FakeOpenAI),
+        patch("smart_rag_core.gateways.openai_rerank.traced_openai_client", FakeOpenAI),
         pytest.raises(OpenAIRerankError, match="rerank_incomplete"),
     ):
         _run(first, second)

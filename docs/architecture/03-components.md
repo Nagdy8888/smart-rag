@@ -16,6 +16,7 @@ flowchart LR
   worker["worker lifecycle"] --> graphs
   worker --> core
   core --> gw["ModelGateway"]
+  gw --> langsmith["LangSmithRedacted"]
   core --> repos["repositories planned"]
   core --> bm25["Bm25Retriever"]
   core --> dense["DenseRetriever"]
@@ -28,7 +29,7 @@ flowchart LR
 | FastAPI routers/middleware | `apps/backend` | foundation live/ready |
 | LangGraph query/ingestion scaffolds | `apps/agents` | loadable, unconfigured business |
 | Worker entrypoint | `apps/worker` | process contract only |
-| Settings / logging / model gateway | `packages/core` | Phase 1 Packet 4 |
+| Settings / logging / model gateway / LangSmith | `packages/core` | Gateway tracing live; production query-graph feedback is Phase 6 |
 | Hybrid retrieval / BM25 / LightRAG | `packages/core` | Phase 4 Packet 2 dense/BM25/term adapters; LightRAG Phase 5 |
 | Next.js UI | `apps/frontend` | scaffold; Stitch Phase 8 |
 
@@ -37,4 +38,5 @@ flowchart LR
 - [Containers](./02-containers.md)
 - [Workspace boundaries](../development/WORKSPACE_BOUNDARIES.md)
 - [Hybrid retrieval contract](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
+- [LangSmith tracing](../development/LANGSMITH_TRACING.md)
 - [docs index](../README.md)

@@ -7,6 +7,7 @@ time, and validation failures are converted to messages that omit input values.
 
 from __future__ import annotations
 
+import os
 from enum import StrEnum
 from typing import Self, TypeVar
 
@@ -49,6 +50,14 @@ class SharedSettings(BaseSettings):
             default ``INFO``.
         openai_api_key: Provider credential from ``OPENAI_API_KEY``. Secret and
             optional only while mock mode is enabled.
+        langsmith_tracing: Whether LangSmith export is enabled from
+            ``LANGSMITH_TRACING``. Public, secure default ``false``.
+        langsmith_api_key: LangSmith credential from ``LANGSMITH_API_KEY``.
+            Secret; required when tracing is enabled.
+        langsmith_project: LangSmith project name from ``LANGSMITH_PROJECT``.
+            Public, default ``smart-rag``.
+        langsmith_endpoint: Optional LangSmith API URL from
+            ``LANGSMITH_ENDPOINT``. Internal.
         mock_fixture_id: Frozen fixture identifier from
             ``MOCK_MODEL_FIXTURE_ID``. Internal, default
             ``phase-1-foundation-v1``.
@@ -94,6 +103,33 @@ class SharedSettings(BaseSettings):
         validation_alias="OPENAI_API_KEY",
         description="OpenAI credential required only outside mock mode.",
         json_schema_extra={"security": "secret"},
+    )
+    langsmith_tracing: bool = Field(
+        default=False,
+        validation_alias="LANGSMITH_TRACING",
+        description="Export redacted model-call traces to LangSmith.",
+        json_schema_extra={"security": "public"},
+    )
+    langsmith_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias="LANGSMITH_API_KEY",
+        description="LangSmith credential required when tracing is enabled.",
+        json_schema_extra={"security": "secret"},
+    )
+    langsmith_project: str = Field(
+        default="smart-rag",
+        validation_alias="LANGSMITH_PROJECT",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._-]+$",
+        description="LangSmith project that receives redacted traces.",
+        json_schema_extra={"security": "public"},
+    )
+    langsmith_endpoint: AnyHttpUrl | None = Field(
+        default=None,
+        validation_alias="LANGSMITH_ENDPOINT",
+        description="Optional LangSmith API URL; unset uses the hosted default.",
+        json_schema_extra={"security": "internal"},
     )
     mock_fixture_id: str = Field(
         default="phase-1-foundation-v1",
@@ -151,6 +187,60 @@ class SharedSettings(BaseSettings):
         if not self.mock_model_mode and self.openai_api_key is None:
             raise ValueError("OPENAI_API_KEY is required when MOCK_MODEL_MODE=false")
         return self
+
+    @model_validator(mode="after")
+    def require_langsmith_key_when_tracing(self) -> Self:
+        """Require a LangSmith credential when trace export is enabled.
+
+        Returns:
+            The validated settings instance.
+
+        Raises:
+            ValueError: If tracing is enabled without ``LANGSMITH_API_KEY``.
+        """
+
+        if self.langsmith_tracing and self.langsmith_api_key is None:
+            raise ValueError(
+                "LANGSMITH_API_KEY is required when LANGSMITH_TRACING=true"
+            )
+        return self
+
+    def apply_langsmith_sdk_flags(self) -> dict[str, str]:
+        """Write LangSmith SDK process flags from already-validated settings.
+
+        Hide-input and hide-output are always enabled so wrapper-generated
+        child spans cannot export Responses or embedding bodies. Tracing is
+        forced off unless this instance enabled it, so a leftover shell
+        variable cannot outrank the typed contract.
+
+        Returns:
+            Applied flag names and non-secret values. The API key is omitted.
+
+        Side Effects:
+            Mutates ``LANGSMITH_*`` process environment keys consumed by the
+            pinned LangSmith SDK. Does not open a network connection.
+        """
+
+        os.environ["LANGSMITH_HIDE_INPUTS"] = "true"
+        os.environ["LANGSMITH_HIDE_OUTPUTS"] = "true"
+        applied: dict[str, str] = {
+            "LANGSMITH_HIDE_INPUTS": "true",
+            "LANGSMITH_HIDE_OUTPUTS": "true",
+            "LANGSMITH_TRACING": "false",
+            "LANGSMITH_PROJECT": self.langsmith_project,
+        }
+        if not self.langsmith_tracing or self.langsmith_api_key is None:
+            os.environ["LANGSMITH_TRACING"] = "false"
+            return applied
+        os.environ["LANGSMITH_TRACING"] = "true"
+        os.environ["LANGSMITH_API_KEY"] = self.langsmith_api_key.get_secret_value()
+        os.environ["LANGSMITH_PROJECT"] = self.langsmith_project
+        applied["LANGSMITH_TRACING"] = "true"
+        if self.langsmith_endpoint is not None:
+            endpoint = str(self.langsmith_endpoint).rstrip("/")
+            os.environ["LANGSMITH_ENDPOINT"] = endpoint
+            applied["LANGSMITH_ENDPOINT"] = endpoint
+        return applied
 
 
 SettingsT = TypeVar("SettingsT", bound=BaseSettings)

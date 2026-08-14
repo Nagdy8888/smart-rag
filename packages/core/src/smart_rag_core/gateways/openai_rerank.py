@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 from typing import cast
 
-from openai import APIStatusError, APITimeoutError, AuthenticationError, OpenAI
+from openai import APIStatusError, APITimeoutError, AuthenticationError
 
+from smart_rag_core.observability.langsmith_tracing import (
+    rerank_responses_traceable,
+    traced_openai_client,
+)
 from smart_rag_core.retrieval.profiles import (
     ALLOWED_RERANK_MODEL_IDS,
     RERANK_MAX_OUTPUT_TOKENS,
@@ -33,6 +37,7 @@ class OpenAIRerankError(RuntimeError):
         self.reason = reason
 
 
+@rerank_responses_traceable
 def execute_openai_rerank(
     *,
     api_key: str,
@@ -68,7 +73,9 @@ def execute_openai_rerank(
         ValueError: If versions or the model id are not allow-listed.
 
     Side Effects:
-        One HTTPS Responses request. ``max_retries=0``. No tools.
+        One HTTPS Responses request. ``max_retries=0``. No tools. When
+        LangSmith tracing is enabled, a redacted ``openai.responses.rerank``
+        span is exported.
     """
 
     if prompt_version != RERANK_PROMPT_VERSION or prompt_sha256 != RERANK_PROMPT_SHA256:
@@ -77,7 +84,9 @@ def execute_openai_rerank(
         raise OpenAIRerankError("rerank_version_mismatch")
     if timeout_seconds <= 0:
         raise OpenAIRerankError("rerank_budget_denied")
-    client = OpenAI(api_key=api_key, max_retries=0, timeout=timeout_seconds)
+    client = traced_openai_client(
+        api_key=api_key, max_retries=0, timeout=timeout_seconds
+    )
     schema = rerank_json_schema(candidate_ids, input_hash=input_hash)
     user_payload = {
         "query": query,
