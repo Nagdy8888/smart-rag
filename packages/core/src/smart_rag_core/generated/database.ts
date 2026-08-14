@@ -3003,6 +3003,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fetch_authorized_chunk_context: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_chunk_ids: string[]
+        }
+        Returns: {
+          chunk_id: string
+          chunk_index: number
+          document_id: string
+          is_search_representative: boolean
+          page_number: number
+          parent_chunk_id: string
+          raw_text: string
+          section_path: string[]
+          token_count: number
+          version_id: string
+        }[]
+      }
       finalize_hybrid_ready: {
         Args: {
           p_bm25_job_id?: string

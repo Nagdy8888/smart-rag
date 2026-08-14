@@ -489,4 +489,137 @@ fallback, skipped-case counterfactuals, MMR, quotas, and parent expansion.
 It must not calibrate coverage thresholds on holdout, implement DuckDB
 structured tables, or add a local rerank model.
 
+## Packet 5 — accuracy-first rerank, fallback, MMR, parent expansion
+
+### Quoted requirement
+
+> Implement the accuracy-first top-20 OpenAI reranker contract, deterministic
+> fallback, skipped-case counterfactuals, MMR, quotas, and parent expansion.
+
+### Acceptance checks restated
+
+- Strict schema plus application set-equality rejects unknown, duplicate,
+  missing, extra, and malformed IDs; fallback preserves deterministic
+  authorized RRF order.
+- All non-trivial eligible cases rerank; every development/qualification skip
+  has counterfactual evidence before trigger tightening.
+- MMR/quotas improve duplicate/source diversity without violating citation
+  gates; parent expansion stays authorized/current and inside 12 units / 3500
+  tokens.
+- Repository dependency scan proves no local rerank model/runtime.
+- One Responses operation, `max_retries=0`, no tools; support is a ranking
+  feature, not a probability.
+- Skip only trivial exact identifier/quoted-phrase with complete terms/filters
+  and two independent channel signals; never score-gap skip.
+- Live OpenAI is unused while `MOCK_MODEL_MODE=true`.
+
+### Negative tests restated
+
+Prompt/schema injection, unknown/duplicate/missing IDs, refusal/incomplete
+response, support out of bounds, timeout-after-success, 429, budget/cancel/
+version mismatch, single-document crowding, stale parent, and over-budget
+context take deterministic safe routes.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `supabase/migrations/20260814140000_hybrid_rerank_context_v1.sql` | `app.fetch_authorized_chunk_context` SECURITY INVOKER, `app_api` only |
+| `packages/core/src/smart_rag_core/retrieval/rerank.py` | Pool, skip policy, schema, MMR, quotas, token trim |
+| `packages/core/src/smart_rag_core/retrieval/reranker.py` | One-shot gateway adapter; empty rankings on failure |
+| `packages/core/src/smart_rag_core/retrieval/context.py` | Select, parent recheck, adjacent from authorized pool |
+| `packages/core/src/smart_rag_core/gateways/openai_rerank.py` | `OpenAI(max_retries=0)` + `responses.create`, no `tools` |
+| `apps/agents/src/smart_rag_agents/prompts/rerank_v1.md` | Prompt `rerank_v1` |
+| `scripts/eval_rerank_counterfactual.py` | Holdout-blind always vs skip |
+| `docs/evaluation/RERANK_COUNTERFACTUAL.md` | Counterfactual report |
+| `docs/retrieval/HYBRID_RETRIEVAL_CONTRACT.md` | Frozen Packet 5 tunables |
+| `openai==2.26.0` | Pinned SDK |
+
+Prompt SHA-256 `4767049107cfe6e8591c84d3b1d202393dfd2564383e6c5bfa0bd5fece8f1925`.
+Allow-listed model `gpt-4o-mini`. Frozen: `RERANK_POOL_SIZE=20`,
+`RERANK_MAX_PER_DOCUMENT=5`, `RERANK_EXCERPT_CHARS=400`, `MMR_LAMBDA=0.7`
+(provisional), document/section quota `2/2`, final `12` units / `3500` tokens.
+
+### Primary documentation sources (2026-08-14)
+
+- OpenAI Python `OpenAI(max_retries=0, timeout=...)` and
+  `client.responses.create` with `text.format` `json_schema` `strict=True`,
+  `store=False`, optional `tools` omitted:
+  Context7 `/openai/openai-python` (v2.11.0 README + Responses create
+  signature) and
+  <https://github.com/openai/openai-python>
+- Structured Outputs JSON Schema:
+  <https://platform.openai.com/docs/guides/structured-outputs>
+- Token Jaccard MMR on `arabic_norm_v1` (in-repo normalizer)
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run ruff check` (Packet 5 rerank/context/gateway/tests) | 0 |
+| `uv run pyright` (Packet 5 modules only; not whole `gateways/`) | 0 |
+| `uv run pytest tests/unit/test_hybrid_rerank.py tests/unit/test_openai_rerank.py tests/unit/test_hybrid_fusion.py tests/unit/test_model_gateway.py -q` | 0 (35 passed) |
+| `uv run pytest tests/contract/test_hybrid_rerank.py -q` | 0 (2 passed; local migration applied) |
+| `uv run python scripts/eval_rerank_counterfactual.py` | 0; 293 open-split cases, 43 skipped, 250 reranked, nDCG@5 delta 0.0 |
+| `uv run python scripts/ci/check_migrations.py` | 0 (36 reviewed files) |
+| `pnpm exec supabase gen types typescript --local --schema app,public,storage,auth` | 0; UTF-8 `database.ts` includes `fetch_authorized_chunk_context` |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (61 markdown files, 0 lint issues) |
+
+Holdout manifests were not read. Live OpenAI was not called
+(`MOCK_MODEL_MODE=true`).
+
+### Negative tests
+
+| Fixture | Result |
+| --- | --- |
+| Duplicate candidate ID | `rerank_duplicate_id` |
+| Unknown candidate ID | `rerank_unknown_or_missing_id` |
+| Extra ranking row | `rerank_ranking_length` |
+| Support 1.5 | `rerank_support_out_of_bounds` |
+| Status `incomplete` | `rerank_incomplete` |
+| Input hash mismatch | `rerank_input_hash_mismatch` |
+| Schema/timeout rerank fn | fused RRF order preserved |
+| HTTP 429 | `rerank_budget_denied` |
+| API timeout | `rerank_timeout` |
+| Incomplete status after usage | `rerank_incomplete` |
+| `tools` kwarg | omitted from `responses.create` |
+| SDK retries | `max_retries=0` |
+| Zero deadline | `BUDGET_DENIED`, no gateway call |
+| Single-document crowding | document quota drops extras |
+| Stale parent ID | omitted after recheck |
+| Over-budget parent | `trim_token_budget` drops units over 3500 |
+| Restricted/deleted context IDs | omitted by RPC |
+| `sentence-transformers` / `flashrank` in pyproject/uv.lock | absent |
+| Counterfactual AST `HOLDOUT` / `load_holdout` | absent |
+
+### Deviations
+
+- Live OpenAI always-rerank quality, latency, and cost are **unverified**.
+  Mock identity rankings equal fused RRF order; skip-versus-always deltas on
+  the 43 exact-code skip cases are MMR/quota-only and measured 0.0 nDCG@5.
+- `MMR_LAMBDA=0.7` and document/section quotas `2/2` are provisional until
+  Packet 6 measures development then qualification.
+- Adjacent expansion uses already-authorized pool neighbors
+  (`chunk_index ± 1` on the same version). Parents use the context RPC because
+  they may be non-representative.
+- Chat and query-profile OpenAI adapters remain unavailable; only rerank is
+  wired when `MOCK_MODEL_MODE=false`.
+- Durable token ledger rows for live rerank calls are **unverified** until a
+  live key is configured.
+
+### Rollback
+
+- Revert Packet 5 Python modules, prompt, tests, and
+  `20260814140000_hybrid_rerank_context_v1.sql`.
+- Restore `HYBRID_RETRIEVAL_CONTRACT.md` Packet 5 rows to "not applied".
+- Keep Packet 4 fusion RPCs and `rrf_k=60`.
+
+### Packet 6 handoff
+
+Packet 6 may start after this Packet 5 evidence is accepted in-repo (checkbox).
+It calibrates coverage/refusal by query class on development then
+qualification, never holdout, and freezes retrieval profiles. It must not
+implement DuckDB structured tables, LightRAG, or a local rerank model.
+
 [docs index](../README.md)
+[RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md)

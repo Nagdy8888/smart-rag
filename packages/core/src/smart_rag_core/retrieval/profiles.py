@@ -2,8 +2,9 @@
 
 Packet 2 froze channel caps and HNSW. Packet 4 freezes ``rrf_k=60``, equal
 channel weights, the 205 pre-fusion union cap, metadata clamp ``[1.0, 1.15]``,
-the 90-day ``recent`` window, and the 25-second Hybrid deadline. Rerank, MMR,
-and coverage/refusal thresholds belong to Packets 5-6.
+the 90-day ``recent`` window, and the 25-second Hybrid deadline. Packet 5 freezes
+the top-20 rerank pool, max five passages per document, MMR lambda 0.7, and
+parent/context bounds. Coverage/refusal thresholds belong to Packet 6.
 """
 
 from __future__ import annotations
@@ -35,6 +36,19 @@ HYBRID_DEADLINE_SECONDS = 25
 CHANNEL_WEIGHT_DENSE = 1.0
 CHANNEL_WEIGHT_BM25 = 1.0
 CHANNEL_WEIGHT_TERM = 1.0
+RERANK_POOL_SIZE = 20
+RERANK_MAX_PER_DOCUMENT = 5
+RERANK_EXCERPT_CHARS = 400
+RERANK_MODEL_ID = "gpt-4o-mini"
+ALLOWED_RERANK_MODEL_IDS = frozenset({RERANK_MODEL_ID})
+RERANK_PROMPT_VERSION = "rerank_v1"
+RERANK_MAX_OUTPUT_TOKENS = 2_048
+FINAL_EVIDENCE_MAX = 12
+FINAL_TOKEN_BUDGET = 3_500
+MMR_LAMBDA = 0.7
+MMR_CANDIDATE_DEPTH = 20
+DOCUMENT_QUOTA = 2
+SECTION_QUOTA = 2
 
 
 class HnswProfileId(StrEnum):

@@ -10,10 +10,19 @@ from unittest.mock import patch
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from smart_rag_core.gateways.openai_rerank import (
+    execute_openai_rerank,
+)
 from smart_rag_core.query_profile.models import ModelInferredProfile
 from smart_rag_core.query_profile.versions import (
     PROFILE_PROMPT_SHA256,
     PROFILE_PROMPT_VERSION,
+)
+from smart_rag_core.retrieval.profiles import RERANK_MODEL_ID
+from smart_rag_core.retrieval.rerank import rerank_input_hash
+from smart_rag_core.retrieval.rerank_versions import (
+    RERANK_PROMPT_SHA256,
+    RERANK_PROMPT_VERSION,
 )
 from smart_rag_core.settings import SharedSettings
 
@@ -98,6 +107,58 @@ class QueryProfileModelResponse(BaseModel):
     retrieval_performed: Literal[False] = False
 
 
+class RerankModelRequest(BaseModel):
+    """Bounded structured rerank request. No tools or retrieval.
+
+    Attributes:
+        operation: Must be ``rerank``.
+        query: Original user query.
+        prompt_version: Pinned rerank prompt version.
+        prompt_sha256: Hash of that prompt file.
+        prompt_text: Prompt body used as Responses instructions.
+        model_id: Allow-listed model.
+        candidate_ids: Pool IDs as strings.
+        excerpts: Canonical excerpts aligned with IDs.
+        remaining_deadline_seconds: Client timeout bound.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: Literal["rerank"] = "rerank"
+    query: str = Field(min_length=1, max_length=2000)
+    prompt_version: str = RERANK_PROMPT_VERSION
+    prompt_sha256: str = RERANK_PROMPT_SHA256
+    prompt_text: str = Field(min_length=1, max_length=16_384)
+    model_id: str = RERANK_MODEL_ID
+    candidate_ids: list[str] = Field(min_length=2, max_length=20)
+    excerpts: list[str] = Field(min_length=2, max_length=20)
+    remaining_deadline_seconds: float = Field(gt=0, le=25)
+
+
+class RerankModelResponse(BaseModel):
+    """Structured rerank payload plus usage for one operation.
+
+    Attributes:
+        mode: Adapter mode.
+        payload: JSON object awaiting application set-equality checks.
+        request_id: Provider or fixture id.
+        input_tokens: Usage input tokens.
+        output_tokens: Usage output tokens.
+        model_calls: Always 1 when this response is returned.
+        retrieval_performed: Always false.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["mock", "openai"]
+    payload: dict[str, object]
+    request_id: str = Field(min_length=1, max_length=128)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    model_calls: Literal[1] = 1
+    retrieval_performed: Literal[False] = False
+
+
 class ModelAdapter(Protocol):
     """Protocol implemented by model provider adapters."""
 
@@ -126,6 +187,18 @@ class ModelAdapter(Protocol):
 
         Returns:
             Structured profile response.
+        """
+
+        ...
+
+    async def generate_rerank(self, request: RerankModelRequest) -> RerankModelResponse:
+        """Generate at most one structured rerank payload.
+
+        Args:
+            request: Validated rerank request.
+
+        Returns:
+            Structured rerank response.
         """
 
         ...
@@ -210,6 +283,151 @@ class MockModelAdapter:
             retrieval_performed=False,
         )
 
+    async def generate_rerank(self, request: RerankModelRequest) -> RerankModelResponse:
+        """Return identity rankings without a provider call.
+
+        Args:
+            request: Structured rerank request.
+
+        Returns:
+            Mock payload that preserves fused order.
+
+        Raises:
+            ValueError: If versions, lengths, or the input bound fail.
+
+        Side Effects:
+            None. No network, retrieval, or tool calls.
+        """
+
+        if (
+            request.prompt_version != RERANK_PROMPT_VERSION
+            or request.prompt_sha256 != RERANK_PROMPT_SHA256
+        ):
+            raise ValueError("rerank_prompt_version_mismatch")
+        if len(request.candidate_ids) != len(request.excerpts):
+            raise ValueError("rerank_excerpt_alignment")
+        joined = request.query + "".join(request.excerpts)
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        digest = rerank_input_hash(
+            query=request.query,
+            candidate_ids=tuple(request.candidate_ids),
+            excerpts=tuple(request.excerpts),
+            prompt_sha256=request.prompt_sha256,
+        )
+        rankings: list[dict[str, object]] = [
+            {
+                "chunk_id": chunk_id,
+                "rank": index,
+                "support": 1.0 if index == 1 else 0.5,
+            }
+            for index, chunk_id in enumerate(request.candidate_ids, start=1)
+        ]
+        return RerankModelResponse(
+            mode="mock",
+            payload={
+                "status": "complete",
+                "input_hash": digest,
+                "rankings": rankings,
+            },
+            request_id=f"mock-rerank-{self._fixture_id}",
+            input_tokens=0,
+            output_tokens=0,
+        )
+
+
+class OpenAIRerankAdapter:
+    """Packet 5 OpenAI adapter. Chat and profile calls stay unavailable."""
+
+    def __init__(self, *, api_key: str, max_input_chars: int) -> None:
+        """Store the credential for one-shot rerank calls.
+
+        Args:
+            api_key: Provider secret. Never logged.
+            max_input_chars: Deployable input bound.
+        """
+
+        self._api_key = api_key
+        self._max_input_chars = max_input_chars
+
+    async def generate(self, request: ModelRequest) -> ModelResponse:
+        """Refuse chat generation. Answer prompts are Phase 6.
+
+        Args:
+            request: Foundation probe request.
+
+        Raises:
+            ModelGatewayUnavailableError: Always.
+        """
+
+        raise ModelGatewayUnavailableError("chat_generation_not_configured")
+
+    async def generate_query_profile(
+        self, request: QueryProfileModelRequest
+    ) -> QueryProfileModelResponse:
+        """Refuse live profile calls in this packet.
+
+        Args:
+            request: Profile request.
+
+        Raises:
+            ModelGatewayUnavailableError: Always. Packet 3 remains mock-first.
+        """
+
+        raise ModelGatewayUnavailableError("query_profile_openai_not_configured")
+
+    async def generate_rerank(self, request: RerankModelRequest) -> RerankModelResponse:
+        """Execute one Responses rerank operation.
+
+        Args:
+            request: Bounded rerank request.
+
+        Returns:
+            Provider JSON payload plus usage.
+
+        Raises:
+            OpenAIRerankError: Typed provider failure.
+            ValueError: Input bound or alignment errors.
+
+        Side Effects:
+            One HTTPS call with ``max_retries=0``.
+        """
+
+        if len(request.candidate_ids) != len(request.excerpts):
+            raise ValueError("rerank_excerpt_alignment")
+        joined = request.query + "".join(request.excerpts)
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        digest = rerank_input_hash(
+            query=request.query,
+            candidate_ids=tuple(request.candidate_ids),
+            excerpts=tuple(request.excerpts),
+            prompt_sha256=request.prompt_sha256,
+        )
+        payload, request_id, input_tokens, output_tokens = execute_openai_rerank(
+            api_key=self._api_key,
+            prompt_text=request.prompt_text,
+            prompt_sha256=request.prompt_sha256,
+            prompt_version=request.prompt_version,
+            model_id=request.model_id,
+            query=request.query,
+            candidate_ids=tuple(request.candidate_ids),
+            excerpts=tuple(request.excerpts),
+            input_hash=digest,
+            timeout_seconds=request.remaining_deadline_seconds,
+        )
+        return RerankModelResponse(
+            mode="openai",
+            payload=payload,
+            request_id=request_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
 
 class ModelGateway:
     """Single application-owned boundary for all model invocations."""
@@ -257,6 +475,23 @@ class ModelGateway:
 
         return await self._adapter.generate_query_profile(request)
 
+    async def generate_rerank(self, request: RerankModelRequest) -> RerankModelResponse:
+        """Delegate one structured rerank request. Never a hidden retry.
+
+        Args:
+            request: Bounded rerank request.
+
+        Returns:
+            Structured rerank response plus usage.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            OpenAIRerankError: Typed provider failure.
+            ValueError: If a deployable bound is exceeded.
+        """
+
+        return await self._adapter.generate_rerank(request)
+
 
 def create_model_gateway(settings: SharedSettings) -> ModelGateway:
     """Create the lifecycle-scoped gateway selected by validated settings.
@@ -265,20 +500,26 @@ def create_model_gateway(settings: SharedSettings) -> ModelGateway:
         settings: Validated deployable settings.
 
     Returns:
-        A gateway backed by the frozen mock adapter.
+        Mock adapter when ``MOCK_MODEL_MODE`` is true; otherwise the Packet 5
+        OpenAI rerank adapter (chat/profile remain unavailable).
 
     Raises:
-        ModelGatewayUnavailableError: If real-model mode is selected. The
-            OpenAI adapter is intentionally deferred; no fake real path exists.
+        ModelGatewayUnavailableError: If real mode has no API key.
     """
 
-    if not settings.mock_model_mode:
-        raise ModelGatewayUnavailableError(
-            "Real OpenAI adapter is not configured in the Phase 1 foundation"
+    if settings.mock_model_mode:
+        return ModelGateway(
+            MockModelAdapter(
+                fixture_id=settings.mock_fixture_id,
+                max_input_chars=settings.model_input_max_chars,
+            )
         )
+    secret = settings.openai_api_key
+    if secret is None:
+        raise ModelGatewayUnavailableError("OPENAI_API_KEY is required outside mock mode")
     return ModelGateway(
-        MockModelAdapter(
-            fixture_id=settings.mock_fixture_id,
+        OpenAIRerankAdapter(
+            api_key=secret.get_secret_value(),
             max_input_chars=settings.model_input_max_chars,
         )
     )

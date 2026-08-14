@@ -15,6 +15,8 @@ from smart_rag_core.gateways.model import (
     ModelResponse,
     QueryProfileModelRequest,
     QueryProfileModelResponse,
+    RerankModelRequest,
+    RerankModelResponse,
     block_openai_network,
     create_model_gateway,
 )
@@ -31,6 +33,8 @@ __all__ = [
     "ModelResponse",
     "QueryProfileModelRequest",
     "QueryProfileModelResponse",
+    "RerankModelRequest",
+    "RerankModelResponse",
     "block_openai_network",
     "create_embedding_gateway",
     "create_model_gateway",

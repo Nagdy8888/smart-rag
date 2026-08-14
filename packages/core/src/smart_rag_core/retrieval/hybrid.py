@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
@@ -43,6 +44,7 @@ class HybridRetrievalResult:
         deadline_exhausted: True when a channel missed the remaining deadline.
         cache_key: Versioned ID-only cache key.
         scanned_bm25: BM25 IDs scanned before recheck, for evidence.
+        channel_hits: Independent channels that retrieved each fused ID.
     """
 
     fused: tuple[RetrievalCandidate, ...]
@@ -51,6 +53,7 @@ class HybridRetrievalResult:
     deadline_exhausted: bool
     cache_key: str
     scanned_bm25: tuple[UUID, ...] = ()
+    channel_hits: dict[UUID, frozenset[str]] | None = None
 
 
 def assemble_hybrid(
@@ -173,6 +176,17 @@ def assemble_hybrid(
     )
     if len(scanned_bm25) > BM25_SCAN_ID_CAP:
         scanned_bm25 = scanned_bm25[:BM25_SCAN_ID_CAP]
+    hits: dict[UUID, set[str]] = defaultdict(set)
+    for variant in dense_capped:
+        for item in variant:
+            hits[item.chunk_id].add("dense")
+    for variant in bm25_capped:
+        for item in variant:
+            hits[item.chunk_id].add("bm25")
+    for variant in term_capped:
+        for item in variant:
+            hits[item.chunk_id].add("term")
+    channel_hits = {chunk_id: frozenset(names) for chunk_id, names in hits.items()}
     return HybridRetrievalResult(
         fused=fused,
         coverage=coverage,
@@ -180,6 +194,7 @@ def assemble_hybrid(
         deadline_exhausted=False,
         cache_key=key,
         scanned_bm25=scanned_bm25,
+        channel_hits=channel_hits,
     )
 
 

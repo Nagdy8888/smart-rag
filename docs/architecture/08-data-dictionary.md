@@ -142,7 +142,10 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - `documents.graph_eligible` requires `company_visible`, non-null current version, and no soft delete.
 - Restricted visibility uses per-user `document_acl` grants only.
 - `document_chunks.embedding` is `vector(1024)` per [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md). Packet 2 adds HNSW cosine index `document_chunks_embedding_hnsw_idx` and trigram GIN indexes on `term_normalized` / `alias_normalized`.
-- Retrieval RPCs `retrieve_dense_candidates`, `retrieve_term_candidates`, and `recheck_retrieval_candidates` are `SECURITY INVOKER` for `app_api` only. Authorization predicates run before rank/limit.
+- Retrieval RPCs `retrieve_dense_candidates`, `retrieve_term_candidates`,
+  `recheck_retrieval_candidates`, and `fetch_authorized_chunk_context` are
+  `SECURITY INVOKER` for `app_api` only. Authorization predicates run before
+  rank/limit. Context fetch may return non-representative parent rows.
 - `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
 - Pending glossary imports never write `search_aliases`; approval projects aliases; rollback deletes that projection.
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.

@@ -4,7 +4,7 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-14
 audience: engineering, reviewers
-phase_packet: Phase 4 Packets 2-4
+phase_packet: Phase 4 Packets 2-5
 ---
 
 # Hybrid retrieval contract
@@ -13,15 +13,17 @@ Single source for versioned Hybrid channel profiles. Packet 2 freezes dense,
 BM25, term, HNSW, and authorization foundations. Packet 3 freezes
 ``hybrid_default_v1`` as the only query-profile retrieval ID. Packet 4 freezes
 RRF, channel weights, the 205 pre-fusion union, UTC temporal policies, coverage
-signals, and the versioned cache-key/recheck interface. Rerank, MMR, and
-calibrated coverage/refusal thresholds remain **not selected** until Packets
-5-6 measure them on development/qualification data. Holdout is never used for
+signals, and the versioned cache-key/recheck interface. Packet 5 freezes the
+top-20 OpenAI rerank contract, skip policy, MMR/quotas, and parent expansion.
+Calibrated coverage/refusal thresholds remain **not selected** until Packet 6
+measures them on development/qualification data. Holdout is never used for
 tuning.
 
 Related: [ARABIC_NORMALIZATION.md](./ARABIC_NORMALIZATION.md) ·
 [BM25_PROJECTION_CONTRACT.md](./BM25_PROJECTION_CONTRACT.md) ·
 [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
 [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md) ·
+[RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md) ·
 [phase-04 evidence](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Protocol
@@ -134,12 +136,48 @@ Raw channel scores never mix. Equal fused scores break ties by effective date,
 published date, then canonical ID. Equally authoritative current contradictions
 emit `conflict` with both IDs.
 
+## Frozen Packet 5 values
+
+Accuracy-first: rerank every non-trivial knowledge query with at least two
+authorized candidates. Skip only a trivial exact identifier/quoted-phrase
+lookup with complete terms/filters and two independent channel signals.
+Numeric score gaps never skip. Support is a ranking feature, not a
+probability. Live OpenAI is unused while `MOCK_MODEL_MODE=true`.
+
+```mermaid
+flowchart TD
+  fused["Authorized fused IDs"] --> pool["Top-20 pool, max 5 per document"]
+  pool --> skip{"Trivial exact and two channels?"}
+  skip -->|yes| mmrSkip["MMR plus quotas. No model call"]
+  skip -->|no| oneCall["One Responses json_schema call. max_retries=0. No tools"]
+  oneCall --> valid{"Set-equality and ranks valid?"}
+  valid -->|no| rrf["Keep fused RRF order. Typed fallback"]
+  valid -->|yes| mmr["MMR plus document/section quotas"]
+  mmrSkip --> parents["Recheck parents. Adjacent from authorized pool"]
+  rrf --> parents
+  mmr --> parents
+  parents --> trim["Cap 12 units / 3500 tokens. Canonical raw_text only"]
+```
+
+Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md).
+
+| Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rerank pool | IDs | Plan | 2–20 | **20** | `hybrid_default_v1` | `build_rerank_pool` | retrieval | 20 | Packet 6 |
+| Max passages per document in pool | IDs | Plan | 1–5 | **5** | unit quota test | Duplicates cannot crowd the pool | retrieval | 5 | Packet 6 |
+| Rerank model | model id | OpenAI Responses structured output | allow-listed | **`gpt-4o-mini`** | `openai==2.26.0` | Mock identity in CI; live unverified | retrieval | `gpt-4o-mini` | Packet 6 live bake-off |
+| Rerank prompt | version | Packet 5 | `rerank_v1` | **`rerank_v1`** | SHA-256 `4767049107cfe6e8591c84d3b1d202393dfd2564383e6c5bfa0bd5fece8f1925` | Changelog | retrieval | `rerank_v1` | Prompt edit |
+| SDK retries | count | Plan one-operation | 0 | **0** | OpenAI client `max_retries=0` | Timeout/429 fall back to RRF | retrieval | 0 | SDK bump |
+| Excerpt bound | chars / passage | Input bound | 1–400 | **400** | `RERANK_EXCERPT_CHARS` | Canonical `raw_text` only | retrieval | 400 | Token miss |
+| MMR lambda | mix | Plan | (0, 1] | **0.7** provisional | Jaccard on `arabic_norm_v1` | Unit diversity test | retrieval | 0.7 | Packet 6 |
+| Document / section quota | passages | Plan | ≥1 | **2 / 2** | unit quota | Stable ID tie-break | retrieval | 2 | Packet 6 |
+| Final evidence | units / tokens | Plan ~8–12 | ≤12 / ≤3500 | **12 / 3500** | trim after parents | Recheck after expansion | retrieval | 12 / 3500 | Packet 6 |
+| Skip policy | rule | Plan | trivial exact only | **two-channel exact/quote** | counterfactual script | No score-gap skip | retrieval | same | Live always-rerank |
+
 ## Not selected (later packets)
 
 | Tunable | Owner packet | Status |
 | --- | --- | --- |
-| OpenAI rerank pool / model / schema | 5 | not applied |
-| MMR / quotas / parent expansion | 5 | not applied |
 | Coverage / refusal numeric thresholds | 6 | not applied |
 | Cache TTLs / Valkey store | 6 | interface only |
 
@@ -160,12 +198,14 @@ must read `document_chunks.raw_text`. BM25 `body_search` and
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py -q
+uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/unit/test_hybrid_rerank.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py tests/contract/test_hybrid_rerank.py -q
+uv run python scripts/eval_rerank_counterfactual.py
 uv run python scripts/ci/check_migrations.py
 ```
 
 ## Rollback
 
-Drop forward migration `20260814130000_hybrid_retrieval_v1.sql` via a later
-expand/contract migration. ParadeDB index rebuild is derived
+Drop forward via later expand/contract migrations
+`20260814130000_hybrid_retrieval_v1.sql` and
+`20260814140000_hybrid_rerank_context_v1.sql`. ParadeDB index rebuild is derived
 (`infra/paradedb/migrations/20260814130000_bm25_search_index.sql`).
