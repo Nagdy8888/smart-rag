@@ -1,8 +1,8 @@
 ---
 title: Phase 3 ingestion evidence
 owner: engineering-lead
-status: draft
-last-reviewed: 2026-08-13
+status: pending
+last-reviewed: 2026-08-14
 audience: engineering, reviewers
 phase: 3
 ---
@@ -410,7 +410,7 @@ Adversarial comparison rejected ad-hoc `pdfplumber`/unpinned OCR stacks due to w
 5. [x] Parser/OCR sandbox and typed format adapters
 6. [x] Chunking, deduplication, typed Parquet artifacts
 7. [x] Embeddings, BM25 projection, lifecycle, graph handoff
-8. [ ] Adversarial, crash, throughput, and exit proof
+8. [x] Adversarial, crash, throughput, and exit proof
 
 ## Packet 7 — embeddings, BM25 projection, Hybrid lifecycle, graph handoff, status APIs
 
@@ -463,3 +463,86 @@ Adversarial comparison rejected ad-hoc `pdfplumber`/unpinned OCR stacks due to w
 - Full adversarial/crash matrix across scan→embed→BM25→handoff with real ClamAV/Storage/Postgres/ParadeDB boundaries.
 - Throughput/lag measurement to signed 500 text / 100 OCR pages/hour gates.
 - Apply migration on local Supabase before integration contracts.
+
+## Packet 8 — adversarial, crash, throughput, and exit proof
+
+### Quoted requirement
+
+> Exercise positive, failure, authorization, idempotency, crash-recovery, resource-limit, malware, sensitive-data, and SSRF fixtures; complete Phase 3 exit proof without new product features.
+
+### Acceptance checks restated
+
+- Immutable fixture manifest covers required categories with source/license/hash (or explicit null hash), sensitivity, external-processing mode, and owning tests.
+- Crash matrix maps plan crash points to owning evidence; live-stack crash injections remain explicit pending blockers.
+- Owning unit/contract suite exits 0; real-boundary skips are named (Postgres/ClamAV/Docker/ParadeDB), not mocked as pass.
+- Throughput report is honest: local parse→chunk→mock-embed measured; Hybrid Ready + OCR gates `not_run` / unmet without approved capacity change → phase remains `pending`.
+- Every Phase 3 `Done when` clause mapped; managed/production-only gaps listed; explicit user acceptance requested before status `complete` or Phase 4.
+
+### Implemented / corrected
+
+| Path | Role |
+| --- | --- |
+| `tests/fixtures/phase3/FIXTURE_MANIFEST.json` | Immutable 35-row fixture registry (`manifest_sha256` pinned) |
+| `tests/fixtures/phase3/__init__.py` | Load + canonical digest helpers |
+| `tests/contract/test_phase3_fixture_manifest.py` | Manifest integrity, categories, AST owning-test resolve |
+| `tests/contract/test_phase3_crash_matrix.py` | Proven vs pending E2E crash-point registry |
+| `scripts/phase3_throughput_benchmark.py` | Bounded local throughput probe (exit `2` when Hybrid Ready not measured) |
+| `tests/unit/test_ingestion_status_openapi.py` | Member retry forbidden (403) |
+| `packages/core/.../tables/__init__.py`, `crawl/__init__.py` | Break circular imports for suite/benchmark importability |
+
+### Fixture coverage
+
+Categories present: `format`, `malware`, `governance`, `sensitive_data`, `ssrf`, `authorization`, `idempotency`, `crash_recovery`, `resource_limit` (35 fixtures). PDF/OOXML hashes may be `null` when generator metadata is non-deterministic; structure asserted in owning tests. EICAR digest pinned to canonical `275a021b…`.
+
+### Crash matrix
+
+- Proven (owning tests exist): SKIP LOCKED exclusivity, heartbeat/lease-loss cancel, invalid lease denial, dead-letter replay, promotion saga crash points, duplicate enqueue, graph handoff idempotency, deletion ACL exclusion, parser oversize fail-closed, governance detector block, embedding real-content deny.
+- Pending live E2E (explicit): Storage mid-download crash, scan mid-crash, parser kill timeout, LangGraph checkpoint interrupt, canonical mid-batch rollback, embedding timeout after provider success, BM25 mid-batch before verify, Hybrid Ready flip before BM25 verify.
+
+### Commands and results
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff check` (Packet 8 paths) | 0 | |
+| `uv run pyright` (touched package inits) | 0 | |
+| `uv run pytest` (manifest + crash matrix + all owning modules) | 0 | 131 passed, 18 skipped (local Supabase `54322`, ClamAV, Docker, or ParadeDB unavailable); 0 failed |
+| `uv run python scripts/phase3_throughput_benchmark.py --iterations 10` | 2 | Local text parse→chunk→mock-embed ~1.26e6 pages/hour on host; `hybrid_ready_gate=not_run`; OCR gate `null` |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 | |
+
+### Done when mapping (Phase 3)
+
+| Done-when theme | Evidence | Posture |
+| --- | --- | --- |
+| Governance packet signed; real company content blocked | Packet 1 evidence; `OPENAI_DATA_GOVERNANCE.md` / `SUBPROCESSOR_GOVERNANCE.md`; external-processing tests | Proven (real content still prohibited) |
+| RLS upload, MFA/category/URL approval, quarantine quota/TTL, promotion saga, provenance | Packets 2–3 owning tests + manifest auth/idempotency/crash rows | Proven in code/tests; live Postgres skips when stack down |
+| Anomaly → local admin notifications | Packet 3 evidence | Proven in prior packet |
+| Malware/stale/oversize/sensitive/SSRF/egress fail-closed | Manifest malware/sensitive/ssrf + ClamAV/crawl/governance owning tests | Proven unit/policy; live ClamAV/proxy skips when unavailable |
+| Leased SKIP LOCKED, heartbeat, dead-letter, admission | Packet 2 + crash matrix | Proven; live DB skips when stack down |
+| Parser sandbox + format/chunk matrix | Packets 5–6 + format fixtures | Proven inprocess; Docker sandbox skip when Docker unavailable |
+| Hybrid Ready only after BM25 verify; Graph Pending/Ineligible only | Packet 7 + lifecycle/scope guards | Proven; no Graph Ready in Phase 3 |
+| Deletion/ACL immediate exclusion + BM25 cleanup | Packet 7 hybrid lifecycle tests | Proven (ParadeDB delete may skip without URL) |
+| Signed 500 text / 100 OCR pages/hour through Hybrid Ready | Throughput script | **Not proven** — Hybrid Ready E2E + OCR not measured; phase stays pending |
+| Status APIs for ingestion/review/retry/BM25/handoff | Packet 7 OpenAPI + member 403 | Proven |
+
+### Managed / production-only gaps
+
+- Managed Supabase / Vercel / LangSmith / OpenAI provider matrix verification before real company content.
+- Live Compose: ClamAV freshclam <24h, Storage promotion, worker leases, ParadeDB projection lag/cost on launch hardware.
+- Full mid-pipeline crash injection on live stack (pending crash points above).
+- OCR pages/hour on parser-sandbox + Tesseract path.
+
+### Deviations / rollback
+
+- Deviation: Packet 8 does not claim Hybrid Ready or OCR throughput gates; exits pending with blockers rather than inventing rates.
+- Deviation: PDF fixture hash left `null` due to PyMuPDF metadata nondeterminism.
+- Rollback: revert Packet 8 commit; restore prior package `__init__` imports if needed; no schema migrations in this packet.
+
+### Phase status
+
+- Phase wrapper `status`: remains `pending`.
+- Packet 8 checkbox: checked after this evidence; **does not** mean phase complete.
+- **User acceptance required** before marking Phase 3 `complete` or starting Phase 4.
+
+### Explicit acceptance request
+
+Please review this Packet 8 exit record and reply with acceptance or required blockers. Until accepted, Phase 3 stays pending and Phase 4 must not begin.

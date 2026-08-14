@@ -1,6 +1,10 @@
-"""Typed Parquet table artifact package."""
+"""Typed Parquet table artifact package.
+
+Only the bundle type is eager so ``chunking.types`` can import it without
+pulling Storage/gateway/embedding cycles through ``tables.service``.
+Import ``build_table_artifacts`` from ``smart_rag_core.ingestion.tables.service``.
+"""
 
 from smart_rag_core.ingestion.tables.bundle import TableArtifactBundle
-from smart_rag_core.ingestion.tables.service import build_table_artifacts
 
-__all__ = ["TableArtifactBundle", "build_table_artifacts"]
+__all__ = ["TableArtifactBundle"]

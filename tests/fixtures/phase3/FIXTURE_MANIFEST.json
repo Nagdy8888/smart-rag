@@ -1,0 +1,558 @@
+{
+  "manifest_version": "phase3_packet8_v1",
+  "manifest_sha256": "90be29404a3fb73fb34ab357631c22a59cda6cf95adffbf7c80bc5cbfc893414",
+  "created": "2026-08-13",
+  "description": "Immutable Phase 3 adversarial, format, security, crash, and throughput fixture registry for Packet 8 exit proof.",
+  "fixtures": [
+    {
+      "id": "fmt_text_utf8_arabic_mixed",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser (text_fixture in test_parser_adapters)",
+      "license": "MIT (repository test harness)",
+      "sha256": "ef05cb9b840112afa5094bc60b5bbc3793fc1b872d940dc1f875a7f3a92fcbf1",
+      "expected_status": "supported",
+      "expected_elements": [
+        "paragraph"
+      ],
+      "expected_locators": [
+        "text:line"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_adapter_emits_deterministic_elements[build_text_fixture-sample.txt-text]"
+    },
+    {
+      "id": "fmt_markdown_code_list",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser.build_markdown_fixture",
+      "license": "MIT (repository test harness)",
+      "sha256": "e198b316cfed2288be3d9f0264693c7d3bb60c8833b6cd6ec4e8fd28ea5da5ca",
+      "expected_status": "supported",
+      "expected_elements": [
+        "heading",
+        "paragraph",
+        "code_block"
+      ],
+      "expected_locators": [
+        "markdown:token_path"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_adapter_emits_deterministic_elements[build_markdown_fixture-sample.md-markdown]"
+    },
+    {
+      "id": "fmt_csv_duplicate_headers_arabic",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser.build_csv_fixture",
+      "license": "MIT (repository test harness)",
+      "sha256": "41c65553e0993674ec0a9a0a09619a40bb8c4a47c5001ae7ed0733b05999738c",
+      "expected_status": "supported",
+      "expected_elements": [
+        "table"
+      ],
+      "expected_locators": [
+        "csv:row"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_table_parquet.py::test_csv_fixture_parquet_round_trip"
+    },
+    {
+      "id": "fmt_html_boilerplate_removed",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser.build_html_fixture",
+      "license": "MIT (repository test harness)",
+      "sha256": "bb80f72e60ced7f5e3b044be01776d6fc9b448108b169ef35141ddcc4eff33f1",
+      "expected_status": "supported",
+      "expected_elements": [
+        "heading",
+        "paragraph",
+        "link"
+      ],
+      "expected_locators": [
+        "html:dom_path"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_html_boilerplate_removed"
+    },
+    {
+      "id": "fmt_docx_nested_table_arabic",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser.build_docx_fixture",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "supported",
+      "expected_elements": [
+        "heading",
+        "paragraph",
+        "table"
+      ],
+      "expected_locators": [
+        "docx:logical_path"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_adapter_emits_deterministic_elements[build_docx_fixture-sample.docx-docx]",
+      "notes": "OOXML zip timestamps vary; digest verified at runtime via builder replay only."
+    },
+    {
+      "id": "fmt_pptx_slide_media_only",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser.build_pptx_fixture",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "supported",
+      "expected_elements": [
+        "slide_break",
+        "paragraph",
+        "figure"
+      ],
+      "expected_locators": [
+        "pptx:slide_shape"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_pptx_emits_slide_and_text",
+      "notes": "OOXML zip timestamps vary; structure asserted in owning test."
+    },
+    {
+      "id": "fmt_xlsx_formula_hidden_sheet",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser.build_xlsx_fixture",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "supported",
+      "expected_elements": [
+        "table"
+      ],
+      "expected_locators": [
+        "xlsx:cell"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_xlsx_formula_not_recalculated",
+      "notes": "OOXML zip timestamps vary; formula preservation asserted in owning test."
+    },
+    {
+      "id": "fmt_pdf_headers_multipage",
+      "category": "format",
+      "source": "programmatic:tests.fixtures.parser.build_pdf_text_fixture",
+      "license": "MIT (repository test harness; PyMuPDF AGPL-3.0 runtime)",
+      "sha256": null,
+      "expected_status": "supported",
+      "expected_elements": [
+        "paragraph",
+        "page_break"
+      ],
+      "expected_locators": [
+        "pdf:page_box"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_pdf_header_footer_removed",
+      "notes": "PyMuPDF bytes can vary by generator metadata; structure asserted in owning test."
+    },
+    {
+      "id": "fmt_oversized_parser_input",
+      "category": "resource_limit",
+      "source": "synthetic:bytes>PARSER_SANDBOX_MAX_INPUT_BYTES",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "failed",
+      "expected_elements": [],
+      "expected_locators": [],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "parser_sandbox",
+      "owning_test": "tests/unit/test_parser_sandbox.py::test_oversize_input_fails_without_partial_elements"
+    },
+    {
+      "id": "fmt_chunk_duplicate_provenance",
+      "category": "format",
+      "source": "programmatic:duplicate prose elements in test_chunking_service",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "supported",
+      "expected_elements": [
+        "paragraph"
+      ],
+      "expected_locators": [
+        "text:line"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "chunking",
+      "owning_test": "tests/unit/test_chunking_service.py::test_exact_duplicate_provenance_retained"
+    },
+    {
+      "id": "fmt_chunk_oversized_atomic",
+      "category": "resource_limit",
+      "source": "synthetic:600+ token atomic element",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "supported",
+      "expected_elements": [
+        "paragraph"
+      ],
+      "expected_locators": [
+        "text:line"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "chunking",
+      "owning_test": "tests/unit/test_chunking_service.py::test_oversized_atomic_fragments_reconstructable"
+    },
+    {
+      "id": "malware_eicar",
+      "category": "malware",
+      "source": "EICAR standard test file (https://www.eicar.org)",
+      "license": "EICAR distribution terms (non-malicious test pattern)",
+      "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+      "expected_status": "infected",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic_malware_test",
+      "external_processing_mode": "deny",
+      "boundary": "clamav",
+      "owning_test": "tests/contract/test_clamav_scan.py::test_eicar_detected_and_clean_file_passes"
+    },
+    {
+      "id": "malware_oversize_scan_stream",
+      "category": "malware",
+      "source": "synthetic:stream>scan_max_bytes",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "over_limit",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "clamav_client",
+      "owning_test": "tests/unit/test_clamav_client.py::test_oversize_stream_fails_closed_without_scan"
+    },
+    {
+      "id": "malware_fake_clean_app_api",
+      "category": "authorization",
+      "source": "synthetic:app_api role scan_events insert",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "postgres_rls",
+      "owning_test": "tests/contract/test_quarantine_cleanup.py::test_scan_events_block_fake_clean_for_app_api"
+    },
+    {
+      "id": "gov_sensitive_detector_positive",
+      "category": "sensitive_data",
+      "source": "synthetic:Luhn-valid test PAN in extracted text",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "quarantined",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic_pii_pattern",
+      "external_processing_mode": "deny",
+      "boundary": "governance",
+      "owning_test": "tests/unit/test_parser_governance.py::test_extraction_positive_detector_blocks_promotion"
+    },
+    {
+      "id": "gov_unverified_provider_real_content",
+      "category": "sensitive_data",
+      "source": "synthetic:real_company_content decision input",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "real_company_content_simulated",
+      "external_processing_mode": "deny",
+      "boundary": "external_processing",
+      "owning_test": "tests/unit/test_embedding_service.py::test_embedding_service_denies_real_company_without_provider_verification"
+    },
+    {
+      "id": "gov_missing_attestation",
+      "category": "governance",
+      "source": "synthetic:ExternalProcessingDecisionInput",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "external_processing",
+      "owning_test": "tests/unit/test_external_processing_governance.py::test_missing_attestation_denies"
+    },
+    {
+      "id": "crawl_ssrf_localhost_private_metadata",
+      "category": "ssrf",
+      "source": "URL vectors in test_crawl_policy parametrize",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "policy_denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "crawl_policy",
+      "owning_test": "tests/unit/test_crawl_policy.py::test_normalize_url_ssrf_vectors_fail_closed"
+    },
+    {
+      "id": "crawl_redirect_to_private",
+      "category": "ssrf",
+      "source": "localhost fixture HTTP /redirect-private",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "policy_denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "crawl_adapter",
+      "owning_test": "tests/contract/test_crawl_ssrf.py::test_redirect_to_private_fails_closed"
+    },
+    {
+      "id": "crawl_decompression_ratio_bomb",
+      "category": "resource_limit",
+      "source": "localhost fixture HTTP /gzip-bomb",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "limit_exceeded",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "crawl_proxy",
+      "owning_test": "tests/unit/test_crawl_proxy.py::test_decode_body_enforces_ratio_limit"
+    },
+    {
+      "id": "crawl_egress_bypass_compose",
+      "category": "ssrf",
+      "source": "docker-compose.yml topology assertion",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "blocked",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "compose_topology",
+      "owning_test": "tests/contract/test_crawl_ssrf.py::test_worker_compose_has_no_public_egress_network"
+    },
+    {
+      "id": "auth_finalize_cross_user",
+      "category": "authorization",
+      "source": "synthetic:wrong user finalize RPC",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "postgres_rls",
+      "owning_test": "tests/contract/test_upload_finalize.py::test_finalize_quarantine_upload_idempotent_and_wrong_path_denied"
+    },
+    {
+      "id": "auth_ingestion_retry_member_forbidden",
+      "category": "authorization",
+      "source": "FastAPI retry route with member CallerContext",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "403",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "fastapi_rbac",
+      "owning_test": "tests/unit/test_ingestion_status_openapi.py::test_member_retry_is_forbidden"
+    },
+    {
+      "id": "idempotency_duplicate_enqueue",
+      "category": "idempotency",
+      "source": "synthetic:duplicate idempotency_key",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "same_job",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "postgres_jobs",
+      "owning_test": "tests/contract/test_job_leases.py::test_duplicate_enqueue_returns_same_job"
+    },
+    {
+      "id": "idempotency_graph_handoff_replay",
+      "category": "idempotency",
+      "source": "synthetic:lightrag_index_jobs handoff",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "single_row",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "postgres_handoff",
+      "owning_test": "tests/contract/test_hybrid_lifecycle.py::test_graph_pending_handoff_is_idempotent"
+    },
+    {
+      "id": "idempotency_promotion_saga_crash",
+      "category": "crash_recovery",
+      "source": "synthetic:PromotionSaga crash_after injection",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "completed_once",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "postgres_storage_saga",
+      "owning_test": "tests/contract/test_promotion_saga.py::test_promotion_saga_replays_after_each_crash_point"
+    },
+    {
+      "id": "crash_lease_loss_heartbeat_cancel",
+      "category": "crash_recovery",
+      "source": "synthetic:lease token invalidation",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "ledger_denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "postgres_jobs",
+      "owning_test": "tests/contract/test_job_leases.py::test_heartbeat_renews_and_cancel_blocks_writes"
+    },
+    {
+      "id": "crash_dead_letter_replay",
+      "category": "crash_recovery",
+      "source": "synthetic:dead_letter_jobs replay link",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "traceable_replay",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "postgres_jobs",
+      "owning_test": "tests/contract/test_job_leases.py::test_dead_letter_replay_creates_traceable_attempt"
+    },
+    {
+      "id": "resource_pending_cap_backpressure",
+      "category": "resource_limit",
+      "source": "synthetic:MAX_PENDING_INGESTION_JOBS",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "admission_denied",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "admission",
+      "owning_test": "tests/unit/test_job_backoff_admission.py::test_admission_rejects_pending_cap"
+    },
+    {
+      "id": "resource_graph_handoff_pause",
+      "category": "resource_limit",
+      "source": "synthetic:GRAPH_HANDOFF_PAUSE_PENDING_INDEX",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "index_claim_skipped",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "postgres_jobs",
+      "owning_test": "tests/contract/test_job_leases.py::test_graph_handoff_pause_blocks_index_claims"
+    },
+    {
+      "id": "resource_parser_network_none",
+      "category": "resource_limit",
+      "source": "infra/parser-sandbox Dockerfile + compose profile",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "network_none",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "docker_sandbox",
+      "owning_test": "tests/contract/test_parser_sandbox.py::test_docker_run_uses_network_none"
+    },
+    {
+      "id": "lifecycle_deletion_acl_immediate",
+      "category": "authorization",
+      "source": "synthetic:document version deletion RPC",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "retrieval_excluded",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "postgres_canonical",
+      "owning_test": "tests/contract/test_hybrid_lifecycle.py::test_deletion_excludes_retrieval_and_enqueues_bm25_cleanup"
+    },
+    {
+      "id": "scope_phase3_no_graph_ready_writes",
+      "category": "authorization",
+      "source": "repository AST guard",
+      "license": "MIT (repository test harness)",
+      "sha256": null,
+      "expected_status": "scope_violation",
+      "expected_elements": null,
+      "expected_locators": null,
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "code_scope",
+      "owning_test": "tests/unit/test_phase3_graph_scope_guard.py::test_phase3_runtime_has_no_graph_ready_or_mapping_writes"
+    },
+    {
+      "id": "fmt_ocr_scanned_pdf",
+      "category": "format",
+      "source": "programmatic:scanned PDF render path (Tesseract when present)",
+      "license": "MIT (repository test harness; Tesseract Apache-2.0)",
+      "sha256": null,
+      "expected_status": "supported_or_media_only",
+      "expected_elements": [
+        "page_break",
+        "paragraph"
+      ],
+      "expected_locators": [
+        "pdf:page_box"
+      ],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "mock_allowed",
+      "boundary": "parser_inprocess",
+      "owning_test": "tests/unit/test_parser_adapters.py::test_adapter_emits_deterministic_elements[build_pdf_text_fixture-sample.pdf-pdf]",
+      "notes": "Selectable-text PDF exercises text path; full OCR page benchmark uses throughput script."
+    },
+    {
+      "id": "archive_zip_bomb_guard",
+      "category": "resource_limit",
+      "source": "programmatic:tests.fixtures.parser.build_encrypted_zip_bomb_attempt",
+      "license": "MIT (repository test harness)",
+      "sha256": "7395703ccdd3698d5ee955073380f7575139f3c0fd0ff73a4149b9a80651b971",
+      "expected_status": "failed_or_over_limit",
+      "expected_elements": [],
+      "expected_locators": [],
+      "sensitivity_class": "synthetic",
+      "external_processing_mode": "deny",
+      "boundary": "parser_sandbox",
+      "owning_test": "tests/unit/test_parser_sandbox.py::test_oversize_input_fails_without_partial_elements",
+      "notes": "Full ClamAV archive-bomb boundary requires live clamd; deferred to managed stack."
+    }
+  ]
+}
