@@ -51,7 +51,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 5. [x] Implement the accuracy-first top-20 OpenAI reranker contract, deterministic fallback, skipped-case counterfactuals, MMR, quotas, and parent expansion.
 6. [x] Calibrate coverage/refusal by query class before the immutable holdout and prohibit unsupported advanced methods.
 7. [x] Implement the declarative, sandboxed structured-table path with exact workbook/sheet/range provenance.
-8. [ ] Publish ablations, quality, latency, cost, citation, ACL, and fallback evidence; freeze winning versioned profiles.
+8. [x] Publish ablations, quality, latency, cost, citation, ACL, and fallback evidence; freeze winning versioned profiles.
 
 ## Cheap-model execution protocol
 

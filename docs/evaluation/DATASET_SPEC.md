@@ -10,7 +10,7 @@ audience: engineering, SME, reviewers
 
 Canonical labeled-corpus contract for Hybrid RAG. Runtime retrieval is Packet 2+. This file freezes schema, class minima, split isolation, holdout access, and synthetic SME posture.
 
-Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
+Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Schema version
 
@@ -100,7 +100,7 @@ Identifier rules are sampled from the synthetic corpus (`INV-SR-\d{4}`, `PRJ-[A-
 
 ## SME posture
 
-This Packet 1 corpus is synthetic and provisionally accepted so later Hybrid packets can proceed. Named Knowledge Owner hours (12–20) remain unverified. Packet 8 launch claims still require SME-sealed holdout approval.
+This Packet 1 corpus is synthetic and provisionally accepted so later Hybrid packets can proceed. Named Knowledge Owner hours (12–20) remain unverified. Packet 8 recorded a holdout **no-go**; launch claims still require SME-sealed holdout approval.
 
 ## Verification
 

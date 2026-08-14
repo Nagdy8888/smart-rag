@@ -18,6 +18,8 @@ Related: [HYBRID_RETRIEVAL_CONTRACT.md](./HYBRID_RETRIEVAL_CONTRACT.md) ·
 [COVERAGE_QUALIFICATION.md](../evaluation/COVERAGE_QUALIFICATION.md) ·
 [PROHIBITED_V1_METHODS.md](./PROHIBITED_V1_METHODS.md) ·
 [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md) ·
+[PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md) ·
+[PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md) ·
 [phase-04 evidence](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Freeze
@@ -36,7 +38,7 @@ Related: [HYBRID_RETRIEVAL_CONTRACT.md](./HYBRID_RETRIEVAL_CONTRACT.md) ·
 flowchart LR
   development["Development occupancy sweep"] --> freeze["hybrid_default_v1"]
   freeze --> qualification["Qualification once"]
-  qualification --> sealed["Holdout sealed"]
+  qualification --> sealed["Holdout sealed / Packet 8 no-go"]
 ```
 
 ## Rejected candidates
@@ -52,7 +54,8 @@ was evaluated.
 ## Leakage control
 
 `load_tuning_cases()` returns development cases only. Qualification is a
-separate one-shot script that does not sweep. Neither script imports holdout
-loaders.
+separate one-shot script that does not sweep. Packet 8 freeze also stays
+holdout-blind and refuses to run when holdout access is enabled.
 
+[PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md)
 [docs index](../README.md)

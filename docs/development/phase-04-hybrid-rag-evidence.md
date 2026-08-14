@@ -19,6 +19,9 @@ Related: [DATASET_SPEC.md](../evaluation/DATASET_SPEC.md) ·
 [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) ·
 [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) ·
 [COVERAGE_QUALIFICATION.md](../evaluation/COVERAGE_QUALIFICATION.md) ·
+[PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md) ·
+[PHASE4_ABLATIONS.md](../evaluation/PHASE4_ABLATIONS.md) ·
+[PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md) ·
 [HYBRID_TUNING.md](../retrieval/HYBRID_TUNING.md) ·
 [docs index](../README.md)
 
@@ -905,6 +908,9 @@ evidence, and one immutable holdout run. Holdout stays sealed until freeze
 hashes are recorded. Do not tune on holdout. Do not set phase `status`
 complete until the user accepts Packet 8.
 
+[PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md)
+[PHASE4_ABLATIONS.md](../evaluation/PHASE4_ABLATIONS.md)
+[PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md)
 [docs index](../README.md)
 [STRUCTURED_TABLE.md](../retrieval/STRUCTURED_TABLE.md)
 [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
@@ -914,3 +920,130 @@ complete until the user accepts Packet 8.
 [COVERAGE_QUALIFICATION.md](../evaluation/COVERAGE_QUALIFICATION.md)
 [HYBRID_TUNING.md](../retrieval/HYBRID_TUNING.md)
 [PROHIBITED_V1_METHODS.md](../retrieval/PROHIBITED_V1_METHODS.md)
+
+## Packet 8 — freeze, ablations, and holdout no-go (2026-08-14)
+
+Quoted requirement: publish ablations, quality, latency, cost, citation, ACL,
+and fallback evidence; freeze winning versioned profiles.
+
+### Plan requirement
+
+Packet 8 records code/config/prompt/SDK hashes, the required simpler-baseline
+matrix on development/qualification, signed-gate comparison, Phase 3
+reconfirm, and one immutable holdout run **or** an honest no-go. Holdout
+must not be opened for tuning. Phase status stays pending until the user
+accepts. Phase 5 does not start in this run.
+
+### Acceptance checks restated
+
+- Ablation matrix and freeze hashes are reproducible from commands.
+- Signed Hybrid/profile/citation/ACL/latency/cost gates pass, **or** Phase 4
+  remains pending with no-go evidence.
+- Unexecuted Phase 5/6 labels are not counted as passes.
+- Continue-versus-pilot is requested; not silently decided.
+
+### Negative tests restated
+
+Holdout access during freeze, invented Recall@10, occupancy treated as
+ranked-ID recall, or marking the phase complete without user acceptance
+fails.
+
+### LangSmith (user gate, before Packet 8)
+
+Gateway tracing was already landed in `1a90fd3`. Reconfirmed this packet:
+every production `OpenAI()` ctor remains in `traced_openai_client`;
+embeddings.create remains in `traced_embeddings_create`; mock generate/embed
+emit redacted spans when tracing is enabled. Live LangSmith project
+visibility is still **unverified** (no real key in this run).
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/evaluation/phase4_freeze.py` | Holdout-blind freeze report |
+| `scripts/eval_phase4_freeze.py` | Writes freeze markdown; prints git SHA |
+| `docs/evaluation/PHASE4_FREEZE.md` | Generated freeze snapshot |
+| `docs/evaluation/PHASE4_ABLATIONS.md` | Ablation matrix |
+| `docs/evaluation/PHASE4_HOLDOUT.md` | No-go holdout record |
+| `FROZEN_HYBRID_PROFILE_SHA256` | `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` |
+| Parent git SHA at freeze | `b1282f7c246b5417dca5b279ab190dc1bfe3ae08` (Packet 7) |
+| OpenAI / LangSmith / DuckDB / PyArrow | `2.26.0` / `0.10.18` / `1.2.1` / `19.0.1` |
+
+### Dataset counts (open splits only)
+
+| Split | n |
+| --- | --- |
+| Development | 216 |
+| Qualification | 77 |
+| Open total | 293 |
+| Holdout ids in sealed manifest (labels not loaded) | 112 |
+| Deferred later-phase labels on open splits | 81 |
+
+SME corpus status remains `synthetic_provisional`.
+
+### Launch decision
+
+**no-go.** Holdout was not opened. Live Hybrid Recall@10, citation
+correctness/completeness, faithfulness, and envelope p95 are unverified.
+Query-profile QT-QP-001 through QT-QP-006 passed on development and
+qualification with `model_calls=0` (mock extract). ACL is fixture-only.
+Winning profile remains `hybrid_default_v1`. Cache TTLs and unequal RRF
+weights stay unselected.
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run python scripts/eval_phase4_freeze.py` | 0 (`launch_decision=no_go`, `holdout_opened=false`) |
+| `uv run python scripts/eval_query_profile.py` | 0 (development 216 and qualification 77 passed) |
+| `uv run ruff check` (freeze module, script, tests) | 0 |
+| `uv run pyright` (same freeze paths) | 0 |
+| `uv run pytest tests/unit/test_phase4_freeze.py tests/unit/test_langsmith_tracing.py tests/unit/test_chunking_service.py tests/unit/test_chunking_dedup.py tests/unit/test_phase4_dataset.py tests/unit/test_hybrid_coverage.py -q` | 0 (52 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (69 markdown files, 0 lint issues) |
+
+Live Hybrid Ready E2E, ParadeDB overlay, and envelope p95 were **not**
+re-run in this packet. Phase 3 chunking unit tests passed.
+
+### Negative tests
+
+| Fixture | Result |
+| --- | --- |
+| Freeze AST `load_holdout` / `DatasetSplit` / `load_cases` | absent |
+| Freeze while holdout access enabled | `HoldoutSealedError` |
+| Live recall claimed on any ablation | false |
+| Occupancy PASS as Recall@10 | rejected in freeze/ablation docs |
+| Phase wrapper `status: complete` | not set |
+
+### Deviations
+
+- Honest no-go instead of a fake holdout run. The synthetic holdout
+  manifest exists as ids/hashes only and is not independently SME-sealed.
+- Arrow-register DuckDB path and mock rerank remain as Packets 5–7.
+- Gateway LangSmith tracing is present; Phase 6 still owns query-graph
+  feedback and online evaluators.
+- No ADR for the no-go itself; Hybrid Pilot continue-versus-pilot vote is
+  still pending user action
+  ([ADR-hybrid-pilot-release-cut.md](../adr/ADR-hybrid-pilot-release-cut.md)).
+
+### Rollback
+
+Delete Packet 8 freeze docs/script/module and uncheck wrapper box 8.
+Restore Hybrid contract "Not selected" wording. Frozen profile
+`hybrid_default_v1` stays; Packet 8 did not mutate it.
+
+### Phase 5 inputs (do not start)
+
+- Hybrid runtime profile: `hybrid_default_v1` at the pinned SHA-256 above.
+- Coverage threshold 0.65 all classes; `rrf_k=60`; equal channel weights.
+- Structured tables: Packet 7 sandbox; no HTTP route.
+- Graph/Combined/LightRAG: not implemented; relationship/multi-hop/
+  graph_mapping/prompt_injection labels are deferred.
+- Blockers for a Hybrid launch claim: live ranked-ID Recall@K, citation
+  assembler metrics, independently SME-sealed holdout, envelope p95/cost,
+  named Knowledge Owner hours.
+- User must choose continue-to-Phase-5 versus `0.x Hybrid Pilot` before
+  Phase 5 work starts.
+
+Phase 4 wrapper checkbox 8 is checked because the no-go evidence is
+complete. Wrapper `status` remains `pending` until explicit user
+acceptance.

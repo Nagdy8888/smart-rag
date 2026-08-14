@@ -64,4 +64,5 @@ flowchart LR
 ```
 
 [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md)
+[PHASE4_FREEZE.md](./PHASE4_FREEZE.md)
 [docs index](../README.md)

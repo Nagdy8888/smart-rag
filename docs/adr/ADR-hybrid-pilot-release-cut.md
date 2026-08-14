@@ -31,7 +31,7 @@ Global contracts require a dated Hybrid Pilot decision record during Phase 1 sig
 | Checkpoint | Planned date | Scope | Approver field | Decision recorded |
 | --- | --- | --- | --- | --- |
 | End of Phase 1 | 2026-08-22 | Confirm targets/sign-off and whether the full Hybrid+Graph path remains funded | user (Cursor chat) | framework accepted 2026-08-12; checkpoint decision pending |
-| End of Phase 4 | 2026-11-07 | Re-estimate delivery; choose continue-to-GraphRAG vs Hybrid Pilot cut before Phase 5 starts | user (Cursor chat) | framework accepted 2026-08-12; checkpoint decision pending |
+| End of Phase 4 | 2026-11-07 | Re-estimate delivery; choose continue-to-GraphRAG vs Hybrid Pilot cut before Phase 5 starts | user (Cursor chat) | framework accepted 2026-08-12; Packet 8 no-go recorded 2026-08-14; checkpoint vote still pending |
 
 Effort basis (one experienced FTE, excluding client wait): Phase 1 ≈1–1.5 weeks; Phases 2–4 ≈1.5–2.5 + 3–4 + 3.5–5 weeks. Dates assume work start 2026-08-12 and mid-to-upper planning ranges; they are planning anchors, not SLAs.
 
@@ -51,6 +51,21 @@ At each checkpoint the approver must record a binary choice using these criteria
 ## Explicit production-label prohibition
 
 A Hybrid Pilot **must not** be marketed, contracted, or operated as “production v1.” Relabeling requires a new signed scope that redefines acceptance gates; it is outside this ADR.
+
+## Phase 4 Packet 8 checkpoint record (2026-08-14)
+
+Packet 8 published freeze hashes and the ablation catalog, then recorded
+**no-go**: holdout was not independently SME-sealed and was not opened;
+live Hybrid Recall@10, citation correctness/completeness, and envelope p95
+remain unverified. Query-profile open-split gates passed on the mock
+extract. Winning profile stays `hybrid_default_v1`.
+
+This record does **not** cast the continue-versus-pilot vote. The user must
+choose continue-to-Phase-5 versus `0.x Hybrid Pilot` explicitly. Phase 4
+status remains `pending`. Evidence:
+[PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md),
+[PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md),
+[phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md).
 
 ## Consequences
 
@@ -73,3 +88,5 @@ A Hybrid Pilot **must not** be marketed, contracted, or operated as “productio
 - [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
 - [Global contracts](../../.cursor/plans/hybrid-graph-rag/00-global-contracts.md)
 - [Phase 1 foundation evidence](../development/phase-01-foundation-evidence.md)
+- [Phase 4 Hybrid evidence](../development/phase-04-hybrid-rag-evidence.md)
+- [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md)

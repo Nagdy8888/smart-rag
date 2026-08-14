@@ -4,7 +4,7 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-14
 audience: engineering, reviewers
-phase_packet: Phase 4 Packets 2-7
+phase_packet: Phase 4 Packets 2-8
 ---
 
 # Hybrid retrieval contract
@@ -16,7 +16,8 @@ RRF, channel weights, the 205 pre-fusion union, UTC temporal policies, coverage
 signals, and the versioned cache-key/recheck interface. Packet 5 freezes the
 top-20 OpenAI rerank contract, skip policy, MMR/quotas, and parent expansion.
 Packet 6 freezes per-class ``coverage_score`` thresholds at ``0.65`` in the
-hashed artifact ``retrieval/frozen/hybrid_default_v1.json``. Holdout is never
+hashed artifact ``retrieval/frozen/hybrid_default_v1.json``. Packet 8 froze
+those values as the winning profile and recorded a holdout **no-go**. Holdout is never
 used for tuning. Unequal RRF weights and a different ``rrf_k`` were **not**
 selected.
 
@@ -30,6 +31,9 @@ Related: [ARABIC_NORMALIZATION.md](./ARABIC_NORMALIZATION.md) ·
 [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) ·
 [COVERAGE_QUALIFICATION.md](../evaluation/COVERAGE_QUALIFICATION.md) ·
 [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md) ·
+[PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md) ·
+[PHASE4_ABLATIONS.md](../evaluation/PHASE4_ABLATIONS.md) ·
+[PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md) ·
 [phase-04 evidence](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Protocol
@@ -126,16 +130,16 @@ flowchart TD
 
 | Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| RRF `k` | dimensionless | Plan Packet 4 | 60 | **60** | `hybrid_default_v1` | No ranked-ID evidence to retune | retrieval | 60 | Packet 8 live ablation |
-| Channel weights dense/BM25/term | weight | Equal until measured | >0 allow-listed | **1.0 / 1.0 / 1.0** | `hybrid_default_v1` | Unequal weights not selected | retrieval | 1.0 | Packet 8 |
+| RRF `k` | dimensionless | Plan Packet 4 | 60 | **60** | `hybrid_default_v1` | No ranked-ID evidence to retune | retrieval | 60 | Future sealed holdout after live ranked-ID repair |
+| Channel weights dense/BM25/term | weight | Equal until measured | >0 allow-listed | **1.0 / 1.0 / 1.0** | `hybrid_default_v1` | Unequal weights not selected | retrieval | 1.0 | Future ranked-ID ablation |
 | Variant credit | rule | Plan | max, never sum | **max per ID** | unit tests | Order/duplicate invariant | retrieval | max | Packet 6 |
 | Pre-fusion unique IDs | IDs / query | Plan | 1–205 | **205** | unit overflow | Truncate after fused sort | retrieval | 205 | Packet 6 depths |
 | Metadata product | multiplier | Plan | `[1.0, 1.15]` | **clamp 1.15** | unit clamp | ACL/current-version are hard filters | retrieval | 1.15 | Packet 6 |
 | Hybrid deadline | seconds | Global contract | ≤25 | **25** | `HYBRID_DEADLINE_SECONDS` | Parallel channels cancel; timeout ≠ empty | retrieval | 25 | Latency miss |
 | `recent` window | days | Plan UTC | positive | **90** provisional | QT-TZ-001 | Unknown dates excluded | retrieval | 90 | Packet 6 |
 | Temporal intents | enum | Plan / QT-TZ-001 | `none` `latest` `current` `recent` `as_of` | **UTC only** | temporal unit tests | Naive/Hijri timestamps rejected | retrieval | UTC | Signed company TZ |
-| Coverage signals | enum | Plan Packet 4 | listed enums | **signals plus numeric score** | unit fixtures | Full-summary refused when headings missing | retrieval | same | Packet 8 |
-| Cache key | SHA-256 | Plan Packet 4 | versioned material | **IDs/ranks only** | `hybrid_cache_key` | Must recheck before evidence; no Valkey yet | retrieval | same | Packet 8 TTL |
+| Coverage signals | enum | Plan Packet 4 | listed enums | **signals plus numeric score** | unit fixtures | Full-summary refused when headings missing | retrieval | same | Live ranked-ID coverage |
+| Cache key | SHA-256 | Plan Packet 4 | versioned material | **IDs/ranks only** | `hybrid_cache_key` | Must recheck before evidence; Valkey TTL not selected | retrieval | same | Valkey store still interface-only |
 | BM25 degradation | reason | Plan | `bm25_unavailable` / version / timeout | **visible dense+term** | assemble tests | Never labeled three-channel Hybrid | retrieval | same | Circuit breaker |
 
 Raw channel scores never mix. Equal fused scores break ties by effective date,
@@ -214,7 +218,7 @@ flowchart TD
 
 | Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Coverage threshold (all classes) | score | Development baseline 0.65 | 0.50–0.90 | **0.65** | `hybrid_default_v1` SHA-256 `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` | [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) | retrieval | 0.65 | Packet 8 holdout |
+| Coverage threshold (all classes) | score | Development baseline 0.65 | 0.50–0.90 | **0.65** | `hybrid_default_v1` SHA-256 `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` | [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) | retrieval | 0.65 | Independently sealed holdout (not opened in Packet 8) |
 | False-supported loss weight | weight | Plan | >0 | **2** | occupancy eval | Qualification confirm | retrieval | 2 | Label revision |
 | Unnecessary-refusal loss weight | weight | Plan | >0 | **1** | occupancy eval | Qualification confirm | retrieval | 1 | Label revision |
 | Profile id | id | Packet 3 | allow-listed | **`hybrid_default_v1`** | hashed JSON | Unknown id fails closed | retrieval | `hybrid_packet5_v1` docs-only | Hash mismatch |
@@ -231,7 +235,7 @@ hint. See [STRUCTURED_TABLE.md](./STRUCTURED_TABLE.md).
 
 | Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Statement deadline | seconds | Plan Packet 7 | >0 | **3.0** | DuckDB 1.2.1 subprocess | Unit timeout terminate-then-kill | retrieval | 3.0 | Packet 8 table latency |
+| Statement deadline | seconds | Plan Packet 7 | >0 | **3.0** | DuckDB 1.2.1 subprocess | Unit timeout terminate-then-kill | retrieval | 3.0 | Labeled-table p95 still unverified |
 | Kill grace | seconds | Plan Packet 7 | >0 | **0.5** | same | Unit FakeProc | retrieval | 0.5 | Hang incidents |
 | DuckDB memory_limit | bytes label | Adversarial bound | allow-listed | **64MB** | pin 1.2.1 | Connect config | retrieval | 64MB | Host RAM change |
 | Temp directory size | bytes label | Adversarial bound | allow-listed | **32MB** | pin 1.2.1 | Connect config | retrieval | 32MB | Spill incidents |
@@ -241,12 +245,17 @@ hint. See [STRUCTURED_TABLE.md](./STRUCTURED_TABLE.md).
 | Scanned rows LIMIT | rows | Plan | 1–100000 | **100000** | Packet 7 | Compiler LIMIT | retrieval | 100000 | Envelope change |
 | Timezone | IANA | Plan UTC | UTC | **UTC** | Packet 7 | `SET TimeZone='UTC'` | retrieval | UTC | Signed company TZ |
 
-## Not selected (later packets)
+## Not selected (Packet 8 freeze)
+
+Packet 8 recorded a **no-go**. See [PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md)
+and [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md). Winning profile remains
+`hybrid_default_v1`. Cache TTLs and unequal RRF weights stay unselected.
 
 | Tunable | Owner packet | Status |
 | --- | --- | --- |
-| Cache TTLs / Valkey store | 8 | interface only |
+| Cache TTLs / Valkey store | 8 | still interface only; IDs/ranks plus mandatory recheck |
 | Unequal RRF channel weights | 8 | not selected; no ranked-ID evidence |
+| Live Hybrid Recall@10 / citation percents | 8 | unverified; holdout not opened |
 
 ## Authorization negatives
 
@@ -265,10 +274,11 @@ must read `document_chunks.raw_text`. BM25 `body_search` and
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/unit/test_hybrid_rerank.py tests/unit/test_hybrid_coverage.py tests/unit/test_phase4_dataset.py tests/unit/test_structured_table.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py tests/contract/test_hybrid_rerank.py tests/contract/test_structured_table.py -q
+uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/unit/test_hybrid_rerank.py tests/unit/test_hybrid_coverage.py tests/unit/test_phase4_dataset.py tests/unit/test_structured_table.py tests/unit/test_phase4_freeze.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py tests/contract/test_hybrid_rerank.py tests/contract/test_structured_table.py -q
 uv run python scripts/eval_coverage_calibration.py
 uv run python scripts/eval_coverage_qualification.py
 uv run python scripts/eval_rerank_counterfactual.py
+uv run python scripts/eval_phase4_freeze.py
 uv run python scripts/ci/check_migrations.py
 ```
 
