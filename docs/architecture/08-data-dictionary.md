@@ -26,6 +26,9 @@ erDiagram
   documents ||--o| document_versions : current_version
   document_versions ||--|{ document_chunks : contains
   document_chunks ||--o{ document_search_terms : indexes
+  glossary_imports ||--|{ glossary_entries : contains
+  glossary_entries ||--o{ glossary_aliases : names
+  glossary_entries ||--o{ search_aliases : projects
   documents ||--o{ document_acl : grants
   documents ||--o{ lightrag_source_map : maps
   document_chunks ||--o| lightrag_chunk_map : maps
@@ -66,7 +69,10 @@ erDiagram
 | `document_tables` | `app` | authority | table parser | structured tool | with version | sheets/tables | cascade | table `id` | 3 ingestion |
 | `document_table_columns` | `app` | authority | table parser | structured tool | with table | columns per table | cascade | `(table_id, ordinal)` | 3 ingestion |
 | `document_search_terms` | `app` | authority | ingestion indexer | Hybrid term search | with chunk | many | cascade | term row `id` | 4 retrieval |
-| `search_aliases` | `app` | authority | admin seed/eval | Hybrid alias recall | until removed | glossary size | hard delete | normalized alias unique | 4 retrieval |
+| `search_aliases` | `app` | derived projection | owner/admin glossary approve | Hybrid alias recall | until rollback | glossary size | hard delete on rollback | normalized alias unique | 4 retrieval |
+| `glossary_imports` | `app` | authority | owner/admin import RPC | admin/audit | import lifetime | sparse batches | retain after rollback | `idempotency_key` unique | 4 packet 1 |
+| `glossary_entries` | `app` | authority | owner/admin import RPC | worker read after import | with import | per batch | cascade with import | `(import_id, entry_key)` | 4 packet 1 |
+| `glossary_aliases` | `app` | authority | owner/admin import RPC | worker read after import | with entry | per entry | cascade | alias row `id` | 4 packet 1 |
 
 ## Jobs and projections
 
@@ -137,6 +143,7 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - Restricted visibility uses per-user `document_acl` grants only.
 - `document_chunks.embedding` is `vector(1024)` per [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md).
 - `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
+- Pending glossary imports never write `search_aliases`; approval projects aliases; rollback deletes that projection.
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
 - `audit_events` rejects UPDATE/DELETE (append-only trigger).
 - RLS is enabled on all exposed tables; Storage quarantine INSERT is reservation-scoped; no authenticated SELECT on quarantine.
@@ -149,4 +156,5 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [05-database-connections.md](./05-database-connections.md)
 - [06-database-workload-isolation.md](./06-database-workload-isolation.md)
 - [07-bm25-projection.md](./07-bm25-projection.md)
+- [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md)
 - [ADR-expand-contract-migrations](../adr/ADR-expand-contract-migrations.md)

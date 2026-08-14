@@ -227,3 +227,4 @@ The following require explicit user approval before Packet 1 and Phase 1 can adv
 - [Risk register](./development/RISK_REGISTER.md)
 - [Availability and isolation triggers](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md)
 - [Phase 1 foundation evidence](./development/phase-01-foundation-evidence.md)
+- [Evaluation dataset specification](./evaluation/DATASET_SPEC.md)

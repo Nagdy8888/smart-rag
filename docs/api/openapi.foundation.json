@@ -1,4 +1,1019 @@
 {
+  "components": {
+    "schemas": {
+      "Bm25Diagnostics": {
+        "description": "BM25 projection index version, lag, retry, and dead-letter counts.",
+        "properties": {
+          "active_index_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Index Version"
+          },
+          "dead_letter": {
+            "default": 0,
+            "title": "Dead Letter",
+            "type": "integer"
+          },
+          "failed": {
+            "default": 0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "index_schema_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Schema Version"
+          },
+          "lag_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag Seconds"
+          },
+          "pending": {
+            "default": 0,
+            "title": "Pending",
+            "type": "integer"
+          },
+          "processing": {
+            "default": 0,
+            "title": "Processing",
+            "type": "integer"
+          },
+          "retry_attempts": {
+            "default": 0,
+            "title": "Retry Attempts",
+            "type": "integer"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "title": "Bm25Diagnostics",
+        "type": "object"
+      },
+      "ChunkTableDiagnostics": {
+        "description": "Canonical chunk and structured-table counts.",
+        "properties": {
+          "chunk_count": {
+            "default": 0,
+            "title": "Chunk Count",
+            "type": "integer"
+          },
+          "table_count": {
+            "default": 0,
+            "title": "Table Count",
+            "type": "integer"
+          }
+        },
+        "title": "ChunkTableDiagnostics",
+        "type": "object"
+      },
+      "DocumentIngestionStatusResponse": {
+        "description": "Document-scoped ingestion status envelope.",
+        "properties": {
+          "recent_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/IngestionJobSummary"
+            },
+            "title": "Recent Jobs",
+            "type": "array"
+          },
+          "version": {
+            "$ref": "#/components/schemas/IngestionStatusResponse"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "DocumentIngestionStatusResponse",
+        "type": "object"
+      },
+      "EmbeddingDiagnostics": {
+        "description": "Durable embedding ledger counts and policy identity.",
+        "properties": {
+          "completed_count": {
+            "default": 0,
+            "title": "Completed Count",
+            "type": "integer"
+          },
+          "failed_count": {
+            "default": 0,
+            "title": "Failed Count",
+            "type": "integer"
+          },
+          "ledger_count": {
+            "default": 0,
+            "title": "Ledger Count",
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "policy_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Hash"
+          }
+        },
+        "title": "EmbeddingDiagnostics",
+        "type": "object"
+      },
+      "EnqueueWebsiteCrawlRequest": {
+        "description": "Owner/admin request to crawl one approved start URL.",
+        "properties": {
+          "approved_domain": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Approved Domain",
+            "type": "string"
+          },
+          "attestation_policy_version": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attestation Policy Version"
+          },
+          "content_class": {
+            "default": "synthetic",
+            "maxLength": 32,
+            "title": "Content Class",
+            "type": "string"
+          },
+          "document_title": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Title"
+          },
+          "graph_eligible": {
+            "default": false,
+            "title": "Graph Eligible",
+            "type": "boolean"
+          },
+          "idempotency_key": {
+            "maxLength": 256,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "max_depth": {
+            "default": 2,
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Max Depth",
+            "type": "integer"
+          },
+          "max_pages": {
+            "default": 50,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Pages",
+            "type": "integer"
+          },
+          "start_url": {
+            "maxLength": 2048,
+            "minLength": 8,
+            "title": "Start Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_url",
+          "approved_domain",
+          "idempotency_key"
+        ],
+        "title": "EnqueueWebsiteCrawlRequest",
+        "type": "object"
+      },
+      "EnqueueWebsiteCrawlResponse": {
+        "description": "Identifiers created or reused for one approved crawl enqueue.",
+        "properties": {
+          "approval_id": {
+            "format": "uuid",
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "version_id",
+          "source_id",
+          "approval_id",
+          "job_id"
+        ],
+        "title": "EnqueueWebsiteCrawlResponse",
+        "type": "object"
+      },
+      "GlossaryAliasRequest": {
+        "description": "One alias in an import request.",
+        "properties": {
+          "alias": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Alias",
+            "type": "string"
+          },
+          "language": {
+            "$ref": "#/components/schemas/GlossaryLanguage",
+            "default": "en"
+          }
+        },
+        "required": [
+          "alias"
+        ],
+        "title": "GlossaryAliasRequest",
+        "type": "object"
+      },
+      "GlossaryEntryRequest": {
+        "description": "One canonical glossary entry in an import request.",
+        "properties": {
+          "aliases": {
+            "items": {
+              "$ref": "#/components/schemas/GlossaryAliasRequest"
+            },
+            "maxItems": 20,
+            "title": "Aliases",
+            "type": "array"
+          },
+          "canonical_term": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Canonical Term",
+            "type": "string"
+          },
+          "checksum_algorithm": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Algorithm"
+          },
+          "effective_scope": {
+            "$ref": "#/components/schemas/GlossaryScope",
+            "default": "synthetic_eval"
+          },
+          "entry_key": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:-]+$",
+            "title": "Entry Key",
+            "type": "string"
+          },
+          "entry_type": {
+            "$ref": "#/components/schemas/GlossaryEntryType"
+          },
+          "identifier_pattern": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identifier Pattern"
+          },
+          "language": {
+            "$ref": "#/components/schemas/GlossaryLanguage",
+            "default": "en"
+          }
+        },
+        "required": [
+          "entry_key",
+          "canonical_term",
+          "entry_type"
+        ],
+        "title": "GlossaryEntryRequest",
+        "type": "object"
+      },
+      "GlossaryEntryType": {
+        "description": "Allow-listed glossary entry types.",
+        "enum": [
+          "product_code",
+          "project_name",
+          "acronym",
+          "canonical_term",
+          "identifier_rule"
+        ],
+        "title": "GlossaryEntryType",
+        "type": "string"
+      },
+      "GlossaryImportResponse": {
+        "description": "Identifiers after import, approval, or rollback.",
+        "properties": {
+          "alias_count": {
+            "title": "Alias Count",
+            "type": "integer"
+          },
+          "entry_count": {
+            "title": "Entry Count",
+            "type": "integer"
+          },
+          "import_id": {
+            "format": "uuid",
+            "title": "Import Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "import_id",
+          "status",
+          "entry_count",
+          "alias_count"
+        ],
+        "title": "GlossaryImportResponse",
+        "type": "object"
+      },
+      "GlossaryLanguage": {
+        "description": "Allow-listed glossary languages.",
+        "enum": [
+          "en",
+          "ar",
+          "mixed"
+        ],
+        "title": "GlossaryLanguage",
+        "type": "string"
+      },
+      "GlossaryScope": {
+        "description": "Effective scope. Cross-scope alias collisions are rejected.",
+        "enum": [
+          "company",
+          "synthetic_eval"
+        ],
+        "title": "GlossaryScope",
+        "type": "string"
+      },
+      "GraphHandoffDiagnostics": {
+        "description": "LightRAG index-job handoff counts (Phase 3 stops at Graph Pending).",
+        "properties": {
+          "completed": {
+            "default": 0,
+            "title": "Completed",
+            "type": "integer"
+          },
+          "dead_letter": {
+            "default": 0,
+            "title": "Dead Letter",
+            "type": "integer"
+          },
+          "failed": {
+            "default": 0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "pending": {
+            "default": 0,
+            "title": "Pending",
+            "type": "integer"
+          },
+          "processing": {
+            "default": 0,
+            "title": "Processing",
+            "type": "integer"
+          }
+        },
+        "title": "GraphHandoffDiagnostics",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ImportGlossaryRequest": {
+        "description": "Owner/admin glossary import body.",
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/GlossaryEntryRequest"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Entries",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "maxLength": 256,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "source_name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source Name",
+            "type": "string"
+          },
+          "source_version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Source Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_name",
+          "source_version",
+          "idempotency_key",
+          "entries"
+        ],
+        "title": "ImportGlossaryRequest",
+        "type": "object"
+      },
+      "IngestionJobSummary": {
+        "description": "Safe ingestion job diagnostic row.",
+        "properties": {
+          "attempt_count": {
+            "title": "Attempt Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Category"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_kind": {
+            "title": "Job Kind",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "max_attempts": {
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "job_kind",
+          "status",
+          "priority",
+          "attempt_count",
+          "max_attempts",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IngestionJobSummary",
+        "type": "object"
+      },
+      "IngestionStatusResponse": {
+        "description": "Public lifecycle plus nested diagnostics for one document version.",
+        "properties": {
+          "bm25": {
+            "$ref": "#/components/schemas/Bm25Diagnostics"
+          },
+          "bm25_jobs": {
+            "additionalProperties": true,
+            "title": "Bm25 Jobs",
+            "type": "object"
+          },
+          "bm25_verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bm25 Verified At"
+          },
+          "chunk_count": {
+            "title": "Chunk Count",
+            "type": "integer"
+          },
+          "chunk_set_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunk Set Hash"
+          },
+          "chunks_tables": {
+            "$ref": "#/components/schemas/ChunkTableDiagnostics"
+          },
+          "document_graph_eligible": {
+            "title": "Document Graph Eligible",
+            "type": "boolean"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "embedding": {
+            "$ref": "#/components/schemas/EmbeddingDiagnostics"
+          },
+          "embedding_ledger_count": {
+            "default": 0,
+            "title": "Embedding Ledger Count",
+            "type": "integer"
+          },
+          "embedding_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Model"
+          },
+          "embedding_policy_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Policy Hash"
+          },
+          "graph_handoff": {
+            "$ref": "#/components/schemas/GraphHandoffDiagnostics"
+          },
+          "graph_handoff_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Handoff At"
+          },
+          "graph_handoff_jobs": {
+            "additionalProperties": true,
+            "title": "Graph Handoff Jobs",
+            "type": "object"
+          },
+          "hybrid_verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hybrid Verified At"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "ocr": {
+            "$ref": "#/components/schemas/OcrDiagnostics"
+          },
+          "queue_age": {
+            "$ref": "#/components/schemas/QueueAgeDiagnostics"
+          },
+          "retrieval_eligible": {
+            "title": "Retrieval Eligible",
+            "type": "boolean"
+          },
+          "retry_allowed": {
+            "default": false,
+            "title": "Retry Allowed",
+            "type": "boolean"
+          },
+          "review": {
+            "$ref": "#/components/schemas/ReviewDiagnostics"
+          },
+          "scan": {
+            "$ref": "#/components/schemas/ScanDiagnostics"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          },
+          "visibility": {
+            "title": "Visibility",
+            "type": "string"
+          },
+          "visibility_generation": {
+            "title": "Visibility Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "document_id",
+          "status",
+          "version_number",
+          "is_current",
+          "retrieval_eligible",
+          "title",
+          "visibility",
+          "document_graph_eligible",
+          "visibility_generation",
+          "chunk_count"
+        ],
+        "title": "IngestionStatusResponse",
+        "type": "object"
+      },
+      "OcrDiagnostics": {
+        "description": "Page and OCR counts derived from canonical chunks.",
+        "properties": {
+          "ocr_pages": {
+            "default": 0,
+            "title": "Ocr Pages",
+            "type": "integer"
+          },
+          "page_count": {
+            "default": 0,
+            "title": "Page Count",
+            "type": "integer"
+          }
+        },
+        "title": "OcrDiagnostics",
+        "type": "object"
+      },
+      "QueueAgeDiagnostics": {
+        "description": "Oldest pending ingestion job age for this version.",
+        "properties": {
+          "oldest_pending_job_age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Pending Job Age Seconds"
+          },
+          "oldest_pending_job_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Pending Job Kind"
+          }
+        },
+        "title": "QueueAgeDiagnostics",
+        "type": "object"
+      },
+      "RetryIngestionJobResponse": {
+        "description": "Result of a role-scoped dead-letter or failed-job retry.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "detail"
+        ],
+        "title": "RetryIngestionJobResponse",
+        "type": "object"
+      },
+      "ReviewDiagnostics": {
+        "description": "Category attestation and URL-approval diagnostics.",
+        "properties": {
+          "approval_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Status"
+          },
+          "attestation_policy_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attestation Policy Version"
+          },
+          "declared_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Declared Category"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          }
+        },
+        "title": "ReviewDiagnostics",
+        "type": "object"
+      },
+      "ScanDiagnostics": {
+        "description": "Latest append-only scan evidence for one version.\n\nOrthogonal to public lifecycle; never introduces a new status enum.",
+        "properties": {
+          "age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Seconds"
+          },
+          "engine_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Version"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "object_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Hash"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "scanned_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scanned At"
+          },
+          "signature_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Version"
+          }
+        },
+        "title": "ScanDiagnostics",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
   "info": {
     "description": "Phase 1 foundation transport scaffold. Business routes are not implemented; readiness is unconfigured until later phases.",
     "title": "Smart RAG API",
@@ -6,6 +1021,330 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/admin/glossary/imports": {
+      "post": {
+        "description": "Import a pending glossary batch. Members cannot seed aliases.\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Source, version, idempotency key, and entries.\n    caller: Authenticated caller context.\n\nReturns:\n    Import identifiers. Duplicate idempotency keys reuse one row.\n\nRaises:\n    HTTPException: 403 for members/viewers, 400 for validation failures,\n        503 when the database URL is unset.",
+        "operationId": "create_glossary_import_admin_glossary_imports_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportGlossaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Glossary Import",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/admin/glossary/imports/{import_id}/approve": {
+      "post": {
+        "description": "Approve a pending import and project aliases into search_aliases.\n\nArgs:\n    request: FastAPI request with backend settings.\n    import_id: Pending import identifier.\n    caller: Authenticated caller context.\n\nReturns:\n    Updated import identifiers.\n\nRaises:\n    HTTPException: 403 for members/viewers, 400 when approval is rejected.",
+        "operationId": "approve_glossary_import_route_admin_glossary_imports__import_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Glossary Import Route",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/admin/glossary/imports/{import_id}/rollback": {
+      "post": {
+        "description": "Roll back an approved import by deleting its search projection.\n\nArgs:\n    request: FastAPI request with backend settings.\n    import_id: Import identifier.\n    caller: Authenticated caller context.\n\nReturns:\n    Updated import identifiers.\n\nRaises:\n    HTTPException: 403 for members/viewers, 400 when rollback is rejected.",
+        "operationId": "rollback_glossary_import_route_admin_glossary_imports__import_id__rollback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rollback Glossary Import Route",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "description": "Call the registered liveness behavior for direct smoke tests.\n\nReturns:\n    A mapping with ``status=live``.",
@@ -55,6 +1394,330 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/ingestion/crawls": {
+      "post": {
+        "description": "Enqueue one approved website crawl. Members cannot broaden crawl scope.\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Start URL, approved domain, and crawl bounds.\n    caller: Authenticated caller context.\n\nReturns:\n    Document/source/job identifiers. Duplicate idempotency keys reuse one job.\n\nRaises:\n    HTTPException: 403 for members/viewers, 400 for policy/domain mismatch,\n        503 when the database URL is unset.",
+        "operationId": "enqueue_website_crawl_ingestion_crawls_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnqueueWebsiteCrawlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnqueueWebsiteCrawlResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enqueue Website Crawl",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/ingestion/jobs/{job_id}/retry": {
+      "post": {
+        "description": "Retry one failed, backoff, or dead-letter ingestion job when authorized.\n\nDead-letter replay creates a **new** job with a new idempotency key and\nretains the original dead-letter row. Failed-but-not-dead-letter jobs only\nclear ``next_attempt_at``; ``last_error`` and ``attempt_count`` stay.\n\nArgs:\n    request: FastAPI request with backend settings.\n    job_id: Source ingestion job identifier.\n    caller: Authenticated caller context.\n\nReturns:\n    The job that should run next (replay child for dead-letter).\n\nRaises:\n    HTTPException: 403 for members/viewers, 404 when missing, 409 when the\n        job is not retryable, 503 when the database URL is unset.",
+        "operationId": "retry_ingestion_job_ingestion_jobs__job_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryIngestionJobResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Ingestion Job",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/ingestion/versions/{version_id}/status": {
+      "get": {
+        "description": "Return public lifecycle and nested diagnostics for one document version.\n\nArgs:\n    request: FastAPI request with backend settings.\n    version_id: Canonical document version identifier.\n    caller: Authenticated caller; role controls ``retry_allowed`` only.\n\nReturns:\n    Version status plus recent job summaries.\n\nRaises:\n    HTTPException: 404 when the version is missing; 503 when the database\n        URL is unset.",
+        "operationId": "get_version_ingestion_status_ingestion_versions__version_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentIngestionStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Version Ingestion Status",
+        "tags": [
+          "ingestion"
         ]
       }
     }

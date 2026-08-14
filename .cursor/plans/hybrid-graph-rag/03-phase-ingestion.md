@@ -1,10 +1,13 @@
 ---
 name: hybrid-graph-rag-phase-03-ingestion
 phase: 3
-status: pending
+status: complete
 depends_on: [1, 2]
 source_plan: ../hybrid-graph-rag_ab5281ef.plan.md
 global_contract: ./00-global-contracts.md
+completed: 2026-08-14
+accepted_by: "user (Cursor chat)"
+acceptance_text: "implement this phase (Phase 4)"
 ---
 
 # Phase 3: Ingestion

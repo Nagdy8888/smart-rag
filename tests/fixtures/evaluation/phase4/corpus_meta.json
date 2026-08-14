@@ -1,0 +1,45 @@
+{
+  "case_count": 405,
+  "class_counts": {
+    "acl_negative": 20,
+    "alias": 20,
+    "arabic_mixed": 20,
+    "broad_synthesis": 15,
+    "document_summary": 10,
+    "exact_code": 25,
+    "graph_mapping": 20,
+    "insufficient_refusal": 20,
+    "latest_as_of": 15,
+    "media_limitation": 5,
+    "mixed_locale_temporal": 10,
+    "multi_hop": 30,
+    "multi_part": 20,
+    "negation": 10,
+    "profile_fidelity": 20,
+    "prompt_injection": 30,
+    "relationship": 30,
+    "selective_metadata_filter": 15,
+    "semantic_factual": 35,
+    "tabular_aggregation": 20,
+    "typo": 15
+  },
+  "label_revision": "phase4-labels-synthetic-v1",
+  "manifest_hashes": {
+    "manifest_development": "9dcbe2c564d33a38fba096253d60d2c8172fb9dd6c76bf95627446c857f89264",
+    "manifest_holdout": "7c70b4267efbd9df46247c099333ef7e82ed4ccc6df906727d8997e7bcacada2",
+    "manifest_qualification": "716ea031255217a82fa8ce2a1d7f89dbf17e841a99e7b1f4dc4de3a51d42cc14"
+  },
+  "schema_hash": "996fb7553dcffa1805020444b2c4e22eebf05d6a9909882468a2cc7b80d151c9",
+  "schema_version": "phase4-dataset-v1",
+  "sme_approval": {
+    "approver": "user (Cursor chat; Phase 4 Packet 1 mandate)",
+    "hours_committed": "unverified",
+    "named_knowledge_owner": "unverified",
+    "status": "synthetic_provisional"
+  },
+  "split_counts": {
+    "development": 216,
+    "holdout": 112,
+    "qualification": 77
+  }
+}

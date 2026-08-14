@@ -1,0 +1,229 @@
+{
+  "rows": [
+    {
+      "case_id": "p4-alias-0001",
+      "normalized_hash": "136064304c110a071101becb86e9c88fb06f017b1294977b762f7c2639e56956",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0002",
+      "normalized_hash": "839cc7e19d54efa9d627285af3b5be33ea1847ad882f9668996a830e66b20bae",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0003",
+      "normalized_hash": "7922ff979114d2d9d47bbb5658d13783879cecadcf6307e2ff74705324c255fc",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0004",
+      "normalized_hash": "0cf1af874a758b045917f20a842390dbd5a804dc294bb056a7ad10f2f9398892",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0005",
+      "normalized_hash": "96d41b7418ae07e2ab5b4e1f213dd9ce1b43413022de642c28915f2bb0a4335b",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0006",
+      "normalized_hash": "487e6a8f1bc897399c19cf5be917534d7fa54bce10df94f0de0d185284c9c8f0",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0007",
+      "normalized_hash": "27f789d95a85d4e22560d4048c56b7d7638b4845fcd2166634a1149d3c596a2a",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0008",
+      "normalized_hash": "e6878de84a6994b2d7d2fd8de2810a942a4d58e4b692f7f258219ef9ea183435",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0009",
+      "normalized_hash": "9f2f67fa9212578c68484da474c6d31fed662c8556ad502a99ebb7a54e1ee72f",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0010",
+      "normalized_hash": "31aa657ac0017e4f0afdd7753c82f7fef75195d393cb6c8efe025d5971a77b35",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0011",
+      "normalized_hash": "4669064e71dfb85afbe4c722e21460f39de795ce2663218e59c4ebd4b2969297",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0012",
+      "normalized_hash": "c8d6d835627bad3ee2fdfe879e534434990f21e8bd6ff60b2f00fafa857c16c6",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0013",
+      "normalized_hash": "6e3a80f86e4121aa7f65e52f02f191b710493427dc4b10eb93995b24cab97f12",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0014",
+      "normalized_hash": "1c5045c43ccd0660647f7f2ae0749d3a1d94e4206bb30f2858df3e7a28b16ea9",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0015",
+      "normalized_hash": "62e624c0c23f433f2469dd311e808b6041c38fa53975a33a727456e1ff3431c2",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0016",
+      "normalized_hash": "61022c33fd6e7ec618ce05b4c52644ed32c81a65fe72537efc2aebea6cd9ef06",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0017",
+      "normalized_hash": "e922bd9dcc2a0d9b5b028af6145f7f11df5adbfb6aca0072166914e96a28dec9",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0018",
+      "normalized_hash": "d9e95f4943054a00dc95453ce9bae6ab3ac2f73cc83a75d84f21dc7eb20568ee",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0019",
+      "normalized_hash": "76f75f0005534d8a9117a8ea0d9ecfd12c6f39dff3b26c446b2121b41437ab9e",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-alias-0020",
+      "normalized_hash": "f68b2d6ea5314fd0e707a7b5d936a4fa7bb7917d9464fef28bcd5cb7793271f9",
+      "term_kind": "approved_alias"
+    },
+    {
+      "case_id": "p4-exact_code-0001",
+      "normalized_hash": "8200251d6584eb9240d3ce0d248a9441995a82ee52f5f7642c7c365f60de1375",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0002",
+      "normalized_hash": "a064ed67913726ed4cc7a06e1159f7dc57e7ba3c7d12cb0cf56c56fc37a26d5e",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0003",
+      "normalized_hash": "2459e0547ee47aa2e92b9810a401cb1f8600e68f00b1c9c2421be296ebf4db7b",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0004",
+      "normalized_hash": "a31d70292f8d6c788e6dabe86d7fa8feaa86b2d5b5d318dfe282f136fb96ab39",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0005",
+      "normalized_hash": "4e5f51f8934c6d1770d5e7fb162ceba98afbcc31a9b31b491dfbaa217ef82109",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0006",
+      "normalized_hash": "8b26bd6a3930814a1d7840e02790d68065518f49bc9c3daa1e1d9d15c5106f64",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0007",
+      "normalized_hash": "7965c687908829f7e3e2727b9ce37e8cdd2f4c7975ab589ff2e841bcd12aad65",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0008",
+      "normalized_hash": "0ff973038568765e0fe1124c35fa0feea04aa08264468304d958792bb88e716f",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0009",
+      "normalized_hash": "bbf9daa0632d3a50deda730a1cc10843fb386eb3220f9b512898e715bab365e7",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0010",
+      "normalized_hash": "849c406df261eb97757e89a3558caa2e74e797007132ab10210900617c5bf242",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0011",
+      "normalized_hash": "be473158d906e3aa51240aee03c8da3f9e39ae803b37c2ac6256ee7e1223acdb",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0012",
+      "normalized_hash": "a11653d91e8c707c37210ba95d27295c6d110b1ed90efd5f962972eba726e937",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0013",
+      "normalized_hash": "9de816d97a130c16203c9af70fbdbd8bcc1de9d91e494156270ee12d6d99feb4",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0014",
+      "normalized_hash": "e53f952e7d886d8c08a2e4c0fa89d86cdb4842311e84b058fd02ad6b115bfb1d",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0015",
+      "normalized_hash": "257f2ab9a78b1b113398b01ed75a6fb3852ab5b410071436136a732ecb2144cd",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0016",
+      "normalized_hash": "b65a8611dbe7aeaad38744d8448429bae0bbb8e60989eed27819f071001058b7",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0017",
+      "normalized_hash": "d2389e2369c3a7de228bb5a8071a09b883b478cb632b59db144d967f0b756ab4",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0018",
+      "normalized_hash": "5cb6df0512b8ef476de328750ecaa25f2d03a99618615a7b6780f67cdea1b2a6",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0019",
+      "normalized_hash": "bf1f9e79e90d2e1c30e5ebe21e70cb788846d85ef7eb00bc6b715bc9ed8a463d",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0020",
+      "normalized_hash": "af2f9bd6dfdf9ab60a9c3c4066ed9ed8de17756d2185bac6200aae077194c28a",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0021",
+      "normalized_hash": "a42c244370756a36a03b4e705eca99a68e507c15a4c4ea82d799c77442411274",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0022",
+      "normalized_hash": "0652b9090692f579a6827426db47116fbf6ff17e4b2589aca5a22d5ad8a70f19",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0023",
+      "normalized_hash": "db4cd665ece3366f0ec67328aaf800e356aab8a29590922e2d41154b5eb38e90",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0024",
+      "normalized_hash": "c073b536558b90b99a4b3f164c52d8ea7083a93317b3b8f23ee52d6c7f13eb3f",
+      "term_kind": "product_code"
+    },
+    {
+      "case_id": "p4-exact_code-0025",
+      "normalized_hash": "39192e78fe19c465bc99297849efb74d032f0cf0cea59cdb676d60ba1461a212",
+      "term_kind": "product_code"
+    }
+  ]
+}

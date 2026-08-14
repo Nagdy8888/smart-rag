@@ -1,7 +1,7 @@
 ---
 title: Phase 3 ingestion evidence
 owner: engineering-lead
-status: pending
+status: accepted
 last-reviewed: 2026-08-14
 audience: engineering, reviewers
 phase: 3
@@ -697,10 +697,9 @@ QT-BM25-003 p95 lag &lt;5 minutes: this synthetic drive measured 1.005s projecti
 
 ### Phase status
 
-- Phase wrapper `status`: remains `pending`.
-- Do **not** start Phase 4 in this run.
-- **User acceptance required** before marking Phase 3 `complete`.
+- Phase wrapper `status`: `complete`.
+- Accepted when the user requested Phase 4 implementation on 2026-08-14.
 
-### Explicit acceptance request
+### Explicit acceptance
 
-Please review this Phase 3 gap close-out exit record (Runs 1–4) and reply with acceptance or required blockers. Until you accept it, Phase 3 stays pending and Phase 4 must not begin.
+User request: implement Phase 4 (`.cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md`). That request is recorded as Phase 3 acceptance to start Phase 4 Packet 1.

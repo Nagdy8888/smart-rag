@@ -32,6 +32,9 @@ Validation errors list field paths and categories but omit source values.
 | `SMART_RAG_REQUIRE_CLAMAV` | `1` fails closed | public | Contract tests fail instead of skip when ClamAV is down |
 | `SMART_RAG_REQUIRE_CRAWL_PROXY` | `1` fails closed | public | Live proxy overlay tests fail instead of skip |
 | `SMART_RAG_REQUIRE_JOB_INTEGRATION` | `1` fails closed | public | Postgres job/checkpointer tests fail instead of skip |
+| `SMART_RAG_HOLDOUT_ACCESS` | boolean; `false` | public | Default denies sealed holdout labels. Enable only for Packet 8 or dataset seal verify |
+| `SMART_RAG_HOLDOUT_ACCESS_PURPOSE` | `packet8_immutable_holdout` or `dataset_seal_verify` | internal | Required when holdout access is enabled |
+| `SMART_RAG_HOLDOUT_ACCESS_ACTOR` | safe identifier | internal | Auditable actor required when holdout access is enabled |
 | `ADMIN_ALERT_SMTP_HOST` | optional hostname; empty skips SMTP | internal | Local Inbucket/Mailpit host. Unset skips mail; set `127.0.0.1` for Packet 8 proof |
 | `ADMIN_ALERT_SMTP_PORT` | integer; `54325` | public | Exposed local SMTP port from `supabase/config.toml` `local_smtp.smtp_port` |
 | `ADMIN_ALERT_SMTP_FROM` | email; `alerts@localhost` | public | Envelope from for metadata-only admin alerts |

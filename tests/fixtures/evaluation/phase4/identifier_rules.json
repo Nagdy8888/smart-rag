@@ -1,0 +1,55 @@
+{
+  "rules": [
+    {
+      "approved": true,
+      "checksum_algorithm": null,
+      "collision_risk": "low",
+      "language": "en",
+      "pattern": "INV-SR-\\d{4}",
+      "rejection_reason": null,
+      "rule_id": "inv-sr-v1",
+      "source_version": "identifier-rules-v1"
+    },
+    {
+      "approved": true,
+      "checksum_algorithm": null,
+      "collision_risk": "low",
+      "language": "en",
+      "pattern": "PRJ-[A-Z]{5,12}",
+      "rejection_reason": null,
+      "rule_id": "prj-orion-v1",
+      "source_version": "identifier-rules-v1"
+    },
+    {
+      "approved": true,
+      "checksum_algorithm": null,
+      "collision_risk": "low",
+      "language": "en",
+      "pattern": "SKU-P4-[A-Z0-9]{3}",
+      "rejection_reason": null,
+      "rule_id": "sku-p4-v1",
+      "source_version": "identifier-rules-v1"
+    },
+    {
+      "approved": true,
+      "checksum_algorithm": null,
+      "collision_risk": "low",
+      "language": "mixed",
+      "pattern": "P4-[A-Z]{2}-\\d{3}",
+      "rejection_reason": null,
+      "rule_id": "acr-mixed-v1",
+      "source_version": "identifier-rules-v1"
+    },
+    {
+      "approved": false,
+      "checksum_algorithm": null,
+      "collision_risk": "high",
+      "language": "en",
+      "pattern": "\\d{1,3}",
+      "rejection_reason": "short_literal",
+      "rule_id": "reject-digit-only",
+      "source_version": "identifier-rules-v1"
+    }
+  ],
+  "version": "identifier-rules-v1"
+}

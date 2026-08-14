@@ -9,6 +9,10 @@ from smart_rag_core.settings.base import (
     SharedSettings,
     load_settings,
 )
+from smart_rag_core.settings.evaluation import (
+    EvaluationSettings,
+    load_evaluation_settings,
+)
 from smart_rag_core.settings.operations import (
     JwksRolloverSettings,
     load_jwks_rollover_settings,
@@ -19,6 +23,7 @@ __all__ = [
     "AgentSettings",
     "BackendSettings",
     "Environment",
+    "EvaluationSettings",
     "JwksRolloverSettings",
     "LogLevel",
     "SettingsValidationError",
@@ -26,6 +31,7 @@ __all__ = [
     "WorkerSettings",
     "load_agent_settings",
     "load_backend_settings",
+    "load_evaluation_settings",
     "load_jwks_rollover_settings",
     "load_settings",
     "load_worker_settings",

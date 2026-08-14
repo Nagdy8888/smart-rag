@@ -31,6 +31,19 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260813140000_storage_quotas_graph_retention_v1.sql",
     "20260813150000_audit_chain_role_timeouts_v1.sql",
     "20260813160000_security_advisor_search_path_v1.sql",
+    "20260813170000_job_leases_ledger_claim_v1.sql",
+    "20260813180000_quarantine_scan_promotion_v1.sql",
+    "20260813190000_crawl_snapshots_provenance_v1.sql",
+    "20260813200000_hybrid_embedding_lifecycle_v1.sql",
+    "20260814100000_langgraph_checkpoint_v9.sql",
+    "20260814101000_retry_ingestion_job_v1.sql",
+    "20260814102000_enqueue_approved_website_crawl_v1.sql",
+    "20260814103000_document_status_uploading.sql",
+    "20260814103100_reserve_uploading_version_v1.sql",
+    "20260814103200_finalize_uploading_status_grants_v1.sql",
+    "20260814103300_hybrid_ready_requires_bm25_job_v1.sql",
+    "20260814103400_app_worker_extensions_usage_v1.sql",
+    "20260814120000_glossary_import_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

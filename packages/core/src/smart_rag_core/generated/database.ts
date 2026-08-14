@@ -156,12 +156,14 @@ export type Database = {
           chunk_id: string | null
           created_at: string
           error_category: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes: number
           heartbeat_at: string | null
           id: string
           idempotency_key: string
           last_error: string | null
           lease_expires_at: string | null
           lease_owner: string | null
+          lease_token: string | null
           max_attempts: number
           next_attempt_at: string | null
           operation: Database["app"]["Enums"]["bm25_job_operation"]
@@ -176,12 +178,14 @@ export type Database = {
           chunk_id?: string | null
           created_at?: string
           error_category?: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes?: number
           heartbeat_at?: string | null
           id?: string
           idempotency_key: string
           last_error?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
+          lease_token?: string | null
           max_attempts?: number
           next_attempt_at?: string | null
           operation: Database["app"]["Enums"]["bm25_job_operation"]
@@ -196,12 +200,14 @@ export type Database = {
           chunk_id?: string | null
           created_at?: string
           error_category?: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes?: number
           heartbeat_at?: string | null
           id?: string
           idempotency_key?: string
           last_error?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
+          lease_token?: string | null
           max_attempts?: number
           next_attempt_at?: string | null
           operation?: Database["app"]["Enums"]["bm25_job_operation"]
@@ -444,6 +450,71 @@ export type Database = {
         }
         Relationships: []
       }
+      crawl_fetch_events: {
+        Row: {
+          content_type: string | null
+          crawl_run_id: string | null
+          created_at: string
+          decision: string
+          decoded_bytes: number
+          final_url: string
+          id: string
+          peer_ip: string | null
+          pinned_ips: Json
+          policy_version: string
+          reason: string
+          redirect_hop: number
+          requested_url: string
+          robots: Json | null
+          status_code: number | null
+          wire_bytes: number
+        }
+        Insert: {
+          content_type?: string | null
+          crawl_run_id?: string | null
+          created_at?: string
+          decision: string
+          decoded_bytes?: number
+          final_url: string
+          id?: string
+          peer_ip?: string | null
+          pinned_ips?: Json
+          policy_version: string
+          reason: string
+          redirect_hop?: number
+          requested_url: string
+          robots?: Json | null
+          status_code?: number | null
+          wire_bytes?: number
+        }
+        Update: {
+          content_type?: string | null
+          crawl_run_id?: string | null
+          created_at?: string
+          decision?: string
+          decoded_bytes?: number
+          final_url?: string
+          id?: string
+          peer_ip?: string | null
+          pinned_ips?: Json
+          policy_version?: string
+          reason?: string
+          redirect_hop?: number
+          requested_url?: string
+          robots?: Json | null
+          status_code?: number | null
+          wire_bytes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crawl_fetch_events_crawl_run_id_fkey"
+            columns: ["crawl_run_id"]
+            isOneToOne: false
+            referencedRelation: "web_crawl_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dead_letter_jobs: {
         Row: {
           attempt_count: number
@@ -455,6 +526,7 @@ export type Database = {
           last_error: string | null
           lease_expires_at: string | null
           lease_owner: string | null
+          lease_token: string | null
           max_attempts: number
           next_attempt_at: string | null
           payload_ref: Json
@@ -474,6 +546,7 @@ export type Database = {
           last_error?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
+          lease_token?: string | null
           max_attempts?: number
           next_attempt_at?: string | null
           payload_ref?: Json
@@ -493,6 +566,7 @@ export type Database = {
           last_error?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
+          lease_token?: string | null
           max_attempts?: number
           next_attempt_at?: string | null
           payload_ref?: Json
@@ -545,11 +619,15 @@ export type Database = {
       document_chunks: {
         Row: {
           chunk_index: number
+          content_hash: string | null
+          contextual_text: string | null
           created_at: string
           deleted_at: string | null
           document_id: string
+          duplicate_of_chunk_id: string | null
           embedding: string | null
           id: string
+          is_search_representative: boolean
           page_number: number | null
           parent_chunk_id: string | null
           provenance: Json
@@ -562,11 +640,15 @@ export type Database = {
         }
         Insert: {
           chunk_index: number
+          content_hash?: string | null
+          contextual_text?: string | null
           created_at?: string
           deleted_at?: string | null
           document_id: string
+          duplicate_of_chunk_id?: string | null
           embedding?: string | null
           id?: string
+          is_search_representative?: boolean
           page_number?: number | null
           parent_chunk_id?: string | null
           provenance?: Json
@@ -579,11 +661,15 @@ export type Database = {
         }
         Update: {
           chunk_index?: number
+          content_hash?: string | null
+          contextual_text?: string | null
           created_at?: string
           deleted_at?: string | null
           document_id?: string
+          duplicate_of_chunk_id?: string | null
           embedding?: string | null
           id?: string
+          is_search_representative?: boolean
           page_number?: number | null
           parent_chunk_id?: string | null
           provenance?: Json
@@ -600,6 +686,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_duplicate_of_chunk_id_fkey"
+            columns: ["duplicate_of_chunk_id"]
+            isOneToOne: false
+            referencedRelation: "document_chunks"
             referencedColumns: ["id"]
           },
           {
@@ -620,6 +713,8 @@ export type Database = {
       }
       document_scan_events: {
         Row: {
+          bytes_examined: number | null
+          config_version: string | null
           declared_category: string | null
           details: Json
           document_id: string | null
@@ -631,12 +726,15 @@ export type Database = {
           scan_engine_version: string | null
           scanned_at: string
           session_id: string | null
+          signature_db_ids: Json
           signature_db_timestamp: string | null
           signature_version: string | null
           uploader_user_id: string | null
           version_id: string | null
         }
         Insert: {
+          bytes_examined?: number | null
+          config_version?: string | null
           declared_category?: string | null
           details?: Json
           document_id?: string | null
@@ -648,12 +746,15 @@ export type Database = {
           scan_engine_version?: string | null
           scanned_at?: string
           session_id?: string | null
+          signature_db_ids?: Json
           signature_db_timestamp?: string | null
           signature_version?: string | null
           uploader_user_id?: string | null
           version_id?: string | null
         }
         Update: {
+          bytes_examined?: number | null
+          config_version?: string | null
           declared_category?: string | null
           details?: Json
           document_id?: string | null
@@ -665,6 +766,7 @@ export type Database = {
           scan_engine_version?: string | null
           scanned_at?: string
           session_id?: string | null
+          signature_db_ids?: Json
           signature_db_timestamp?: string | null
           signature_version?: string | null
           uploader_user_id?: string | null
@@ -870,17 +972,25 @@ export type Database = {
       }
       document_versions: {
         Row: {
+          bm25_verified_at: string | null
           byte_size: number | null
+          chunk_set_hash: string | null
           content_hash: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           document_id: string
           effective_at: string | null
+          embedding_model: string | null
+          embedding_policy_hash: string | null
           graph_eligible: boolean
+          graph_handoff_at: string | null
+          hybrid_verified_at: string | null
           id: string
+          is_current: boolean
           language: string | null
           media_type: string | null
+          retrieval_eligible: boolean
           status: Database["app"]["Enums"]["document_status"]
           storage_bucket: string | null
           storage_path: string | null
@@ -888,17 +998,25 @@ export type Database = {
           version_number: number
         }
         Insert: {
+          bm25_verified_at?: string | null
           byte_size?: number | null
+          chunk_set_hash?: string | null
           content_hash?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           document_id: string
           effective_at?: string | null
+          embedding_model?: string | null
+          embedding_policy_hash?: string | null
           graph_eligible?: boolean
+          graph_handoff_at?: string | null
+          hybrid_verified_at?: string | null
           id?: string
+          is_current?: boolean
           language?: string | null
           media_type?: string | null
+          retrieval_eligible?: boolean
           status?: Database["app"]["Enums"]["document_status"]
           storage_bucket?: string | null
           storage_path?: string | null
@@ -906,17 +1024,25 @@ export type Database = {
           version_number: number
         }
         Update: {
+          bm25_verified_at?: string | null
           byte_size?: number | null
+          chunk_set_hash?: string | null
           content_hash?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           document_id?: string
           effective_at?: string | null
+          embedding_model?: string | null
+          embedding_policy_hash?: string | null
           graph_eligible?: boolean
+          graph_handoff_at?: string | null
+          hybrid_verified_at?: string | null
           id?: string
+          is_current?: boolean
           language?: string | null
           media_type?: string | null
+          retrieval_eligible?: boolean
           status?: Database["app"]["Enums"]["document_status"]
           storage_bucket?: string | null
           storage_path?: string | null
@@ -980,6 +1106,226 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "document_versions"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      embedding_operation_ledger: {
+        Row: {
+          actual_usd: number | null
+          attempt_count: number
+          created_at: string
+          dimensions: number
+          id: string
+          input_count: number
+          model: string
+          operation_key: string
+          policy_hash: string
+          provider_request_id: string | null
+          reserved_usd: number | null
+          result_ref: Json
+          status: string
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          actual_usd?: number | null
+          attempt_count?: number
+          created_at?: string
+          dimensions: number
+          id?: string
+          input_count?: number
+          model: string
+          operation_key: string
+          policy_hash: string
+          provider_request_id?: string | null
+          reserved_usd?: number | null
+          result_ref?: Json
+          status?: string
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          actual_usd?: number | null
+          attempt_count?: number
+          created_at?: string
+          dimensions?: number
+          id?: string
+          input_count?: number
+          model?: string
+          operation_key?: string
+          policy_hash?: string
+          provider_request_id?: string | null
+          reserved_usd?: number | null
+          result_ref?: Json
+          status?: string
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "embedding_operation_ledger_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      glossary_aliases: {
+        Row: {
+          alias: string
+          alias_normalized: string | null
+          created_at: string
+          entry_id: string
+          id: string
+          language: string
+        }
+        Insert: {
+          alias: string
+          alias_normalized?: string | null
+          created_at?: string
+          entry_id: string
+          id?: string
+          language: string
+        }
+        Update: {
+          alias?: string
+          alias_normalized?: string | null
+          created_at?: string
+          entry_id?: string
+          id?: string
+          language?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "glossary_aliases_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "glossary_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      glossary_entries: {
+        Row: {
+          canonical_term: string
+          checksum_algorithm: string | null
+          created_at: string
+          effective_scope: string
+          entry_key: string
+          entry_type: Database["app"]["Enums"]["glossary_entry_type"]
+          id: string
+          identifier_pattern: string | null
+          import_id: string
+          language: string
+          term_normalized: string | null
+        }
+        Insert: {
+          canonical_term: string
+          checksum_algorithm?: string | null
+          created_at?: string
+          effective_scope: string
+          entry_key: string
+          entry_type: Database["app"]["Enums"]["glossary_entry_type"]
+          id?: string
+          identifier_pattern?: string | null
+          import_id: string
+          language: string
+          term_normalized?: string | null
+        }
+        Update: {
+          canonical_term?: string
+          checksum_algorithm?: string | null
+          created_at?: string
+          effective_scope?: string
+          entry_key?: string
+          entry_type?: Database["app"]["Enums"]["glossary_entry_type"]
+          id?: string
+          identifier_pattern?: string | null
+          import_id?: string
+          language?: string
+          term_normalized?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "glossary_entries_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "glossary_imports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      glossary_imports: {
+        Row: {
+          alias_count: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          entry_count: number
+          id: string
+          idempotency_key: string
+          imported_by: string
+          rolled_back_at: string | null
+          rolled_back_by: string | null
+          source_name: string
+          source_version: string
+          status: Database["app"]["Enums"]["glossary_import_status"]
+          updated_at: string
+        }
+        Insert: {
+          alias_count?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          entry_count?: number
+          id?: string
+          idempotency_key: string
+          imported_by: string
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          source_name: string
+          source_version: string
+          status: Database["app"]["Enums"]["glossary_import_status"]
+          updated_at?: string
+        }
+        Update: {
+          alias_count?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          entry_count?: number
+          id?: string
+          idempotency_key?: string
+          imported_by?: string
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          source_name?: string
+          source_version?: string
+          status?: Database["app"]["Enums"]["glossary_import_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "glossary_imports_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "glossary_imports_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "glossary_imports_rolled_back_by_fkey"
+            columns: ["rolled_back_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1051,6 +1397,7 @@ export type Database = {
           created_at: string
           document_id: string | null
           error_category: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes: number
           heartbeat_at: string | null
           id: string
           idempotency_key: string
@@ -1058,6 +1405,7 @@ export type Database = {
           last_error: string | null
           lease_expires_at: string | null
           lease_owner: string | null
+          lease_token: string | null
           max_attempts: number
           next_attempt_at: string | null
           payload_ref: Json
@@ -1071,6 +1419,7 @@ export type Database = {
           created_at?: string
           document_id?: string | null
           error_category?: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes?: number
           heartbeat_at?: string | null
           id?: string
           idempotency_key: string
@@ -1078,6 +1427,7 @@ export type Database = {
           last_error?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
+          lease_token?: string | null
           max_attempts?: number
           next_attempt_at?: string | null
           payload_ref?: Json
@@ -1091,6 +1441,7 @@ export type Database = {
           created_at?: string
           document_id?: string | null
           error_category?: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes?: number
           heartbeat_at?: string | null
           id?: string
           idempotency_key?: string
@@ -1098,6 +1449,7 @@ export type Database = {
           last_error?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
+          lease_token?: string | null
           max_attempts?: number
           next_attempt_at?: string | null
           payload_ref?: Json
@@ -1122,6 +1474,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      job_operation_ledger: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          job_table: string
+          lease_token: string
+          operation_key: string
+          result_ref: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          job_table: string
+          lease_token: string
+          operation_key: string
+          result_ref?: Json
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          job_table?: string
+          lease_token?: string
+          operation_key?: string
+          result_ref?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       lightrag_chunk_map: {
         Row: {
@@ -1158,12 +1546,14 @@ export type Database = {
           created_at: string
           document_id: string | null
           error_category: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes: number
           heartbeat_at: string | null
           id: string
           idempotency_key: string
           last_error: string | null
           lease_expires_at: string | null
           lease_owner: string | null
+          lease_token: string | null
           max_attempts: number
           next_attempt_at: string | null
           operation: Database["app"]["Enums"]["lightrag_job_operation"]
@@ -1178,12 +1568,14 @@ export type Database = {
           created_at?: string
           document_id?: string | null
           error_category?: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes?: number
           heartbeat_at?: string | null
           id?: string
           idempotency_key: string
           last_error?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
+          lease_token?: string | null
           max_attempts?: number
           next_attempt_at?: string | null
           operation: Database["app"]["Enums"]["lightrag_job_operation"]
@@ -1198,12 +1590,14 @@ export type Database = {
           created_at?: string
           document_id?: string | null
           error_category?: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes?: number
           heartbeat_at?: string | null
           id?: string
           idempotency_key?: string
           last_error?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
+          lease_token?: string | null
           max_attempts?: number
           next_attempt_at?: string | null
           operation?: Database["app"]["Enums"]["lightrag_job_operation"]
@@ -1636,7 +2030,11 @@ export type Database = {
           alias_normalized: string | null
           canonical_term: string
           created_at: string
+          effective_scope: string | null
+          glossary_entry_id: string | null
           id: string
+          import_id: string | null
+          language: string | null
           updated_at: string
         }
         Insert: {
@@ -1644,7 +2042,11 @@ export type Database = {
           alias_normalized?: string | null
           canonical_term: string
           created_at?: string
+          effective_scope?: string | null
+          glossary_entry_id?: string | null
           id?: string
+          import_id?: string | null
+          language?: string | null
           updated_at?: string
         }
         Update: {
@@ -1652,16 +2054,39 @@ export type Database = {
           alias_normalized?: string | null
           canonical_term?: string
           created_at?: string
+          effective_scope?: string | null
+          glossary_entry_id?: string | null
           id?: string
+          import_id?: string | null
+          language?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "search_aliases_glossary_entry_id_fkey"
+            columns: ["glossary_entry_id"]
+            isOneToOne: false
+            referencedRelation: "glossary_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "search_aliases_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "glossary_imports"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       source_approval_requests: {
         Row: {
           created_at: string
           domain: string | null
+          expires_at: string | null
           id: string
+          max_depth: number
+          max_pages: number
+          policy_version: string | null
           requested_by: string | null
           review_notes: string | null
           reviewed_by: string | null
@@ -1673,7 +2098,11 @@ export type Database = {
         Insert: {
           created_at?: string
           domain?: string | null
+          expires_at?: string | null
           id?: string
+          max_depth?: number
+          max_pages?: number
+          policy_version?: string | null
           requested_by?: string | null
           review_notes?: string | null
           reviewed_by?: string | null
@@ -1685,7 +2114,11 @@ export type Database = {
         Update: {
           created_at?: string
           domain?: string | null
+          expires_at?: string | null
           id?: string
+          max_depth?: number
+          max_pages?: number
+          policy_version?: string | null
           requested_by?: string | null
           review_notes?: string | null
           reviewed_by?: string | null
@@ -1700,6 +2133,72 @@ export type Database = {
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "document_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storage_promotion_sagas: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_step: string
+          destination_bucket: string
+          destination_path: string
+          expected_bytes: number
+          expected_hash: string
+          id: string
+          idempotency_key: string
+          quarantine_bucket: string
+          quarantine_path: string
+          reservation_id: string | null
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_step?: string
+          destination_bucket: string
+          destination_path: string
+          expected_bytes: number
+          expected_hash: string
+          id?: string
+          idempotency_key: string
+          quarantine_bucket: string
+          quarantine_path: string
+          reservation_id?: string | null
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_step?: string
+          destination_bucket?: string
+          destination_path?: string
+          expected_bytes?: number
+          expected_hash?: string
+          id?: string
+          idempotency_key?: string
+          quarantine_bucket?: string
+          quarantine_path?: string
+          reservation_id?: string | null
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_promotion_sagas_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "upload_quota_reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "storage_promotion_sagas_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -1903,6 +2402,7 @@ export type Database = {
           cleanup_status: string | null
           committed_at: string | null
           created_at: string
+          document_id: string | null
           expires_at: string
           finalized_at: string | null
           id: string
@@ -1915,12 +2415,14 @@ export type Database = {
           storage_path: string | null
           updated_at: string
           user_id: string
+          version_id: string | null
         }
         Insert: {
           actual_bytes?: number | null
           cleanup_status?: string | null
           committed_at?: string | null
           created_at?: string
+          document_id?: string | null
           expires_at: string
           finalized_at?: string | null
           id?: string
@@ -1933,12 +2435,14 @@ export type Database = {
           storage_path?: string | null
           updated_at?: string
           user_id: string
+          version_id?: string | null
         }
         Update: {
           actual_bytes?: number | null
           cleanup_status?: string | null
           committed_at?: string | null
           created_at?: string
+          document_id?: string | null
           expires_at?: string
           finalized_at?: string | null
           id?: string
@@ -1951,8 +2455,24 @@ export type Database = {
           storage_path?: string | null
           updated_at?: string
           user_id?: string
+          version_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "upload_quota_reservations_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_quota_reservations_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_feedback: {
         Row: {
@@ -1989,6 +2509,147 @@ export type Database = {
           },
         ]
       }
+      web_crawl_runs: {
+        Row: {
+          completed_at: string | null
+          crawl_version: number
+          created_at: string
+          decoded_bytes_total: number
+          failure_reason: string | null
+          id: string
+          pages_fetched: number
+          policy_version: string
+          source_id: string
+          start_url: string
+          started_at: string
+          status: string
+          updated_at: string
+          version_id: string | null
+          wire_bytes_total: number
+        }
+        Insert: {
+          completed_at?: string | null
+          crawl_version: number
+          created_at?: string
+          decoded_bytes_total?: number
+          failure_reason?: string | null
+          id?: string
+          pages_fetched?: number
+          policy_version: string
+          source_id: string
+          start_url: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          version_id?: string | null
+          wire_bytes_total?: number
+        }
+        Update: {
+          completed_at?: string | null
+          crawl_version?: number
+          created_at?: string
+          decoded_bytes_total?: number
+          failure_reason?: string | null
+          id?: string
+          pages_fetched?: number
+          policy_version?: string
+          source_id?: string
+          start_url?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          version_id?: string | null
+          wire_bytes_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_crawl_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "document_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_crawl_runs_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      web_snapshots: {
+        Row: {
+          canonical_url: string
+          content_hash: string
+          content_type: string | null
+          crawl_run_id: string
+          created_at: string
+          decoded_bytes: number
+          fetched_at: string
+          id: string
+          peer_ip: string | null
+          pinned_ips: Json
+          redirect_chain: Json
+          source_id: string
+          storage_bucket: string
+          storage_path: string
+          title: string | null
+          wire_bytes: number
+        }
+        Insert: {
+          canonical_url: string
+          content_hash: string
+          content_type?: string | null
+          crawl_run_id: string
+          created_at?: string
+          decoded_bytes?: number
+          fetched_at?: string
+          id?: string
+          peer_ip?: string | null
+          pinned_ips?: Json
+          redirect_chain?: Json
+          source_id: string
+          storage_bucket: string
+          storage_path: string
+          title?: string | null
+          wire_bytes?: number
+        }
+        Update: {
+          canonical_url?: string
+          content_hash?: string
+          content_type?: string | null
+          crawl_run_id?: string
+          created_at?: string
+          decoded_bytes?: number
+          fetched_at?: string
+          id?: string
+          peer_ip?: string | null
+          pinned_ips?: Json
+          redirect_chain?: Json
+          source_id?: string
+          storage_bucket?: string
+          storage_path?: string
+          title?: string | null
+          wire_bytes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_snapshots_crawl_run_id_fkey"
+            columns: ["crawl_run_id"]
+            isOneToOne: false
+            referencedRelation: "web_crawl_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_snapshots_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "document_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       company_health: {
@@ -2020,9 +2681,40 @@ export type Database = {
       }
     }
     Functions: {
+      _validate_job_lease_seconds: {
+        Args: { p_lease_seconds: number }
+        Returns: undefined
+      }
+      _validate_job_owner: { Args: { p_owner: string }; Returns: undefined }
       accept_invitation: {
         Args: { p_token_hash: string; p_user_email: string; p_user_id: string }
         Returns: string
+      }
+      activate_graph_ineligible_version: {
+        Args: { p_version_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          current_version_id: string | null
+          deleted_at: string | null
+          description: string | null
+          graph_eligible: boolean
+          id: string
+          title: string
+          updated_at: string
+          visibility: Database["app"]["Enums"]["document_visibility"]
+          visibility_generation: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "documents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      advance_promotion_saga_step: {
+        Args: { p_expected_step: string; p_new_step: string; p_saga_id: string }
+        Returns: boolean
       }
       append_audit_event: {
         Args: {
@@ -2039,6 +2731,20 @@ export type Database = {
           p_target_type: string
         }
         Returns: string
+      }
+      approve_glossary_import: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          target_import_id: string
+        }
+        Returns: {
+          alias_count: number
+          entry_count: number
+          import_id: string
+          status: Database["app"]["Enums"]["glossary_import_status"]
+        }[]
       }
       assert_graph_index_allowed: {
         Args: { p_document_id: string; p_version_id?: string }
@@ -2085,6 +2791,119 @@ export type Database = {
         }
         Returns: boolean
       }
+      cancel_ingestion_job: {
+        Args: { p_job_id: string; p_lease_token: string; p_owner: string }
+        Returns: boolean
+      }
+      claim_bm25_index_job: {
+        Args: { p_lease_seconds: number; p_owner: string }
+        Returns: {
+          attempt_count: number
+          chunk_id: string | null
+          created_at: string
+          error_category: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes: number
+          heartbeat_at: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          lease_token: string | null
+          max_attempts: number
+          next_attempt_at: string | null
+          operation: Database["app"]["Enums"]["bm25_job_operation"]
+          payload_ref: Json
+          priority: Database["app"]["Enums"]["job_priority"]
+          status: Database["app"]["Enums"]["job_status"]
+          updated_at: string
+          version_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "bm25_index_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_ingestion_job: {
+        Args: { p_lease_seconds: number; p_owner: string }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          document_id: string | null
+          error_category: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes: number
+          heartbeat_at: string | null
+          id: string
+          idempotency_key: string
+          job_kind: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          lease_token: string | null
+          max_attempts: number
+          next_attempt_at: string | null
+          payload_ref: Json
+          priority: Database["app"]["Enums"]["job_priority"]
+          status: Database["app"]["Enums"]["job_status"]
+          updated_at: string
+          version_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "ingestion_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_lightrag_index_job: {
+        Args: { p_lease_seconds: number; p_owner: string }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          document_id: string | null
+          error_category: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes: number
+          heartbeat_at: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          lease_token: string | null
+          max_attempts: number
+          next_attempt_at: string | null
+          operation: Database["app"]["Enums"]["lightrag_job_operation"]
+          payload_ref: Json
+          priority: Database["app"]["Enums"]["job_priority"]
+          status: Database["app"]["Enums"]["job_status"]
+          updated_at: string
+          version_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "lightrag_index_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      complete_ingestion_job: {
+        Args: { p_job_id: string; p_lease_token: string; p_owner: string }
+        Returns: boolean
+      }
+      complete_promotion_db_switch: {
+        Args: {
+          p_byte_size: number
+          p_content_hash: string
+          p_destination_bucket: string
+          p_destination_path: string
+          p_media_type: string
+          p_saga_id: string
+          p_version_id: string
+        }
+        Returns: boolean
+      }
       current_authorization_version: { Args: never; Returns: number }
       emit_admin_notification: {
         Args: {
@@ -2099,6 +2918,141 @@ export type Database = {
       emit_graph_acl_remove_for_document: {
         Args: { p_document_id: string }
         Returns: undefined
+      }
+      enqueue_approved_website_crawl: {
+        Args: {
+          approved_domain: string
+          attestation_policy_version?: string
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          content_class?: string
+          document_title: string
+          graph_eligible?: boolean
+          idempotency_key: string
+          max_depth?: number
+          max_pages?: number
+          start_url: string
+        }
+        Returns: {
+          approval_id: string
+          document_id: string
+          job_id: string
+          source_id: string
+          version_id: string
+        }[]
+      }
+      enqueue_bm25_projection_for_version: {
+        Args: {
+          p_chunk_set_hash: string
+          p_operation_key?: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+      enqueue_graph_pending_handoff: {
+        Args: {
+          p_content_hash?: string
+          p_lightrag_version?: string
+          p_pipeline_version?: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+      exclude_version_from_retrieval: {
+        Args: { p_reason?: string; p_version_id: string }
+        Returns: {
+          bm25_verified_at: string | null
+          byte_size: number | null
+          chunk_set_hash: string | null
+          content_hash: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          document_id: string
+          effective_at: string | null
+          embedding_model: string | null
+          embedding_policy_hash: string | null
+          graph_eligible: boolean
+          graph_handoff_at: string | null
+          hybrid_verified_at: string | null
+          id: string
+          is_current: boolean
+          language: string | null
+          media_type: string | null
+          retrieval_eligible: boolean
+          status: Database["app"]["Enums"]["document_status"]
+          storage_bucket: string | null
+          storage_path: string | null
+          updated_at: string
+          version_number: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "document_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      finalize_hybrid_ready: {
+        Args: {
+          p_bm25_job_id?: string
+          p_chunk_set_hash: string
+          p_version_id: string
+        }
+        Returns: {
+          bm25_verified_at: string | null
+          byte_size: number | null
+          chunk_set_hash: string | null
+          content_hash: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          document_id: string
+          effective_at: string | null
+          embedding_model: string | null
+          embedding_policy_hash: string | null
+          graph_eligible: boolean
+          graph_handoff_at: string | null
+          hybrid_verified_at: string | null
+          id: string
+          is_current: boolean
+          language: string | null
+          media_type: string | null
+          retrieval_eligible: boolean
+          status: Database["app"]["Enums"]["document_status"]
+          storage_bucket: string | null
+          storage_path: string | null
+          updated_at: string
+          version_number: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "document_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      finalize_quarantine_upload: {
+        Args: {
+          actual_bytes: number
+          attestation_policy_version: string
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          content_hash: string
+          declared_category: string
+          document_title?: string
+          idempotency_key: string
+          media_type: string
+          object_name: string
+          reservation_id: string
+        }
+        Returns: {
+          document_id: string
+          job_id: string
+          version_id: string
+        }[]
       }
       finalize_upload_quota: {
         Args: {
@@ -2115,6 +3069,37 @@ export type Database = {
           reservation_id: string
           reserved_bytes: number
           status: Database["app"]["Enums"]["budget_reservation_status"]
+        }[]
+      }
+      glossary_identifier_rule_rejected: {
+        Args: { pattern: string }
+        Returns: boolean
+      }
+      glossary_payload_has_cycle: { Args: { payload: Json }; Returns: boolean }
+      heartbeat_ingestion_job: {
+        Args: {
+          p_job_id: string
+          p_lease_seconds: number
+          p_lease_token: string
+          p_owner: string
+        }
+        Returns: boolean
+      }
+      import_glossary_batch: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          idempotency_key: string
+          payload: Json
+          source_name: string
+          source_version: string
+        }
+        Returns: {
+          alias_count: number
+          entry_count: number
+          import_id: string
+          status: Database["app"]["Enums"]["glossary_import_status"]
         }[]
       }
       list_quarantine_cleanup_candidates: {
@@ -2156,6 +3141,20 @@ export type Database = {
           visibility_generation: number
         }[]
       }
+      load_active_crawl_approval: {
+        Args: { p_source_id: string }
+        Returns: {
+          approval_id: string
+          approved_domain: string
+          max_depth: number
+          max_pages: number
+          policy_version: string
+          requester_user_id: string
+          reviewer_user_id: string
+          source_id: string
+          start_url: string
+        }[]
+      }
       mark_quarantine_cleanup_done: {
         Args: { p_reservation_id: string }
         Returns: undefined
@@ -2163,6 +3162,33 @@ export type Database = {
       quarantine_upload_path_allowed: {
         Args: { object_name: string }
         Returns: boolean
+      }
+      record_embedding_ledger: {
+        Args: {
+          p_actual_usd?: number
+          p_dimensions: number
+          p_input_count: number
+          p_model: string
+          p_operation_key: string
+          p_policy_hash: string
+          p_provider_request_id?: string
+          p_reserved_usd?: number
+          p_result_ref?: Json
+          p_status: string
+          p_version_id: string
+        }
+        Returns: string
+      }
+      record_job_operation_ledger: {
+        Args: {
+          p_job_id: string
+          p_job_table: string
+          p_lease_token: string
+          p_operation_key: string
+          p_result_ref?: Json
+          p_status: string
+        }
+        Returns: string
       }
       redact_audit_payload: { Args: { payload: Json }; Returns: Json }
       release_expired_upload_reservations: {
@@ -2180,16 +3206,59 @@ export type Database = {
           storage_path?: string
         }
         Returns: {
+          document_id: string
           expires_at: string
           reservation_id: string
           reserved_bytes: number
           reserved_storage_path: string
           storage_bucket: string
+          version_id: string
+        }[]
+      }
+      retry_ingestion_job: {
+        Args: { p_job_id: string }
+        Returns: {
+          attempt_count: number
+          created_at: string
+          detail: string
+          document_id: string
+          error_category: Database["app"]["Enums"]["job_error_category"]
+          estimated_size_bytes: number
+          heartbeat_at: string
+          id: string
+          idempotency_key: string
+          job_kind: string
+          last_error: string
+          lease_expires_at: string
+          lease_owner: string
+          lease_token: string
+          max_attempts: number
+          next_attempt_at: string
+          original_job_id: string
+          payload_ref: Json
+          priority: Database["app"]["Enums"]["job_priority"]
+          status: Database["app"]["Enums"]["job_status"]
+          updated_at: string
+          version_id: string
         }[]
       }
       revoke_session: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
+      }
+      rollback_glossary_import: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          target_import_id: string
+        }
+        Returns: {
+          alias_count: number
+          entry_count: number
+          import_id: string
+          status: Database["app"]["Enums"]["glossary_import_status"]
+        }[]
       }
       set_document_visibility: {
         Args: {
@@ -2219,6 +3288,28 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      transition_document_version_status: {
+        Args: {
+          p_expected_status: Database["app"]["Enums"]["document_status"]
+          p_new_status: Database["app"]["Enums"]["document_status"]
+          p_version_id: string
+        }
+        Returns: boolean
+      }
+      upsert_promotion_saga_intent: {
+        Args: {
+          p_destination_bucket: string
+          p_destination_path: string
+          p_expected_bytes: number
+          p_expected_hash: string
+          p_idempotency_key: string
+          p_quarantine_bucket: string
+          p_quarantine_path: string
+          p_reservation_id?: string
+          p_version_id: string
+        }
+        Returns: string
+      }
       validate_caller_context: {
         Args: {
           caller_authorization_version: number
@@ -2238,6 +3329,7 @@ export type Database = {
         | "released"
         | "expired"
       document_status:
+        | "uploading"
         | "uploaded"
         | "scanning"
         | "parsing"
@@ -2248,6 +3340,17 @@ export type Database = {
         | "deletion_pending"
         | "failed"
       document_visibility: "company_visible" | "restricted"
+      glossary_entry_type:
+        | "product_code"
+        | "project_name"
+        | "acronym"
+        | "canonical_term"
+        | "identifier_rule"
+      glossary_import_status:
+        | "pending_approval"
+        | "approved"
+        | "rolled_back"
+        | "rejected"
       job_error_category:
         | "transient"
         | "permanent"
@@ -2281,6 +3384,7 @@ export type Database = {
         | "unscannable"
         | "stale_signature"
         | "over_limit"
+        | "hash_mismatch"
       source_type: "file_upload" | "website_crawl"
       tool_permission_level: "none" | "read" | "execute" | "admin"
       user_role: "owner" | "admin" | "member" | "viewer"
@@ -4094,6 +5198,7 @@ export const Constants = {
         "expired",
       ],
       document_status: [
+        "uploading",
         "uploaded",
         "scanning",
         "parsing",
@@ -4105,6 +5210,19 @@ export const Constants = {
         "failed",
       ],
       document_visibility: ["company_visible", "restricted"],
+      glossary_entry_type: [
+        "product_code",
+        "project_name",
+        "acronym",
+        "canonical_term",
+        "identifier_rule",
+      ],
+      glossary_import_status: [
+        "pending_approval",
+        "approved",
+        "rolled_back",
+        "rejected",
+      ],
       job_error_category: [
         "transient",
         "permanent",
@@ -4142,6 +5260,7 @@ export const Constants = {
         "unscannable",
         "stale_signature",
         "over_limit",
+        "hash_mismatch",
       ],
       source_type: ["file_upload", "website_crawl"],
       tool_permission_level: ["none", "read", "execute", "admin"],
@@ -4177,3 +5296,4 @@ export const Constants = {
     },
   },
 } as const
+

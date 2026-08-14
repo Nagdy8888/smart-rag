@@ -1,7 +1,7 @@
-"""Generate foundation OpenAPI and fail on unexpected route drift.
+"""Generate the public OpenAPI snapshot and fail on unexpected route drift.
 
-Phase 1 only exposes liveness/readiness health routes. This check regenerates
-the committed snapshot and compares; it does not invent later-phase APIs.
+Additive later-phase routes must be listed explicitly. This check regenerates
+the committed snapshot and compares; it does not invent undeclared APIs.
 """
 
 from __future__ import annotations
@@ -26,7 +26,16 @@ def main() -> int:
 
     schema = app.openapi()
     paths = sorted(schema.get("paths", {}))
-    allowed = {"/health/live", "/health/ready"}
+    allowed = {
+        "/health/live",
+        "/health/ready",
+        "/ingestion/crawls",
+        "/ingestion/jobs/{job_id}/retry",
+        "/ingestion/versions/{version_id}/status",
+        "/admin/glossary/imports",
+        "/admin/glossary/imports/{import_id}/approve",
+        "/admin/glossary/imports/{import_id}/rollback",
+    }
     unexpected = [path for path in paths if path not in allowed]
     if unexpected:
         print(f"unexpected foundation paths: {unexpected}", file=sys.stderr)
