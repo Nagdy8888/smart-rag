@@ -13,6 +13,8 @@ from smart_rag_core.gateways.model import (
     ModelGatewayUnavailableError,
     ModelRequest,
     ModelResponse,
+    QueryProfileModelRequest,
+    QueryProfileModelResponse,
     block_openai_network,
     create_model_gateway,
 )
@@ -27,6 +29,8 @@ __all__ = [
     "ModelGatewayUnavailableError",
     "ModelRequest",
     "ModelResponse",
+    "QueryProfileModelRequest",
+    "QueryProfileModelResponse",
     "block_openai_network",
     "create_embedding_gateway",
     "create_model_gateway",

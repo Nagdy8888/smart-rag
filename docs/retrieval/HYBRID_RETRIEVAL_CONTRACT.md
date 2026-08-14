@@ -4,16 +4,17 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-14
 audience: engineering, reviewers
-phase_packet: Phase 4 Packet 2
+phase_packet: Phase 4 Packets 2-3
 ---
 
 # Hybrid retrieval contract
 
 Single source for versioned Hybrid channel profiles. Packet 2 freezes dense,
-BM25, term, HNSW, and authorization foundations. RRF, temporal factors, rerank,
-MMR, coverage/refusal, and cache TTLs are listed as **not selected** until their
-owning packet measures them on development/qualification data. Holdout is never
-used for tuning.
+BM25, term, HNSW, and authorization foundations. Packet 3 freezes
+``hybrid_default_v1`` as the only query-profile retrieval ID. RRF, temporal
+factors, rerank, MMR, coverage/refusal, and cache TTLs are listed as **not
+selected** until their owning packet measures them on development/qualification
+data. Holdout is never used for tuning.
 
 Related: [ARABIC_NORMALIZATION.md](./ARABIC_NORMALIZATION.md) ·
 [BM25_PROJECTION_CONTRACT.md](./BM25_PROJECTION_CONTRACT.md) ·
@@ -79,6 +80,7 @@ dataset/config version, metric evidence, owner, rollback, and review trigger.
 | BM25 operators | enum | ParadeDB match/phrase | `\|\|\|` `&&&` `###` | typed only; **no `pdb.parse`** | contract tests | Injection text stays a bound parameter | retrieval | typed | Pin change |
 | Fallback `bm25_unavailable` | reason | Plan | enum | recorded, dense+term continue | Packet 2 | ParadeDB error or missing index | retrieval | same | Packet 4 coverage |
 | Fallback `weak_evidence` | reason | Plan exact bound | enum | exact refused when count > 10k | Packet 2 | No unbounded seq scan | retrieval | same | Envelope change |
+| Retrieval profile ID | enum | Plan Packet 3 | allow-listed IDs | **`hybrid_default_v1`** | `query_profile_v1` | LLM cannot set weights, depths, SQL, or timeouts | retrieval | `hybrid_default_v1` | New allow-listed ID |
 
 ## Not selected (later packets)
 

@@ -52,6 +52,10 @@ flowchart LR
 
 ## Failure attribution
 
-`first_failure_stage` is a placeholder until Packet 3+ scoring. Deferred graph/Combined/injection cases use `deferred_owner` so they cannot be counted as Phase 4 retrieval passes.
+Packet 3 scores every gated field independently. The first failing stage is
+`profile` when a gated field mismatches, `deferred_owner` when the case is
+owned by a later phase and the profile passed, and `none` otherwise. Retrieval
+is not blamed when the profile is wrong. Holdout examples cannot become
+few-shots.
 
 [docs index](../README.md)

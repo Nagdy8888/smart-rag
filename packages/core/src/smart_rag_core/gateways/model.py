@@ -10,6 +10,11 @@ from unittest.mock import patch
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from smart_rag_core.query_profile.models import ModelInferredProfile
+from smart_rag_core.query_profile.versions import (
+    PROFILE_PROMPT_SHA256,
+    PROFILE_PROMPT_VERSION,
+)
 from smart_rag_core.settings import SharedSettings
 
 OPENAI_API_HOST = "api.openai.com"
@@ -57,6 +62,42 @@ class ModelResponse(BaseModel):
     retrieval_performed: Literal[False] = False
 
 
+class QueryProfileModelRequest(BaseModel):
+    """Bounded structured profile request. No tools or retrieval.
+
+    Attributes:
+        operation: Must be ``query_profile``.
+        query: Original user query.
+        prompt_version: Pinned profile prompt version.
+        prompt_sha256: Hash of that prompt file.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: Literal["query_profile"] = "query_profile"
+    query: str = Field(min_length=1, max_length=2000)
+    prompt_version: str = PROFILE_PROMPT_VERSION
+    prompt_sha256: str = PROFILE_PROMPT_SHA256
+
+
+class QueryProfileModelResponse(BaseModel):
+    """Mock structured profile payload. Inferred fields stay empty.
+
+    Attributes:
+        mode: Adapter mode.
+        inferred: Empty inferred object in mock mode.
+        fixture_provenance: Fixture URI.
+        retrieval_performed: Always false.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["mock"]
+    inferred: ModelInferredProfile
+    fixture_provenance: str = Field(max_length=256)
+    retrieval_performed: Literal[False] = False
+
+
 class ModelAdapter(Protocol):
     """Protocol implemented by model provider adapters."""
 
@@ -71,6 +112,20 @@ class ModelAdapter(Protocol):
 
         Raises:
             ModelGatewayUnavailableError: If the selected adapter cannot run.
+        """
+
+        ...
+
+    async def generate_query_profile(
+        self, request: QueryProfileModelRequest
+    ) -> QueryProfileModelResponse:
+        """Generate at most one structured profile payload.
+
+        Args:
+            request: Validated profile request.
+
+        Returns:
+            Structured profile response.
         """
 
         ...
@@ -120,6 +175,41 @@ class MockModelAdapter:
             retrieval_performed=False,
         )
 
+    async def generate_query_profile(
+        self, request: QueryProfileModelRequest
+    ) -> QueryProfileModelResponse:
+        """Return an empty inferred profile without a provider call.
+
+        Args:
+            request: Structured profile request.
+
+        Returns:
+            Mock payload with empty inferred fields.
+
+        Raises:
+            ValueError: If the query exceeds the input bound or the prompt
+                hash does not match the pinned prompt.
+
+        Side Effects:
+            None. No network, retrieval, or tool calls.
+        """
+
+        if len(request.query) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        if (
+            request.prompt_version != PROFILE_PROMPT_VERSION
+            or request.prompt_sha256 != PROFILE_PROMPT_SHA256
+        ):
+            raise ValueError("profile_prompt_version_mismatch")
+        return QueryProfileModelResponse(
+            mode="mock",
+            inferred=ModelInferredProfile(),
+            fixture_provenance=f"fixture://smart-rag/mock-model/{self._fixture_id}",
+            retrieval_performed=False,
+        )
+
 
 class ModelGateway:
     """Single application-owned boundary for all model invocations."""
@@ -148,6 +238,24 @@ class ModelGateway:
         """
 
         return await self._adapter.generate(request)
+
+    async def generate_query_profile(
+        self, request: QueryProfileModelRequest
+    ) -> QueryProfileModelResponse:
+        """Delegate one structured profile request. Never a second hidden call.
+
+        Args:
+            request: Bounded profile request.
+
+        Returns:
+            Structured profile response.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            ValueError: If a deployable bound is exceeded.
+        """
+
+        return await self._adapter.generate_query_profile(request)
 
 
 def create_model_gateway(settings: SharedSettings) -> ModelGateway:

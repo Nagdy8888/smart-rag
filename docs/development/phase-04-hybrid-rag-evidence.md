@@ -271,4 +271,97 @@ implement fusion/RRF, rerank, coverage calibration, DuckDB tables, or holdout
 tuning. It must not add a second Arabic normalizer or install `pg_search` on
 managed Supabase.
 
+## Packet 3 — typed query profiling and first-stage attribution
+
+### Quoted requirement
+
+> Implement typed query profiling including negation, document scope, media
+> dependence, and historical-relationship signals; independently score every
+> field before attributing misses to retrieval.
+
+### Acceptance checks restated
+
+- Signed provisional gates pass separately on development then qualification:
+  language/configuration ≥95%; temporal macro-F1 ≥90%; exact code/date F1 ≥98%;
+  entity/alias macro-F1 ≥90%; metadata-filter P/R ≥95%;
+  query-type/relationship/table/decomposition macro-F1 ≥90%.
+- Negation, document scope, media, historical relationship, and variant
+  fidelity are reported separately.
+- Every value has confidence/provenance; deterministic contradictions and
+  unknown hard fields cannot pass.
+- No profile fixture requires a second hidden model/keyword operation.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/query_profile/` | Extract, date parser, profiler, merge, metrics, runner |
+| `apps/agents/src/smart_rag_agents/prompts/query_profile_v1.md` | Sole Packet 3 prompt |
+| `packages/core/src/smart_rag_core/gateways/model.py` | One structured `query_profile` mock operation |
+| `docs/evaluation/QUERY_PROFILE_EVAL.md` | Gates, versions, failure routes |
+| `tests/fixtures/evaluation/phase4/fewshots.json` | Empty approved few-shot list |
+| `scripts/eval_query_profile.py` | Open-split scorer |
+
+Prompt SHA-256
+`01f33dfbb98720b3cb08a89fdd7d8d8be48941e834e15deb53a8e8142ae20693`.
+Model version `query-profile-mock-v1`. Date parser `gregorian_v1`. Retrieval
+profile ID `hybrid_default_v1`. Live OpenAI profile calls are not configured
+(`MOCK_MODEL_MODE=true`).
+
+### Primary documentation sources (2026-08-14)
+
+- Pydantic models: <https://docs.pydantic.dev/latest/concepts/models/>
+- QUALITY_TARGETS QT-QP-001–006 in-repo
+- Packet 1 sealed corpus `phase4-dataset-v1` / `phase4-labels-synthetic-v1`
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run ruff check` (Packet 3 paths) | 0 |
+| `uv run pyright` (Packet 3 production/scripts) | 0 |
+| `uv run pytest tests/unit/test_query_profile.py -q` | 0 (11 passed) |
+| `uv run python scripts/eval_query_profile.py` | 0; development 216 and qualification 77 passed; `model_calls=0` |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (60 markdown files, 0 lint issues) |
+
+Gated scores were 1.0 on both open splits. Historical-relationship F1 is 0.61
+development / 0.80 qualification because Packet 1 labels `true` only on even
+multi-hop indexes while every multi-hop query shares the same "after the …
+handoff" span. That field is reported, not used to fail QT-QP-001–006.
+
+### Negative tests
+
+| Fixture | Result |
+| --- | --- |
+| Unknown retrieval profile ID | keep `hybrid_default_v1`; `unknown_hard_field` |
+| Low-confidence extra filter | soft diagnostic; not a hard predicate |
+| Variant that changes a code | `VariantFidelityError` |
+| More than three variants | Pydantic `ValueError` |
+| Timeout / budget / malformed model | typed fallback; deterministic extract kept |
+| Holdout few-shot id | `FewShotManifestError` |
+| Prompt-injection JSON profile id | ignored; original query unchanged |
+| Second model call (`model_calls=2`) | `second_profile_model_call_forbidden` |
+| Runner AST | no `load_cases` / holdout purposes |
+
+### Deviations
+
+- The labeled corpus is covered by deterministic extract; the optional
+  structured model call is mock-empty and used only when `force_model` is set.
+- Code F1 scores gold codes that appear in the query. Packet 1 index codes
+  absent from query text are not extraction misses.
+- Historical-relationship F1 is not a signed QT-QP row; even/odd labeling is
+  not recoverable from query text.
+
+### Rollback
+
+- Revert `query_profile_v1` via prompt changelog; keep `hybrid_default_v1`.
+- Few-shot manifest stays empty until SME approval on open splits only.
+
+### Packet 4 handoff
+
+Packet 4 may start after this Packet 3 evidence is accepted in-repo (checkbox).
+It implements bounded parallel channels, weighted RRF (max across variants),
+UTC temporal policies, and coverage/refusal signals. It must not rerank,
+calibrate on holdout, or implement DuckDB structured tables.
+
 [docs index](../README.md)
