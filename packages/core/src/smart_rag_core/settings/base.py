@@ -243,6 +243,20 @@ class SharedSettings(BaseSettings):
         return applied
 
 
+def snapshot_process_environ() -> dict[str, str]:
+    """Copy process environment for sandbox filtering.
+
+    Structured-table workers must not inherit provider secrets. This
+    snapshot is the only process-environment read used by the table
+    executor.
+
+    Returns:
+        Shallow copy of the current process environment.
+    """
+
+    return dict(os.environ)
+
+
 SettingsT = TypeVar("SettingsT", bound=BaseSettings)
 
 

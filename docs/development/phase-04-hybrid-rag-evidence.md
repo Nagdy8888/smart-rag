@@ -792,7 +792,122 @@ It implements sandboxed DuckDB structured tables with exact workbook/sheet/
 range provenance. It must not read holdout, add LightRAG, or install a
 prohibited retrieval method.
 
+## Packet 7 — sandboxed structured tables (2026-08-14)
+
+Quoted requirement: implement the declarative, sandboxed structured-table path
+with exact workbook/sheet/range provenance.
+
+### Plan requirement
+
+Ordinary spreadsheet cell/text lookup stays Hybrid. Calculation uses
+`structured_table_query` with a strict `TableQueryPlan`, server-side
+`app.resolve_structured_table`, and an isolated DuckDB process. DuckDB
+settings are defense in depth, not the sole sandbox.
+
+### Inspected pins and primary docs
+
+| Item | Value | Source |
+| --- | --- | --- |
+| DuckDB | `1.2.1` on `smart-rag-core` and workspace | `packages/core/pyproject.toml`, `uv.lock` |
+| PyArrow | `19.0.1` | Phase 3 table artifacts |
+| `connect` | `:memory:`, `config={enable_external_access: false, ...}` | Context7 `/duckdb/duckdb-python` 2026-08-14; live 1.2.1 |
+| `lock_configuration` | `SET lock_configuration=true` | [DuckDB securing extensions](https://duckdb.org/docs/current/operations_manual/securing_duckdb/securing_extensions.html) 2026-08-14 |
+| External access | false blocks `ATTACH`, `COPY`, `read_parquet` of files | [CLI safe mode](https://duckdb.org/docs/current/clients/cli/safe_mode.html); live Permission Error |
+| Arrow register | `connection.register("allowed_table", arrow)` | Context7 Python register API; live 1.2.1 with external access off |
+| Parquet schema | `table_parquet_v1` plus `__provenance_json` | Phase 3 ingestion |
+
+Live 1.2.1 finding: `enable_external_access=false` blocks `read_parquet` of
+the authorized file, so the read path is PyArrow `read_table` then register.
+DuckDB settings remain locked afterward.
+
+### Files
+
+- `packages/core/src/smart_rag_core/tables/` plan, builder, sandbox worker,
+  executor, resolver, refusals, service
+- `packages/core/src/smart_rag_core/settings/base.py`
+  `snapshot_process_environ` (environment-boundary compliant)
+- `supabase/migrations/20260814150000_structured_table_v1.sql`
+- `tests/unit/test_structured_table.py`
+- `tests/contract/test_structured_table.py`
+- `docs/retrieval/STRUCTURED_TABLE.md`
+- Hybrid contract, data dictionary, docs index, components
+
+No public HTTP route. Phase 6 owns API/SSE.
+
+### Limits frozen
+
+| Bound | Value |
+| --- | --- |
+| Statement deadline | 3.0s then terminate, 0.5s kill |
+| DuckDB memory / temp / threads | 64MB / 32MB / 1 |
+| Output rows / bytes / scanned LIMIT | 1000 / 1 MiB / 100000 |
+| Timezone | UTC |
+| POSIX `RLIMIT_AS` / `RLIMIT_CPU` | 512MiB / 4s when `resource` exists; unverified on Windows |
+
+### Commands
+
+| Command | Exit |
+| --- | --- |
+| `uv run pytest tests/unit/test_structured_table.py tests/contract/test_structured_table.py tests/unit/test_langsmith_tracing.py -q` | 0 (32 passed, 1 skipped: symlink privileges) |
+| `uv run pyright packages/core/src/smart_rag_core/tables packages/core/src/smart_rag_core/settings/base.py packages/core/src/smart_rag_core/settings/__init__.py` | 0 |
+| `uv run ruff check` (Packet 7 modules and tests) | 0 |
+| `uv run python scripts/ci/check_migrations.py` | 0 (37 files) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (66 markdown files) |
+
+Local `app.resolve_structured_table` applied to Postgres at `127.0.0.1:54322`.
+
+### Negative tests
+
+| Fixture | Result |
+| --- | --- |
+| Extra `sql` field / path-shaped predicate | `ValidationError` |
+| Ordinary lookup with no operation | `ordinary lookup stays Hybrid` |
+| Unknown table id / disabled caller / wrong version | `TableResolveError` |
+| Member vs restricted table RPC | no row; owner can read ACL grant |
+| Stale version / deleted document | no row |
+| Anon `EXECUTE` | `InsufficientPrivilege` |
+| Hidden sheet / formula column / mixed USD+EUR | typed refusals |
+| Duplicate original header used as id | `duplicate_header_reference` |
+| `ATTACH` / `COPY` / `https://` SQL | `blocked_sql` |
+| `read_parquet` of another local file | Permission / filesystem disabled |
+| Catalog SHA-256 mismatch | `artifact_hash_mismatch` |
+| Output byte / row abuse | fail closed |
+| Hung worker | terminate then kill (`statement_deadline`) |
+| Secret env inheritance | KEY/SECRET/TOKEN/JWT/OPENAI/SUPABASE/LANGSMITH stripped |
+| Infinity aggregation | `non_finite_result` |
+| Process reuse after `INSTALL` | later allowed SUM still 32 |
+| Symlink to another file | skip on this Windows host without privilege; path mismatch when created |
+
+### Provenance
+
+Filtered SUM of ops rows returns `budget.xlsx!Summary!B2` (and B3) from
+`__provenance_json` cell locators, not sheet-only labels.
+
+### Deviations
+
+- DuckDB `read_parquet` cannot load the authorized file when external access
+  is disabled. Arrow register is the read path. Documented, not an ADR: same
+  isolation outcome, stronger than SQL-path reads.
+- Windows has no `resource.setrlimit`. Deadline plus DuckDB `memory_limit`
+  are the Windows bounds.
+- No FastAPI table route (Phase 6). No holdout use. No LightRAG.
+- Junction/symlink escape is unit-tested when the OS allows symlink creation.
+
+### Rollback
+
+Replace `app.resolve_structured_table` with `RETURN;` and revoke `app_api`.
+Stop binding `should_bind_structured_table`. Ordinary lookup remains Hybrid.
+
+### Packet 8 handoff
+
+Packet 8 publishes ablations, quality/latency/cost/citation/ACL/fallback
+evidence, and one immutable holdout run. Holdout stays sealed until freeze
+hashes are recorded. Do not tune on holdout. Do not set phase `status`
+complete until the user accepts Packet 8.
+
 [docs index](../README.md)
+[STRUCTURED_TABLE.md](../retrieval/STRUCTURED_TABLE.md)
+[HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
 [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md)
 [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.md)
 [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md)

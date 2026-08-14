@@ -66,7 +66,7 @@ erDiagram
 | `source_approval_requests` | `app` | authority | member request; admin review | admin UI | audit window | pending crawls | status transition | request `id` | 2 schema / 3 crawl |
 | `document_scan_events` | `app` | authority | scanner worker | audit, promotion gate | scan evidence | many per version | cascade | append-only insert | 3 ingestion |
 | `document_chunks` | `app` | authority | ingestion embed worker | Hybrid/graph resolver | corpus lifetime | ≤ 1M chunks env | soft delete + BM25 remove job | `(version_id, chunk_index)` | 3 ingestion / 4 retrieval |
-| `document_tables` | `app` | authority | table parser | structured tool | with version | sheets/tables | cascade | table `id` | 3 ingestion |
+| `document_tables` | `app` | authority | table parser | structured tool / `resolve_structured_table` | with version | sheets/tables | cascade | table `id` | 3 ingestion / 4 packet 7 |
 | `document_table_columns` | `app` | authority | table parser | structured tool | with table | columns per table | cascade | `(table_id, ordinal)` | 3 ingestion |
 | `document_search_terms` | `app` | authority | ingestion indexer | Hybrid term search | with chunk | many | cascade | term row `id` | 4 retrieval |
 | `search_aliases` | `app` | derived projection | owner/admin glossary approve | Hybrid alias recall | until rollback | glossary size | hard delete on rollback | normalized alias unique | 4 retrieval |
@@ -143,9 +143,11 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - Restricted visibility uses per-user `document_acl` grants only.
 - `document_chunks.embedding` is `vector(1024)` per [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md). Packet 2 adds HNSW cosine index `document_chunks_embedding_hnsw_idx` and trigram GIN indexes on `term_normalized` / `alias_normalized`.
 - Retrieval RPCs `retrieve_dense_candidates`, `retrieve_term_candidates`,
-  `recheck_retrieval_candidates`, and `fetch_authorized_chunk_context` are
-  `SECURITY INVOKER` for `app_api` only. Authorization predicates run before
-  rank/limit. Context fetch may return non-representative parent rows.
+  `recheck_retrieval_candidates`, `fetch_authorized_chunk_context`, and
+  `resolve_structured_table` are `SECURITY INVOKER` for `app_api` only.
+  Authorization predicates run before rank/limit or artifact return. Context
+  fetch may return non-representative parent rows. Table paths never come from
+  the client or model.
 - `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
 - Pending glossary imports never write `search_aliases`; approval projects aliases; rollback deletes that projection.
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.

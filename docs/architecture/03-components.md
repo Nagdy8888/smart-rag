@@ -21,6 +21,7 @@ flowchart LR
   core --> bm25["Bm25Retriever"]
   core --> dense["DenseRetriever"]
   core --> terms["TermRetriever"]
+  core --> tables["structured_table_query"]
   core --> graphR["GraphRetriever planned"]
 ```
 
@@ -30,7 +31,7 @@ flowchart LR
 | LangGraph query/ingestion scaffolds | `apps/agents` | loadable, unconfigured business |
 | Worker entrypoint | `apps/worker` | process contract only |
 | Settings / logging / model gateway / LangSmith | `packages/core` | Gateway tracing live; production query-graph feedback is Phase 6 |
-| Hybrid retrieval / BM25 / LightRAG | `packages/core` | Phase 4 Packet 2 dense/BM25/term adapters; LightRAG Phase 5 |
+| Hybrid retrieval / BM25 / LightRAG | `packages/core` | Phase 4 Packet 2–7 dense/BM25/term/rerank/coverage/tables; LightRAG Phase 5 |
 | Next.js UI | `apps/frontend` | scaffold; Stitch Phase 8 |
 
 ## Links
@@ -38,5 +39,6 @@ flowchart LR
 - [Containers](./02-containers.md)
 - [Workspace boundaries](../development/WORKSPACE_BOUNDARIES.md)
 - [Hybrid retrieval contract](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
+- [Structured-table contract](../retrieval/STRUCTURED_TABLE.md)
 - [LangSmith tracing](../development/LANGSMITH_TRACING.md)
 - [docs index](../README.md)

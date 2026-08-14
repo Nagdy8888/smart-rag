@@ -50,6 +50,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-embedding-model-dimension.md](./adr/ADR-embedding-model-dimension.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [retrieval/ARABIC_NORMALIZATION.md](./retrieval/ARABIC_NORMALIZATION.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
+| [retrieval/STRUCTURED_TABLE.md](./retrieval/STRUCTURED_TABLE.md) | engineering-lead | draft | 2026-08-14 | eng, security, reviewers |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-08-13 | eng |

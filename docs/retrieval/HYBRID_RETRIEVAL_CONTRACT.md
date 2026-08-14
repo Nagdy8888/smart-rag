@@ -4,7 +4,7 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-14
 audience: engineering, reviewers
-phase_packet: Phase 4 Packets 2-6
+phase_packet: Phase 4 Packets 2-7
 ---
 
 # Hybrid retrieval contract
@@ -24,6 +24,7 @@ Related: [ARABIC_NORMALIZATION.md](./ARABIC_NORMALIZATION.md) ·
 [BM25_PROJECTION_CONTRACT.md](./BM25_PROJECTION_CONTRACT.md) ·
 [HYBRID_TUNING.md](./HYBRID_TUNING.md) ·
 [PROHIBITED_V1_METHODS.md](./PROHIBITED_V1_METHODS.md) ·
+[STRUCTURED_TABLE.md](./STRUCTURED_TABLE.md) ·
 [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
 [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md) ·
 [COVERAGE_CALIBRATION.md](../evaluation/COVERAGE_CALIBRATION.md) ·
@@ -222,6 +223,24 @@ Channel depths, rerank skip, MMR, and quotas were **not** retuned. Packet 5
 counterfactuals remain the recall evidence for those values. Occupancy
 calibration is not a live ranked-ID ablation.
 
+## Frozen Packet 7 structured-table values
+
+Ordinary cell/text lookup stays Hybrid. Calculation binds
+`structured_table_query` when the profile has `table_intent` and a calculation
+hint. See [STRUCTURED_TABLE.md](./STRUCTURED_TABLE.md).
+
+| Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Statement deadline | seconds | Plan Packet 7 | >0 | **3.0** | DuckDB 1.2.1 subprocess | Unit timeout terminate-then-kill | retrieval | 3.0 | Packet 8 table latency |
+| Kill grace | seconds | Plan Packet 7 | >0 | **0.5** | same | Unit FakeProc | retrieval | 0.5 | Hang incidents |
+| DuckDB memory_limit | bytes label | Adversarial bound | allow-listed | **64MB** | pin 1.2.1 | Connect config | retrieval | 64MB | Host RAM change |
+| Temp directory size | bytes label | Adversarial bound | allow-listed | **32MB** | pin 1.2.1 | Connect config | retrieval | 32MB | Spill incidents |
+| Threads | count | Plan | 1 | **1** | pin 1.2.1 | Connect config | retrieval | 1 | Never raise in v1 |
+| Output rows | rows | Plan | 1–1000 | **1000** hard; plan default 100 | Packet 7 | Over-limit fails closed | retrieval | 1000 | Wide-sheet abuse |
+| Output bytes | bytes | Plan | 1–1048576 | **1048576** | Packet 7 | Worker JSON cap | retrieval | 1048576 | Wide-sheet abuse |
+| Scanned rows LIMIT | rows | Plan | 1–100000 | **100000** | Packet 7 | Compiler LIMIT | retrieval | 100000 | Envelope change |
+| Timezone | IANA | Plan UTC | UTC | **UTC** | Packet 7 | `SET TimeZone='UTC'` | retrieval | UTC | Signed company TZ |
+
 ## Not selected (later packets)
 
 | Tunable | Owner packet | Status |
@@ -246,7 +265,7 @@ must read `document_chunks.raw_text`. BM25 `body_search` and
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/unit/test_hybrid_rerank.py tests/unit/test_hybrid_coverage.py tests/unit/test_phase4_dataset.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py tests/contract/test_hybrid_rerank.py -q
+uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/unit/test_hybrid_rerank.py tests/unit/test_hybrid_coverage.py tests/unit/test_phase4_dataset.py tests/unit/test_structured_table.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py tests/contract/test_hybrid_rerank.py tests/contract/test_structured_table.py -q
 uv run python scripts/eval_coverage_calibration.py
 uv run python scripts/eval_coverage_qualification.py
 uv run python scripts/eval_rerank_counterfactual.py
@@ -256,6 +275,7 @@ uv run python scripts/ci/check_migrations.py
 ## Rollback
 
 Drop forward via later expand/contract migrations
-`20260814130000_hybrid_retrieval_v1.sql` and
-`20260814140000_hybrid_rerank_context_v1.sql`. ParadeDB index rebuild is derived
+`20260814130000_hybrid_retrieval_v1.sql`,
+`20260814140000_hybrid_rerank_context_v1.sql`, and
+`20260814150000_structured_table_v1.sql`. ParadeDB index rebuild is derived
 (`infra/paradedb/migrations/20260814130000_bm25_search_index.sql`).

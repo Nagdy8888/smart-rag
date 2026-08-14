@@ -8,6 +8,7 @@ from smart_rag_core.settings.base import (
     SettingsValidationError,
     SharedSettings,
     load_settings,
+    snapshot_process_environ,
 )
 from smart_rag_core.settings.evaluation import (
     EvaluationSettings,
@@ -35,4 +36,5 @@ __all__ = [
     "load_jwks_rollover_settings",
     "load_settings",
     "load_worker_settings",
+    "snapshot_process_environ",
 ]

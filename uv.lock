@@ -1493,6 +1493,7 @@ version = "0.1.0"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "beautifulsoup4" },
+    { name = "duckdb" },
     { name = "httpx" },
     { name = "langsmith" },
     { name = "lxml" },
@@ -1516,6 +1517,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = "==4.13.3" },
+    { name = "duckdb", specifier = "==1.2.1" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "langsmith", specifier = "==0.10.18" },
     { name = "lxml", specifier = "==5.3.1" },
