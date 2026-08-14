@@ -4,17 +4,19 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-14
 audience: engineering, reviewers
-phase_packet: Phase 4 Packets 2-3
+phase_packet: Phase 4 Packets 2-4
 ---
 
 # Hybrid retrieval contract
 
 Single source for versioned Hybrid channel profiles. Packet 2 freezes dense,
 BM25, term, HNSW, and authorization foundations. Packet 3 freezes
-``hybrid_default_v1`` as the only query-profile retrieval ID. RRF, temporal
-factors, rerank, MMR, coverage/refusal, and cache TTLs are listed as **not
-selected** until their owning packet measures them on development/qualification
-data. Holdout is never used for tuning.
+``hybrid_default_v1`` as the only query-profile retrieval ID. Packet 4 freezes
+RRF, channel weights, the 205 pre-fusion union, UTC temporal policies, coverage
+signals, and the versioned cache-key/recheck interface. Rerank, MMR, and
+calibrated coverage/refusal thresholds remain **not selected** until Packets
+5-6 measure them on development/qualification data. Holdout is never used for
+tuning.
 
 Related: [ARABIC_NORMALIZATION.md](./ARABIC_NORMALIZATION.md) ·
 [BM25_PROJECTION_CONTRACT.md](./BM25_PROJECTION_CONTRACT.md) ·
@@ -46,6 +48,8 @@ sequenceDiagram
     Txn->>RPC: recheck_retrieval_candidates
   end
   Txn-->>API: authorized IDs
+  API->>API: max-across-variant RRF then weighted channels
+  API->>API: UTC temporal policy plus coverage signals
   API->>Txn: COMMIT or ROLLBACK
 ```
 
@@ -82,17 +86,62 @@ dataset/config version, metric evidence, owner, rollback, and review trigger.
 | Fallback `weak_evidence` | reason | Plan exact bound | enum | exact refused when count > 10k | Packet 2 | No unbounded seq scan | retrieval | same | Envelope change |
 | Retrieval profile ID | enum | Plan Packet 3 | allow-listed IDs | **`hybrid_default_v1`** | `query_profile_v1` | LLM cannot set weights, depths, SQL, or timeouts | retrieval | `hybrid_default_v1` | New allow-listed ID |
 
+## Frozen Packet 4 values
+
+Packet 4 does not calibrate on holdout. Equal channel weights and the 90-day
+`recent` window are plan-safe defaults until Packet 6 measures development
+then qualification.
+
+```mermaid
+flowchart TD
+  variants["At most 3 variants per channel"]
+  denseCap["Dense cap 100"]
+  bm25Cap["Authorized BM25 cap 75 after recheck"]
+  termCap["Term cap 30"]
+  maxRrf["Max RRF contribution per ID across variants"]
+  weighted["Weighted channel sum rrf_k 60"]
+  union["Unique IDs cap 205"]
+  temporal["UTC latest current recent as_of"]
+  coverage["Coverage conflict media negation"]
+
+  variants --> denseCap
+  variants --> bm25Cap
+  variants --> termCap
+  denseCap --> maxRrf
+  bm25Cap --> maxRrf
+  termCap --> maxRrf
+  maxRrf --> weighted
+  weighted --> union
+  union --> temporal
+  temporal --> coverage
+```
+
+| Tunable | Unit | Source / baseline | Allowed range | Selected | Dataset / config | Evidence | Owner | Rollback | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| RRF `k` | dimensionless | Plan Packet 4 | 60 only until Packet 6 | **60** | `phase4-dataset-v1` | Unit `1/(60+rank)`; other `k` raises | retrieval | 60 | Packet 6 ablation |
+| Channel weights dense/BM25/term | weight | Equal until measured | >0 allow-listed | **1.0 / 1.0 / 1.0** | `hybrid_default_v1` | Weighted sum after max-across-variants | retrieval | 1.0 | Packet 6 |
+| Variant credit | rule | Plan | max, never sum | **max per ID** | unit tests | Order/duplicate invariant | retrieval | max | Packet 6 |
+| Pre-fusion unique IDs | IDs / query | Plan | 1–205 | **205** | unit overflow | Truncate after fused sort | retrieval | 205 | Packet 6 depths |
+| Metadata product | multiplier | Plan | `[1.0, 1.15]` | **clamp 1.15** | unit clamp | ACL/current-version are hard filters | retrieval | 1.15 | Packet 6 |
+| Hybrid deadline | seconds | Global contract | ≤25 | **25** | `HYBRID_DEADLINE_SECONDS` | Parallel channels cancel; timeout ≠ empty | retrieval | 25 | Latency miss |
+| `recent` window | days | Plan UTC | positive | **90** provisional | QT-TZ-001 | Unknown dates excluded | retrieval | 90 | Packet 6 |
+| Temporal intents | enum | Plan / QT-TZ-001 | `none` `latest` `current` `recent` `as_of` | **UTC only** | temporal unit tests | Naive/Hijri timestamps rejected | retrieval | UTC | Signed company TZ |
+| Coverage signals | enum | Plan Packet 4 | listed enums | **signals, not thresholds** | unit fixtures | Full-summary refused when headings missing | retrieval | same | Packet 6 thresholds |
+| Cache key | SHA-256 | Plan Packet 4 | versioned material | **IDs/ranks only** | `hybrid_cache_key` | Must recheck before evidence; no Valkey yet | retrieval | same | Packet 6 TTL |
+| BM25 degradation | reason | Plan | `bm25_unavailable` / version / timeout | **visible dense+term** | assemble tests | Never labeled three-channel Hybrid | retrieval | same | Circuit breaker |
+
+Raw channel scores never mix. Equal fused scores break ties by effective date,
+published date, then canonical ID. Equally authoritative current contradictions
+emit `conflict` with both IDs.
+
 ## Not selected (later packets)
 
 | Tunable | Owner packet | Status |
 | --- | --- | --- |
-| RRF `k` (plan-fixed 60) | 4 | not applied |
-| Channel weights / variant max-not-sum | 4 | not applied |
-| UTC temporal policies | 4 | not applied |
 | OpenAI rerank pool / model / schema | 5 | not applied |
 | MMR / quotas / parent expansion | 5 | not applied |
-| Coverage / refusal thresholds | 6 | not applied |
-| Cache keys / TTLs | 4–6 | not applied |
+| Coverage / refusal numeric thresholds | 6 | not applied |
+| Cache TTLs / Valkey store | 6 | interface only |
 
 ## Authorization negatives
 
@@ -111,7 +160,7 @@ must read `document_chunks.raw_text`. BM25 `body_search` and
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/contract/test_hybrid_retrieval.py -q
+uv run pytest tests/unit/test_hybrid_retrieval_foundations.py tests/unit/test_hybrid_fusion.py tests/contract/test_hybrid_retrieval.py tests/contract/test_hybrid_fusion.py -q
 uv run python scripts/ci/check_migrations.py
 ```
 

@@ -2,17 +2,18 @@
 title: Hybrid tuning
 owner: engineering-lead
 status: planned
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-14
 owning_phase: 4
 audience: engineering
 ---
 
 # Hybrid tuning (planned)
 
-**Owning phase:** 4. No selected weights yet.
+**Owning phase:** 4. Packet 4 selected equal channel weights (`1.0`) and
+`rrf_k=60`. Packet 6 may retune those values on development then confirm once
+on qualification. Holdout stays sealed.
 
-Will record immutable profiles, candidate/rerank/MMR/RRF search space, per-query-class curves, rollback.
-
-Channel bounds and HNSW profiles now live in [HYBRID_RETRIEVAL_CONTRACT.md](./HYBRID_RETRIEVAL_CONTRACT.md).
+Channel bounds, RRF, and UTC temporal policies live in
+[HYBRID_RETRIEVAL_CONTRACT.md](./HYBRID_RETRIEVAL_CONTRACT.md).
 
 [docs index](../README.md)

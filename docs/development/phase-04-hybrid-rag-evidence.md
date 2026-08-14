@@ -364,4 +364,129 @@ It implements bounded parallel channels, weighted RRF (max across variants),
 UTC temporal policies, and coverage/refusal signals. It must not rerank,
 calibrate on holdout, or implement DuckDB structured tables.
 
+## Packet 4 — bounded channels, RRF, temporal policy, coverage
+
+### Quoted requirement
+
+> Implement bounded parallel channels and query variants, normalized weighted
+> RRF, UTC-anchored temporal policies, whole-document coverage/refusal, and
+> conflict behavior.
+
+### Acceptance checks restated
+
+- Caps hold across all variants: 100 dense, 75 authorized BM25, 30 term, 205
+  unique pre-fusion IDs. BM25 scanning never exceeds 300 IDs / one top-N query
+  (Packet 2: keyset not qualified).
+- Zero unauthorized/stale/deleted/wrong-current IDs from this seed reach fusion.
+  BM25 IDs are rechecked through Supabase before fusion.
+- RRF is invariant to variant order/duplicates and uses max-not-sum; metadata
+  product is clamped to `[1.0, 1.15]`; `rrf_k=60`.
+- UTC temporal policies `latest`, `current`, `recent`, `as_of`, none; unknown
+  dates cannot win `latest`; naive/Hijri timestamps are rejected.
+- Conflict, whole-document uncovered headings, unscoped negation, and media
+  limitation emit signed routes. BM25 kill/version/timeout degrades visibly to
+  dense+term with `bm25_unavailable`.
+- Cache keys include principal/ACL-scope hash, profile/index/normalizer
+  versions, and visibility generation; payloads are IDs/ranks only and must be
+  rechecked before evidence. No Valkey store in this packet.
+
+### Negative tests restated
+
+Client limit override, unqualified relevance cursor, score mixing,
+sum-across-variants, stale cache key reuse across visibility generation,
+forged actor (Packet 2 RPCs), unauthorized BM25 ID, unknown date winning
+`latest`, full-summary claim with uncovered headings, or silent BM25 outage
+fails.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/retrieval/fusion.py` | Max-across-variant RRF, weighted sum, 205 cap, metadata clamp |
+| `packages/core/src/smart_rag_core/retrieval/temporal.py` | UTC `latest`/`current`/`recent`/`as_of` |
+| `packages/core/src/smart_rag_core/retrieval/coverage.py` | Summary, media, negation, conflict signals |
+| `packages/core/src/smart_rag_core/retrieval/hybrid.py` | Assemble + parallel deadline |
+| `packages/core/src/smart_rag_core/retrieval/cache_key.py` | Versioned SHA-256 key; ID-only payload |
+| `packages/core/src/smart_rag_core/retrieval/profiles.py` | Frozen Packet 4 constants |
+| `docs/retrieval/HYBRID_RETRIEVAL_CONTRACT.md` | Packet 4 tunables |
+| `tests/unit/test_hybrid_fusion.py` | RRF/temporal/coverage/deadline |
+| `tests/contract/test_hybrid_fusion.py` | Live dense+term fusion; ParadeDB recheck |
+
+Frozen Packet 4 values: `RRF_K=60`, channel weights `1.0`, `PREFUSION_UNION_CAP=205`,
+metadata clamp `[1.0, 1.15]`, `RECENT_WINDOW_DAYS=90` (provisional),
+`HYBRID_DEADLINE_SECONDS=25`. BM25 scan remains one top-300 query.
+
+### Primary documentation sources (2026-08-14)
+
+- Reciprocal rank fusion (`k=60` plan-fixed):
+  [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
+- UTC temporal policy QT-TZ-001: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
+- concurrent.futures wait/timeout:
+  <https://docs.python.org/3/library/concurrent.futures.html>
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run ruff check` (Packet 4 retrieval + fusion tests) | 0 |
+| `uv run pyright packages/core/src/smart_rag_core/retrieval` | 0 |
+| `uv run pytest tests/unit/test_hybrid_fusion.py tests/contract/test_hybrid_fusion.py -q` | 0 (16 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (60 markdown files, 0 lint issues) |
+
+Holdout manifests were not read. No rerank, DuckDB, or LightRAG code was added.
+
+### Negative tests
+
+| Fixture | Result |
+| --- | --- |
+| `rrf_k=59` | `FusionError` |
+| Duplicate/reversed variants | identical fused ID order; max credit once |
+| Dense 120 × 3 variants | unique fused IDs ≤ 205 |
+| Metadata factor 9.0 | clamped to 1.15 |
+| Fourth variant | `more_than_three_variants` |
+| Unknown `effective_at` vs dated | dated wins `latest` |
+| Naive datetime | `naive_datetime_forbidden` |
+| `as_of` before effective day | empty |
+| Expired version + `current` | dropped |
+| Uncovered heading + full summary | `scoped_summary` |
+| BM25 unavailable | `BM25_DEGRADED` + `bm25_unavailable` |
+| Media dependence | `MEDIA_LIMITATION` |
+| `set_complement` negation | `NEGATION_UNSCOPED` |
+| Two contradictory IDs | `CONFLICT` |
+| Historical with one unit | `WEAK_EVIDENCE` |
+| Unknown retrieval profile in cache key | `unknown_retrieval_profile` |
+| Deadline 0 | channels not started; `deadline_exhausted` |
+| Restricted/stale/deleted seed IDs | absent from fused live results |
+| ParadeDB restricted projection row | dropped by recheck before fusion |
+
+### Deviations
+
+- Channel weights are equal `1.0` until Packet 6 measures development then
+  qualification. The 90-day `recent` window is the same class of provisional
+  value.
+- Coverage emits signed signals; numeric supported/refusal thresholds are
+  Packet 6.
+- Cache is a versioned key plus ID-only payload interface. Valkey TTL is not
+  implemented.
+- Live contract dense results may include leftover company-visible chunks from
+  earlier seeds; assertions require this seed's restricted/stale/deleted IDs
+  to be absent and expected seed hits to be present.
+- Recheck RPC caps survivors at 75, so dense's 100 IDs are not re-passed
+  through that RPC; dense/term authorization remains the security-invoker
+  retrieve RPCs from Packet 2.
+
+### Rollback
+
+- Revert Packet 4 Python modules; Packet 2 RPCs/indexes stay.
+- Restore `HYBRID_RETRIEVAL_CONTRACT.md` Packet 4 rows to "not applied".
+- Keep `rrf_k=60` and caps if a later packet retunes weights only.
+
+### Packet 5 handoff
+
+Packet 5 may start after this Packet 4 evidence is accepted in-repo (checkbox).
+It implements the accuracy-first top-20 OpenAI reranker, deterministic RRF
+fallback, skipped-case counterfactuals, MMR, quotas, and parent expansion.
+It must not calibrate coverage thresholds on holdout, implement DuckDB
+structured tables, or add a local rerank model.
+
 [docs index](../README.md)

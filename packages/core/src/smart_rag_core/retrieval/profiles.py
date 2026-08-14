@@ -1,7 +1,9 @@
-"""Hybrid retrieval channel bounds, HNSW profiles, and fallback reasons.
+"""Hybrid retrieval channel bounds, HNSW profiles, RRF, and fallback reasons.
 
-Values are Packet 2 channel foundations. RRF, rerank, and coverage thresholds
-belong to later Phase 4 packets and remain unset here.
+Packet 2 froze channel caps and HNSW. Packet 4 freezes ``rrf_k=60``, equal
+channel weights, the 205 pre-fusion union cap, metadata clamp ``[1.0, 1.15]``,
+the 90-day ``recent`` window, and the 25-second Hybrid deadline. Rerank, MMR,
+and coverage/refusal thresholds belong to Packets 5-6.
 """
 
 from __future__ import annotations
@@ -24,6 +26,15 @@ BM25_INDEX_SCHEMA_VERSION = "bm25_v1"
 MAX_NORMALIZED_QUERY_CHARS = 512
 HYBRID_DEFAULT_PROFILE_ID = "hybrid_default_v1"
 ALLOWED_RETRIEVAL_PROFILE_IDS = frozenset({HYBRID_DEFAULT_PROFILE_ID})
+RRF_K = 60
+PREFUSION_UNION_CAP = 205
+METADATA_FACTOR_MIN = 1.0
+METADATA_FACTOR_MAX = 1.15
+RECENT_WINDOW_DAYS = 90
+HYBRID_DEADLINE_SECONDS = 25
+CHANNEL_WEIGHT_DENSE = 1.0
+CHANNEL_WEIGHT_BM25 = 1.0
+CHANNEL_WEIGHT_TERM = 1.0
 
 
 class HnswProfileId(StrEnum):

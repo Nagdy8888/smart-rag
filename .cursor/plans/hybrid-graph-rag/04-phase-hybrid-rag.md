@@ -47,7 +47,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 1. [x] Freeze disjoint development/qualification/holdout datasets and import the private approved glossary, identifiers, acronyms, and aliases.
 2. [x] Implement versioned indexed representations, Arabic normalization parity, private ParadeDB BM25 queries, filtered HNSW iterative scans, and populated trigram terms.
 3. [x] Implement typed query profiling including negation, document scope, media dependence, and historical-relationship signals; independently score every field before attributing misses to retrieval.
-4. [ ] Implement bounded parallel channels and query variants, normalized weighted RRF, UTC-anchored temporal policies, whole-document coverage/refusal, and conflict behavior.
+4. [x] Implement bounded parallel channels and query variants, normalized weighted RRF, UTC-anchored temporal policies, whole-document coverage/refusal, and conflict behavior.
 5. [ ] Implement the accuracy-first top-20 OpenAI reranker contract, deterministic fallback, skipped-case counterfactuals, MMR, quotas, and parent expansion.
 6. [ ] Calibrate coverage/refusal by query class before the immutable holdout and prohibit unsupported advanced methods.
 7. [ ] Implement the declarative, sandboxed structured-table path with exact workbook/sheet/range provenance.
