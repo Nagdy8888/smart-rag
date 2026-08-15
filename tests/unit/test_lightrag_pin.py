@@ -202,6 +202,33 @@ def test_apply_query_bounds_clamps_and_rejects_non_positive() -> None:
         )
 
 
+def test_graph_source_envelope_binds_and_strips_identity() -> None:
+    """Identity envelopes are reversible and reject unsafe document IDs."""
+
+    from smart_rag_core.retrieval.graph import (
+        GraphSourceEnvelopeError,
+        bind_graph_source_text,
+        strip_graph_source_envelope,
+    )
+
+    bound = bind_graph_source_text(
+        document_version_id="doc-version-1",
+        normalized_text="Alpha Probe reports a finding.",
+    )
+    assert bound.startswith(
+        "<<smart-rag-graph-source:graph_source_envelope_v1:doc-version-1>>\n"
+    )
+    assert strip_graph_source_envelope(bound) == "Alpha Probe reports a finding."
+    other = bind_graph_source_text(
+        document_version_id="doc-version-2",
+        normalized_text="Alpha Probe reports a finding.",
+    )
+    assert bound != other
+    assert strip_graph_source_envelope("no envelope") == "no envelope"
+    with pytest.raises(GraphSourceEnvelopeError):
+        bind_graph_source_text(document_version_id="bad id", normalized_text="x")
+
+
 def test_source_id_parser_rejects_empty_ambiguous_and_truncated() -> None:
     """Delimiter parsing fails closed instead of inventing complete provenance."""
 

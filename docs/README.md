@@ -45,7 +45,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/README.md](./adr/README.md) | engineering-lead | draft | 2026-08-15 | eng |
 | [adr/ADR-hybrid-pilot-release-cut.md](./adr/ADR-hybrid-pilot-release-cut.md) | product-owner | accepted | 2026-08-15 | client, eng |
 | [adr/ADR-phase4-engineering-close.md](./adr/ADR-phase4-engineering-close.md) | product-owner | accepted | 2026-08-15 | client, eng |
-| [adr/ADR-lightrag-identical-content-collapse.md](./adr/ADR-lightrag-identical-content-collapse.md) | engineering-lead | accepted | 2026-08-15 | eng, reviewers |
+| [adr/ADR-lightrag-identical-content-collapse.md](./adr/ADR-lightrag-identical-content-collapse.md) | engineering-lead | superseded | 2026-08-16 | eng, reviewers |
+| [adr/ADR-graph-source-identity-envelope.md](./adr/ADR-graph-source-identity-envelope.md) | engineering-lead | accepted | 2026-08-16 | eng, reviewers |
 | [adr/ADR-cve-pin-patch-2026-08.md](./adr/ADR-cve-pin-patch-2026-08.md) | engineering-lead | accepted | 2026-08-15 | eng, security |
 | [adr/ADR-paradedb-edition-availability.md](./adr/ADR-paradedb-edition-availability.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-private-service-tls.md](./adr/ADR-private-service-tls.md) | engineering-lead | accepted | 2026-08-12 | eng, security |

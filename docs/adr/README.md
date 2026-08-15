@@ -21,9 +21,10 @@ audience: engineering
 | Privileged Auth administration boundary | accepted | 2 | [ADR-privileged-auth-administration-boundary.md](./ADR-privileged-auth-administration-boundary.md) |
 | Upload capability / Storage privilege | accepted | 2 | [ADR-upload-capability-and-storage-privilege.md](./ADR-upload-capability-and-storage-privilege.md) |
 | CVE pin patch (lxml/Pillow; pyarrow advisory) | accepted | 4 | [ADR-cve-pin-patch-2026-08.md](./ADR-cve-pin-patch-2026-08.md) |
-| LightRAG identical-content collapse | accepted (GraphRAG disabled) | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
+| LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
+| Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | Graph eligibility / ACL isolation | planned | 2/5 | TBD |
-| PGTableGraphStorage | disabled pending redesign | 5 | [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) · [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
+| PGTableGraphStorage | accepted with identity envelope | 5 | [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) · [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | Canonical vs inference grounding | planned | 5/6 | TBD |
 | Structured-table execution | planned | 4 | TBD |
 | Reserve-once durable budgets | planned | 6 | TBD |

@@ -2,7 +2,7 @@
 title: Phase 5 GraphRAG evidence
 owner: engineering-lead
 status: pending
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering, reviewers
 phase: 5
 ---
@@ -12,9 +12,11 @@ phase: 5
 Canonical packet evidence and exit record for
 [Phase 5](../../.cursor/plans/hybrid-graph-rag/05-phase-graphrag.md).
 Packet 1 creates this file; later packets append. Phase status remains
-`pending`. Holdout stays sealed. Packets 2–8 are not started.
+`pending`. Holdout stays sealed. Packets 2–8 follow the identity-envelope
+unblocker below.
 
 Related: [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) ·
+[ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·
 [ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md) ·
 [TOOL_VERSIONS.md](./TOOL_VERSIONS.md) ·
 [CONFIGURATION.md](./CONFIGURATION.md) ·
@@ -140,13 +142,39 @@ retrieval `__init__`, gateways, pin/contract tests): 0 errors.
 
 ### Identical-content hard gate
 
-**Failed.** Live `test_ids_sources_duplicates_and_identical_content_gate`
-against local Supabase: `apipeline_enqueue_documents` collapsed identical
-synthetic text under `duplicate_kind=content_hash` even with distinct IDs and
-unique opaque basenames. The second canonical ID had no `LIGHTRAG_DOC_STATUS`
-row (`identical_content_status_missing`). GraphRAG is **disabled** by
-[ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md).
-The gate was not weakened.
+**Raw vendor insert failed; identity envelope restores independence.** Live
+qualification against local Supabase showed `apipeline_enqueue_documents`
+collapses identical synthetic text under `duplicate_kind=content_hash` when
+`bind_identity=false`. The second canonical ID had no `LIGHTRAG_DOC_STATUS`
+row (`identical_content_status_missing`). That vendor behavior remains
+recorded in
+[ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md)
+(`superseded`). Production inserts use `bind_graph_source_text` per
+[ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md).
+The independence gate is not weakened: enveloped IDs must both exist and
+delete independently; raw collapse remains the negative fixture.
+
+### Packet 1 follow-up — identity envelope (2026-08-16)
+
+User directed Phase 5 to continue as an expert implementation rather than
+leave GraphRAG disabled. Application-owned insert text is prefixed with
+`<<smart-rag-graph-source:graph_source_envelope_v1:{document_version_id}>>`.
+Canonical Hybrid chunks stay unenveloped. Mapping must
+`strip_graph_source_envelope` before hash/span match.
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_lightrag_pin.py -q` | 0 (17 passed) |
+| `uv run python -m pytest tests/contract/test_lightrag_contract.py -q` | 0 (5 passed; independence true; raw collapse still fails) |
+| `uv run python scripts/check.py --tier format` | 0 |
+| `uv run python scripts/check.py --tier lint` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Packet 2 handoff
+
+**Packet 2 may start** after this envelope follow-up proves independence
+and the raw-collapse negative. Holdout remains sealed. Do not mark Phase 5
+complete.
 
 ### Deviations
 
@@ -169,12 +197,6 @@ The gate was not weakened.
 ### Rollback
 
 - Remove Packet 1 adapter/qualification modules and tests.
-- Revert documentation index links and the disable ADR.
+- Revert documentation index links and envelope/collapse ADRs.
 - Do not drop application schemas; Packet 1 uses disposable test schemas only.
 - Keep `lightrag-hku==1.5.6` in the lock only if a later packet still needs it.
-
-### Packet 2 handoff
-
-**Packet 2 must not start.** Packet 1 recorded an honest GraphRAG disable:
-identical-content independence failed on pin 1.5.6. Hybrid RAG remains
-available. Holdout remains sealed. Do not mark Phase 5 complete.

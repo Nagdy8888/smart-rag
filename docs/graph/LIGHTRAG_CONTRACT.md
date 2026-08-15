@@ -2,7 +2,7 @@
 title: LightRAG pin and qualification contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering, reviewers
 phase_packet: Phase 5 Packet 1
 ---
@@ -16,6 +16,7 @@ private-schema bootstrap migrations, and Graph Ready mappings are later packets.
 Related: [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [TOOL_VERSIONS.md](../development/TOOL_VERSIONS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
+[ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·
 [ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md) ·
 [ADR index](../adr/README.md) ·
 [docs index](../README.md)
@@ -139,12 +140,12 @@ Delimiter: `GRAPH_FIELD_SEP = "<SEP>"`. Retention caps:
 at-cap lists fail closed (possible truncation).
 
 `normalize_document_file_path` reduces paths to a basename. Unique opaque
-basenames are required. Duplicate basename and duplicate content-hash are
-vendor behaviors. Live 1.5.6 qualification **failed** independent
-identical-content attribution: the second canonical ID is omitted from
-document status. GraphRAG is disabled per
-[ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md).
-Do not weaken that gate.
+basenames are required. Duplicate basename and duplicate **raw** content-hash
+are vendor behaviors. Live 1.5.6 qualification proved raw identical text
+collapses. Application inserts therefore prefix
+`bind_graph_source_text` so vendor hashes include `document_version_id`.
+Raw `bind_identity=false` inserts remain the negative fixture. See
+[ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md).
 
 ## Schema and bootstrap
 

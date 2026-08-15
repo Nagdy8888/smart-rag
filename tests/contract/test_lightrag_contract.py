@@ -28,7 +28,6 @@ from smart_rag_core.retrieval.graph import (
 from smart_rag_core.retrieval.lightrag_qualification import (
     EXPECTED_PGTABLE_TABLES,
     SYNTHETIC_QUALIFICATION_TEXT,
-    IdenticalContentIndependenceError,
     LightRagPostgresParams,
     VendorPostgresOverrides,
     age_extension_present,
@@ -60,9 +59,6 @@ from tests.contract.integration_support import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-IDENTICAL_CONTENT_ADR = (
-    REPO_ROOT / "docs" / "adr" / "ADR-lightrag-identical-content-collapse.md"
-)
 AQUERY_FIXTURE = (
     REPO_ROOT / "tests" / "fixtures" / "lightrag" / "aquery_data_success_envelope.json"
 )
@@ -489,21 +485,32 @@ async def _ids_sources_duplicates_and_identical_content_gate(
         shared = await document_status(session, "canonical-doc-3")
         if shared is not None:
             assert shared.is_duplicate or shared.duplicate_kind == "filename"
-        try:
-            await evaluate_identical_content_independence(
-                session,
-                first_id="ident-a",
-                second_id="ident-b",
-                first_basename="opaque-ident-a.txt",
-                second_basename="opaque-ident-b.txt",
-            )
-        except IdenticalContentIndependenceError as exc:
-            assert IDENTICAL_CONTENT_ADR.is_file(), (
-                f"identical-content independence failed ({exc}); "
-                "write disable ADR rather than weakening the contract"
-            )
-        else:
-            assert not IDENTICAL_CONTENT_ADR.is_file()
+        independence = await evaluate_identical_content_independence(
+            session,
+            first_id="ident-a",
+            second_id="ident-b",
+            first_basename="opaque-ident-a.txt",
+            second_basename="opaque-ident-b.txt",
+        )
+        assert independence.passed is True
+        await insert_synthetic_document(
+            session,
+            document_id="raw-collapse-a",
+            source_basename="raw-collapse-a.txt",
+            bind_identity=False,
+        )
+        await insert_synthetic_document(
+            session,
+            document_id="raw-collapse-b",
+            source_basename="raw-collapse-b.txt",
+            bind_identity=False,
+        )
+        raw_second = await document_status(session, "raw-collapse-b")
+        assert (
+            raw_second is None
+            or raw_second.is_duplicate
+            or (raw_second.duplicate_kind == "content_hash")
+        )
     finally:
         if session is not None:
             await session.finalize()

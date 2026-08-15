@@ -1,9 +1,9 @@
 ---
 title: ADR — Disable GraphRAG on LightRAG 1.5.6 identical-content collapse
 adr_id: ADR-lightrag-identical-content-collapse
-status: accepted
+status: superseded
 owner: engineering-lead
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering, reviewers
 phase: 5
 ---
@@ -12,10 +12,12 @@ phase: 5
 
 ## Status
 
-`accepted` for Phase 5 Packet 1. GraphRAG production indexing, mapping, and
-Combined routing stay **disabled** on pin `lightrag-hku==1.5.6` until an
-approved design restores independent attribution. This is not a license to
-weaken the independence gate or to start Packet 2.
+`superseded` on 2026-08-16 by
+[ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md).
+The Packet 1 live qualification honestly recorded vendor content-hash collapse
+on raw `ainsert` text. Production GraphRAG continues on the same pin by binding
+insert payloads to `document_version_id` rather than weakening the
+independence gate or floating the dependency.
 
 ## Context
 

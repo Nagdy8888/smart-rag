@@ -43,6 +43,7 @@ from smart_rag_core.retrieval.graph import (
     SELECTED_VECTOR_STORAGE,
     GraphLeadSet,
     GraphQueryBounds,
+    bind_graph_source_text,
 )
 from smart_rag_core.retrieval.lightrag_callbacks import CountedLightRagCallbacks
 from smart_rag_core.retrieval.lightrag_structured import (
@@ -695,6 +696,7 @@ async def insert_synthetic_document(
     source_basename: str,
     text: str = SYNTHETIC_QUALIFICATION_TEXT,
     track_id: str | None = None,
+    bind_identity: bool = True,
 ) -> str:
     """Insert one synthetic document through ``ainsert``.
 
@@ -704,13 +706,24 @@ async def insert_synthetic_document(
         source_basename: Unique opaque basename ``file_paths`` token.
         text: Synthetic qualification text only.
         track_id: Optional monitoring token. Not idempotency.
+        bind_identity: When true (default), prefix the identity envelope so
+            LightRAG content-hash dedup cannot collapse distinct IDs. Set
+            false only to prove raw vendor collapse.
 
     Returns:
         Vendor track ID.
     """
 
+    payload = (
+        bind_graph_source_text(
+            document_version_id=document_id,
+            normalized_text=text,
+        )
+        if bind_identity
+        else text
+    )
     return await session.rag.ainsert(
-        text,
+        payload,
         ids=[document_id],
         file_paths=[source_basename],
         track_id=track_id,
@@ -969,19 +982,21 @@ async def evaluate_identical_content_independence(
         second attributable.
 
     Raises:
-        IdenticalContentIndependenceError: When independence fails. Callers
-            must write a disable ADR rather than weakening this gate.
+        IdenticalContentIndependenceError: When independence fails after the
+            identity envelope is applied.
     """
 
     await insert_synthetic_document(
         session,
         document_id=first_id,
         source_basename=first_basename,
+        bind_identity=True,
     )
     await insert_synthetic_document(
         session,
         document_id=second_id,
         source_basename=second_basename,
+        bind_identity=True,
     )
     first = await document_status(session, first_id)
     second = await document_status(session, second_id)

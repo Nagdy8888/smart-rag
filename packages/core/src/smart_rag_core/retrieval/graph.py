@@ -9,6 +9,7 @@ Production insert/query wiring is intentionally absent from this module.
 
 from __future__ import annotations
 
+import re
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,6 +41,8 @@ ADAPTER_MAX_GRAPH_CANDIDATES = 12
 ADAPTER_MAX_HOPS = 3
 ADAPTER_MAX_PATHS = 6
 ADAPTER_DEFAULT_DEADLINE_SECONDS = 45.0
+GRAPH_SOURCE_ENVELOPE_VERSION = "graph_source_envelope_v1"
+_GRAPH_SOURCE_ENVELOPE_PREFIX = "<<smart-rag-graph-source:"
 
 
 class GraphLeadEntity(BaseModel):
@@ -374,3 +377,63 @@ def parse_source_id_list(raw: str | None, *, limit: int) -> tuple[str, ...]:
     if len(unique) >= limit:
         raise SourceIdContractError("source_id_list_truncated")
     return unique
+
+
+_DOCUMENT_VERSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+_ENVELOPE_RE = re.compile(
+    r"^<<smart-rag-graph-source:"
+    + re.escape(GRAPH_SOURCE_ENVELOPE_VERSION)
+    + r":([A-Za-z0-9._-]{1,128})>>\n",
+)
+
+
+class GraphSourceEnvelopeError(ValueError):
+    """Raised when identity-bound graph source text cannot be formed."""
+
+
+def bind_graph_source_text(*, document_version_id: str, normalized_text: str) -> str:
+    """Bind vendor content identity to the canonical document version ID.
+
+    LightRAG 1.5.6 deduplicates on content hash, not caller-supplied IDs.
+    Distinct canonical versions with identical normalized text must remain
+    independent vendor documents so deletion and attribution stay separate.
+    This envelope is a non-secret, reversible, versioned header. It is not
+    a random salt and does not alter canonical Hybrid chunks.
+
+    Args:
+        document_version_id: Canonical document version ID used as vendor
+            ``ids`` and as the envelope token.
+        normalized_text: Version text that would otherwise be inserted raw.
+
+    Returns:
+        Envelope header plus the original normalized text.
+
+    Raises:
+        GraphSourceEnvelopeError: If the ID is empty or not a safe token.
+    """
+
+    if not _DOCUMENT_VERSION_ID_RE.fullmatch(document_version_id):
+        raise GraphSourceEnvelopeError("graph_source_envelope_invalid_document_id")
+    return (
+        f"{_GRAPH_SOURCE_ENVELOPE_PREFIX}{GRAPH_SOURCE_ENVELOPE_VERSION}:"
+        f"{document_version_id}>>\n{normalized_text}"
+    )
+
+
+def strip_graph_source_envelope(text: str) -> str:
+    """Remove the identity envelope when present.
+
+    Mapping and canonical hash matching use the remainder. Missing envelopes
+    are returned unchanged so unmapped vendor chunks stay diagnosable.
+
+    Args:
+        text: Vendor chunk or full-document text.
+
+    Returns:
+        Text without a leading identity envelope, or the original string.
+    """
+
+    match = _ENVELOPE_RE.match(text)
+    if match is None:
+        return text
+    return text[match.end() :]
