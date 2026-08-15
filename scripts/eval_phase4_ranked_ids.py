@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -54,6 +55,27 @@ DEFAULT_SIDECAR = (
     / "gold_id_map.json"
 )
 DEFAULT_PARADE_PORT = "54329"
+
+
+def _load_repo_env() -> None:
+    """Fill missing process env from repo ``.env`` without overriding exports.
+
+    Side Effects:
+        Reads ``.env`` with ``setdefault``. Values are not logged.
+    """
+
+    path = _ROOT / ".env"
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        name = key.strip()
+        if not name:
+            continue
+        os.environ.setdefault(name, value.strip().strip('"').strip("'"))
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -262,27 +284,32 @@ def _lookup_member_caller(supabase: psycopg.Connection) -> CallerContext | None:
 
     Returns:
         ``CallerContext`` or None when no profile exists.
+
+    Side Effects:
+        Reads ``app.profiles`` in a committed transaction so the connection
+        is idle for later ``retrieval_transaction`` calls.
     """
 
-    supabase.execute("SET ROLE postgres")
-    with supabase.cursor() as cursor:
-        cursor.execute("SELECT app.current_authorization_version()")
-        version_row = cursor.fetchone()
-        cursor.execute(
-            """
-            SELECT user_id::text, role::text
-            FROM app.profiles
-            WHERE disabled_at IS NULL
-            ORDER BY CASE role::text
-              WHEN 'member' THEN 0
-              WHEN 'viewer' THEN 1
-              WHEN 'admin' THEN 2
-              ELSE 3
-            END
-            LIMIT 1
-            """
-        )
-        row = cursor.fetchone()
+    with supabase.transaction():
+        supabase.execute("SET ROLE postgres")
+        with supabase.cursor() as cursor:
+            cursor.execute("SELECT app.current_authorization_version()")
+            version_row = cursor.fetchone()
+            cursor.execute(
+                """
+                SELECT user_id::text, role::text
+                FROM app.profiles
+                WHERE disabled_at IS NULL
+                ORDER BY CASE role::text
+                  WHEN 'member' THEN 0
+                  WHEN 'viewer' THEN 1
+                  WHEN 'admin' THEN 2
+                  ELSE 3
+                END
+                LIMIT 1
+                """
+            )
+            row = cursor.fetchone()
     if row is None or version_row is None:
         return None
     user_raw: object = row[0]
@@ -349,6 +376,7 @@ def _live_outcomes(
             embedding_gateway=gateway,
             supabase=supabase,
             paradedb=parade,
+            supabase_dsn=supabase_url,
             dense=DenseRetriever(supabase),
             bm25=Bm25Retriever(parade),
             term=TermRetriever(supabase),
@@ -361,11 +389,18 @@ def _live_outcomes(
                     table_ok=executed,
                 )
                 continue
-            result = retriever.retrieve(
-                query=case.query,
-                caller=caller,
-                profile=case.expected_profile,
-            )
+            try:
+                result = retriever.retrieve(
+                    query=case.query,
+                    caller=caller,
+                    profile=case.expected_profile,
+                )
+            except Exception as error:
+                sys.stderr.write(
+                    f"retrieve_skipped {case.case_id} {type(error).__name__}:{error}\n"
+                )
+                outcomes[case.case_id] = CaseRetrieveOutcome()
+                continue
             evidence_ids = tuple(unit.chunk_id for unit in result.evidence)
             ranked_prefix = result.ranked_ids[:12]
             fetch_ids = evidence_ids or ranked_prefix
@@ -401,6 +436,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args = _parse_args(argv)
     split: OpenSplitName = args.split
+    _load_repo_env()
     settings = SharedSettings()
     embeddings = _embeddings_kind(settings)
     cases = load_eval_cases(split, limit=args.limit)

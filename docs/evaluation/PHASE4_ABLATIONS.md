@@ -2,16 +2,16 @@
 title: Phase 4 Packet 8 ablation matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering, reviewers
 ---
 
 # Phase 4 Packet 8 ablation matrix
 
 Compiled simpler-baseline and method evidence on development and
-qualification only. Holdout labels were not read. Live Hybrid Recall@K,
-MRR, and nDCG on the 405-case corpus are **unverified**. Occupancy
-coverage from Packet 6 is not a ranked-ID ablation.
+qualification only. Holdout labels were not read. Packet 9 measured
+Phase-4-owned open-split ranked-ID Recall@K (not occupancy). Full-corpus
+MRR/nDCG and holdout remain unverified.
 
 Related: [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) ·
 [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) ·

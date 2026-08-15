@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 import psycopg
@@ -37,7 +38,7 @@ from smart_rag_core.retrieval.profiles import (
     RetrievalFallbackReason,
 )
 from smart_rag_core.retrieval.rerank import RerankFallbackReason, RerankRanking
-from smart_rag_core.retrieval.temporal import TemporalIntent
+from smart_rag_core.retrieval.temporal import TemporalDocument, TemporalIntent
 from smart_rag_core.retrieval.types import (
     Bm25RetrievalResult,
     DenseRetrievalResult,
@@ -153,6 +154,7 @@ class HybridRetriever:
         load_context: ContextFn | None = None,
         rerank: RerankFn | None = None,
         channel_jobs: dict[str, Callable[[], object]] | None = None,
+        supabase_dsn: str | None = None,
     ) -> None:
         """Bind gateways, optional retrievers, and test doubles.
 
@@ -166,11 +168,17 @@ class HybridRetriever:
             load_context: Optional context loader. Defaults to the RPC.
             rerank: Optional one-shot rerank callback.
             channel_jobs: Optional zero-arg jobs replacing retriever calls.
+            supabase_dsn: Full Postgres URL used to open one idle connection
+                per parallel channel. Dense, term, and BM25-recheck each need
+                their own transaction; ``psycopg`` connections are not safe to
+                share across those threads. ``Connection.info.dsn`` omits the
+                password, so callers must pass the complete URL.
         """
 
         self._embedding_gateway = embedding_gateway
         self._supabase = supabase
         self._paradedb = paradedb
+        self._supabase_dsn = supabase_dsn
         self._dense = dense
         self._bm25 = bm25
         self._term = term
@@ -279,6 +287,9 @@ class HybridRetriever:
         required_terms = _str_list_field(profile, "codes") + _str_list_field(
             profile, "exact_terms"
         )
+        temporal_records = self._load_temporal_records(
+            _flatten_channel_candidates(dense_lists, bm25_result.candidates, term_lists)
+        )
         assemble_kwargs = dict(
             dense_variants=dense_lists,
             bm25_variants=(bm25_result.candidates,) if bm25_result.candidates else (),
@@ -286,6 +297,7 @@ class HybridRetriever:
             bm25_fallback=bm25_fallback,
             temporal_intent=temporal_intent,
             target_date=target,
+            temporal_records=temporal_records,
             want_full_summary=want_full_summary,
             media_dependence=media_dependence,
             negation_scope=negation_scope,
@@ -415,19 +427,22 @@ class HybridRetriever:
                     Per-variant dense candidate lists.
                 """
 
-                lists: list[tuple[RetrievalCandidate, ...]] = []
-                retrieve = self._dense.retrieve  # type: ignore[union-attr]
-                for text, vector in zip(texts, vectors, strict=False):
-                    del text
-                    result = retrieve(
-                        caller=caller,
-                        query_embedding=list(vector),
-                    )
-                    if isinstance(result, DenseRetrievalResult):
-                        lists.append(result.candidates)
-                    elif isinstance(result, tuple):
-                        lists.append(result)
-                return tuple(lists)
+                if self._supabase_dsn:
+                    from smart_rag_core.retrieval.dense import DenseRetriever
+
+                    with self._channel_supabase() as connection:
+                        return _collect_dense_lists(
+                            DenseRetriever(connection).retrieve,
+                            caller=caller,
+                            texts=texts,
+                            vectors=vectors,
+                        )
+                return _collect_dense_lists(
+                    self._dense.retrieve,  # type: ignore[union-attr]
+                    caller=caller,
+                    texts=texts,
+                    vectors=vectors,
+                )
 
             jobs["dense"] = _dense_job
         if self._bm25 is not None:
@@ -440,11 +455,19 @@ class HybridRetriever:
                 """
 
                 try:
-                    result = self._bm25.retrieve(  # type: ignore[union-attr]
-                        supabase=self._supabase,
-                        caller=caller,
-                        query_text=query,
-                    )
+                    if self._supabase_dsn:
+                        with self._channel_supabase() as supabase_conn:
+                            result = self._bm25.retrieve(  # type: ignore[union-attr]
+                                supabase=supabase_conn,
+                                caller=caller,
+                                query_text=query,
+                            )
+                    else:
+                        result = self._bm25.retrieve(  # type: ignore[union-attr]
+                            supabase=self._supabase,
+                            caller=caller,
+                            query_text=query,
+                        )
                 except Exception:
                     return Bm25RetrievalResult(
                         scanned_ids=(),
@@ -471,18 +494,93 @@ class HybridRetriever:
                     Per-variant term candidate lists.
                 """
 
-                lists: list[tuple[RetrievalCandidate, ...]] = []
-                retrieve = self._term.retrieve  # type: ignore[union-attr]
-                for text in texts:
-                    result = retrieve(caller=caller, query_text=text)
-                    if isinstance(result, TermRetrievalResult):
-                        lists.append(result.candidates)
-                    elif isinstance(result, tuple):
-                        lists.append(result)
-                return tuple(lists)
+                if self._supabase_dsn:
+                    from smart_rag_core.retrieval.terms import TermRetriever
+
+                    with self._channel_supabase() as connection:
+                        return _collect_term_lists(
+                            TermRetriever(connection).retrieve,
+                            caller=caller,
+                            texts=texts,
+                        )
+                return _collect_term_lists(
+                    self._term.retrieve,  # type: ignore[union-attr]
+                    caller=caller,
+                    texts=texts,
+                )
 
             jobs["term"] = _term_job
         return jobs
+
+    @contextmanager
+    def _channel_supabase(self) -> Generator[psycopg.Connection, None, None]:
+        """Open one idle canonical Postgres connection for a channel thread.
+
+        Yields:
+            A new ``psycopg`` connection created from ``supabase_dsn``.
+
+        Raises:
+            RuntimeError: If ``supabase_dsn`` is missing.
+
+        Side Effects:
+            Opens and closes one connection. Does not use the bound
+            ``supabase`` connection, which stays idle for context RPC.
+        """
+
+        dsn = self._supabase_dsn
+        if not dsn:
+            raise RuntimeError("hybrid_channel_requires_supabase_dsn")
+        connection = psycopg.connect(dsn)
+        try:
+            yield connection
+        finally:
+            connection.close()
+
+    def _load_temporal_records(
+        self,
+        candidates: tuple[RetrievalCandidate, ...],
+    ) -> dict[UUID, TemporalDocument]:
+        """Load UTC ``effective_at`` values for fused channel candidates.
+
+        ``as_of`` / ``latest`` policies skip undated rows. Eval compact sources
+        must stamp ``document_versions.effective_at`` or those classes empty
+        the fused list.
+
+        Args:
+            candidates: Dense, BM25, and term candidates before fusion.
+
+        Returns:
+            Per-chunk temporal records. Empty when no DSN/candidates exist.
+        """
+
+        version_ids = tuple({item.version_id for item in candidates})
+        if not version_ids or not self._supabase_dsn:
+            return {}
+        by_version: dict[UUID, datetime | None] = {}
+        with self._channel_supabase() as connection:
+            connection.execute("SET ROLE postgres")
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, effective_at
+                    FROM app.document_versions
+                    WHERE id = ANY(%s)
+                    """,
+                    (list(version_ids),),
+                )
+                for row in cursor.fetchall():
+                    version_id = UUID(str(row[0]))
+                    stamp = row[1]
+                    by_version[version_id] = (
+                        stamp if isinstance(stamp, datetime) else None
+                    )
+        records: dict[UUID, TemporalDocument] = {}
+        for item in candidates:
+            records[item.chunk_id] = TemporalDocument(
+                item.chunk_id,
+                effective_at=by_version.get(item.version_id),
+            )
+        return records
 
     def _bound_loader(
         self,
@@ -527,7 +625,7 @@ class HybridRetriever:
 
         Args:
             caller: Server-derived identity.
-            chunk_ids: At most 75 IDs.
+            chunk_ids: Canonical IDs. Batched at 75 per RPC.
 
         Returns:
             Authorized rows. Empty when no loader/connection is bound.
@@ -643,6 +741,100 @@ def _elapsed_ms(started: float) -> float:
     """
 
     return max(0.0, (time.perf_counter() - started) * 1000.0)
+
+
+def _collect_dense_lists(
+    retrieve: Callable[..., object],
+    *,
+    caller: CallerContext,
+    texts: tuple[str, ...],
+    vectors: tuple[tuple[float, ...], ...],
+) -> tuple[tuple[RetrievalCandidate, ...], ...]:
+    """Run dense retrieve once per fused query vector.
+
+    Args:
+        retrieve: Bound ``DenseRetriever.retrieve`` or a test double.
+        caller: Server-derived identity.
+        texts: Query forms aligned with ``vectors``.
+        vectors: Query embeddings.
+
+    Returns:
+        Per-variant dense candidate lists.
+    """
+
+    lists: list[tuple[RetrievalCandidate, ...]] = []
+    for _text, vector in zip(texts, vectors, strict=False):
+        result = retrieve(caller=caller, query_embedding=list(vector))
+        if isinstance(result, DenseRetrievalResult):
+            lists.append(result.candidates)
+        elif isinstance(result, tuple):
+            lists.append(result)
+    return tuple(lists)
+
+
+def _collect_term_lists(
+    retrieve: Callable[..., object],
+    *,
+    caller: CallerContext,
+    texts: tuple[str, ...],
+) -> tuple[tuple[RetrievalCandidate, ...], ...]:
+    """Run term retrieve once per fused query text.
+
+    Args:
+        retrieve: Bound ``TermRetriever.retrieve`` or a test double.
+        caller: Server-derived identity.
+        texts: Query forms.
+
+    Returns:
+        Per-variant term candidate lists.
+    """
+
+    lists: list[tuple[RetrievalCandidate, ...]] = []
+    for text in texts:
+        result = retrieve(caller=caller, query_text=text)
+        if isinstance(result, TermRetrievalResult):
+            lists.append(result.candidates)
+        elif isinstance(result, tuple):
+            lists.append(result)
+    return tuple(lists)
+
+
+def _flatten_channel_candidates(
+    dense_lists: tuple[tuple[RetrievalCandidate, ...], ...],
+    bm25_candidates: tuple[RetrievalCandidate, ...],
+    term_lists: tuple[tuple[RetrievalCandidate, ...], ...],
+) -> tuple[RetrievalCandidate, ...]:
+    """Flatten dense, BM25, and term candidates for temporal lookup.
+
+    Args:
+        dense_lists: Per-variant dense lists.
+        bm25_candidates: Authorized BM25 survivors.
+        term_lists: Per-variant term lists.
+
+    Returns:
+        Deduplicated candidates in first-seen order.
+    """
+
+    seen: set[UUID] = set()
+    ordered: list[RetrievalCandidate] = []
+    for variant in dense_lists:
+        for item in variant:
+            if item.chunk_id in seen:
+                continue
+            seen.add(item.chunk_id)
+            ordered.append(item)
+    for item in bm25_candidates:
+        if item.chunk_id in seen:
+            continue
+        seen.add(item.chunk_id)
+        ordered.append(item)
+    for variant in term_lists:
+        for item in variant:
+            if item.chunk_id in seen:
+                continue
+            seen.add(item.chunk_id)
+            ordered.append(item)
+    return tuple(ordered)
 
 
 def _unpack_dense(

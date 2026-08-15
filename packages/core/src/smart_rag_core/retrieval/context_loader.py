@@ -12,9 +12,11 @@ import psycopg
 from smart_rag_core.retrieval.session import retrieval_transaction
 from smart_rag_core.security.identity import CallerContext
 
+CONTEXT_BATCH_LIMIT = 75
+
 
 class ContextBatchError(RuntimeError):
-    """Raised when a context fetch exceeds the 75-ID bound."""
+    """Raised when a single RPC batch exceeds the 75-ID bound."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,19 +126,25 @@ def fetch_authorized_chunk_context(
 ) -> tuple[ChunkContext, ...]:
     """Load ACL-visible current rows including non-representative parents.
 
+    The SQL RPC rejects more than 75 IDs. Fused Hybrid lists can exceed that
+    (dense 100 + BM25 75 + term 30), so this adapter issues sequential 75-ID
+    RPC batches on the same connection after each transaction commits.
+
     Args:
-        connection: Login role that can become ``app_api``.
+        connection: Login role that can become ``app_api``. Must be idle.
         caller: Server-derived identity.
-        chunk_ids: At most 75 IDs.
+        chunk_ids: Canonical IDs. Duplicates are dropped. Length may exceed 75.
 
     Returns:
-        Authorized rows in request order. Missing/unauthorized IDs are omitted.
+        Authorized rows in first-seen request order. Missing/unauthorized IDs
+        are omitted.
 
     Raises:
-        ContextBatchError: If more than 75 IDs are supplied.
+        ContextBatchError: If an internal RPC batch is built above 75 IDs.
 
     Side Effects:
-        One retrieval transaction. Unauthorized IDs never leave the RPC.
+        One retrieval transaction per 75-ID batch. Unauthorized IDs never
+        leave the RPC.
     """
 
     unique: list[UUID] = []
@@ -146,9 +154,46 @@ def fetch_authorized_chunk_context(
             continue
         seen.add(chunk_id)
         unique.append(chunk_id)
-    if len(unique) > 75:
-        raise ContextBatchError("context_batch_exceeds_limit")
     if not unique:
+        return ()
+    loaded: dict[UUID, ChunkContext] = {}
+    for start in range(0, len(unique), CONTEXT_BATCH_LIMIT):
+        batch = tuple(unique[start : start + CONTEXT_BATCH_LIMIT])
+        for row in _fetch_context_rpc_batch(
+            connection,
+            caller=caller,
+            chunk_ids=batch,
+        ):
+            loaded[row.chunk_id] = row
+    return tuple(loaded[item] for item in unique if item in loaded)
+
+
+def _fetch_context_rpc_batch(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    chunk_ids: tuple[UUID, ...],
+) -> tuple[ChunkContext, ...]:
+    """Issue one ``fetch_authorized_chunk_context`` RPC of at most 75 IDs.
+
+    Args:
+        connection: Idle login connection.
+        caller: Server-derived identity.
+        chunk_ids: Unique IDs, length ≤ ``CONTEXT_BATCH_LIMIT``.
+
+    Returns:
+        Authorized rows returned by the RPC (unordered relative to ``chunk_ids``).
+
+    Raises:
+        ContextBatchError: If ``chunk_ids`` exceeds the RPC bound.
+
+    Side Effects:
+        One retrieval transaction.
+    """
+
+    if len(chunk_ids) > CONTEXT_BATCH_LIMIT:
+        raise ContextBatchError("context_batch_exceeds_limit")
+    if not chunk_ids:
         return ()
     with retrieval_transaction(
         connection,
@@ -182,7 +227,7 @@ def fetch_authorized_chunk_context(
                     caller.rpc_user_id(),
                     caller.rpc_role(),
                     caller.rpc_authorization_version(),
-                    unique,
+                    list(chunk_ids),
                 ),
             )
             rows = cursor.fetchall()

@@ -78,6 +78,12 @@ uv run python scripts/eval_phase4_ranked_ids.py --split development --live
 Contract tests skip when Compose, ParadeDB `localhost:54329`, or mapped sidecar
 UUIDs are missing.
 
+Live Hybrid retrieve opens **one idle Supabase connection per parallel
+channel** from the full Postgres URL (`supabase_dsn`). Sharing one `psycopg`
+connection across dense, term, and BM25-recheck raises
+`retrieval_requires_idle_connection`. Context loading batches fused IDs into
+75-ID `fetch_authorized_chunk_context` RPC calls.
+
 ## Failure modes
 
 - Unmapped sidecar: exit `2`, `recall_at_10=null`, `sidecar_unmapped=true`.
@@ -89,6 +95,23 @@ UUIDs are missing.
 - Signed gate miss: JSON `follow_up` names two development repairs then
   qualification; RRF/weights stay frozen.
 
-This harness does not complete Packet 9, open holdout, or start Phase 5.
+This harness does not open holdout, start Phase 5, or set wrapper
+`status: complete` before user acceptance.
+
+## Live Packet 9 measurements (2026-08-15)
+
+Phase-4-owned open splits only. `holdout_opened=false`. Frozen
+`hybrid_default_v1` not retuned. Sidecar SHA-256 development
+`b5e8728da85bd227ebc956bfeab9bbd1de668ca39a77468d707fb9adcd40fea8`,
+qualification
+`8786aa5051f16c7abefe087101dc21a872f898fda2980e0bb3f95536bcea7dbd`.
+
+| Split | Recall@10 | Exact-code@5 | Alias@10 | Locator | First-evidence p95 |
+| --- | --- | --- | --- | --- | --- |
+| development | 0.902 | 1.00 | 1.00 | 1.00 | 785 ms |
+| qualification | 0.868 | 1.00 | 1.00 | 1.00 | 601 ms |
+
+See [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
+Packet 9.
 
 [docs index](../README.md)

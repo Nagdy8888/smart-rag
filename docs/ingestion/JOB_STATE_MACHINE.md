@@ -2,7 +2,7 @@
 title: Durable job state machine
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering
 ---
 
@@ -145,3 +145,10 @@ stateDiagram-v2
 ```
 
 `GET /ingestion/versions/{version_id}/status` returns the public `status` plus nested diagnostics: scan evidence/age, review/governance, OCR pages, chunk/table counts, embedding ledger, BM25 index version/lag/retry/dead-letter, queue age, and graph-handoff counts. Owner/admin may retry; members receive 403.
+
+Retrieval RPCs (`retrieve_dense_candidates`, `retrieve_term_candidates`,
+`recheck_retrieval_candidates`) only read chunks whose version equals
+`documents.current_version_id`. Graph-ineligible Hybrid Ready versions must
+receive that pointer (`promote_graph_ineligible_current` in the Hybrid Ready
+driver) because `app.activate_graph_ineligible_version` still requires status
+`hybrid_ready` and finalize already moved ineligible rows to `graph_ineligible`.

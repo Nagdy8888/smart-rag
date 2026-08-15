@@ -2,7 +2,7 @@
 title: Phase 4 Packet 8 freeze
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering, reviewers, client-approver
 ---
 
@@ -24,7 +24,7 @@ Related: [PHASE4_ABLATIONS.md](./PHASE4_ABLATIONS.md) ·
 - Holdout opened: `false`
 - Client continue-versus-pilot: `pending_user_acceptance`
 - SME corpus status: `synthetic_provisional`
-- Holdout blocked: sealed holdout labels were not materialized; corpus SME status is synthetic_provisional, not independently_sealed; live ranked-ID Hybrid and citation gates are unverified
+- Holdout blocked: sealed holdout labels were not materialized; corpus SME status is synthetic_provisional, not independently_sealed; Packet 9 measured Phase-4-owned open-split ranked-ID gates without opening holdout
 
 ```mermaid
 flowchart TD
@@ -87,13 +87,13 @@ flowchart TD
 
 | ID | Title | Status | Target | Evidence |
 | --- | --- | --- | --- | --- |
-| `QT-EVAL-001` | Zero ACL leaks | `fixture_only` | 0 leaks | Hybrid and table RPC IDOR fixtures pass; 405-case live Hybrid ACL slice not ranked-ID measured |
-| `QT-EVAL-002` | Citation correctness | `blocker` | >=98% | Answer assembler is Phase 6; BM25 snippets are not evidence |
+| `QT-EVAL-001` | Zero ACL leaks | `pass_open_split` | 0 leaks | Packet 9 live ranked-ID ACL leak count 0 on Phase-4-owned development/qualification; full 405-case ACL still not a holdout run |
+| `QT-EVAL-002` | Citation correctness | `blocker` | >=98% | Packet 9 locator correctness **1.00** on returned Hybrid units (open splits). Answer/citation assembler remains Phase 6 |
 | `QT-EVAL-003` | Citation completeness | `blocker` | >=90% | No Phase 4 answer/citation assembler run on labeled corpus |
 | `QT-EVAL-004` | Answer faithfulness | `blocker` | >=90% | No answer/verifier prompts in Phase 4 |
-| `QT-EVAL-006` | Hybrid Recall@10 | `blocker` | >=85% | No live ranked-ID Hybrid run on the 405-case corpus |
-| `QT-EVAL-007` | Exact-code Recall@5 | `blocker` | >=98% | Term RPC fixtures exist; labeled Recall@5 unverified |
-| `QT-EVAL-008` | Approved-alias Recall@10 | `blocker` | >=95% | Glossary coverage hashes exist; labeled Recall@10 unverified |
+| `QT-EVAL-006` | Hybrid Recall@10 | `pass_open_split` | >=85% | Packet 9 live ranked-ID development **0.902** / qualification **0.868** on Phase-4-owned classes; holdout sealed |
+| `QT-EVAL-007` | Exact-code Recall@5 | `pass_open_split` | >=98% | Packet 9 live **1.00** development and qualification |
+| `QT-EVAL-008` | Approved-alias Recall@10 | `pass_open_split` | >=95% | Packet 9 live **1.00** development and qualification |
 | `QT-EVAL-009` | Combined vs Hybrid relationship/multi-hop | `deferred` | +10pp without ceiling breach | Phase 5/6; labels must not count as Phase 4 passes |
 | `QT-QP-001` | Language/configuration accuracy | `pass` | >=95% | scripts/eval_query_profile.py open splits; mock extract |
 | `QT-QP-002` | Temporal-intent macro-F1 | `pass` | >=90% | QUERY_PROFILE_EVAL.md Packet 3 open-split confirm |
@@ -101,7 +101,7 @@ flowchart TD
 | `QT-QP-004` | Entity/approved-alias macro-F1 | `pass` | >=90% | eval_query_profile.py 2026-08-14; development and qualification passed |
 | `QT-QP-005` | Metadata-filter precision and recall | `pass` | >=95% | eval_query_profile.py 2026-08-14; both splits passed |
 | `QT-QP-006` | Query-type/relationship/table/decomposition macro-F1 | `pass` | >=90% | eval_query_profile.py 2026-08-14; both splits passed |
-| `QT-LAT-001` | Hybrid first evidence p95 | `unverified` | <=2s | MOCK_MODEL_MODE; no envelope p95 trace |
+| `QT-LAT-001` | Hybrid first evidence p95 | `pass_open_split` | <=2s | Packet 9 live development **785 ms** / qualification **601 ms** (retrieve path, not first answer token) |
 | `QT-LAT-006` | Structured-table p95 | `unverified` | <=5s deterministic | Packet 7 unit deadline 3s; labeled-table p95 not benchmarked |
 | `QT-HOLD-001` | Immutable holdout run | `blocker` | one sealed end-to-end run | Holdout not independently SME-sealed; access remains denied |
 

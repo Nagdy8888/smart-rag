@@ -313,3 +313,25 @@ def test_rerank_prompt_canary_is_hashed_not_copied() -> None:
     assert not payload_contains_forbidden_text(
         payload, CANARY_TOKEN, CANARY_EMAIL, CANARY_PASSAGE
     )
+
+
+def test_redact_gateway_outputs_accepts_embedding_response() -> None:
+    """LangSmith may pass EmbeddingResponse directly instead of a mapping."""
+
+    from decimal import Decimal
+
+    from smart_rag_core.gateways.embedding import EmbeddingResponse
+    from smart_rag_core.observability.langsmith_tracing import redact_gateway_outputs
+
+    response = EmbeddingResponse(
+        mode="openai",
+        vectors=((0.0, 1.0),),
+        provider_request_id="req-1",
+        fixture_provenance="openai://text-embedding-3-large",
+        estimated_cost_usd=Decimal("0"),
+    )
+    payload = redact_gateway_outputs(response)
+    assert payload["mode"] == "openai"
+    assert payload["vector_count"] == 1
+    assert payload["vector_dimensions"] == 2
+    assert payload["request_id"] == "req-1"

@@ -244,6 +244,60 @@ def list_persisted_table_ids(
     return tuple(UUID(str(row[0])) for row in rows)
 
 
+def promote_graph_ineligible_current(
+    supabase: psycopg.Connection,
+    *,
+    document_id: UUID,
+    version_id: UUID,
+) -> None:
+    """Point retrieval RPCs at a graph-ineligible Hybrid Ready version.
+
+    Dense/term/recheck require ``documents.current_version_id`` to equal the
+    chunk version. ``app.activate_graph_ineligible_version`` only accepts
+    status ``hybrid_ready``, but ``finalize_hybrid_ready`` already moved
+    non-graph rows to ``graph_ineligible``. This is the Phase 3 current-pointer
+    flip for those versions.
+
+    Args:
+        supabase: Superuser-capable connection.
+        document_id: Canonical document.
+        version_id: Verified graph-ineligible version.
+
+    Side Effects:
+        Clears other ``is_current`` rows on the document, sets this version
+        current, and writes ``documents.current_version_id``.
+    """
+
+    supabase.execute("SET ROLE postgres")
+    with supabase.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE app.document_versions
+            SET is_current = false, updated_at = timezone('utc', now())
+            WHERE document_id = %s
+              AND is_current = true
+              AND id IS DISTINCT FROM %s
+            """,
+            (document_id, version_id),
+        )
+        cursor.execute(
+            """
+            UPDATE app.document_versions
+            SET is_current = true, updated_at = timezone('utc', now())
+            WHERE id = %s
+            """,
+            (version_id,),
+        )
+        cursor.execute(
+            """
+            UPDATE app.documents
+            SET current_version_id = %s, updated_at = timezone('utc', now())
+            WHERE id = %s
+            """,
+            (version_id, document_id),
+        )
+
+
 def drive_hybrid_ready(
     *,
     supabase_url: str,
@@ -292,6 +346,11 @@ def drive_hybrid_ready(
             job_id=bm25_job_id,
         )
         if passed:
+            promote_graph_ineligible_current(
+                supabase,
+                document_id=document_id,
+                version_id=version_id,
+            )
             supabase.commit()
             parade.commit()
         else:

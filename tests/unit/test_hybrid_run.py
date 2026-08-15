@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from uuid import UUID, uuid4
 
+import pytest
 from smart_rag_core.evaluation.schema import det
 from smart_rag_core.gateways.embedding import (
     EmbeddingGateway,
@@ -197,6 +198,24 @@ def _retriever(
         load_context=load,
         rerank=rerank,
     )
+
+
+def test_flatten_channel_candidates_dedupes_first_seen() -> None:
+    """Temporal lookup sees each chunk once across dense, BM25, and term."""
+
+    from smart_rag_core.retrieval.hybrid_run import _flatten_channel_candidates
+
+    first = _candidate(rank=1)
+    second = _candidate(rank=2)
+    bm25_dup = RetrievalCandidate(
+        chunk_id=first.chunk_id,
+        document_id=first.document_id,
+        version_id=first.version_id,
+        channel_rank=3,
+        channel_score=0.1,
+    )
+    flat = _flatten_channel_candidates(((first,),), (bm25_dup, second), ())
+    assert tuple(item.chunk_id for item in flat) == (first.chunk_id, second.chunk_id)
 
 
 def test_retrieval_slice_is_statement_timeout_bound() -> None:
@@ -588,6 +607,53 @@ def test_mocked_retrievers_compose_ranked_ids() -> None:
     result = retriever.retrieve(query="annual leave policy", caller=_caller())
     assert dense.chunk_id in result.ranked_ids
     assert result.embedding_call_count == 1
+
+
+def test_channel_supabase_opens_dedicated_connection_from_full_dsn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Live channels clone from the full DSN, not password-less ``info.dsn``."""
+
+    opened: list[str] = []
+    closed: list[int] = []
+
+    class _Conn:
+        """Stand-in connection that records close()."""
+
+        def close(self) -> None:
+            """Record that the channel connection was closed."""
+
+            closed.append(1)
+
+    def _connect(dsn: str, **_kwargs: object) -> _Conn:
+        """Record the DSN used to open a channel connection.
+
+        Args:
+            dsn: Caller-supplied Postgres URL.
+            **_kwargs: Ignored connect kwargs.
+
+        Returns:
+            Dummy connection.
+        """
+
+        opened.append(dsn)
+        return _Conn()
+
+    monkeypatch.setattr(
+        "smart_rag_core.retrieval.hybrid_run.psycopg.connect",
+        _connect,
+    )
+    dsn = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    retriever = HybridRetriever(
+        embedding_gateway=EmbeddingGateway(
+            MockEmbeddingAdapter(fixture_id="hybrid-run")
+        ),
+        supabase_dsn=dsn,
+    )
+    with retriever._channel_supabase() as conn:
+        assert isinstance(conn, _Conn)
+    assert opened == [dsn]
+    assert closed == [1]
 
 
 def test_locators_from_provenance_round_trip_sheet_and_url() -> None:

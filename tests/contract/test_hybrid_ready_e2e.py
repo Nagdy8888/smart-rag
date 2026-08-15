@@ -84,9 +84,7 @@ def test_synthetic_website_reaches_bm25_outbox_without_hand_insert(
     """Merged website snapshots persist as one version with one BM25 job."""
 
     first_payload, _first_hash = build_html_fixture()
-    second = (
-        b"<html><body><main><p>Second page body.</p></main></body></html>"
-    )
+    second = b"<html><body><main><p>Second page body.</p></main></body></html>"
     first = parse_local_bytes(first_payload, filename="p1.html", format_key="html")
     page_two = parse_local_bytes(second, filename="p2.html", format_key="html")
     combined = "c" * 64
@@ -138,6 +136,20 @@ def test_synthetic_file_reaches_verified_hybrid_ready() -> None:
     assert result.hybrid_ready is True
     assert result.status in {"hybrid_ready", "graph_ineligible"}
     assert result.bm25_job_id is not None
+    with psycopg.connect(resolve_supabase_db_url()) as supabase:
+        supabase.execute("SET ROLE postgres")
+        with supabase.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT current_version_id
+                FROM app.documents
+                WHERE id = %s
+                """,
+                (result.document_id,),
+            )
+            current = cursor.fetchone()
+    assert current is not None
+    assert current[0] == result.version_id
 
 
 def test_synthetic_website_reaches_verified_hybrid_ready() -> None:

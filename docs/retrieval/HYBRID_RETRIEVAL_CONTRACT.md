@@ -192,6 +192,13 @@ Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.
 | Final evidence | units / tokens | Plan ~8–12 | ≤12 / ≤3500 | **12 / 3500** | trim after parents | Recheck after expansion | retrieval | 12 / 3500 | Packet 6 |
 | Skip policy | rule | Plan | trivial exact only | **two-channel exact/quote** | counterfactual script | No score-gap skip; Packet 6 did not retune | retrieval | same | Live always-rerank |
 
+`app.fetch_authorized_chunk_context` still raises `context_batch_exceeds_limit`
+above 75 IDs **per RPC**. The Python loader batches fused Hybrid IDs
+(dense 100 + BM25 75 + term 30) into sequential 75-ID calls. Parallel
+dense, term, and BM25-recheck channels each open a dedicated Supabase
+connection from the full Postgres URL; they must not share one `psycopg`
+connection (`Connection.info.dsn` omits the password).
+
 ## Frozen Packet 6 values
 
 Runtime loads only ``hybrid_default_v1``. Unknown ids, including the documented
@@ -263,7 +270,7 @@ and [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md). Winning profile remain
 | --- | --- | --- |
 | Cache TTLs / Valkey store | 8 | still interface only; IDs/ranks plus mandatory recheck |
 | Unequal RRF channel weights | 8 | not selected; no ranked-ID evidence |
-| Live Hybrid Recall@10 / citation percents | 8 | unverified; holdout not opened |
+| Live Hybrid Recall@10 / citation percents | 8 | Packet 8 unverified; Packet 9 measured Phase-4-owned open-split Recall@K (holdout sealed) |
 
 ## Authorization negatives
 

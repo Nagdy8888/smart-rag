@@ -2,7 +2,7 @@
 title: Phase 4 hybrid RAG evidence
 owner: engineering-lead
 status: pending
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering, reviewers
 phase: 4
 ---
@@ -12,7 +12,7 @@ phase: 4
 Canonical packet evidence and exit record for
 [Phase 4](../../.cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md).
 Packet 1 creates this file; later packets append. Phase status remains
-`pending` until Packet 8 and explicit user acceptance.
+`pending` until Packet 9 evidence and explicit user acceptance.
 
 Related: [DATASET_SPEC.md](../evaluation/DATASET_SPEC.md) ·
 [QUERY_PROFILE_LABELING.md](../evaluation/QUERY_PROFILE_LABELING.md) ·
@@ -1047,3 +1047,161 @@ Restore Hybrid contract "Not selected" wording. Frozen profile
 Phase 4 wrapper checkbox 8 is checked because the no-go evidence is
 complete. Wrapper `status` remains `pending` until explicit user
 acceptance.
+
+## Packet 9 — engineering close on open splits (holdout sealed)
+
+### Quoted requirement
+
+> Keep holdout sealed. Filter eval to `runtime_owner=phase_4`. Implement
+> query-time batched embeddings and one `HybridRetriever.retrieve`.
+> Materialize compact Hybrid Ready sources with a sidecar gold-ID map.
+> Run ranked-ID Recall@10 / exact-code Recall@5 / alias Recall@10, locator
+> correctness, ACL negatives, table path, refusal classes, and
+> first-evidence p95 on development, then qualification once. Record cost,
+> hashes, commands, and residual launch blockers.
+
+### Acceptance checks restated
+
+- A single retrieve path returns authorized canonical IDs and locators;
+  BM25 snippets are never evidence.
+- Phase-4-owned open-split ranked-ID gates meet QT-EVAL-006/007/008 or a
+  bounded-repair miss is recorded without a fake pass.
+- Locator correctness is measured on returned evidence units from
+  canonical rows.
+- First-evidence p95 is QT-LAT-001 on the retrieve path, not first answer
+  token.
+- `holdout_opened=false`; freeze tooling still refuses holdout access.
+- ADR engineering-close is recorded; Phase 5 does not start.
+
+### Negative tests restated
+
+Holdout load from the eval runner, occupancy labeled as Recall@10,
+unauthorized gold IDs in ranked lists, BM25 text as citation, mock-only
+semantic Recall@10 claimed as live, or Phase 5 files, fails.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/retrieval/hybrid_run.py` | `HybridRetriever.retrieve` |
+| `packages/core/src/smart_rag_core/gateways/embedding.py` | `OpenAIEmbeddingAdapter`, `openai==2.26.0`, `text-embedding-3-large` @ 1024 |
+| `packages/core/src/smart_rag_core/evaluation/materialize.py` | Holdout-blind compact sources + sidecar |
+| `packages/core/src/smart_rag_core/evaluation/ranked_ids.py` | Ranked-ID / locator / ACL / p95 harness |
+| `scripts/materialize_phase4_eval_corpus.py` | Open-split ingest CLI |
+| `scripts/eval_phase4_ranked_ids.py` | Open-split live eval CLI |
+| `tests/fixtures/evaluation/phase4/runtime/gold_id_map.json` | Development sidecar (gitignored) |
+| `.tmp-phase4-qualification/gold_id_map.json` | Qualification sidecar (gitignored) |
+| `docs/adr/ADR-phase4-engineering-close.md` | SME-holdout waiver for Phase 4 engineering close |
+| Frozen profile | `hybrid_default_v1` SHA-256 `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` |
+
+### Live ranked-ID results (Phase-4-owned classes only)
+
+Holdout labels were not loaded. Occupancy/`coverage_eval` is not Recall@K.
+`qt_eval_006_live=true` on mapped OpenAI embeddings. Frozen
+`hybrid_default_v1` was not retuned. Qualification ran once after two
+development repairs (current-version pointer; `as_of` dates plus gold
+locators). Identity rerank (`rerank_call_count=0`) was used; OpenAI
+rerank was not injected.
+
+| Split | Cases | Recall@10 | Exact-code@5 | Alias@10 | Locator | First-evidence p95 | ACL leaks | `holdout_opened` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| development | 157 (112 recall) | **0.902** (≥0.85) | **1.000** (≥0.98) | **1.000** (≥0.95) | **1.000** (≥0.98) | **785 ms** (≤2000) | **0** | false |
+| qualification | 55 (38 recall) | **0.868** (≥0.85) | **1.000** | **1.000** | **1.000** | **601 ms** | **0** | false |
+
+Sidecar SHA-256:
+
+| Split | `sidecar_sha256` |
+| --- | --- |
+| development | `b5e8728da85bd227ebc956bfeab9bbd1de668ca39a77468d707fb9adcd40fea8` |
+| qualification | `8786aa5051f16c7abefe087101dc21a872f898fda2980e0bb3f95536bcea7dbd` |
+
+Hardware (both runs): Windows 10, AMD64, Intel Core, 20 CPUs, Python 3.11.15.
+
+Development recall misses after repair (not retuned):
+`p4-arabic_mixed-0008/0010/0011/0012/0013/0016`,
+`p4-profile_fidelity-0003/0004/0008/0016`,
+`p4-semantic_factual-0015`.
+
+Qualification recall misses (confirm only):
+`p4-arabic_mixed-0014/0020`, `p4-profile_fidelity-0020`,
+`p4-semantic_factual-0020/0023`.
+
+Table lane: 11 development / 4 qualification cases dispatched as
+`tabular_aggregation`; Packet 7 `execute_compiled_query` ran **0** times
+because `{case_id}.parquet` artifacts were not materialized. Ordinary
+cell lookup stayed on Hybrid retrieve. Refusal correct rate 0.870
+(development) / 0.889 (qualification). Embedding USD cost was **not**
+summed by the harness (`cost=null`).
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run python scripts/materialize_phase4_eval_corpus.py --split development --ingest` | 0 (`ingest_ok=157`, `holdout_opened=false`) |
+| `uv run python scripts/eval_phase4_ranked_ids.py --split development --live` | 0 (`qt_eval_006_live=true`, `follow_up=null`) |
+| `uv run python scripts/materialize_phase4_eval_corpus.py --split qualification --ingest --output-dir .tmp-phase4-qualification` | 0 (`ingest_ok=55`) |
+| `uv run python scripts/eval_phase4_ranked_ids.py --split qualification --live --sidecar .tmp-phase4-qualification/gold_id_map.json` | 0 (`qt_eval_006_live=true`, `follow_up=null`) |
+| `uv run pytest tests/unit/test_phase4_ranked_ids.py tests/unit/test_hybrid_run.py tests/unit/test_context_loader.py -q` | 0 |
+
+### Negative tests
+
+| Fixture | Result |
+| --- | --- |
+| Ranked-ID / materialize AST `load_holdout` | absent |
+| Dry sidecar `chunk_id=null` | fail-closed `recall_at_10=null` |
+| Mock embeddings labeled live QT-EVAL-006 | `qt_eval_006_live=false` |
+| Occupancy as Recall@10 | rejected |
+| Shared `psycopg` connection across channels | `retrieval_requires_idle_connection`; live path uses `supabase_dsn` |
+| Phase wrapper `status: complete` | not set |
+| Phase 5 / LightRAG | not started |
+
+### Deviations
+
+- Compact markdown eval corpus, not the full 405-case raw sources. Codes
+  are reused across classes in labels; Recall@K is still per-case gold
+  chunk UUID after Hybrid Ready persist.
+- Graph-ineligible Hybrid Ready rows do not become retrieval-current
+  through `activate_graph_ineligible_version` (that RPC still requires
+  `hybrid_ready`). The Hybrid Ready driver now sets
+  `documents.current_version_id` after finalize. First live run scored
+  Recall@10 **0.0** until that pointer existed.
+- `as_of` cases empty the fused list when `effective_at` is null.
+  Materialize stamps UTC `effective_at` and gold page/section locators.
+- Live retrieve used identity rerank, not `gpt-4o-mini` Responses rerank.
+- Duplicate `p4-eval-*` documents from earlier ingest attempts remain in
+  the local database; only sidecar-mapped versions were promoted current.
+- BM25 outbox rows may remain `processing` after a successful ParadeDB
+  upsert; dense+term still retrieved.
+
+No ADR beyond
+[ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md).
+`hybrid_default_v1` SHA-256 is unchanged.
+
+### Residual launch blockers
+
+- Independently SME-sealed holdout (QT-HOLD-001); waived for Phase 4
+  engineering close only.
+- First-answer-token / completion p95 (QT-LAT-002/003) — Phase 6.
+- Answer faithfulness (QT-EVAL-004) — Phase 6/9.
+- Citation assembler completeness (QT-EVAL-003) — Phase 6.
+- Structured-table labeled p95 and Parquet eval artifacts (QT-LAT-006).
+- Named Knowledge Owner hours; corpus remains `synthetic_provisional`.
+- Continue-versus-`0.x Hybrid Pilot` vote
+  ([ADR-hybrid-pilot-release-cut.md](../adr/ADR-hybrid-pilot-release-cut.md)).
+
+### Rollback
+
+Delete Packet 9 retrieve/eval modules and uncheck wrapper box 9 after
+user direction. Frozen `hybrid_default_v1` stays. Do not open holdout to
+force a pass.
+
+### Phase 5 inputs (do not start)
+
+- Hybrid runtime profile: `hybrid_default_v1` at the pinned SHA-256 above.
+- Open-split ranked-ID evidence in this packet; holdout still sealed.
+- Graph/Combined/LightRAG: not implemented.
+
+**Request for user acceptance:** Packet 9 engineering-close evidence is
+ready. Phase 4 wrapper checkbox 9 and `status: complete` stay unchecked
+until you accept this record. Phase 5 will not start in this change.
+

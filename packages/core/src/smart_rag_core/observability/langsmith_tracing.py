@@ -214,18 +214,22 @@ def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def redact_gateway_outputs(outputs: Mapping[str, Any]) -> dict[str, Any]:
+def redact_gateway_outputs(outputs: object) -> dict[str, Any]:
     """Keep usage and mode; drop passages, rankings text, and vectors.
 
     Args:
         outputs: Traceable return wrapper. LangSmith may nest the value
-            under ``output``.
+            under ``output``, or pass the gateway response object directly.
 
     Returns:
         Exportable metadata with token counts when present.
     """
 
-    raw: object = outputs.get("output", outputs)
+    raw: object
+    if isinstance(outputs, Mapping):
+        raw = outputs.get("output", outputs)
+    else:
+        raw = outputs
     payload: dict[str, Any] = {}
     mode = getattr(raw, "mode", None)
     if mode is not None:
@@ -360,17 +364,22 @@ def redact_embedding_call_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def redact_embedding_call_outputs(outputs: Mapping[str, Any]) -> dict[str, Any]:
+def redact_embedding_call_outputs(outputs: object) -> dict[str, Any]:
     """Export embedding usage without vector values.
 
     Args:
-        outputs: Traceable return wrapper around a CreateEmbeddingResponse.
+        outputs: Traceable return value. LangSmith may pass a mapping or the
+            raw ``CreateEmbeddingResponse`` / ``EmbeddingResponse``.
 
     Returns:
         Embedding count, dimension, and token usage when present.
     """
 
-    raw: object = outputs.get("output", outputs)
+    raw: object
+    if isinstance(outputs, Mapping):
+        raw = outputs.get("output", outputs)
+    else:
+        raw = outputs
     payload: dict[str, Any] = {}
     data = getattr(raw, "data", None)
     if data:
