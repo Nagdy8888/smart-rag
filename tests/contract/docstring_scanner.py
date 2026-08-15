@@ -21,6 +21,21 @@ _EXCLUDED_PARTS = {
 }
 
 
+def _is_excluded(path: Path) -> bool:
+    """Return whether a path is cache, vendor, or local scratch output.
+
+    Args:
+        path: Candidate Python file.
+
+    Returns:
+        True when the file must not participate in authored-code contracts.
+    """
+
+    if any(part in _EXCLUDED_PARTS for part in path.parts):
+        return True
+    return any(part.startswith(".tmp") for part in (*path.parts, path.name))
+
+
 @dataclass(frozen=True)
 class DocstringViolation:
     """Describe one authored definition missing a docstring.
@@ -45,15 +60,11 @@ def iter_authored_python_files(repo_root: Path) -> list[Path]:
         repo_root: Repository root to inspect.
 
     Returns:
-        Python source paths excluding only caches, build output, historical
-        review artifacts, and explicit vendor directories.
+        Python source paths excluding caches, build output, historical review
+        artifacts, vendor directories, and local ``.tmp*`` scratch files.
     """
 
-    return sorted(
-        path
-        for path in repo_root.rglob("*.py")
-        if not any(part in _EXCLUDED_PARTS for part in path.parts)
-    )
+    return sorted(path for path in repo_root.rglob("*.py") if not _is_excluded(path))
 
 
 def scan_source_for_docstrings(source: str, path: Path) -> list[DocstringViolation]:

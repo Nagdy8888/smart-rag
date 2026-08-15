@@ -64,7 +64,10 @@ class DeadLetterService:
                 )
             except psycopg.errors.RaiseException as exc:
                 message = str(exc)
-                if "ingestion_job_not_found" in message or "dead_letter_row_not_found" in message:
+                if (
+                    "ingestion_job_not_found" in message
+                    or "dead_letter_row_not_found" in message
+                ):
                     raise JobNotFoundError(str(job_id)) from exc
                 if "retry_not_allowed" in message:
                     raise JobRetryNotAllowedError("retry_not_allowed") from exc

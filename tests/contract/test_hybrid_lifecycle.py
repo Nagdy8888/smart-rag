@@ -252,8 +252,7 @@ def test_deletion_excludes_retrieval_and_enqueues_bm25_cleanup() -> None:
 
 
 @pytest.mark.skipif(
-    packet8_paradedb_url() is None
-    or try_connect(packet8_paradedb_url() or "") is None,
+    packet8_paradedb_url() is None or try_connect(packet8_paradedb_url() or "") is None,
     reason="Packet 8 ParadeDB overlay required for host-side psycopg contracts",
 )
 def test_bm25_delete_job_clears_parade_projection() -> None:
@@ -288,9 +287,10 @@ def test_bm25_delete_job_clears_parade_projection() -> None:
             )
         )
         parade.commit()
-    with psycopg.connect(resolve_supabase_db_url()) as supabase, psycopg.connect(
-        parade_url, connect_timeout=5
-    ) as parade:
+    with (
+        psycopg.connect(resolve_supabase_db_url()) as supabase,
+        psycopg.connect(parade_url, connect_timeout=5) as parade,
+    ):
         supabase.execute("SET ROLE app_worker")
         parade.execute("SET ROLE paradedb_writer")
         service = Bm25ProjectionService(supabase, parade)

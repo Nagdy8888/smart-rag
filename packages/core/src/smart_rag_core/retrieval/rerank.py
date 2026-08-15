@@ -500,6 +500,7 @@ def apply_mmr(
     doc_counts: dict[UUID, int] = {}
     section_counts: dict[str, int] = {}
     while remaining and len(selected) < limit:
+
         def score(item: RerankPassage) -> tuple[float, str]:
             """MMR objective with stable ID tie-break.
 
@@ -514,7 +515,9 @@ def apply_mmr(
             diversity = 0.0
             if selected:
                 diversity = max(
-                    _jaccard(item.excerpt or item.raw_text, other.excerpt or other.raw_text)
+                    _jaccard(
+                        item.excerpt or item.raw_text, other.excerpt or other.raw_text
+                    )
                     for other in selected
                 )
             return (
@@ -536,7 +539,9 @@ def apply_mmr(
             section_counts[section] = section_counts.get(section, 0) + 1
     selected_ids = {item.candidate.chunk_id for item in selected}
     dropped = tuple(
-        item.candidate.chunk_id for item in depth if item.candidate.chunk_id not in selected_ids
+        item.candidate.chunk_id
+        for item in depth
+        if item.candidate.chunk_id not in selected_ids
     )
     return tuple(selected), dropped
 

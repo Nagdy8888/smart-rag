@@ -52,7 +52,9 @@ def parse_xlsx(path: Path, content_hash: str, format_key: str) -> ParseResult:
         for row in sheet.iter_rows():
             row_count += 1
             if row_count > PARSER_SANDBOX_MAX_ROWS:
-                raise ParserLimitExceeded("rows", f"row count exceeds {PARSER_SANDBOX_MAX_ROWS}")
+                raise ParserLimitExceeded(
+                    "rows", f"row count exceeds {PARSER_SANDBOX_MAX_ROWS}"
+                )
             for cell in row:
                 if not isinstance(cell, Cell):
                     continue
@@ -88,7 +90,9 @@ def parse_xlsx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                 order += 1
     workbook.close()
     elements_tuple = tuple(elements)
-    config_hash = ParseResult.stable_config_hash(PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION)
+    config_hash = ParseResult.stable_config_hash(
+        PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION
+    )
     return ParseResult(
         disposition=ParseDisposition.SUPPORTED,
         format=format_key,
@@ -103,7 +107,9 @@ def parse_xlsx(path: Path, content_hash: str, format_key: str) -> ParseResult:
     )
 
 
-def _cell_fields(cell: Cell) -> tuple[str | None, dict[str, str | int | float | bool | None]]:
+def _cell_fields(
+    cell: Cell,
+) -> tuple[str | None, dict[str, str | int | float | bool | None]]:
     """Extract typed value, formula text, and cache authority metadata."""
 
     metadata: dict[str, str | int | float | bool | None] = {}

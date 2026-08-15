@@ -209,7 +209,9 @@ class EmbeddingService:
             },
         )
 
-        attempt_count = self._ledger_attempt_count(batch.version_id, batch.operation_key)
+        attempt_count = self._ledger_attempt_count(
+            batch.version_id, batch.operation_key
+        )
         return EmbeddingBatchResult(
             version_id=batch.version_id,
             policy_hash=policy_hash,

@@ -124,9 +124,7 @@ def test_incompatible_signatures_without_timestamps_fail_closed() -> None:
 def test_encrypted_scan_response_is_unscannable() -> None:
     """Encrypted/password ClamAV responses map to unscannable."""
 
-    disposition, threat, detail = _parse_scan_response(
-        b"stream: Encrypted.PDF ERROR"
-    )
+    disposition, threat, detail = _parse_scan_response(b"stream: Encrypted.PDF ERROR")
     assert disposition is ScanDisposition.UNSCANNABLE
     assert threat is None
     assert "Encrypted" in detail

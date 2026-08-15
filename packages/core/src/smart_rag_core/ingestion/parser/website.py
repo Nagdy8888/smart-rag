@@ -55,9 +55,7 @@ def merge_website_parse_results(
         if page.disposition is ParseDisposition.FAILED:
             failed = True
         for element in page.elements:
-            elements.append(
-                element.model_copy(update={"reading_order": len(elements)})
-            )
+            elements.append(element.model_copy(update={"reading_order": len(elements)}))
         removals.extend(page.removals)
         warnings.extend(page.warnings)
         wall_seconds += page.resource_metrics.wall_seconds

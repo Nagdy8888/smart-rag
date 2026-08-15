@@ -50,7 +50,6 @@ def _choose_slash_date(first_token: str, second_token: str, year: int) -> str | 
     return mdy
 
 
-
 def _valid_gregorian(year: int, month: int, day: int) -> bool:
     """Return whether the civil Gregorian triple is a real calendar day.
 
@@ -116,7 +115,11 @@ def parse_gregorian_v1(text: str) -> tuple[str, ...]:
     ordered: list[str] = []
     seen: set[str] = set()
     for match in _ISO.finditer(text):
-        year, month, day = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        year, month, day = (
+            int(match.group(1)),
+            int(match.group(2)),
+            int(match.group(3)),
+        )
         if _valid_gregorian(year, month, day):
             _append_unique(ordered, seen, _iso(year, month, day))
     for match in _SLASH.finditer(text):

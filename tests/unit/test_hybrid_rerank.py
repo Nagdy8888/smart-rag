@@ -45,7 +45,9 @@ from smart_rag_core.retrieval.types import RetrievalCandidate
 from smart_rag_core.settings import AgentSettings
 
 
-def _candidate(chunk: UUID | None = None, document: UUID | None = None) -> RetrievalCandidate:
+def _candidate(
+    chunk: UUID | None = None, document: UUID | None = None
+) -> RetrievalCandidate:
     """Build one fused candidate.
 
     Args:
@@ -134,7 +136,9 @@ def test_pool_caps_and_per_document_quota() -> None:
     """The pool keeps 20 IDs and at most five passages per document."""
 
     document = uuid4()
-    overflow = tuple(_passage(document=document, text=f"dup {index}") for index in range(8))
+    overflow = tuple(
+        _passage(document=document, text=f"dup {index}") for index in range(8)
+    )
     others = tuple(_passage(text=f"other {index}") for index in range(20))
     pool = build_rerank_pool(overflow + others)
     assert len(pool) <= RERANK_POOL_SIZE
@@ -147,9 +151,7 @@ def test_skip_only_trivial_exact_with_two_channels() -> None:
     """Score gaps never skip; exact code with two channels does."""
 
     cases = [
-        case
-        for case in load_open_splits()
-        if case.query_class is QueryClass.EXACT_CODE
+        case for case in load_open_splits() if case.query_class is QueryClass.EXACT_CODE
     ]
     profile = cases[0].expected_profile
     assert str(profile.query_type.value) == QueryType.EXACT_IDENTIFIER.value
@@ -190,7 +192,9 @@ def test_schema_rejects_unknown_duplicate_missing_and_support() -> None:
             {"chunk_id": str(second), "rank": 2, "support": 0.1},
         ],
     }
-    parsed = validate_rerank_payload(valid, candidate_ids=(first, second), input_hash=digest)
+    parsed = validate_rerank_payload(
+        valid, candidate_ids=(first, second), input_hash=digest
+    )
     assert [item.chunk_id for item in parsed] == [first, second]
     with pytest.raises(ValueError, match="rerank_duplicate_id"):
         validate_rerank_payload(
@@ -343,7 +347,10 @@ def test_rerank_failure_falls_back_to_rrf_order() -> None:
         remaining_deadline_seconds=8.0,
     )
     assert selected.fallback_reason is RerankFallbackReason.SCHEMA_INVALID
-    assert selected.rerank_order == (first.candidate.chunk_id, second.candidate.chunk_id)
+    assert selected.rerank_order == (
+        first.candidate.chunk_id,
+        second.candidate.chunk_id,
+    )
     assert selected.usage is None
 
 
@@ -362,7 +369,9 @@ def test_mmr_respects_document_quota() -> None:
     )
     docs = {item.candidate.document_id for item in selected}
     assert document in docs
-    assert len([item for item in selected if item.candidate.document_id == document]) == 1
+    assert (
+        len([item for item in selected if item.candidate.document_id == document]) == 1
+    )
     assert third.candidate.chunk_id in {item.candidate.chunk_id for item in selected}
     assert second.candidate.chunk_id in set(dropped) or first.candidate.chunk_id in set(
         dropped
@@ -617,4 +626,3 @@ def test_budget_denied_does_not_call_gateway() -> None:
     assert rankings == ()
     assert usage is None
     assert reason is RerankFallbackReason.BUDGET_DENIED
-

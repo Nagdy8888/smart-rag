@@ -140,7 +140,9 @@ def decide_external_processing(
             reason_code="review_required",
             detail="Mandatory-review category lacks owner/admin approval.",
         )
-    if any(result is not DetectorResult.CLEAN for result in decision_input.detector_results):
+    if any(
+        result is not DetectorResult.CLEAN for result in decision_input.detector_results
+    ):
         return ExternalProcessingDecision(
             allowed=False,
             reason_code="sensitive_detector",

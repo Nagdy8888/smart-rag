@@ -2,7 +2,7 @@
 title: Phase 3 ingestion evidence
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering, reviewers
 phase: 3
 ---
@@ -303,10 +303,10 @@ Packet 5 implements no-network parser/OCR isolation and typed format adapters. C
 | python-docx | 1.1.2 | MIT | DOCX logical block/table paths |
 | python-pptx | 1.0.2 | MIT | PPTX slides/shapes/reading-order |
 | openpyxl | 3.1.5 | MIT | XLSX typed cells/formulas/cache state |
-| beautifulsoup4 + lxml | 4.13.3 / 5.3.1 | MIT / BSD | HTML boilerplate cleaning |
+| beautifulsoup4 + lxml | 4.13.3 / 6.1.0 | MIT / BSD | HTML boilerplate cleaning |
 | markdown-it-py | 3.0.0 | MIT | Markdown token/line spans |
 | pytesseract + Tesseract | 0.3.13 / distro | Apache-2.0 | OCR boxes/confidence |
-| Pillow | 11.1.0 | HPND | OCR image buffers |
+| Pillow | 12.3.0 | HPND | OCR image buffers |
 
 Adversarial comparison rejected ad-hoc `pdfplumber`/unpinned OCR stacks due to weaker box fidelity (PDF), non-deterministic HTML recovery, and missing OOXML structure coverage relative to the pinned set above.
 

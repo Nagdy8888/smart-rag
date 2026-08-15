@@ -130,7 +130,9 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
         sortable = filtered
 
     elements: list[TypedElement] = []
-    for order, (_sort_key, element) in enumerate(sorted(sortable, key=lambda item: item[0])):
+    for order, (_sort_key, element) in enumerate(
+        sorted(sortable, key=lambda item: item[0])
+    ):
         locator: SourceLocator = element.locator
         if isinstance(locator, OcrLocator):
             pass
@@ -151,7 +153,9 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
         )
 
     elements_tuple = tuple(elements)
-    config_hash = ParseResult.stable_config_hash(PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION)
+    config_hash = ParseResult.stable_config_hash(
+        PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION
+    )
     return ParseResult(
         disposition=ParseDisposition.SUPPORTED,
         format=format_key,

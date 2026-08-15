@@ -67,7 +67,9 @@ def get_version_ingestion_status(
         repository = IngestionStatusRepository(connection)
         row = repository.get_version_status(version_id)
         if row is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="not_found"
+            )
         jobs = repository.list_recent_jobs(document_id=UUID(str(row["document_id"])))
     retry_allowed = caller.role in {UserRole.OWNER, UserRole.ADMIN}
     payload = dict(row)

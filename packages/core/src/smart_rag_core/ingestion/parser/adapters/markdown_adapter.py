@@ -61,7 +61,9 @@ def parse_markdown(path: Path, content_hash: str, format_key: str) -> ParseResul
             order += 1
         elif token.type == "fence":
             line = token.map[0] + 1 if token.map else 1
-            locator = MarkdownLocator(line_start=line, line_end=line, token_path=("fence",))
+            locator = MarkdownLocator(
+                line_start=line, line_end=line, token_path=("fence",)
+            )
             elements.append(
                 TypedElement(
                     element_id=element_id(
@@ -93,7 +95,9 @@ def parse_markdown(path: Path, content_hash: str, format_key: str) -> ParseResul
             )
             order += 1
     elements_tuple = tuple(elements)
-    config_hash = ParseResult.stable_config_hash(PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION)
+    config_hash = ParseResult.stable_config_hash(
+        PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION
+    )
     return ParseResult(
         disposition=ParseDisposition.SUPPORTED,
         format=format_key,

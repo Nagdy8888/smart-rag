@@ -97,7 +97,9 @@ def _synthetic_pool(case: EvaluationCase) -> tuple[list[RerankPassage], set[UUID
     gold_set = set(gold)
     passages: list[RerankPassage] = []
     for index in range(10):
-        chunk_id = gold[index] if index < len(gold) else uuid5(_NS, f"{case.case_id}-d{index}")
+        chunk_id = (
+            gold[index] if index < len(gold) else uuid5(_NS, f"{case.case_id}-d{index}")
+        )
         channels: frozenset[str]
         if index == 0 and gold:
             channels = frozenset({"bm25", "term"})

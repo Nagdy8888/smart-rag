@@ -216,7 +216,9 @@ class ParserSandboxLauncher:
                     detail="parser sandbox exceeded kill timeout",
                 )
             if completed.returncode != 0:
-                detail = (completed.stderr or completed.stdout or "sandbox failed").strip()
+                detail = (
+                    completed.stderr or completed.stdout or "sandbox failed"
+                ).strip()
                 return _failed_result(
                     content_hash=content_hash,
                     format_key=format_key or "unknown",
@@ -233,7 +235,9 @@ class ParserSandboxLauncher:
                     code="missing_output",
                     detail="sandbox produced no result.json",
                 )
-            result = ParseResult.model_validate_json(output_path.read_text(encoding="utf-8"))
+            result = ParseResult.model_validate_json(
+                output_path.read_text(encoding="utf-8")
+            )
             metrics = result.resource_metrics.model_copy(
                 update={"wall_seconds": time.monotonic() - started}
             )

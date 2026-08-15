@@ -75,9 +75,10 @@ class Bm25WorkerLoop:
         )
         heartbeat_thread.start()
         try:
-            with psycopg.connect(postgres_url) as supabase, psycopg.connect(
-                parade_url
-            ) as parade:
+            with (
+                psycopg.connect(postgres_url) as supabase,
+                psycopg.connect(parade_url) as parade,
+            ):
                 supabase.execute("SET ROLE app_worker")
                 parade.execute("SET ROLE paradedb_writer")
                 service = Bm25ProjectionService(supabase, parade)

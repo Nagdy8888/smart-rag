@@ -92,9 +92,7 @@ def expand_parents(
             extra.append(item.parent_chunk_id)
     loaded = load_context(tuple(extra)) if extra else ()
     by_id = {item.chunk_id: item for item in loaded}
-    neighbors = {
-        (item.candidate.version_id, item.chunk_index): item for item in pool
-    }
+    neighbors = {(item.candidate.version_id, item.chunk_index): item for item in pool}
     expanded: list[RerankPassage] = []
     parent_ids: list[UUID] = []
     seen: set[UUID] = set()
@@ -141,7 +139,9 @@ def expand_parents(
                     )
                 )
         for offset in (-1, 1):
-            neighbor = neighbors.get((item.candidate.version_id, item.chunk_index + offset))
+            neighbor = neighbors.get(
+                (item.candidate.version_id, item.chunk_index + offset)
+            )
             if neighbor is not None:
                 _append(neighbor)
     return tuple(expanded), tuple(parent_ids)

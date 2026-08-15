@@ -169,9 +169,7 @@ def test_live_bm25_recheck_drops_restricted_before_fusion(
             query_text=shared,
         )
     assert len(bm25.scanned_ids) <= BM25_SCAN_ID_CAP
-    assert seed.restricted_chunk_id not in {
-        item.chunk_id for item in bm25.candidates
-    }
+    assert seed.restricted_chunk_id not in {item.chunk_id for item in bm25.candidates}
     rechecked = recheck_retrieval_candidates(
         db_connection,
         caller=seed.member,

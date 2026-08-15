@@ -51,7 +51,9 @@ VERSION_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
         (build_pdf_text_fixture, "chunk.pdf", "pdf"),
     ],
 )
-def test_chunk_ids_stable_on_replay(builder, filename: str, format_key: str, tmp_path: Path) -> None:
+def test_chunk_ids_stable_on_replay(
+    builder, filename: str, format_key: str, tmp_path: Path
+) -> None:
     """Identical parse inputs produce identical chunk IDs on replay."""
 
     payload, digest = builder()
@@ -101,7 +103,10 @@ def test_markdown_code_block_remains_atomic(tmp_path: Path) -> None:
     code_chunks = [
         chunk
         for chunk in result.chunks
-        if any(locator.get("token_path") == ["fence"] for locator in chunk.provenance.locators)
+        if any(
+            locator.get("token_path") == ["fence"]
+            for locator in chunk.provenance.locators
+        )
     ]
     assert code_chunks
     assert "print('hi')" in code_chunks[0].raw_text
@@ -164,7 +169,9 @@ def test_exact_duplicate_provenance_retained() -> None:
     result = chunk_parse_result(parsed, document_id=DOCUMENT_ID, version_id=VERSION_ID)
     passages = [chunk for chunk in result.chunks if chunk.kind.value == "passage"]
     representatives = [chunk for chunk in passages if chunk.is_search_representative]
-    duplicates = [chunk for chunk in passages if chunk.duplicate_of_chunk_id is not None]
+    duplicates = [
+        chunk for chunk in passages if chunk.duplicate_of_chunk_id is not None
+    ]
     assert len(representatives) >= 1
     assert duplicates
     assert duplicates[0].duplicate_of_chunk_id == representatives[0].chunk_id

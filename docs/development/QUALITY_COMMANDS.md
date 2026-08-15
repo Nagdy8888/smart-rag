@@ -2,7 +2,7 @@
 title: Quality commands
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-15
 audience: engineering
 ---
 
@@ -56,10 +56,14 @@ Dependency and secret scans use the locked Python/Node graphs and the same Gitle
 
 ```powershell
 uv export --frozen --all-packages --group dev --no-emit-workspace --format requirements.txt --output-file .tmp-audit-requirements.txt
-uv run pip-audit --strict --requirement .tmp-audit-requirements.txt
+uv run pip-audit --strict --ignore-vuln PYSEC-2026-113 --requirement .tmp-audit-requirements.txt
 Remove-Item .tmp-audit-requirements.txt
 pnpm audit --audit-level high
 docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f detect --source=/repo --no-banner --redact
 ```
+
+`PYSEC-2026-113` is ignored because Apache documents the issue as Arrow C++ IPC
+pre-buffering that Python bindings do not expose. Packet 8 keeps
+`pyarrow==19.0.1`. See [ADR-cve-pin-patch-2026-08.md](../adr/ADR-cve-pin-patch-2026-08.md).
 
 [docs index](../README.md) · [CI tiers](./CI_TIERS.md)

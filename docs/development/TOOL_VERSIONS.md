@@ -2,7 +2,7 @@
 title: Tool and dependency versions (Phase 1)
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering
 ---
 
@@ -58,6 +58,9 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | pre-commit (dev) | 4.6.2 |
 | PyYAML (dev) | 6.0.3 |
 | pip-audit (dev) | 2.10.1 |
+| lxml (core / parser sandbox) | 6.1.0 |
+| Pillow (core / parser sandbox) | 12.3.0 |
+| pyarrow (core) | 19.0.1 |
 | PyJWT[crypto] | 2.13.0 |
 
 ## Direct Node pins

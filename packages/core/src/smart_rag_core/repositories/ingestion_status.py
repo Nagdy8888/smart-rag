@@ -274,7 +274,9 @@ class IngestionStatusRepository:
             row = cursor.fetchone()
             return dict(row) if row else None
 
-    def list_recent_jobs(self, *, document_id: UUID, limit: int = 20) -> list[dict[str, Any]]:
+    def list_recent_jobs(
+        self, *, document_id: UUID, limit: int = 20
+    ) -> list[dict[str, Any]]:
         """Return recent ingestion jobs with safe diagnostics.
 
         Args:

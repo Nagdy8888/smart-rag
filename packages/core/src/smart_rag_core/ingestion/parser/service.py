@@ -65,7 +65,9 @@ class ParserService:
 
         expected = hashlib.sha256(invocation.payload).hexdigest()
         if expected != invocation.content_hash:
-            failed = _hash_mismatch_result(invocation.content_hash, invocation.format_key)
+            failed = _hash_mismatch_result(
+                invocation.content_hash, invocation.format_key
+            )
             return ParserServiceResult(
                 parse_result=failed,
                 promotion_allowed=False,

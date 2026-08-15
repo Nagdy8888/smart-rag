@@ -89,9 +89,7 @@ class Bm25IndexJobRepository:
         attempt = int(job.get("attempt_count", 0))
         max_attempts = int(job.get("max_attempts", DEFAULT_MAX_JOB_ATTEMPTS))
         next_status = (
-            JobStatus.DEAD_LETTER
-            if attempt >= max_attempts
-            else JobStatus.PENDING
+            JobStatus.DEAD_LETTER if attempt >= max_attempts else JobStatus.PENDING
         )
         delay = compute_retry_delay_seconds(attempt)
         next_attempt = datetime.now(tz=UTC) + timedelta(seconds=delay)

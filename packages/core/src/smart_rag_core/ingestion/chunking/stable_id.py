@@ -68,4 +68,6 @@ def stable_chunk_id(
         ]
     )
     name = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    return uuid.uuid5(chunk_namespace(document_id=document_id, version_id=version_id), name)
+    return uuid.uuid5(
+        chunk_namespace(document_id=document_id, version_id=version_id), name
+    )

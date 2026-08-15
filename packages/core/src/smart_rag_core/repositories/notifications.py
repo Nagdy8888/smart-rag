@@ -49,7 +49,9 @@ def deliver_admin_alert_smtp(
     host = os.environ.get("ADMIN_ALERT_SMTP_HOST", "").strip()
     if not host:
         return
-    port_raw = os.environ.get("ADMIN_ALERT_SMTP_PORT", str(DEFAULT_ADMIN_ALERT_SMTP_PORT))
+    port_raw = os.environ.get(
+        "ADMIN_ALERT_SMTP_PORT", str(DEFAULT_ADMIN_ALERT_SMTP_PORT)
+    )
     try:
         port = int(port_raw)
     except ValueError:

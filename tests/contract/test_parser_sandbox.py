@@ -42,18 +42,23 @@ def test_docker_run_uses_network_none() -> None:
     """Sandbox launcher constructs docker run with --network none."""
 
     launcher = ParserSandboxLauncher(
-        config=SandboxLaunchConfig(image="smart-rag-parser-sandbox:local", use_docker=True)
+        config=SandboxLaunchConfig(
+            image="smart-rag-parser-sandbox:local", use_docker=True
+        )
     )
     assert launcher.config.use_docker is True
     payload = b"contract line\n"
     digest = hashlib.sha256(payload).hexdigest()
     if shutil.which("docker") is None:
         pytest.skip("docker missing")
-    image_exists = subprocess.run(
-        ["docker", "image", "inspect", "smart-rag-parser-sandbox:local"],
-        capture_output=True,
-        check=False,
-    ).returncode == 0
+    image_exists = (
+        subprocess.run(
+            ["docker", "image", "inspect", "smart-rag-parser-sandbox:local"],
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    )
     if not image_exists:
         pytest.skip("parser sandbox image not built")
     result = launcher.run(
@@ -85,7 +90,9 @@ def test_sandbox_ocr_scanned_pdf_emits_searchable_text() -> None:
         pytest.skip("parser sandbox image not built")
     payload, digest = build_ocr_scanned_pdf()
     launcher = ParserSandboxLauncher(
-        config=SandboxLaunchConfig(image="smart-rag-parser-sandbox:local", use_docker=True)
+        config=SandboxLaunchConfig(
+            image="smart-rag-parser-sandbox:local", use_docker=True
+        )
     )
     result = launcher.run(
         payload=payload,

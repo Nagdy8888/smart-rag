@@ -7,7 +7,9 @@ from fastapi.testclient import TestClient
 from smart_rag_api.main import create_app
 
 
-def _schema_properties(components: dict[str, object], field_schema: dict[str, object]) -> dict[str, object]:
+def _schema_properties(
+    components: dict[str, object], field_schema: dict[str, object]
+) -> dict[str, object]:
     """Resolve OpenAPI ``$ref`` / ``allOf`` to a properties map.
 
     Args:

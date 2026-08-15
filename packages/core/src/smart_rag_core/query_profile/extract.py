@@ -16,9 +16,7 @@ _QUOTES = re.compile(r'"([^"]{1,200})"')
 _ARABIC = re.compile(r"[\u0600-\u06FF]")
 _LATIN = re.compile(r"[A-Za-z]")
 _DOCUMENT_SCOPE = re.compile(r"\bdocument\s+(p4-src-\d{4})\b", re.IGNORECASE)
-_COMPARE = re.compile(
-    r"^Compare\s+(PRJ-[A-Z]{5,12})\s+leave days and notice period\.$"
-)
+_COMPARE = re.compile(r"^Compare\s+(PRJ-[A-Z]{5,12})\s+leave days and notice period\.$")
 ALLOWED_FILTER_KEYS = frozenset({"tag", "language"})
 ALLOWED_TABLE_OPS = frozenset({"sum", "count", "avg", "min", "max"})
 

@@ -41,7 +41,9 @@ def split_prose_segments(
     if not segments:
         return []
     merged_text = "\n\n".join(segment.text for segment in segments)
-    merged_ids = tuple(element_id for segment in segments for element_id in segment.element_ids)
+    merged_ids = tuple(
+        element_id for segment in segments for element_id in segment.element_ids
+    )
     merged_locators = tuple(
         locator for segment in segments for locator in segment.locators
     )
@@ -122,7 +124,9 @@ def split_prose_segments(
     return overlapped
 
 
-def split_oversized_atomic(text: str, *, hard_max: int = PASSAGE_HARD_MAX_TOKENS) -> list[str]:
+def split_oversized_atomic(
+    text: str, *, hard_max: int = PASSAGE_HARD_MAX_TOKENS
+) -> list[str]:
     """Split one oversized atomic element into reconstructable fragments.
 
     Args:

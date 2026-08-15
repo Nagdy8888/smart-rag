@@ -64,7 +64,9 @@ def hybrid_cache_key(
     return hashlib.sha256(encoded).hexdigest()
 
 
-def cache_payload(chunk_ids: tuple[UUID, ...], ranks: tuple[int, ...]) -> dict[str, object]:
+def cache_payload(
+    chunk_ids: tuple[UUID, ...], ranks: tuple[int, ...]
+) -> dict[str, object]:
     """Return an ID-only cache payload. Snippets are forbidden.
 
     Args:

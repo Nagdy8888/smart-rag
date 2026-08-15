@@ -30,7 +30,9 @@ class LabeledPair:
     is_near_duplicate: bool
 
 
-def apply_deduplication(chunks: list[CanonicalChunk]) -> tuple[list[CanonicalChunk], DedupMetrics]:
+def apply_deduplication(
+    chunks: list[CanonicalChunk],
+) -> tuple[list[CanonicalChunk], DedupMetrics]:
     """Apply exact and optional near deduplication while preserving provenance.
 
     Args:
@@ -65,16 +67,20 @@ def apply_deduplication(chunks: list[CanonicalChunk]) -> tuple[list[CanonicalChu
             for right in passage_chunks[index + 1 :]:
                 if right.duplicate_of_chunk_id is not None:
                     continue
-                if left.provenance.normalized_content_hash == right.provenance.normalized_content_hash:
+                if (
+                    left.provenance.normalized_content_hash
+                    == right.provenance.normalized_content_hash
+                ):
                     continue
-                if _near_similarity(left.raw_text, right.raw_text) >= NEAR_DUP_SIMILARITY_THRESHOLD:
+                if (
+                    _near_similarity(left.raw_text, right.raw_text)
+                    >= NEAR_DUP_SIMILARITY_THRESHOLD
+                ):
                     _mark_duplicate(right, left)
                     near_duplicate_pairs += 1
 
     precision, recall = (
-        measure_fuzzy_metrics(DEFAULT_FUZZY_FIXTURES)
-        if fuzzy_enabled
-        else (None, None)
+        measure_fuzzy_metrics(DEFAULT_FUZZY_FIXTURES) if fuzzy_enabled else (None, None)
     )
     return chunks, DedupMetrics(
         exact_duplicate_groups=exact_duplicate_groups,
@@ -94,7 +100,10 @@ def _mark_duplicate(duplicate: CanonicalChunk, representative: CanonicalChunk) -
     duplicate_locators = tuple(duplicate.provenance.locators)
     duplicate.provenance = duplicate.provenance.model_copy(
         update={
-            "duplicate_locators": (*duplicate.provenance.duplicate_locators, *duplicate_locators),
+            "duplicate_locators": (
+                *duplicate.provenance.duplicate_locators,
+                *duplicate_locators,
+            ),
             "dedup_mode": representative.provenance.dedup_mode,
         }
     )
@@ -138,7 +147,9 @@ def measure_fuzzy_metrics(pairs: tuple[LabeledPair, ...]) -> tuple[float, float]
     false_positive = 0
     false_negative = 0
     for pair in pairs:
-        predicted = _near_similarity(pair.text_a, pair.text_b) >= NEAR_DUP_SIMILARITY_THRESHOLD
+        predicted = (
+            _near_similarity(pair.text_a, pair.text_b) >= NEAR_DUP_SIMILARITY_THRESHOLD
+        )
         if pair.is_near_duplicate and predicted:
             true_positive += 1
         elif not pair.is_near_duplicate and predicted:

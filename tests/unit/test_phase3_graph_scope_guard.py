@@ -45,5 +45,7 @@ def test_phase3_runtime_has_no_graph_ready_or_mapping_writes() -> None:
             text = path.read_text(encoding="utf-8")
             for pattern, reason in FORBIDDEN_PATTERNS:
                 if pattern in text:
-                    violations.append(f"{path.relative_to(repo_root)}: {reason} ({pattern})")
+                    violations.append(
+                        f"{path.relative_to(repo_root)}: {reason} ({pattern})"
+                    )
     assert not violations, "\n".join(violations)

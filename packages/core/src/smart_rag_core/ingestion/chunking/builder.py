@@ -183,7 +183,11 @@ def build_hierarchical_chunks(
                 )
             )
             continue
-        if kind in {ElementKind.TABLE_HEADER, ElementKind.TABLE_CELL, ElementKind.TABLE_ROW}:
+        if kind in {
+            ElementKind.TABLE_HEADER,
+            ElementKind.TABLE_CELL,
+            ElementKind.TABLE_ROW,
+        }:
             flush_prose()
             flush_list()
             if kind is ElementKind.TABLE_HEADER and element.text:
@@ -468,7 +472,8 @@ def collect_chunking_metrics(
     hard_violations = [
         chunk
         for chunk in ordinary
-        if chunk.token_count > PASSAGE_HARD_MAX_TOKENS and not chunk.provenance.is_atomic_exception
+        if chunk.token_count > PASSAGE_HARD_MAX_TOKENS
+        and not chunk.provenance.is_atomic_exception
     ]
     return ChunkingMetrics(
         total_chunks=len(chunks),
@@ -478,6 +483,8 @@ def collect_chunking_metrics(
         ordinary_prose_in_target=len(in_target),
         overlap_violations=0,
         hard_cap_violations=len(hard_violations),
-        atomic_exceptions=sum(1 for chunk in chunks if chunk.provenance.is_atomic_exception),
+        atomic_exceptions=sum(
+            1 for chunk in chunks if chunk.provenance.is_atomic_exception
+        ),
         dedup=dedup_metrics,
     )

@@ -58,7 +58,9 @@ def test_expired_approval_denies() -> None:
 def test_contradictory_category_denies() -> None:
     """Contradictory category evidence denies external processing."""
 
-    payload = _base_allowed_input().model_copy(update={"attestation_contradictory": True})
+    payload = _base_allowed_input().model_copy(
+        update={"attestation_contradictory": True}
+    )
     decision = decide_external_processing(payload)
     assert decision.allowed is False
     assert decision.reason_code == "contradictory_category"

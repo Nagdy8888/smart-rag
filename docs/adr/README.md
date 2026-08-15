@@ -20,6 +20,7 @@ audience: engineering
 | Embedding model/dimension | accepted | 2 gate | [ADR-embedding-model-dimension.md](./ADR-embedding-model-dimension.md) |
 | Privileged Auth administration boundary | accepted | 2 | [ADR-privileged-auth-administration-boundary.md](./ADR-privileged-auth-administration-boundary.md) |
 | Upload capability / Storage privilege | accepted | 2 | [ADR-upload-capability-and-storage-privilege.md](./ADR-upload-capability-and-storage-privilege.md) |
+| CVE pin patch (lxml/Pillow; pyarrow advisory) | accepted | 4 | [ADR-cve-pin-patch-2026-08.md](./ADR-cve-pin-patch-2026-08.md) |
 | Graph eligibility / ACL isolation | planned | 2/5 | TBD |
 | PGTableGraphStorage | planned | 5 | TBD |
 | Canonical vs inference grounding | planned | 5/6 | TBD |

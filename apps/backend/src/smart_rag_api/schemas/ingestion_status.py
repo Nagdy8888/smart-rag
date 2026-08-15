@@ -120,7 +120,9 @@ class IngestionStatusResponse(BaseModel):
     embedding: EmbeddingDiagnostics = Field(default_factory=EmbeddingDiagnostics)
     bm25: Bm25Diagnostics = Field(default_factory=Bm25Diagnostics)
     queue_age: QueueAgeDiagnostics = Field(default_factory=QueueAgeDiagnostics)
-    graph_handoff: GraphHandoffDiagnostics = Field(default_factory=GraphHandoffDiagnostics)
+    graph_handoff: GraphHandoffDiagnostics = Field(
+        default_factory=GraphHandoffDiagnostics
+    )
     retry_allowed: bool = False
 
 
@@ -143,9 +145,7 @@ class DocumentIngestionStatusResponse(BaseModel):
     """Document-scoped ingestion status envelope."""
 
     version: IngestionStatusResponse
-    recent_jobs: list[IngestionJobSummary] = Field(
-        default_factory=lambda: []
-    )
+    recent_jobs: list[IngestionJobSummary] = Field(default_factory=lambda: [])
 
 
 class RetryIngestionJobResponse(BaseModel):

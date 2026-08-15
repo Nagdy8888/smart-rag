@@ -69,7 +69,9 @@ def infer_format(path: Path, media_type: str | None = None) -> str:
     raise ParserUnsupportedFormat(f"unsupported format for {path.name}")
 
 
-def parse_file(path: Path, content_hash: str, format_key: str | None = None) -> ParseResult:
+def parse_file(
+    path: Path, content_hash: str, format_key: str | None = None
+) -> ParseResult:
     """Parse one local file through the selected adapter.
 
     Args:

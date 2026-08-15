@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering, ops
 ---
 
@@ -140,10 +140,10 @@ Parser/OCR library pins (uv workspace `packages/core`):
 | python-pptx | 1.0.2 | MIT | PPTX slides/shapes/order |
 | openpyxl | 3.1.5 | MIT | XLSX typed cells/formulas |
 | beautifulsoup4 | 4.13.3 | MIT | HTML DOM + boilerplate |
-| lxml | 5.3.1 | BSD | HTML parser backend |
+| lxml | 6.1.0 | BSD | HTML parser backend |
 | markdown-it-py | 3.0.0 | MIT | Markdown token paths |
 | pytesseract | 0.3.13 | Apache-2.0 | OCR wrapper |
-| Pillow | 11.1.0 | HPND | OCR/image buffers |
+| Pillow | 12.3.0 | HPND | OCR/image buffers |
 | pydantic | 2.13.4 | MIT | ParseResult JSON in sandbox runner |
 | Tesseract (image) | distro package | Apache-2.0 | OCR engine + eng/ara traineddata |
 

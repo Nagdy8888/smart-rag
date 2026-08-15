@@ -66,7 +66,8 @@ def build_table_artifacts(
             continue
         columns = _column_manifest(rows, headers=headers.get(sheet_name, {}))
         arrow_columns = [
-            (column.column_name, _arrow_type_for_column(rows, column)) for column in columns
+            (column.column_name, _arrow_type_for_column(rows, column))
+            for column in columns
         ]
         parquet_rows: list[dict[str, Any]] = []
         for row_index, row_cells in enumerate(rows):
@@ -74,7 +75,9 @@ def build_table_artifacts(
                 ROW_INDEX_COLUMN: row_index,
                 PROVENANCE_COLUMN: provenance_json(
                     {
-                        "cells": [locator_to_dict(cell.locator) for cell in row_cells.values()],
+                        "cells": [
+                            locator_to_dict(cell.locator) for cell in row_cells.values()
+                        ],
                         "element_ids": [cell.element_id for cell in row_cells.values()],
                     }
                 ),
@@ -87,7 +90,9 @@ def build_table_artifacts(
                     _arrow_type_for_column(rows, column),
                 )
             parquet_rows.append(row_payload)
-        parquet_bytes, _schema = write_parquet_artifact(columns=arrow_columns, rows=parquet_rows)
+        parquet_bytes, _schema = write_parquet_artifact(
+            columns=arrow_columns, rows=parquet_rows
+        )
         safe_sheet = _safe_name(sheet_name or "sheet")
         storage_path = table_artifact_storage_path(
             document_id=document_id,
@@ -126,7 +131,9 @@ def _collect_headers(parse_result: ParseResult) -> dict[str | None, dict[int, st
         if element.kind is not ElementKind.TABLE_HEADER:
             continue
         sheet = _sheet_name(element.locator)
-        headers.setdefault(sheet, {})[_column_index(element.locator)] = element.text or ""
+        headers.setdefault(sheet, {})[_column_index(element.locator)] = (
+            element.text or ""
+        )
     return headers
 
 
@@ -211,13 +218,19 @@ def _column_type_name(rows: list[dict[int, Any]], ordinal: int) -> str:
     return next(iter(kinds)) if kinds else "string"
 
 
-def _arrow_type_for_column(rows: list[dict[int, Any]], column: ColumnManifest) -> pa.DataType:
+def _arrow_type_for_column(
+    rows: list[dict[int, Any]], column: ColumnManifest
+) -> pa.DataType:
     """Resolve Arrow type for one column without lossy mixed-type coercion."""
 
     if column.column_type == "string":
         return pa.string()
     sample = _first_cell(rows, column.header_ordinal)
-    metadata = dict(sample.metadata) if sample is not None else {"typed_value_kind": column.column_type}
+    metadata = (
+        dict(sample.metadata)
+        if sample is not None
+        else {"typed_value_kind": column.column_type}
+    )
     return infer_arrow_type(metadata)
 
 

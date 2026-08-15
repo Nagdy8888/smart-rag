@@ -14,7 +14,13 @@ DEFAULT_FEWSHOT_PATH = (
     REPO_ROOT / "tests" / "fixtures" / "evaluation" / "phase4" / "fewshots.json"
 )
 HOLDOUT_MANIFEST_PATH = (
-    REPO_ROOT / "tests" / "fixtures" / "evaluation" / "phase4" / "manifests" / "holdout.json"
+    REPO_ROOT
+    / "tests"
+    / "fixtures"
+    / "evaluation"
+    / "phase4"
+    / "manifests"
+    / "holdout.json"
 )
 
 

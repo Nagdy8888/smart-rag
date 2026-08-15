@@ -48,7 +48,9 @@ def test_arrow_parquet_arrow_round_trip_preserves_schema() -> None:
     assert round_trip.column("name").to_pylist() == ["Widget", "مرحبا"]
 
 
-def test_xlsx_fixture_parquet_preserves_formula_and_typed_values(tmp_path: Path) -> None:
+def test_xlsx_fixture_parquet_preserves_formula_and_typed_values(
+    tmp_path: Path,
+) -> None:
     """Spreadsheet fixtures preserve formulas and typed values without coercion."""
 
     payload, digest = build_xlsx_fixture()

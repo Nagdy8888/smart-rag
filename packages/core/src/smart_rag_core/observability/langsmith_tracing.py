@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from langsmith import (
     traceable as _langsmith_traceable,  # pyright: ignore[reportUnknownVariableType]
@@ -20,10 +20,12 @@ from langsmith.utils import (
     tracing_is_enabled as _langsmith_tracing_is_enabled,  # pyright: ignore[reportUnknownVariableType]
 )
 from openai import OpenAI
-from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 from smart_rag_core.observability.logging import current_correlation_ids
 from smart_rag_core.settings import SharedSettings
+
+if TYPE_CHECKING:
+    from openai.types.create_embedding_response import CreateEmbeddingResponse
 
 traceable = cast(Any, _langsmith_traceable)
 tracing_is_enabled = cast(Any, _langsmith_tracing_is_enabled)

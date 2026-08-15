@@ -2,7 +2,7 @@
 title: Dependency updates
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-15
 audience: engineering
 ---
 
@@ -15,5 +15,9 @@ audience: engineering
 5. Record versions in [TOOL_VERSIONS.md](./TOOL_VERSIONS.md).
 
 Never hand-edit lock package entries. Never regenerate lockfiles inside Docker images.
+
+Python `pip-audit --strict` currently ignores only `PYSEC-2026-113` (Arrow C++
+IPC pre-buffering not exposed in `pyarrow` Python bindings). See
+[ADR-cve-pin-patch-2026-08.md](../adr/ADR-cve-pin-patch-2026-08.md).
 
 [docs index](../README.md)

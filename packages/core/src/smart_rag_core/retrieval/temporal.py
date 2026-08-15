@@ -165,7 +165,5 @@ def apply_temporal_policy(
         return ()
     latest_stamp = max(stamps)
     return tuple(
-        item
-        for item in dated
-        if records[item.chunk_id].effective_at == latest_stamp
+        item for item in dated if records[item.chunk_id].effective_at == latest_stamp
     )

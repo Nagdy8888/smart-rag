@@ -38,15 +38,19 @@ REQUIRED_CATEGORIES = frozenset(
 )
 
 PROGRAMMATIC_HASH_BUILDERS: dict[str, object] = {
-    "ef05cb9b840112afa5094bc60b5bbc3793fc1b872d940dc1f875a7f3a92fcbf1": lambda: hashlib.sha256(
-        b"Line one English.\nLine two Arabic \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7.\n"
-    ).hexdigest(),
+    "ef05cb9b840112afa5094bc60b5bbc3793fc1b872d940dc1f875a7f3a92fcbf1": lambda: (
+        hashlib.sha256(
+            b"Line one English.\nLine two Arabic \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7.\n"
+        ).hexdigest()
+    ),
     "e198b316cfed2288be3d9f0264693c7d3bb60c8833b6cd6ec4e8fd28ea5da5ca": build_markdown_fixture,
     "41c65553e0993674ec0a9a0a09619a40bb8c4a47c5001ae7ed0733b05999738c": build_csv_fixture,
     "bb80f72e60ced7f5e3b044be01776d6fc9b448108b169ef35141ddcc4eff33f1": build_html_fixture,
-    "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f": lambda: hashlib.sha256(
-        b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
-    ).hexdigest(),
+    "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f": lambda: (
+        hashlib.sha256(
+            b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+        ).hexdigest()
+    ),
 }
 
 
@@ -100,7 +104,9 @@ def test_manifest_covers_required_security_and_format_categories() -> None:
     assert not missing, f"Missing categories: {sorted(missing)}"
 
 
-@pytest.mark.parametrize("row", iter_fixtures(load_manifest()), ids=lambda row: row["id"])
+@pytest.mark.parametrize(
+    "row", iter_fixtures(load_manifest()), ids=lambda row: row["id"]
+)
 def test_manifest_row_has_required_fields(row: dict[str, object]) -> None:
     """Each fixture row documents source, sensitivity, mode, and owning test."""
 

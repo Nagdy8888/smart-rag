@@ -104,7 +104,9 @@ def test_pdf_header_footer_removed(tmp_path) -> None:
     path = tmp_path / "headers.pdf"
     path.write_bytes(payload)
     result = parse_file(path, digest, "pdf")
-    assert any(removal.reason == "repeated_header_footer" for removal in result.removals)
+    assert any(
+        removal.reason == "repeated_header_footer" for removal in result.removals
+    )
 
 
 def test_html_boilerplate_removed(tmp_path) -> None:
@@ -127,7 +129,9 @@ def test_pptx_emits_slide_and_text(tmp_path) -> None:
     path.write_bytes(payload)
     result = parse_file(path, digest, "pptx")
     assert any(element.kind.value == "slide_break" for element in result.elements)
-    assert any((element.text or "").startswith("Slide caption") for element in result.elements)
+    assert any(
+        (element.text or "").startswith("Slide caption") for element in result.elements
+    )
 
 
 def test_xlsx_formula_not_recalculated(tmp_path) -> None:

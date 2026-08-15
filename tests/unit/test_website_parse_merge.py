@@ -15,7 +15,9 @@ from smart_rag_core.ingestion.parser.website import merge_website_parse_results
 
 
 def _page(text: str, content_hash: str) -> ParseResult:
-    locator = HtmlLocator(dom_path=("body", "p"), element_index=0, source_url="https://example.test/")
+    locator = HtmlLocator(
+        dom_path=("body", "p"), element_index=0, source_url="https://example.test/"
+    )
     element = TypedElement(
         element_id=content_hash[:32],
         kind=ElementKind.PARAGRAPH,

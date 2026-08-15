@@ -66,6 +66,7 @@ INDEPENDENT_SME_STATUS = "independently_sealed"
 
 GateStatus = Literal[
     "pass",
+    "pass_open_split",
     "fixture_only",
     "unverified",
     "deferred",
@@ -106,6 +107,8 @@ class FreezeGate(BaseModel):
         gate_id: Stable ``QUALITY_TARGETS.md`` identifier.
         title: Short human label.
         status: Measurement posture. ``blocker`` prevents a launch claim.
+            ``pass_open_split`` is live Packet 9 evidence on unsealed splits
+            only; it is not a holdout pass.
         signed_target: Signed numeric or policy target.
         evidence: Where the status was proven or why it is unverified.
     """
@@ -357,21 +360,23 @@ def _ablations() -> tuple[FreezeAblation, ...]:
 
 
 def _gates() -> tuple[FreezeGate, ...]:
-    """Return signed-target statuses without inventing live metrics.
+    """Return signed-target statuses, including Packet 9 open-split measurements.
 
     Returns:
-        Gate rows. Blockers force ``no_go``.
+        Gate rows. Blockers force ``no_go``. ``pass_open_split`` is not a
+        holdout pass and does not clear launch.
     """
 
     return (
         FreezeGate(
             gate_id="QT-EVAL-001",
             title="Zero ACL leaks",
-            status="fixture_only",
+            status="pass_open_split",
             signed_target="0 leaks",
             evidence=(
-                "Hybrid and table RPC IDOR fixtures pass; 405-case live Hybrid "
-                "ACL slice not ranked-ID measured"
+                "Packet 9 live ranked-ID ACL leak count 0 on Phase-4-owned "
+                "development/qualification; full 405-case ACL still not a "
+                "holdout run"
             ),
         ),
         FreezeGate(
@@ -379,7 +384,10 @@ def _gates() -> tuple[FreezeGate, ...]:
             title="Citation correctness",
             status="blocker",
             signed_target=">=98%",
-            evidence="Answer assembler is Phase 6; BM25 snippets are not evidence",
+            evidence=(
+                "Packet 9 locator correctness **1.00** on returned Hybrid units "
+                "(open splits). Answer/citation assembler remains Phase 6"
+            ),
         ),
         FreezeGate(
             gate_id="QT-EVAL-003",
@@ -398,23 +406,26 @@ def _gates() -> tuple[FreezeGate, ...]:
         FreezeGate(
             gate_id="QT-EVAL-006",
             title="Hybrid Recall@10",
-            status="blocker",
+            status="pass_open_split",
             signed_target=">=85%",
-            evidence="No live ranked-ID Hybrid run on the 405-case corpus",
+            evidence=(
+                "Packet 9 live ranked-ID development **0.902** / qualification "
+                "**0.868** on Phase-4-owned classes; holdout sealed"
+            ),
         ),
         FreezeGate(
             gate_id="QT-EVAL-007",
             title="Exact-code Recall@5",
-            status="blocker",
+            status="pass_open_split",
             signed_target=">=98%",
-            evidence="Term RPC fixtures exist; labeled Recall@5 unverified",
+            evidence="Packet 9 live **1.00** development and qualification",
         ),
         FreezeGate(
             gate_id="QT-EVAL-008",
             title="Approved-alias Recall@10",
-            status="blocker",
+            status="pass_open_split",
             signed_target=">=95%",
-            evidence="Glossary coverage hashes exist; labeled Recall@10 unverified",
+            evidence="Packet 9 live **1.00** development and qualification",
         ),
         FreezeGate(
             gate_id="QT-EVAL-009",
@@ -468,9 +479,12 @@ def _gates() -> tuple[FreezeGate, ...]:
         FreezeGate(
             gate_id="QT-LAT-001",
             title="Hybrid first evidence p95",
-            status="unverified",
+            status="pass_open_split",
             signed_target="<=2s",
-            evidence="MOCK_MODEL_MODE; no envelope p95 trace",
+            evidence=(
+                "Packet 9 live development **785 ms** / qualification **601 ms** "
+                "(retrieve path, not first answer token)"
+            ),
         ),
         FreezeGate(
             gate_id="QT-LAT-006",
@@ -589,8 +603,8 @@ def build_phase4_freeze_report() -> Phase4FreezeReport:
     }
     reason = (
         "sealed holdout labels were not materialized; corpus SME status is "
-        f"{sme_status}, not {INDEPENDENT_SME_STATUS}; live ranked-ID Hybrid "
-        "and citation gates are unverified"
+        f"{sme_status}, not {INDEPENDENT_SME_STATUS}; Packet 9 measured "
+        "Phase-4-owned open-split ranked-ID gates without opening holdout"
     )
     return Phase4FreezeReport(
         launch_decision=LAUNCH_DECISION_NO_GO,
@@ -646,7 +660,7 @@ def render_freeze_markdown(report: Phase4FreezeReport) -> str:
             "title: Phase 4 Packet 8 freeze",
             "owner: engineering-lead",
             "status: draft",
-            "last-reviewed: 2026-08-14",
+            "last-reviewed: 2026-08-15",
             "audience: engineering, reviewers, client-approver",
             "---",
             "",

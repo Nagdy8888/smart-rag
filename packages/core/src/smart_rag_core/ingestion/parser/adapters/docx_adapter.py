@@ -38,7 +38,9 @@ def parse_docx(path: Path, content_hash: str, format_key: str) -> ParseResult:
     block_index = 0
     for index, block in enumerate(document.element.body):
         if block_index > DOCX_MAX_BLOCKS:
-            raise ParserLimitExceeded("blocks", f"block count exceeds {DOCX_MAX_BLOCKS}")
+            raise ParserLimitExceeded(
+                "blocks", f"block count exceeds {DOCX_MAX_BLOCKS}"
+            )
         block_path = (index,)
         if isinstance(block, CT_P):
             paragraph = Paragraph(block, document)
@@ -67,7 +69,11 @@ def parse_docx(path: Path, content_hash: str, format_key: str) -> ParseResult:
             elements.append(
                 TypedElement(
                     element_id=element_id(
-                        content_hash, block_index, ElementKind.TABLE, table_locator, None
+                        content_hash,
+                        block_index,
+                        ElementKind.TABLE,
+                        table_locator,
+                        None,
                     ),
                     kind=ElementKind.TABLE,
                     text=None,
@@ -97,7 +103,9 @@ def parse_docx(path: Path, content_hash: str, format_key: str) -> ParseResult:
         TypedElement(**element.model_dump() | {"reading_order": index})
         for index, element in enumerate(elements)
     )
-    config_hash = ParseResult.stable_config_hash(PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION)
+    config_hash = ParseResult.stable_config_hash(
+        PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION
+    )
     return ParseResult(
         disposition=ParseDisposition.SUPPORTED,
         format=format_key,

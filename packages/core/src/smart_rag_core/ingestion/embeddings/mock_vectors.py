@@ -9,7 +9,9 @@ import struct
 from smart_rag_core.ingestion.embeddings.policy import EMBEDDING_DIMENSIONS
 
 
-def mock_embedding_vector(text: str, *, dimensions: int = EMBEDDING_DIMENSIONS) -> list[float]:
+def mock_embedding_vector(
+    text: str, *, dimensions: int = EMBEDDING_DIMENSIONS
+) -> list[float]:
     """Return a finite unit-normalized vector derived from input text.
 
     Args:

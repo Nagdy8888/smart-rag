@@ -28,8 +28,7 @@ def table_artifact_storage_path(
     """
 
     return (
-        f"documents/{document_id}/versions/{version_id}/tables/"
-        f"{sheet_name}/{filename}"
+        f"documents/{document_id}/versions/{version_id}/tables/{sheet_name}/{filename}"
     )
 
 

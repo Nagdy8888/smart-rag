@@ -75,7 +75,9 @@ def test_rrf_is_max_not_sum_and_order_invariant() -> None:
 def test_caps_hold_across_variants() -> None:
     """Dense variants cannot multiply the 100-candidate cap."""
 
-    overflow = tuple(_candidate(rank=index) for index in range(1, DENSE_CANDIDATE_CAP + 20))
+    overflow = tuple(
+        _candidate(rank=index) for index in range(1, DENSE_CANDIDATE_CAP + 20)
+    )
     fused = fuse_channels(dense=(overflow, overflow, overflow))
     assert len(fused) <= PREFUSION_UNION_CAP
     assert len({item.chunk_id for item in fused}) == len(fused)

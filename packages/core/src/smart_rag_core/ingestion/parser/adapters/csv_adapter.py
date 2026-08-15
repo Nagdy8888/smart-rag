@@ -40,8 +40,10 @@ def parse_csv(path: Path, content_hash: str, format_key: str) -> ParseResult:
     byte_offset = 0
     for record_index, row in enumerate(rows):
         for column_index, value in enumerate(row):
-            header_text = headers[column_index] if record_index > 0 and column_index < len(headers) else (
-                value if record_index == 0 else None
+            header_text = (
+                headers[column_index]
+                if record_index > 0 and column_index < len(headers)
+                else (value if record_index == 0 else None)
             )
             if record_index == 0:
                 kind = ElementKind.TABLE_HEADER
@@ -68,7 +70,9 @@ def parse_csv(path: Path, content_hash: str, format_key: str) -> ParseResult:
             order += 1
             byte_offset = locator.byte_end or byte_offset
     elements_tuple = tuple(elements)
-    config_hash = ParseResult.stable_config_hash(PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION)
+    config_hash = ParseResult.stable_config_hash(
+        PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION
+    )
     return ParseResult(
         disposition=ParseDisposition.SUPPORTED,
         format=format_key,

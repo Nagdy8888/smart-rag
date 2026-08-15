@@ -93,7 +93,10 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                             geometry_h=float(shape.height),
                         ),
                         media_only=True,
-                        metadata={"unsupported_region": True, "smartart_or_group": True},
+                        metadata={
+                            "unsupported_region": True,
+                            "smartart_or_group": True,
+                        },
                     )
                 )
                 order += 1
@@ -154,7 +157,9 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
             order += 1
 
     elements_tuple = tuple(elements)
-    config_hash = ParseResult.stable_config_hash(PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION)
+    config_hash = ParseResult.stable_config_hash(
+        PARSER_CONFIG_VERSION, CLEANING_POLICY_VERSION
+    )
     return ParseResult(
         disposition=ParseDisposition.SUPPORTED,
         format=format_key,

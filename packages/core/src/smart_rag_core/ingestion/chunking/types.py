@@ -87,4 +87,3 @@ class ChunkingResult(BaseModel):
     table_artifacts: tuple[TableArtifactBundle, ...] = Field(default_factory=tuple)
     metrics: ChunkingMetrics = Field(default_factory=ChunkingMetrics)
     config_hash: str
-

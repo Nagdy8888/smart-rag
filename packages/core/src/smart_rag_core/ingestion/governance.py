@@ -18,7 +18,9 @@ from smart_rag_core.security.external_processing import (
 _CARD_PATTERN = re.compile(r"\b(?:\d[ -]*?){13,19}\b")
 _SECRET_PATTERN = re.compile(r"(?i)\b(api[_-]?key|secret|password|token|credential)\b")
 _NATIONAL_ID_PATTERN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-_HEALTH_MARKER_PATTERN = re.compile(r"(?i)\b(patient|diagnosis|phi|hipaa|medical record)\b")
+_HEALTH_MARKER_PATTERN = re.compile(
+    r"(?i)\b(patient|diagnosis|phi|hipaa|medical record)\b"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,7 +184,9 @@ def evaluate_extraction_governance(
             or decision_input.review_approved
         )
     )
-    detail = external.detail if not promotion_allowed else "extraction governance passed"
+    detail = (
+        external.detail if not promotion_allowed else "extraction governance passed"
+    )
     return ExtractionGovernanceResult(
         category=category,
         detector_results=detectors,
@@ -214,6 +218,8 @@ def _run_detectors(
     results: list[DetectorResult] = []
     for pattern in families:
         results.append(
-            DetectorResult.POSITIVE if pattern.search(haystack) else DetectorResult.CLEAN
+            DetectorResult.POSITIVE
+            if pattern.search(haystack)
+            else DetectorResult.CLEAN
         )
     return tuple(results)

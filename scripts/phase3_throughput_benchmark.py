@@ -226,10 +226,16 @@ def _drive_hybrid_ready(
 
     postgres_url = resolve_supabase_db_url()
     parade_url = packet8_paradedb_url()
-    if try_connect(postgres_url) is None or not paradedb_host_reachable() or parade_url is None:
+    if (
+        try_connect(postgres_url) is None
+        or not paradedb_host_reachable()
+        or parade_url is None
+    ):
         return False, None, None, "stack_unavailable"
     text_payload, _text_digest = build_pdf_text_fixture()
-    text_parsed = parse_local_bytes(text_payload, filename="bench.pdf", format_key="pdf")
+    text_parsed = parse_local_bytes(
+        text_payload, filename="bench.pdf", format_key="pdf"
+    )
     started = time.perf_counter()
     text_ok, text_detail = _drive_one_hybrid_ready(
         postgres_url=postgres_url,

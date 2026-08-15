@@ -22,7 +22,9 @@ def _require_live_proxy() -> str:
             response = client.get(f"{base}/health")
     except httpx.HTTPError:
         if read_process_env("SMART_RAG_REQUIRE_CRAWL_PROXY") == "1":
-            pytest.fail(f"SMART_RAG_REQUIRE_CRAWL_PROXY=1 but proxy unreachable at {base}")
+            pytest.fail(
+                f"SMART_RAG_REQUIRE_CRAWL_PROXY=1 but proxy unreachable at {base}"
+            )
         pytest.skip(f"crawl-proxy overlay unreachable at {base}")
     if response.status_code != 200:
         if read_process_env("SMART_RAG_REQUIRE_CRAWL_PROXY") == "1":

@@ -39,7 +39,9 @@ class DuckdbSandbox:
         if not self.allowed_parquet.is_file():
             raise DuckdbSandboxError("allowed parquet fixture must exist")
 
-    def query_fixture(self, *, column: str, limit: int = 10) -> list[tuple[object, ...]]:
+    def query_fixture(
+        self, *, column: str, limit: int = 10
+    ) -> list[tuple[object, ...]]:
         """Run a bounded SELECT against the allowed Parquet fixture.
 
         Args:
@@ -59,7 +61,9 @@ class DuckdbSandbox:
         self._validate_sql(sql)
         connection = duckdb.connect(database=":memory:")
         try:
-            parquet_literal = self.allowed_parquet.resolve().as_posix().replace("'", "''")
+            parquet_literal = (
+                self.allowed_parquet.resolve().as_posix().replace("'", "''")
+            )
             connection.execute(
                 f"CREATE VIEW allowed_fixture AS SELECT * FROM read_parquet('{parquet_literal}')"  # noqa: S608
             )
@@ -88,7 +92,9 @@ class DuckdbSandbox:
             raise DuckdbSandboxError("only SELECT queries are permitted")
         allowed_path = self.allowed_parquet.resolve().as_posix()
         if "read_parquet" in stripped.lower() and allowed_path not in stripped:
-            raise DuckdbSandboxError("read_parquet must reference the allowed fixture only")
+            raise DuckdbSandboxError(
+                "read_parquet must reference the allowed fixture only"
+            )
         for pattern in _BLOCKED_PATTERNS:
             if pattern.search(stripped):
                 raise DuckdbSandboxError(f"blocked SQL construct: {pattern.pattern}")

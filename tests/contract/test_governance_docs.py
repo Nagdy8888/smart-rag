@@ -47,4 +47,6 @@ def test_claimed_status_without_approver_is_rejected(
         (incomplete, sibling),
     )
     errors = check_docs.check_governance_signoff()
-    assert any("without required frontmatter field 'approver'" in item for item in errors)
+    assert any(
+        "without required frontmatter field 'approver'" in item for item in errors
+    )

@@ -92,9 +92,7 @@ def validate_lease(
     lease_owner = configurable.get("lease_owner")
     lease_seconds_raw = configurable.get("job_lease_seconds", 300)
     lease_seconds = (
-        int(lease_seconds_raw)
-        if isinstance(lease_seconds_raw, int)
-        else 300
+        int(lease_seconds_raw) if isinstance(lease_seconds_raw, int) else 300
     )
     if not isinstance(postgres_url, str) or not isinstance(lease_owner, str):
         return {

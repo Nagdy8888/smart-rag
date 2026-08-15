@@ -180,7 +180,9 @@ def _boolean_f1(pairs: list[tuple[bool, bool]]) -> float:
     return _f1(true_positive, false_positive, false_negative)
 
 
-def _aligned_codes(case: EvaluationCase, profile: ExpectedProfile) -> tuple[list[str], list[str]]:
+def _aligned_codes(
+    case: EvaluationCase, profile: ExpectedProfile
+) -> tuple[list[str], list[str]]:
     """Score only codes that appear in the query.
 
     Packet 1 labels sometimes attach the class index code even when it is not
@@ -194,12 +196,18 @@ def _aligned_codes(case: EvaluationCase, profile: ExpectedProfile) -> tuple[list
         Aligned gold and predicted code lists.
     """
 
-    gold = [item for item in _as_list(case.expected_profile.codes.value) if item in case.query]
+    gold = [
+        item
+        for item in _as_list(case.expected_profile.codes.value)
+        if item in case.query
+    ]
     pred = [item for item in _as_list(profile.codes.value) if item in case.query]
     return gold, pred
 
 
-def _aligned_entities(case: EvaluationCase, profile: ExpectedProfile) -> tuple[list[str], list[str]]:
+def _aligned_entities(
+    case: EvaluationCase, profile: ExpectedProfile
+) -> tuple[list[str], list[str]]:
     """Align entities to in-query codes plus resolved aliases.
 
     Args:
@@ -214,7 +222,8 @@ def _aligned_entities(case: EvaluationCase, profile: ExpectedProfile) -> tuple[l
     gold = [
         item
         for item in gold_raw
-        if item in case.query or item in _as_list(case.expected_profile.approved_aliases.value)
+        if item in case.query
+        or item in _as_list(case.expected_profile.approved_aliases.value)
     ]
     return gold, _as_list(profile.entities.value)
 
@@ -231,7 +240,9 @@ def _score_row(name: str, value: float, threshold: float) -> FieldScore:
         Field score.
     """
 
-    return FieldScore(name=name, value=value, threshold=threshold, passed=value + 1e-12 >= threshold)
+    return FieldScore(
+        name=name, value=value, threshold=threshold, passed=value + 1e-12 >= threshold
+    )
 
 
 def score_cases(cases: list[EvaluationCase], *, split: str) -> ProfileEvalReport:
@@ -282,12 +293,17 @@ def score_cases(cases: list[EvaluationCase], *, split: str) -> ProfileEvalReport
         gold = case.expected_profile
         languages.append((str(gold.language.value), str(predicted.language.value)))
         locales.append(
-            (str(gold.locale_configuration.value), str(predicted.locale_configuration.value))
+            (
+                str(gold.locale_configuration.value),
+                str(predicted.locale_configuration.value),
+            )
         )
         temporals.append(
             (str(gold.temporal_intent.value), str(predicted.temporal_intent.value))
         )
-        query_types.append((str(gold.query_type.value), str(predicted.query_type.value)))
+        query_types.append(
+            (str(gold.query_type.value), str(predicted.query_type.value))
+        )
         g_codes, p_codes = _aligned_codes(case, predicted)
         code_gold.append(g_codes)
         code_pred.append(p_codes)
@@ -301,9 +317,14 @@ def score_cases(cases: list[EvaluationCase], *, split: str) -> ProfileEvalReport
         filter_gold.append(_as_list(gold.metadata_filters.value))
         filter_pred.append(_as_list(predicted.metadata_filters.value))
         rel_pairs.append(
-            (bool(gold.relationship_intent.value), bool(predicted.relationship_intent.value))
+            (
+                bool(gold.relationship_intent.value),
+                bool(predicted.relationship_intent.value),
+            )
         )
-        table_pairs.append((bool(gold.table_intent.value), bool(predicted.table_intent.value)))
+        table_pairs.append(
+            (bool(gold.table_intent.value), bool(predicted.table_intent.value))
+        )
         media_pairs.append(
             (bool(gold.media_dependence.value), bool(predicted.media_dependence.value))
         )
@@ -313,7 +334,9 @@ def score_cases(cases: list[EvaluationCase], *, split: str) -> ProfileEvalReport
                 bool(predicted.historical_relationship.value),
             )
         )
-        scope_pairs.append((str(gold.document_scope.value), str(predicted.document_scope.value)))
+        scope_pairs.append(
+            (str(gold.document_scope.value), str(predicted.document_scope.value))
+        )
         neg_pairs.append(
             (str(gold.negation_scope.value), str(predicted.negation_scope.value))
         )
@@ -362,7 +385,9 @@ def score_cases(cases: list[EvaluationCase], *, split: str) -> ProfileEvalReport
     type_bundle = min(type_f1, rel_f1, table_f1, decomp_f1)
     temporal_f1 = _macro_f1(temporals)
     scores = (
-        _score_row("language_configuration_accuracy", lang_config, LANGUAGE_ACCURACY_MIN),
+        _score_row(
+            "language_configuration_accuracy", lang_config, LANGUAGE_ACCURACY_MIN
+        ),
         _score_row("temporal_macro_f1", temporal_f1, TEMPORAL_MACRO_F1_MIN),
         _score_row("code_date_f1", code_date_f1, CODE_DATE_F1_MIN),
         _score_row("entity_alias_macro_f1", entity_alias, ENTITY_ALIAS_MACRO_F1_MIN),

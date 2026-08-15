@@ -57,6 +57,9 @@ def test_entrypoints_import_without_network_or_provider_construction() -> None:
         fake_openai = types.ModuleType("openai")
         fake_openai.OpenAI = Trap
         fake_openai.AsyncOpenAI = Trap
+        fake_openai.APIStatusError = Exception
+        fake_openai.APITimeoutError = Exception
+        fake_openai.AuthenticationError = Exception
         sys.modules["openai"] = fake_openai
         socket.create_connection = denied_socket
         socket.getaddrinfo = denied_socket

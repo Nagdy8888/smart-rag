@@ -36,7 +36,9 @@ def element_id(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
 
 
-def build_coverage(elements: tuple[TypedElement, ...], removed: int = 0) -> CoverageAccounting:
+def build_coverage(
+    elements: tuple[TypedElement, ...], removed: int = 0
+) -> CoverageAccounting:
     """Compute coverage accounting from emitted elements.
 
     Args:
@@ -47,7 +49,9 @@ def build_coverage(elements: tuple[TypedElement, ...], removed: int = 0) -> Cove
         Coverage metrics with char coverage ratio.
     """
 
-    text_elements = [element for element in elements if element.text and element.text.strip()]
+    text_elements = [
+        element for element in elements if element.text and element.text.strip()
+    ]
     media_only = [element for element in elements if element.media_only]
     unsupported = [
         element
