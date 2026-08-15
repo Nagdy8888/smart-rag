@@ -11,7 +11,7 @@ audience: engineering
 
 **Owning phase:** 4 Packet 3. Thresholds live in [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) QT-QP-*.
 
-Packet 1 froze labels in [DATASET_SPEC.md](./DATASET_SPEC.md) and [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md). Packet 3 scores each field independently on development then qualification and stores the first failing stage. Holdout remains sealed.
+Packet 1 froze labels in [DATASET_SPEC.md](./DATASET_SPEC.md) and [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md). Packet 3 scores each field independently on development then qualification and stores the first failing stage. Holdout remains sealed. The Packet 9 QueryType map is in [QueryType to Phase 6 family](./DATASET_SPEC.md#querytype-to-phase-6-family); it does not change QT-QP or weaken `model_calls == 0`.
 
 Related: [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md) ·
 [prompt changelog](../../apps/agents/src/smart_rag_agents/prompts/CHANGELOG.md) ·

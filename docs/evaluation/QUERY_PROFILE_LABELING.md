@@ -10,7 +10,7 @@ audience: engineering, SME
 
 Labeling contract for expected query-profile fields. Packet 3 scores these fields; Packet 1 only freezes the schema and synthetic labels.
 
-Related: [DATASET_SPEC.md](./DATASET_SPEC.md) · [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md) · [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
+Related: [DATASET_SPEC.md](./DATASET_SPEC.md) · [QueryType to Phase 6 family](./DATASET_SPEC.md#querytype-to-phase-6-family) · [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md) · [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
 
 ## Field contract
 

@@ -10,7 +10,7 @@ audience: engineering, SME, reviewers
 
 Canonical labeled-corpus contract for Hybrid RAG. Runtime retrieval is Packet 2+. This file freezes schema, class minima, split isolation, holdout access, and synthetic SME posture.
 
-Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
+Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Schema version
 
@@ -51,7 +51,7 @@ Every case has an immutable `case_id`, a `source_family_id` that cannot cross sp
 | media_limitation | 5 | Phase 4 |
 | prompt_injection | 30 | Phase 6 label only |
 
-Graph, Combined, tool, and frontend labels do not make Phase 4 pass.
+Graph, Combined, tool, and frontend labels do not make Phase 4 pass. The frozen `QueryType` values those classes carry still have a Phase 6 family in [QueryType to Phase 6 family](#querytype-to-phase-6-family); executing Combined or inspection is not a Phase 4 pass.
 
 ## Split isolation
 
@@ -104,6 +104,48 @@ This Packet 1 corpus is synthetic and provisionally accepted so Hybrid packets c
 
 Phase 4 Recall@10 / code Recall@5 / alias Recall@10 population is `runtime_owner=phase_4` cases on development then qualification only.
 
+## QueryType to Phase 6 family
+
+Frozen Phase 4 `QueryType` members do not change. Packet 9 records the Phase 6 route family each member selects so later routing can consume a typed contract. Implementation: `packages/core/src/smart_rag_core/query_profile/phase6_map.py`. Field meanings live in [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md). QT-QP still requires `model_calls == 0` on the deterministic extract path; see [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md).
+
+This section does not implement Phase 6 routing. `graph_inspection` and `no_retrieval` are Phase-6-only family names on the map output type; they are not Phase 4 `QueryType` values and cannot be produced from `QueryType` alone.
+
+```mermaid
+flowchart TD
+    exactId["exact_identifier"]
+    factual["factual"]
+    semantic["semantic_conceptual"]
+    multiPart["multi_part"]
+    relHop["relationship_multi_hop"]
+    broad["broad_summary"]
+    tabular["structured_tabular_aggregation"]
+    hybridFam["Hybrid"]
+    combinedFam["Combined"]
+    tableFam["StructuredTable"]
+    scopedFam["ScopedRefusal"]
+    exactId --> hybridFam
+    factual --> hybridFam
+    semantic --> hybridFam
+    multiPart -->|"comparison subset"| hybridFam
+    relHop -->|"current QueryClass.relationship or multi_hop"| combinedFam
+    relHop -->|"historical_relationship"| hybridFam
+    broad -->|"ordinary synthesis"| hybridFam
+    broad -->|"incomplete section coverage"| scopedFam
+    tabular --> tableFam
+```
+
+| Phase 4 `QueryType` | Phase 6 family | Notes |
+| --- | --- | --- |
+| `exact_identifier` | Hybrid | Phase 4 may execute when `runtime_owner=phase_4` |
+| `factual` | Hybrid | Same |
+| `semantic_conceptual` | Hybrid | Same |
+| `multi_part` | Hybrid | Comparison is a subset of `multi_part`, not its own `QueryType`. Phase 6 may label Composite when mixed families are required |
+| `relationship_multi_hop` | Combined, or Hybrid + `temporal_graph_limitation` | `QueryClass.relationship` versus `multi_hop` distinguish kind; historical/`as_of` stays Hybrid. Runtime owner is Phase 5/6 |
+| `broad_summary` | Hybrid or scoped refusal | Whole-document claims need `section_coverage_ratio=1.0` |
+| `structured_tabular_aggregation` | StructuredTable | Numeric aggregation |
+
+Phase 4 may execute the mapped family only when `class_runtime_owner` is `phase_4`. Relationship, multi-hop, graph-mapping, and prompt-injection labels remain later-phase runtime even though their `QueryType` still maps.
+
 ## Verification
 
 ```powershell
@@ -111,7 +153,7 @@ uv run python scripts/seal_phase4_dataset.py
 uv run python scripts/validate_phase4_dataset.py
 uv run python scripts/eval_coverage_calibration.py
 uv run python scripts/eval_coverage_qualification.py
-uv run pytest tests/unit/test_phase4_dataset.py tests/unit/test_hybrid_coverage.py tests/unit/test_glossary_validation.py tests/unit/test_glossary_openapi.py -q
+uv run pytest tests/unit/test_phase4_dataset.py tests/unit/test_hybrid_coverage.py tests/unit/test_glossary_validation.py tests/unit/test_glossary_openapi.py tests/unit/test_phase6_querytype_map.py -q
 ```
 
 [docs index](../README.md)
