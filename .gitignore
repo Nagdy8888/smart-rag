@@ -69,3 +69,9 @@ supabase/.branches/
 
 # OS / editor backups
 *~
+
+# Phase 4 Packet 9 generated Hybrid Ready eval corpus (schema/README stay tracked)
+tests/fixtures/evaluation/phase4/runtime/sources/
+tests/fixtures/evaluation/phase4/runtime/gold_id_map.json
+tests/fixtures/evaluation/phase4/runtime/*.parquet
+

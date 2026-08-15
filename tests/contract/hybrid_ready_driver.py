@@ -1,7 +1,8 @@
-"""Drive a synthetic parse→chunk→mock-embed→canonical→BM25 Hybrid Ready path.
+"""Drive a synthetic parse→chunk→embed→canonical→BM25 Hybrid Ready path.
 
-Packet 8 uses this helper from contract tests and the throughput script. Real
-OpenAI embeddings are never called.
+Packet 8/9 contract tests and eval materialization use this helper. Embeddings
+go through ``create_embedding_gateway(settings)`` so live-or-mock matches query
+time. ``MOCK_MODEL_MODE=true`` (the settings default) keeps the mock adapter.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import psycopg
-from smart_rag_core.gateways.embedding import EmbeddingGateway, MockEmbeddingAdapter
+from smart_rag_core.gateways.embedding import create_embedding_gateway
 from smart_rag_core.ingestion.bm25_projection import Bm25ProjectionService
 from smart_rag_core.ingestion.canonical.repository import CanonicalRepository
 from smart_rag_core.ingestion.chunking import chunk_parse_result
@@ -29,6 +30,7 @@ from smart_rag_core.security.external_processing import (
     ContentClass,
     ExternalProcessingDecisionInput,
 )
+from smart_rag_core.settings import SharedSettings
 
 from tests.contract.integration_support import ensure_paradedb_bm25_index
 
@@ -51,29 +53,44 @@ def persist_parse_to_bm25_outbox(
     parse_result: ParseResult,
     title: str,
     filename: str,
+    settings: SharedSettings | None = None,
+    visibility: str = "company_visible",
 ) -> tuple[UUID, UUID, UUID]:
-    """Create a version, embed with the mock gateway, and enqueue BM25.
+    """Create a version, embed through the shared gateway, and enqueue BM25.
 
     Args:
         supabase: Open worker-capable connection (caller sets role).
         parse_result: Closed parser output for one file or merged website.
         title: Document title.
         filename: Original filename for search-term extraction.
+        settings: Optional deployable settings. When omitted, mock-model mode
+            is forced so Packet 8 contract tests do not inherit a live
+            ``MOCK_MODEL_MODE=false`` process environment.
+        visibility: ``company_visible`` or ``restricted``. Restricted gold is
+            never inserted as globally public.
 
     Returns:
         ``(document_id, version_id, bm25_job_id)``.
+
+    Raises:
+        ValueError: If ``visibility`` is not an allow-listed enum value.
 
     Side Effects:
         Inserts document, version, chunks, embedding ledger, and BM25 outbox.
     """
 
+    if visibility not in {"company_visible", "restricted"}:
+        raise ValueError("visibility must be company_visible or restricted")
     document_id = uuid4()
     version_id = uuid4()
     supabase.execute("SET ROLE postgres")
     with supabase.cursor() as cursor:
         cursor.execute(
-            "INSERT INTO app.documents (id, title) VALUES (%s, %s)",
-            (document_id, title),
+            """
+            INSERT INTO app.documents (id, title, visibility)
+            VALUES (%s, %s, %s::app.document_visibility)
+            """,
+            (document_id, title, visibility),
         )
         cursor.execute(
             """
@@ -90,7 +107,9 @@ def persist_parse_to_bm25_outbox(
         document_id=document_id,
         version_id=version_id,
     )
-    gateway = EmbeddingGateway(MockEmbeddingAdapter(fixture_id="phase3-packet8"))
+    gateway = create_embedding_gateway(
+        settings if settings is not None else SharedSettings(mock_model_mode=True)
+    )
     embedding_service = EmbeddingService(supabase, gateway=gateway)
     embedding = embedding_service.embed_version(
         EmbeddingBatchInput(
@@ -169,6 +188,62 @@ def mark_bm25_job_processing(supabase: psycopg.Connection, job_id: UUID) -> None
         )
 
 
+def list_persisted_chunk_texts(
+    supabase: psycopg.Connection, version_id: UUID
+) -> tuple[tuple[UUID, str], ...]:
+    """Return persisted chunk ids and raw text for sidecar gold matching.
+
+    Args:
+        supabase: Open Postgres connection.
+        version_id: Canonical version identifier.
+
+    Returns:
+        Ordered ``(chunk_id, raw_text)`` pairs.
+    """
+
+    supabase.execute("SET ROLE postgres")
+    with supabase.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, raw_text
+            FROM app.document_chunks
+            WHERE version_id = %s
+            ORDER BY chunk_index ASC
+            """,
+            (version_id,),
+        )
+        rows = cursor.fetchall()
+    return tuple((UUID(str(row[0])), str(row[1] or "")) for row in rows)
+
+
+def list_persisted_table_ids(
+    supabase: psycopg.Connection, version_id: UUID
+) -> tuple[UUID, ...]:
+    """Return persisted table artifact ids for one version.
+
+    Args:
+        supabase: Open Postgres connection.
+        version_id: Canonical version identifier.
+
+    Returns:
+        Table UUIDs in insert order.
+    """
+
+    supabase.execute("SET ROLE postgres")
+    with supabase.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id
+            FROM app.document_tables
+            WHERE version_id = %s
+            ORDER BY created_at ASC
+            """,
+            (version_id,),
+        )
+        rows = cursor.fetchall()
+    return tuple(UUID(str(row[0])) for row in rows)
+
+
 def drive_hybrid_ready(
     *,
     supabase_url: str,
@@ -176,6 +251,8 @@ def drive_hybrid_ready(
     parse_result: ParseResult,
     title: str,
     filename: str,
+    settings: SharedSettings | None = None,
+    visibility: str = "company_visible",
 ) -> HybridReadyDriveResult:
     """Persist canonical rows, project BM25, and finalize Hybrid Ready.
 
@@ -185,20 +262,25 @@ def drive_hybrid_ready(
         parse_result: Closed parser output.
         title: Document title.
         filename: Original filename.
+        settings: Optional settings for ``create_embedding_gateway``.
+        visibility: Document visibility used at insert time.
 
     Returns:
         Drive outcome including public version status.
     """
 
     ensure_paradedb_bm25_index()
-    with psycopg.connect(supabase_url) as supabase, psycopg.connect(
-        parade_url, connect_timeout=8
-    ) as parade:
+    with (
+        psycopg.connect(supabase_url) as supabase,
+        psycopg.connect(parade_url, connect_timeout=8) as parade,
+    ):
         document_id, version_id, bm25_job_id = persist_parse_to_bm25_outbox(
             supabase,
             parse_result=parse_result,
             title=title,
             filename=filename,
+            settings=settings,
+            visibility=visibility,
         )
         supabase.execute("SET ROLE app_worker")
         mark_bm25_job_processing(supabase, bm25_job_id)

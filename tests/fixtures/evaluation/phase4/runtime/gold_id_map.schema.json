@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "phase4-gold-id-map-v1",
+  "title": "Phase 4 gold-id sidecar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "holdout_opened",
+    "runtime_owner",
+    "splits",
+    "case_count",
+    "records"
+  ],
+  "properties": {
+    "schema_version": { "const": "phase4-gold-id-map-v1" },
+    "holdout_opened": { "const": false },
+    "runtime_owner": { "const": "phase_4" },
+    "splits": {
+      "type": "array",
+      "items": { "enum": ["development", "qualification"] }
+    },
+    "case_count": { "type": "integer", "minimum": 0 },
+    "sidecar_sha256": { "type": ["string", "null"], "minLength": 64, "maxLength": 64 },
+    "records": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/goldIdRecord" }
+    }
+  },
+  "$defs": {
+    "goldIdRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "split",
+        "query_class",
+        "visibility",
+        "labeled_actor_id",
+        "restricted_actor",
+        "visible_to_actor"
+      ],
+      "properties": {
+        "case_id": { "type": "string" },
+        "split": { "enum": ["development", "qualification"] },
+        "query_class": { "type": "string" },
+        "synthetic_chunk_id": { "type": ["string", "null"] },
+        "synthetic_table_id": { "type": ["string", "null"] },
+        "synthetic_source_id": { "type": ["string", "null"] },
+        "synthetic_version_id": { "type": ["string", "null"] },
+        "chunk_id": { "type": ["string", "null"], "format": "uuid" },
+        "table_id": { "type": ["string", "null"], "format": "uuid" },
+        "document_id": { "type": ["string", "null"], "format": "uuid" },
+        "version_id": { "type": ["string", "null"], "format": "uuid" },
+        "visibility": { "enum": ["company_visible", "restricted"] },
+        "labeled_actor_id": { "type": "string" },
+        "restricted_actor": { "type": "boolean" },
+        "visible_to_actor": { "type": "boolean" }
+      }
+    }
+  }
+}
