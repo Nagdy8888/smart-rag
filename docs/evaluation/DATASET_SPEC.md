@@ -10,7 +10,7 @@ audience: engineering, SME, reviewers
 
 Canonical labeled-corpus contract for Hybrid RAG. Runtime retrieval is Packet 2+. This file freezes schema, class minima, split isolation, holdout access, and synthetic SME posture.
 
-Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
+Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Schema version
 
@@ -102,7 +102,11 @@ Identifier rules are sampled from the synthetic corpus (`INV-SR-\d{4}`, `PRJ-[A-
 
 This Packet 1 corpus is synthetic and provisionally accepted so Hybrid packets can proceed. Named Knowledge Owner hours (12–20) remain unverified. Packet 8 recorded a holdout **no-go**. [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) allows Phase 4 **engineering-complete** acceptance from Packet 9 open-split ranked-ID gates without opening this holdout. Launch claims still require a newly collected, independently SME-sealed holdout. Relationship, multi-hop, graph_mapping, and prompt_injection remain later-phase runtime.
 
-Phase 4 Recall@10 / code Recall@5 / alias Recall@10 population is `runtime_owner=phase_4` cases on development then qualification only.
+Phase 4 Recall@10 / code Recall@5 / alias Recall@10 population is `runtime_owner=phase_4` cases on development then qualification only. Ranked-ID formulas, locator/ACL/table/p95 lanes, and the fail-closed sidecar rule live in [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md). This Packet 1 schema is unchanged.
+
+## Ranked-ID eval (Packet 9 Wave 2)
+
+Holdout-blind Recall@K, locator correctness, ACL, table dispatch, and first-evidence p95 are defined in [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md). Gold `p4-chk-*` ids join through the Wave 1B sidecar; occupancy in `coverage_eval` is not Recall@K. Packet 1 schema, manifests, and class matrix above are unchanged.
 
 ## QueryType to Phase 6 family
 
@@ -153,7 +157,8 @@ uv run python scripts/seal_phase4_dataset.py
 uv run python scripts/validate_phase4_dataset.py
 uv run python scripts/eval_coverage_calibration.py
 uv run python scripts/eval_coverage_qualification.py
-uv run pytest tests/unit/test_phase4_dataset.py tests/unit/test_hybrid_coverage.py tests/unit/test_glossary_validation.py tests/unit/test_glossary_openapi.py tests/unit/test_phase6_querytype_map.py -q
+uv run pytest tests/unit/test_phase4_dataset.py tests/unit/test_hybrid_coverage.py tests/unit/test_glossary_validation.py tests/unit/test_glossary_openapi.py tests/unit/test_phase6_querytype_map.py tests/unit/test_phase4_ranked_ids.py -q
+uv run python scripts/eval_phase4_ranked_ids.py --split development --limit 3
 ```
 
 [docs index](../README.md)
