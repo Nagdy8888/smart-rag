@@ -9,6 +9,13 @@ from smart_rag_core.retrieval.bm25_query import (
 )
 from smart_rag_core.retrieval.dense import DenseRetriever
 from smart_rag_core.retrieval.fusion import fuse_channels
+from smart_rag_core.retrieval.graph import (
+    GraphIndexer,
+    GraphLeadSet,
+    GraphQueryBounds,
+    GraphRetriever,
+    apply_query_bounds,
+)
 from smart_rag_core.retrieval.hybrid import HybridRetrievalResult, assemble_hybrid
 from smart_rag_core.retrieval.hybrid_run import (
     EvidenceLocator,
@@ -65,6 +72,10 @@ __all__ = [
     "DenseRetriever",
     "EvidenceLocator",
     "EvidenceUnit",
+    "GraphIndexer",
+    "GraphLeadSet",
+    "GraphQueryBounds",
+    "GraphRetriever",
     "HnswProfileId",
     "HybridRetrievalResult",
     "HybridRetriever",
@@ -75,6 +86,7 @@ __all__ = [
     "RetrievalSessionError",
     "TermRetrievalResult",
     "TermRetriever",
+    "apply_query_bounds",
     "assemble_hybrid",
     "build_bm25_query",
     "fuse_channels",

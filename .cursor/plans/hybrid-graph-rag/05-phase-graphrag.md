@@ -42,7 +42,7 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
-1. [ ] Pin and contract-test the exact LightRAG version, storage/schema behavior, structured identifier/source semantics, and precomputed-keyword bypass.
+1. [x] Pin and contract-test the exact LightRAG version, storage/schema behavior, structured identifier/source semantics, and precomputed-keyword bypass.
 2. [ ] Initialize reviewed private PostgreSQL storages through controlled bootstrap and confine all LightRAG access to project adapters.
 3. [ ] Implement concurrency-one insert/delete/rebuild with durable status, advisory locking, budgets, backlog ETA, and safe workspace states.
 4. [ ] Build document, internal-chunk, entity/relation/statement, path-edge, and canonical-passage mappings before Graph Ready.

@@ -163,6 +163,73 @@ class RerankModelResponse(BaseModel):
     retrieval_performed: Literal[False] = False
 
 
+class LightRagLlmRequest(BaseModel):
+    """Bounded LightRAG callback request. Never a user-facing answer.
+
+    Attributes:
+        operation: Must be ``lightrag_llm``.
+        role: Vendor callback role. ``extract`` is entity extraction,
+            ``keyword`` is query keyword extraction, ``query`` is answer
+            generation, ``vlm`` is multimodal, and ``other`` is unclassified.
+        prompt: User/task prompt text from LightRAG.
+        system_prompt: Optional system prompt. Empty when unused.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: Literal["lightrag_llm"] = "lightrag_llm"
+    role: Literal["extract", "keyword", "query", "vlm", "other"]
+    prompt: str = Field(default="", max_length=65_536)
+    system_prompt: str = Field(default="", max_length=65_536)
+
+
+class LightRagLlmResponse(BaseModel):
+    """Mock LightRAG callback payload. Never a company-knowledge answer.
+
+    Attributes:
+        mode: Adapter mode. Qualification uses ``mock`` only.
+        content: Bounded synthetic callback text.
+        fixture_provenance: Fixture URI.
+        retrieval_performed: Always false.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["mock"]
+    content: str = Field(max_length=8_192)
+    fixture_provenance: str = Field(max_length=256)
+    retrieval_performed: Literal[False] = False
+
+
+def _mock_lightrag_llm_content(role: str) -> str:
+    """Return bounded synthetic LightRAG callback text for one role.
+
+    Args:
+        role: LightRAG callback role name.
+
+    Returns:
+        Vendor-format extraction rows for ``extract``, empty keyword JSON for
+        ``keyword``, and an explicit non-answer for ``query`` and other roles.
+    """
+
+    if role == "extract":
+        delimiter = "<|#|>"
+        complete = "<|COMPLETE|>"
+        return (
+            f"entity{delimiter}Alpha Probe{delimiter}Concept{delimiter}"
+            "Synthetic qualification entity used only in tests\n"
+            f"entity{delimiter}Beta Probe{delimiter}Concept{delimiter}"
+            "Second synthetic qualification entity used only in tests\n"
+            f"relation{delimiter}Alpha Probe{delimiter}Beta Probe{delimiter}"
+            f"links,qualification{delimiter}"
+            "Alpha Probe relates to Beta Probe in synthetic qualification text\n"
+            f"{complete}"
+        )
+    if role == "keyword":
+        return '{"high_level_keywords": [], "low_level_keywords": []}'
+    return "Frozen LightRAG fixture only; no answer generation was performed."
+
+
 class ModelAdapter(Protocol):
     """Protocol implemented by model provider adapters."""
 
@@ -203,6 +270,23 @@ class ModelAdapter(Protocol):
 
         Returns:
             Structured rerank response.
+        """
+
+        ...
+
+    async def generate_lightrag_llm(
+        self, request: LightRagLlmRequest
+    ) -> LightRagLlmResponse:
+        """Generate at most one LightRAG callback payload.
+
+        Args:
+            request: Validated LightRAG callback request.
+
+        Returns:
+            Bounded synthetic or unavailable response.
+
+        Raises:
+            ModelGatewayUnavailableError: If the selected adapter cannot run.
         """
 
         ...
@@ -341,6 +425,40 @@ class MockModelAdapter:
             output_tokens=0,
         )
 
+    async def generate_lightrag_llm(
+        self, request: LightRagLlmRequest
+    ) -> LightRagLlmResponse:
+        """Return a bounded synthetic LightRAG callback without a network call.
+
+        Args:
+            request: LightRAG callback request.
+
+        Returns:
+            Role-specific mock payload. ``extract`` returns the vendor tuple
+            format. ``keyword`` returns empty keyword JSON. ``query`` refuses
+            to answer. No retrieval is performed.
+
+        Raises:
+            ValueError: If combined prompt text exceeds the input bound.
+
+        Side Effects:
+            None. No network, provider, or retrieval calls occur.
+        """
+
+        combined = request.system_prompt + request.prompt
+        if len(combined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        return LightRagLlmResponse(
+            mode="mock",
+            content=_mock_lightrag_llm_content(request.role),
+            fixture_provenance=(
+                f"fixture://smart-rag/mock-lightrag-llm/{self._fixture_id}"
+            ),
+            retrieval_performed=False,
+        )
+
 
 class OpenAIRerankAdapter:
     """Packet 5 OpenAI adapter. Chat and profile calls stay unavailable."""
@@ -432,6 +550,20 @@ class OpenAIRerankAdapter:
             output_tokens=output_tokens,
         )
 
+    async def generate_lightrag_llm(
+        self, request: LightRagLlmRequest
+    ) -> LightRagLlmResponse:
+        """Refuse live LightRAG callbacks. Qualification uses mock mode.
+
+        Args:
+            request: LightRAG callback request.
+
+        Raises:
+            ModelGatewayUnavailableError: Always. Packet 1 never calls OpenAI.
+        """
+
+        raise ModelGatewayUnavailableError("lightrag_llm_openai_not_configured")
+
 
 class ModelGateway:
     """Single application-owned boundary for all model invocations."""
@@ -498,6 +630,29 @@ class ModelGateway:
         """
 
         return await self._adapter.generate_rerank(request)
+
+    @model_call_traceable(name="model.lightrag_llm")
+    async def generate_lightrag_llm(
+        self, request: LightRagLlmRequest
+    ) -> LightRagLlmResponse:
+        """Delegate one LightRAG callback to the configured adapter.
+
+        Args:
+            request: Bounded LightRAG callback request.
+
+        Returns:
+            Provenance-marked callback payload.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            ValueError: If a deployable bound is exceeded.
+
+        Side Effects:
+            Creates a LangSmith span when tracing is enabled. Exported fields
+            are role and counts, never prompt text.
+        """
+
+        return await self._adapter.generate_lightrag_llm(request)
 
 
 def create_model_gateway(settings: SharedSettings) -> ModelGateway:

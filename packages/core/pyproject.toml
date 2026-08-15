@@ -24,6 +24,9 @@ dependencies = [
     "duckdb==1.2.1",
     "langsmith==0.10.18",
     "openai==2.26.0",
+    "lightrag-hku==1.5.6",
+    "asyncpg==0.31.0",
+    "pgvector==0.5.0",
 ]
 
 [build-system]

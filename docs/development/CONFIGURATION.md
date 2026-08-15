@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: developers, operators
 ---
 
@@ -43,6 +43,26 @@ Validation errors list field paths and categories but omit source values.
 | `ADMIN_ALERT_SMTP_PORT` | integer; `54325` | public | Exposed local SMTP port from `supabase/config.toml` `local_smtp.smtp_port` |
 | `ADMIN_ALERT_SMTP_FROM` | email; `alerts@localhost` | public | Envelope from for metadata-only admin alerts |
 | `ADMIN_ALERT_SMTP_TO` | email; `owner@localhost` | public | Owner/admin mailbox captured by Inbucket |
+
+## Phase 5 Packet 1 LightRAG qualification (tests only)
+
+These variables are applied by contract tests via `monkeypatch.setenv` because
+the pinned LightRAG PostgreSQL client reads `os.environ`. Production modules
+do not read them; Packet 1 does not add Graph deployable settings.
+
+| Variable | Qualification value | Contract |
+| --- | --- | --- |
+| `POSTGRES_HOST` / `PORT` / `USER` / `PASSWORD` / `DATABASE` | Parsed from `SUPABASE_DB_URL` | Never logged. Tests only. |
+| `POSTGRES_MAX_CONNECTIONS` | `2` | Caps the process-wide `ClientManager` pool (vendor default 50). |
+| `POSTGRES_CONNECTION_RETRIES` | `0` | Vendor default 10 is unbounded; application owns retry. |
+| `POSTGRES_SERVER_SETTINGS` | `search_path={schema},extensions,public` | Disposable schema first; pgvector lives in `extensions`. |
+| (harness, not env) | `install_pgvector_codec_schema_fallback` | LightRAG calls `register_vector` with `schema='public'`; local Supabase type is `extensions.vector`. |
+| (harness, not env) | `cosine_better_than_threshold=-1.0` | Qualification only. Mock embeddings are not semantic; do not copy into production Graph settings. |
+| `POSTGRES_WORKSPACE` | unset except the override test | When set, overrides constructor workspace and collapses isolation. |
+| `WORKSPACE` | unset in tests | LightRAG constructor default also reads this name. |
+| `MOCK_MODEL_MODE` | `true` (default) | Qualification embeddings/LLM stay on frozen fixtures. |
+
+See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 
 ## Backend-only variables
 

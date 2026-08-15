@@ -1,0 +1,31 @@
+{
+  "source": "lightrag.LightRAG.aquery_data docstring, lightrag-hku==1.5.6",
+  "success_status": "success",
+  "failure_status": "failure",
+  "data_keys": ["entities", "relationships", "chunks", "references"],
+  "entity_keys": [
+    "entity_name",
+    "entity_type",
+    "description",
+    "source_id",
+    "file_path",
+    "created_at",
+    "reference_id"
+  ],
+  "relationship_keys": [
+    "src_id",
+    "tgt_id",
+    "description",
+    "keywords",
+    "weight",
+    "source_id",
+    "file_path",
+    "created_at",
+    "reference_id"
+  ],
+  "chunk_keys": ["content", "file_path", "chunk_id", "reference_id"],
+  "reference_keys": ["reference_id", "file_path"],
+  "metadata_keys": ["query_mode", "keywords", "processing_info"],
+  "keyword_keys": ["high_level", "low_level"],
+  "never_evidence_ids": ["description", "keywords", "file_path", "reference_id"]
+}

@@ -49,6 +49,9 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | uvicorn[standard] | 0.52.1 |
 | pydantic | 2.13.4 |
 | pydantic-settings | 2.15.0 |
+| lightrag-hku (core / GraphRAG pin) | 1.5.6 |
+| asyncpg (core / LightRAG pool) | 0.31.0 |
+| pgvector (core / LightRAG vectors) | 0.5.0 |
 | langsmith | 0.10.18 |
 | openai (core) | 2.26.0 |
 | typing-extensions | 4.16.0 |

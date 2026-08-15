@@ -1204,4 +1204,3 @@ force a pass.
 **Request for user acceptance:** Packet 9 engineering-close evidence is
 ready. Phase 4 wrapper checkbox 9 and `status: complete` stay unchecked
 until you accept this record. Phase 5 will not start in this change.
-

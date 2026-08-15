@@ -7,6 +7,8 @@ from smart_rag_core.gateways.embedding import (
     create_embedding_gateway,
 )
 from smart_rag_core.gateways.model import (
+    LightRagLlmRequest,
+    LightRagLlmResponse,
     MockModelAdapter,
     MockModelNetworkDeniedError,
     ModelGateway,
@@ -25,6 +27,8 @@ __all__ = [
     "EmbeddingGateway",
     "EmbeddingRequest",
     "EmbeddingResponse",
+    "LightRagLlmRequest",
+    "LightRagLlmResponse",
     "MockModelAdapter",
     "MockModelNetworkDeniedError",
     "ModelGateway",
