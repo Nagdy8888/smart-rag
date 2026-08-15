@@ -1,4 +1,4 @@
-"""Embedding gateway types and mock adapter for governed ingestion proofs."""
+"""Embedding gateway types, mock adapter, and OpenAI query-time adapter."""
 
 from __future__ import annotations
 
@@ -9,11 +9,21 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from smart_rag_core.ingestion.embeddings.mock_vectors import mock_embedding_vector
+from smart_rag_core.ingestion.embeddings.policy import (
+    EMBEDDING_DIMENSIONS,
+    EMBEDDING_MODEL,
+)
 from smart_rag_core.observability.langsmith_tracing import (
     configure_langsmith,
     model_call_traceable,
+    traced_embeddings_create,
+    traced_openai_client,
 )
 from smart_rag_core.settings import SharedSettings
+
+# Published list price USD per 1M input tokens for text-embedding-3-large,
+# same pin used by scripts/embedding_qualification_bakeoff.py (2026-08-12).
+_OPENAI_LARGE_USD_PER_MILLION = Decimal("0.13")
 
 
 class EmbeddingRequest(BaseModel):
@@ -32,7 +42,7 @@ class EmbeddingResponse(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    mode: Literal["mock"]
+    mode: Literal["mock", "openai"]
     vectors: tuple[tuple[float, ...], ...]
     provider_request_id: str
     fixture_provenance: str
@@ -52,12 +62,23 @@ class MockEmbeddingAdapter:
     """Deterministic embedding adapter with no provider network access."""
 
     def __init__(self, *, fixture_id: str) -> None:
-        """Initialize deterministic fixture metadata."""
+        """Initialize deterministic fixture metadata.
+
+        Args:
+            fixture_id: Frozen mock fixture identifier from settings.
+        """
 
         self._fixture_id = fixture_id
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
-        """Return deterministic unit vectors keyed by contextual input text."""
+        """Return deterministic unit vectors keyed by contextual input text.
+
+        Args:
+            request: Bounded embedding batch.
+
+        Returns:
+            Mock vectors plus zero cost. ``mode`` is always ``mock``.
+        """
 
         vectors = tuple(
             tuple(mock_embedding_vector(text, dimensions=request.dimensions))
@@ -75,11 +96,101 @@ class MockEmbeddingAdapter:
         )
 
 
+class OpenAIEmbeddingAdapter:
+    """Pinned OpenAI embeddings adapter. No second embeddings path exists."""
+
+    def __init__(self, *, api_key: str) -> None:
+        """Store the provider credential.
+
+        Args:
+            api_key: ``OPENAI_API_KEY`` secret. Never logged.
+
+        Raises:
+            ModelGatewayUnavailableError: If the key is missing or blank.
+        """
+
+        from smart_rag_core.gateways.model import ModelGatewayUnavailableError
+
+        if not api_key.strip():
+            raise ModelGatewayUnavailableError(
+                "OPENAI_API_KEY is required outside mock mode"
+            )
+        self._api_key = api_key
+
+    async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+        """Embed one batch through the traced OpenAI client.
+
+        Args:
+            request: Bounded embedding batch. Model and dimensions should match
+                the pinned ingestion policy; response length is still checked.
+
+        Returns:
+            Vectors ordered by ``data.index``, never by list order alone.
+
+        Raises:
+            ValueError: If a vector is missing, duplicated, or the wrong size.
+
+        Side Effects:
+            One HTTPS ``embeddings.create`` call via ``traced_embeddings_create``.
+        """
+
+        client = traced_openai_client(api_key=self._api_key, max_retries=0)
+        response = traced_embeddings_create(
+            client,
+            model=request.model,
+            input=list(request.inputs),
+            dimensions=request.dimensions,
+            encoding_format="float",
+        )
+        by_index: dict[int, tuple[float, ...]] = {}
+        for item in response.data:
+            index = int(item.index)
+            if index in by_index:
+                raise ValueError("embedding_index_mismatch")
+            by_index[index] = tuple(float(value) for value in item.embedding)
+        expected = set(range(len(request.inputs)))
+        if set(by_index) != expected:
+            raise ValueError("embedding_index_mismatch")
+        vectors: list[tuple[float, ...]] = []
+        for index in range(len(request.inputs)):
+            vector = by_index[index]
+            if len(vector) != request.dimensions:
+                raise ValueError("embedding_dimension_mismatch")
+            vectors.append(vector)
+        usage = getattr(response, "usage", None)
+        prompt_tokens = 0
+        if usage is not None:
+            prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        cost = (
+            Decimal(prompt_tokens) * _OPENAI_LARGE_USD_PER_MILLION / Decimal(1_000_000)
+        )
+        request_id = str(getattr(response, "id", "") or "")
+        if not request_id:
+            digest = hashlib.sha256(
+                "|".join(request.inputs).encode("utf-8")
+            ).hexdigest()[:16]
+            request_id = f"openai-embed-{digest}"
+        return EmbeddingResponse(
+            mode="openai",
+            vectors=tuple(vectors),
+            provider_request_id=request_id,
+            fixture_provenance=(
+                f"openai://embeddings/{EMBEDDING_MODEL}/{EMBEDDING_DIMENSIONS}"
+            ),
+            estimated_cost_usd=cost,
+        )
+
+
 class EmbeddingGateway:
-    """Shared embedding boundary used by ingestion services."""
+    """Shared embedding boundary used by ingestion and Hybrid retrieve."""
 
     def __init__(self, adapter: EmbeddingAdapter) -> None:
-        """Bind one embedding adapter implementation."""
+        """Bind one embedding adapter implementation.
+
+        Args:
+            adapter: Mock or OpenAI adapter. Callers must not bypass this
+                gateway with a second embeddings client.
+        """
 
         self._adapter = adapter
 
@@ -108,18 +219,24 @@ def create_embedding_gateway(settings: SharedSettings) -> EmbeddingGateway:
         settings: Validated deployable settings.
 
     Returns:
-        Mock embedding gateway while ``MOCK_MODEL_MODE`` is true.
+        Mock embedding gateway while ``MOCK_MODEL_MODE`` is true; otherwise
+        the pinned OpenAI adapter.
 
     Raises:
         ModelGatewayUnavailableError: If real-model embeddings are requested
-            before the verified OpenAI adapter exists.
+            without ``OPENAI_API_KEY``.
     """
 
-    configure_langsmith(settings)
-    if not settings.mock_model_mode:
-        from smart_rag_core.gateways.model import ModelGatewayUnavailableError
+    from smart_rag_core.gateways.model import ModelGatewayUnavailableError
 
-        raise ModelGatewayUnavailableError(
-            "Real OpenAI embedding adapter requires verified provider settings"
+    configure_langsmith(settings)
+    if settings.mock_model_mode:
+        return EmbeddingGateway(
+            MockEmbeddingAdapter(fixture_id=settings.mock_fixture_id)
         )
-    return EmbeddingGateway(MockEmbeddingAdapter(fixture_id=settings.mock_fixture_id))
+    secret = settings.openai_api_key
+    if secret is None or not secret.get_secret_value().strip():
+        raise ModelGatewayUnavailableError(
+            "OPENAI_API_KEY is required outside mock mode"
+        )
+    return EmbeddingGateway(OpenAIEmbeddingAdapter(api_key=secret.get_secret_value()))

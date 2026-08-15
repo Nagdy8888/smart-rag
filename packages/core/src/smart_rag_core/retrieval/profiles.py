@@ -5,7 +5,9 @@ channel weights, the 205 pre-fusion union cap, metadata clamp ``[1.0, 1.15]``,
 the 90-day ``recent`` window, and the 25-second Hybrid deadline. Packet 5 freezes
 the top-20 rerank pool, max five passages per document, MMR lambda 0.7, and
 parent/context bounds. Packet 6 freezes per-class ``coverage_score`` thresholds
-at ``0.65`` in ``retrieval/frozen/hybrid_default_v1.json``.
+at ``0.65`` in ``retrieval/frozen/hybrid_default_v1.json``. Packet 9 Wave 1A
+freezes ``RETRIEVAL_SLICE_SECONDS`` at the 8s statement-timeout bound and
+adds named fallbacks for dense/term/auth/empty retrieve failures.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ METADATA_FACTOR_MIN = 1.0
 METADATA_FACTOR_MAX = 1.15
 RECENT_WINDOW_DAYS = 90
 HYBRID_DEADLINE_SECONDS = 25
+RETRIEVAL_SLICE_SECONDS = RETRIEVAL_STATEMENT_TIMEOUT_MS / 1000.0
 CHANNEL_WEIGHT_DENSE = 1.0
 CHANNEL_WEIGHT_BM25 = 1.0
 CHANNEL_WEIGHT_TERM = 1.0
@@ -69,13 +72,17 @@ class DenseMode(StrEnum):
 
 
 class RetrievalFallbackReason(StrEnum):
-    """Packet 2 fallback reasons. Later packets may add values."""
+    """Named Hybrid retrieve fallbacks. Existing Packet 2 values stay stable."""
 
     NONE = "none"
     BM25_UNAVAILABLE = "bm25_unavailable"
     BM25_VERSION_MISMATCH = "bm25_version_mismatch"
     WEAK_EVIDENCE = "weak_evidence"
     TIMEOUT = "retrieval_timeout"
+    DENSE_UNAVAILABLE = "dense_unavailable"
+    TERM_UNAVAILABLE = "term_unavailable"
+    AUTH_CONTEXT_INVALID = "auth_context_invalid"
+    RETRIEVAL_EMPTY = "retrieval_empty"
 
 
 class Bm25Operator(StrEnum):

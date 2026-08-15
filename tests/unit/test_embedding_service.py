@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -11,7 +12,10 @@ from smart_rag_core.gateways.embedding import (
     EmbeddingGateway,
     EmbeddingRequest,
     MockEmbeddingAdapter,
+    OpenAIEmbeddingAdapter,
+    create_embedding_gateway,
 )
+from smart_rag_core.gateways.model import ModelGatewayUnavailableError
 from smart_rag_core.ingestion.chunking.types import (
     CanonicalChunk,
     ChunkKind,
@@ -28,6 +32,7 @@ from smart_rag_core.security.external_processing import (
     ContentClass,
     ExternalProcessingDecisionInput,
 )
+from smart_rag_core.settings import AgentSettings
 
 
 def _chunk(text: str) -> CanonicalChunk:
@@ -187,3 +192,159 @@ def test_embedding_timeout_after_provider_success_records_failed_ledger() -> Non
         service.embed_version(batch)
     joined = " ".join(connection.cursor_obj.statements)
     assert "record_embedding_ledger" in joined
+
+
+def test_mock_embedding_response_mode_is_mock() -> None:
+    """The mock adapter still returns mode=mock through the gateway."""
+
+    gateway = EmbeddingGateway(MockEmbeddingAdapter(fixture_id="test"))
+    response = asyncio.run(
+        gateway.embed(
+            EmbeddingRequest(
+                operation_key="mode",
+                inputs=("annual leave policy",),
+                model="text-embedding-3-large",
+                dimensions=EMBEDDING_DIMENSIONS,
+            )
+        )
+    )
+    assert response.mode == "mock"
+    assert len(response.vectors[0]) == EMBEDDING_DIMENSIONS
+
+
+def test_create_embedding_gateway_mock_branch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MOCK_MODEL_MODE=true selects the deterministic adapter."""
+
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    gateway = create_embedding_gateway(AgentSettings())
+    assert isinstance(gateway._adapter, MockEmbeddingAdapter)
+
+
+def test_create_embedding_gateway_openai_branch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MOCK_MODEL_MODE=false with a key selects the OpenAI adapter."""
+
+    monkeypatch.setenv("MOCK_MODEL_MODE", "false")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-openai-adapter")
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    gateway = create_embedding_gateway(AgentSettings())
+    assert isinstance(gateway._adapter, OpenAIEmbeddingAdapter)
+
+
+def test_create_embedding_gateway_fail_closed_without_key() -> None:
+    """Real-model embeddings fail closed when OPENAI_API_KEY is missing."""
+
+    settings = MagicMock()
+    settings.mock_model_mode = False
+    settings.openai_api_key = None
+    settings.apply_langsmith_sdk_flags.return_value = {}
+    with pytest.raises(ModelGatewayUnavailableError, match="OPENAI_API_KEY"):
+        create_embedding_gateway(settings)
+
+
+def test_openai_adapter_fail_closed_without_key() -> None:
+    """The OpenAI adapter constructor rejects a blank key."""
+
+    with pytest.raises(ModelGatewayUnavailableError, match="OPENAI_API_KEY"):
+        OpenAIEmbeddingAdapter(api_key="   ")
+
+
+def test_openai_adapter_maps_data_by_index() -> None:
+    """OpenAI ``data`` rows are ordered by ``index``, not list order."""
+
+    first = [0.1, 0.2, 0.3, 0.4]
+    second = [0.5, 0.6, 0.7, 0.8]
+
+    class _Item:
+        def __init__(self, index: int, embedding: list[float]) -> None:
+            self.index = index
+            self.embedding = embedding
+
+    class _Usage:
+        prompt_tokens = 8
+        total_tokens = 8
+
+    class _Response:
+        def __init__(self) -> None:
+            self.data = (_Item(1, second), _Item(0, first))
+            self.usage = _Usage()
+            self.id = "embd-index-test"
+
+    def _create(_client: object, **kwargs: object) -> _Response:
+        assert kwargs["model"] == "text-embedding-3-large"
+        assert kwargs["encoding_format"] == "float"
+        assert kwargs["dimensions"] == 4
+        assert kwargs["input"] == ["First text", "Second text"]
+        return _Response()
+
+    adapter = OpenAIEmbeddingAdapter(api_key="sk-test")
+    with (
+        patch(
+            "smart_rag_core.gateways.embedding.traced_openai_client",
+            return_value=object(),
+        ),
+        patch(
+            "smart_rag_core.gateways.embedding.traced_embeddings_create",
+            _create,
+        ),
+    ):
+        response = asyncio.run(
+            adapter.embed(
+                EmbeddingRequest(
+                    operation_key="index",
+                    inputs=("First text", "Second text"),
+                    model="text-embedding-3-large",
+                    dimensions=4,
+                )
+            )
+        )
+    assert response.mode == "openai"
+    assert response.vectors[0] == tuple(first)
+    assert response.vectors[1] == tuple(second)
+    assert response.provider_request_id == "embd-index-test"
+
+
+def test_openai_adapter_rejects_wrong_dimension() -> None:
+    """A vector whose length does not match ``dimensions`` fails closed."""
+
+    class _Item:
+        def __init__(self) -> None:
+            self.index = 0
+            self.embedding = [0.1, 0.2]
+
+    class _Usage:
+        prompt_tokens = 1
+        total_tokens = 1
+
+    class _Response:
+        def __init__(self) -> None:
+            self.data = (_Item(),)
+            self.usage = _Usage()
+            self.id = "embd-dim"
+
+    adapter = OpenAIEmbeddingAdapter(api_key="sk-test")
+    with (
+        patch(
+            "smart_rag_core.gateways.embedding.traced_openai_client",
+            return_value=object(),
+        ),
+        patch(
+            "smart_rag_core.gateways.embedding.traced_embeddings_create",
+            lambda _client, **_kwargs: _Response(),
+        ),
+    ):
+        with pytest.raises(ValueError, match="embedding_dimension_mismatch"):
+            asyncio.run(
+                adapter.embed(
+                    EmbeddingRequest(
+                        operation_key="dim",
+                        inputs=("probe",),
+                        model="text-embedding-3-large",
+                        dimensions=4,
+                    )
+                )
+            )

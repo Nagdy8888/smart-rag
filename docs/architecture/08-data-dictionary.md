@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering, reviewers
 ---
 
@@ -146,7 +146,8 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
   `recheck_retrieval_candidates`, `fetch_authorized_chunk_context`, and
   `resolve_structured_table` are `SECURITY INVOKER` for `app_api` only.
   Authorization predicates run before rank/limit or artifact return. Context
-  fetch may return non-representative parent rows. Table paths never come from
+  fetch may return non-representative parent rows and trailing `provenance jsonb`
+  (sheet/range/URL locators). Table paths never come from
   the client or model.
 - `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
 - Pending glossary imports never write `search_aliases`; approval projects aliases; rollback deletes that projection.

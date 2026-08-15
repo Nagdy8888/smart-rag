@@ -94,6 +94,7 @@ def assemble_hybrid(
     pre_recheck_count: int | None = None,
     authorized_count: int | None = None,
     context_ok: bool = True,
+    deadline_exhausted: bool = False,
 ) -> HybridRetrievalResult:
     """Fuse capped channel lists and attach coverage diagnostics.
 
@@ -130,6 +131,8 @@ def assemble_hybrid(
         pre_recheck_count: Channel IDs before authorization recheck.
         authorized_count: Recheck survivors.
         context_ok: Parent/context expansion stayed authorized.
+        deadline_exhausted: True when a parallel channel missed the retrieval
+            slice. Independent of BM25 degradation.
 
     Returns:
         Hybrid result with at most 205 unique IDs.
@@ -241,7 +244,7 @@ def assemble_hybrid(
         fused=fused,
         coverage=coverage,
         fallback_reason=bm25_fallback,
-        deadline_exhausted=False,
+        deadline_exhausted=deadline_exhausted,
         cache_key=key,
         scanned_bm25=scanned_bm25,
         channel_hits=channel_hits,

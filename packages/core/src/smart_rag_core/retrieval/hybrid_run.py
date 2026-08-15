@@ -1,0 +1,1004 @@
+"""Single Hybrid retrieve composition: embed, channels, fuse, context, locators."""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import date
+from uuid import UUID
+
+import psycopg
+
+from smart_rag_core.evaluation.schema import ExpectedProfile, QueryType
+from smart_rag_core.gateways.embedding import (
+    EmbeddingGateway,
+    EmbeddingRequest,
+    EmbeddingResponse,
+)
+from smart_rag_core.ingestion.embeddings.policy import (
+    EMBEDDING_DIMENSIONS,
+    EMBEDDING_MODEL,
+)
+from smart_rag_core.retrieval.context import ContextFn, RerankFn, select_hybrid_context
+from smart_rag_core.retrieval.context_loader import (
+    ChunkContext,
+    fetch_authorized_chunk_context,
+    heading_inventory_from_contexts,
+)
+from smart_rag_core.retrieval.coverage import CoverageSignal, HybridCoverage
+from smart_rag_core.retrieval.hybrid import assemble_hybrid, run_channels_parallel
+from smart_rag_core.retrieval.profiles import (
+    FINAL_EVIDENCE_MAX,
+    MAX_NORMALIZED_QUERY_CHARS,
+    RETRIEVAL_SLICE_SECONDS,
+    RetrievalFallbackReason,
+)
+from smart_rag_core.retrieval.rerank import RerankFallbackReason, RerankRanking
+from smart_rag_core.retrieval.temporal import TemporalIntent
+from smart_rag_core.retrieval.types import (
+    Bm25RetrievalResult,
+    DenseRetrievalResult,
+    RetrievalCandidate,
+    TermRetrievalResult,
+)
+from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
+
+# Fusion rejects a fourth per-channel list. Embeddings still batch original
+# plus at most three variants (at most four unique strings) as one call.
+_FUSION_LIST_CAP = 3
+_EMBED_TEXT_CAP = 4
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceLocator:
+    """Citation coordinates from canonical rows, never BM25 snippets.
+
+    Attributes:
+        page_number: Page index from ``document_chunks.page_number``.
+        section_path: Heading ancestry from ``section_path``.
+        sheet_name: Spreadsheet sheet from provenance locators.
+        range_ref: Cell or range from provenance locators.
+        source_url: HTML/crawl URL from provenance locators.
+    """
+
+    page_number: int | None = None
+    section_path: tuple[str, ...] = ()
+    sheet_name: str | None = None
+    range_ref: str | None = None
+    source_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceUnit:
+    """One authorized Hybrid evidence unit with canonical citation text.
+
+    Attributes:
+        chunk_id: Canonical chunk UUID.
+        document_id: Document UUID.
+        version_id: Current version UUID.
+        citation_text: ``ChunkContext.raw_text`` only.
+        locator: Page/section/sheet/range/URL from canonical provenance.
+    """
+
+    chunk_id: UUID
+    document_id: UUID
+    version_id: UUID
+    citation_text: str
+    locator: EvidenceLocator
+
+
+@dataclass(frozen=True, slots=True)
+class HybridRunResult:
+    """Typed Hybrid retrieve outcome. No answer text.
+
+    Attributes:
+        ranked_ids: Authorized fused IDs in rank order (Recall@K input).
+        evidence: At most 12 citation units with locators.
+        coverage: Coverage/refusal diagnostics.
+        fallback_reason: Named retrieve fallback, or ``none``.
+        deadline_exhausted: True when a channel missed the retrieval slice.
+        first_evidence_ms: Wall milliseconds until evidence or fail-closed
+            status on this retrieve path (QT-LAT-001), not first answer token.
+        embedding_call_count: ``0`` or ``1``. Variants share one batch.
+        rerank_call_count: ``0`` or ``1`` from the one-shot reranker.
+        cache_key: Versioned ID-only cache key when assembly ran.
+    """
+
+    ranked_ids: tuple[UUID, ...]
+    evidence: tuple[EvidenceUnit, ...]
+    coverage: HybridCoverage
+    fallback_reason: RetrievalFallbackReason
+    deadline_exhausted: bool
+    first_evidence_ms: float
+    embedding_call_count: int
+    rerank_call_count: int
+    cache_key: str = ""
+
+
+class HybridRetriever:
+    """Compose profile, channels, recheck, RRF, rerank, locators, and timing.
+
+    This is the single retrieve entrypoint. BM25 snippets never become
+    citation text. Holdout scoring is out of scope.
+
+    External/model calls:
+        One batched embedding gateway call over the original query plus at
+        most three variants.
+        At most one rerank call through the injected ``rerank`` callback.
+
+    Deadline:
+        ``RETRIEVAL_SLICE_SECONDS`` (8s statement-timeout bound) covers
+        parallel channels plus rerank. The 25s ``HYBRID_DEADLINE_SECONDS``
+        value is the Phase 6 full-run budget and is not used here.
+
+    Failure/fallback:
+        Empty or over-long queries fail closed with ``retrieval_empty``.
+        Channel timeouts set ``deadline_exhausted`` and a named reason.
+        Disabled callers return ``auth_context_invalid``.
+    """
+
+    def __init__(
+        self,
+        *,
+        embedding_gateway: EmbeddingGateway,
+        supabase: psycopg.Connection | None = None,
+        paradedb: psycopg.Connection | None = None,
+        dense: object | None = None,
+        bm25: object | None = None,
+        term: object | None = None,
+        load_context: ContextFn | None = None,
+        rerank: RerankFn | None = None,
+        channel_jobs: dict[str, Callable[[], object]] | None = None,
+    ) -> None:
+        """Bind gateways, optional retrievers, and test doubles.
+
+        Args:
+            embedding_gateway: Shared embedding boundary. No bypass client.
+            supabase: Canonical Postgres for context RPC and term/dense.
+            paradedb: Private BM25 connection when the live retriever is used.
+            dense: Object with sync ``retrieve`` matching ``DenseRetriever``.
+            bm25: Object with sync ``retrieve`` matching ``Bm25Retriever``.
+            term: Object with sync ``retrieve`` matching ``TermRetriever``.
+            load_context: Optional context loader. Defaults to the RPC.
+            rerank: Optional one-shot rerank callback.
+            channel_jobs: Optional zero-arg jobs replacing retriever calls.
+        """
+
+        self._embedding_gateway = embedding_gateway
+        self._supabase = supabase
+        self._paradedb = paradedb
+        self._dense = dense
+        self._bm25 = bm25
+        self._term = term
+        self._load_context = load_context
+        self._rerank = rerank
+        self._channel_jobs = channel_jobs
+
+    def retrieve(
+        self,
+        *,
+        query: str,
+        caller: CallerContext,
+        profile: ExpectedProfile | None = None,
+        principal_scope_hash: str | None = None,
+        visibility_generation: int = 1,
+        deadline_seconds: float | None = None,
+        channel_jobs: dict[str, Callable[[], object]] | None = None,
+    ) -> HybridRunResult:
+        """Run one Hybrid retrieve and return ranked IDs plus locators.
+
+        Args:
+            query: Original user query. Empty or over-long forms fail closed.
+            caller: Server-derived identity. Disabled callers are rejected.
+            profile: Typed query profile. Optional variants are taken from it.
+            principal_scope_hash: Cache principal hash. Derived when omitted.
+            visibility_generation: ACL/visibility generation for the cache key.
+            deadline_seconds: Retrieval+rerank slice. Defaults to 8.0 seconds.
+            channel_jobs: Per-call job override for tests.
+
+        Returns:
+            Ranked authorized IDs, ≤12 evidence units, coverage, fallback,
+            ``first_evidence_ms``, and call counts.
+
+        Side Effects:
+            At most one embedding batch and one rerank call. Channel jobs may
+            read ParadeDB and Supabase. No holdout access. No answer tokens.
+        """
+
+        started = time.perf_counter()
+        slice_seconds = (
+            RETRIEVAL_SLICE_SECONDS if deadline_seconds is None else deadline_seconds
+        )
+        scope_hash = principal_scope_hash or _principal_scope_hash(caller)
+        if not caller.is_active():
+            return _closed_result(
+                RetrievalFallbackReason.AUTH_CONTEXT_INVALID,
+                started=started,
+            )
+        query_check = _fail_closed_query(query)
+        if query_check is not None:
+            return _closed_result(query_check, started=started)
+
+        texts = _query_texts(query, profile)
+        embed_response, embed_error = self._embed_query_texts(texts)
+        if embed_error is not None or embed_response is None:
+            return _closed_result(
+                embed_error or RetrievalFallbackReason.DENSE_UNAVAILABLE,
+                started=started,
+                embedding_call_count=1,
+            )
+        vectors = embed_response.vectors
+        jobs = channel_jobs if channel_jobs is not None else self._channel_jobs
+        if jobs is None:
+            jobs = self._build_channel_jobs(
+                caller=caller,
+                query=query,
+                texts=texts[:_FUSION_LIST_CAP],
+                vectors=vectors[:_FUSION_LIST_CAP],
+            )
+        completed, timed_out, exhausted = run_channels_parallel(
+            jobs,
+            deadline_seconds=slice_seconds,
+        )
+        dense_lists, dense_reason = _unpack_dense(completed.get("dense"))
+        bm25_result = _unpack_bm25(completed.get("bm25"))
+        term_lists, term_reason = _unpack_term(completed.get("term"))
+        timed = frozenset(timed_out)
+        if "dense" in timed:
+            dense_lists = ()
+            dense_reason = RetrievalFallbackReason.DENSE_UNAVAILABLE
+        if "term" in timed:
+            term_lists = ()
+            term_reason = RetrievalFallbackReason.TERM_UNAVAILABLE
+        bm25_fallback = bm25_result.fallback_reason
+        if "bm25" in timed:
+            bm25_result = Bm25RetrievalResult(
+                scanned_ids=(),
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.TIMEOUT,
+            )
+            bm25_fallback = RetrievalFallbackReason.TIMEOUT
+        fallback = _compose_fallback(
+            dense_reason=dense_reason,
+            term_reason=term_reason,
+            bm25_fallback=bm25_fallback,
+            deadline_exhausted=exhausted,
+        )
+        resolved_profile = profile
+        media_dependence = _bool_field(profile, "media_dependence")
+        historical = _bool_field(profile, "historical_relationship")
+        negation_scope = _str_field(profile, "negation_scope") or "none"
+        want_full_summary = False
+        query_type = _query_type(profile)
+        temporal_intent = _temporal_intent(profile)
+        target = _target_date(profile)
+        required_terms = _str_list_field(profile, "codes") + _str_list_field(
+            profile, "exact_terms"
+        )
+        assemble_kwargs = dict(
+            dense_variants=dense_lists,
+            bm25_variants=(bm25_result.candidates,) if bm25_result.candidates else (),
+            term_variants=term_lists,
+            bm25_fallback=bm25_fallback,
+            temporal_intent=temporal_intent,
+            target_date=target,
+            want_full_summary=want_full_summary,
+            media_dependence=media_dependence,
+            negation_scope=negation_scope,
+            historical_relationship=historical,
+            principal_scope_hash=scope_hash,
+            query_normalized=normalize_arabic_v1(query)[:MAX_NORMALIZED_QUERY_CHARS],
+            visibility_generation=visibility_generation,
+            scanned_bm25=bm25_result.scanned_ids,
+            query_type=query_type,
+            required_terms=required_terms,
+            matched_terms=(),
+            deadline_exhausted=exhausted,
+        )
+        assembled = assemble_hybrid(
+            heading_inventory=(),
+            covered_headings=(),
+            **assemble_kwargs,
+        )
+        if fallback is RetrievalFallbackReason.NONE and not assembled.fused:
+            fallback = RetrievalFallbackReason.RETRIEVAL_EMPTY
+        fused_ids = tuple(item.chunk_id for item in assembled.fused)
+        context_cache: dict[UUID, ChunkContext] = {}
+        loader = self._bound_loader(caller, context_cache)
+        contexts = loader(fused_ids) if fused_ids else ()
+        inventory = heading_inventory_from_contexts(contexts)
+        covered = heading_inventory_from_contexts(
+            tuple(item for item in contexts if item.chunk_id in set(fused_ids))
+        )
+        assembled = assemble_hybrid(
+            heading_inventory=inventory,
+            covered_headings=covered,
+            **assemble_kwargs,
+        )
+        remaining = max(0.0, slice_seconds - (time.perf_counter() - started))
+        rerank_fn = self._rerank or _identity_rerank
+        rerank_calls = 0
+        evidence: tuple[EvidenceUnit, ...] = ()
+        if assembled.fused and resolved_profile is not None:
+            selection = select_hybrid_context(
+                query=query,
+                profile=resolved_profile,
+                fused=assembled.fused,
+                contexts=contexts,
+                channel_hits=assembled.channel_hits or {},
+                rerank=rerank_fn,
+                load_context=loader,
+                remaining_deadline_seconds=remaining,
+            )
+            if selection.usage is not None:
+                rerank_calls = selection.usage.model_calls
+            selected_ids = tuple(item.candidate.chunk_id for item in selection.passages)
+            locator_rows = loader(selected_ids) if selected_ids else ()
+            evidence = _evidence_units(selection.passages, locator_rows)
+        elif assembled.fused:
+            evidence = _evidence_units_from_context(
+                assembled.fused[:FINAL_EVIDENCE_MAX],
+                contexts,
+            )
+        if fallback is RetrievalFallbackReason.NONE:
+            fallback = assembled.fallback_reason
+        return HybridRunResult(
+            ranked_ids=tuple(item.chunk_id for item in assembled.fused),
+            evidence=evidence[:FINAL_EVIDENCE_MAX],
+            coverage=assembled.coverage,
+            fallback_reason=fallback,
+            deadline_exhausted=assembled.deadline_exhausted,
+            first_evidence_ms=_elapsed_ms(started),
+            embedding_call_count=1,
+            rerank_call_count=rerank_calls,
+            cache_key=assembled.cache_key,
+        )
+
+    def _embed_query_texts(
+        self,
+        texts: tuple[str, ...],
+    ) -> tuple[EmbeddingResponse | None, RetrievalFallbackReason | None]:
+        """Issue one batched gateway embedding call.
+
+        Args:
+            texts: Unique original plus variants, already bounded.
+
+        Returns:
+            Response and optional fallback when the gateway fails.
+        """
+
+        request = EmbeddingRequest(
+            operation_key="hybrid.query_embed",
+            inputs=texts,
+            model=EMBEDDING_MODEL,
+            dimensions=EMBEDDING_DIMENSIONS,
+        )
+        try:
+            response = asyncio.run(self._embedding_gateway.embed(request))
+        except Exception:
+            return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
+        if len(response.vectors) != len(texts):
+            return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
+        return response, None
+
+    def _build_channel_jobs(
+        self,
+        *,
+        caller: CallerContext,
+        query: str,
+        texts: tuple[str, ...],
+        vectors: tuple[tuple[float, ...], ...],
+    ) -> dict[str, Callable[[], object]]:
+        """Build parallel dense/BM25/term jobs from bound retrievers.
+
+        Args:
+            caller: Server-derived identity.
+            query: Original query used for the single BM25 scan.
+            texts: At most three query forms for dense/term lists.
+            vectors: Embeddings aligned with ``texts``.
+
+        Returns:
+            Zero-argument jobs for ``run_channels_parallel``.
+        """
+
+        jobs: dict[str, Callable[[], object]] = {}
+        if self._dense is not None:
+
+            def _dense_job() -> tuple[tuple[RetrievalCandidate, ...], ...]:
+                """Run dense retrieve per fused query text.
+
+                Returns:
+                    Per-variant dense candidate lists.
+                """
+
+                lists: list[tuple[RetrievalCandidate, ...]] = []
+                retrieve = self._dense.retrieve  # type: ignore[union-attr]
+                for text, vector in zip(texts, vectors, strict=False):
+                    del text
+                    result = retrieve(
+                        caller=caller,
+                        query_embedding=list(vector),
+                    )
+                    if isinstance(result, DenseRetrievalResult):
+                        lists.append(result.candidates)
+                    elif isinstance(result, tuple):
+                        lists.append(result)
+                return tuple(lists)
+
+            jobs["dense"] = _dense_job
+        if self._bm25 is not None:
+
+            def _bm25_job() -> Bm25RetrievalResult:
+                """Run one BM25 scan over the original query.
+
+                Returns:
+                    Authorized BM25 survivors or a named outage fallback.
+                """
+
+                try:
+                    result = self._bm25.retrieve(  # type: ignore[union-attr]
+                        supabase=self._supabase,
+                        caller=caller,
+                        query_text=query,
+                    )
+                except Exception:
+                    return Bm25RetrievalResult(
+                        scanned_ids=(),
+                        candidates=(),
+                        fallback_reason=RetrievalFallbackReason.BM25_UNAVAILABLE,
+                    )
+                if isinstance(result, Bm25RetrievalResult):
+                    return result
+                return Bm25RetrievalResult(scanned_ids=(), candidates=())
+
+            jobs["bm25"] = _bm25_job
+        elif self._paradedb is None and self._bm25 is None:
+            jobs["bm25"] = lambda: Bm25RetrievalResult(
+                scanned_ids=(),
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.BM25_UNAVAILABLE,
+            )
+        if self._term is not None:
+
+            def _term_job() -> tuple[tuple[RetrievalCandidate, ...], ...]:
+                """Run term retrieve per fused query text.
+
+                Returns:
+                    Per-variant term candidate lists.
+                """
+
+                lists: list[tuple[RetrievalCandidate, ...]] = []
+                retrieve = self._term.retrieve  # type: ignore[union-attr]
+                for text in texts:
+                    result = retrieve(caller=caller, query_text=text)
+                    if isinstance(result, TermRetrievalResult):
+                        lists.append(result.candidates)
+                    elif isinstance(result, tuple):
+                        lists.append(result)
+                return tuple(lists)
+
+            jobs["term"] = _term_job
+        return jobs
+
+    def _bound_loader(
+        self,
+        caller: CallerContext,
+        cache: dict[UUID, ChunkContext],
+    ) -> ContextFn:
+        """Return a context loader that rechecks parents through one cache.
+
+        Args:
+            caller: Server-derived identity for the RPC.
+            cache: Mutable ID-to-row map shared across parent expansion.
+
+        Returns:
+            Loader used by ``select_hybrid_context``.
+        """
+
+        def load(chunk_ids: tuple[UUID, ...]) -> tuple[ChunkContext, ...]:
+            """Load missing IDs then return authorized rows in request order.
+
+            Args:
+                chunk_ids: Requested canonical IDs.
+
+            Returns:
+                Cached authorized rows. Unauthorized IDs are omitted.
+            """
+
+            missing = tuple(item for item in chunk_ids if item not in cache)
+            if missing:
+                fetched = self._fetch_context(caller, missing)
+                for row in fetched:
+                    cache[row.chunk_id] = row
+            return tuple(cache[item] for item in chunk_ids if item in cache)
+
+        return load
+
+    def _fetch_context(
+        self,
+        caller: CallerContext,
+        chunk_ids: tuple[UUID, ...],
+    ) -> tuple[ChunkContext, ...]:
+        """Fetch authorized context via injection or the canonical RPC.
+
+        Args:
+            caller: Server-derived identity.
+            chunk_ids: At most 75 IDs.
+
+        Returns:
+            Authorized rows. Empty when no loader/connection is bound.
+        """
+
+        if self._load_context is not None:
+            return self._load_context(chunk_ids)
+        if self._supabase is None:
+            return ()
+        return fetch_authorized_chunk_context(
+            self._supabase,
+            caller=caller,
+            chunk_ids=chunk_ids,
+        )
+
+
+def _fail_closed_query(query: str) -> RetrievalFallbackReason | None:
+    """Return a named fallback when the query must not retrieve.
+
+    Args:
+        query: Raw user query.
+
+    Returns:
+        ``retrieval_empty`` when blank or over ``MAX_NORMALIZED_QUERY_CHARS``.
+    """
+
+    normalized = normalize_arabic_v1(query)
+    if normalized == "" or len(normalized) > MAX_NORMALIZED_QUERY_CHARS:
+        return RetrievalFallbackReason.RETRIEVAL_EMPTY
+    return None
+
+
+def _query_texts(query: str, profile: ExpectedProfile | None) -> tuple[str, ...]:
+    """Build unique embed texts: original plus at most three variants.
+
+    Args:
+        query: Original query.
+        profile: Optional profile whose ``variants`` field is a string list.
+
+    Returns:
+        At most four unique strings, original first.
+    """
+
+    ordered = [query]
+    seen = {query.strip()}
+    for variant in _str_list_field(profile, "variants"):
+        key = variant.strip()
+        if key == "" or key in seen:
+            continue
+        seen.add(key)
+        ordered.append(variant)
+        if len(ordered) >= _EMBED_TEXT_CAP:
+            break
+    return tuple(ordered)
+
+
+def _principal_scope_hash(caller: CallerContext) -> str:
+    """Hash caller identity for the ID-only cache key.
+
+    Args:
+        caller: Server-derived identity.
+
+    Returns:
+        SHA-256 hex digest. Raw user IDs are not logged here.
+    """
+
+    payload = (
+        f"{caller.user_id}:{caller.rpc_role()}:{caller.rpc_authorization_version()}"
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _closed_result(
+    reason: RetrievalFallbackReason,
+    *,
+    started: float,
+    embedding_call_count: int = 0,
+) -> HybridRunResult:
+    """Build a fail-closed retrieve result with no evidence.
+
+    Args:
+        reason: Named fallback.
+        started: ``perf_counter`` timestamp from retrieve start.
+        embedding_call_count: ``1`` when a gateway call was attempted.
+
+    Returns:
+        Empty ranked/evidence result with measured ``first_evidence_ms``.
+    """
+
+    return HybridRunResult(
+        ranked_ids=(),
+        evidence=(),
+        coverage=HybridCoverage(
+            signal=CoverageSignal.WEAK_EVIDENCE,
+            notes=(reason.value,),
+        ),
+        fallback_reason=reason,
+        deadline_exhausted=reason is RetrievalFallbackReason.TIMEOUT,
+        first_evidence_ms=_elapsed_ms(started),
+        embedding_call_count=embedding_call_count,
+        rerank_call_count=0,
+    )
+
+
+def _elapsed_ms(started: float) -> float:
+    """Return milliseconds since ``started``.
+
+    Args:
+        started: ``time.perf_counter`` value.
+
+    Returns:
+        Non-negative milliseconds.
+    """
+
+    return max(0.0, (time.perf_counter() - started) * 1000.0)
+
+
+def _unpack_dense(
+    value: object,
+) -> tuple[tuple[tuple[RetrievalCandidate, ...], ...], RetrievalFallbackReason]:
+    """Normalize a dense channel job result.
+
+    Args:
+        value: Job return value or ``None`` when the job was absent.
+
+    Returns:
+        Variant lists and a named dense fallback when the channel failed.
+    """
+
+    if value is None:
+        return (), RetrievalFallbackReason.NONE
+    if isinstance(value, DenseRetrievalResult):
+        return (value.candidates,), value.fallback_reason
+    if isinstance(value, tuple):
+        if not value:
+            return (), RetrievalFallbackReason.NONE
+        first = value[0]
+        if isinstance(first, RetrievalCandidate):
+            return (value,), RetrievalFallbackReason.NONE
+        if isinstance(first, tuple):
+            return value, RetrievalFallbackReason.NONE
+    return (), RetrievalFallbackReason.DENSE_UNAVAILABLE
+
+
+def _unpack_term(
+    value: object,
+) -> tuple[tuple[tuple[RetrievalCandidate, ...], ...], RetrievalFallbackReason]:
+    """Normalize a term channel job result.
+
+    Args:
+        value: Job return value or ``None`` when the job was absent.
+
+    Returns:
+        Variant lists and a named term fallback when the channel failed.
+    """
+
+    if value is None:
+        return (), RetrievalFallbackReason.NONE
+    if isinstance(value, TermRetrievalResult):
+        return (value.candidates,), RetrievalFallbackReason.NONE
+    if isinstance(value, tuple):
+        if not value:
+            return (), RetrievalFallbackReason.NONE
+        first = value[0]
+        if isinstance(first, RetrievalCandidate):
+            return (value,), RetrievalFallbackReason.NONE
+        if isinstance(first, tuple):
+            return value, RetrievalFallbackReason.NONE
+    return (), RetrievalFallbackReason.TERM_UNAVAILABLE
+
+
+def _unpack_bm25(value: object) -> Bm25RetrievalResult:
+    """Normalize a BM25 channel job result.
+
+    Args:
+        value: Job return value or ``None``.
+
+    Returns:
+        ID-only BM25 result. Missing jobs are empty with ``none``.
+    """
+
+    if isinstance(value, Bm25RetrievalResult):
+        return value
+    if isinstance(value, tuple) and value and isinstance(value[0], RetrievalCandidate):
+        return Bm25RetrievalResult(scanned_ids=(), candidates=value)
+    if (
+        isinstance(value, tuple)
+        and value
+        and isinstance(value[0], tuple)
+        and value[0]
+        and isinstance(value[0][0], RetrievalCandidate)
+    ):
+        return Bm25RetrievalResult(scanned_ids=(), candidates=value[0])
+    return Bm25RetrievalResult(scanned_ids=(), candidates=())
+
+
+def _compose_fallback(
+    *,
+    dense_reason: RetrievalFallbackReason,
+    term_reason: RetrievalFallbackReason,
+    bm25_fallback: RetrievalFallbackReason,
+    deadline_exhausted: bool,
+) -> RetrievalFallbackReason:
+    """Choose the retrieve-level named fallback.
+
+    Args:
+        dense_reason: Dense channel outcome.
+        term_reason: Term channel outcome.
+        bm25_fallback: BM25 outage, version mismatch, timeout, or none.
+        deadline_exhausted: True when any parallel job timed out.
+
+    Returns:
+        Highest-priority named reason. ``none`` when channels completed.
+    """
+
+    if dense_reason is RetrievalFallbackReason.DENSE_UNAVAILABLE:
+        return RetrievalFallbackReason.DENSE_UNAVAILABLE
+    if term_reason is RetrievalFallbackReason.TERM_UNAVAILABLE:
+        return RetrievalFallbackReason.TERM_UNAVAILABLE
+    if bm25_fallback is not RetrievalFallbackReason.NONE:
+        return bm25_fallback
+    if deadline_exhausted:
+        return RetrievalFallbackReason.TIMEOUT
+    return RetrievalFallbackReason.NONE
+
+
+def _identity_rerank(
+    _query: str,
+    pool: tuple[object, ...],
+    _deadline: float,
+) -> tuple[tuple[RerankRanking, ...], None, RerankFallbackReason]:
+    """Keep fused pool order without a model call.
+
+    Args:
+        _query: Unused original query.
+        pool: Authorized rerank pool.
+        _deadline: Unused remaining slice.
+
+    Returns:
+        Identity rankings, no usage, and ``none`` fallback.
+    """
+
+    rankings = tuple(
+        RerankRanking(
+            chunk_id=item.candidate.chunk_id,  # type: ignore[attr-defined]
+            rank=index + 1,
+            support=1.0,
+        )
+        for index, item in enumerate(pool)
+    )
+    return rankings, None, RerankFallbackReason.NONE
+
+
+def _evidence_units(
+    passages: tuple[object, ...],
+    contexts: tuple[ChunkContext, ...],
+) -> tuple[EvidenceUnit, ...]:
+    """Join selected passages to canonical locator rows.
+
+    Args:
+        passages: MMR-trimmed passages. Citation text is canonical raw_text.
+        contexts: Authorized rows for those IDs, including parents.
+
+    Returns:
+        Evidence units capped by selection order. BM25 text is unused.
+    """
+
+    by_id = {item.chunk_id: item for item in contexts}
+    units: list[EvidenceUnit] = []
+    for passage in passages:
+        candidate = passage.candidate  # type: ignore[attr-defined]
+        record = by_id.get(candidate.chunk_id)
+        citation = (
+            record.raw_text
+            if record is not None
+            else str(getattr(passage, "raw_text", ""))
+        )
+        locator = _locator_from_context(record, passage)
+        units.append(
+            EvidenceUnit(
+                chunk_id=candidate.chunk_id,
+                document_id=candidate.document_id,
+                version_id=candidate.version_id,
+                citation_text=citation,
+                locator=locator,
+            )
+        )
+        if len(units) >= FINAL_EVIDENCE_MAX:
+            break
+    return tuple(units)
+
+
+def _evidence_units_from_context(
+    fused: tuple[RetrievalCandidate, ...],
+    contexts: tuple[ChunkContext, ...],
+) -> tuple[EvidenceUnit, ...]:
+    """Build evidence from fused IDs when no profile/rerank ran.
+
+    Args:
+        fused: Fused authorized candidates, already trimmed.
+        contexts: Authorized canonical rows.
+
+    Returns:
+        Evidence units using ``ChunkContext.raw_text`` only.
+    """
+
+    by_id = {item.chunk_id: item for item in contexts}
+    units: list[EvidenceUnit] = []
+    for candidate in fused:
+        record = by_id.get(candidate.chunk_id)
+        if record is None:
+            continue
+        units.append(
+            EvidenceUnit(
+                chunk_id=record.chunk_id,
+                document_id=record.document_id,
+                version_id=record.version_id,
+                citation_text=record.raw_text,
+                locator=_locator_from_context(record, None),
+            )
+        )
+        if len(units) >= FINAL_EVIDENCE_MAX:
+            break
+    return tuple(units)
+
+
+def _locator_from_context(
+    record: ChunkContext | None,
+    passage: object | None,
+) -> EvidenceLocator:
+    """Copy locator fields from canonical context, then passage page/section.
+
+    Args:
+        record: Authorized chunk row when present.
+        passage: Selected passage used only for page/section fallback.
+
+    Returns:
+        Locator with canonical sheet/range/URL when the row exists.
+    """
+
+    if record is not None:
+        return EvidenceLocator(
+            page_number=record.page_number,
+            section_path=record.section_path,
+            sheet_name=record.sheet_name,
+            range_ref=record.range_ref,
+            source_url=record.source_url,
+        )
+    page = getattr(passage, "page_number", None) if passage is not None else None
+    section = getattr(passage, "section_path", ()) if passage is not None else ()
+    return EvidenceLocator(
+        page_number=page if isinstance(page, int) else None,
+        section_path=tuple(section) if isinstance(section, tuple) else (),
+    )
+
+
+def _str_list_field(profile: ExpectedProfile | None, name: str) -> tuple[str, ...]:
+    """Read a list-or-string profile field.
+
+    Args:
+        profile: Optional typed profile.
+        name: Attribute name on ``ExpectedProfile``.
+
+    Returns:
+        String values, or empty when missing.
+    """
+
+    if profile is None:
+        return ()
+    field = getattr(profile, name, None)
+    value = getattr(field, "value", None)
+    if isinstance(value, list):
+        return tuple(str(item) for item in value if str(item).strip())
+    if isinstance(value, str) and value.strip():
+        return (value,)
+    return ()
+
+
+def _str_field(profile: ExpectedProfile | None, name: str) -> str | None:
+    """Read a string profile field.
+
+    Args:
+        profile: Optional typed profile.
+        name: Attribute name.
+
+    Returns:
+        String value or ``None``.
+    """
+
+    if profile is None:
+        return None
+    field = getattr(profile, name, None)
+    value = getattr(field, "value", None)
+    if isinstance(value, str):
+        return value
+    return None
+
+
+def _bool_field(profile: ExpectedProfile | None, name: str) -> bool:
+    """Read a boolean profile field.
+
+    Args:
+        profile: Optional typed profile.
+        name: Attribute name.
+
+    Returns:
+        The boolean value, or ``False`` when missing.
+    """
+
+    if profile is None:
+        return False
+    field = getattr(profile, name, None)
+    value = getattr(field, "value", None)
+    return bool(value) if isinstance(value, bool) else False
+
+
+def _query_type(profile: ExpectedProfile | None) -> QueryType:
+    """Parse an existing ``QueryType`` enum value without adding a map.
+
+    Wave 1C owns QueryType mapping. This only accepts values already on
+    ``QueryType``.
+
+    Args:
+        profile: Optional typed profile.
+
+    Returns:
+        Profile query type when it is a ``QueryType`` member, else ``factual``.
+    """
+
+    raw = _str_field(profile, "query_type")
+    if raw is None:
+        return QueryType.FACTUAL
+    try:
+        return QueryType(raw)
+    except ValueError:
+        return QueryType.FACTUAL
+
+
+def _temporal_intent(profile: ExpectedProfile | None) -> TemporalIntent:
+    """Parse an allow-listed temporal intent from the profile.
+
+    Args:
+        profile: Optional typed profile.
+
+    Returns:
+        Matching ``TemporalIntent``, or ``none``.
+    """
+
+    raw = _str_field(profile, "temporal_intent")
+    if raw is None:
+        return TemporalIntent.NONE
+    try:
+        return TemporalIntent(raw)
+    except ValueError:
+        return TemporalIntent.NONE
+
+
+def _target_date(profile: ExpectedProfile | None) -> date | None:
+    """Parse an ISO ``YYYY-MM-DD`` target date when present.
+
+    Args:
+        profile: Optional typed profile.
+
+    Returns:
+        UTC calendar date, or ``None``.
+    """
+
+    raw = _str_field(profile, "target_date")
+    if raw is None:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None

@@ -10,10 +10,17 @@ from smart_rag_core.retrieval.bm25_query import (
 from smart_rag_core.retrieval.dense import DenseRetriever
 from smart_rag_core.retrieval.fusion import fuse_channels
 from smart_rag_core.retrieval.hybrid import HybridRetrievalResult, assemble_hybrid
+from smart_rag_core.retrieval.hybrid_run import (
+    EvidenceLocator,
+    EvidenceUnit,
+    HybridRetriever,
+    HybridRunResult,
+)
 from smart_rag_core.retrieval.profiles import (
     BM25_AUTHORIZED_SURVIVOR_CAP,
     DENSE_CANDIDATE_CAP,
     PREFUSION_UNION_CAP,
+    RETRIEVAL_SLICE_SECONDS,
     RRF_K,
     TERM_CANDIDATE_CAP,
     Bm25Field,
@@ -42,6 +49,7 @@ __all__ = [
     "BM25_AUTHORIZED_SURVIVOR_CAP",
     "DENSE_CANDIDATE_CAP",
     "PREFUSION_UNION_CAP",
+    "RETRIEVAL_SLICE_SECONDS",
     "RRF_K",
     "TERM_CANDIDATE_CAP",
     "Bm25Field",
@@ -55,8 +63,12 @@ __all__ = [
     "DenseMode",
     "DenseRetrievalResult",
     "DenseRetriever",
+    "EvidenceLocator",
+    "EvidenceUnit",
     "HnswProfileId",
     "HybridRetrievalResult",
+    "HybridRetriever",
+    "HybridRunResult",
     "RecheckRejectedError",
     "RetrievalCandidate",
     "RetrievalFallbackReason",

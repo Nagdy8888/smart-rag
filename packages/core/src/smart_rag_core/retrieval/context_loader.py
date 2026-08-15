@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 import psycopg
@@ -25,11 +27,14 @@ class ChunkContext:
         version_id: Current version.
         parent_chunk_id: Parent passage when present.
         chunk_index: Order within the version.
-        page_number: Optional page locator.
-        section_path: Heading path.
+        page_number: Optional page locator from the canonical row.
+        section_path: Heading path from the canonical row.
         token_count: Stored token count.
-        raw_text: Canonical citation text.
+        raw_text: Canonical citation text. Never a BM25 snippet.
         is_search_representative: Whether the row is a search child.
+        sheet_name: Workbook sheet from provenance locators, if any.
+        range_ref: Sheet/cell range from provenance locators, if any.
+        source_url: Crawl/HTML URL from provenance locators, if any.
     """
 
     chunk_id: UUID
@@ -42,6 +47,73 @@ class ChunkContext:
     token_count: int | None
     raw_text: str
     is_search_representative: bool
+    sheet_name: str | None = None
+    range_ref: str | None = None
+    source_url: str | None = None
+
+
+def locators_from_provenance(
+    provenance: object,
+) -> tuple[str | None, str | None, str | None]:
+    """Parse sheet, range, and URL from canonical ``provenance`` locators.
+
+    Args:
+        provenance: JSON object stored on ``app.document_chunks.provenance``.
+            Locators are the ``locator_to_dict`` payloads under ``locators``.
+
+    Returns:
+        ``(sheet_name, range_ref, source_url)``. Missing keys are ``None``.
+        BM25 snippets are never consulted.
+    """
+
+    payload = _as_mapping(provenance)
+    locators = payload.get("locators")
+    if not isinstance(locators, list):
+        locators = [payload] if payload.get("format") else []
+    sheet_name: str | None = None
+    range_ref: str | None = None
+    source_url: str | None = None
+    for item in locators:
+        mapping = _as_mapping(item)
+        if sheet_name is None:
+            sheet_name = _optional_str(mapping.get("sheet_name"))
+        if range_ref is None:
+            range_ref = _optional_str(mapping.get("range_ref")) or _optional_str(
+                mapping.get("cell_ref")
+            )
+        if source_url is None:
+            source_url = _optional_str(mapping.get("source_url"))
+        if sheet_name and range_ref and source_url:
+            break
+    return sheet_name, range_ref, source_url
+
+
+def heading_inventory_from_contexts(
+    contexts: tuple[ChunkContext, ...],
+) -> tuple[str, ...]:
+    """Return distinct authorized ``section_path`` values.
+
+    There is no second heading-inventory table. Inventory is the distinct
+    current authorized section paths from context rows.
+
+    Args:
+        contexts: Authorized chunk rows, including parents.
+
+    Returns:
+        Distinct joined section paths in first-seen order.
+    """
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in contexts:
+        if not item.section_path:
+            continue
+        label = "/".join(item.section_path)
+        if label in seen:
+            continue
+        seen.add(label)
+        ordered.append(label)
+    return tuple(ordered)
 
 
 def fetch_authorized_chunk_context(
@@ -97,7 +169,8 @@ def fetch_authorized_chunk_context(
                   section_path,
                   token_count,
                   raw_text,
-                  is_search_representative
+                  is_search_representative,
+                  provenance
                 FROM app.fetch_authorized_chunk_context(
                   %s::uuid,
                   %s::text,
@@ -117,6 +190,9 @@ def fetch_authorized_chunk_context(
     for row in rows:
         section = row[6]
         path = tuple(str(item) for item in section) if section else ()
+        sheet_name, range_ref, source_url = locators_from_provenance(
+            row[10] if len(row) > 10 else None
+        )
         results.append(
             ChunkContext(
                 chunk_id=UUID(str(row[0])),
@@ -129,6 +205,47 @@ def fetch_authorized_chunk_context(
                 token_count=int(row[7]) if row[7] is not None else None,
                 raw_text=str(row[8]),
                 is_search_representative=bool(row[9]),
+                sheet_name=sheet_name,
+                range_ref=range_ref,
+                source_url=source_url,
             )
         )
     return tuple(results)
+
+
+def _as_mapping(value: object) -> dict[str, Any]:
+    """Coerce JSONB or JSON text to a dictionary.
+
+    Args:
+        value: Driver-decoded JSON or a JSON string.
+
+    Returns:
+        A dictionary, or empty when the value is not an object.
+    """
+
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            loaded: object = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        if isinstance(loaded, dict):
+            return loaded
+    return {}
+
+
+def _optional_str(value: object) -> str | None:
+    """Return a non-empty string or ``None``.
+
+    Args:
+        value: JSON field.
+
+    Returns:
+        Stripped text, or ``None`` when missing/blank.
+    """
+
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
