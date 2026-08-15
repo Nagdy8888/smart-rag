@@ -30,8 +30,8 @@ Read the Phase 6 wrapper, `00-shared-contracts.md`, exactly one linked active pa
 - Global graph output steers Hybrid only.
 - Combined with `graph_survival_ratio < 0.50` becomes effective Hybrid with `graph_survival_below_threshold`; `NoRetrieval` cannot make company-knowledge claims.
 - One shared correction maximum: coverage below the frozen allow-listed query-class threshold (provisional `0.65`) without relationship signals may retry the same route; Hybrid below that threshold with a retained relationship/multi-hop signal may instead escalate to Combined. Never do both.
-- Enforce hard deadlines: Hybrid 25s, Combined 45s, StructuredTable 30s, Composite 50s, inspection 10s.
-- Count every gateway model call: maxima are 7/8/6/9/3 for Hybrid/Combined/StructuredTable/Composite/inspection. Hybrid targets six; call seven is correction/second-rerank or non-deferrable summary headroom only. Tool calls are at most four, or five for Composite; use at most three subquestions and `recursion_limit=24`.
+- Enforce hard deadlines: Hybrid 25s (full run, including answer), Combined 45s, StructuredTable 30s, Composite 50s, inspection 10s. Hybrid retrieval+rerank uses the Phase 4 retrieval slice inside that 25s envelope.
+- Count every gateway model call, including one batched query-embedding call per retrieve: maxima are 7/8/6/9/3 for Hybrid/Combined/StructuredTable/Composite/inspection. Hybrid targets six; call seven is correction/second-rerank or non-deferrable summary headroom only. Tool calls are at most four, or five for Composite; use at most three subquestions and `recursion_limit=24`.
 - Cancellation stops child work and reconciles reservations.
 - Gateway calls atomically consume only the run-local reservation; shared company/user rows are not relocked per call. Reservations heartbeat during work and completion/crash/orphan reconciliation true-ups actual usage.
 - Instrument event-loop lag/node CPU. Keep a pure-Python stage in-process only below the plan's p95 CPU threshold; otherwise use bounded process offload with cancellation and prove heartbeat jitter under five Composite runs.

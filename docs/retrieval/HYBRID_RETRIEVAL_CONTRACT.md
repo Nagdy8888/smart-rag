@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -95,7 +95,14 @@ dataset/config version, metric evidence, owner, rollback, and review trigger.
 | BM25 field order | priority | Plan | title > heading/alias > body | **title, heading, alias, body** | `bm25_v1` | Separate parameterized field queries | retrieval | same | Packet 4 boosts |
 | BM25 operators | enum | ParadeDB match/phrase | `\|\|\|` `&&&` `###` | typed only; **no `pdb.parse`** | contract tests | Injection text stays a bound parameter | retrieval | typed | Pin change |
 | Fallback `bm25_unavailable` | reason | Plan | enum | recorded, dense+term continue | Packet 2 | ParadeDB error or missing index | retrieval | same | Packet 4 coverage |
+| Fallback `dense_unavailable` | reason | Packet 9 | enum | named | Packet 9 | Dense channel timeout/error | retrieval | same | Live retrieve |
+| Fallback `term_unavailable` | reason | Packet 9 | enum | named | Packet 9 | Term channel timeout/error | retrieval | same | Live retrieve |
+| Fallback `auth_context_invalid` | reason | Packet 9 | enum | named | Packet 9 | Missing/forged/stale caller | retrieval | same | Live retrieve |
+| Fallback `retrieval_empty` | reason | Packet 9 | enum | named | Packet 9 | All channels empty after recheck | retrieval | same | Live retrieve |
+| Fallback `retrieval_timeout` | reason | Packet 9 | enum | named | Packet 9 | Retrieval slice exhausted | retrieval | same | Live retrieve |
 | Fallback `weak_evidence` | reason | Plan exact bound | enum | exact refused when count > 10k | Packet 2 | No unbounded seq scan | retrieval | same | Envelope change |
+| Evidence unit cap | units | Plan Packet 9 | 1–12 | **12** hard max (target 8–12) | `FINAL_EVIDENCE_MAX` | Context selector | retrieval | 12 | Packet 9 |
+| Query embed accounting | calls | Global QT-MC | 1 batched | original ∪ ≤3 variants | Packet 9 | Counts toward Hybrid 7 | retrieval | 1 | Live retrieve |
 | Retrieval profile ID | enum | Plan Packet 3 | allow-listed IDs | **`hybrid_default_v1`** | `query_profile_v1` | LLM cannot set weights, depths, SQL, or timeouts | retrieval | `hybrid_default_v1` | New allow-listed ID |
 
 ## Frozen Packet 4 values

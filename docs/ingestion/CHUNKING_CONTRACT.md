@@ -2,7 +2,7 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-15
 owning_phase: 3
 audience: engineering
 ---
@@ -39,6 +39,10 @@ Chunk IDs are UUID5 values derived from document/version namespace, element IDs/
 - **Exact:** normalized SHA-256 within a version; keep one searchable representative plus every duplicate locator and `duplicate_of_chunk_id`.
 - **Near (intra-version only):** 5-word-shingle Jaccard ≥ **0.92** when fuzzy policy meets **≥99% precision** and **≥85% recall** on fixtures; otherwise **exact-only** fallback (`dedup_v1`). Current fixture evaluation: precision **1.0**, recall **0.5** → **exact-only active**.
 - **Cross-document:** never hard-delete; authority/date may differ.
+
+## Heading inventory (Phase 4 consumer)
+
+Phase 3 stores heading ancestry on each chunk (`section_path`). Phase 4 whole-document coverage uses the **authorized current heading inventory**: distinct `section_path` values on current, undeleted, ACL-visible chunks of exactly one document version. Do not create a second inventory table.
 
 ## Typed tables
 

@@ -1,7 +1,7 @@
 ---
 name: hybrid-graph-rag-split-plan-completeness-audit
 status: resolved
-last_reviewed: 2026-08-12
+last_reviewed: 2026-08-15
 scope: split-plan-integrity
 verification: ./scripts/verify_plan_integrity.py
 ---
@@ -138,6 +138,10 @@ flowchart LR
 5. [x] Disambiguate legacy section references and update cheap-model guardrails.
 6. [x] Replace the one-time coverage claim with reproducible current-state evidence.
 7. [x] Expand Phases 6–11 through canonical one-packet-per-file contracts without recreating monolithic implementation context.
+
+## 2026-08-15 follow-up
+
+Phase 4 Packet 8 no-go plus engineering-close Packet 9: Hybrid retrieval-slice vs Phase 6 25s/answer-token/faithfulness ownership, QueryType mapping, BM25 top-300 (not keyset), and SME-holdout waiver live in the wrappers, Phase 6 shared/packet 02/05, and hybrid/query-agent skills. This note does not authorize Phase 5.
 
 ## Audit boundary
 

@@ -15,15 +15,15 @@ Read the active Phase 4 wrapper and selected inline packet contract before editi
    - private digest-pinned ParadeDB/`pg_search` BM25 over a rebuildable canonical projection, using typed parameterized allow-listed field/phrase/boolean queries, evaluated title/identifier > heading/alias > body boosts, Unicode tokenization, and byte-identical canonical-projection/core-query Arabic normalization while preserving raw citation text;
    - filtered pgvector HNSW with iterative scans and selectivity-aware `ef_search`;
    - deterministic trigram/exact search over populated filenames, titles, codes, glossary terms, and approved aliases.
-4. Give `Bm25Retriever` only server-derived opaque authorization scope and allow-listed filters. Batch-recheck every BM25 ID through the authoritative Supabase RPC before fusion; scan at most 300 IDs over three keyset pages to obtain at most 75 authorized survivors. Never use BM25 snippets as evidence.
-5. If ANN under-fills, increase an allow-listed profile once and then use a bounded exact scan only below the plan's estimated-row limit.
+4. Give `Bm25Retriever` only server-derived opaque authorization scope and allow-listed filters. Batch-recheck every BM25 ID through the authoritative Supabase RPC before fusion; scan at most 300 IDs with one top-300 query (cursor only if a later pin qualifies it) to obtain at most 75 authorized survivors. Never use BM25 snippets as evidence.
+5. If ANN under-fills, increase an allow-listed profile once and then use a bounded exact scan only when the authorized subset is admitted at or below 10,000 rows with hard statement/work/row bounds. Planner estimates are an admission hint, not the safety boundary.
 6. Fuse by RRF using the maximum contribution across variants per channel/passage, not the sum; raw BM25/vector/trigram scores only order their own lists.
 7. Apply only the plan's bounded multiplicative metadata factors.
 8. Apply explicit `latest`, `current`, `recent`, and `as_of` policies across documents.
 9. Start accuracy-first: retrieve up to 100 dense, 75 authorized BM25 survivors, and 30 term candidates across all variants, fuse, then rerank a top-20 pool for every non-trivial query with at least two authorized candidates. Skip only the plan's fully supported trivial exact lookup; never use raw BM25 or fused-score gaps.
 10. Validate that the reranker returns only unique supplied candidate IDs, ranked with bounded support scores. Unknown/duplicate IDs, malformed output, timeout, cancellation, or budget failure falls back to deterministic RRF with a recorded reason.
 11. After reranking, apply query-class-calibrated MMR/quotas, parent expansion, context budget, duplicate-cluster handling, and citation provenance.
-12. Compute `HybridCoverage`; permit only the defined correction/fallback. ParadeDB outage/version mismatch/timeout records `bm25_unavailable` and visibly degrades to dense plus exact/trigram term search.
+12. Compute `HybridCoverage`; permit only the defined correction/fallback. ParadeDB outage/version mismatch/timeout records `bm25_unavailable` and visibly degrades to dense plus exact/trigram term search. Also record `dense_unavailable`, `term_unavailable`, `auth_context_invalid`, `retrieval_empty`, and `retrieval_timeout` when those paths fire. Return at most 12 evidence units.
 13. Dispatch typed CSV/XLSX aggregation to the deterministic StructuredTable executor; never calculate totals from retrieved prose.
 
 ## Accuracy discipline

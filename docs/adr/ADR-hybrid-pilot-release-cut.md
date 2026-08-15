@@ -3,7 +3,7 @@ title: ADR — Hybrid Pilot release cut
 adr_id: ADR-hybrid-pilot-release-cut
 status: accepted
 owner: product-owner / engineering-lead
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-15
 approver: "user (Cursor chat; no legal name provided)"
 approval_date: "2026-08-12"
 audience: client-approver, engineering
@@ -31,7 +31,7 @@ Global contracts require a dated Hybrid Pilot decision record during Phase 1 sig
 | Checkpoint | Planned date | Scope | Approver field | Decision recorded |
 | --- | --- | --- | --- | --- |
 | End of Phase 1 | 2026-08-22 | Confirm targets/sign-off and whether the full Hybrid+Graph path remains funded | user (Cursor chat) | framework accepted 2026-08-12; checkpoint decision pending |
-| End of Phase 4 | 2026-11-07 | Re-estimate delivery; choose continue-to-GraphRAG vs Hybrid Pilot cut before Phase 5 starts | user (Cursor chat) | framework accepted 2026-08-12; Packet 8 no-go recorded 2026-08-14; checkpoint vote still pending |
+| End of Phase 4 | 2026-11-07 | Re-estimate delivery; choose continue-to-GraphRAG vs Hybrid Pilot cut before Phase 5 starts | user (Cursor chat) | framework accepted 2026-08-12; Packet 8 no-go 2026-08-14; engineering-close ADR 2026-08-15 continues toward GraphRAG **later** (Phase 5 not started); SME holdout remains a launch blocker |
 
 Effort basis (one experienced FTE, excluding client wait): Phase 1 ≈1–1.5 weeks; Phases 2–4 ≈1.5–2.5 + 3–4 + 3.5–5 weeks. Dates assume work start 2026-08-12 and mid-to-upper planning ranges; they are planning anchors, not SLAs.
 
@@ -60,12 +60,11 @@ live Hybrid Recall@10, citation correctness/completeness, and envelope p95
 remain unverified. Query-profile open-split gates passed on the mock
 extract. Winning profile stays `hybrid_default_v1`.
 
-This record does **not** cast the continue-versus-pilot vote. The user must
-choose continue-to-Phase-5 versus `0.x Hybrid Pilot` explicitly. Phase 4
-status remains `pending`. Evidence:
+This record does **not** start Phase 5. The 2026-08-15 engineering-close ADR continues toward GraphRAG later and waives only the SME holdout for Phase 4 acceptance. Phase 4 status remains `pending` until Packet 9 evidence is user-accepted. Evidence:
 [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md),
 [PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md),
-[phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md).
+[phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md),
+[ADR-phase4-engineering-close.md](./ADR-phase4-engineering-close.md).
 
 ## Consequences
 

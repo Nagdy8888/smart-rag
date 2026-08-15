@@ -2,7 +2,7 @@
 name: hybrid-graph-rag-source-coverage
 status: verified-at-split-amended-current-locked
 original_monolith_sha256: 41e3ee603ddb25d985b3636f13969e942cb8f53d0ab9c0753234f71fe46bb8ab
-last_amended: 2026-08-12
+last_amended: 2026-08-15
 current_integrity_lock: ./plan-integrity-lock.json
 ---
 
@@ -56,6 +56,7 @@ Do not use `--update` merely to hide an unexplained mismatch.
 - **2026-08-12 — Architecture/security/RAG review amendment:** resolved the linked [`docs/reviews/2026-08-12-hybrid-graph-rag-plan-review.md`](../../../docs/reviews/2026-08-12-hybrid-graph-rag-plan-review.md) findings across global contracts and Phases 1–11: server-derived transaction-pool-safe identity propagation, explicit ACL/read-audit and Auth-limit ownership, authorization-safe cache rechecks, full subprocessor governance, quarantine quotas/cleanup, UTC/negation/media/summary/historical route decisions, Arabic/mixed graph gates, RTL/bidirectional UX, expand/contract migrations, additive API/SSE versioning, Storage-inclusive restore reconciliation, independent security assessment, infrastructure billing alarms, and dated Hybrid Pilot decision criteria.
 - **2026-08-12 — BM25 lexical amendment:** replaced PostgreSQL `ts_rank_cd` FTS as the Hybrid lexical channel with a private digest-pinned ParadeDB/`pg_search` BM25 projection in local Docker and EC2. Supabase remains canonical for text, authorization, current-version state, durable projection jobs, vector/term retrieval, and final evidence; every bounded BM25 candidate is batch-rechecked in Supabase. Added projection versioning/replay/purge, Arabic Unicode normalization parity, dense+term outage degradation, private reader/writer roles, resource/split triggers, rebuild-from-Supabase recovery, telemetry/UI states, security/load/quality gates, and production handoff requirements.
 - **2026-08-12 — Lean Phase 6–11 expansion:** retained Phases 1–5 inline and converted Phases 6–11 to thin wrappers plus canonical phase-shared and one-packet-per-file contracts. Single-sourced the Phase 7/8 frontend contract and Phase 9–11 release concerns, updated model loading rules, and extended integrity validation to discover, validate, navigate, and hash every packet/shared source.
+- **2026-08-15 — Phase 4 engineering-close amendment:** added inline Packet 9 for open-split ranked-ID close after Packet 8 no-go; split Phase 4 retrieval-slice latency from Phase 6 answer-token/faithfulness/25s run deadline; froze BM25 as one top-300; named HybridRetriever/heading-inventory/fallback enums; mapped Phase 4 QueryType to Phase 6 route families; counted batched query embeddings in the Hybrid call ceiling; recorded SME-holdout waiver for engineering-complete Phase 4 in ADR-phase4-engineering-close without opening the synthetic holdout.
 
 ## Preserved split evidence
 

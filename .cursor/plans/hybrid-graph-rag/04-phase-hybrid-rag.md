@@ -52,14 +52,15 @@ Complete these in order. A checked box requires committed implementation evidenc
 6. [x] Calibrate coverage/refusal by query class before the immutable holdout and prohibit unsupported advanced methods.
 7. [x] Implement the declarative, sandboxed structured-table path with exact workbook/sheet/range provenance.
 8. [x] Publish ablations, quality, latency, cost, citation, ACL, and fallback evidence; freeze winning versioned profiles.
+9. [ ] Close Hybrid engineering gates on Phase-4-owned open splits: end-to-end retrieve, live ranked-ID recall, citation locators, first-evidence p95, and the holdout-waiver ADR; do not open the synthetic holdout.
 
 ## Cheap-model execution protocol
 
-The eight checkboxes above are separate work packets. One model run may execute only one packet, in order. Before editing, the model must quote the active packet, state its positive and negative acceptance checks, inspect every target path plus the Phase 1–3 accepted exit records, and prove all prerequisites. This expanded plan does not satisfy any prerequisite or sign-off.
+The nine checkboxes above are separate work packets. One model run may execute only one packet, in order. Packet 9 may follow a Packet 8 no-go; it does not reopen holdout labels. Before editing, the model must quote the active packet, state its positive and negative acceptance checks, inspect every target path plus the Phase 1–3 accepted exit records, and prove all prerequisites. This expanded plan does not satisfy any prerequisite or sign-off.
 
 Use [`docs/development/phase-04-hybrid-rag-evidence.md`](../../../docs/development/phase-04-hybrid-rag-evidence.md) as the canonical packet evidence and exit record. Packet 1 creates it and links it from `docs/README.md`. Every packet appends inspected migrations/schema/pins, dated primary-documentation links, exact commands and exit codes, dataset/config hashes, authorization and failure fixtures, measured quality/latency/cost/resources, unresolved assumptions, rollback, and next-packet handoff.
 
-Create [`docs/retrieval/HYBRID_RETRIEVAL_CONTRACT.md`](../../../docs/retrieval/HYBRID_RETRIEVAL_CONTRACT.md) in packet 2 and update it through packet 8. It is the single source for versioned channel profiles, candidate/scan/deadline bounds, HNSW transaction settings, ParadeDB query/index contract, RRF, temporal factors, rerank pool/schema/model, MMR/quotas, parent/context budget, coverage/refusal thresholds, cache keys/TTLs, and fallback reason enums. Every tunable records unit, source/baseline, allowed range, selected value, dataset/config version, metric evidence, owner, rollback value, and review trigger. Values fixed in this plan remain fixed unless an approved ADR changes them; unspecified values must be measured and frozen rather than invented.
+Create [`docs/retrieval/HYBRID_RETRIEVAL_CONTRACT.md`](../../../docs/retrieval/HYBRID_RETRIEVAL_CONTRACT.md) in packet 2 and update it through packet 9. It is the single source for versioned channel profiles, candidate/scan/deadline bounds, HNSW transaction settings, ParadeDB query/index contract, RRF, temporal factors, rerank pool/schema/model, MMR/quotas, parent/context budget, coverage/refusal thresholds, cache keys/TTLs, and fallback reason enums. Every tunable records unit, source/baseline, allowed range, selected value, dataset/config version, metric evidence, owner, rollback value, and review trigger. Values fixed in this plan remain fixed unless an approved ADR changes them; unspecified values must be measured and frozen rather than invented.
 
 For pgvector, Supabase/PostgREST/connection pooling, ParadeDB/`pg_search`, OpenAI Responses/structured output, LangSmith, DuckDB, and evaluation tooling:
 
@@ -79,6 +80,8 @@ The implementation must preserve these provider caveats:
 - LangSmith split labels can overlap and do not make a dataset immutable. Project validation, manifest hashes, permissions, frozen version tags, and one-way holdout access enforce isolation.
 
 Dataset leakage is a launch-blocking defect. The Phase 2 embedding-qualification slice, Phase 4 development set, Phase 4 qualification set, immutable launch holdout, and post-launch regression set are disjoint by stable case/source-group IDs. Development selects/tunes; qualification confirms one proposed freeze; the launch holdout runs once after freeze and never seeds aliases, prompts, thresholds, or methods. If the holdout fails, record the failed release; repairs use development/qualification data, and a later launch claim requires a newly collected and independently sealed holdout approved by the SME.
+
+Two postures are explicit. **Engineering** may use a sealed synthetic corpus to implement retrieve, ranked-ID metrics, locators, and first-evidence timing on open splits; it cannot close a v1 launch holdout claim. **Launch** requires named Knowledge Owner hours and an independently SME-sealed holdout. Opening the current synthetic holdout only to produce Recall@10 is forbidden. [`docs/adr/ADR-phase4-engineering-close.md`](../../../docs/adr/ADR-phase4-engineering-close.md) records when engineering-complete Phase 4 acceptance is allowed without that SME seal.
 
 The minimum 405 labeled cases in the canonical requirements are the complete initial Phase 4 corpus minimum, not permission to place the same case in several splits. Unless `DATASET_SPEC.md` obtains a different signed allocation before labeling, allocate each query class deterministically as 50% development, 25% qualification, and the remainder holdout, with at least one qualification and one holdout case per class. Group all variants from the same source/question family into one split. Graph/Combined/tool/frontend cases may be labeled now but their runtime execution remains Phase 5/6/8 evidence and cannot make Phase 4 pass.
 
@@ -214,7 +217,7 @@ Every inferred/normalized field carries typed value, confidence in `[0,1]`, and 
 
 - profile/prompt/model/normalizer/date-parser versions and original query;
 - language plus mixed-locale/configuration;
-- query type: exact identifier, factual, semantic/conceptual, multi-part, relationship/multi-hop, broad summary, or structured tabular aggregation;
+- query type: exact identifier, factual, semantic/conceptual, multi-part, relationship/multi-hop, broad summary, or structured tabular aggregation (frozen Phase 4 enum; Phase 6 may map these to route families and add `graph_inspection` / `no_retrieval` without changing this list);
 - exact terms, quoted phrases, codes, numbers, dates, entities, and approved aliases;
 - requested document/source and allow-listed metadata filters;
 - temporal intent `latest`, `current`, `recent`, `as_of`, or none; target date/timezone and authoritative date field;
@@ -277,23 +280,23 @@ Every inferred/normalized field carries typed value, confidence in `[0,1]`, and 
 
 #### Packet 4 ordered actions
 
-1. Derive absolute channel/deadline budgets from the remaining 25-second Hybrid deadline. Start channels in bounded parallel work, cancel/close on deadline, and record timeout/cancellation separately from zero results.
+1. Derive absolute channel/deadline budgets from the named Hybrid **retrieval slice** (statement timeout and remaining time for rerank/context), not from the 25-second full-run Hybrid deadline owned by Phase 6. Start channels in bounded parallel work, cancel/close on the retrieval slice, and record timeout/cancellation separately from zero results. One batched query-embedding gateway call covers `{original} ∪ variants` and counts toward the Hybrid model-call ceiling.
 2. Enforce server-side post-variant-dedup maxima: 100 dense, 75 authorized BM25, 30 term, and 205 unique pre-fusion IDs.
-3. For BM25, scan at most 300 IDs over at most three bounded retrieval rounds across all variants. Use a relevance-preserving cursor only after a pinned-version contract test proves no duplicate/omission; otherwise use one top-300 stable ordered query. Recheck each bounded batch/page through Supabase before accumulation.
+3. For BM25, scan at most 300 IDs across all variants. The frozen pin uses **one top-300** stable ordered query (`score desc, canonical_id asc`); a relevance-preserving cursor is allowed only after a later pin's contract test proves no duplicate/omission. Recheck each bounded batch through Supabase before accumulation.
 4. Reject missing/forged/stale authorization context. Every candidate resolved for fusion/context is current, undeleted, ACL-authorized, scope-matching canonical Supabase data; BM25 text/snippets are discarded.
 5. For each passage/channel, use the best reciprocal-rank contribution across variants exactly once, invariant to variant order/duplicates. Then sum weighted vector/BM25/term contributions with initial `rrf_k=60` and allow-listed query-profile weights.
 6. Keep raw scores only for within-channel order. Apply only evaluated multiplicative authority/title/heading/explicit-temporal factors whose product is clamped `[1.0, 1.15]`; current version/ACL are hard filters.
 7. Implement temporal rules exactly: `latest`, `current`, `recent`, `as_of`, and none under UTC or the one signed company timezone. Unknown dates cannot win strict claims; no-authoritative-date, mixed locale, expiry/supersession, and Hijri limitations are explicit.
 8. Equally authoritative current contradictions return conflict evidence with all relevant dates/citations. Stable final ties use authority, effective date, published date, then canonical ID.
-9. Compute whole-document section coverage from the authorized current heading inventory; if bounded context cannot cover every major section, return scoped uncovered-heading/page diagnostics rather than a full-summary claim.
+9. Compute whole-document section coverage from the authorized current heading inventory: distinct `section_path` values on current undeleted ACL-visible chunks of the requested document version (Phase 3 heading ancestry; no second inventory table). If bounded context cannot cover every major section, return scoped uncovered-heading/page diagnostics rather than a full-summary claim.
 10. Negation/exclusion requires precise scope or deterministic closed-set evidence; media-only required evidence returns the signed limitation. Phase 4 emits coverage/refusal/relationship signals but does not spend the Phase 6 correction/escalation budget.
-11. ParadeDB unavailable/version-mismatched/over-deadline/open-circuit degrades visibly to dense+term with `bm25_unavailable`; never label it full three-channel Hybrid.
-12. If implementing cache in this phase, key it by principal/ACL-scope hash, profile/index/normalization versions, and document-visibility generation; store IDs/ranks only; use signed/global TTLs; always recheck authoritative Supabase before evidence. Otherwise expose the versioned cache-key/recheck interface for Phase 6.
+11. ParadeDB unavailable/version-mismatched/over-deadline/open-circuit degrades visibly to dense+term with `bm25_unavailable`; never label it full three-channel Hybrid. Named fallbacks also include `dense_unavailable`, `term_unavailable`, `auth_context_invalid`, `retrieval_empty`, and `retrieval_timeout`.
+12. Phase 4 ships the versioned cache-key/recheck **interface** (principal/ACL-scope hash, profile/index/normalization versions, document-visibility generation; IDs/ranks only; mandatory authoritative recheck). Phase 6 packet 5 owns Valkey wiring. Do not treat TTL as ACL.
 13. Append candidate/recheck/RRF/temporal/conflict/degradation/deadline evidence.
 
 #### Packet 4 acceptance checks
 
-- Caps hold across all variants; BM25 scanning never exceeds 300/three qualified rounds; zero unauthorized/stale/deleted/wrong-current IDs reach fusion, cache, prompt, or trace.
+- Caps hold across all variants; BM25 scanning never exceeds 300 IDs via one top-N query unless a later pin qualifies a cursor; zero unauthorized/stale/deleted/wrong-current IDs reach fusion, cache, prompt, or trace.
 - RRF is invariant to variant order/duplicate variants and max-not-sum; metadata product never exceeds 1.15.
 - Selective filters retain signed candidate recall/sufficiency; BM25 kill/version/timeout produces bounded visible dense+term degradation.
 - UTC/company-timezone temporal, conflict, whole-document, negation, historical, and media limitation fixtures take deterministic supported/refusal routes.
@@ -337,7 +340,7 @@ Every inferred/normalized field carries typed value, confidence in `[0,1]`, and 
 6. Refusal, incomplete output, schema/semantic failure, timeout, cancellation, budget denial, model/version mismatch, or unknown usage falls back to deterministic pre-rerank RRF order with typed reason. Never retry through a local model.
 7. Run accuracy-reference `always rerank top 20` on development/qualification sets. For every conditionally skipped case, run one offline counterfactual and record top-1/top-5, nDCG, evidence/term/subquestion coverage, citation support, latency, and cost deltas.
 8. Apply query-class-calibrated MMR after rerank with pinned similarity source/normalization/metric/lambda/candidate depth, per-document/section quotas, and stable ID tie-breaks.
-9. Search small passages, then load only strongest authorized current parents/adjacent passages needed for coherence. Recheck after expansion and enforce final approximately 8–12 evidence units/token budget.
+9. Search small passages, then load only strongest authorized current parents/adjacent passages needed for coherence. Recheck after expansion and enforce a hard maximum of 12 evidence units inside the token budget (target 8–12).
 10. Return canonical IDs, component/fused/rerank ranks, support feature, decision/fallback, MMR/quota/parent decisions, source metadata, and exact canonical locators; no synthetic prefix/BM25 snippet becomes citation.
 11. Append schema/model/budget/counterfactual/diversity/context/fallback evidence.
 
@@ -506,6 +509,52 @@ Every inferred/normalized field carries typed value, confidence in `[0,1]`, and 
 
 - Frozen manifest/config/run hashes, complete ablation and holdout reports, all stage/slice metrics and confidence intervals, service/resource/cost traces, ACL/citation/fallback fixtures, Phase 3 reconfirmation, no-go/new-holdout record if needed, revised estimate/client decision, exact commands, and explicit user acceptance.
 
+### Packet 9 — engineering close on open splits (holdout sealed)
+
+#### Packet 9 preconditions
+
+- Packets 1–8 evidence exists; Packet 8 recorded holdout no-go or equivalent sealed-holdout status.
+- Phases 1–3 remain accepted. Signed `QUALITY_TARGETS.md` and [`ADR-phase4-engineering-close.md`](../../../docs/adr/ADR-phase4-engineering-close.md) are in force for engineering-complete acceptance.
+- Local Supabase, private ParadeDB overlay, and the shared embedding/model gateway can exercise real boundaries. Holdout access remains denied.
+
+#### Packet 9 allowed outputs
+
+- End-to-end `HybridRetriever` in `packages/core/src/smart_rag_core/retrieval/`, OpenAI embedding adapter on the shared gateway, open-split eval-corpus materializer with sidecar gold-ID map, ranked-ID/locator/first-evidence eval runner, Phase 4↔Phase 6 `QueryType` map, contract/docs/ADR updates, and Packet 9 evidence.
+- Live Recall@K, locator correctness, ACL negatives, table fixtures, and first-evidence p95 on **Phase-4-owned** development then one qualification confirm.
+
+#### Packet 9 forbidden outputs
+
+- Opening, scoring, or tuning on holdout labels; mutating sealed manifests; counting relationship/multi-hop/graph_mapping/prompt_injection runtime as Phase 4 passes; answer/SSE/faithfulness claims; LightRAG/Phase 5 work; setting `status: complete` before user acceptance; inventing Recall@10 from occupancy.
+
+#### Packet 9 ordered actions
+
+1. Keep holdout sealed. Filter eval to `runtime_owner=phase_4`.
+2. Implement query-time batched embeddings through the shared gateway and one `HybridRetriever.retrieve` composing profile, channels, recheck, RRF, rerank, `select_hybrid_context`, locators, coverage, and `first_evidence_ms`.
+3. Materialize compact Hybrid Ready sources for open-split Phase-4-owned cases; map synthetic evidence IDs to real chunk UUIDs in a sidecar only.
+4. Run ranked-ID Recall@10 / exact-code Recall@5 / alias Recall@10, locator correctness, ACL negatives, table path, refusal classes, and first-evidence p95 on development, then qualification once.
+5. Record cost, hashes, commands, and residual launch blockers (SME holdout, answer-token latency, faithfulness).
+
+#### Packet 9 acceptance checks
+
+- A single retrieve path returns authorized canonical IDs and locators; BM25 snippets are never evidence.
+- Phase-4-owned open-split ranked-ID gates meet signed QT-EVAL-006/007/008 or the packet records a bounded-repair miss without a fake pass.
+- Locator correctness is measured on returned evidence units (page/section/sheet/range/URL from canonical rows).
+- First-evidence p95 is measured on the retrieval path (QT-LAT-001), not first answer token.
+- `holdout_opened=false`; freeze job still refuses holdout access.
+- ADR engineering-close and Hybrid Pilot checkpoint notes are recorded; Phase 5 does not start in this packet.
+
+#### Packet 9 negative tests
+
+- Holdout load from the eval runner, occupancy labeled as Recall@10, unauthorized ID in ranked lists, BM25 text as citation, mock-only semantic Recall@10 claimed as live, or Phase 5 files implemented, fails.
+
+#### Packet 9 stop routes
+
+- Real embedding/retrieve/ParadeDB/Supabase boundary cannot be exercised and only a skipped test would pass; holdout isolation is compromised; signed lexical/semantic gates miss after two development repairs without an explicit recorded miss.
+
+#### Packet 9 required evidence
+
+- Retrieve module paths, embedding adapter pin, materializer sidecar hashes, ranked-ID reports, locator/ACL/p95/cost traces, exact commands and exit codes, ADR links, residual launch blockers, and a request for user acceptance before `status: complete`.
+
 ## Cross-packet invariants and ownership
 
 - Supabase current authorized canonical passages and deterministic table values are the only evidence. ParadeDB returns ranks/IDs only; every ID is rechecked before fusion and again before context/citation assembly.
@@ -519,7 +568,7 @@ Every inferred/normalized field carries typed value, confidence in `[0,1]`, and 
 - Phase 6 owns final query LangGraph, route/correction/escalation budgets, Combined/Composite composition, answer/verifier/summary prompts, SSE/API, production tracing/redaction, feedback, and online evaluators.
 - Phase 8 owns the complete frontend/tool UX and client-side rendering tests.
 - A label for later-phase behavior is not implementation or passing evidence in Phase 4.
-- Phase 4 remains pending until packet 8 evidence and client/user acceptance are complete.
+- Phase 4 remains pending until packet 9 evidence and client/user acceptance are complete. Packet 8 no-go plus packet 9 engineering close is the accepted path when the SME holdout is waived for Phase 4 only.
 
 ## Phase sequence requirement
 
@@ -647,7 +696,7 @@ After RRF:
 6. If the OpenAI reranker is unavailable, invalid, over budget, cancelled, incomplete, version-mismatched, or times out, fall back to deterministic RRF rather than failing retrieval. Record the fallback reason. Disable or explicitly account for SDK/gateway automatic retries so the one-operation/model-call budget is truthful; timeout-after-provider-success and duplicate cost remain observable. Never retry with a local model.
 7. Apply per-document/section quotas and query-class-calibrated MMR after reranking so one source cannot fill final context while complementary evidence remains.
 8. Search using small passages, then load only the strongest parent sections and adjacent passages required for coherence.
-9. Return approximately 8–12 final evidence units, bounded by a token budget, with raw component ranks, fused/rerank scores, decision/fallback reason, source metadata, and citation coordinates.
+9. Return at most 12 final evidence units (target 8–12), bounded by a token budget, with raw component ranks, fused/rerank scores, decision/fallback reason, source metadata, and citation coordinates.
 
 The v1 `Reranker` implementation is OpenAI-only; do not install, download, or run a local cross-encoder/reranking model. Keep the interface for testing and future provider changes, but changing provider or adding a local model requires user approval, an ADR, data/cost/latency evaluation, and updated release gates.
 
@@ -668,11 +717,11 @@ coverage_score = min(
 
 Simple queries use `subquestion_coverage=1` and `profile_minimum=1`; relationship candidates require at least two distinct evidence units; broad synthesis requires three sections/documents; multi-part requires one supported unit per subquestion. `support_confidence` is a bounded reranker support feature when run, otherwise `1.0` for an exact phrase/code match or a top passage present in at least two channels, and `0.60` for a single-channel-only winner. It is not asserted to be a calibrated probability. Start with `coverage_score < 0.65` as a development baseline. Calibrate allow-listed thresholds per query class on the development set against supported-answer precision, answer rate/recall, false-supported-answer rate, and unnecessary-refusal rate; confirm one frozen candidate on qualification, then freeze before one final holdout run. Refusal calibration includes insufficient-evidence, contradictory-authority, missing-subquestion, and ACL-filtered cases and weights an unsupported confident answer more heavily than an honest refusal.
 
-For a requested whole-document summary, first resolve exactly one authorized current document version and compute `section_coverage_ratio = covered_major_sections / total_major_sections` from its deterministic heading inventory. Claim a full-document summary only when the bounded 8–12 evidence-unit/token budget contains at least one adequate passage for every major section and `section_coverage_ratio=1.0`; otherwise return a scoped refusal listing uncovered headings/page ranges and suggest section/range questions. No map-reduce, recursive summary tree, or RAPTOR summary path is allowed in v1.
+For a requested whole-document summary, first resolve exactly one authorized current document version and compute `section_coverage_ratio = covered_major_sections / total_major_sections` from its deterministic heading inventory (distinct current authorized `section_path` values). Claim a full-document summary only when the bounded at-most-12 evidence-unit/token budget contains at least one adequate passage for every major section and `section_coverage_ratio=1.0`; otherwise return a scoped refusal listing uncovered headings/page ranges and suggest section/range questions. No map-reduce, recursive summary tree, or RAPTOR summary path is allowed in v1.
 
 Negation/exclusion queries do not infer a complete complement from ordinary top-k retrieval. They either obtain a precise user scope, use deterministic table/enumeration evidence that proves the closed set, or return a clarification/scoped refusal. Media-dependent questions whose required evidence is only inside a figure/chart/diagram return the signed v1 limitation notice; adjacent captions/OCR may answer only the text they actually contain.
 
-All retrieval rewriting and route escalation share the single global correction budget from Section 1. Weak evidence without relationship/multi-hop signals may use one same-route rewrite/retrieval correction. Weak Hybrid **with** any retained relationship/multi-hop signal may instead spend that correction to escalate to Combined. No path receives both corrections; after the budget is spent, return verified partial/insufficient evidence rather than forcing an answer.
+**Phase 6 consumer:** All retrieval rewriting and route escalation share the single global correction budget from Section 1. Weak evidence without relationship/multi-hop signals may use one same-route rewrite/retrieval correction. Weak Hybrid **with** any retained relationship/multi-hop signal may instead spend that correction to escalate to Combined. No path receives both corrections; after the budget is spent, return verified partial/insufficient evidence rather than forcing an answer. Phase 4 emits coverage/refusal/relationship signals only and must not implement Combined escalation or spend that budget.
 
 Do not add HyDE, RAPTOR, SPLADE, ColBERT, or learned-to-rank in v1. Preserve extension points and evaluate them only when the golden dataset identifies a concrete failure:
 
@@ -687,7 +736,7 @@ Tune on development/qualification data and use the final holdout once after free
 
 Implement `structured_table_query` as a registry-backed internal tool that is deterministically bound when the typed profile requires filter, sort, group, sum, count, average, min/max, or comparison over CSV/XLSX cells; it does not incur catalog discovery. Ordinary spreadsheet lookups still use Hybrid passages.
 
-The model emits a validated declarative `TableQueryPlan` containing authorized table/version IDs, stable allow-listed columns, typed predicates, allow-listed aggregations, grouping, ordering, comparison, units, and row/output limit. It never emits SQL, paths, globs, URIs, extensions, pragmas, or functions. The server resolves IDs to exact authorized current immutable Parquet artifacts and rechecks ACL/current/deletion before open and result assembly. Run DuckDB in a no-network/no-secret OS-isolated process/container; read-only/allow-listed paths, disabled external access/autoload/autoinstall/unsigned extensions/filesystems, and locked configuration are defense in depth. Enforce bounded threads/memory/temp/scanned bytes/rows/output and the three-second statement deadline with a process timer, interrupt, and bounded kill grace because DuckDB has no assumed general SQL statement-timeout guarantee. Results include table/version/artifact/schema IDs, workbook/sheet, exact source ranges/cells, operation/predicates/grouping, units/currency, input/output rows, rounding/null policy, and deterministic values so the final answer can cite both calculation and source cells. Missing/stale formula caches, unsupported formulas/types, ambiguous/duplicate headers, mixed units/currencies, non-finite values, precision/timezone loss, hidden-sheet conflict, or insufficient provenance produce clarification/refusal rather than an invented calculation.
+Phase 4 implements the sandboxed executor, `TableQueryPlan` validation, authorization resolver, and provenance. **Phase 6 consumer:** the query model may emit a validated declarative `TableQueryPlan` containing authorized table/version IDs, stable allow-listed columns, typed predicates, allow-listed aggregations, grouping, ordering, comparison, units, and row/output limit. It never emits SQL, paths, globs, URIs, extensions, pragmas, or functions. The server resolves IDs to exact authorized current immutable Parquet artifacts and rechecks ACL/current/deletion before open and result assembly. Run DuckDB in a no-network/no-secret OS-isolated process/container; read-only/allow-listed paths, disabled external access/autoload/autoinstall/unsigned extensions/filesystems, and locked configuration are defense in depth. Enforce bounded threads/memory/temp/scanned bytes/rows/output and the three-second statement deadline with a process timer, interrupt, and bounded kill grace because DuckDB has no assumed general SQL statement-timeout guarantee. Results include table/version/artifact/schema IDs, workbook/sheet, exact source ranges/cells, operation/predicates/grouping, units/currency, input/output rows, rounding/null policy, and deterministic values so the final answer can cite both calculation and source cells. Missing/stale formula caches, unsupported formulas/types, ambiguous/duplicate headers, mixed units/currencies, non-finite values, precision/timezone loss, hidden-sheet conflict, or insufficient provenance produce clarification/refusal rather than an invented calculation.
 
 ## 11. LangSmith, prompts, cost, and evaluation
 
@@ -724,4 +773,4 @@ Define the feedback taxonomy and curation contract for “chunk/cleaning loss,�
 
 - Deliver: immutable held-out dataset plus labeled query profiles/refusals; private SME glossary/code/acronym seed and import; versioned Arabic normalizer/cross-runtime conformance fixture; private pinned ParadeDB `Bm25Retriever` with typed queries, field boosts, Unicode tokenization, authorization prefilter plus Supabase recheck, projection/rebuild telemetry, and outage fallback; lightweight contextual HNSW with filtered iterative scans and bounded 100/75/30 dense/BM25/term depths; UTC/company-timezone temporal metadata; negation/document-scope/media/historical profile fields; whole-document section-coverage proof and scoped refusal; max-normalized variant RRF; accuracy-first top-20 OpenAI reranking with schema validation/RRF fallback and skipped-case counterfactual report; query-class MMR/parent expansion; profile/tunable/coverage calibration report; tables; diagnostics/citations; and a Phase 4 delivery re-estimate/Hybrid-Pilot decision record.
 - Review: chunking baseline impact, small/large embedding decision, Arabic normalization/ta-marbuta and multilingual BM25 expectations, ParadeDB field boosts/tokenizer/query safety/pin, selective-filter/candidate-depth/recheck recall, projection lag/index size/rebuild/outage, glossary/identifier/alias coverage, per-field profile errors, negation and whole-document-summary refusal behavior, media limitations, mixed-locale temporal accuracy, variant bias, `rrf_k`/weights/multipliers, permissive rerank value and safe skip conditions, MMR/context, coverage answer/refusal curves, table results, ACL, cost, latency, and the proceed-to-Phase-5 versus 0.x-pilot decision.
-- Done when: all Section 1 Hybrid/code/alias/BM25 gates pass and Phase 3 chunk/projection gates are re-confirmed on representative indexed fixtures; the 405-case corpus has approved source-family-disjoint development/qualification/one-use holdout manifests and no leakage; profile fields including negation/document/media/historical signals meet signed thresholds with first-failure attribution; Data API/direct pooled identity protocols, transaction-local HNSW settings, private typed BM25 queries, and Supabase batched recheck return zero unauthorized/stale/deleted/wrong-current evidence, retain signed recall under selective filters against an exact oracle, and obey 100/75/30, 205-union, 300-scan/three-qualified-round, exact-fallback, and deadline bounds; normalized Arabic/mixed BM25 and UTC-anchored temporal cases beat declared baselines; projection lag/rebuild/index resources fit signed targets; killed/incompatible/late ParadeDB produces observable dense+term degradation without uncited evidence; full-document summary fixtures require section coverage `1.0` or scoped guidance; negation fixtures clarify/prove/refuse without confident inversion; media-dependent fixtures return the signed limitation; one-operation strict-set-equality OpenAI reranking plus deterministic fallback, MMR/quotas, and authorized parent expansion beat simpler methods within signed cost/latency; every tightened trigger/depth is justified by counterfactual curves; coverage/refusal thresholds are frozen before the single immutable holdout; the OS-isolated declarative table path produces exact typed values/ranges or fails closed; citations open authorized current Supabase passages/ranges rather than BM25 snippets/context prefixes; no local reranker, advanced prohibited method, ungrounded map-reduce, or later-phase runtime exists; all signed ACL/citation/recall/profile/latency/cost/refusal/table/fallback gates pass on the frozen holdout or the phase records no-go; and the revised estimate plus client-approved continue/pilot decision and explicit user acceptance are recorded before Phase 5.
+- Done when: Phase 3 chunk/projection gates are re-confirmed on representative indexed fixtures; the 405-case corpus has source-family-disjoint development/qualification/holdout manifests with no leakage and holdout labels remain sealed unless independently SME-sealed; profile fields including negation/document/media/historical signals meet signed thresholds with first-failure attribution on open splits; Data API/direct pooled identity protocols, transaction-local HNSW settings, private typed BM25 queries, and Supabase batched recheck return zero unauthorized/stale/deleted/wrong-current evidence, retain signed recall under selective filters against an exact oracle, and obey 100/75/30, 205-union, 300-scan/one-top-N, exact-fallback, and retrieval-slice deadline bounds; normalized Arabic/mixed BM25 and UTC-anchored temporal cases beat declared baselines; killed/incompatible/late ParadeDB produces observable dense+term degradation without uncited evidence; full-document summary fixtures require section coverage `1.0` or scoped guidance; negation fixtures clarify/prove/refuse without confident inversion; media-dependent fixtures return the signed limitation; one-operation strict-set-equality OpenAI reranking plus deterministic fallback, MMR/quotas, and authorized parent expansion stay inside the at-most-12 evidence-unit cap; coverage/refusal thresholds are frozen; the OS-isolated declarative table path produces exact typed values/ranges or fails closed; citations are typed locators to authorized current Supabase passages/ranges rather than BM25 snippets/context prefixes; no local reranker, advanced prohibited method, ungrounded map-reduce, or later-phase runtime exists; Packet 9 proves end-to-end retrieve plus Phase-4-owned open-split ranked-ID Recall@10/code Recall@5/alias Recall@10, locator correctness, ACL negatives, table fixtures, and first-evidence p95, or records an honest bounded miss; first-answer-token, completion p95, and answer faithfulness remain Phase 6/9; a v1 launch holdout remains a launch blocker unless independently SME-sealed; [`ADR-phase4-engineering-close.md`](../../../docs/adr/ADR-phase4-engineering-close.md) may accept Phase 4 as engineering-complete without opening the synthetic holdout; and the revised estimate plus continue/pilot checkpoint and explicit user acceptance are recorded before Phase 5.

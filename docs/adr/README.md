@@ -2,7 +2,7 @@
 title: ADR index and backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-15
 audience: engineering
 ---
 
@@ -11,6 +11,7 @@ audience: engineering
 | ADR | Status | Phase | Path |
 | --- | --- | --- | --- |
 | Hybrid Pilot release cut | accepted | 1 | [ADR-hybrid-pilot-release-cut.md](./ADR-hybrid-pilot-release-cut.md) |
+| Phase 4 engineering close | accepted | 4 | [ADR-phase4-engineering-close.md](./ADR-phase4-engineering-close.md) |
 | ParadeDB edition/availability | accepted | 1 | [ADR-paradedb-edition-availability.md](./ADR-paradedb-edition-availability.md) |
 | Private service TLS | accepted | 1 | [ADR-private-service-tls.md](./ADR-private-service-tls.md) |
 | Expand/contract migrations | accepted | 1 | [ADR-expand-contract-migrations.md](./ADR-expand-contract-migrations.md) |

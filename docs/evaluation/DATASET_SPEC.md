@@ -2,7 +2,7 @@
 title: Evaluation dataset specification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-15
 audience: engineering, SME, reviewers
 ---
 
@@ -10,7 +10,7 @@ audience: engineering, SME, reviewers
 
 Canonical labeled-corpus contract for Hybrid RAG. Runtime retrieval is Packet 2+. This file freezes schema, class minima, split isolation, holdout access, and synthetic SME posture.
 
-Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
+Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Schema version
 
@@ -100,7 +100,9 @@ Identifier rules are sampled from the synthetic corpus (`INV-SR-\d{4}`, `PRJ-[A-
 
 ## SME posture
 
-This Packet 1 corpus is synthetic and provisionally accepted so later Hybrid packets can proceed. Named Knowledge Owner hours (12–20) remain unverified. Packet 8 recorded a holdout **no-go**; launch claims still require SME-sealed holdout approval.
+This Packet 1 corpus is synthetic and provisionally accepted so Hybrid packets can proceed. Named Knowledge Owner hours (12–20) remain unverified. Packet 8 recorded a holdout **no-go**. [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) allows Phase 4 **engineering-complete** acceptance from Packet 9 open-split ranked-ID gates without opening this holdout. Launch claims still require a newly collected, independently SME-sealed holdout. Relationship, multi-hop, graph_mapping, and prompt_injection remain later-phase runtime.
+
+Phase 4 Recall@10 / code Recall@5 / alias Recall@10 population is `runtime_owner=phase_4` cases on development then qualification only.
 
 ## Verification
 

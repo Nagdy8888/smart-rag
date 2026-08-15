@@ -2,7 +2,7 @@
 title: Quality, capacity, cost, and launch targets
 owner: product-owner / engineering-lead
 status: accepted
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-15
 audience: client-approver, engineering
 provenance: .cursor/plans/hybrid-graph-rag/00-global-contracts.md (provisional measurable targets)
 approval_status: accepted
@@ -52,14 +52,14 @@ This document is the Phase 1 canonical record of provisional launch gates copied
 
 | ID | Target | Unit | Provenance | Approval | Approver | Approval date | Measure in | On failure |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| QT-LAT-001 | Hybrid: first evidence/status ≤2 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Tune or reduce envelope; do not silently raise gate |
-| QT-LAT-002 | Hybrid: first answer token ≤5 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Same |
-| QT-LAT-003 | Hybrid: completion ≤20 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Same |
+| QT-LAT-001 | Hybrid: first evidence/status ≤2 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 / Phase 9 | Tune or reduce envelope; do not silently raise gate |
+| QT-LAT-002 | Hybrid: first answer token ≤5 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
+| QT-LAT-003 | Hybrid: completion ≤20 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
 | QT-LAT-004 | Combined: first answer token ≤10 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 5/6/9 | Same; qualification forbids duplicate LightRAG keyword-extraction call |
 | QT-LAT-005 | Combined: completion ≤35 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 5/6/9 | Same |
-| QT-LAT-006 | Structured-table: deterministic result ≤5 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Same |
-| QT-LAT-007 | Structured-table: first answer token ≤8 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Same |
-| QT-LAT-008 | Structured-table: completion ≤20 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Same |
+| QT-LAT-006 | Structured-table: deterministic result ≤5 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 / Phase 9 | Same |
+| QT-LAT-007 | Structured-table: first answer token ≤8 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
+| QT-LAT-008 | Structured-table: completion ≤20 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
 | QT-LAT-009 | Graph inspection: bounded view ≤5 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 5/9 | Same |
 | QT-LAT-010 | Composite: first answer token ≤12 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
 | QT-LAT-011 | Composite: completion ≤40 | seconds p95 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
@@ -79,7 +79,7 @@ This document is the Phase 1 canonical record of provisional launch gates copied
 
 ### 3.3 Model-call and tool ceilings
 
-Count every gateway model invocation (query prep/routing/rewriting, LightRAG callbacks, rerank, answer, summary, verifier).
+Count every gateway model invocation (query prep/routing/rewriting, **one batched query embedding per retrieve**, LightRAG callbacks, rerank, answer, summary, verifier).
 
 | ID | Target | Unit | Provenance | Approval | Approver | Approval date | Measure in | On failure |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -143,13 +143,13 @@ Normal-operation OpenAI spend and the graph compliance/maintenance reserve are *
 | ID | Target | Unit | Provenance | Approval | Approver | Approval date | Measure in | On failure |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | QT-EVAL-001 | Zero ACL leaks | count | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 9 (and earlier security suites) | Block release |
-| QT-EVAL-002 | Citation correctness ≥98% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/6/9 | Fail quality gate |
-| QT-EVAL-003 | Citation completeness ≥90% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/6/9 | Same |
-| QT-EVAL-004 | Answer faithfulness ≥90% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/6/9 | Same |
+| QT-EVAL-002 | Citation correctness ≥98% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 locators; Phase 6/9 answer citations | Fail quality gate |
+| QT-EVAL-003 | Citation completeness ≥90% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 answer citations | Same |
+| QT-EVAL-004 | Answer faithfulness ≥90% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
 | QT-EVAL-005 | Routing accuracy ≥90% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
-| QT-EVAL-006 | Hybrid Recall@10 ≥85% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Same |
-| QT-EVAL-007 | Exact-identifier/code Recall@5 ≥98% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Same |
-| QT-EVAL-008 | Approved-alias Recall@10 ≥95% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/9 | Same |
+| QT-EVAL-006 | Hybrid Recall@10 ≥85% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 on `runtime_owner=phase_4` open splits; SME holdout is launch/Phase 9 | Same |
+| QT-EVAL-007 | Exact-identifier/code Recall@5 ≥98% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 open splits; launch holdout Phase 9 | Same |
+| QT-EVAL-008 | Approved-alias Recall@10 ≥95% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 open splits; launch holdout Phase 9 | Same |
 | QT-EVAL-009 | Combined improves relationship/multi-hop success by ≥10 percentage points over Hybrid alone without violating latency/cost ceilings | percentage points | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 5/6/9 | Do not launch Combined as default if unmet |
 | QT-QP-001 | Language/configuration accuracy ≥95% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/6 | Score profile fields before blaming ranking |
 | QT-QP-002 | Temporal-intent macro-F1 ≥90% | macro-F1 | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4/6 | Same |
@@ -201,7 +201,7 @@ The following require explicit user approval before Packet 1 and Phase 1 can adv
 3. V1 media limitation (QT-MEDIA-*).
 4. UTC temporal policy and non-authoritative Hijri (QT-TZ-*).
 5. RTO/RPO and availability/isolation triggers.
-6. Dated Hybrid Pilot decision criteria in [ADR-hybrid-pilot-release-cut.md](./adr/ADR-hybrid-pilot-release-cut.md).
+6. Dated Hybrid Pilot decision criteria in [ADR-hybrid-pilot-release-cut.md](./adr/ADR-hybrid-pilot-release-cut.md). Phase 4 engineering-complete without SME holdout is [ADR-phase4-engineering-close.md](./adr/ADR-phase4-engineering-close.md).
 
 ## 13. Retention defaults (Phase 2 Packet 5)
 
@@ -224,6 +224,7 @@ The following require explicit user approval before Packet 1 and Phase 1 can adv
 ## Related documents
 
 - [Hybrid Pilot ADR](./adr/ADR-hybrid-pilot-release-cut.md)
+- [Phase 4 engineering-close ADR](./adr/ADR-phase4-engineering-close.md)
 - [Risk register](./development/RISK_REGISTER.md)
 - [Availability and isolation triggers](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md)
 - [Phase 1 foundation evidence](./development/phase-01-foundation-evidence.md)
