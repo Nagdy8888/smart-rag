@@ -43,7 +43,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 2. [x] [Write copy-ready Stitch prompts, responsive LTR/RTL frames, Arabic/bidirectional behavior, information hierarchy, component inventory, localization decision, and design tokens.](./07-phase-stitch-specification/packets/02-write-stitch-prompts-and-frames.md)
 3. [x] [Specify every loading, empty, error, permission, quarantine, quota, compatibility, limitation, fallback, partial-readiness, budget, and degraded state.](./07-phase-stitch-specification/packets/03-specify-visible-states.md)
 4. [x] [Map each visible action and field to a real typed API/Auth contract; identify gaps instead of inventing mock behavior.](./07-phase-stitch-specification/packets/04-map-ui-to-real-contracts.md)
-5. [ ] [Review accessibility, RTL keyboard/focus behavior, mobile layouts, mixed-direction citation/highlight interactions, safe text rendering, and security boundaries.](./07-phase-stitch-specification/packets/05-review-accessibility-and-security.md)
+5. [x] [Review accessibility, RTL keyboard/focus behavior, mobile layouts, mixed-direction citation/highlight interactions, safe text rendering, and security boundaries.](./07-phase-stitch-specification/packets/05-review-accessibility-and-security.md)
 6. [ ] [Timebox user generation/review to five business days and two rounds; record approval or explicitly select the component-system fallback.](./07-phase-stitch-specification/packets/06-record-approval-or-fallback.md)
 
 ## Phase sequence requirement

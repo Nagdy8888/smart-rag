@@ -23,6 +23,8 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) is part of this brief: every
 loading, empty, error, permission, quarantine, quota, compatibility,
 limitation, fallback, partial-readiness, budget, and degraded state.
+[STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md) is the accessibility
+and security review.
 
 ## Localization decision
 

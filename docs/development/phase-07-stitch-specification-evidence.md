@@ -229,3 +229,37 @@ denial or GAP rows. No mock endpoints added.
 ### Rollback
 
 Revert the P07-04 section of `API_UI_MAPPING.md`.
+
+## Packet 5 — Review accessibility, RTL keyboard/focus behavior, mobile layouts, mixed-direction citation/highlight interactions, safe text rendering, and security boundaries
+
+### Requirement (quoted)
+
+> Review accessibility, RTL keyboard/focus behavior, mobile layouts,
+> mixed-direction citation/highlight interactions, safe text rendering, and
+> security boundaries.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `docs/frontend/STITCH_A11Y_SECURITY.md` | Created |
+| `docs/frontend/STITCH_BRIEF.md` | Linked review |
+| `tests/unit/test_phase07_stitch_a11y.py` | Created |
+| `docs/README.md` | Indexed |
+| Phase 7 wrapper | Packet 5 checkbox |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_phase07_stitch_a11y.py -q` | 0 (2 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Defects
+
+A11Y-01 missing generated frames is not a waiver. SEC-01/02 remain HTTP
+gaps. Warning color used with body text `#0F172A`.
+
+### Rollback
+
+Delete the a11y review document and test.
