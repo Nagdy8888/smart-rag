@@ -4193,6 +4193,21 @@ export type Database = {
           start_url: string
         }[]
       }
+      load_query_memory: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+          p_limit?: number
+        }
+        Returns: {
+          content: string
+          created_at: string
+          message_id: string
+          role: string
+        }[]
+      }
       mark_graph_maps_ineligible_for_version: {
         Args: { p_version_id: string }
         Returns: number

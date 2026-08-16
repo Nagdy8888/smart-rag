@@ -28,7 +28,7 @@ flowchart LR
 | Component | Ownership | Phase status |
 | --- | --- | --- |
 | FastAPI routers/middleware | `apps/backend` | foundation live/ready |
-| LangGraph query admission / ingestion probe | `apps/agents` | query: `enforce_admission`; ingestion: lease/ledger probe |
+| LangGraph query admission / routing / ingestion probe | `apps/agents` | query: `enforce_admission` → memory → prepare → plan → branches → one correction (no answer); ingestion: lease/ledger probe |
 | Worker entrypoint | `apps/worker` | process contract only |
 | Settings / logging / model gateway / LangSmith | `packages/core` | Gateway tracing live; production query-graph feedback is Phase 6 |
 | Hybrid retrieval / BM25 / LightRAG | `packages/core` | Phase 4 Packet 2–7 dense/BM25/term/rerank/coverage/tables; LightRAG Phase 5 |
@@ -41,4 +41,5 @@ flowchart LR
 - [Hybrid retrieval contract](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
 - [Structured-table contract](../retrieval/STRUCTURED_TABLE.md)
 - [LangSmith tracing](../development/LANGSMITH_TRACING.md)
+- [Query routing](../agent/QUERY_ROUTING.md)
 - [docs index](../README.md)

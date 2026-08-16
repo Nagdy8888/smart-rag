@@ -39,7 +39,7 @@ def test_langgraph_cli_validate_config_file() -> None:
 def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
     """Query graph rejects missing context and does not claim answers."""
 
-    from datetime import UTC, datetime
+    from datetime import UTC, datetime, timedelta
     from decimal import Decimal
     from uuid import uuid4
 
@@ -63,7 +63,7 @@ def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
     )
     assert extra_rejected["status"] == "admission_rejected"
 
-    now = datetime(2026, 8, 16, 12, 0, tzinfo=UTC)
+    now = datetime.now(UTC)
     context = AuthorizedRuntimeContext(
         user_id=uuid4(),
         role=UserRole.MEMBER,
@@ -73,7 +73,7 @@ def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
         reservation_id=uuid4(),
         reconnect=False,
         route_family=Phase6RouteFamily.HYBRID,
-        deadline_at=now,
+        deadline_at=now + timedelta(seconds=25),
         recursion_limit=24,
         correction_ceiling=1,
         subquestion_ceiling=3,
@@ -94,11 +94,28 @@ def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
     admitted = query_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
         pending_query_state(context.model_dump(mode="json"))
     )
-    assert admitted["status"] == "admitted"
+    assert admitted["status"] == "routing_rejected"
     assert admitted["route_family"] == "hybrid"
     assert admitted["remaining_model_calls"] == 7
-    assert "profiling is not implemented" in admitted["detail"]
+    assert admitted["detail"] == "empty_query"
     assert "answer" not in admitted["detail"]
+    assert admitted["keyword_extract_count"] == 0
+    assert admitted["catalog_llm_call_count"] == 0
+
+    routed = query_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+        pending_query_state(
+            context.model_dump(mode="json"),
+            user_query="What is the status of INV-SR-1001?",
+        )
+    )
+    assert routed["status"] in {"correction_applied", "insufficient_evidence"}
+    assert routed["effective_route"] == "hybrid"
+    assert routed["keyword_extract_count"] == 0
+    assert routed["catalog_llm_call_count"] == 0
+    assert routed.get("answer") is None
+    assert "not implemented" in routed["detail"]
+    assert routed["preparation"] is not None
+    assert routed["retrieval_plan"] is not None
 
 
 def test_ingestion_graph_marks_invalid_lease_without_postgres_config() -> None:

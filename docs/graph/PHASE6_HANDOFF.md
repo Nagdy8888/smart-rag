@@ -171,3 +171,8 @@ refuse, reduced envelope, scaling options.
 Phase 6 must still implement: Combined fusion and ablation versus naive
 union, answer verifier and citations, SSE, query-agent orchestration,
 final holdout, and QT-EVAL-009. Packet 8 does not implement those paths.
+
+Related: [QUERY_ROUTING.md](../agent/QUERY_ROUTING.md) (Phase 6 packet 2)
+invokes `GraphRetriever.retrieve_local` / `retrieve_hybrid` /
+`retrieve_global_steering` with precomputed `hl_keywords`/`ll_keywords`
+only. Empty keywords fail closed. Packet 3 owns Combined fusion.

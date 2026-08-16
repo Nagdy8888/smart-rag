@@ -57,6 +57,7 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260816150000_graph_pointer_switch_cleanup_v1.sql",
     "20260816160000_bm25_reconcile_and_ineligible_pointer_v1.sql",
     "20260816170000_query_run_admission_v1.sql",
+    "20260816180000_query_memory_routing_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
