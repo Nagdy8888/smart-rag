@@ -199,6 +199,15 @@ class IngestionRetryResult:
 
 
 def _row_to_ingestion_job(row: dict[str, Any]) -> IngestionJobRecord:
+    """Map one ``ingestion_jobs`` dictionary row to a typed record.
+
+    Args:
+        row: Database row including status, lease, and payload fields.
+
+    Returns:
+        Frozen ``IngestionJobRecord`` for retry and dead-letter paths.
+    """
+
     return IngestionJobRecord(
         id=UUID(str(row["id"])),
         document_id=UUID(str(row["document_id"])) if row["document_id"] else None,

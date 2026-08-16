@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
@@ -368,7 +368,7 @@ def _claim_dummy_job(
     *,
     owner: str,
     suffix: str = "ok",
-) -> tuple[object, str]:
+) -> tuple[UUID, str]:
     """Insert and claim one LightRAG job for lease RPC tests.
 
     Args:
@@ -421,4 +421,4 @@ def _claim_dummy_job(
     claimed = repo.claim()
     connection.commit()
     assert claimed is not None
-    return claimed["id"], str(claimed["lease_token"])
+    return UUID(str(claimed["id"])), str(claimed["lease_token"])

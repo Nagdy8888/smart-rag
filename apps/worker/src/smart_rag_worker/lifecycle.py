@@ -7,9 +7,10 @@ import logging
 import socket
 import threading
 import time
+from collections.abc import Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg
@@ -147,6 +148,15 @@ class WorkerLifecycle:
             self._checkpointer = None
 
     def _require_postgres_url(self) -> str:
+        """Return the configured Postgres URL or fail closed.
+
+        Returns:
+            Connection URL for worker-role SQL.
+
+        Raises:
+            JobRepositoryError: When ``supabase_db_url`` is unset.
+        """
+
         postgres_url = self._settings.supabase_db_url
         if postgres_url is None:
             raise JobRepositoryError("supabase_db_url_unconfigured")
@@ -206,11 +216,11 @@ class WorkerLifecycle:
     def _invoke_graph(
         self,
         graph: Any,
-        initial_input: dict[str, Any],
+        initial_input: Mapping[str, object],
         config: dict[str, object],
         *,
         success_statuses: tuple[str, ...],
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Invoke or resume one compiled graph using checkpoint thread id.
 
         Args:
@@ -231,20 +241,29 @@ class WorkerLifecycle:
         """
 
         if self._checkpointer is None:
-            result = graph.invoke(initial_input, config)  # pyright: ignore[reportUnknownMemberType]
-            return dict(result)
+            return _graph_result_mapping(
+                graph.invoke(initial_input, config)  # pyright: ignore[reportUnknownMemberType]
+            )
         snapshot = graph.get_state(config)  # pyright: ignore[reportUnknownMemberType]
         next_nodes = tuple(snapshot.next or ())
-        values = snapshot.values if isinstance(snapshot.values, dict) else {}
+        values = _graph_result_mapping(snapshot.values)
         if next_nodes:
-            result = graph.invoke(None, config)  # pyright: ignore[reportUnknownMemberType]
-        elif values.get("status") in success_statuses:
-            result = values
-        else:
-            result = graph.invoke(initial_input, config)  # pyright: ignore[reportUnknownMemberType]
-        return dict(result)
+            return _graph_result_mapping(
+                graph.invoke(None, config)  # pyright: ignore[reportUnknownMemberType]
+            )
+        if values.get("status") in success_statuses:
+            return values
+        return _graph_result_mapping(
+            graph.invoke(initial_input, config)  # pyright: ignore[reportUnknownMemberType]
+        )
 
     def _claim_one(self) -> IngestionJobRecord | None:
+        """Claim the next eligible ingestion job, or return None.
+
+        Returns:
+            Leased job record, or ``None`` when the queue is empty.
+        """
+
         postgres_url = self._require_postgres_url()
         with psycopg.connect(postgres_url) as connection:
             connection.execute("SET ROLE app_worker")
@@ -261,6 +280,12 @@ class WorkerLifecycle:
             return job
 
     def _process_job(self, job: IngestionJobRecord) -> None:
+        """Run one leased ingestion job and persist success or failure.
+
+        Args:
+            job: Claimed ingestion job with a lease token.
+        """
+
         postgres_url = self._require_postgres_url()
         lease_token = job.lease_token
         if lease_token is None:
@@ -269,6 +294,8 @@ class WorkerLifecycle:
         stop_heartbeat = threading.Event()
 
         def heartbeat_loop() -> None:
+            """Renew the ingestion job lease until the worker signals stop."""
+
             while not stop_heartbeat.wait(
                 timeout=self._settings.job_heartbeat_interval_seconds
             ):
@@ -296,7 +323,7 @@ class WorkerLifecycle:
             config = self._run_config(job)
             if job.job_kind == "scan_promote":
                 graph_input = _scan_graph_input_from_job(job)
-                result = self._invoke_graph(  # pyright: ignore[reportUnknownMemberType]
+                result = self._invoke_graph(
                     self._scan_graph,
                     graph_input,
                     config,
@@ -306,7 +333,7 @@ class WorkerLifecycle:
                 detail = str(result.get("detail", "scan_promote_failed"))
             elif job.job_kind == "website_crawl":
                 graph_input = _crawl_graph_input_from_job(job)
-                result = self._invoke_graph(  # pyright: ignore[reportUnknownMemberType]
+                result = self._invoke_graph(
                     self._crawl_graph,
                     graph_input,
                     config,
@@ -316,7 +343,7 @@ class WorkerLifecycle:
                 detail = str(result.get("detail", "website_crawl_failed"))
             elif job.job_kind == "hybrid_index":
                 graph_input = _index_graph_input_from_job(job)
-                result = self._invoke_graph(  # pyright: ignore[reportUnknownMemberType]
+                result = self._invoke_graph(
                     self._index_graph,
                     graph_input,
                     config,
@@ -326,7 +353,7 @@ class WorkerLifecycle:
                 detail = str(result.get("detail", "hybrid_index_failed"))
             else:
                 graph_input = _probe_graph_input_from_job(job)
-                result = self._invoke_graph(  # pyright: ignore[reportUnknownMemberType]
+                result = self._invoke_graph(
                     self._probe_graph,
                     graph_input,
                     config,
@@ -361,6 +388,14 @@ class WorkerLifecycle:
             heartbeat_thread.join(timeout=5)
 
     def _fail_job(self, job_id: UUID, lease_token: str, message: str) -> None:
+        """Best-effort persist a transient ingestion job failure.
+
+        Args:
+            job_id: Ingestion job identifier.
+            lease_token: Active lease token.
+            message: Operator-visible error detail, truncated to 4000 chars.
+        """
+
         postgres_url = self._require_postgres_url()
         try:
             with psycopg.connect(postgres_url) as connection:
@@ -385,6 +420,13 @@ class WorkerLifecycle:
         connection: psycopg.Connection,
         job: IngestionJobRecord,
     ) -> None:
+        """Commit the reserved ingestion budget after a successful job.
+
+        Args:
+            connection: Open worker-role connection.
+            job: Completed job whose payload may include a reservation id.
+        """
+
         reservation_raw = job.payload_ref.get("budget_reservation_id")
         if not isinstance(reservation_raw, str):
             return
@@ -401,8 +443,29 @@ class WorkerLifecycle:
         )
 
     def _lease_owner(self) -> str:
+        """Return the stable lease owner id for this worker process.
+
+        Returns:
+            ``{instance_id}@{hostname}`` owner string.
+        """
+
         hostname = socket.gethostname()
         return f"{self._settings.worker_instance_id}@{hostname}"
+
+
+def _graph_result_mapping(payload: object) -> dict[str, object]:
+    """Copy a compiled-graph result or checkpoint values into a plain dict.
+
+    Args:
+        payload: ``invoke`` result or ``get_state().values``.
+
+    Returns:
+        String-keyed mapping. Empty when ``payload`` is not a ``dict``.
+    """
+
+    if not isinstance(payload, dict):
+        return {}
+    return cast(dict[str, object], payload)
 
 
 def _probe_graph_input_from_job(job: IngestionJobRecord) -> IngestionProbeState:

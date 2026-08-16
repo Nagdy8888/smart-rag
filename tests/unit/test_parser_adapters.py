@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from smart_rag_core.ingestion.parser.adapters import infer_format, parse_file
@@ -16,6 +18,7 @@ from tests.fixtures.parser import (
     build_pdf_text_fixture,
     build_pptx_fixture,
     build_xlsx_fixture,
+    pdf_selectable_text,
 )
 
 
@@ -41,10 +44,10 @@ def build_text_fixture() -> tuple[bytes, str]:
     ],
 )
 def test_adapter_emits_deterministic_elements(
-    builder,
+    builder: Callable[[], tuple[bytes, str]],
     filename: str,
     format_key: str,
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     """Supported formats emit deterministic typed elements on replay."""
 
@@ -62,19 +65,13 @@ def test_adapter_emits_deterministic_elements(
     assert all(element.reading_order >= 0 for element in first.elements)
 
 
-def test_ocr_scanned_pdf_has_no_selectable_text(tmp_path) -> None:
+def test_ocr_scanned_pdf_has_no_selectable_text(tmp_path: Path) -> None:
     """Image-only scanned PDF has no text layer and takes the OCR path."""
-
-    import fitz
 
     from tests.fixtures.parser import build_ocr_scanned_pdf
 
     payload, digest = build_ocr_scanned_pdf()
-    rendered = fitz.open(stream=payload, filetype="pdf")
-    try:
-        assert not rendered[0].get_text("text").strip()
-    finally:
-        rendered.close()
+    assert not pdf_selectable_text(payload).strip()
     path = tmp_path / "scanned.pdf"
     path.write_bytes(payload)
     result = parse_file(path, digest, "pdf")
@@ -83,7 +80,7 @@ def test_ocr_scanned_pdf_has_no_selectable_text(tmp_path) -> None:
     assert kinds & {"figure", "paragraph", "page_break"}
 
 
-def test_encrypted_pdf_fails_closed(tmp_path) -> None:
+def test_encrypted_pdf_fails_closed(tmp_path: Path) -> None:
     """Password-protected PDFs fail closed without partial elements."""
 
     from smart_rag_core.ingestion.parser.exceptions import ParserEncryptedError
@@ -97,7 +94,7 @@ def test_encrypted_pdf_fails_closed(tmp_path) -> None:
         parse_file(path, digest, "pdf")
 
 
-def test_pdf_header_footer_removed(tmp_path) -> None:
+def test_pdf_header_footer_removed(tmp_path: Path) -> None:
     """Repeated PDF header/footer lines produce removal diagnostics."""
 
     payload, digest = build_pdf_text_fixture()
@@ -109,7 +106,7 @@ def test_pdf_header_footer_removed(tmp_path) -> None:
     )
 
 
-def test_html_boilerplate_removed(tmp_path) -> None:
+def test_html_boilerplate_removed(tmp_path: Path) -> None:
     """HTML adapter removes nav/cookie boilerplate with diagnostics."""
 
     payload, digest = build_html_fixture()
@@ -121,7 +118,7 @@ def test_html_boilerplate_removed(tmp_path) -> None:
     assert any(removal.reason == "html_boilerplate" for removal in result.removals)
 
 
-def test_pptx_emits_slide_and_text(tmp_path) -> None:
+def test_pptx_emits_slide_and_text(tmp_path: Path) -> None:
     """PPTX adapter emits slide breaks and text with reading-order locators."""
 
     payload, digest = build_pptx_fixture()
@@ -134,7 +131,7 @@ def test_pptx_emits_slide_and_text(tmp_path) -> None:
     )
 
 
-def test_xlsx_formula_not_recalculated(tmp_path) -> None:
+def test_xlsx_formula_not_recalculated(tmp_path: Path) -> None:
     """XLSX adapter preserves formula text without recalculation."""
 
     payload, digest = build_xlsx_fixture()
@@ -150,7 +147,7 @@ def test_xlsx_formula_not_recalculated(tmp_path) -> None:
     assert formula_cells[0].metadata.get("cache_authority") == "unevaluated"
 
 
-def test_infer_format_from_extension(tmp_path) -> None:
+def test_infer_format_from_extension(tmp_path: Path) -> None:
     """Format inference resolves common extensions."""
 
     path = tmp_path / "doc.pdf"

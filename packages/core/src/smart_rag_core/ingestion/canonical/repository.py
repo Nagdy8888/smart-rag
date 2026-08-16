@@ -199,6 +199,14 @@ class CanonicalRepository:
         version_id: UUID,
         artifact: TableArtifactBundle,
     ) -> None:
+        """Upsert one table artifact row for a canonical document version.
+
+        Args:
+            document_id: Parent document identifier.
+            version_id: Canonical version that owns the table.
+            artifact: Parquet bundle and column manifest to persist.
+        """
+
         manifest = artifact.manifest
         table_id = uuid5(NAMESPACE_URL, manifest.manifest_hash())
         with self._connection.cursor() as cursor:

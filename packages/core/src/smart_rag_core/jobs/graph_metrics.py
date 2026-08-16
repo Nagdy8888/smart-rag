@@ -105,6 +105,13 @@ class GraphMetricsService:
         )
 
     def _backlog(self) -> tuple[int, int, float | None]:
+        """Count pending LightRAG index versus non-index jobs and oldest age.
+
+        Returns:
+            Index backlog count, other-job backlog count, and oldest pending
+            age in seconds, or ``None`` when the queue is empty.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -148,6 +155,12 @@ class GraphMetricsService:
         return int(row[0]) if row else 0
 
     def _documents_per_hour(self) -> float | None:
+        """Count Graph Ready document versions updated in the last hour.
+
+        Returns:
+            Count as a float when at least one version flipped, else ``None``.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -165,6 +178,12 @@ class GraphMetricsService:
         return float(count) if count else None
 
     def _graph_costs(self) -> tuple[Decimal, Decimal]:
+        """Sum reserved-or-committed and committed graph budget amounts.
+
+        Returns:
+            Attempted cost and settled cost in USD.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -188,6 +207,12 @@ class GraphMetricsService:
         return Decimal(str(row[0])), Decimal(str(row[1]))
 
     def _bulk_window(self) -> tuple[bool, datetime | None, datetime | None]:
+        """Load the company graph bulk-window flags from settings.
+
+        Returns:
+            Whether the window is active, plus start and end timestamps.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """

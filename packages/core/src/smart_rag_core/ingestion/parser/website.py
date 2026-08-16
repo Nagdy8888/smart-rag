@@ -7,6 +7,8 @@ from smart_rag_core.ingestion.parser.types import (
     ParseDisposition,
     ParseResult,
     ParserResourceMetrics,
+    ParseWarning,
+    RemovalDiagnostic,
     TypedElement,
 )
 
@@ -47,8 +49,8 @@ def merge_website_parse_results(
         )
 
     elements: list[TypedElement] = []
-    removals = []
-    warnings = []
+    removals: list[RemovalDiagnostic] = []
+    warnings: list[ParseWarning] = []
     wall_seconds = 0.0
     failed = False
     for page in pages:

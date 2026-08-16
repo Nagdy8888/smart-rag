@@ -28,7 +28,13 @@ from smart_rag_core.ingestion.chunking.types import (
     ChunkKind,
     ChunkProvenance,
 )
-from smart_rag_core.ingestion.parser.types import ElementKind, ParseResult, TypedElement
+from smart_rag_core.ingestion.parser.types import (
+    CsvLocator,
+    DocxLocator,
+    ElementKind,
+    ParseResult,
+    TypedElement,
+)
 from smart_rag_core.ingestion.provenance import locator_to_dict
 
 
@@ -78,6 +84,8 @@ def build_hierarchical_chunks(
     list_items: list[TypedElement] = []
 
     def flush_prose() -> None:
+        """Split the buffered prose segments into passage drafts and clear it."""
+
         nonlocal prose_buffer
         if not prose_buffer:
             return
@@ -95,6 +103,8 @@ def build_hierarchical_chunks(
         prose_buffer = []
 
     def flush_table() -> None:
+        """Emit one passage draft per buffered table row, then clear the table."""
+
         nonlocal table_rows, table_headers
         if not table_rows:
             return
@@ -119,6 +129,8 @@ def build_hierarchical_chunks(
         table_headers = []
 
     def flush_list() -> None:
+        """Emit one passage draft per buffered list item, then clear the list."""
+
         nonlocal list_intro, list_items
         if not list_items:
             list_intro = None
@@ -425,12 +437,10 @@ def _table_row_index(element: TypedElement) -> int:
     """Extract a stable row index from one table cell locator."""
 
     locator = element.locator
-    block_path = getattr(locator, "block_path", None)
-    if isinstance(block_path, tuple) and len(block_path) >= 2:
-        return int(block_path[-2])
-    record_index = getattr(locator, "record_index", None)
-    if isinstance(record_index, int):
-        return record_index
+    if isinstance(locator, DocxLocator) and len(locator.block_path) >= 2:
+        return int(locator.block_path[-2])
+    if isinstance(locator, CsvLocator):
+        return locator.record_index
     return element.reading_order
 
 

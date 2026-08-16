@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
 
 import httpx
 
@@ -86,7 +86,7 @@ class CrawlProxyGateway:
             ValueError: When direct egress is attempted without a proxy URL.
         """
 
-        payload: dict[str, Any] = {
+        payload: dict[str, object] = {
             "url": request.url,
             "method": request.method.upper(),
             "host_header": request.host_header,
@@ -122,32 +122,56 @@ class CrawlProxyGateway:
             )
         if not isinstance(data, dict):
             raise CrawlProxyError("proxy returned invalid json object")
-        error = data.get("error")
+        parsed = cast(dict[str, object], data)
+        error = parsed.get("error")
         if isinstance(error, str) and error:
             raise CrawlProxyError(error, status_code=response.status_code)
-        body_b64 = data.get("body_base64")
+        body_b64 = parsed.get("body_base64")
         body = b""
         if isinstance(body_b64, str) and body_b64:
             body = base64.b64decode(body_b64.encode("ascii"))
-        headers_raw = data.get("headers")
+        headers_raw = parsed.get("headers")
         headers: dict[str, str] = {}
         if isinstance(headers_raw, dict):
-            headers = {str(k): str(v) for k, v in headers_raw.items()}
-        peer_ip = str(data.get("peer_ip", ""))
+            untyped_headers = cast(dict[object, object], headers_raw)
+            headers = {str(key): str(value) for key, value in untyped_headers.items()}
+        peer_ip = str(parsed.get("peer_ip", ""))
         if not peer_ip:
             raise CrawlProxyError("proxy did not report peer_ip")
+        content_type_raw = parsed.get("content_type")
         return ProxyFetchResponse(
-            status_code=int(data.get("status_code", 0)),
+            status_code=_json_int(parsed.get("status_code", 0)),
             headers=headers,
             body=body,
-            wire_bytes=int(data.get("wire_bytes", len(body))),
-            decoded_bytes=int(data.get("decoded_bytes", len(body))),
+            wire_bytes=_json_int(parsed.get("wire_bytes", len(body))),
+            decoded_bytes=_json_int(parsed.get("decoded_bytes", len(body))),
             peer_ip=peer_ip,
             content_type=(
-                str(data.get("content_type"))
-                if data.get("content_type") is not None
+                str(content_type_raw)
+                if content_type_raw is not None
                 else headers.get("Content-Type")
             ),
-            truncated=bool(data.get("truncated", False)),
+            truncated=bool(parsed.get("truncated", False)),
             error=str(error) if isinstance(error, str) else None,
         )
+
+
+def _json_int(value: object) -> int:
+    """Coerce a JSON numeric field to int.
+
+    Args:
+        value: JSON number, numeric string, or already an int.
+
+    Returns:
+        Integer form of ``value``.
+    """
+
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        return int(value)
+    return int(str(value))

@@ -138,6 +138,8 @@ def test_crawl_proxy_denies_by_default() -> None:
         """Capture status without a real socket."""
 
         def __init__(self) -> None:
+            """Bind a denied POST path and empty JSON body."""
+
             self.path = "/legacy"
             self.headers = {"Content-Length": "2"}
             self.rfile = __import__("io").BytesIO(b"{}")
@@ -145,13 +147,18 @@ def test_crawl_proxy_denies_by_default() -> None:
             self.status = 0
 
         def send_response(self, code: int, message: str | None = None) -> None:
+            """Record the HTTP status that FetchHandler would send."""
+
+            del message
             self.status = code
 
         def send_header(self, keyword: str, value: str) -> None:
-            return None
+            """Ignore headers; only status is asserted."""
+
+            del keyword, value
 
         def end_headers(self) -> None:
-            return None
+            """No-op header terminator."""
 
     handler = _Handler()
     handler.do_POST()

@@ -4,13 +4,18 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from decimal import Decimal
+from typing import cast
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import psycopg
 import pytest
-from smart_rag_agents.ingestion.crawl_graph import execute_approved_crawl
-from smart_rag_agents.ingestion.scan_graph import promote_object
+from langchain_core.runnables import RunnableConfig
+from smart_rag_agents.ingestion.crawl_graph import (
+    IngestionCrawlState,
+    execute_approved_crawl,
+)
+from smart_rag_agents.ingestion.scan_graph import IngestionScanState, promote_object
 from smart_rag_core.ingestion.crawl.adapter import (
     CrawlRunResult,
     WebSnapshotRecord,
@@ -26,7 +31,10 @@ from tests.contract.integration_support import (
     resolve_supabase_db_url,
     try_connect,
 )
-from tests.contract.test_upload_finalize import _auth_version, _insert_auth_user
+from tests.contract.test_upload_finalize import (
+    insert_auth_user,
+    read_authorization_version,
+)
 
 
 def _require_postgres() -> psycopg.Connection:
@@ -155,7 +163,7 @@ def test_promote_object_enqueues_hybrid_index_after_scan(
             (version_id, document_id),
         )
     worker_connection.commit()
-    state = {
+    state: IngestionScanState = {
         "job_id": str(uuid4()),
         "lease_token": "unused",
         "document_id": str(document_id),
@@ -179,13 +187,16 @@ def test_promote_object_enqueues_hybrid_index_after_scan(
         "scan_result": "clean",
         "detail": "",
     }
-    config = {
-        "configurable": {
-            "postgres_url": postgres_url,
-            "storage_url": "http://127.0.0.1:54321",
-            "storage_admin_secret": "test-storage-secret",
-        }
-    }
+    config = cast(
+        RunnableConfig,
+        {
+            "configurable": {
+                "postgres_url": postgres_url,
+                "storage_url": "http://127.0.0.1:54321",
+                "storage_admin_secret": "test-storage-secret",
+            }
+        },
+    )
     with patch("smart_rag_agents.ingestion.scan_graph.PromotionSaga") as saga_cls:
         saga_cls.return_value.run.return_value = None
         result = promote_object(state, config)
@@ -213,7 +224,7 @@ def test_crawl_complete_enqueues_hybrid_index(
     postgres_url = resolve_supabase_db_url()
     worker_connection.execute("SET ROLE postgres")
     with worker_connection.cursor() as cursor:
-        _insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
+        insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
         cursor.execute(
             """
             INSERT INTO app.profiles (user_id, role, upload_enabled, mfa_enrolled)
@@ -221,7 +232,7 @@ def test_crawl_complete_enqueues_hybrid_index(
             """,
             (owner_id,),
         )
-        auth_version = _auth_version(cursor)
+        auth_version = read_authorization_version(cursor)
     worker_connection.commit()
     worker_connection.execute("SET ROLE app_api")
     with worker_connection.cursor() as cursor:
@@ -280,7 +291,7 @@ def test_crawl_complete_enqueues_hybrid_index(
             failure_reason=None,
         )
 
-    state = {
+    state: IngestionCrawlState = {
         "job_id": str(_job_id),
         "lease_token": "unused",
         "source_id": str(source_id),
@@ -294,14 +305,17 @@ def test_crawl_complete_enqueues_hybrid_index(
         "crawl_run_id": None,
         "detail": "",
     }
-    config = {
-        "configurable": {
-            "postgres_url": postgres_url,
-            "crawl_proxy_url": "http://127.0.0.1:18080",
-            "storage_url": "http://127.0.0.1:54321",
-            "storage_admin_secret": "test-storage-secret",
-        }
-    }
+    config = cast(
+        RunnableConfig,
+        {
+            "configurable": {
+                "postgres_url": postgres_url,
+                "crawl_proxy_url": "http://127.0.0.1:18080",
+                "storage_url": "http://127.0.0.1:54321",
+                "storage_admin_secret": "test-storage-secret",
+            }
+        },
+    )
     with patch(
         "smart_rag_agents.ingestion.crawl_graph.BoundedCrawlAdapter.crawl",
         _fake_crawl,

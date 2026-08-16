@@ -896,4 +896,4 @@ class ObjectMapping:
     available: bool = False
     reason: str = ""
     method: str = ""
-    provenance: dict[str, object] = field(default_factory=dict)
+    provenance: dict[str, object] = field(default_factory=dict[str, object])

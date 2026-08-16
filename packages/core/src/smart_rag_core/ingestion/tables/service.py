@@ -6,8 +6,6 @@ import re
 from typing import Any
 from uuid import UUID
 
-import pyarrow as pa
-
 from smart_rag_core.ingestion.parser.types import (
     CsvLocator,
     ElementKind,
@@ -15,6 +13,7 @@ from smart_rag_core.ingestion.parser.types import (
     XlsxLocator,
 )
 from smart_rag_core.ingestion.provenance import locator_to_dict
+from smart_rag_core.ingestion.tables import arrow_facade as arrow
 from smart_rag_core.ingestion.tables.bundle import TableArtifactBundle
 from smart_rag_core.ingestion.tables.limits import (
     TABLE_ARTIFACT_SCHEMA_VERSION,
@@ -220,11 +219,11 @@ def _column_type_name(rows: list[dict[int, Any]], ordinal: int) -> str:
 
 def _arrow_type_for_column(
     rows: list[dict[int, Any]], column: ColumnManifest
-) -> pa.DataType:
+) -> arrow.ArrowType:
     """Resolve Arrow type for one column without lossy mixed-type coercion."""
 
     if column.column_type == "string":
-        return pa.string()
+        return arrow.string()
     sample = _first_cell(rows, column.header_ordinal)
     metadata = (
         dict(sample.metadata)
@@ -234,18 +233,18 @@ def _arrow_type_for_column(
     return infer_arrow_type(metadata)
 
 
-def _coerce_value(value: Any, arrow_type: pa.DataType) -> Any:
+def _coerce_value(value: Any, arrow_type: arrow.ArrowType) -> Any:
     """Coerce one Python value to the declared Arrow type safely."""
 
     if value is None:
         return None
-    if pa.types.is_string(arrow_type):
+    if arrow.is_string(arrow_type):
         return str(value)
-    if pa.types.is_int64(arrow_type) and not isinstance(value, bool):
+    if arrow.is_int64(arrow_type) and not isinstance(value, bool):
         return int(value)
-    if pa.types.is_floating(arrow_type):
+    if arrow.is_floating(arrow_type):
         return float(value)
-    if pa.types.is_boolean(arrow_type):
+    if arrow.is_boolean(arrow_type):
         return bool(value) if isinstance(value, bool) else str(value).lower() == "true"
     return value
 

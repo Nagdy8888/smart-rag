@@ -11,6 +11,7 @@ import pytest
 from smart_rag_core.gateways.embedding import (
     EmbeddingGateway,
     EmbeddingRequest,
+    EmbeddingResponse,
     MockEmbeddingAdapter,
     OpenAIEmbeddingAdapter,
     create_embedding_gateway,
@@ -34,8 +35,19 @@ from smart_rag_core.security.external_processing import (
 )
 from smart_rag_core.settings import AgentSettings
 
+from tests.unit.typed_attrs import module_attr
+
 
 def _chunk(text: str) -> CanonicalChunk:
+    """Build one passage chunk with stable provenance versions.
+
+    Args:
+        text: Raw chunk text used as embedding input.
+
+    Returns:
+        Canonical chunk with a fresh id and fixture hashes.
+    """
+
     return CanonicalChunk(
         chunk_id=uuid4(),
         chunk_index=0,
@@ -67,6 +79,8 @@ def test_embedding_gateway_replay_is_stable() -> None:
     """Gateway replay returns identical vectors and request IDs for same inputs."""
 
     async def _run() -> None:
+        """Replay one embedding request and assert identical responses."""
+
         gateway = EmbeddingGateway(MockEmbeddingAdapter(fixture_id="test"))
         request = EmbeddingRequest(
             operation_key="op-1",
@@ -88,7 +102,18 @@ def test_embedding_service_denies_real_company_without_provider_verification() -
     gateway = EmbeddingGateway(MockEmbeddingAdapter(fixture_id="test"))
 
     class _Connection:
-        def cursor(self):
+        """Connection double that must not be used when governance denies."""
+
+        def cursor(self) -> object:
+            """Fail if the service opens a cursor after a governance deny.
+
+            Returns:
+                Never returns; always raises.
+
+            Raises:
+                AssertionError: Database was reached unexpectedly.
+            """
+
             raise AssertionError("database should not be reached")
 
     service = EmbeddingService(_Connection(), gateway=gateway)  # type: ignore[arg-type]
@@ -134,23 +159,62 @@ def test_embedding_timeout_after_provider_success_records_failed_ledger() -> Non
     """Timeout after the mock provider returns still records a failed ledger row."""
 
     class _TimeoutAdapter:
-        async def embed(self, request: EmbeddingRequest):
+        """Adapter that succeeds at the provider then times out in the client."""
+
+        async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+            """Raise TimeoutError after the caller would have seen provider work.
+
+            Args:
+                request: Unused embedding request.
+
+            Returns:
+                Never returns; always raises.
+
+            Raises:
+                TimeoutError: Simulated client timeout.
+            """
+
             raise TimeoutError("client timed out after provider success")
 
     class _Cursor:
+        """In-memory cursor that records SQL for ledger assertions."""
+
         def __init__(self) -> None:
+            """Start with an empty statement log."""
+
             self.statements: list[str] = []
 
         def __enter__(self) -> _Cursor:
+            """Enter the context manager and return this cursor.
+
+            Returns:
+                The same cursor instance.
+            """
+
             return self
 
         def __exit__(self, *_args: object) -> None:
+            """Leave the context without suppressing exceptions."""
+
             return None
 
         def execute(self, sql: str, _params: object = None) -> None:
+            """Append one SQL string to the statement log.
+
+            Args:
+                sql: Statement text.
+                _params: Unused bind parameters.
+            """
+
             self.statements.append(sql)
 
         def fetchone(self) -> tuple[object, ...]:
+            """Return a stub row matching the last executed statement.
+
+            Returns:
+                Ledger id, attempt count, or a null placeholder tuple.
+            """
+
             if "record_embedding_ledger" in self.statements[-1]:
                 return (uuid4(),)
             if "attempt_count" in self.statements[-1]:
@@ -158,13 +222,33 @@ def test_embedding_timeout_after_provider_success_records_failed_ledger() -> Non
             return (None,)
 
     class _Connection:
+        """Connection double that reuses one in-memory cursor."""
+
         def __init__(self) -> None:
+            """Create the shared cursor used by ``cursor`` and ``execute``."""
+
             self.cursor_obj = _Cursor()
 
         def cursor(self) -> _Cursor:
+            """Return the shared in-memory cursor.
+
+            Returns:
+                The same ``_Cursor`` instance for the connection.
+            """
+
             return self.cursor_obj
 
         def execute(self, sql: str, params: object = None) -> _Cursor:
+            """Execute through the shared cursor and return it.
+
+            Args:
+                sql: Statement text.
+                params: Bind parameters forwarded to the cursor.
+
+            Returns:
+                The shared cursor after ``execute``.
+            """
+
             self.cursor_obj.execute(sql, params)
             return self.cursor_obj
 
@@ -220,7 +304,8 @@ def test_create_embedding_gateway_mock_branch(
     monkeypatch.setenv("MOCK_MODEL_MODE", "true")
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
     gateway = create_embedding_gateway(AgentSettings())
-    assert isinstance(gateway._adapter, MockEmbeddingAdapter)
+    adapter: object = module_attr(gateway, "_adapter")
+    assert isinstance(adapter, MockEmbeddingAdapter)
 
 
 def test_create_embedding_gateway_openai_branch(
@@ -232,7 +317,8 @@ def test_create_embedding_gateway_openai_branch(
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-openai-adapter")
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
     gateway = create_embedding_gateway(AgentSettings())
-    assert isinstance(gateway._adapter, OpenAIEmbeddingAdapter)
+    adapter: object = module_attr(gateway, "_adapter")
+    assert isinstance(adapter, OpenAIEmbeddingAdapter)
 
 
 def test_create_embedding_gateway_fail_closed_without_key() -> None:
@@ -260,21 +346,46 @@ def test_openai_adapter_maps_data_by_index() -> None:
     second = [0.5, 0.6, 0.7, 0.8]
 
     class _Item:
+        """One OpenAI embedding row with an explicit index."""
+
         def __init__(self, index: int, embedding: list[float]) -> None:
+            """Store index and vector for adapter reordering tests.
+
+            Args:
+                index: OpenAI ``data[].index``.
+                embedding: Vector values for that index.
+            """
+
             self.index = index
             self.embedding = embedding
 
     class _Usage:
+        """Stub usage counters for a two-input embeddings call."""
+
         prompt_tokens = 8
         total_tokens = 8
 
     class _Response:
+        """Embeddings payload with rows reversed relative to input order."""
+
         def __init__(self) -> None:
+            """Place index 1 before index 0 to prove reordering."""
+
             self.data = (_Item(1, second), _Item(0, first))
             self.usage = _Usage()
             self.id = "embd-index-test"
 
     def _create(_client: object, **kwargs: object) -> _Response:
+        """Return the reversed-index stub after asserting create kwargs.
+
+        Args:
+            _client: Unused traced client.
+            **kwargs: embeddings.create keyword arguments.
+
+        Returns:
+            Stub OpenAI embeddings response.
+        """
+
         assert kwargs["model"] == "text-embedding-3-large"
         assert kwargs["encoding_format"] == "float"
         assert kwargs["dimensions"] == 4
@@ -312,21 +423,45 @@ def test_openai_adapter_rejects_wrong_dimension() -> None:
     """A vector whose length does not match ``dimensions`` fails closed."""
 
     class _Item:
+        """Embedding row whose vector length does not match ``dimensions``."""
+
         def __init__(self) -> None:
+            """Store a two-float vector for a four-dimension request."""
+
             self.index = 0
             self.embedding = [0.1, 0.2]
 
     class _Usage:
+        """Stub usage counters for a single mismatched embedding."""
+
         prompt_tokens = 1
         total_tokens = 1
 
     class _Response:
+        """Embeddings payload with one undersized vector."""
+
         def __init__(self) -> None:
+            """Attach the mismatched item and a request id."""
+
             self.data = (_Item(),)
             self.usage = _Usage()
             self.id = "embd-dim"
 
     adapter = OpenAIEmbeddingAdapter(api_key="sk-test")
+
+    def _create(_client: object, **_kwargs: object) -> _Response:
+        """Return a dimension-mismatched embedding payload.
+
+        Args:
+            _client: Unused traced client.
+            **_kwargs: Unused embeddings.create kwargs.
+
+        Returns:
+            Stub OpenAI embeddings response.
+        """
+
+        return _Response()
+
     with (
         patch(
             "smart_rag_core.gateways.embedding.traced_openai_client",
@@ -334,7 +469,7 @@ def test_openai_adapter_rejects_wrong_dimension() -> None:
         ),
         patch(
             "smart_rag_core.gateways.embedding.traced_embeddings_create",
-            lambda _client, **_kwargs: _Response(),
+            _create,
         ),
     ):
         with pytest.raises(ValueError, match="embedding_dimension_mismatch"):

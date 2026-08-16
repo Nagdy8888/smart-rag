@@ -529,7 +529,10 @@ def test_resolver_maps_inspection_acl_and_repair(
             WHERE proname = 'inspect_graph_neighborhood'
             """
         )
-        inspect_sql = str(cursor.fetchone()[0])
+        inspect_row = cursor.fetchone()
+        assert inspect_row is not None
+        inspect_definition: object = inspect_row[0]
+        inspect_sql = str(inspect_definition)
     assert "statement_timeout" in inspect_sql
     assert "'3s'" in inspect_sql
     assert "200" in inspect_sql

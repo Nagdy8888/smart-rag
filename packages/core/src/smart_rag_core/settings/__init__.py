@@ -7,7 +7,11 @@ from smart_rag_core.settings.base import (
     LogLevel,
     SettingsValidationError,
     SharedSettings,
+    get_process_environ,
     load_settings,
+    pop_process_environ,
+    set_process_environ,
+    setdefault_process_environ,
     snapshot_process_environ,
 )
 from smart_rag_core.settings.evaluation import (
@@ -33,6 +37,7 @@ __all__ = [
     "SettingsValidationError",
     "SharedSettings",
     "WorkerSettings",
+    "get_process_environ",
     "load_agent_settings",
     "load_backend_settings",
     "load_evaluation_settings",
@@ -40,5 +45,8 @@ __all__ = [
     "load_lightrag_schema_admin_settings",
     "load_settings",
     "load_worker_settings",
+    "pop_process_environ",
+    "set_process_environ",
+    "setdefault_process_environ",
     "snapshot_process_environ",
 ]

@@ -158,6 +158,12 @@ class JobAdmissionService:
             return int(row[0])
 
     def _count_pending_ingestion_jobs(self) -> int:
+        """Count ingestion jobs waiting in pending status.
+
+        Returns:
+            Number of ``pending`` rows in ``app.ingestion_jobs``.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -172,6 +178,19 @@ class JobAdmissionService:
             return int(row[0])
 
     def _reserve_daily_ingestion_budget(self, estimated_cost_usd: Decimal) -> UUID:
+        """Insert one daily ingestion budget reservation after the cap check.
+
+        Args:
+            estimated_cost_usd: Positive estimated cost for this admission.
+
+        Returns:
+            New reservation identifier.
+
+        Raises:
+            JobAdmissionError: When the estimate is not positive or the daily
+                cap cannot cover it.
+        """
+
         if estimated_cost_usd <= 0:
             raise JobAdmissionError("invalid_estimated_cost")
         self._assert_daily_budget_available(estimated_cost_usd)
@@ -195,6 +214,16 @@ class JobAdmissionService:
         return reservation_id
 
     def _assert_daily_budget_available(self, estimated_cost_usd: Decimal) -> None:
+        """Fail closed when the remaining daily ingestion budget is too small.
+
+        Args:
+            estimated_cost_usd: Positive estimated cost for this admission.
+
+        Raises:
+            JobAdmissionError: When the estimate is invalid or the remaining
+                cap is insufficient.
+        """
+
         if estimated_cost_usd <= 0:
             raise JobAdmissionError("invalid_estimated_cost")
         with self._connection.cursor() as cursor:
@@ -355,6 +384,16 @@ class JobAdmissionService:
         reservation_kind: str,
         estimated_cost_usd: Decimal,
     ) -> None:
+        """Fail closed when remaining graph index or maintenance budget is too small.
+
+        Args:
+            reservation_kind: ``graph_index`` or ``graph_maintenance``.
+            estimated_cost_usd: Positive estimated cost for this reservation.
+
+        Raises:
+            JobAdmissionError: When the remaining cap cannot cover the estimate.
+        """
+
         with self._connection.cursor() as cursor:
             if reservation_kind == "graph_index":
                 cursor.execute(

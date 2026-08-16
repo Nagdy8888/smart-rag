@@ -47,6 +47,10 @@ class SandboxWorkerError(RuntimeError):
 def run_worker_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Execute one compiled SELECT against the exact authorized Parquet.
 
+    Does not apply POSIX rlimits. Those are applied only by ``main`` in the
+    isolated worker process so in-process callers, including unit tests,
+    keep the parent process limits.
+
     Args:
         payload: Trusted JSON from the parent executor. Must include
             ``parquet_path``, ``expected_path``, ``expected_sha256``,
@@ -63,7 +67,6 @@ def run_worker_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
     import duckdb
 
-    _apply_os_limits()
     parquet_path = Path(str(payload["parquet_path"])).resolve()
     expected = Path(str(payload["expected_path"])).resolve()
     if parquet_path != expected or not parquet_path.is_file():
@@ -144,12 +147,18 @@ def run_worker_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _apply_os_limits() -> None:
-    """Apply POSIX address-space and CPU limits when available.
+    """Apply POSIX address-space and CPU limits to the worker process.
+
+    Limits apply to the worker process entrypoint only (``main`` /
+    ``python -m smart_rag_core.tables.sandbox_worker``). In-process payload
+    execution, including unit tests, does not call this function and does
+    not change the parent process.
 
     Windows has no ``resource.setrlimit``. DuckDB ``memory_limit`` plus the
     parent process deadline remain the Windows bounds. Address space is 512
     MiB so CPython plus Arrow plus DuckDB can import; DuckDB's own cap stays
-    64MB.
+    64MB. CPU soft and hard limits are ``TABLE_STATEMENT_DEADLINE_SECONDS``
+    plus one second.
     """
 
     try:
@@ -229,10 +238,15 @@ def _json_value(value: object) -> object:
 def main() -> int:
     """Read one JSON payload from stdin and write one JSON result.
 
+    Applies POSIX address-space and CPU limits to this worker process
+    before executing the payload. In-process callers of
+    ``run_worker_payload`` do not inherit those limits.
+
     Returns:
         Process exit code.
     """
 
+    _apply_os_limits()
     payload = json.loads(sys.stdin.read())
     try:
         result = run_worker_payload(payload)

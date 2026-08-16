@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import cast
 from uuid import uuid4
 
 import psycopg
@@ -22,6 +24,20 @@ pytestmark = pytest.mark.skipif(
     try_connect(resolve_supabase_db_url()) is None or not paradedb_reachable(),
     reason="local Supabase or ParadeDB unavailable",
 )
+
+
+def _require_row(row: object) -> Sequence[object]:
+    """Return a fetched SQL row or fail the current assertion.
+
+    Args:
+        row: ``cursor.fetchone()`` result.
+
+    Returns:
+        The non-null row as a sequence of column values.
+    """
+
+    assert row is not None
+    return cast(Sequence[object], row)
 
 
 def _parade_url() -> str:
@@ -70,12 +86,12 @@ def test_graph_pending_handoff_is_idempotent() -> None:
                 "SELECT app.enqueue_graph_pending_handoff(%s, 'hash123')",
                 (version_id,),
             )
-            first = cursor.fetchone()[0]
+            first = _require_row(cursor.fetchone())[0]
             cursor.execute(
                 "SELECT app.enqueue_graph_pending_handoff(%s, 'hash123')",
                 (version_id,),
             )
-            second = cursor.fetchone()[0]
+            second = _require_row(cursor.fetchone())[0]
             cursor.execute(
                 """
                 SELECT count(*)
@@ -84,7 +100,7 @@ def test_graph_pending_handoff_is_idempotent() -> None:
                 """,
                 (version_id,),
             )
-            count = int(cursor.fetchone()[0])
+            count = int(str(_require_row(cursor.fetchone())[0]))
         connection.rollback()
 
     assert first == second
@@ -128,17 +144,17 @@ def test_graph_ineligible_replacement_may_flip_current() -> None:
                 "SELECT current_version_id FROM app.activate_graph_ineligible_version(%s)",
                 (second_id,),
             )
-            current = cursor.fetchone()[0]
+            current = _require_row(cursor.fetchone())[0]
             cursor.execute(
                 "SELECT is_current FROM app.document_versions WHERE id = %s",
                 (second_id,),
             )
-            second_current = cursor.fetchone()[0]
+            second_current = _require_row(cursor.fetchone())[0]
             cursor.execute(
                 "SELECT is_current FROM app.document_versions WHERE id = %s",
                 (first_id,),
             )
-            first_current = cursor.fetchone()[0]
+            first_current = _require_row(cursor.fetchone())[0]
         connection.rollback()
     assert current == second_id
     assert second_current is True
@@ -190,7 +206,7 @@ def test_graph_eligible_replacement_stays_non_current() -> None:
                 "SELECT is_current FROM app.document_versions WHERE id = %s",
                 (version_id,),
             )
-            is_current = cursor.fetchone()[0]
+            is_current = _require_row(cursor.fetchone())[0]
         connection.rollback()
     assert is_current is False
 
@@ -245,10 +261,12 @@ def test_deletion_excludes_retrieval_and_enqueues_bm25_cleanup() -> None:
             bm25_row = cursor.fetchone()
         connection.rollback()
 
-    assert version_row[0] is False
-    assert version_row[1] == "deletion_pending"
-    assert bm25_row[0] == "high"
-    assert bm25_row[1] == "delete"
+    version_values = _require_row(version_row)
+    bm25_values = _require_row(bm25_row)
+    assert version_values[0] is False
+    assert version_values[1] == "deletion_pending"
+    assert bm25_values[0] == "high"
+    assert bm25_values[1] == "delete"
 
 
 @pytest.mark.skipif(

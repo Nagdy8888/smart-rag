@@ -3,23 +3,29 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-from smart_rag_api.main import create_app
+
+from tests.unit.typed_openapi import (
+    as_openapi_client,
+    json_object,
+    openapi_test_client,
+)
 
 
 def test_ingestion_crawl_route_is_registered() -> None:
     """Approved crawl enqueue appears in OpenAPI."""
 
-    with TestClient(create_app()) as client:
-        schema = client.get("/openapi.json").json()
-    assert "/ingestion/crawls" in schema.get("paths", {})
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
+        schema = json_object(client.get("/openapi.json").json())
+    assert "/ingestion/crawls" in json_object(schema.get("paths", {}))
 
 
 def test_member_cannot_enqueue_website_crawl(monkeypatch: pytest.MonkeyPatch) -> None:
     """Members cannot broaden crawl scope."""
 
     monkeypatch.setenv("APP_ENV", "test")
-    with TestClient(create_app()) as client:
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
         response = client.post(
             "/ingestion/crawls",
             json={
@@ -34,4 +40,4 @@ def test_member_cannot_enqueue_website_crawl(monkeypatch: pytest.MonkeyPatch) ->
             },
         )
     assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
+    assert json_object(response.json())["detail"] == "forbidden"

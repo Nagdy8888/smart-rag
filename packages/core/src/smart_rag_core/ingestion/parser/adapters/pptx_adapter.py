@@ -10,7 +10,13 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from smart_rag_core.ingestion.parser.exceptions import ParserLimitExceeded
-from smart_rag_core.ingestion.parser.helpers import build_coverage, element_id
+from smart_rag_core.ingestion.parser.helpers import (
+    as_float,
+    as_int,
+    build_coverage,
+    element_id,
+    vendor_attr,
+)
 from smart_rag_core.ingestion.parser.limits import (
     CLEANING_POLICY_VERSION,
     PARSER_CONFIG_VERSION,
@@ -57,14 +63,14 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
         order += 1
         shape_entries: list[tuple[float, float, int, object]] = []
         for shape in slide.shapes:
-            top = float(getattr(shape, "top", 0) or 0)
-            left = float(getattr(shape, "left", 0) or 0)
-            z_order = int(getattr(shape, "shape_id", 0) or 0)
+            top = as_float(vendor_attr(shape, "top", 0) or 0)
+            left = as_float(vendor_attr(shape, "left", 0) or 0)
+            z_order = as_int(vendor_attr(shape, "shape_id", 0) or 0)
             shape_entries.append((top, left, z_order, shape))
         for reading_index, (_top, _left, z_order, shape) in enumerate(
             sorted(shape_entries, key=lambda item: (item[0], item[1], item[2]))
         ):
-            if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            if vendor_attr(shape, "shape_type") == MSO_SHAPE_TYPE.GROUP:
                 elements.append(
                     TypedElement(
                         element_id=element_id(
@@ -73,7 +79,7 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                             ElementKind.FIGURE,
                             PptxLocator(
                                 slide_index=slide_index,
-                                shape_id=int(shape.shape_id),
+                                shape_id=_shape_id(shape),
                                 z_order=z_order,
                                 reading_order_index=reading_index,
                             ),
@@ -84,13 +90,13 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                         reading_order=order,
                         locator=PptxLocator(
                             slide_index=slide_index,
-                            shape_id=int(shape.shape_id),
+                            shape_id=_shape_id(shape),
                             z_order=z_order,
                             reading_order_index=reading_index,
-                            geometry_x=float(shape.left),
-                            geometry_y=float(shape.top),
-                            geometry_w=float(shape.width),
-                            geometry_h=float(shape.height),
+                            geometry_x=_shape_emu(shape, "left"),
+                            geometry_y=_shape_emu(shape, "top"),
+                            geometry_w=_shape_emu(shape, "width"),
+                            geometry_h=_shape_emu(shape, "height"),
                         ),
                         media_only=True,
                         metadata={
@@ -103,9 +109,12 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                 continue
             text = ""
             if hasattr(shape, "text"):
-                text = str(shape.text).strip()
+                text = str(vendor_attr(shape, "text")).strip()
             if not text:
-                if shape.shape_type in {MSO_SHAPE_TYPE.PICTURE, MSO_SHAPE_TYPE.CHART}:
+                if vendor_attr(shape, "shape_type") in {
+                    MSO_SHAPE_TYPE.PICTURE,
+                    MSO_SHAPE_TYPE.CHART,
+                }:
                     elements.append(
                         TypedElement(
                             element_id=element_id(
@@ -114,7 +123,7 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                                 ElementKind.FIGURE,
                                 PptxLocator(
                                     slide_index=slide_index,
-                                    shape_id=int(shape.shape_id),
+                                    shape_id=_shape_id(shape),
                                     reading_order_index=reading_index,
                                 ),
                                 None,
@@ -124,7 +133,7 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                             reading_order=order,
                             locator=PptxLocator(
                                 slide_index=slide_index,
-                                shape_id=int(shape.shape_id),
+                                shape_id=_shape_id(shape),
                                 z_order=z_order,
                                 reading_order_index=reading_index,
                             ),
@@ -135,13 +144,13 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                 continue
             locator = PptxLocator(
                 slide_index=slide_index,
-                shape_id=int(shape.shape_id),
+                shape_id=_shape_id(shape),
                 z_order=z_order,
                 reading_order_index=reading_index,
-                geometry_x=float(shape.left),
-                geometry_y=float(shape.top),
-                geometry_w=float(shape.width),
-                geometry_h=float(shape.height),
+                geometry_x=_shape_emu(shape, "left"),
+                geometry_y=_shape_emu(shape, "top"),
+                geometry_w=_shape_emu(shape, "width"),
+                geometry_h=_shape_emu(shape, "height"),
             )
             elements.append(
                 TypedElement(
@@ -175,3 +184,38 @@ def parse_pptx(path: Path, content_hash: str, format_key: str) -> ParseResult:
         ),
         detail="pptx parsed",
     )
+
+
+def _shape_id(shape: object) -> int:
+    """Return ``int(shape.shape_id)`` for an untyped PPTX shape.
+
+    Args:
+        shape: python-pptx shape handle stored as ``object``.
+
+    Returns:
+        Integer shape id.
+
+    Raises:
+        TypeError: If ``shape_id`` is not convertible to int.
+        ValueError: If ``shape_id`` is a non-integer string.
+    """
+
+    return as_int(vendor_attr(shape, "shape_id"))
+
+
+def _shape_emu(shape: object, name: str) -> float:
+    """Return ``float(shape.<name>)`` for an untyped PPTX geometry field.
+
+    Args:
+        shape: python-pptx shape handle stored as ``object``.
+        name: Attribute name such as ``left``, ``top``, ``width``, or ``height``.
+
+    Returns:
+        Geometry value in EMUs as float.
+
+    Raises:
+        TypeError: If the attribute is not convertible to float.
+        ValueError: If the attribute is a non-numeric string.
+    """
+
+    return as_float(vendor_attr(shape, name))

@@ -67,7 +67,9 @@ class GraphWorkerLoop:
             advisory lock during mutation, then completes or fails the job.
         """
 
-        if self._adapter is None or self._indexer is None:
+        adapter = self._adapter
+        indexer = self._indexer
+        if adapter is None or indexer is None:
             return False
         postgres_url = self._postgres_url()
         with psycopg.connect(postgres_url) as claimed:
@@ -86,6 +88,7 @@ class GraphWorkerLoop:
         job_id = UUID(str(job["id"]))
         lease_token = str(job["lease_token"])
         writer_token: str | None = None
+        occupied_token = ""
         lock_connection: psycopg.Connection | None = None
         guard: GraphWriterGuard | None = None
         stop_heartbeat = threading.Event()
@@ -100,10 +103,11 @@ class GraphWorkerLoop:
                     workspace_key=DEFAULT_GRAPH_WORKSPACE,
                 )
                 try:
-                    writer_token = guard.occupy(
+                    occupied_token = guard.occupy(
                         job_id=job_id,
                         job_lease_token=lease_token,
                     )
+                    writer_token = occupied_token
                     occupy_conn.commit()
                 except GraphWriterLostError as exc:
                     occupy_conn.rollback()
@@ -120,8 +124,6 @@ class GraphWorkerLoop:
 
             lock_connection = psycopg.connect(postgres_url)
             lock_connection.autocommit = True
-            if guard is None:
-                raise GraphWriterLostError("writer_lease_not_occupied")
             try:
                 guard.acquire_session_lock(lock_connection)
             except GraphWriterLostError as exc:
@@ -137,6 +139,8 @@ class GraphWorkerLoop:
                 raise
 
             def heartbeat_loop() -> None:
+                """Renew LightRAG and graph-writer leases until stop is set."""
+
                 while not stop_heartbeat.wait(
                     timeout=self._settings.job_heartbeat_interval_seconds
                 ):
@@ -149,13 +153,12 @@ class GraphWorkerLoop:
                                 lease_seconds=self._settings.job_lease_seconds,
                             )
                             repository.heartbeat(job_id, lease_token)
-                            if writer_token is not None:
-                                heartbeat_graph_writer_lease(
-                                    connection,
-                                    lease_owner=self._lease_owner(),
-                                    writer_token=writer_token,
-                                    lease_seconds=self._settings.job_lease_seconds,
-                                )
+                            heartbeat_graph_writer_lease(
+                                connection,
+                                lease_owner=self._lease_owner(),
+                                writer_token=occupied_token,
+                                lease_seconds=self._settings.job_lease_seconds,
+                            )
                             connection.commit()
                     except (JobLeaseError, GraphWriterLostError):
                         return
@@ -167,12 +170,12 @@ class GraphWorkerLoop:
             )
             heartbeat_thread.start()
 
-            indexer = self._indexer
-            adapter = self._adapter
             if not isinstance(indexer, LightRagGraphIndexer):
                 raise RuntimeError("graph_indexer_missing")
 
             def _pre_provider() -> None:
+                """Re-check the occupied graph-writer lease before vendor calls."""
+
                 with psycopg.connect(postgres_url) as verify_conn:
                     verify_conn.execute("SET ROLE app_worker")
                     verify_guard = GraphWriterGuard(
@@ -263,8 +266,7 @@ class GraphWorkerLoop:
             )
             return True
         finally:
-            if self._adapter is not None:
-                self._adapter.callbacks.pre_provider_hook = None
+            adapter.callbacks.pre_provider_hook = None
             stop_heartbeat.set()
             if heartbeat_thread is not None:
                 heartbeat_thread.join(timeout=5)
@@ -304,6 +306,18 @@ class GraphWorkerLoop:
         last_error: str,
         result: dict[str, Any],
     ) -> None:
+        """Persist completion or classified failure for one LightRAG job.
+
+        Args:
+            postgres_url: Worker Postgres URL.
+            job_id: LightRAG index job identifier.
+            lease_token: Active lease token.
+            outcome_kind: ``completed`` or a failure kind.
+            error_category: Failure category when not completing.
+            last_error: Operator-visible error detail.
+            result: Completion payload stored on success.
+        """
+
         with psycopg.connect(postgres_url) as connection:
             connection.execute("SET ROLE app_worker")
             repository = LightragIndexJobRepository(
@@ -331,6 +345,16 @@ class GraphWorkerLoop:
         error_category: JobErrorCategory,
         last_error: str,
     ) -> None:
+        """Best-effort persist a LightRAG job failure.
+
+        Args:
+            postgres_url: Worker Postgres URL.
+            job_id: LightRAG index job identifier.
+            lease_token: Active lease token.
+            error_category: Classified failure category.
+            last_error: Operator-visible error detail.
+        """
+
         try:
             with psycopg.connect(postgres_url) as connection:
                 connection.execute("SET ROLE app_worker")
@@ -350,10 +374,25 @@ class GraphWorkerLoop:
             LOGGER.exception("unable to persist graph failure for job %s", job_id)
 
     def _postgres_url(self) -> str:
+        """Return the configured Supabase Postgres URL.
+
+        Returns:
+            Connection URL for worker-role SQL.
+
+        Raises:
+            JobLeaseError: When ``supabase_db_url`` is unset.
+        """
+
         if self._settings.supabase_db_url is None:
             raise JobLeaseError("supabase_db_url_unconfigured")
         return self._settings.supabase_db_url.get_secret_value()
 
     def _lease_owner(self) -> str:
+        """Return the stable lease owner id for this worker process.
+
+        Returns:
+            ``{instance_id}@{hostname}`` owner string.
+        """
+
         hostname = socket.gethostname()
         return f"{self._settings.worker_instance_id}@{hostname}"

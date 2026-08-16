@@ -45,7 +45,7 @@ def evaluate_robots(
     parser = RobotFileParser()
     parser.parse(robots_body.splitlines())
     allowed = parser.can_fetch(user_agent, target.normalized)
-    delay = parser.crawl_delay(user_agent)
+    delay = _crawl_delay_seconds(parser, user_agent)
     if not allowed:
         return RobotsDecision(
             allowed=False,
@@ -82,3 +82,28 @@ def require_robots_allowed(decision: RobotsDecision) -> None:
 
     if not decision.allowed:
         raise CrawlPolicyError(decision.reason, code="robots_denied")
+
+
+def _crawl_delay_seconds(parser: RobotFileParser, user_agent: str) -> float | None:
+    """Return robots.txt crawl-delay as seconds.
+
+    ``urllib.robotparser.RobotFileParser.crawl_delay`` is stubbed as
+    ``str | None`` while CPython stores a float. ``float(raw)`` is identity
+    for both a numeric string and an actual float.
+
+    Args:
+        parser: Parsed robots.txt handler.
+        user_agent: Crawler user agent token.
+
+    Returns:
+        Delay in seconds, or None when the parser has no delay.
+
+    Raises:
+        TypeError: If the delay cannot be converted to float.
+        ValueError: If a string delay is not numeric.
+    """
+
+    raw = parser.crawl_delay(user_agent)
+    if raw is None:
+        return None
+    return float(raw)

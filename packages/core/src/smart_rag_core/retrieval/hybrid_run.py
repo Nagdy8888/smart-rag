@@ -9,11 +9,12 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Protocol, TypedDict, TypeGuard, cast
 from uuid import UUID
 
 import psycopg
 
-from smart_rag_core.evaluation.schema import ExpectedProfile, QueryType
+from smart_rag_core.evaluation.schema import ExpectedProfile, ProfileField, QueryType
 from smart_rag_core.gateways.embedding import (
     EmbeddingGateway,
     EmbeddingRequest,
@@ -30,14 +31,22 @@ from smart_rag_core.retrieval.context_loader import (
     heading_inventory_from_contexts,
 )
 from smart_rag_core.retrieval.coverage import CoverageSignal, HybridCoverage
-from smart_rag_core.retrieval.hybrid import assemble_hybrid, run_channels_parallel
+from smart_rag_core.retrieval.hybrid import (
+    HybridRetrievalResult,
+    assemble_hybrid,
+    run_channels_parallel,
+)
 from smart_rag_core.retrieval.profiles import (
     FINAL_EVIDENCE_MAX,
     MAX_NORMALIZED_QUERY_CHARS,
     RETRIEVAL_SLICE_SECONDS,
     RetrievalFallbackReason,
 )
-from smart_rag_core.retrieval.rerank import RerankFallbackReason, RerankRanking
+from smart_rag_core.retrieval.rerank import (
+    RerankFallbackReason,
+    RerankPassage,
+    RerankRanking,
+)
 from smart_rag_core.retrieval.temporal import TemporalDocument, TemporalIntent
 from smart_rag_core.retrieval.types import (
     Bm25RetrievalResult,
@@ -52,6 +61,89 @@ from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 # plus at most three variants (at most four unique strings) as one call.
 _FUSION_LIST_CAP = 3
 _EMBED_TEXT_CAP = 4
+
+_CandidateList = tuple[RetrievalCandidate, ...]
+_VariantLists = tuple[_CandidateList, ...]
+_DenseRetrieveCall = Callable[..., DenseRetrievalResult | _CandidateList]
+_TermRetrieveCall = Callable[..., TermRetrievalResult | _CandidateList]
+_Bm25RetrieveCall = Callable[..., object]
+_ChannelJob = Callable[[], object]
+
+
+class _DenseRetrieverLike(Protocol):
+    """Object with a dense ``retrieve`` method used by Hybrid channel jobs.
+
+    Attributes:
+        retrieve: Bound dense retrieve callable or test double.
+    """
+
+    retrieve: _DenseRetrieveCall
+
+
+class _Bm25RetrieverLike(Protocol):
+    """Object with a BM25 ``retrieve`` method used by Hybrid channel jobs.
+
+    Attributes:
+        retrieve: Bound BM25 retrieve callable or test double.
+    """
+
+    retrieve: _Bm25RetrieveCall
+
+
+class _TermRetrieverLike(Protocol):
+    """Object with a term ``retrieve`` method used by Hybrid channel jobs.
+
+    Attributes:
+        retrieve: Bound term retrieve callable or test double.
+    """
+
+    retrieve: _TermRetrieveCall
+
+
+class _AssembleHybridKwargs(TypedDict):
+    """Keyword arguments shared by both Hybrid assemble calls in one retrieve.
+
+    Attributes:
+        dense_variants: Per-variant dense lists.
+        bm25_variants: Authorized BM25 lists.
+        term_variants: Per-variant term lists.
+        bm25_fallback: BM25 outage, timeout, or none.
+        temporal_intent: UTC temporal policy.
+        target_date: ``as_of`` target.
+        temporal_records: Effective timestamps by chunk.
+        want_full_summary: Whole-document request.
+        media_dependence: Figure-only required evidence.
+        negation_scope: Profile negation enum.
+        historical_relationship: Profile historical-relationship flag.
+        principal_scope_hash: Cache principal hash.
+        query_normalized: Normalized query used in the cache key.
+        visibility_generation: ACL/visibility generation.
+        scanned_bm25: BM25 IDs scanned before recheck.
+        query_type: Profile query type.
+        required_terms: Codes and exact terms.
+        matched_terms: Terms already matched; Hybrid retrieve passes empty.
+        deadline_exhausted: True when a parallel channel missed the slice.
+    """
+
+    dense_variants: _VariantLists
+    bm25_variants: _VariantLists
+    term_variants: _VariantLists
+    bm25_fallback: RetrievalFallbackReason
+    temporal_intent: TemporalIntent
+    target_date: date | None
+    temporal_records: dict[UUID, TemporalDocument]
+    want_full_summary: bool
+    media_dependence: bool
+    negation_scope: str
+    historical_relationship: bool
+    principal_scope_hash: str
+    query_normalized: str
+    visibility_generation: int
+    scanned_bm25: tuple[UUID, ...]
+    query_type: QueryType
+    required_terms: tuple[str, ...]
+    matched_terms: tuple[str, ...]
+    deadline_exhausted: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,7 +245,7 @@ class HybridRetriever:
         term: object | None = None,
         load_context: ContextFn | None = None,
         rerank: RerankFn | None = None,
-        channel_jobs: dict[str, Callable[[], object]] | None = None,
+        channel_jobs: dict[str, _ChannelJob] | None = None,
         supabase_dsn: str | None = None,
     ) -> None:
         """Bind gateways, optional retrievers, and test doubles.
@@ -195,7 +287,7 @@ class HybridRetriever:
         principal_scope_hash: str | None = None,
         visibility_generation: int = 1,
         deadline_seconds: float | None = None,
-        channel_jobs: dict[str, Callable[[], object]] | None = None,
+        channel_jobs: dict[str, _ChannelJob] | None = None,
         restrict_version_id: UUID | None = None,
     ) -> HybridRunResult:
         """Run one Hybrid retrieve and return ranked IDs plus locators.
@@ -244,7 +336,9 @@ class HybridRetriever:
                 embedding_call_count=1,
             )
         vectors = embed_response.vectors
-        jobs = channel_jobs if channel_jobs is not None else self._channel_jobs
+        jobs: dict[str, _ChannelJob] | None = (
+            channel_jobs if channel_jobs is not None else self._channel_jobs
+        )
         if jobs is None:
             jobs = self._build_channel_jobs(
                 caller=caller,
@@ -300,7 +394,7 @@ class HybridRetriever:
         temporal_records = self._load_temporal_records(
             _flatten_channel_candidates(dense_lists, bm25_result.candidates, term_lists)
         )
-        assemble_kwargs = dict(
+        assemble_kwargs = _hybrid_assemble_kwargs(
             dense_variants=dense_lists,
             bm25_variants=(bm25_result.candidates,) if bm25_result.candidates else (),
             term_variants=term_lists,
@@ -321,10 +415,10 @@ class HybridRetriever:
             matched_terms=(),
             deadline_exhausted=exhausted,
         )
-        assembled = assemble_hybrid(
+        assembled = _call_assemble_hybrid(
             heading_inventory=(),
             covered_headings=(),
-            **assemble_kwargs,
+            kwargs=assemble_kwargs,
         )
         if fallback is RetrievalFallbackReason.NONE and not assembled.fused:
             fallback = RetrievalFallbackReason.RETRIEVAL_EMPTY
@@ -336,13 +430,13 @@ class HybridRetriever:
         covered = heading_inventory_from_contexts(
             tuple(item for item in contexts if item.chunk_id in set(fused_ids))
         )
-        assembled = assemble_hybrid(
+        assembled = _call_assemble_hybrid(
             heading_inventory=inventory,
             covered_headings=covered,
-            **assemble_kwargs,
+            kwargs=assemble_kwargs,
         )
         remaining = max(0.0, slice_seconds - (time.perf_counter() - started))
-        rerank_fn = self._rerank or _identity_rerank
+        rerank_fn: RerankFn = self._rerank or _identity_rerank
         rerank_calls = 0
         evidence: tuple[EvidenceUnit, ...] = ()
         if assembled.fused and resolved_profile is not None:
@@ -414,7 +508,7 @@ class HybridRetriever:
         query: str,
         texts: tuple[str, ...],
         vectors: tuple[tuple[float, ...], ...],
-    ) -> dict[str, Callable[[], object]]:
+    ) -> dict[str, _ChannelJob]:
         """Build parallel dense/BM25/term jobs from bound retrievers.
 
         Args:
@@ -427,10 +521,12 @@ class HybridRetriever:
             Zero-argument jobs for ``run_channels_parallel``.
         """
 
-        jobs: dict[str, Callable[[], object]] = {}
-        if self._dense is not None:
+        jobs: dict[str, _ChannelJob] = {}
+        dense = self._dense
+        if dense is not None:
+            dense_retriever = cast(_DenseRetrieverLike, dense)
 
-            def _dense_job() -> tuple[tuple[RetrievalCandidate, ...], ...]:
+            def _dense_job() -> _VariantLists:
                 """Run dense retrieve per fused query text.
 
                 Returns:
@@ -448,14 +544,16 @@ class HybridRetriever:
                             vectors=vectors,
                         )
                 return _collect_dense_lists(
-                    self._dense.retrieve,  # type: ignore[union-attr]
+                    dense_retriever.retrieve,
                     caller=caller,
                     texts=texts,
                     vectors=vectors,
                 )
 
             jobs["dense"] = _dense_job
-        if self._bm25 is not None:
+        bm25 = self._bm25
+        if bm25 is not None:
+            bm25_retriever = cast(_Bm25RetrieverLike, bm25)
 
             def _bm25_job() -> Bm25RetrievalResult:
                 """Run one BM25 scan over the original query.
@@ -467,13 +565,13 @@ class HybridRetriever:
                 try:
                     if self._supabase_dsn:
                         with self._channel_supabase() as supabase_conn:
-                            result = self._bm25.retrieve(  # type: ignore[union-attr]
+                            result = bm25_retriever.retrieve(
                                 supabase=supabase_conn,
                                 caller=caller,
                                 query_text=query,
                             )
                     else:
-                        result = self._bm25.retrieve(  # type: ignore[union-attr]
+                        result = bm25_retriever.retrieve(
                             supabase=self._supabase,
                             caller=caller,
                             query_text=query,
@@ -495,9 +593,11 @@ class HybridRetriever:
                 candidates=(),
                 fallback_reason=RetrievalFallbackReason.BM25_UNAVAILABLE,
             )
-        if self._term is not None:
+        term = self._term
+        if term is not None:
+            term_retriever = cast(_TermRetrieverLike, term)
 
-            def _term_job() -> tuple[tuple[RetrievalCandidate, ...], ...]:
+            def _term_job() -> _VariantLists:
                 """Run term retrieve per fused query text.
 
                 Returns:
@@ -514,7 +614,7 @@ class HybridRetriever:
                             texts=texts,
                         )
                 return _collect_term_lists(
-                    self._term.retrieve,  # type: ignore[union-attr]
+                    term_retriever.retrieve,
                     caller=caller,
                     texts=texts,
                 )
@@ -652,6 +752,135 @@ class HybridRetriever:
         )
 
 
+def _hybrid_assemble_kwargs(
+    *,
+    dense_variants: _VariantLists,
+    bm25_variants: _VariantLists,
+    term_variants: _VariantLists,
+    bm25_fallback: RetrievalFallbackReason,
+    temporal_intent: TemporalIntent,
+    target_date: date | None,
+    temporal_records: dict[UUID, TemporalDocument],
+    want_full_summary: bool,
+    media_dependence: bool,
+    negation_scope: str,
+    historical_relationship: bool,
+    principal_scope_hash: str,
+    query_normalized: str,
+    visibility_generation: int,
+    scanned_bm25: tuple[UUID, ...],
+    query_type: QueryType,
+    required_terms: tuple[str, ...],
+    matched_terms: tuple[str, ...],
+    deadline_exhausted: bool,
+) -> _AssembleHybridKwargs:
+    """Pack the shared ``assemble_hybrid`` kwargs for one retrieve.
+
+    Args:
+        dense_variants: Per-variant dense lists.
+        bm25_variants: Authorized BM25 lists.
+        term_variants: Per-variant term lists.
+        bm25_fallback: BM25 outage, timeout, or none.
+        temporal_intent: UTC temporal policy.
+        target_date: ``as_of`` target.
+        temporal_records: Effective timestamps by chunk.
+        want_full_summary: Whole-document request.
+        media_dependence: Figure-only required evidence.
+        negation_scope: Profile negation enum.
+        historical_relationship: Profile historical-relationship flag.
+        principal_scope_hash: Cache principal hash.
+        query_normalized: Normalized query used in the cache key.
+        visibility_generation: ACL/visibility generation.
+        scanned_bm25: BM25 IDs scanned before recheck.
+        query_type: Profile query type.
+        required_terms: Codes and exact terms.
+        matched_terms: Terms already matched; Hybrid retrieve passes empty.
+        deadline_exhausted: True when a parallel channel missed the slice.
+
+    Returns:
+        Typed kwargs unpacked into both ``assemble_hybrid`` calls.
+    """
+
+    return {
+        "dense_variants": dense_variants,
+        "bm25_variants": bm25_variants,
+        "term_variants": term_variants,
+        "bm25_fallback": bm25_fallback,
+        "temporal_intent": temporal_intent,
+        "target_date": target_date,
+        "temporal_records": temporal_records,
+        "want_full_summary": want_full_summary,
+        "media_dependence": media_dependence,
+        "negation_scope": negation_scope,
+        "historical_relationship": historical_relationship,
+        "principal_scope_hash": principal_scope_hash,
+        "query_normalized": query_normalized,
+        "visibility_generation": visibility_generation,
+        "scanned_bm25": scanned_bm25,
+        "query_type": query_type,
+        "required_terms": required_terms,
+        "matched_terms": matched_terms,
+        "deadline_exhausted": deadline_exhausted,
+    }
+
+
+def _call_assemble_hybrid(
+    *,
+    heading_inventory: tuple[str, ...],
+    covered_headings: tuple[str, ...],
+    kwargs: _AssembleHybridKwargs,
+) -> HybridRetrievalResult:
+    """Call ``assemble_hybrid`` with the same heading and channel arguments.
+
+    Args:
+        heading_inventory: Current major headings.
+        covered_headings: Headings present in fused evidence.
+        kwargs: Shared channel, temporal, and coverage arguments.
+
+    Returns:
+        The ``assemble_hybrid`` result for this heading snapshot.
+    """
+
+    return assemble_hybrid(
+        heading_inventory=heading_inventory,
+        covered_headings=covered_headings,
+        **kwargs,
+    )
+
+
+def _is_candidate_tuple(value: object) -> TypeGuard[_CandidateList]:
+    """Return whether ``value`` is a tuple of retrieval candidates.
+
+    Args:
+        value: Channel job payload or an inner list.
+
+    Returns:
+        True when ``value`` is a tuple whose first item is a candidate, or
+        empty. Matches the existing unpack ``isinstance`` checks.
+    """
+
+    if not isinstance(value, tuple):
+        return False
+    items = cast(tuple[object, ...], value)
+    return not items or isinstance(items[0], RetrievalCandidate)
+
+
+def _is_variant_tuple(value: object) -> TypeGuard[_VariantLists]:
+    """Return whether ``value`` is a tuple of per-variant candidate lists.
+
+    Args:
+        value: Channel job payload.
+
+    Returns:
+        True when ``value`` is a non-empty tuple whose first item is a tuple.
+    """
+
+    if not isinstance(value, tuple) or not value:
+        return False
+    items = cast(tuple[object, ...], value)
+    return isinstance(items[0], tuple)
+
+
 def _fail_closed_query(query: str) -> RetrievalFallbackReason | None:
     """Return a named fallback when the query must not retrieve.
 
@@ -759,7 +988,7 @@ def _collect_dense_lists(
     caller: CallerContext,
     texts: tuple[str, ...],
     vectors: tuple[tuple[float, ...], ...],
-) -> tuple[tuple[RetrievalCandidate, ...], ...]:
+) -> _VariantLists:
     """Run dense retrieve once per fused query vector.
 
     Args:
@@ -772,13 +1001,13 @@ def _collect_dense_lists(
         Per-variant dense candidate lists.
     """
 
-    lists: list[tuple[RetrievalCandidate, ...]] = []
+    lists: list[_CandidateList] = []
     for _text, vector in zip(texts, vectors, strict=False):
         result = retrieve(caller=caller, query_embedding=list(vector))
         if isinstance(result, DenseRetrievalResult):
             lists.append(result.candidates)
         elif isinstance(result, tuple):
-            lists.append(result)
+            lists.append(cast(_CandidateList, result))
     return tuple(lists)
 
 
@@ -787,7 +1016,7 @@ def _collect_term_lists(
     *,
     caller: CallerContext,
     texts: tuple[str, ...],
-) -> tuple[tuple[RetrievalCandidate, ...], ...]:
+) -> _VariantLists:
     """Run term retrieve once per fused query text.
 
     Args:
@@ -799,13 +1028,13 @@ def _collect_term_lists(
         Per-variant term candidate lists.
     """
 
-    lists: list[tuple[RetrievalCandidate, ...]] = []
+    lists: list[_CandidateList] = []
     for text in texts:
         result = retrieve(caller=caller, query_text=text)
         if isinstance(result, TermRetrievalResult):
             lists.append(result.candidates)
         elif isinstance(result, tuple):
-            lists.append(result)
+            lists.append(cast(_CandidateList, result))
     return tuple(lists)
 
 
@@ -899,7 +1128,7 @@ def _flatten_channel_candidates(
 
 def _unpack_dense(
     value: object,
-) -> tuple[tuple[tuple[RetrievalCandidate, ...], ...], RetrievalFallbackReason]:
+) -> tuple[_VariantLists, RetrievalFallbackReason]:
     """Normalize a dense channel job result.
 
     Args:
@@ -913,20 +1142,18 @@ def _unpack_dense(
         return (), RetrievalFallbackReason.NONE
     if isinstance(value, DenseRetrievalResult):
         return (value.candidates,), value.fallback_reason
-    if isinstance(value, tuple):
+    if _is_candidate_tuple(value):
         if not value:
             return (), RetrievalFallbackReason.NONE
-        first = value[0]
-        if isinstance(first, RetrievalCandidate):
-            return (value,), RetrievalFallbackReason.NONE
-        if isinstance(first, tuple):
-            return value, RetrievalFallbackReason.NONE
+        return (value,), RetrievalFallbackReason.NONE
+    if _is_variant_tuple(value):
+        return value, RetrievalFallbackReason.NONE
     return (), RetrievalFallbackReason.DENSE_UNAVAILABLE
 
 
 def _unpack_term(
     value: object,
-) -> tuple[tuple[tuple[RetrievalCandidate, ...], ...], RetrievalFallbackReason]:
+) -> tuple[_VariantLists, RetrievalFallbackReason]:
     """Normalize a term channel job result.
 
     Args:
@@ -940,14 +1167,12 @@ def _unpack_term(
         return (), RetrievalFallbackReason.NONE
     if isinstance(value, TermRetrievalResult):
         return (value.candidates,), RetrievalFallbackReason.NONE
-    if isinstance(value, tuple):
+    if _is_candidate_tuple(value):
         if not value:
             return (), RetrievalFallbackReason.NONE
-        first = value[0]
-        if isinstance(first, RetrievalCandidate):
-            return (value,), RetrievalFallbackReason.NONE
-        if isinstance(first, tuple):
-            return value, RetrievalFallbackReason.NONE
+        return (value,), RetrievalFallbackReason.NONE
+    if _is_variant_tuple(value):
+        return value, RetrievalFallbackReason.NONE
     return (), RetrievalFallbackReason.TERM_UNAVAILABLE
 
 
@@ -963,15 +1188,9 @@ def _unpack_bm25(value: object) -> Bm25RetrievalResult:
 
     if isinstance(value, Bm25RetrievalResult):
         return value
-    if isinstance(value, tuple) and value and isinstance(value[0], RetrievalCandidate):
+    if _is_candidate_tuple(value) and value:
         return Bm25RetrievalResult(scanned_ids=(), candidates=value)
-    if (
-        isinstance(value, tuple)
-        and value
-        and isinstance(value[0], tuple)
-        and value[0]
-        and isinstance(value[0][0], RetrievalCandidate)
-    ):
+    if _is_variant_tuple(value) and value[0] and _is_candidate_tuple(value[0]):
         return Bm25RetrievalResult(scanned_ids=(), candidates=value[0])
     return Bm25RetrievalResult(scanned_ids=(), candidates=())
 
@@ -1008,7 +1227,7 @@ def _compose_fallback(
 
 def _identity_rerank(
     _query: str,
-    pool: tuple[object, ...],
+    pool: tuple[RerankPassage, ...],
     _deadline: float,
 ) -> tuple[tuple[RerankRanking, ...], None, RerankFallbackReason]:
     """Keep fused pool order without a model call.
@@ -1024,7 +1243,7 @@ def _identity_rerank(
 
     rankings = tuple(
         RerankRanking(
-            chunk_id=item.candidate.chunk_id,  # type: ignore[attr-defined]
+            chunk_id=item.candidate.chunk_id,
             rank=index + 1,
             support=1.0,
         )
@@ -1034,7 +1253,7 @@ def _identity_rerank(
 
 
 def _evidence_units(
-    passages: tuple[object, ...],
+    passages: tuple[RerankPassage, ...],
     contexts: tuple[ChunkContext, ...],
 ) -> tuple[EvidenceUnit, ...]:
     """Join selected passages to canonical locator rows.
@@ -1050,13 +1269,9 @@ def _evidence_units(
     by_id = {item.chunk_id: item for item in contexts}
     units: list[EvidenceUnit] = []
     for passage in passages:
-        candidate = passage.candidate  # type: ignore[attr-defined]
+        candidate = passage.candidate
         record = by_id.get(candidate.chunk_id)
-        citation = (
-            record.raw_text
-            if record is not None
-            else str(getattr(passage, "raw_text", ""))
-        )
+        citation = record.raw_text if record is not None else passage.raw_text
         locator = _locator_from_context(record, passage)
         units.append(
             EvidenceUnit(
@@ -1108,7 +1323,7 @@ def _evidence_units_from_context(
 
 def _locator_from_context(
     record: ChunkContext | None,
-    passage: object | None,
+    passage: RerankPassage | None,
 ) -> EvidenceLocator:
     """Copy locator fields from canonical context, then passage page/section.
 
@@ -1128,11 +1343,11 @@ def _locator_from_context(
             range_ref=record.range_ref,
             source_url=record.source_url,
         )
-    page = getattr(passage, "page_number", None) if passage is not None else None
-    section = getattr(passage, "section_path", ()) if passage is not None else ()
+    if passage is None:
+        return EvidenceLocator()
     return EvidenceLocator(
-        page_number=page if isinstance(page, int) else None,
-        section_path=tuple(section) if isinstance(section, tuple) else (),
+        page_number=passage.page_number,
+        section_path=passage.section_path,
     )
 
 
@@ -1147,10 +1362,10 @@ def _str_list_field(profile: ExpectedProfile | None, name: str) -> tuple[str, ..
         String values, or empty when missing.
     """
 
-    if profile is None:
+    field = _profile_field(profile, name)
+    if field is None:
         return ()
-    field = getattr(profile, name, None)
-    value = getattr(field, "value", None)
+    value = field.value
     if isinstance(value, list):
         return tuple(str(item) for item in value if str(item).strip())
     if isinstance(value, str) and value.strip():
@@ -1169,10 +1384,10 @@ def _str_field(profile: ExpectedProfile | None, name: str) -> str | None:
         String value or ``None``.
     """
 
-    if profile is None:
+    field = _profile_field(profile, name)
+    if field is None:
         return None
-    field = getattr(profile, name, None)
-    value = getattr(field, "value", None)
+    value = field.value
     if isinstance(value, str):
         return value
     return None
@@ -1189,11 +1404,30 @@ def _bool_field(profile: ExpectedProfile | None, name: str) -> bool:
         The boolean value, or ``False`` when missing.
     """
 
-    if profile is None:
+    field = _profile_field(profile, name)
+    if field is None:
         return False
-    field = getattr(profile, name, None)
-    value = getattr(field, "value", None)
+    value = field.value
     return bool(value) if isinstance(value, bool) else False
+
+
+def _profile_field(profile: ExpectedProfile | None, name: str) -> ProfileField | None:
+    """Return a named ``ProfileField`` from the typed profile.
+
+    Args:
+        profile: Optional typed profile.
+        name: Attribute name on ``ExpectedProfile``.
+
+    Returns:
+        The field when present, otherwise ``None``.
+    """
+
+    if profile is None:
+        return None
+    raw: object = getattr(profile, name, None)
+    if isinstance(raw, ProfileField):
+        return raw
+    return None
 
 
 def _query_type(profile: ExpectedProfile | None) -> QueryType:

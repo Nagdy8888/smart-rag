@@ -22,6 +22,16 @@ uv run python scripts/ci/check_migrations.py
 uv run python scripts/ci/check_phase2_integration.py
 ```
 
+GitHub CI invokes one `--tier` per job (or a paired reusable job such as
+`format-lint` / `docs-frontend`). It does not run `--tier fast` as a single
+GitHub job. Local `uv run python scripts/check.py --tier fast` still exists
+and still includes `types`. Parallel job membership:
+[CI_TIERS.md](./CI_TIERS.md).
+
+When `CI=true`, `check.py` appends `--tb=short -ra` to the unit and
+contract pytest invocations. Local runs without that environment variable
+keep pytest’s default traceback style.
+
 The schema determinism gate is intentionally destructive and local-only. With
 the pinned Supabase stack running, it resets the local database exactly twice,
 runs the authoritative schema contract after each reset, and compares roles,
@@ -45,14 +55,15 @@ uv run python scripts/ci/check_phase2_integration.py
 ```
 
 Tiers hard-fail (no `|| true`). Zero collected tests fail the unit/contract tiers.
-The `types` tier stays in `FAST_TIERS` and still invokes `python -m pyright`
-strict over `apps/`, `packages/core`, `scripts`, `tests`, and `infra/crawl-proxy`
-(`pyproject.toml` `[tool.pyright]`). Packet-scoped “zero new errors” is not a
-pass. Full-repo Pyright was **882** errors on 2026-08-16 (exit 1); the types
-tier remains red until that count is 0. The same tier also runs
-`scripts/ci/check_pyright_baseline.py`, which fails only when the count
-**increases** above the recorded baseline. The ratchet is not a waiver. See
-[PYRIGHT_BASELINE.md](./PYRIGHT_BASELINE.md).
+The `lint` tier runs Ruff with pydocstyle (D) enabled; missing Google-style
+docstrings fail lint. The `types` tier stays in `FAST_TIERS` and still invokes
+`python -m pyright` strict over `apps/`, `packages/core`, `scripts`, `tests`,
+and `infra/crawl-proxy` (`pyproject.toml` `[tool.pyright]`). Packet-scoped
+“zero new errors” is not a pass. Full-repo Pyright is **0** errors as of
+2026-08-16 (exit 0). The same tier also runs
+`scripts/ci/check_pyright_baseline.py`, which fails if the count
+**increases** above the recorded baseline of 0. The ratchet is not a
+waiver. See [PYRIGHT_BASELINE.md](./PYRIGHT_BASELINE.md).
 
 ```powershell
 uv run python scripts/ci/check_pyright_baseline.py

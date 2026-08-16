@@ -24,6 +24,15 @@ ALLOWED_PATH_PARTS: tuple[str, ...] = (
 
 
 def _is_allowed(path: Path) -> bool:
+    """Return whether a path may mention Phase 5 graph artifacts.
+
+    Args:
+        path: Repository file under scan.
+
+    Returns:
+        True when the path is docs, tests, schema, or an allowed mapping module.
+    """
+
     normalized = path.as_posix()
     return any(part in normalized for part in ALLOWED_PATH_PARTS)
 

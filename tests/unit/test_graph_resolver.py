@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from typing import Protocol, cast
+from uuid import UUID, uuid4
 
+import smart_rag_core.jobs.graph_resolver as graph_resolver_mod
 from smart_rag_core.jobs.graph_resolver import (
     ResolvedStatement,
     VisibilityCounts,
-    _apply_whole_candidate_survival,
-    _MapRow,
     expand_bounded_paths,
     limitation_for_visibility,
 )
@@ -31,6 +31,90 @@ from smart_rag_core.retrieval.graph import (
     reject_rendered_context_parser,
     workspace_limitation_code,
 )
+from smart_rag_core.retrieval.graph_results import GraphPath, GraphResolvedCandidate
+
+
+class _MapRowView(Protocol):
+    """Constructor-compatible view of the resolver's private map row."""
+
+    vendor_key: str
+    object_type: str
+    object_id: str
+    chunk_id: UUID | None
+    document_id: UUID | None
+    version_id: UUID | None
+    support: float
+    src_vendor: str
+    tgt_vendor: str
+    vendor_name: str
+    path_edge_id: str
+    survived: bool
+    drop_reason: str
+
+
+class _MapRowFactory(Protocol):
+    """Keyword constructor for the resolver's private map-row dataclass."""
+
+    def __call__(
+        self,
+        *,
+        vendor_key: str,
+        object_type: str,
+        object_id: str,
+        chunk_id: UUID | None,
+        document_id: UUID | None,
+        version_id: UUID | None,
+        support: float,
+        src_vendor: str,
+        tgt_vendor: str,
+        vendor_name: str,
+        path_edge_id: str,
+        survived: bool,
+        drop_reason: str,
+    ) -> _MapRowView:
+        """Build one map row.
+
+        Returns:
+            Frozen map-row view.
+        """
+
+        ...
+
+
+class _ApplyWholeCandidateSurvival(Protocol):
+    """Typed wrapper around the resolver's private whole-candidate helper."""
+
+    def __call__(
+        self,
+        leads: GraphLeadSet,
+        *,
+        chunk_rows: tuple[_MapRowView, ...],
+        evidence_rows: tuple[_MapRowView, ...],
+    ) -> tuple[
+        tuple[GraphResolvedCandidate, ...],
+        tuple[GraphPath, ...],
+        tuple[dict[str, str], ...],
+        tuple[str, ...],
+    ]:
+        """Drop native leads that fail a required mapping.
+
+        Args:
+            leads: Clamped vendor leads.
+            chunk_rows: Chunk-map joins.
+            evidence_rows: Evidence-map joins.
+
+        Returns:
+            Candidates, paths, repair payloads, and diagnostics.
+        """
+
+        ...
+
+
+_MapRow = cast(_MapRowFactory, object.__getattribute__(graph_resolver_mod, "_MapRow"))
+_apply_whole_candidate_survival = cast(
+    _ApplyWholeCandidateSurvival,
+    object.__getattribute__(graph_resolver_mod, "_apply_whole_candidate_survival"),
+)
 
 
 def _survived_row(
@@ -42,7 +126,7 @@ def _survived_row(
     tgt: str = "",
     vendor_name: str = "",
     support: float = 0.9,
-) -> _MapRow:
+) -> _MapRowView:
     """Return one surviving map row for whole-candidate tests.
 
     Args:

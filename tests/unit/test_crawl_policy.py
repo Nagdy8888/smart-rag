@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from smart_rag_core.ingestion.crawl.dns import resolve_hostname
@@ -23,6 +23,15 @@ from smart_rag_core.ingestion.crawl.policy import (
 
 
 def _scope(domain: str = "example.com") -> ApprovedCrawlScope:
+    """Build one approved crawl scope for policy unit tests.
+
+    Args:
+        domain: Approved hostname used as start URL and allowlist.
+
+    Returns:
+        Frozen ``ApprovedCrawlScope`` with small depth/page caps.
+    """
+
     return ApprovedCrawlScope(
         approval_id="a1",
         source_id="s1",
@@ -105,7 +114,7 @@ def test_idna_confusion_rejected() -> None:
 
 
 @patch("smart_rag_core.ingestion.crawl.dns.socket.getaddrinfo")
-def test_dns_rebinding_pin_list(mock_getaddrinfo: object) -> None:
+def test_dns_rebinding_pin_list(mock_getaddrinfo: MagicMock) -> None:
     """DNS resolution returns pinned public IPs only."""
 
     mock_getaddrinfo.return_value = [

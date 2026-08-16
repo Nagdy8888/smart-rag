@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import ast
 import hashlib
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeAlias
 
 import pytest
 
@@ -16,6 +18,7 @@ from tests.fixtures.parser import (
 )
 from tests.fixtures.phase3 import (
     MANIFEST_PATH,
+    FixtureRecord,
     compute_manifest_sha256,
     iter_fixtures,
     load_manifest,
@@ -37,7 +40,9 @@ REQUIRED_CATEGORIES = frozenset(
     }
 )
 
-PROGRAMMATIC_HASH_BUILDERS: dict[str, object] = {
+FixtureDigestBuilder: TypeAlias = Callable[[], str | tuple[object, ...]]
+
+PROGRAMMATIC_HASH_BUILDERS: dict[str, FixtureDigestBuilder] = {
     "ef05cb9b840112afa5094bc60b5bbc3793fc1b872d940dc1f875a7f3a92fcbf1": lambda: (
         hashlib.sha256(
             b"Line one English.\nLine two Arabic \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7.\n"
@@ -52,6 +57,25 @@ PROGRAMMATIC_HASH_BUILDERS: dict[str, object] = {
         ).hexdigest()
     ),
 }
+
+
+def _required_fixture_text(row: FixtureRecord, key: str) -> str:
+    """Return one required string field from a fixture row.
+
+    Args:
+        row: Manifest fixture record.
+        key: Field name.
+
+    Returns:
+        Non-empty field text.
+
+    Raises:
+        AssertionError: If the field is missing or not a string.
+    """
+
+    value = row.get(key)
+    assert isinstance(value, str) and value, f"fixture row missing {key}"
+    return value
 
 
 def _resolve_owning_test(nodeid: str) -> None:
@@ -99,7 +123,9 @@ def test_manifest_covers_required_security_and_format_categories() -> None:
     """Every required Packet 8 category appears at least once."""
 
     manifest = load_manifest()
-    categories = {row["category"] for row in iter_fixtures(manifest)}
+    categories = {
+        _required_fixture_text(row, "category") for row in iter_fixtures(manifest)
+    }
     missing = REQUIRED_CATEGORIES - categories
     assert not missing, f"Missing categories: {sorted(missing)}"
 
@@ -133,18 +159,18 @@ def test_programmatic_fixture_hashes_match_builders() -> None:
 
     manifest = load_manifest()
     for row in iter_fixtures(manifest):
-        digest = row.get("sha256")
-        if not digest:
+        digest_value = row.get("sha256")
+        if not isinstance(digest_value, str) or not digest_value:
             continue
-        builder = PROGRAMMATIC_HASH_BUILDERS.get(str(digest))
+        builder = PROGRAMMATIC_HASH_BUILDERS.get(digest_value)
         if builder is None:
             continue
         result = builder()
         if isinstance(result, tuple):
-            _, live_digest = result
+            live_digest = result[1]
         else:
             live_digest = result
-        assert live_digest == digest, row["id"]
+        assert live_digest == digest_value, _required_fixture_text(row, "id")
 
 
 def test_manifest_references_phase3_test_modules() -> None:
@@ -152,7 +178,7 @@ def test_manifest_references_phase3_test_modules() -> None:
 
     manifest = load_manifest()
     for row in iter_fixtures(manifest):
-        owning = str(row["owning_test"]).split("::", 1)[0]
+        owning = _required_fixture_text(row, "owning_test").split("::", 1)[0]
         path = REPO_ROOT / owning
         assert path.is_file(), owning
         assert owning.startswith(("tests/unit/", "tests/contract/"))

@@ -7,13 +7,18 @@ from __future__ import annotations
 # ruff: noqa: I001
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from typing import Protocol, cast
 from uuid import UUID, uuid4
 
 import psycopg
 import pytest
-from smart_rag_core.jobs.graph_mapping_service import GraphMappingService
+from smart_rag_core.jobs.graph_mapping_service import (
+    GraphMappingService,
+    GraphVendorReader,
+)
 from smart_rag_core.ingestion.chunking.normalize import content_hash
+from smart_rag_core.jobs.graph_writer import GraphWriterGuard
 from smart_rag_core.retrieval.graph import bind_graph_source_text
 from smart_rag_core.retrieval.graph_mapping import expected_vendor_basename
 
@@ -21,8 +26,38 @@ from tests.contract.integration_support import (
     read_process_env,
     resolve_supabase_db_url,
     try_connect,
+    typed_module_attr,
 )
-from tests.unit.test_graph_mapping import _FakeVendor, _StubWriter
+import tests.unit.test_graph_mapping as graph_mapping_unit
+
+
+class _FakeVendorFactory(Protocol):
+    """Constructor for the in-memory vendor catalog used by mapping contracts."""
+
+    def __call__(
+        self,
+        *,
+        status: str = "processed",
+        file_path: str | None = None,
+        chunks: list[dict[str, object]] | None = None,
+        nodes: list[dict[str, object]] | None = None,
+        edges: list[dict[str, object]] | None = None,
+    ) -> GraphVendorReader:
+        """Build one vendor-reader stub."""
+
+        ...
+
+
+_FakeVendor = typed_module_attr(
+    graph_mapping_unit,
+    "_FakeVendor",
+    cast(_FakeVendorFactory, None),
+)
+_StubWriter = typed_module_attr(
+    graph_mapping_unit,
+    "_StubWriter",
+    cast("Callable[[], GraphWriterGuard]", None),
+)
 
 
 def _require_postgres() -> psycopg.Connection:

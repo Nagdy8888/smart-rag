@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from uuid import uuid4
 
 import psycopg
 import pyarrow as pa
 import pytest
-from smart_rag_core.ingestion.tables.parquet_io import write_parquet_artifact
+from smart_rag_core.ingestion.tables import parquet_io
 from smart_rag_core.ingestion.tables.schema import PROVENANCE_COLUMN, ROW_INDEX_COLUMN
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.tables.plan import (
@@ -24,6 +24,40 @@ from smart_rag_core.tables.service import structured_table_query
 
 from tests.contract.hybrid_retrieval_seed import seed_hybrid_retrieval_fixture
 from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+
+
+def _arrow_type(name: str) -> object:
+    """Return one pyarrow dtype by name without relying on untyped stubs.
+
+    Args:
+        name: ``pyarrow`` factory attribute such as ``string`` or ``int64``.
+
+    Returns:
+        The constructed dtype object.
+    """
+
+    factory: Callable[[], object] = getattr(pa, name)
+    return factory()
+
+
+def _write_parquet(
+    *,
+    columns: list[tuple[str, object]],
+    rows: list[dict[str, object]],
+) -> bytes:
+    """Write Parquet bytes through the production helper with explicit types.
+
+    Args:
+        columns: Logical column name and dtype pairs.
+        rows: Row dictionaries including provenance fields.
+
+    Returns:
+        In-memory Parquet payload.
+    """
+
+    writer: Callable[..., tuple[object, object]] = parquet_io.write_parquet_artifact
+    payload, _schema = writer(columns=columns, rows=rows)
+    return bytes(payload)
 
 
 @pytest.fixture
@@ -54,8 +88,8 @@ def _write_sales(path: Path) -> str:
         SHA-256 of the bytes.
     """
 
-    payload, _schema = write_parquet_artifact(
-        columns=[("dept", pa.string()), ("amount", pa.int64())],
+    payload = _write_parquet(
+        columns=[("dept", _arrow_type("string")), ("amount", _arrow_type("int64"))],
         rows=[
             {
                 "dept": "ops",

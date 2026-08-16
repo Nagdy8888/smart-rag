@@ -91,8 +91,10 @@ class CrawlRunResult:
     pages_fetched: int
     wire_bytes_total: int
     decoded_bytes_total: int
-    snapshots: list[WebSnapshotRecord] = field(default_factory=list)
-    fetch_events: list[CrawlFetchProvenance] = field(default_factory=list)
+    snapshots: list[WebSnapshotRecord] = field(default_factory=list[WebSnapshotRecord])
+    fetch_events: list[CrawlFetchProvenance] = field(
+        default_factory=list[CrawlFetchProvenance]
+    )
     failure_reason: str | None = None
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import importlib.util
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -12,7 +13,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROXY_SERVER = REPO_ROOT / "infra" / "crawl-proxy" / "server.py"
 
 
-def _load_proxy_module():
+def _load_proxy_module() -> ModuleType:
+    """Load the crawl-proxy server module from its source path.
+
+    Returns:
+        Imported ``server`` module.
+
+    Raises:
+        AssertionError: If the module spec or loader is missing.
+    """
+
     spec = importlib.util.spec_from_file_location("crawl_proxy_server", PROXY_SERVER)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -58,7 +68,11 @@ def test_post_fetch_route_denies_unknown_paths() -> None:
     module = _load_proxy_module()
 
     class _Handler(module.FetchHandler):
+        """Minimal FetchHandler double that records the HTTP status."""
+
         def __init__(self) -> None:
+            """Initialize in-memory request buffers and a zero status."""
+
             self.path = "/legacy"
             self.headers = {"Content-Length": "0"}
             self.rfile = __import__("io").BytesIO(b"")
@@ -67,12 +81,28 @@ def test_post_fetch_route_denies_unknown_paths() -> None:
             self.payload: dict[str, object] | None = None
 
         def send_response(self, code: int, message: str | None = None) -> None:
+            """Record the status code without writing a real socket.
+
+            Args:
+                code: HTTP status to store.
+                message: Unused reason phrase.
+            """
+
             self.status = code
 
         def send_header(self, keyword: str, value: str) -> None:
+            """Ignore headers; this double only asserts status.
+
+            Args:
+                keyword: Unused header name.
+                value: Unused header value.
+            """
+
             return None
 
         def end_headers(self) -> None:
+            """No-op; the double does not emit a wire response."""
+
             return None
 
     handler = _Handler()
@@ -86,19 +116,48 @@ def test_proxy_peer_mismatch_fails_closed(monkeypatch: pytest.MonkeyPatch) -> No
     module = _load_proxy_module()
 
     class _MismatchedSocket:
+        """Socket double whose peer IP is never the expected pin."""
+
         def getpeername(self) -> tuple[str, int]:
+            """Return a private address that must fail the pin check.
+
+            Returns:
+                Peer host and port that do not match the fixture pin.
+            """
+
             return ("10.0.0.9", 80)
 
         def close(self) -> None:
+            """No-op close for the in-memory socket double."""
+
             return None
 
         def settimeout(self, _value: float) -> None:
+            """Ignore timeout; the double never blocks.
+
+            Args:
+                _value: Unused timeout seconds.
+            """
+
             return None
+
+    def _mismatched_connection(*_args: object, **_kwargs: object) -> _MismatchedSocket:
+        """Return a socket whose peer does not match the pin.
+
+        Args:
+            *_args: Ignored ``create_connection`` positional arguments.
+            **_kwargs: Ignored ``create_connection`` keyword arguments.
+
+        Returns:
+            Socket stub reporting ``10.0.0.9``.
+        """
+
+        return _MismatchedSocket()
 
     monkeypatch.setattr(
         module.socket,
         "create_connection",
-        lambda *_args, **_kwargs: _MismatchedSocket(),
+        _mismatched_connection,
     )
     with pytest.raises(module.FetchError) as exc:
         module.execute_fetch(

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import smtplib
 from dataclasses import dataclass
 from email.message import EmailMessage
 from uuid import UUID
 
 import psycopg
+from smart_rag_core.settings.base import get_process_environ
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,19 +46,19 @@ def deliver_admin_alert_smtp(
         local Inbucket (``127.0.0.1:54325``) in development.
     """
 
-    host = os.environ.get("ADMIN_ALERT_SMTP_HOST", "").strip()
+    host = (get_process_environ("ADMIN_ALERT_SMTP_HOST") or "").strip()
     if not host:
         return
-    port_raw = os.environ.get(
+    port_raw = get_process_environ(
         "ADMIN_ALERT_SMTP_PORT", str(DEFAULT_ADMIN_ALERT_SMTP_PORT)
-    )
+    ) or str(DEFAULT_ADMIN_ALERT_SMTP_PORT)
     try:
         port = int(port_raw)
     except ValueError:
         LOGGER.warning("admin alert SMTP skipped: invalid ADMIN_ALERT_SMTP_PORT")
         return
-    mail_from = os.environ.get("ADMIN_ALERT_SMTP_FROM", "alerts@localhost")
-    mail_to = os.environ.get("ADMIN_ALERT_SMTP_TO", "owner@localhost")
+    mail_from = get_process_environ("ADMIN_ALERT_SMTP_FROM") or "alerts@localhost"
+    mail_to = get_process_environ("ADMIN_ALERT_SMTP_TO") or "owner@localhost"
     message = EmailMessage()
     message["From"] = mail_from
     message["To"] = mail_to

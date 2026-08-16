@@ -9,23 +9,10 @@ permissions:
   contents: read
 
 jobs:
-  compose-and-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d
-        with:
-          version: "0.11.23"
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with:
-          python-version: "3.11"
-      - name: uv sync
-        run: uv sync --all-packages --group dev --python 3.11 --frozen
-      - name: Unit and contract
-        run: |
-          uv run python scripts/check.py --tier unit
-          uv run python scripts/check.py --tier contract
-      - name: Compose config
-        run: docker compose --env-file .env.example config --quiet
-      # Future (not enabled): Supabase reset/RLS, LightRAG, retrieval evals, restore.
+  unit:
+    uses: ./.github/workflows/job-unit.yml
+  contract:
+    uses: ./.github/workflows/job-contract.yml
+  compose:
+    uses: ./.github/workflows/job-compose.yml
+  # Future (not enabled): Supabase reset/RLS, LightRAG, retrieval evals, restore.

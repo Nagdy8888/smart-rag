@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
+from smart_rag_core.settings.base import get_process_environ
+
 Tier = Literal[
     "format",
     "lint",
@@ -68,6 +70,25 @@ class CheckOptions:
 
     tier: Tier
     mermaid_puppeteer_config: Path | None
+
+
+def _pytest_args(path: str) -> tuple[str, ...]:
+    """Build pytest path arguments with optional CI traceback flags.
+
+    Args:
+        path: Test directory relative to the repository root
+            (``tests/unit`` or ``tests/contract``).
+
+    Returns:
+        A tuple that starts with ``path``. When the ``CI`` environment
+        variable is truthy, ``--tb=short`` and ``-ra`` follow the path so
+        GitHub Actions logs stay compact. Local runs keep pytest defaults
+        when ``CI`` is unset or empty.
+    """
+
+    if get_process_environ("CI"):
+        return (path, "--tb=short", "-ra")
+    return (path,)
 
 
 class CheckRunner:
@@ -137,7 +158,9 @@ class CheckRunner:
             tier: Tier other than ``fast``.
 
         Returns:
-            Ordered commands for the tier.
+            Ordered commands for the tier. Unit and contract pytest
+            argument tuples append ``--tb=short`` and ``-ra`` after the
+            test path when ``CI`` is truthy; local runs omit those flags.
 
         Raises:
             ValueError: If ``tier`` is unknown or composite.
@@ -173,13 +196,13 @@ class CheckRunner:
             "unit": (
                 Command(
                     "Python unit tests",
-                    (*python_module, "pytest", "tests/unit"),
+                    (*python_module, "pytest", *_pytest_args("tests/unit")),
                 ),
             ),
             "contract": (
                 Command(
                     "Python contract tests",
-                    (*python_module, "pytest", "tests/contract"),
+                    (*python_module, "pytest", *_pytest_args("tests/contract")),
                 ),
             ),
             "docs": (

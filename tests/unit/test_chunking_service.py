@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,7 @@ from tests.fixtures.parser import (
 
 DOCUMENT_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 VERSION_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
+FixtureBuilder = Callable[[], tuple[bytes, str]]
 
 
 @pytest.mark.parametrize(
@@ -52,7 +54,7 @@ VERSION_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
     ],
 )
 def test_chunk_ids_stable_on_replay(
-    builder, filename: str, format_key: str, tmp_path: Path
+    builder: FixtureBuilder, filename: str, format_key: str, tmp_path: Path
 ) -> None:
     """Identical parse inputs produce identical chunk IDs on replay."""
 
@@ -196,7 +198,7 @@ def test_spreadsheet_produces_parquet_not_prose_chunks(tmp_path: Path) -> None:
 def test_ordinary_prose_sizing_metrics() -> None:
     """Chunk metrics expose ordinary prose distribution against contract bounds."""
 
-    paragraphs = []
+    paragraphs: list[TypedElement] = []
     for index in range(8):
         paragraphs.append(
             TypedElement(

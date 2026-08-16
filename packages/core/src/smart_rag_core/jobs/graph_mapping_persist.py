@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from typing import cast
 from uuid import UUID
 
 import psycopg
@@ -140,6 +141,24 @@ def upsert_source_map(
         )
 
 
+def _require_chunk_match(value: object) -> ChunkMatch:
+    """Return ``value`` when it is a ``ChunkMatch``.
+
+    Args:
+        value: Mapping row payload expected to be a ``ChunkMatch``.
+
+    Returns:
+        The same ``ChunkMatch`` instance.
+
+    Raises:
+        TypeError: If ``value`` is not a ``ChunkMatch``.
+    """
+
+    if not isinstance(value, ChunkMatch):
+        raise TypeError("chunk_match_required")
+    return value
+
+
 def insert_chunk_map(
     connection: psycopg.Connection,
     *,
@@ -166,9 +185,8 @@ def insert_chunk_map(
         retrieval_eligible: False until Packet 7 switch commits.
     """
 
-    if not isinstance(match, ChunkMatch):
-        raise TypeError("chunk_match_required")
-    canonical = match.canonical
+    match_checked = _require_chunk_match(match)
+    canonical = match_checked.canonical
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -590,16 +608,24 @@ def load_entity_rules(connection: psycopg.Connection) -> tuple[EntityRuleView, .
             status,
             raw_rule,
         ) = row
-        rule = raw_rule if isinstance(raw_rule, dict) else {}
+        rule: dict[str, object]
+        if isinstance(raw_rule, dict):
+            untyped_rule = cast(dict[object, object], raw_rule)
+            rule = {str(key): item for key, item in untyped_rule.items()}
+        else:
+            rule = {}
+        aliases_source: object = aliases_raw or rule.get("aliases") or []
+        blocked_source: object = blocked_raw or rule.get("do_not_merge") or []
+        languages_source: object = languages_raw or []
         aliases = tuple(
-            str(item) for item in (aliases_raw or rule.get("aliases", []) or []) if item
+            str(item) for item in cast(Sequence[object], aliases_source) if item
         )
         blocked = tuple(
-            str(item)
-            for item in (blocked_raw or rule.get("do_not_merge", []) or [])
-            if item
+            str(item) for item in cast(Sequence[object], blocked_source) if item
         )
-        languages = tuple(str(item) for item in (languages_raw or []) if item)
+        languages = tuple(
+            str(item) for item in cast(Sequence[object], languages_source) if item
+        )
         canonical = canonical_name or rule.get("canonical_name")
         views.append(
             EntityRuleView(

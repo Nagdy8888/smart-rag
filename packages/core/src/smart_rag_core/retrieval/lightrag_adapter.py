@@ -11,13 +11,12 @@ logged. ``POSTGRES_WORKSPACE`` is never set; constructor workspace only.
 
 from __future__ import annotations
 
-import os
 import tempfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, Protocol, cast
 
 import psycopg
 from pydantic import BaseModel, ConfigDict, SecretStr
@@ -75,7 +74,12 @@ from smart_rag_core.retrieval.lightrag_structured import (
     parse_aquery_data_payload,
     to_graph_leads,
 )
-from smart_rag_core.settings.base import SharedSettings, snapshot_process_environ
+from smart_rag_core.settings.base import (
+    SharedSettings,
+    pop_process_environ,
+    set_process_environ,
+    snapshot_process_environ,
+)
 
 LIGHTRAG_SCHEMA_NAME = "lightrag"
 VECTOR_TABLE_SUFFIX = "text_embedding_3_large_1024d"
@@ -294,14 +298,14 @@ def apply_lightrag_postgres_env(
     applied: list[tuple[str, str]] = []
     for key, value in pairs:
         if key == "POSTGRES_SERVER_SETTINGS":
-            os.environ[key] = server_settings
+            set_process_environ(key, server_settings)
             applied.append((key, server_settings))
             continue
-        os.environ[key] = value
+        set_process_environ(key, value)
         if key != "POSTGRES_PASSWORD":
             applied.append((key, value))
-    os.environ.pop("POSTGRES_WORKSPACE", None)
-    os.environ.pop("WORKSPACE", None)
+    pop_process_environ("POSTGRES_WORKSPACE")
+    pop_process_environ("WORKSPACE")
     return tuple(applied)
 
 
@@ -408,7 +412,30 @@ async def _set_runtime_role(connection: object) -> None:
     execute = getattr(connection, "execute", None)
     if not callable(execute):
         raise LightRagAdapterError("runtime_role_set_unavailable")
-    await execute(f"SET ROLE {LIGHTRAG_RUNTIME_ROLE}")
+    await cast(Callable[[str], Awaitable[object]], execute)(
+        f"SET ROLE {LIGHTRAG_RUNTIME_ROLE}"
+    )
+
+
+class _LightRagSharedStorage(Protocol):
+    """Typed view of LightRAG shared-storage locking used during attach.
+
+    Attributes:
+        get_data_init_lock: Vendor lock factory around storage initialize.
+    """
+
+    get_data_init_lock: Callable[..., AbstractAsyncContextManager[object]]
+
+
+class _AsyncpgPoolModule(Protocol):
+    """Typed view of ``asyncpg`` used to wrap ``create_pool``.
+
+    Attributes:
+        create_pool: Vendor pool factory. Signature is intentionally wide
+            because pinned asyncpg stubs expose Unknown parameters.
+    """
+
+    create_pool: Callable[..., Awaitable[object]]
 
 
 async def construct_lightrag_engine(
@@ -493,7 +520,7 @@ async def construct_lightrag_engine(
 
 
 @asynccontextmanager
-async def runtime_attach_without_ddl() -> AsyncIterator[None]:
+async def runtime_attach_without_ddl() -> AsyncGenerator[None]:
     """Patch vendor initialize so runtime never issues CREATE/ALTER.
 
     Yields:
@@ -506,15 +533,20 @@ async def runtime_attach_without_ddl() -> AsyncIterator[None]:
     """
 
     from lightrag.kg import postgres_impl as postgres_impl_mod
+    from lightrag.kg import shared_storage as shared_storage_mod
     from lightrag.kg.pgtable_impl import PGTableGraphStorage
     from lightrag.kg.postgres_impl import PGVectorStorage, PostgreSQLDB
-    from lightrag.kg.shared_storage import get_data_init_lock
 
+    get_data_init_lock = cast(
+        _LightRagSharedStorage, shared_storage_mod
+    ).get_data_init_lock
     original_check_tables = PostgreSQLDB.check_tables
     original_configure_vector = PostgreSQLDB.configure_vector_extension
     original_setup_table = PGVectorStorage.setup_table
     original_graph_initialize = PGTableGraphStorage.initialize
-    original_create_pool = postgres_impl_mod.asyncpg.create_pool
+    original_create_pool = cast(
+        _AsyncpgPoolModule, postgres_impl_mod.asyncpg
+    ).create_pool
 
     async def configure_vector_extension_verify(
         self: PostgreSQLDB, connection: object
@@ -533,7 +565,7 @@ async def runtime_attach_without_ddl() -> AsyncIterator[None]:
         fetchrow = getattr(connection, "fetchrow", None)
         if not callable(fetchrow):
             raise LightRagAdapterError("vector_type_codec_missing")
-        row = await fetchrow(
+        row = await cast(Callable[[str], Awaitable[object]], fetchrow)(
             """
             SELECT n.nspname
             FROM pg_type t
@@ -652,7 +684,9 @@ async def runtime_attach_without_ddl() -> AsyncIterator[None]:
             """
 
             if callable(original_init):
-                await original_init(connection)
+                await cast(Callable[[object], Awaitable[object]], original_init)(
+                    connection
+                )
             await _set_runtime_role(connection)
 
         async def reset_with_role(connection: object) -> None:
@@ -663,7 +697,9 @@ async def runtime_attach_without_ddl() -> AsyncIterator[None]:
             """
 
             if callable(original_reset):
-                await original_reset(connection)
+                await cast(Callable[[object], Awaitable[object]], original_reset)(
+                    connection
+                )
             await _set_runtime_role(connection)
 
         kwargs["init"] = init_with_role
@@ -884,10 +920,13 @@ class LightRagRuntimeAdapter:
         query = getattr(db, "query", None)
         if not callable(query):
             raise LightRagAdapterError("client_manager_query_unavailable")
-        row = await query("SELECT current_user AS role_name")
+        row = await cast(Callable[..., Awaitable[object]], query)(
+            "SELECT current_user AS role_name"
+        )
         if not isinstance(row, dict) or "role_name" not in row:
             raise LightRagAdapterError("runtime_role_query_failed")
-        return str(row["role_name"])
+        typed_row = cast(dict[str, object], row)
+        return str(typed_row["role_name"])
 
     async def _vendor_query(
         self,
@@ -920,13 +959,13 @@ class LightRagRuntimeAdapter:
         query = getattr(db, "query", None)
         if not callable(query):
             raise LightRagAdapterError("client_manager_query_unavailable")
-        rows = await query(sql, params, True)
+        rows = await cast(Callable[..., Awaitable[object]], query)(sql, params, True)
         if rows is None:
             return []
         if isinstance(rows, dict):
             return [cast(dict[str, object], rows)]
         if isinstance(rows, list):
-            return [cast(dict[str, object], row) for row in rows]
+            return cast(list[dict[str, object]], rows)
         raise LightRagAdapterError("vendor_query_shape")
 
     async def list_vendor_doc_chunks(

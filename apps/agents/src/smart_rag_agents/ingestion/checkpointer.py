@@ -9,15 +9,20 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import TypeAlias
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.postgres.base import MIGRATIONS
+from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.typing import ContextT, InputT, OutputT, StateT
 from psycopg import Connection
-from psycopg.rows import dict_row
+from psycopg.rows import DictRow, dict_row
 from psycopg_pool import ConnectionPool
+
+CheckpointerConnection: TypeAlias = Connection[DictRow]
+CheckpointerPool: TypeAlias = ConnectionPool[CheckpointerConnection]
 
 EXPECTED_CHECKPOINT_VERSIONS: tuple[int, ...] = tuple(range(len(MIGRATIONS)))
 """Official ``PostgresSaver.MIGRATIONS`` indices that must already exist."""
@@ -27,7 +32,7 @@ class CheckpointerSchemaError(RuntimeError):
     """Raised when the ``langgraph`` schema does not match the pinned library."""
 
 
-def _configure_checkpointer_connection(connection: Connection) -> None:
+def _configure_checkpointer_connection(connection: CheckpointerConnection) -> None:
     """Bind one pooled connection to the checkpointer role and search path.
 
     Args:
@@ -42,7 +47,28 @@ def _configure_checkpointer_connection(connection: Connection) -> None:
     connection.execute("SET search_path TO langgraph, pg_catalog")
 
 
-def assert_checkpointer_schema_ready(connection: Connection) -> None:
+def _checkpoint_migration_version(row: DictRow) -> int:
+    """Read one ``checkpoint_migrations.v`` value from a dict row.
+
+    Args:
+        row: ``dict_row`` mapping for ``SELECT v FROM checkpoint_migrations``.
+
+    Returns:
+        Integer migration version.
+
+    Raises:
+        CheckpointerSchemaError: When ``v`` is missing or not an integer.
+    """
+
+    raw: object = row["v"]
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise CheckpointerSchemaError(
+            f"checkpoint_migrations.v is not an integer: {raw!r}"
+        )
+    return raw
+
+
+def assert_checkpointer_schema_ready(connection: CheckpointerConnection) -> None:
     """Require checkpoint migration versions to match the pinned library.
 
     Args:
@@ -55,7 +81,9 @@ def assert_checkpointer_schema_ready(connection: Connection) -> None:
 
     with connection.cursor() as cursor:
         cursor.execute("SELECT v FROM checkpoint_migrations ORDER BY v")
-        versions = tuple(int(row["v"]) for row in cursor.fetchall())
+        versions = tuple(
+            _checkpoint_migration_version(row) for row in cursor.fetchall()
+        )
     if versions != EXPECTED_CHECKPOINT_VERSIONS:
         raise CheckpointerSchemaError(
             "langgraph checkpoint schema versions "
@@ -75,7 +103,7 @@ class IngestionCheckpointer:
         saver: LangGraph Postgres checkpointer. ``setup()`` is never invoked.
     """
 
-    pool: ConnectionPool
+    pool: CheckpointerPool
     saver: PostgresSaver
 
     def close(self) -> None:
@@ -110,7 +138,7 @@ def open_ingestion_checkpointer(
         Opens a ``psycopg_pool.ConnectionPool``. Does not auto-migrate.
     """
 
-    pool = ConnectionPool(
+    pool = ConnectionPool[CheckpointerConnection](
         conninfo=dsn,
         min_size=1,
         max_size=max(1, max_size),
@@ -133,11 +161,11 @@ def open_ingestion_checkpointer(
 
 
 def compile_ingestion_graph(
-    builder: Any,
+    builder: StateGraph[StateT, ContextT, InputT, OutputT],
     *,
-    checkpointer: BaseCheckpointSaver | None = None,
+    checkpointer: BaseCheckpointSaver[str] | None = None,
     interrupt_after: Sequence[str] | None = None,
-) -> CompiledStateGraph[Any, Any, Any, Any]:
+) -> CompiledStateGraph[StateT, ContextT, InputT, OutputT]:
     """Compile one ingestion ``StateGraph`` with optional durable checkpoints.
 
     Args:
@@ -150,9 +178,8 @@ def compile_ingestion_graph(
         Compiled graph. Runtime workers pass a PostgresSaver; Studio imports do not.
     """
 
-    kwargs: dict[str, Any] = {}
-    if checkpointer is not None:
-        kwargs["checkpointer"] = checkpointer
-    if interrupt_after:
-        kwargs["interrupt_after"] = list(interrupt_after)
-    return builder.compile(**kwargs)  # pyright: ignore[reportUnknownMemberType]
+    interrupt_nodes = list(interrupt_after) if interrupt_after else None
+    return builder.compile(  # pyright: ignore[reportUnknownMemberType]
+        checkpointer=checkpointer,
+        interrupt_after=interrupt_nodes,
+    )

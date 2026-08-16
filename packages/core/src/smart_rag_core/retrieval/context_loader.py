@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
 from uuid import UUID
 
 import psycopg
@@ -69,9 +70,14 @@ def locators_from_provenance(
     """
 
     payload = _as_mapping(provenance)
-    locators = payload.get("locators")
-    if not isinstance(locators, list):
-        locators = [payload] if payload.get("format") else []
+    raw_locators = payload.get("locators")
+    locators: list[object]
+    if isinstance(raw_locators, list):
+        locators = list(cast(list[object], raw_locators))
+    elif payload.get("format"):
+        locators = [payload]
+    else:
+        locators = []
     sheet_name: str | None = None
     range_ref: str | None = None
     source_url: str | None = None
@@ -232,9 +238,14 @@ def _fetch_context_rpc_batch(
             )
             rows = cursor.fetchall()
     results: list[ChunkContext] = []
-    for row in rows:
+    for raw_row in rows:
+        row = cast(Sequence[object], raw_row)
         section = row[6]
-        path = tuple(str(item) for item in section) if section else ()
+        path = (
+            tuple(str(item) for item in cast(Sequence[object], section))
+            if section
+            else ()
+        )
         sheet_name, range_ref, source_url = locators_from_provenance(
             row[10] if len(row) > 10 else None
         )
@@ -244,10 +255,10 @@ def _fetch_context_rpc_batch(
                 document_id=UUID(str(row[1])),
                 version_id=UUID(str(row[2])),
                 parent_chunk_id=UUID(str(row[3])) if row[3] is not None else None,
-                chunk_index=int(row[4]),
-                page_number=int(row[5]) if row[5] is not None else None,
+                chunk_index=int(str(row[4])),
+                page_number=int(str(row[5])) if row[5] is not None else None,
                 section_path=path,
-                token_count=int(row[7]) if row[7] is not None else None,
+                token_count=int(str(row[7])) if row[7] is not None else None,
                 raw_text=str(row[8]),
                 is_search_representative=bool(row[9]),
                 sheet_name=sheet_name,
@@ -258,7 +269,7 @@ def _fetch_context_rpc_batch(
     return tuple(results)
 
 
-def _as_mapping(value: object) -> dict[str, Any]:
+def _as_mapping(value: object) -> dict[str, object]:
     """Coerce JSONB or JSON text to a dictionary.
 
     Args:
@@ -269,14 +280,14 @@ def _as_mapping(value: object) -> dict[str, Any]:
     """
 
     if isinstance(value, dict):
-        return value
+        return cast(dict[str, object], value)
     if isinstance(value, str) and value.strip():
         try:
             loaded: object = json.loads(value)
         except json.JSONDecodeError:
             return {}
         if isinstance(loaded, dict):
-            return loaded
+            return cast(dict[str, object], loaded)
     return {}
 
 

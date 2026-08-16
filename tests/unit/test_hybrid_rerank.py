@@ -44,6 +44,8 @@ from smart_rag_core.retrieval.reranker import rerank_pool
 from smart_rag_core.retrieval.types import RetrievalCandidate
 from smart_rag_core.settings import AgentSettings
 
+from tests.unit.typed_openapi import json_object
+
 
 def _candidate(
     chunk: UUID | None = None, document: UUID | None = None
@@ -181,16 +183,17 @@ def test_schema_rejects_unknown_duplicate_missing_and_support() -> None:
         prompt_sha256="0" * 64,
     )
     schema = rerank_json_schema(ids, input_hash=digest)
-    rankings_schema = schema["properties"]["rankings"]
-    assert isinstance(rankings_schema, dict)
+    properties = json_object(schema["properties"])
+    rankings_schema = json_object(properties["rankings"])
     assert rankings_schema["maxItems"] == 2
-    valid = {
+    ranking_rows: list[dict[str, str | int | float]] = [
+        {"chunk_id": str(first), "rank": 1, "support": 0.9},
+        {"chunk_id": str(second), "rank": 2, "support": 0.1},
+    ]
+    valid: dict[str, object] = {
         "status": "complete",
         "input_hash": digest,
-        "rankings": [
-            {"chunk_id": str(first), "rank": 1, "support": 0.9},
-            {"chunk_id": str(second), "rank": 2, "support": 0.1},
-        ],
+        "rankings": ranking_rows,
     }
     parsed = validate_rerank_payload(
         valid, candidate_ids=(first, second), input_hash=digest
@@ -246,8 +249,10 @@ def test_schema_rejects_unknown_duplicate_missing_and_support() -> None:
             {
                 "status": "complete",
                 "input_hash": digest,
-                "rankings": valid["rankings"]
-                + [{"chunk_id": str(uuid4()), "rank": 3, "support": 0.0}],
+                "rankings": [
+                    *ranking_rows,
+                    {"chunk_id": str(uuid4()), "rank": 3, "support": 0.0},
+                ],
             },
             candidate_ids=(first, second),
             input_hash=digest,

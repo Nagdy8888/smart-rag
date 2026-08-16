@@ -134,6 +134,15 @@ class IngestionJobRepository:
     def _get_by_idempotency_key(
         self, idempotency_key: str
     ) -> IngestionJobRecord | None:
+        """Load an ingestion job by its idempotency key.
+
+        Args:
+            idempotency_key: Unique enqueue key.
+
+        Returns:
+            The matching job, or ``None`` when the key is unused.
+        """
+
         with self._connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
@@ -321,6 +330,17 @@ class IngestionJobRepository:
         error_category: JobErrorCategory,
         last_error: str,
     ) -> IngestionJobRecord:
+        """Copy an exhausted ingestion job into dead-letter storage.
+
+        Args:
+            job: Job that has exhausted retries.
+            error_category: Classified failure category.
+            last_error: Operator-visible error detail.
+
+        Returns:
+            The job record after the dead-letter insert and status update.
+        """
+
         dead_letter_key = f"dead-letter:{job.id}:{job.attempt_count}"
         with self._connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(

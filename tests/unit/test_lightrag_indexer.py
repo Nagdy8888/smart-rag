@@ -21,6 +21,12 @@ VERSION_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
 
 def _processed() -> DocumentStatusView:
+    """Return a processed vendor status view for the fixture version.
+
+    Returns:
+        DocumentStatusView with status ``processed``.
+    """
+
     return DocumentStatusView(
         document_id=VERSION_ID,
         status="processed",
@@ -36,6 +42,15 @@ def test_enqueue_insert_passes_envelope_ids_and_fresh_track() -> None:
     captured: dict[str, object] = {}
 
     async def _insert(**kwargs: object) -> GraphIndexEnqueueResult:
+        """Capture enqueue kwargs and return a pending insert result.
+
+        Args:
+            **kwargs: Vendor insert keyword arguments.
+
+        Returns:
+            Pending GraphIndexEnqueueResult using the captured track id.
+        """
+
         captured.update(kwargs)
         return GraphIndexEnqueueResult(
             document_id=VERSION_ID,

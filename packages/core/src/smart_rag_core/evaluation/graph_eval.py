@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
-import subprocess
 from collections import Counter
 from pathlib import Path
 from typing import Literal
@@ -83,6 +81,7 @@ SCHEMA_FINGERPRINT_PATH = (
     REPO_ROOT / "tests" / "fixtures" / "lightrag" / "schema_fingerprint_v1.json"
 )
 PACKET7_PIN_COMMIT = "c546f9c"
+CODE_REVISION_GIT_SHA = "52b331f06320a5086e1018c2fa1149abe72a33f8"
 PLAN_GRAPH_DOCUMENTS = 2_000
 PLAN_GRAPH_CHUNKS = 200_000
 SEVEN_DAY_SECONDS = GRAPH_CLEAN_REBUILD_SLA_DAYS * 24 * 3_600
@@ -96,29 +95,18 @@ COMBINED_QUALITY_NO_CLAIM = (
 
 
 def code_revision_git_sha() -> str:
-    """Return the current git HEAD SHA for the freeze manifest.
+    """Return the frozen git SHA recorded in the Packet 8 manifest.
+
+    Live ``HEAD`` cannot be written into committed freeze markdown: the
+    SHA is unknown until the commit exists, and the next commit would
+    invalidate the files. The pin is the last Hybrid/GraphRAG
+    implementation revision this freeze describes.
 
     Returns:
-        Forty-character SHA, or ``unverified`` if git is unavailable.
-
-    Side Effects:
-        Runs ``git rev-parse HEAD`` in the repository root.
+        Forty-character SHA of ``CODE_REVISION_GIT_SHA``.
     """
 
-    git = shutil.which("git")
-    if git is None:
-        return "unverified"
-    try:
-        completed = subprocess.run(  # noqa: S603
-            [git, "rev-parse", "HEAD"],
-            cwd=REPO_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return "unverified"
-    return completed.stdout.strip()
+    return CODE_REVISION_GIT_SHA
 
 
 GraphGateStatus = Literal[

@@ -79,6 +79,16 @@ def worker_connection() -> Iterator[psycopg.Connection]:
 
 
 def _repository(connection: psycopg.Connection, owner: str) -> IngestionJobRepository:
+    """Build one ingestion job repository bound to ``owner``.
+
+    Args:
+        connection: Open ``app_worker`` connection.
+        owner: Lease owner identifier.
+
+    Returns:
+        Repository using a 120-second lease.
+    """
+
     return IngestionJobRepository(connection, lease_owner=owner, lease_seconds=120)
 
 
@@ -154,6 +164,12 @@ def test_skip_locked_claim_is_exclusive(worker_connection: psycopg.Connection) -
     url = resolve_supabase_db_url()
 
     def claim(owner: str) -> None:
+        """Claim one job from a dedicated connection as ``owner``.
+
+        Args:
+            owner: Lease owner used for the claim RPC.
+        """
+
         assert url is not None
         with psycopg.connect(url) as connection:
             connection.execute("SET ROLE app_worker")

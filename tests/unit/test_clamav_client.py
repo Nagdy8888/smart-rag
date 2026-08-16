@@ -2,15 +2,32 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
+from smart_rag_core.gateways import clamav as clamav_mod
 from smart_rag_core.gateways.clamav import (
     ClamAvClient,
     ClamAvEngineInfo,
     ScanDisposition,
     SignatureDatabaseInfo,
-    _parse_scan_response,
-    _parse_stats,
+)
+
+from tests.unit.typed_attrs import module_attr
+
+_parse_scan_response = cast(
+    Callable[[bytes], tuple[ScanDisposition, str | None, str]],
+    module_attr(clamav_mod, "_parse_scan_response"),
+)
+_parse_stats = cast(
+    Callable[[str], tuple[SignatureDatabaseInfo, ...]],
+    module_attr(clamav_mod, "_parse_stats"),
+)
+_clamd_text = cast(Callable[[bytes], str], module_attr(clamav_mod, "_clamd_text"))
+_parse_version_signature_timestamp = cast(
+    Callable[[str], datetime | None],
+    module_attr(clamav_mod, "_parse_version_signature_timestamp"),
 )
 
 
@@ -45,16 +62,12 @@ def test_parse_scan_response_maps_ok_to_clean() -> None:
 def test_ping_accepts_null_terminated_pong() -> None:
     """Live clamd z-protocol terminates ``PONG`` with NUL."""
 
-    from smart_rag_core.gateways.clamav import _clamd_text
-
     assert _clamd_text(b"PONG\x00") == "PONG"
     assert _parse_scan_response(b"stream: OK\x00")[0] is ScanDisposition.CLEAN
 
 
 def test_version_string_supplies_signature_timestamp() -> None:
     """Modern clamd STATS omit CVD lines; VERSION still carries the date."""
-
-    from smart_rag_core.gateways.clamav import _parse_version_signature_timestamp
 
     parsed = _parse_version_signature_timestamp(
         "ClamAV 1.5.4/28087/Sun Aug  9 06:24:56 2026"

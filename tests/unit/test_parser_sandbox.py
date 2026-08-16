@@ -76,12 +76,37 @@ def test_parser_sandbox_kill_timeout_returns_failed(
     import subprocess
 
     def _timeout(*_args: object, **_kwargs: object) -> object:
+        """Raise TimeoutExpired to simulate a hung Docker sandbox.
+
+        Args:
+            *_args: Unused subprocess.run positional arguments.
+            **_kwargs: Unused subprocess.run keyword arguments.
+
+        Returns:
+            Never returns; always raises.
+
+        Raises:
+            TimeoutExpired: Simulated Docker kill-timeout.
+        """
+
         raise subprocess.TimeoutExpired(cmd="docker", timeout=1)
+
+    def _which(_name: str) -> str:
+        """Return a fake Docker path so the launcher attempts a container run.
+
+        Args:
+            _name: Executable name passed to ``shutil.which``.
+
+        Returns:
+            Absolute path treated as a present Docker binary.
+        """
+
+        return "/usr/bin/docker"
 
     monkeypatch.setattr(subprocess, "run", _timeout)
     monkeypatch.setattr(
         "smart_rag_core.ingestion.parser.sandbox.launcher.shutil.which",
-        lambda _name: "/usr/bin/docker",
+        _which,
     )
     launcher = ParserSandboxLauncher(
         config=SandboxLaunchConfig(

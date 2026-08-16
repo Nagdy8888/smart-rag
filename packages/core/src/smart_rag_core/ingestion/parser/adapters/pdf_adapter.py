@@ -17,7 +17,15 @@ from smart_rag_core.ingestion.parser.exceptions import (
     ParserEncryptedError,
     ParserLimitExceeded,
 )
-from smart_rag_core.ingestion.parser.helpers import build_coverage, element_id
+from smart_rag_core.ingestion.parser.helpers import (
+    as_float,
+    as_int,
+    build_coverage,
+    element_id,
+    vendor_attr,
+    vendor_call,
+    vendor_items,
+)
 from smart_rag_core.ingestion.parser.limits import (
     CLEANING_POLICY_VERSION,
     PARSER_CONFIG_VERSION,
@@ -47,15 +55,16 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
         raise
     if document.needs_pass:
         raise ParserEncryptedError("password-protected PDF")
-    if document.page_count > PDF_MAX_PAGES:
-        raise ParserLimitExceeded("pages", f"page count {document.page_count}")
+    page_count = as_int(vendor_attr(document, "page_count"))
+    if page_count > PDF_MAX_PAGES:
+        raise ParserLimitExceeded("pages", f"page count {page_count}")
 
     page_lines: list[list[str]] = []
     sortable: list[tuple[int, TypedElement]] = []
     ocr_pages = 0
-    for page_index in range(document.page_count):
+    for page_index in range(page_count):
         page = document.load_page(page_index)
-        text = page.get_text("text")
+        text = str(vendor_call(vendor_attr(page, "get_text"), "text"))
         page_lines.append(text.splitlines())
         sortable.append(
             (
@@ -82,21 +91,28 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
             for element in ocr_elements:
                 sortable.append((element.reading_order, element))
             continue
-        for block in page.get_text("blocks"):
-            if len(block) < 5:
+        for block in vendor_items(vendor_call(vendor_attr(page, "get_text"), "blocks")):
+            parts = vendor_items(block)
+            if len(parts) < 5:
                 continue
-            x0, y0, x1, y1, block_text, *_rest = block
+            x0, y0, x1, y1, block_text = (
+                parts[0],
+                parts[1],
+                parts[2],
+                parts[3],
+                parts[4],
+            )
             cleaned = str(block_text).strip()
             if not cleaned:
                 continue
             locator = PdfLocator(
                 page_index=page_index,
-                bbox_x0=round(float(x0), 3),
-                bbox_y0=round(float(y0), 3),
-                bbox_x1=round(float(x1), 3),
-                bbox_y1=round(float(y1), 3),
+                bbox_x0=round(as_float(x0), 3),
+                bbox_y0=round(as_float(y0), 3),
+                bbox_x1=round(as_float(x1), 3),
+                bbox_y1=round(as_float(y1), 3),
             )
-            sort_key = page_index * 10_000 + int(y0)
+            sort_key = page_index * 10_000 + as_int(y0)
             sortable.append(
                 (
                     sort_key,
@@ -137,9 +153,8 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
         if isinstance(locator, OcrLocator):
             pass
         elements.append(
-            TypedElement(
-                **element.model_dump()
-                | {
+            element.model_copy(
+                update={
                     "reading_order": order,
                     "element_id": element_id(
                         content_hash,
@@ -168,7 +183,7 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
         coverage=build_coverage(elements_tuple, removed=len(removals)),
         resource_metrics=ParserResourceMetrics(
             wall_seconds=time.monotonic() - started,
-            pages_processed=document.page_count,
+            pages_processed=page_count,
             ocr_pages=ocr_pages,
         ),
         detail="pdf parsed",

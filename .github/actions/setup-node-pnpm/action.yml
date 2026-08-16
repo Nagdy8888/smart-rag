@@ -1,0 +1,17 @@
+name: Setup Node.js with pnpm
+description: Install Node.js 20 and pnpm 9.15.0, then install workspace dependencies from the frozen lockfile.
+runs:
+  using: composite
+  steps:
+    - name: Install pnpm
+      uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3
+      with:
+        version: 9.15.0
+    - name: Set up Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      with:
+        node-version: "20"
+        cache: pnpm
+    - name: Install Node.js dependencies
+      run: pnpm install --frozen-lockfile
+      shell: bash

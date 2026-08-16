@@ -44,6 +44,27 @@ FIXTURE = REPO_ROOT / "tests" / "fixtures" / "lightrag" / "schema_fingerprint_v1
 OPS_SCRIPT = REPO_ROOT / "scripts" / "ops" / "bootstrap_lightrag_schema.py"
 
 
+def _settings_from_env(factory: object) -> LightRagSchemaAdminSettings:
+    """Construct schema-admin settings from process environment.
+
+    Args:
+        factory: ``LightRagSchemaAdminSettings`` class object.
+
+    Returns:
+        Validated settings loaded from env.
+
+    Raises:
+        TypeError: If ``factory`` is not a callable settings class.
+    """
+
+    if not callable(factory):
+        raise TypeError("LightRagSchemaAdminSettings must be callable")
+    loaded = factory()
+    if not isinstance(loaded, LightRagSchemaAdminSettings):
+        raise TypeError("expected LightRagSchemaAdminSettings")
+    return loaded
+
+
 def test_reviewed_fixture_matches_pin_manifest() -> None:
     """The committed fingerprint fixture must list the reviewed vendor tables."""
 
@@ -144,7 +165,7 @@ def test_schema_admin_settings_load_in_isolation(
         "LIGHTRAG_SCHEMA_ADMIN_DSN",
         "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
     )
-    loaded = LightRagSchemaAdminSettings()
+    loaded = _settings_from_env(LightRagSchemaAdminSettings)
     assert isinstance(loaded.lightrag_schema_admin_dsn, SecretStr)
     assert "postgres:postgres" not in repr(loaded)
 

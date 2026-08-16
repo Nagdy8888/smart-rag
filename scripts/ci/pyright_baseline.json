@@ -4,18 +4,18 @@
   "pyright_version": "1.1.411",
   "type_checking_mode": "strict",
   "command": "uv run pyright --outputjson",
-  "exit_code": 1,
-  "files_analyzed": 414,
-  "error_count": 882,
+  "exit_code": 0,
+  "files_analyzed": 417,
+  "error_count": 0,
   "warning_count": 0,
-  "files_with_errors": 76,
+  "files_with_errors": 0,
   "by_tree": {
-    "tests": 488,
-    "packages/core": 348,
-    "apps/agents": 19,
-    "apps/worker": 16,
-    "infra": 11,
-    "apps/backend": 0,
-    "scripts": 0
+    "apps/agents/src": 0,
+    "apps/backend/src": 0,
+    "apps/worker/src": 0,
+    "infra/crawl-proxy": 0,
+    "packages/core/src": 0,
+    "scripts": 0,
+    "tests": 0
   }
 }

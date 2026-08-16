@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import math
 import subprocess
+import sys
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid4
 
 import duckdb
-import pyarrow as pa
 import pytest
 from pydantic import ValidationError
+from smart_rag_core.ingestion.tables import arrow_facade as arrow
 from smart_rag_core.ingestion.tables.limits import (
     DUCKDB_VERSION_PIN as INGESTION_DUCKDB_PIN,
 )
@@ -44,7 +46,11 @@ from smart_rag_core.tables.plan import (
 )
 from smart_rag_core.tables.refusals import TableQueryRefusal
 from smart_rag_core.tables.resolver import MemoryTableResolver, TableResolveError
-from smart_rag_core.tables.sandbox_worker import SandboxWorkerError, run_worker_payload
+from smart_rag_core.tables.sandbox_worker import (
+    SandboxWorkerError,
+    main,
+    run_worker_payload,
+)
 from smart_rag_core.tables.service import (
     should_bind_structured_table,
     structured_table_query,
@@ -146,7 +152,7 @@ def _write_sales(path: Path) -> str:
     """
 
     payload, _schema = write_parquet_artifact(
-        columns=[("dept", pa.string()), ("amount", pa.int64())],
+        columns=[("dept", arrow.string()), ("amount", arrow.int64())],
         rows=[
             {
                 "dept": "ops",
@@ -397,9 +403,9 @@ def test_decimal_null_date_and_arabic(tmp_path: Path) -> None:
     parquet = tmp_path / "mixed.parquet"
     payload, _schema = write_parquet_artifact(
         columns=[
-            ("dept", pa.string()),
-            ("amount", pa.decimal128(10, 2)),
-            ("booked_on", pa.date32()),
+            ("dept", arrow.string()),
+            ("amount", arrow.decimal128(10, 2)),
+            ("booked_on", arrow.date32()),
         ],
         rows=[
             {
@@ -637,7 +643,7 @@ def test_non_finite_result_refuses(tmp_path: Path) -> None:
 
     parquet = tmp_path / "inf.parquet"
     payload, _schema = write_parquet_artifact(
-        columns=[("amount", pa.float64())],
+        columns=[("amount", arrow.float64())],
         rows=[
             {
                 "amount": math.inf,
@@ -683,7 +689,7 @@ def test_worker_rejects_blocked_sql_path_hash_and_http(tmp_path: Path) -> None:
     digest = _write_sales(parquet)
     other = tmp_path / "other.parquet"
     other.write_bytes(parquet.read_bytes())
-    base = {
+    base: dict[str, str | int | list[str]] = {
         "parquet_path": parquet.as_posix(),
         "expected_path": parquet.as_posix(),
         "expected_sha256": digest,
@@ -991,7 +997,10 @@ def test_timestamp_stays_utc(tmp_path: Path) -> None:
     parquet = tmp_path / "ts.parquet"
     instant = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
     payload, _schema = write_parquet_artifact(
-        columns=[("amount", pa.int64()), ("seen_at", pa.timestamp("us", tz="UTC"))],
+        columns=[
+            ("amount", arrow.int64()),
+            ("seen_at", arrow.timestamp("us", tz="UTC")),
+        ],
         rows=[
             {
                 "amount": 4,
@@ -1034,3 +1043,79 @@ def test_timestamp_stays_utc(tmp_path: Path) -> None:
     )
     assert int(result.rows[0]["total"]) == 4
     assert "timezone:UTC" in result.diagnostics
+
+
+def test_in_process_payload_does_not_change_parent_rlimits(tmp_path: Path) -> None:
+    """In-process ``run_worker_payload`` must not mutate pytest rlimits.
+
+    Args:
+        tmp_path: Temporary directory for the Parquet fixture.
+    """
+
+    resource = pytest.importorskip("resource")
+    parquet = tmp_path / "sales.parquet"
+    digest = _write_sales(parquet)
+    base: dict[str, str | int | list[str]] = {
+        "parquet_path": parquet.as_posix(),
+        "expected_path": parquet.as_posix(),
+        "expected_sha256": digest,
+        "params": [],
+        "count_sql": "SELECT COUNT(*) FROM allowed_table",
+        "count_params": [],
+        "provenance_sql": "",
+        "provenance_params": [],
+        "row_limit": 10,
+        "output_byte_limit": 1000,
+    }
+    cpu_before = resource.getrlimit(resource.RLIMIT_CPU)
+    as_before = resource.getrlimit(resource.RLIMIT_AS)
+    with pytest.raises(SandboxWorkerError, match="blocked_sql"):
+        run_worker_payload({**base, "sql": "ATTACH 'x.db' AS db"})
+    assert resource.getrlimit(resource.RLIMIT_CPU) == cpu_before
+    assert resource.getrlimit(resource.RLIMIT_AS) == as_before
+
+
+def test_worker_entrypoint_applies_os_limits(tmp_path: Path) -> None:
+    """Worker ``main`` applies rlimits; in-process payload execution does not.
+
+    Args:
+        tmp_path: Temporary directory for the Parquet fixture.
+    """
+
+    pytest.importorskip("resource")
+    payload_src = inspect.getsource(run_worker_payload)
+    main_src = inspect.getsource(main)
+    assert "_apply_os_limits()" in main_src
+    for line in payload_src.splitlines():
+        code = line.split("#", 1)[0]
+        assert "_apply_os_limits()" not in code
+
+    parquet = tmp_path / "sales.parquet"
+    digest = _write_sales(parquet)
+    payload: dict[str, str | int | list[str]] = {
+        "parquet_path": parquet.as_posix(),
+        "expected_path": parquet.as_posix(),
+        "expected_sha256": digest,
+        "sql": "ATTACH 'x.db' AS db",
+        "params": [],
+        "count_sql": "SELECT COUNT(*) FROM allowed_table",
+        "count_params": [],
+        "provenance_sql": "",
+        "provenance_params": [],
+        "row_limit": 10,
+        "output_byte_limit": 1000,
+    }
+    resource = pytest.importorskip("resource")
+    cpu_before = resource.getrlimit(resource.RLIMIT_CPU)
+    as_before = resource.getrlimit(resource.RLIMIT_AS)
+    completed = subprocess.run(
+        [sys.executable, "-m", "smart_rag_core.tables.sandbox_worker"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert completed.returncode == 1
+    assert resource.getrlimit(resource.RLIMIT_CPU) == cpu_before
+    assert resource.getrlimit(resource.RLIMIT_AS) == as_before

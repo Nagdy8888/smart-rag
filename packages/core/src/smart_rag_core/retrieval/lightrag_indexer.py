@@ -209,6 +209,12 @@ class LightRagGraphIndexer:
         """
 
         async def _once() -> GraphIndexDeleteResult:
+            """Issue one vendor delete attempt for this document.
+
+            Returns:
+                Vendor deletion status for the current attempt.
+            """
+
             return await self._adapter.delete_document(
                 document_id=document_id,
                 delete_llm_cache=delete_llm_cache,

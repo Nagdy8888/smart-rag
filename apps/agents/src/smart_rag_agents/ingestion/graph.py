@@ -220,7 +220,7 @@ def build_ingestion_graph() -> IngestionStateGraph:
 
 def build_probe_ingestion_graph(
     *,
-    checkpointer: BaseCheckpointSaver | None = None,
+    checkpointer: BaseCheckpointSaver[str] | None = None,
     interrupt_after: Sequence[str] | None = None,
 ) -> CompiledIngestionGraph:
     """Compile the probe graph.

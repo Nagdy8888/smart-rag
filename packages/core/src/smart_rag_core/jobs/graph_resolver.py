@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
+from typing import cast
 from uuid import UUID
 
 import psycopg
@@ -1126,7 +1127,7 @@ def _load_locators(
             sheet_name, range_ref, source_url = locators_from_provenance(row[5])
             section = row[4]
             if isinstance(section, list):
-                section_path = tuple(str(item) for item in section)
+                section_path = tuple(str(item) for item in cast(list[object], section))
             else:
                 section_path = ()
             locators.append(

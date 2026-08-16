@@ -2,20 +2,23 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Mapping
 from decimal import Decimal
 from importlib.metadata import version
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 import psycopg
 import pytest
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.base import MIGRATIONS
+from smart_rag_agents.ingestion import graph as ingestion_graph_mod
 from smart_rag_agents.ingestion.checkpointer import (
     EXPECTED_CHECKPOINT_VERSIONS,
     open_ingestion_checkpointer,
 )
-from smart_rag_agents.ingestion.graph import build_probe_ingestion_graph
+from smart_rag_agents.ingestion.graph import CompiledIngestionGraph, IngestionProbeState
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.jobs.ledger import JobOperationLedger
 
@@ -23,6 +26,13 @@ from tests.contract.integration_support import (
     read_process_env,
     resolve_supabase_db_url,
     try_connect,
+    typed_module_attr,
+)
+
+_build_probe_ingestion_graph = typed_module_attr(
+    ingestion_graph_mod,
+    "build_probe_ingestion_graph",
+    cast("Callable[..., CompiledIngestionGraph]", None),
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -84,7 +94,7 @@ def test_checkpoint_schema_versions_match_pinned_library(postgres_url: str) -> N
             rows = connection.execute(
                 "SELECT v FROM checkpoint_migrations ORDER BY v"
             ).fetchall()
-        versions = [int(row["v"]) for row in rows]
+        versions = [int(str(cast(Mapping[str, object], row)["v"])) for row in rows]
         assert versions == list(EXPECTED_CHECKPOINT_VERSIONS)
         with checkpointer.pool.connection() as connection:
             exists = connection.execute(
@@ -140,20 +150,23 @@ def test_probe_interrupt_resume_does_not_duplicate_ledger(
 
     checkpointer = open_ingestion_checkpointer(postgres_url, max_size=1)
     try:
-        interrupted = build_probe_ingestion_graph(
+        interrupted = _build_probe_ingestion_graph(
             checkpointer=checkpointer.saver,
             interrupt_after=["validate_lease"],
         )
-        resumed = build_probe_ingestion_graph(checkpointer=checkpointer.saver)
-        config = {
-            "configurable": {
-                "thread_id": str(claimed.id),
-                "postgres_url": postgres_url,
-                "lease_owner": "checkpoint-resume-owner",
-                "job_lease_seconds": 120,
-            }
-        }
-        graph_input = {
+        resumed = _build_probe_ingestion_graph(checkpointer=checkpointer.saver)
+        config = cast(
+            RunnableConfig,
+            {
+                "configurable": {
+                    "thread_id": str(claimed.id),
+                    "postgres_url": postgres_url,
+                    "lease_owner": "checkpoint-resume-owner",
+                    "job_lease_seconds": 120,
+                }
+            },
+        )
+        graph_input: IngestionProbeState = {
             "job_id": str(claimed.id),
             "lease_token": claimed.lease_token,
             "document_id": None,

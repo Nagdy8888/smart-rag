@@ -8,12 +8,11 @@ audience: engineering, reviewers
 
 # Pyright types-tier baseline
 
-Honest budget for review finding P1-7. Phase 1 closed `uv run pyright` at
-**0** errors. This snapshot re-measured full-repo strict Pyright on
-2026-08-16. The types tier must stay a real `python -m pyright` invocation
-and must **fail** until the error count is driven to zero or a separately
-dated waiver exists. Packet-scoped “zero new errors on files I touched” is
-not a substitute.
+Measured full-repo strict Pyright budget for review finding P1-7. This
+snapshot is **0** errors. The types tier must stay a real
+`python -m pyright` invocation inside `FAST_TIERS`. Recovery is complete
+only at this measured zero; it is not a waiver, `|| true`, or an exclude of
+`tests`.
 
 Commands, include paths, and the hard-fail runner: [QUALITY_COMMANDS.md](./QUALITY_COMMANDS.md).
 CI membership: [CI_TIERS.md](./CI_TIERS.md). Machine-readable copy:
@@ -25,13 +24,11 @@ flowchart TD
   ratchet["baseline ratchet"]
   pyright["python -m pyright strict"]
   regression["fail if count exceeds baseline"]
-  debt["fail while any error remains"]
-  zero["green only at zero errors"]
+  green["types tier exits 0 at measured zero"]
   fastTier --> ratchet
   fastTier --> pyright
   ratchet --> regression
-  pyright --> debt
-  debt --> zero
+  pyright --> green
 ```
 
 ## Policy
@@ -39,11 +36,10 @@ flowchart TD
 - Do not remove `types` from `FAST_TIERS`.
 - Do not add `|| true`, disable strict mode, or exclude `tests` to pass.
   Phase 1 included `tests` in `[tool.pyright]`; that remains required.
-- Do not raise `error_count` in the JSON to hide new errors.
-- A count at or below this baseline is **not** a types-tier pass. It only
-  means recorded debt did not grow.
+- Do not raise `error_count` in the JSON to hide new errors. The recorded
+  count is **0**; any new diagnostic is a ratchet and types-tier failure.
 - Prefer precise annotations over `# type: ignore`. Ignore comments are not
-  a cleanup strategy for this baseline.
+  a cleanup strategy.
 - No dated waiver exists as of this writing. Remote GitHub Actions
   conclusion for the types tier is **unverified** here.
 
@@ -54,20 +50,15 @@ flowchart TD
 | Command | `uv run pyright --outputjson` |
 | Pyright | 1.1.411 (`typeCheckingMode = "strict"`, Python 3.11) |
 | Host | local Windows workspace; not GitHub Actions |
-| Exit code | 1 |
-| Files analyzed | 414 |
-| Errors | **882** |
+| Exit code | 0 |
+| Files analyzed | 417 |
+| Errors | **0** |
 | Warnings | 0 |
-| Files with at least one error | 76 |
+| Files with at least one error | 0 |
 
-Phase 5 Packet 1 recorded “~612 pre-existing errors.” That figure was **not**
-re-run from that commit in this measurement. Do not treat 612 as this snapshot.
-
-The first complete probe in this run was also **882** errors (408 files).
-While the baseline was being written, concurrent BM25 reconcile tests appeared
-and transient probes read 884, 887, and 890. The freeze re-measure is **882**
-errors / 414 files. New files from this packet have 0 Pyright errors. This
-packet did not edit BM25 or graph-writer production code.
+An earlier same-day freeze recorded **882** errors / 414 files while
+recovery was incomplete. This re-measure is **0** errors / 417 files.
+`generalDiagnostics` was empty. Do not treat 882 as the current budget.
 
 ### Errors by tree
 
@@ -76,63 +67,39 @@ tree is in scope and produced no diagnostics in this run.
 
 | Tree | Errors | Files with errors |
 | --- | --- | --- |
-| `tests` | 488 | 41 |
-| `packages/core` | 348 | 27 |
-| `apps/agents` | 19 | 5 |
-| `apps/worker` | 16 | 2 |
-| `infra` | 11 | 1 |
-| `apps/backend` | 0 | 0 |
+| `apps/agents/src` | 0 | 0 |
+| `apps/backend/src` | 0 | 0 |
+| `apps/worker/src` | 0 | 0 |
+| `infra/crawl-proxy` | 0 | 0 |
+| `packages/core/src` | 0 | 0 |
 | `scripts` | 0 | 0 |
-| **Total** | **882** | **76** |
-
-`tests` split: `tests/unit` 348, `tests/contract` 110, `tests/fixtures` 30.
-
-`packages/core` split (under `smart_rag_core/`): `ingestion` 149,
-`retrieval` 116, `jobs` 47, `gateways` 23, `observability` 13.
+| `tests` | 0 | 0 |
+| **Total** | **0** | **0** |
 
 ### Dominant rules
 
-| Rule | Count |
-| --- | --- |
-| `reportUnknownMemberType` | 200 |
-| `reportArgumentType` | 171 |
-| `reportUnknownVariableType` | 165 |
-| `reportUnknownArgumentType` | 150 |
-| `reportUnknownLambdaType` | 52 |
-| `reportPrivateUsage` | 28 |
-| `reportUnknownParameterType` | 26 |
-| `reportGeneralTypeIssues` | 20 |
-
-Most of the mass is untyped third-party / incomplete annotations, not a
-handful of syntax errors. An 882-error cleanup in one change would be a
-reckless rewrite.
+None. This snapshot has zero diagnostics.
 
 ### Hottest files (this snapshot)
 
-| Errors | Path |
-| --- | --- |
-| 84 | `packages/core/src/smart_rag_core/retrieval/hybrid_run.py` |
-| 69 | `tests/unit/test_graph_mapping.py` |
-| 50 | `tests/unit/test_parser_adapters.py` |
-| 40 | `packages/core/src/smart_rag_core/ingestion/tables/schema.py` |
-| 33 | `tests/unit/test_graph_mapping_hybrid.py` |
-| 32 | `tests/unit/test_graph_retriever.py` |
-| 27 | `tests/fixtures/parser/__init__.py` |
-| 25 | `packages/core/src/smart_rag_core/ingestion/tables/parquet_io.py` |
-| 25 | `tests/unit/test_graph_inspect_openapi.py` |
-| 24 | `tests/unit/test_ingestion_status_openapi.py` |
+None. This snapshot has zero diagnostics.
+
+### Leftover diagnostics
+
+None. Do not invent a zero: `summary.errorCount` was 0 and
+`generalDiagnostics` was `[]`.
 
 ## Ratchet
 
 `scripts/ci/check_pyright_baseline.py` invokes `python -m pyright --outputjson`
 (or reads `--report-path`) and **fails if the error count increases** above
 `scripts/ci/pyright_baseline.json`. The types tier still runs
-`python -m pyright` afterward. The ratchet never makes a non-zero count
-green.
+`python -m pyright` afterward. With `error_count` at 0, both commands are
+expected to exit 0.
 
-When the count drops, lower `error_count` (and this document) in the same
-change. When it reaches 0, set the baseline to 0 and keep the direct
-Pyright invocation.
+When the count rises, do not raise the baseline. Fix the new diagnostics.
+When it is 0, keep the direct Pyright invocation and keep `types` in
+`FAST_TIERS`.
 
 ## Verification
 
@@ -142,8 +109,9 @@ uv run python scripts/check.py --tier types
 uv run pyright --outputjson
 ```
 
-Expected until the debt is paid: ratchet exit `0` when the count is `<= 882`
-and did not grow; types tier exit `1` from Pyright while any error remains.
+Expected at this snapshot: ratchet exit `0` at 0 errors; types tier exit
+`0` from both the ratchet and `python -m pyright`. A non-zero count must
+fail both the ratchet (if above this baseline) and the direct Pyright run.
 
 Review finding P1-7 close-out:
 [2026-08-16-phases-01-05-closeout.md](../reviews/2026-08-16-phases-01-05-closeout.md).

@@ -137,6 +137,8 @@ class Bm25WorkerLoop:
         stop_heartbeat = threading.Event()
 
         def heartbeat_loop() -> None:
+            """Renew the BM25 job lease until the worker signals stop."""
+
             while not stop_heartbeat.wait(
                 timeout=self._settings.job_heartbeat_interval_seconds
             ):
@@ -242,16 +244,37 @@ class Bm25WorkerLoop:
         )
 
     def _postgres_url(self) -> str:
+        """Return the configured Supabase Postgres URL.
+
+        Returns:
+            Connection URL for worker-role SQL.
+
+        Raises:
+            JobRepositoryError: When ``supabase_db_url`` is unset.
+        """
+
         if self._settings.supabase_db_url is None:
             raise JobRepositoryError("supabase_db_url_unconfigured")
         return self._settings.supabase_db_url.get_secret_value()
 
     def _parade_url(self) -> str | None:
+        """Return the ParadeDB URL when BM25 projection is configured.
+
+        Returns:
+            ParadeDB connection URL, or ``None`` when unset.
+        """
+
         if self._settings.paradedb_url is None:
             return None
         return self._settings.paradedb_url.get_secret_value()
 
     def _lease_owner(self) -> str:
+        """Return the stable lease owner id for this worker process.
+
+        Returns:
+            ``{instance_id}@{hostname}`` owner string.
+        """
+
         import socket
 
         hostname = socket.gethostname()

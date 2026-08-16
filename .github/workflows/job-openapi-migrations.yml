@@ -1,0 +1,24 @@
+name: OpenAPI and migrations
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  openapi-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
+
+      - name: OpenAPI foundation snapshot
+        run: uv run python scripts/ci/check_openapi.py
+
+      - name: Migration policy
+        run: uv run python scripts/ci/check_migrations.py

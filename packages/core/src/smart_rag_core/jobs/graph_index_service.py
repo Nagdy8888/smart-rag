@@ -822,9 +822,9 @@ class GraphIndexService:
             expected_workspace_key=live_key,
             target_workspace_key=target_key,
             target_embedding_model=str(target["embedding_model"]),
-            target_embedding_dimensions=int(target["embedding_dimensions"]),
+            target_embedding_dimensions=_as_int(target["embedding_dimensions"]),
             source_embedding_model=str(live["embedding_model"]),
-            source_embedding_dimensions=int(live["embedding_dimensions"]),
+            source_embedding_dimensions=_as_int(live["embedding_dimensions"]),
         )
         self._connection.commit()
         return GraphJobOutcome(
@@ -1105,3 +1105,26 @@ def _actual_from_callbacks(
     if actual <= 0:
         actual = Decimal("0.01")
     return actual
+
+
+def _as_int(value: object) -> int:
+    """Coerce a workspace numeric column to int.
+
+    Args:
+        value: Database number, numeric string, or already an int.
+
+    Returns:
+        Integer form of ``value``.
+    """
+
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, Decimal):
+        return int(value)
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        return int(value)
+    return int(str(value))

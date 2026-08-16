@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg
@@ -83,7 +84,7 @@ class JobOperationLedger:
         job_table: str,
         job_id: UUID,
         operation_key: str,
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, object] | None:
         """Return a completed ledger result payload when present."""
 
         with self._connection.cursor() as cursor:
@@ -101,9 +102,33 @@ class JobOperationLedger:
             row = cursor.fetchone()
             if row is None or row[0] is None:
                 return None
-            payload = row[0]
-            if isinstance(payload, dict):
-                return payload
-            if isinstance(payload, str):
-                return json.loads(payload)
-            return dict(payload)
+            return _as_result_ref(row[0])
+
+
+def _as_result_ref(value: object) -> dict[str, object]:
+    """Normalize a ledger JSON payload to a string-keyed dict.
+
+    Args:
+        value: ``result_ref`` JSON from Postgres.
+
+    Returns:
+        String-keyed mapping. Nested values stay JSON-compatible objects.
+    """
+
+    if isinstance(value, dict):
+        untyped = cast(dict[object, object], value)
+        return {str(key): item for key, item in untyped.items()}
+    if isinstance(value, str):
+        loaded: object = json.loads(value)
+        if isinstance(loaded, dict):
+            untyped = cast(dict[object, object], loaded)
+            return {str(key): item for key, item in untyped.items()}
+        if isinstance(loaded, Mapping):
+            untyped = cast(Mapping[object, object], loaded)
+            return {str(key): item for key, item in untyped.items()}
+        return {}
+    if isinstance(value, Mapping):
+        untyped = cast(Mapping[object, object], value)
+        return {str(key): item for key, item in untyped.items()}
+    converted = dict(cast(Mapping[object, object], value))
+    return {str(key): item for key, item in converted.items()}

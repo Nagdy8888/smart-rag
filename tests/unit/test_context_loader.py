@@ -2,16 +2,57 @@
 
 from __future__ import annotations
 
+from typing import Protocol, cast
 from uuid import UUID, uuid4
 
 import pytest
+from smart_rag_core.retrieval import context_loader as context_loader_mod
 from smart_rag_core.retrieval.context_loader import (
     CONTEXT_BATCH_LIMIT,
+    ChunkContext,
     ContextBatchError,
-    _fetch_context_rpc_batch,
     fetch_authorized_chunk_context,
 )
 from smart_rag_core.security.identity import CallerContext, UserRole
+
+from tests.unit.typed_attrs import module_attr
+
+
+class _FetchBatch(Protocol):
+    """Private RPC batch helper signature used by the loader tests."""
+
+    def __call__(
+        self,
+        connection: object,
+        *,
+        caller: CallerContext,
+        chunk_ids: tuple[UUID, ...],
+    ) -> tuple[ChunkContext, ...]:
+        """Fetch one authorized context batch."""
+        ...
+
+
+def _fetch_context_rpc_batch(
+    connection: object,
+    *,
+    caller: CallerContext,
+    chunk_ids: tuple[UUID, ...],
+) -> tuple[ChunkContext, ...]:
+    """Call the private context RPC helper under test.
+
+    Args:
+        connection: Unused connection stand-in.
+        caller: Server-derived identity.
+        chunk_ids: IDs for one RPC batch.
+
+    Returns:
+        Authorized chunk contexts.
+    """
+
+    fetch = cast(
+        _FetchBatch, module_attr(context_loader_mod, "_fetch_context_rpc_batch")
+    )
+    return fetch(connection, caller=caller, chunk_ids=chunk_ids)
 
 
 def _caller() -> CallerContext:
@@ -77,7 +118,7 @@ def test_rpc_batch_rejects_more_than_sql_limit() -> None:
     oversized = tuple(uuid4() for _ in range(CONTEXT_BATCH_LIMIT + 1))
     with pytest.raises(ContextBatchError, match="context_batch_exceeds_limit"):
         _fetch_context_rpc_batch(
-            object(),  # type: ignore[arg-type]
+            object(),
             caller=_caller(),
             chunk_ids=oversized,
         )

@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import cast
+from typing import TypeVar, cast
 from urllib.parse import quote
 
 import psycopg
@@ -21,6 +21,27 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SUPABASE_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 ARABIC_NORM_SQL = REPO_ROOT / "infra" / "paradedb" / "sql" / "arabic_norm_v1.sql"
 COMPOSE_ENV_FILE = REPO_ROOT / ".env.compose"
+_T = TypeVar("_T")
+
+
+def typed_module_attr(owner: object, name: str, typed: _T) -> _T:
+    """Return ``getattr(owner, name)`` using ``typed`` only for the result type.
+
+    This avoids importing private identifiers and reading untyped third-party
+    members while keeping the caller's annotation. ``typed`` is never used
+    at runtime.
+
+    Args:
+        owner: Module or object that owns the attribute.
+        name: Attribute name, including private helpers owned elsewhere.
+        typed: Unused value that supplies the returned type.
+
+    Returns:
+        The named attribute, typed as ``typed``.
+    """
+
+    del typed
+    return cast(_T, getattr(owner, name))
 
 
 def read_process_env(name: str) -> str | None:

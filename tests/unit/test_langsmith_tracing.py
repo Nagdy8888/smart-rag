@@ -5,12 +5,14 @@ from __future__ import annotations
 import ast
 import asyncio
 import json
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
+import langsmith
 import pytest
-from langsmith import tracing_context
 from smart_rag_core.gateways.embedding import EmbeddingRequest, create_embedding_gateway
 from smart_rag_core.gateways.model import ModelRequest, create_model_gateway
 from smart_rag_core.observability.langsmith_tracing import (
@@ -28,6 +30,8 @@ from smart_rag_core.settings import (
     SettingsValidationError,
     load_backend_settings,
 )
+
+from tests.unit.typed_attrs import module_attr
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _ALLOWED_OPENAI_CTOR = {
@@ -48,6 +52,26 @@ _SCAN_ROOTS = (
 CANARY_TOKEN = "sk-canarysecretFORBID123456"  # noqa: S105 - inert leak canary
 CANARY_EMAIL = "canary.user@example.com"
 CANARY_PASSAGE = "SECRET_COMPANY_PASSAGE_DO_NOT_EXPORT"
+
+
+def _tracing_context(
+    *, enabled: bool, client: object
+) -> AbstractContextManager[object]:
+    """Return LangSmith ``tracing_context`` with a known callable type.
+
+    Args:
+        enabled: Whether tracing is enabled for the block.
+        client: Recording client used by the unit tests.
+
+    Returns:
+        Context manager from ``langsmith.tracing_context``.
+    """
+
+    factory = cast(
+        Callable[..., AbstractContextManager[object]],
+        module_attr(langsmith, "tracing_context"),
+    )
+    return factory(enabled=enabled, client=client)
 
 
 class RecordingLangSmithClient:
@@ -192,7 +216,7 @@ def test_mock_generate_is_traced_without_prompt_body() -> None:
     recorder = RecordingLangSmithClient()
     gateway = create_model_gateway(AgentSettings())
     request = ModelRequest(prompt=f"probe {CANARY_PASSAGE}")
-    with tracing_context(enabled=True, client=recorder):  # type: ignore[arg-type]
+    with _tracing_context(enabled=True, client=recorder):
         asyncio.run(gateway.generate(request))
     names = [item["name"] for item in recorder.created]
     assert "model.generate" in names
@@ -210,7 +234,7 @@ def test_tracing_disabled_creates_no_runs() -> None:
 
     recorder = RecordingLangSmithClient()
     gateway = create_model_gateway(AgentSettings())
-    with tracing_context(enabled=False, client=recorder):  # type: ignore[arg-type]
+    with _tracing_context(enabled=False, client=recorder):
         asyncio.run(gateway.generate(ModelRequest(prompt="foundation probe")))
     assert recorder.created == []
 
@@ -226,7 +250,7 @@ def test_mock_embed_is_traced_without_input_text() -> None:
         model="text-embedding-3-large",
         dimensions=8,
     )
-    with tracing_context(enabled=True, client=recorder):  # type: ignore[arg-type]
+    with _tracing_context(enabled=True, client=recorder):
         asyncio.run(gateway.embed(request))
     names = [item["name"] for item in recorder.created]
     assert "embedding.embed" in names
@@ -269,6 +293,8 @@ def test_production_openai_calls_use_traced_helpers() -> None:
             filename=str(relative),
         )
         for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
             name = _call_name(node)
             if name is None:
                 continue

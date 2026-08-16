@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pytesseract
 from PIL import Image
 
-from smart_rag_core.ingestion.parser.helpers import element_id
+from smart_rag_core.ingestion.parser.helpers import as_float, element_id
 from smart_rag_core.ingestion.parser.limits import (
     OCR_CONFIG_VERSION,
     OCR_DPI,
@@ -95,13 +95,13 @@ def parse_scanned_pdf_page(
     order_base = page_index * 1000
     for index in range(len(data["text"])):
         text = str(data["text"][index]).strip()
-        conf = float(data["conf"][index])
+        conf = as_float(data["conf"][index])
         if not text or conf < OCR_MIN_CONFIDENCE:
             continue
-        x = float(data["left"][index])
-        y = float(data["top"][index])
-        w = float(data["width"][index])
-        h = float(data["height"][index])
+        x = as_float(data["left"][index])
+        y = as_float(data["top"][index])
+        w = as_float(data["width"][index])
+        h = as_float(data["height"][index])
         locator = OcrLocator(
             page_index=page_index,
             bbox_x0=x,

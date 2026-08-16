@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from types import SimpleNamespace
-from uuid import uuid4
+from typing import Protocol, cast
+from uuid import UUID, uuid4
 
+import psycopg
 import pytest
 from smart_rag_core.evaluation.schema import (
     DATE_PARSER_VERSION,
@@ -26,9 +29,11 @@ from smart_rag_core.retrieval.graph import (
     GraphLeadRelation,
     GraphLeadSet,
     GraphLimitationCode,
+    GraphQueryBounds,
     apply_query_bounds,
 )
 from smart_rag_core.retrieval.graph_results import (
+    GraphCanonicalLocator,
     GraphResolvedCandidate,
     RollingSurvivalWindow,
 )
@@ -119,7 +124,7 @@ def _active_snapshot() -> QueryWorkspaceSnapshot:
     )
 
 
-def _bounds(*, deadline: float = 5.0):
+def _bounds(*, deadline: float = 5.0) -> GraphQueryBounds:
     """Return adapter bounds for unit retrieval.
 
     Args:
@@ -183,6 +188,131 @@ class _FakeRetriever:
         return self.leads
 
 
+def _load_active_workspace(_connection: psycopg.Connection) -> QueryWorkspaceSnapshot:
+    """Return an active pointer snapshot.
+
+    Args:
+        _connection: Unused retrieve connection.
+
+    Returns:
+        Active workspace snapshot.
+    """
+
+    del _connection
+    return _active_snapshot()
+
+
+def _workspace_loader(
+    *,
+    state: str,
+    pointer_attached: bool,
+    workspace_id: UUID | None,
+    config_generation: str = "x",
+    generation: int = 1,
+) -> Callable[[psycopg.Connection], QueryWorkspaceSnapshot]:
+    """Build a ``load_query_workspace`` stub for one workspace state.
+
+    Args:
+        state: Workspace state label.
+        pointer_attached: Whether a pointer row is attached.
+        workspace_id: Pointer workspace id, if any.
+        config_generation: Mapping config digest.
+        generation: Pointer generation.
+
+    Returns:
+        Loader that ignores the connection and returns the snapshot.
+    """
+
+    snapshot = QueryWorkspaceSnapshot(
+        workspace_key="company_default",
+        workspace_id=workspace_id,
+        state=state,
+        pointer_attached=pointer_attached,
+        generation=generation,
+        config_generation=config_generation,
+    )
+
+    def _load(_connection: psycopg.Connection) -> QueryWorkspaceSnapshot:
+        """Return the bound snapshot.
+
+        Args:
+            _connection: Unused retrieve connection.
+
+        Returns:
+            Frozen workspace snapshot.
+        """
+
+        del _connection
+        return snapshot
+
+    return _load
+
+
+def _zero_visibility(*_args: object, **_kwargs: object) -> VisibilityCounts:
+    """Return empty authorized visibility counts.
+
+    Returns:
+        Zero partial-readiness and ACL-blindness.
+    """
+
+    return VisibilityCounts(0, 0)
+
+
+def _skip_repairs(*_args: object, **_kwargs: object) -> None:
+    """Skip query-time repair enqueue."""
+
+    return None
+
+
+def _no_locators(
+    *_args: object, **_kwargs: object
+) -> tuple[GraphCanonicalLocator, ...]:
+    """Return no canonical locators.
+
+    Returns:
+        Empty locator tuple.
+    """
+
+    return ()
+
+
+def _one_survival_sample(*_args: object, **_kwargs: object) -> RollingSurvivalWindow:
+    """Return a single-sample survival window.
+
+    Returns:
+        Window with mean 1.0.
+    """
+
+    return RollingSurvivalWindow(sample_count=1, mean=1.0, below_alert_threshold=False)
+
+
+def _empty_resolve(*_args: object, **_kwargs: object) -> ResolveOutcome:
+    """Return an empty resolver outcome.
+
+    Returns:
+        No candidates, paths, or drops.
+    """
+
+    return ResolveOutcome(
+        candidates=(),
+        paths=(),
+        dropped=(),
+        diagnostics=(),
+        returned_candidates=0,
+        supported_candidates=0,
+    )
+
+
+class _StructuredQueryParam(Protocol):
+    """LightRAG QueryParam fields asserted by the structured adapter contract."""
+
+    enable_rerank: bool
+    only_need_context: bool
+    hl_keywords: list[str]
+    ll_keywords: list[str]
+    mode: str
+
+
 def _patch_common(monkeypatch: pytest.MonkeyPatch, **overrides: object) -> None:
     """Patch resolver helpers used by ``retrieve_graph``.
 
@@ -194,21 +324,12 @@ def _patch_common(monkeypatch: pytest.MonkeyPatch, **overrides: object) -> None:
     import smart_rag_core.retrieval.graph_retriever as gr
 
     defaults: dict[str, object] = {
-        "load_query_workspace": lambda _conn: _active_snapshot(),
-        "visibility_counts": lambda *_a, **_k: VisibilityCounts(0, 0),
-        "enqueue_query_repairs": lambda *_a, **_k: None,
-        "load_canonical_locators": lambda *_a, **_k: (),
-        "record_survival_sample": lambda *_a, **_k: RollingSurvivalWindow(
-            sample_count=1, mean=1.0, below_alert_threshold=False
-        ),
-        "resolve_graph_leads": lambda *_a, **_k: ResolveOutcome(
-            candidates=(),
-            paths=(),
-            dropped=(),
-            diagnostics=(),
-            returned_candidates=0,
-            supported_candidates=0,
-        ),
+        "load_query_workspace": _load_active_workspace,
+        "visibility_counts": _zero_visibility,
+        "enqueue_query_repairs": _skip_repairs,
+        "load_canonical_locators": _no_locators,
+        "record_survival_sample": _one_survival_sample,
+        "resolve_graph_leads": _empty_resolve,
     }
     defaults.update(overrides)
     for name, value in defaults.items():
@@ -246,12 +367,10 @@ def test_outage_skips_vendor(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     _patch_common(
         monkeypatch,
-        load_query_workspace=lambda _conn: QueryWorkspaceSnapshot(
-            workspace_key="company_default",
-            workspace_id=None,
+        load_query_workspace=_workspace_loader(
             state="quarantined",
             pointer_attached=False,
-            generation=1,
+            workspace_id=None,
             config_generation="",
         ),
     )
@@ -282,13 +401,10 @@ def test_updating_and_filtered_dirty_typed_signals(
     retriever = _FakeRetriever(GraphLeadSet(mode="local"))
     _patch_common(
         monkeypatch,
-        load_query_workspace=lambda _conn: QueryWorkspaceSnapshot(
-            workspace_key="company_default",
-            workspace_id=uuid4(),
+        load_query_workspace=_workspace_loader(
             state="updating",
             pointer_attached=True,
-            generation=1,
-            config_generation="x",
+            workspace_id=uuid4(),
         ),
     )
     updating = asyncio.run(
@@ -307,13 +423,10 @@ def test_updating_and_filtered_dirty_typed_signals(
     assert updating.limitations[0].code is GraphLimitationCode.GRAPH_UPDATING
     _patch_common(
         monkeypatch,
-        load_query_workspace=lambda _conn: QueryWorkspaceSnapshot(
-            workspace_key="company_default",
-            workspace_id=uuid4(),
+        load_query_workspace=_workspace_loader(
             state="filtered_dirty",
             pointer_attached=True,
-            generation=1,
-            config_generation="x",
+            workspace_id=uuid4(),
         ),
     )
     dirty = asyncio.run(
@@ -412,7 +525,13 @@ def test_survival_below_threshold_signal(monkeypatch: pytest.MonkeyPatch) -> Non
         returned_candidates=3,
         supported_candidates=1,
     )
-    _patch_common(monkeypatch, resolve_graph_leads=lambda *_a, **_k: outcome)
+
+    def _resolve(*_args: object, **_kwargs: object) -> ResolveOutcome:
+        """Return the low-survival fixture outcome."""
+
+        return outcome
+
+    _patch_common(monkeypatch, resolve_graph_leads=_resolve)
     result = asyncio.run(
         retrieve_graph(
             retriever=retriever,
@@ -439,7 +558,11 @@ def test_hidden_keyword_callback_fails_closed(
     """A keyword-extract callback during query raises GraphQueryError."""
 
     class _HiddenRetriever(_FakeRetriever):
+        """Retriever that increments the forbidden keyword-extract counter."""
+
         async def retrieve_local(self, **_kwargs: object) -> GraphLeadSet:
+            """Increment the hidden keyword-extract counter, then return leads."""
+
             self.calls += 1
             callbacks.counts.keyword_extract += 1
             return self.leads
@@ -467,7 +590,18 @@ def test_vendor_timeout_cancels_query_task(monkeypatch: pytest.MonkeyPatch) -> N
     """Outer wait_for raises graph_deadline when the vendor hangs."""
 
     class _SlowRetriever(_FakeRetriever):
+        """Retriever that sleeps past the query deadline."""
+
         async def retrieve_local(self, **_kwargs: object) -> GraphLeadSet:
+            """Sleep long enough to trip the outer wait_for deadline.
+
+            Args:
+                **_kwargs: Unused retrieve_local keyword arguments.
+
+            Returns:
+                The fixture lead set if the sleep is not cancelled.
+            """
+
             self.calls += 1
             await asyncio.sleep(5)
             return self.leads
@@ -493,7 +627,21 @@ def test_vendor_empty_emits_graph_empty(monkeypatch: pytest.MonkeyPatch) -> None
     """LightRagQueryFailure degrades to graph_empty without Hybrid."""
 
     class _EmptyRetriever(_FakeRetriever):
+        """Retriever that surfaces a vendor empty-result failure."""
+
         async def retrieve_local(self, **_kwargs: object) -> GraphLeadSet:
+            """Raise LightRagQueryFailure so the adapter emits graph_empty.
+
+            Args:
+                **_kwargs: Unused retrieve_local keyword arguments.
+
+            Returns:
+                Never returns; always raises.
+
+            Raises:
+                LightRagQueryFailure: Simulated vendor empty result.
+            """
+
             self.calls += 1
             raise LightRagQueryFailure("no_results")
 
@@ -520,7 +668,7 @@ def test_inspect_deadline_and_seed_limit(monkeypatch: pytest.MonkeyPatch) -> Non
 
     import smart_rag_core.retrieval.graph_retriever as gr
 
-    monkeypatch.setattr(gr, "load_query_workspace", lambda _c: _active_snapshot())
+    monkeypatch.setattr(gr, "load_query_workspace", _load_active_workspace)
     deadline = inspect_graph_authorized(
         connection=object(),  # type: ignore[arg-type]
         caller=_CALLER,
@@ -543,7 +691,11 @@ def test_aquery_data_structured_sets_query_param_contract() -> None:
     captured: dict[str, object] = {}
 
     class _Rag:
+        """LightRAG double that captures QueryParam for contract assertions."""
+
         async def aquery_data(self, query: str, param: object) -> dict[str, object]:
+            """Capture QueryParam and return a successful structured envelope."""
+
             captured["query"] = query
             captured["param"] = param
             return {
@@ -573,7 +725,7 @@ def test_aquery_data_structured_sets_query_param_contract() -> None:
             bounds=_bounds(),
         )
     )
-    param = captured["param"]
+    param = cast(_StructuredQueryParam, captured["param"])
     assert param.enable_rerank is False
     assert param.only_need_context is True
     assert param.hl_keywords == ["ownership"]

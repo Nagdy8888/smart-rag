@@ -23,7 +23,7 @@ def extract_main_content(
     html: str,
     *,
     source_url: str | None = None,
-) -> tuple[BeautifulSoup, tuple[RemovalDiagnostic, ...]]:
+) -> tuple[Tag, tuple[RemovalDiagnostic, ...]]:
     """Remove navigation/cookie/sidebar boilerplate using deterministic rules.
 
     Args:
@@ -54,7 +54,8 @@ def extract_main_content(
                 )
             )
             tag.decompose()
-    main = soup.find("main") or soup.find("article") or soup.body or soup
+    candidate = soup.find("main") or soup.find("article") or soup.body or soup
+    main = candidate if isinstance(candidate, Tag) else soup
     return main, tuple(removals)
 
 
@@ -63,10 +64,31 @@ def _is_boilerplate(tag: Tag) -> bool:
 
     if tag.name in _BOILERPLATE_TAGS:
         return True
-    class_text = " ".join(tag.get("class", [])).lower()
+    class_text = _class_attribute_text(tag)
     id_text = str(tag.get("id", "")).lower()
     haystack = f"{class_text} {id_text}"
     return any(keyword in haystack for keyword in _BOILERPLATE_CLASS_KEYWORDS)
+
+
+def _class_attribute_text(tag: Tag) -> str:
+    """Return the lowercased class attribute joined on spaces.
+
+    Missing class is empty. A string class is joined character-by-character,
+    matching ``" ".join(value)`` when BeautifulSoup stores class as a str.
+
+    Args:
+        tag: HTML tag whose class attribute is read.
+
+    Returns:
+        Lowercased class string.
+    """
+
+    raw_class = tag.get("class")
+    if raw_class is None:
+        return ""
+    if isinstance(raw_class, str):
+        return " ".join(raw_class).lower()
+    return " ".join(str(item) for item in raw_class).lower()
 
 
 def _dom_path(tag: Tag) -> tuple[str, ...]:

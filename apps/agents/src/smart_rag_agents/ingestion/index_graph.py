@@ -512,7 +512,7 @@ def build_index_graph() -> IngestionIndexGraph:
 
 def build_index_ingestion_graph(
     *,
-    checkpointer: BaseCheckpointSaver | None = None,
+    checkpointer: BaseCheckpointSaver[str] | None = None,
     interrupt_after: Sequence[str] | None = None,
 ) -> CompiledIngestionIndexGraph:
     """Compile hybrid indexing graph.

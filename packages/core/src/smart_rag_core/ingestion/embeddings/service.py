@@ -236,6 +236,26 @@ class EmbeddingService:
         actual_usd: Decimal | None = None,
         result_ref: dict[str, Any] | None = None,
     ) -> UUID:
+        """Insert one embedding ledger row and return its identifier.
+
+        Args:
+            version_id: Canonical document version.
+            operation_key: Idempotent embedding operation key.
+            policy_hash: Embedding policy hash recorded on the ledger.
+            input_count: Number of texts in this attempt.
+            status: Ledger status written by ``record_embedding_ledger``.
+            provider_request_id: Optional provider request id.
+            reserved_usd: Optional reserved cost.
+            actual_usd: Optional settled cost.
+            result_ref: Optional JSON result payload.
+
+        Returns:
+            Ledger row identifier.
+
+        Raises:
+            EmbeddingGateError: When the ledger RPC returns no id.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -263,6 +283,16 @@ class EmbeddingService:
             return UUID(str(row[0]))
 
     def _ledger_attempt_count(self, version_id: UUID, operation_key: str) -> int:
+        """Return the stored attempt count for one embedding operation.
+
+        Args:
+            version_id: Canonical document version.
+            operation_key: Idempotent embedding operation key.
+
+        Returns:
+            Attempt count, or ``1`` when no ledger row exists yet.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """

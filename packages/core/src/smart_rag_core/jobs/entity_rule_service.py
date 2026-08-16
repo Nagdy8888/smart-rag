@@ -8,9 +8,10 @@ This service never writes Hybrid ``search_aliases`` and never patches vendor
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, LiteralString, cast
 from uuid import UUID
 
 import psycopg
@@ -135,6 +136,20 @@ def _reason_from_db(exc: psycopg.Error) -> str:
     return "entity_rule_rejected"
 
 
+def _as_str_tuple(value: object) -> tuple[str, ...]:
+    """Return string items from a JSON/list column.
+
+    Args:
+        value: Database array, JSON list, or empty fallback.
+
+    Returns:
+        Tuple of stringified items.
+    """
+
+    items = cast(Sequence[object], value)
+    return tuple(str(item) for item in items)
+
+
 def _draft_payload(draft: EntityRuleDraft) -> dict[str, object]:
     """Return the JSON payload sent to security-definer RPCs.
 
@@ -195,9 +210,9 @@ def _record_from_row(row: dict[str, Any]) -> EntityRuleRecord:
         Typed rule record.
     """
 
-    aliases = row.get("aliases") or []
-    blocked = row.get("do_not_merge") or []
-    languages = row.get("languages") or []
+    aliases = _as_str_tuple(row.get("aliases") or [])
+    blocked = _as_str_tuple(row.get("do_not_merge") or [])
+    languages = _as_str_tuple(row.get("languages") or [])
     confidence = row.get("confidence")
     return EntityRuleRecord(
         id=UUID(str(row["id"])),
@@ -206,9 +221,9 @@ def _record_from_row(row: dict[str, Any]) -> EntityRuleRecord:
         if row.get("canonical_name")
         else None,
         display_label=str(row["display_label"]) if row.get("display_label") else None,
-        aliases=tuple(str(item) for item in aliases),
-        do_not_merge=tuple(str(item) for item in blocked),
-        languages=tuple(str(item) for item in languages),
+        aliases=aliases,
+        do_not_merge=blocked,
+        languages=languages,
         alias_scope=str(row.get("alias_scope") or "company"),
         relation_label_policy=str(row.get("relation_label_policy") or "directed"),
         status=str(row["status"]),
@@ -532,7 +547,7 @@ def _call_mutation(
         Persists the rule mutation and optional invalidation/rebuild.
     """
 
-    sql_by_function = {
+    sql_by_function: dict[str, LiteralString] = {
         "upsert_graph_entity_rule": """
             SELECT *
             FROM app.upsert_graph_entity_rule(

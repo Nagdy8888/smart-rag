@@ -18,7 +18,7 @@ from tests.contract.integration_support import (
     resolve_supabase_db_url,
     try_connect,
 )
-from tests.contract.test_local_auth_mail import _await_mail
+from tests.contract.test_local_auth_mail import await_mail
 
 
 @pytest.fixture
@@ -86,4 +86,4 @@ def test_anomaly_notification_creates_row_and_inbucket_mail(
         )
         row = cursor.fetchone()
         assert row is not None
-    _await_mail(mailpit_url, recipient)
+    await_mail(mailpit_url, recipient)

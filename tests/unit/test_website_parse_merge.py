@@ -15,6 +15,16 @@ from smart_rag_core.ingestion.parser.website import merge_website_parse_results
 
 
 def _page(text: str, content_hash: str) -> ParseResult:
+    """Build one HTML page parse result with a single paragraph.
+
+    Args:
+        text: Paragraph text.
+        content_hash: Content hash also used to derive the element id.
+
+    Returns:
+        Supported HTML ``ParseResult`` for merge tests.
+    """
+
     locator = HtmlLocator(
         dom_path=("body", "p"), element_index=0, source_url="https://example.test/"
     )

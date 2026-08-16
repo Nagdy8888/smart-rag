@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-from smart_rag_api.main import create_app
+
+from tests.unit.typed_openapi import (
+    as_openapi_client,
+    json_object,
+    openapi_test_client,
+)
 
 
 def test_entity_rule_routes_are_registered() -> None:
     """Owner/admin entity-rule CRUD appears in OpenAPI."""
 
-    with TestClient(create_app()) as client:
-        schema = client.get("/openapi.json").json()
-    paths = schema.get("paths", {})
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
+        schema = json_object(client.get("/openapi.json").json())
+    paths = json_object(schema.get("paths", {}))
     assert "/admin/graph/entity-rules" in paths
     assert "/admin/graph/entity-rules/suggestions" in paths
     assert "/admin/graph/entity-rules/{rule_id}/approve" in paths
@@ -23,7 +28,8 @@ def test_member_cannot_create_entity_rule(monkeypatch: pytest.MonkeyPatch) -> No
     """Members cannot mutate graph entity rules."""
 
     monkeypatch.setenv("APP_ENV", "test")
-    with TestClient(create_app()) as client:
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
         response = client.post(
             "/admin/graph/entity-rules",
             json={
@@ -38,14 +44,15 @@ def test_member_cannot_create_entity_rule(monkeypatch: pytest.MonkeyPatch) -> No
             },
         )
     assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
+    assert json_object(response.json())["detail"] == "forbidden"
 
 
 def test_viewer_cannot_approve_entity_rule(monkeypatch: pytest.MonkeyPatch) -> None:
     """Viewers cannot approve suggestions."""
 
     monkeypatch.setenv("APP_ENV", "test")
-    with TestClient(create_app()) as client:
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
         response = client.post(
             "/admin/graph/entity-rules/00000000-0000-4000-8000-000000000099/approve",
             json={"row_version": 1},
@@ -56,4 +63,4 @@ def test_viewer_cannot_approve_entity_rule(monkeypatch: pytest.MonkeyPatch) -> N
             },
         )
     assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
+    assert json_object(response.json())["detail"] == "forbidden"

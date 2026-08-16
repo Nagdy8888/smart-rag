@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import duckdb
 
@@ -25,6 +26,39 @@ _BLOCKED_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 class DuckdbSandboxError(Exception):
     """Raised when a sandbox policy violation is detected."""
+
+
+@runtime_checkable
+class DuckdbRelation(Protocol):
+    """Structural DuckDB relation handle used after ``execute``."""
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        """Return all result rows.
+
+        Returns:
+            Query rows as tuples.
+        """
+        ...
+
+
+@runtime_checkable
+class DuckdbConnection(Protocol):
+    """Structural DuckDB connection handle for the in-memory sandbox."""
+
+    def execute(self, sql: str) -> DuckdbRelation:
+        """Run one SQL string.
+
+        Args:
+            sql: Statement text, unchanged from the sandbox caller.
+
+        Returns:
+            Relation handle supporting ``fetchall``.
+        """
+        ...
+
+    def close(self) -> None:
+        """Close the in-memory connection."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +93,7 @@ class DuckdbSandbox:
             raise DuckdbSandboxError("column name is not allow-listed")
         sql = f"SELECT {column} FROM allowed_fixture LIMIT {int(limit)}"  # noqa: S608
         self._validate_sql(sql)
-        connection = duckdb.connect(database=":memory:")
+        connection = _connect_memory()
         try:
             parquet_literal = (
                 self.allowed_parquet.resolve().as_posix().replace("'", "''")
@@ -98,3 +132,53 @@ class DuckdbSandbox:
         for pattern in _BLOCKED_PATTERNS:
             if pattern.search(stripped):
                 raise DuckdbSandboxError(f"blocked SQL construct: {pattern.pattern}")
+
+
+def _call(factory: object, /, *args: object, **kwargs: object) -> object:
+    """Invoke one DuckDB callable with the original positional and keyword arguments.
+
+    Args:
+        factory: DuckDB factory or connection method.
+        *args: Positional arguments forwarded unchanged.
+        **kwargs: Keyword arguments forwarded unchanged.
+
+    Returns:
+        Opaque vendor result.
+
+    Raises:
+        TypeError: If ``factory`` is not callable.
+    """
+
+    if not callable(factory):
+        raise TypeError("DuckDB factory is not callable")
+    return factory(*args, **kwargs)
+
+
+def _member(owner: object, name: str) -> object:
+    """Return one named attribute from a DuckDB module or handle.
+
+    Args:
+        owner: DuckDB module or opaque connection/relation handle.
+        name: Attribute name resolved at the call site.
+
+    Returns:
+        The attribute value.
+    """
+
+    return getattr(owner, name)
+
+
+def _connect_memory() -> DuckdbConnection:
+    """Open an in-memory DuckDB connection with the same arguments as ``duckdb.connect``.
+
+    Returns:
+        Connection handle supporting ``execute`` and ``close``.
+
+    Raises:
+        TypeError: If DuckDB does not return a connection handle.
+    """
+
+    connection: object = _call(_member(duckdb, "connect"), database=":memory:")
+    if not isinstance(connection, DuckdbConnection):
+        raise TypeError("duckdb.connect must return a connection handle")
+    return connection

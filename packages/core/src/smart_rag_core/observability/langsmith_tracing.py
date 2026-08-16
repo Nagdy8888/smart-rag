@@ -109,6 +109,23 @@ def _as_int(value: object) -> int:
     return int(str(value))
 
 
+def _traced_output_value(outputs: object) -> object:
+    """Return the nested LangSmith output or the original value.
+
+    Args:
+        outputs: Traceable return wrapper or the raw gateway response.
+
+    Returns:
+        The ``output`` entry when ``outputs`` is a mapping, otherwise
+        ``outputs``.
+    """
+
+    if not isinstance(outputs, Mapping):
+        return outputs
+    mapped = cast(Mapping[str, object], outputs)
+    return mapped.get("output", mapped)
+
+
 def configure_langsmith(settings: SharedSettings) -> dict[str, str]:
     """Apply process LangSmith flags from validated deployable settings.
 
@@ -227,11 +244,7 @@ def redact_gateway_outputs(outputs: object) -> dict[str, Any]:
         Exportable metadata with token counts when present.
     """
 
-    raw: object
-    if isinstance(outputs, Mapping):
-        raw = outputs.get("output", outputs)
-    else:
-        raw = outputs
+    raw = _traced_output_value(outputs)
     payload: dict[str, Any] = {}
     mode = getattr(raw, "mode", None)
     if mode is not None:
@@ -377,11 +390,7 @@ def redact_embedding_call_outputs(outputs: object) -> dict[str, Any]:
         Embedding count, dimension, and token usage when present.
     """
 
-    raw: object
-    if isinstance(outputs, Mapping):
-        raw = outputs.get("output", outputs)
-    else:
-        raw = outputs
+    raw = _traced_output_value(outputs)
     payload: dict[str, Any] = {}
     data = getattr(raw, "data", None)
     if data:

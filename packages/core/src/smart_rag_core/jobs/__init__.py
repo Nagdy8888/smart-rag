@@ -4,6 +4,8 @@ Graph-writer symbols are lazy exports. Importing ``jobs.limits`` during
 evaluation-package init must not pull ``retrieval.graph``.
 """
 
+from typing import TYPE_CHECKING
+
 from smart_rag_core.jobs.admission import JobAdmissionService
 from smart_rag_core.jobs.backoff import compute_retry_delay_seconds
 from smart_rag_core.jobs.dead_letter import DeadLetterService
@@ -33,6 +35,12 @@ from smart_rag_core.jobs.limits import (
     MAX_ESTIMATED_JOB_SIZE_BYTES,
     MAX_PENDING_INGESTION_JOBS,
 )
+
+if TYPE_CHECKING:
+    from smart_rag_core.jobs.graph_writer import (
+        GraphWriterGuard,
+        graph_advisory_lock_keys,
+    )
 
 __all__ = [
     "DEFAULT_DAILY_INGESTION_BUDGET_USD",

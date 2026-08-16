@@ -5,15 +5,25 @@ from __future__ import annotations
 import hashlib
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
+from smart_rag_core.ingestion.parser.sandbox import launcher as sandbox_launcher
 from smart_rag_core.ingestion.parser.sandbox.launcher import (
     ParserSandboxLauncher,
     SandboxLaunchConfig,
-    _docker_available,
 )
 from smart_rag_core.ingestion.parser.types import ParseDisposition
+
+from tests.contract.integration_support import typed_module_attr
+
+docker_available = typed_module_attr(
+    sandbox_launcher,
+    "_docker_available",
+    cast("Callable[[], bool]", None),
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPO_ROOT / "infra" / "parser-sandbox" / "Dockerfile"
@@ -37,7 +47,7 @@ def test_compose_parser_service_not_on_egress() -> None:
     assert "egress" not in compose.split("parser-sandbox:")[1].split("frontend:")[0]
 
 
-@pytest.mark.skipif(not _docker_available(), reason="Docker unavailable")
+@pytest.mark.skipif(not docker_available(), reason="Docker unavailable")
 def test_docker_run_uses_network_none() -> None:
     """Sandbox launcher constructs docker run with --network none."""
 
@@ -70,7 +80,7 @@ def test_docker_run_uses_network_none() -> None:
     assert result.disposition in {ParseDisposition.SUPPORTED, ParseDisposition.FAILED}
 
 
-@pytest.mark.skipif(not _docker_available(), reason="Docker unavailable")
+@pytest.mark.skipif(not docker_available(), reason="Docker unavailable")
 def test_sandbox_ocr_scanned_pdf_emits_searchable_text() -> None:
     """Rebuilt parser sandbox image OCRs the image-only scanned PDF fixture."""
 
@@ -106,7 +116,7 @@ def test_sandbox_ocr_scanned_pdf_emits_searchable_text() -> None:
     assert result.resource_metrics.ocr_pages >= 1
 
 
-def test_sandbox_escape_fixture_rejected_inprocess(tmp_path) -> None:
+def test_sandbox_escape_fixture_rejected_inprocess(tmp_path: Path) -> None:
     """Path traversal filename does not escape temp directory."""
 
     launcher = ParserSandboxLauncher(

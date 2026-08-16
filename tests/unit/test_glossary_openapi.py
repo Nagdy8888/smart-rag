@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-from smart_rag_api.main import create_app
+
+from tests.unit.typed_openapi import (
+    as_openapi_client,
+    json_object,
+    openapi_test_client,
+)
 
 
 def test_glossary_routes_are_registered() -> None:
     """Glossary import, approve, and rollback appear in OpenAPI."""
 
-    with TestClient(create_app()) as client:
-        schema = client.get("/openapi.json").json()
-    paths = schema.get("paths", {})
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
+        schema = json_object(client.get("/openapi.json").json())
+    paths = json_object(schema.get("paths", {}))
     assert "/admin/glossary/imports" in paths
     assert "/admin/glossary/imports/{import_id}/approve" in paths
     assert "/admin/glossary/imports/{import_id}/rollback" in paths
@@ -22,7 +27,8 @@ def test_member_cannot_import_glossary(monkeypatch: pytest.MonkeyPatch) -> None:
     """Members cannot seed the private glossary."""
 
     monkeypatch.setenv("APP_ENV", "test")
-    with TestClient(create_app()) as client:
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
         response = client.post(
             "/admin/glossary/imports",
             json={
@@ -45,14 +51,15 @@ def test_member_cannot_import_glossary(monkeypatch: pytest.MonkeyPatch) -> None:
             },
         )
     assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
+    assert json_object(response.json())["detail"] == "forbidden"
 
 
 def test_viewer_cannot_approve_glossary(monkeypatch: pytest.MonkeyPatch) -> None:
     """Viewers cannot approve glossary imports."""
 
     monkeypatch.setenv("APP_ENV", "test")
-    with TestClient(create_app()) as client:
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
         response = client.post(
             "/admin/glossary/imports/00000000-0000-4000-8000-000000000099/approve",
             headers={
@@ -62,4 +69,4 @@ def test_viewer_cannot_approve_glossary(monkeypatch: pytest.MonkeyPatch) -> None
             },
         )
     assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
+    assert json_object(response.json())["detail"] == "forbidden"

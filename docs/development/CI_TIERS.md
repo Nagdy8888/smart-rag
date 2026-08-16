@@ -8,22 +8,61 @@ audience: engineering
 
 # CI tiers
 
-| Tier | Workflow | Phase 1 behavior |
-| --- | --- | --- |
-| PR fast | `.github/workflows/pr-fast.yml` | full-history Gitleaks, locked installs, Python/Node dependency audits, plan integrity, `check.py --tier fast`, OpenAPI, and migration policy |
-| Main | `.github/workflows/main.yml` | unit/contract tiers and Compose configuration validation |
-| Nightly | `.github/workflows/nightly.yml` | full fast tier plus OpenAPI and migration policy |
+GitHub PR and nightly callers run reusable jobs in parallel. They do **not**
+run `check.py --tier fast` as one job. Each caller only `uses:` a child
+workflow. There is no `needs:` graph.
 
-The fast tier still includes `types`. That command is a real
-`python -m pyright` run plus the error-count ratchet in
-[QUALITY_COMMANDS.md](./QUALITY_COMMANDS.md). As of 2026-08-16 the local
-full-repo count is **882** errors, so `types` is expected to fail until the
-debt is paid. See [PYRIGHT_BASELINE.md](./PYRIGHT_BASELINE.md). A workflow
-file is not remote execution evidence.
+Parallel PR/nightly jobs: `preflight`, `format-lint`, `types`, `unit`,
+`contract`, `docs-frontend`, `openapi-migrations`. Main runs `unit`,
+`contract`, and `compose`. Local `uv run python scripts/check.py --tier fast`
+still includes `types`. Types is a real `python -m pyright` run. Local
+full-repo Pyright is **0** errors as of 2026-08-16; see
+[PYRIGHT_BASELINE.md](./PYRIGHT_BASELINE.md). A red `types` job is not a
+pass. Remote GitHub conclusion remains unverified until a run URL is
+recorded.
+
+| Tier | Workflow | GitHub jobs |
+| --- | --- | --- |
+| PR fast | `.github/workflows/pr-fast.yml` | `preflight`, `format-lint`, `types`, `unit`, `contract`, `docs-frontend`, `openapi-migrations` |
+| Main | `.github/workflows/main.yml` | `unit`, `contract`, `compose` |
+| Nightly | `.github/workflows/nightly.yml` | same parallel reusable jobs as PR fast |
+
+`FAST_TIERS` in `scripts/check.py` remains `format`, `lint`, `types`,
+`unit`, `contract`, `docs`, `frontend`. GitHub maps `format`+`lint` to
+`format-lint` and `docs`+`frontend` to `docs-frontend`, then adds
+`preflight` and `openapi-migrations`. See
+[QUALITY_COMMANDS.md](./QUALITY_COMMANDS.md).
+
+```mermaid
+flowchart TD
+  trigger["PR or push to main"]
+  preflight["preflight"]
+  formatLint["format-lint"]
+  types["types"]
+  unit["unit"]
+  contract["contract"]
+  docsFrontend["docs-frontend"]
+  openapiMigrations["openapi-migrations"]
+  trigger --> preflight
+  trigger --> formatLint
+  trigger --> types
+  trigger --> unit
+  trigger --> contract
+  trigger --> docsFrontend
+  trigger --> openapiMigrations
+```
+
+As of 2026-08-16 the local full-repo Pyright count is **0** errors, so
+`types` is expected to exit 0 locally. See
+[PYRIGHT_BASELINE.md](./PYRIGHT_BASELINE.md). A workflow file is not remote
+execution evidence.
 
 **Future (not fake-green):** Supabase reset/RLS, LightRAG, retrieval evals, load, restore — Phases 2–10.
 
-Actions are pinned by commit SHA. The workflows use `permissions: contents: read`; the secret scanner disables PR comments and artifact upload. A local workflow definition is not remote execution evidence, so a GitHub run URL and conclusion must be recorded separately.
+Actions are pinned by commit SHA. The caller workflows use
+`permissions: contents: read`; the secret scanner disables PR comments and
+artifact upload. A local workflow definition is not remote execution
+evidence, so a GitHub run URL and conclusion must be recorded separately.
 
 GitHub-hosted Ubuntu runners block the Chromium sandbox required by Mermaid
 CLI. After the locked Node install, PR and nightly jobs use the pinned Puppeteer

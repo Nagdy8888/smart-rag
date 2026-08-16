@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
+from contextlib import AbstractContextManager
+from typing import Protocol, cast, runtime_checkable
 from uuid import UUID, uuid4
 
 import pytest
@@ -13,6 +16,7 @@ from smart_rag_core.gateways.embedding import (
     MockEmbeddingAdapter,
 )
 from smart_rag_core.query_profile.profiler import profile_query_sync
+from smart_rag_core.retrieval import hybrid_run as hybrid_run_mod
 from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     heading_inventory_from_contexts,
@@ -44,7 +48,80 @@ from smart_rag_core.retrieval.types import (
 )
 from smart_rag_core.security.identity import CallerContext, UserRole
 
+from tests.unit.typed_attrs import module_attr
+
 BM25_SNIPPET = "bm25 snippet must never be cited"
+
+_FlattenFn = Callable[
+    [
+        tuple[tuple[RetrievalCandidate, ...], ...],
+        tuple[RetrievalCandidate, ...],
+        tuple[tuple[RetrievalCandidate, ...], ...],
+    ],
+    tuple[RetrievalCandidate, ...],
+]
+
+
+@runtime_checkable
+class _ConnectionContext(Protocol):
+    """Context manager returned by HybridRetriever channel DSN open."""
+
+    def __enter__(self) -> object:
+        """Enter the connection context."""
+        ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: object,
+    ) -> bool | None:
+        """Exit the connection context."""
+        ...
+
+
+def _flatten_channel_candidates(
+    dense_lists: tuple[tuple[RetrievalCandidate, ...], ...],
+    bm25_candidates: tuple[RetrievalCandidate, ...],
+    term_lists: tuple[tuple[RetrievalCandidate, ...], ...],
+) -> tuple[RetrievalCandidate, ...]:
+    """Call the Hybrid flatten helper under test.
+
+    Args:
+        dense_lists: Per-variant dense lists.
+        bm25_candidates: Authorized BM25 survivors.
+        term_lists: Per-variant term lists.
+
+    Returns:
+        Deduplicated candidates in first-seen order.
+    """
+
+    flatten = cast(
+        _FlattenFn, module_attr(hybrid_run_mod, "_flatten_channel_candidates")
+    )
+    return flatten(dense_lists, bm25_candidates, term_lists)
+
+
+def _channel_supabase(retriever: HybridRetriever) -> AbstractContextManager[object]:
+    """Open the Hybrid channel-Supabase context manager under test.
+
+    Args:
+        retriever: Retriever constructed with a DSN.
+
+    Returns:
+        Connection context manager.
+
+    Raises:
+        TypeError: If the private opener is missing or not a context manager.
+    """
+
+    opener: object = module_attr(retriever, "_channel_supabase")
+    if not callable(opener):
+        raise TypeError("HybridRetriever._channel_supabase must be callable")
+    manager = opener()
+    if not isinstance(manager, _ConnectionContext):
+        raise TypeError("expected a connection context manager")
+    return manager
 
 
 def _caller(*, disabled: bool = False) -> CallerContext:
@@ -208,8 +285,6 @@ def _retriever(
 
 def test_flatten_channel_candidates_dedupes_first_seen() -> None:
     """Temporal lookup sees each chunk once across dense, BM25, and term."""
-
-    from smart_rag_core.retrieval.hybrid_run import _flatten_channel_candidates
 
     first = _candidate(rank=1)
     second = _candidate(rank=2)
@@ -656,7 +731,7 @@ def test_channel_supabase_opens_dedicated_connection_from_full_dsn(
         ),
         supabase_dsn=dsn,
     )
-    with retriever._channel_supabase() as conn:
+    with _channel_supabase(retriever) as conn:
         assert isinstance(conn, _Conn)
     assert opened == [dsn]
     assert closed == [1]

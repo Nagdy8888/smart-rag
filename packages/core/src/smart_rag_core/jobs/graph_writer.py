@@ -538,6 +538,16 @@ class GraphWriterGuard:
         return UUID(str(row[0]))
 
     def _validate_job_lease(self, job_id: UUID, job_lease_token: str) -> bool:
+        """Return whether this owner still holds an active LightRAG job lease.
+
+        Args:
+            job_id: LightRAG index job identifier.
+            job_lease_token: Opaque lease token presented by the worker.
+
+        Returns:
+            True when ``validate_active_lightrag_lease`` accepts the token.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -549,6 +559,16 @@ class GraphWriterGuard:
         return row is not None and row[0] is True
 
     def _heartbeat_job(self, job_id: UUID, job_lease_token: str) -> bool:
+        """Extend the LightRAG job lease heartbeat for this owner.
+
+        Args:
+            job_id: LightRAG index job identifier.
+            job_lease_token: Opaque lease token presented by the worker.
+
+        Returns:
+            True when the heartbeat RPC accepted the token.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """

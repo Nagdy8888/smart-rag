@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping, Sequence
 from types import SimpleNamespace
+from typing import cast
 from uuid import UUID, uuid4
 
+import psycopg
 import pytest
 from smart_rag_core.ingestion.chunking.normalize import content_hash
 from smart_rag_core.jobs.exceptions import GraphMappingError
 from smart_rag_core.jobs.extraction_policy import ExtractionPolicySnapshot
-from smart_rag_core.jobs.graph_mapping_service import GraphMappingService
+from smart_rag_core.jobs.graph_mapping_service import (
+    GraphMappingService,
+    MappingOutcome,
+)
+from smart_rag_core.jobs.graph_writer import GraphWriterGuard
 from smart_rag_core.jobs.limits import (
     GRAPH_PIPELINE_VERSION,
     MAPPING_SUPPORT_MIN,
@@ -51,6 +58,103 @@ from smart_rag_core.retrieval.types import RetrievalCandidate
 
 VERSION_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 VERSION_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+
+def _mapping_connection() -> psycopg.Connection:
+    """Return a non-connecting stand-in used only for constructor injection.
+
+    Returns:
+        Connection-typed stub. Persist and vendor reads are patched first.
+    """
+
+    return cast(psycopg.Connection, SimpleNamespace())
+
+
+def _empty_entity_rules(_connection: psycopg.Connection) -> tuple[EntityRuleView, ...]:
+    """Return no approved entity rules.
+
+    Args:
+        _connection: Unused mapping connection.
+
+    Returns:
+        Empty rule tuple.
+    """
+
+    del _connection
+    return ()
+
+
+def _english_language(_self: GraphMappingService, _version_id: UUID) -> str:
+    """Return English so coverage gates do not query Postgres.
+
+    Args:
+        _self: Mapping service under test.
+        _version_id: Canonical version.
+
+    Returns:
+        Language code ``en``.
+    """
+
+    del _self, _version_id
+    return "en"
+
+
+def _outcome_from_persist(
+    service: GraphMappingService, **kwargs: object
+) -> MappingOutcome:
+    """Build a mapping outcome from patched persist kwargs.
+
+    Args:
+        service: Mapping service whose call counters are copied.
+        **kwargs: Persist keyword arguments, including ``ready`` and ``reason``.
+
+    Returns:
+        Frozen outcome. Ready follows the persist decision.
+    """
+
+    ready = cast(bool, kwargs["ready"])
+    return MappingOutcome(
+        ready=ready,
+        maps_verified=ready,
+        reason=str(kwargs["reason"]),
+        workspace_state="updating",
+        hybrid_calls=service.counts.hybrid_retrieve,
+        rerank_calls=service.counts.support_rerank,
+        coverage=(),
+    )
+
+
+def _unready_persist(self: GraphMappingService, **kwargs: object) -> MappingOutcome:
+    """Return an unready persist outcome without touching Postgres.
+
+    Args:
+        self: Mapping service whose call counters are copied.
+        **kwargs: Persist keyword arguments. ``reason`` is required.
+
+    Returns:
+        Frozen unready outcome.
+    """
+
+    return MappingOutcome(
+        ready=False,
+        maps_verified=False,
+        reason=str(kwargs["reason"]),
+        workspace_state="updating",
+        hybrid_calls=self.counts.hybrid_retrieve,
+        rerank_calls=self.counts.support_rerank,
+        coverage=(),
+    )
+
+
+def _unused_hybrid(_query: str, _version_id: UUID) -> None:
+    """Attached Hybrid callback that repair must refuse.
+
+    Args:
+        _query: Unused retrieve query.
+        _version_id: Unused version.
+    """
+
+    del _query, _version_id
 
 
 def _passage(
@@ -327,15 +431,25 @@ class _FakeVendor:
         *,
         status: str = "processed",
         file_path: str | None = None,
-        chunks: list[dict[str, object]] | None = None,
-        nodes: list[dict[str, object]] | None = None,
-        edges: list[dict[str, object]] | None = None,
+        chunks: Sequence[Mapping[str, object]] | None = None,
+        nodes: Sequence[Mapping[str, object]] | None = None,
+        edges: Sequence[Mapping[str, object]] | None = None,
     ) -> None:
+        """Bind in-memory vendor catalog rows.
+
+        Args:
+            status: Vendor document status label.
+            file_path: Optional vendor file path.
+            chunks: Vendor chunk rows.
+            nodes: Vendor graph nodes.
+            edges: Vendor graph edges.
+        """
+
         self._status = status
         self._file_path = file_path
-        self._chunks = chunks or []
-        self._nodes = nodes or []
-        self._edges = edges or []
+        self._chunks = list(chunks or ())
+        self._nodes = list(nodes or ())
+        self._edges = list(edges or ())
 
     async def vendor_document_status(self, document_id: str) -> DocumentStatusView:
         """Return the configured vendor status view."""
@@ -351,7 +465,7 @@ class _FakeVendor:
     ) -> list[dict[str, object]]:
         """Return configured vendor chunks."""
 
-        return list(self._chunks)
+        return [dict(row) for row in self._chunks]
 
     async def list_vendor_entity_joins(
         self, **_kwargs: object
@@ -372,14 +486,14 @@ class _FakeVendor:
     ) -> list[dict[str, object]]:
         """Return configured nodes."""
 
-        return list(self._nodes)
+        return [dict(row) for row in self._nodes]
 
     async def list_vendor_graph_edges(
         self, **_kwargs: object
     ) -> list[dict[str, object]]:
         """Return configured edges."""
 
-        return list(self._edges)
+        return [dict(row) for row in self._edges]
 
 
 class _StubWriter:
@@ -398,7 +512,19 @@ class _StubWriter:
         return uuid4()
 
 
-def _stub_extraction_policy(_connection: object) -> ExtractionPolicySnapshot:
+def _mapping_writer() -> GraphWriterGuard:
+    """Return a writer stub that records no Postgres transitions.
+
+    Returns:
+        Writer-typed stub for mapping-service construction.
+    """
+
+    return cast(GraphWriterGuard, _StubWriter())
+
+
+def _stub_extraction_policy(
+    _connection: psycopg.Connection,
+) -> ExtractionPolicySnapshot:
     """Return generation-1 policy so Packet 4 unit tests need no Postgres.
 
     Args:
@@ -420,26 +546,18 @@ def test_processed_only_is_not_graph_ready(monkeypatch: pytest.MonkeyPatch) -> N
     captured: dict[str, object] = {}
 
     def _load_canonicals(
-        _connection: object, *, version_id: UUID
+        _connection: psycopg.Connection, *, version_id: UUID
     ) -> tuple[CanonicalPassage, ...]:
         """Return one canonical that will not match empty vendor chunks."""
 
         del version_id
         return (_passage(text="canonical only"),)
 
-    def _persist(self: GraphMappingService, **kwargs: object) -> object:
+    def _persist(self: GraphMappingService, **kwargs: object) -> MappingOutcome:
         """Capture the Graph Ready decision without touching Postgres."""
 
         captured.update(kwargs)
-        return SimpleNamespace(
-            ready=kwargs["ready"],
-            maps_verified=kwargs["ready"],
-            reason=kwargs["reason"],
-            workspace_state="updating",
-            hybrid_calls=self.counts.hybrid_retrieve,
-            rerank_calls=self.counts.support_rerank,
-            coverage=(),
-        )
+        return _outcome_from_persist(self, **kwargs)
 
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_canonical_passages",
@@ -447,7 +565,7 @@ def test_processed_only_is_not_graph_ready(monkeypatch: pytest.MonkeyPatch) -> N
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_entity_rules",
-        lambda _connection: (),
+        _empty_entity_rules,
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_service.load_extraction_policy",
@@ -457,12 +575,12 @@ def test_processed_only_is_not_graph_ready(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(
         GraphMappingService,
         "_load_version_language",
-        lambda self, _version_id: "en",
+        _english_language,
     )
     service = GraphMappingService(
-        SimpleNamespace(),
+        _mapping_connection(),
         vendor_reader=_FakeVendor(chunks=[]),
-        writer=_StubWriter(),
+        writer=_mapping_writer(),
     )
     outcome = asyncio.run(
         service.map_after_vendor_success(
@@ -512,7 +630,7 @@ def test_unresolved_batch_uses_one_hybrid_and_one_rerank(
         )
 
     def _load_canonicals(
-        _connection: object, *, version_id: UUID
+        _connection: psycopg.Connection, *, version_id: UUID
     ) -> tuple[CanonicalPassage, ...]:
         """Return three canonicals; Hybrid ranks only the first two."""
 
@@ -521,21 +639,13 @@ def test_unresolved_batch_uses_one_hybrid_and_one_rerank(
 
     captured: dict[str, object] = {}
 
-    def _persist(self: GraphMappingService, **kwargs: object) -> object:
+    def _persist(self: GraphMappingService, **kwargs: object) -> MappingOutcome:
         """Capture call counts without Postgres."""
 
         captured["hybrid"] = self.counts.hybrid_retrieve
         captured["rerank"] = self.counts.support_rerank
         captured["ready"] = kwargs["ready"]
-        return SimpleNamespace(
-            ready=False,
-            maps_verified=False,
-            reason=str(kwargs["reason"]),
-            workspace_state="updating",
-            hybrid_calls=self.counts.hybrid_retrieve,
-            rerank_calls=self.counts.support_rerank,
-            coverage=(),
-        )
+        return _unready_persist(self, **kwargs)
 
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_canonical_passages",
@@ -543,7 +653,7 @@ def test_unresolved_batch_uses_one_hybrid_and_one_rerank(
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_entity_rules",
-        lambda _connection: (),
+        _empty_entity_rules,
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_service.load_extraction_policy",
@@ -553,7 +663,7 @@ def test_unresolved_batch_uses_one_hybrid_and_one_rerank(
     monkeypatch.setattr(
         GraphMappingService,
         "_load_version_language",
-        lambda self, _version_id: "en",
+        _english_language,
     )
     vendor_chunk = {
         "id": "vc-1",
@@ -591,9 +701,9 @@ def test_unresolved_batch_uses_one_hybrid_and_one_rerank(
         },
     ]
     service = GraphMappingService(
-        SimpleNamespace(),
+        _mapping_connection(),
         vendor_reader=_FakeVendor(chunks=[vendor_chunk], nodes=nodes, edges=edges),
-        writer=_StubWriter(),
+        writer=_mapping_writer(),
         hybrid_retrieve=hybrid,
         support_rerank=rerank,
     )
@@ -636,7 +746,7 @@ def test_empty_hybrid_skips_support_rerank(
         return ()
 
     def _load_canonicals(
-        _connection: object, *, version_id: UUID
+        _connection: psycopg.Connection, *, version_id: UUID
     ) -> tuple[CanonicalPassage, ...]:
         """Return two canonicals that must not be reranked after empty Hybrid."""
 
@@ -652,7 +762,7 @@ def test_empty_hybrid_skips_support_rerank(
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_entity_rules",
-        lambda _connection: (),
+        _empty_entity_rules,
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_service.load_extraction_policy",
@@ -661,20 +771,12 @@ def test_empty_hybrid_skips_support_rerank(
     monkeypatch.setattr(
         GraphMappingService,
         "_persist",
-        lambda self, **kwargs: SimpleNamespace(
-            ready=False,
-            maps_verified=False,
-            reason=str(kwargs["reason"]),
-            workspace_state="updating",
-            hybrid_calls=self.counts.hybrid_retrieve,
-            rerank_calls=self.counts.support_rerank,
-            coverage=(),
-        ),
+        _unready_persist,
     )
     monkeypatch.setattr(
         GraphMappingService,
         "_load_version_language",
-        lambda self, _version_id: "en",
+        _english_language,
     )
     vendor_chunk = {
         "id": "vc-1",
@@ -682,9 +784,9 @@ def test_empty_hybrid_skips_support_rerank(
         "content": body,
     }
     service = GraphMappingService(
-        SimpleNamespace(),
+        _mapping_connection(),
         vendor_reader=_FakeVendor(chunks=[vendor_chunk]),
-        writer=_StubWriter(),
+        writer=_mapping_writer(),
         hybrid_retrieve=hybrid,
         support_rerank=rerank,
     )
@@ -724,7 +826,7 @@ def test_single_hybrid_ranked_id_skips_support_rerank(
         return ()
 
     def _load_canonicals(
-        _connection: object, *, version_id: UUID
+        _connection: psycopg.Connection, *, version_id: UUID
     ) -> tuple[CanonicalPassage, ...]:
         """Return two canonicals so a full-pool fallback would be legal."""
 
@@ -737,7 +839,7 @@ def test_single_hybrid_ranked_id_skips_support_rerank(
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_entity_rules",
-        lambda _connection: (),
+        _empty_entity_rules,
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_service.load_extraction_policy",
@@ -746,20 +848,12 @@ def test_single_hybrid_ranked_id_skips_support_rerank(
     monkeypatch.setattr(
         GraphMappingService,
         "_persist",
-        lambda self, **kwargs: SimpleNamespace(
-            ready=False,
-            maps_verified=False,
-            reason=str(kwargs["reason"]),
-            workspace_state="updating",
-            hybrid_calls=self.counts.hybrid_retrieve,
-            rerank_calls=self.counts.support_rerank,
-            coverage=(),
-        ),
+        _unready_persist,
     )
     monkeypatch.setattr(
         GraphMappingService,
         "_load_version_language",
-        lambda self, _version_id: "en",
+        _english_language,
     )
     vendor_chunk = {
         "id": "vc-1",
@@ -767,9 +861,9 @@ def test_single_hybrid_ranked_id_skips_support_rerank(
         "content": body,
     }
     service = GraphMappingService(
-        SimpleNamespace(),
+        _mapping_connection(),
         vendor_reader=_FakeVendor(chunks=[vendor_chunk]),
-        writer=_StubWriter(),
+        writer=_mapping_writer(),
         hybrid_retrieve=hybrid,
         support_rerank=rerank,
     )
@@ -798,7 +892,7 @@ def test_hybrid_callback_asyncio_run_does_not_nest(
         return SimpleNamespace(ranked_ids=())
 
     def _load_canonicals(
-        _connection: object, *, version_id: UUID
+        _connection: psycopg.Connection, *, version_id: UUID
     ) -> tuple[CanonicalPassage, ...]:
         """Return one canonical so unresolved mapping still runs Hybrid."""
 
@@ -811,7 +905,7 @@ def test_hybrid_callback_asyncio_run_does_not_nest(
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_entity_rules",
-        lambda _connection: (),
+        _empty_entity_rules,
     )
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_service.load_extraction_policy",
@@ -820,23 +914,15 @@ def test_hybrid_callback_asyncio_run_does_not_nest(
     monkeypatch.setattr(
         GraphMappingService,
         "_persist",
-        lambda self, **kwargs: SimpleNamespace(
-            ready=False,
-            maps_verified=False,
-            reason=str(kwargs["reason"]),
-            workspace_state="updating",
-            hybrid_calls=self.counts.hybrid_retrieve,
-            rerank_calls=self.counts.support_rerank,
-            coverage=(),
-        ),
+        _unready_persist,
     )
     monkeypatch.setattr(
         GraphMappingService,
         "_load_version_language",
-        lambda self, _version_id: "en",
+        _english_language,
     )
     service = GraphMappingService(
-        SimpleNamespace(),
+        _mapping_connection(),
         vendor_reader=_FakeVendor(
             chunks=[
                 {
@@ -846,7 +932,7 @@ def test_hybrid_callback_asyncio_run_does_not_nest(
                 }
             ]
         ),
-        writer=_StubWriter(),
+        writer=_mapping_writer(),
         hybrid_retrieve=hybrid,
     )
     outcome = asyncio.run(
@@ -863,10 +949,10 @@ def test_repair_must_not_query_hybrid() -> None:
     """Repair refuses to run when Hybrid or rerank callbacks are attached."""
 
     service = GraphMappingService(
-        SimpleNamespace(),
+        _mapping_connection(),
         vendor_reader=_FakeVendor(),
-        writer=_StubWriter(),
-        hybrid_retrieve=lambda _query, _version_id: None,
+        writer=_mapping_writer(),
+        hybrid_retrieve=_unused_hybrid,
     )
     with pytest.raises(GraphMappingError, match="repair_must_not_query_hybrid"):
         asyncio.run(

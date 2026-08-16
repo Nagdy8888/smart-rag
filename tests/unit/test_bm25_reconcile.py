@@ -101,7 +101,18 @@ def _service_with_verifier(
     service = Bm25ProjectionService(supabase, MagicMock())
 
     class _Verifier:
+        """Stub BM25 verifier that returns a fixed pass/fail result."""
+
         def verify_version(self, _version_id: object) -> object:
+            """Return a MagicMock whose ``passed`` flag matches the fixture.
+
+            Args:
+                _version_id: Unused document version identifier.
+
+            Returns:
+                Stub verification result with ``passed`` set.
+            """
+
             result = MagicMock()
             result.passed = passed
             return result

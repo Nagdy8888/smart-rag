@@ -302,7 +302,7 @@ def build_crawl_graph() -> IngestionCrawlGraph:
 
 def build_crawl_ingestion_graph(
     *,
-    checkpointer: BaseCheckpointSaver | None = None,
+    checkpointer: BaseCheckpointSaver[str] | None = None,
     interrupt_after: Sequence[str] | None = None,
 ) -> CompiledIngestionCrawlGraph:
     """Compile crawl graph.

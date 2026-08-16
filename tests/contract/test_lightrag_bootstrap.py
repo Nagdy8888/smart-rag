@@ -7,15 +7,14 @@ Live tests skip when local Supabase Postgres is unreachable unless
 from __future__ import annotations
 
 import asyncio
-import os
 from collections.abc import Iterator
 from pathlib import Path
 
 import psycopg
 import pytest
 from pydantic import SecretStr
-from smart_rag_core.gateways.embedding import create_embedding_gateway
-from smart_rag_core.gateways.model import create_model_gateway
+from smart_rag_core.gateways.embedding import EmbeddingGateway, create_embedding_gateway
+from smart_rag_core.gateways.model import ModelGateway, create_model_gateway
 from smart_rag_core.retrieval.graph import (
     DEFAULT_GRAPH_WORKSPACE,
     LIGHTRAG_RUNTIME_ROLE,
@@ -42,6 +41,11 @@ from smart_rag_core.retrieval.lightrag_qualification import (
     reset_process_client_manager,
 )
 from smart_rag_core.settings import SharedSettings
+from smart_rag_core.settings.base import (
+    get_process_environ,
+    pop_process_environ,
+    set_process_environ,
+)
 
 from tests.contract.integration_support import (
     read_process_env,
@@ -98,15 +102,15 @@ def postgres_url() -> Iterator[str]:
 def restore_postgres_env() -> Iterator[None]:
     """Restore ``POSTGRES_*`` keys after each test. Values are not logged."""
 
-    snapshot = {key: os.environ.get(key) for key in _POSTGRES_ENV_KEYS}
+    snapshot = {key: get_process_environ(key) for key in _POSTGRES_ENV_KEYS}
     try:
         yield
     finally:
         for key, value in snapshot.items():
             if value is None:
-                os.environ.pop(key, None)
+                pop_process_environ(key)
             else:
-                os.environ[key] = value
+                set_process_environ(key, value)
 
 
 @pytest.fixture(autouse=True)
@@ -127,7 +131,7 @@ def forbid_runtime_pipmaster_install(monkeypatch: pytest.MonkeyPatch) -> None:
         return
 
 
-def _gateways() -> tuple[object, object]:
+def _gateways() -> tuple[EmbeddingGateway, ModelGateway]:
     """Return mock embedding and model gateways."""
 
     settings = SharedSettings(mock_model_mode=True)

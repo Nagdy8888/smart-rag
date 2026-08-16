@@ -152,6 +152,14 @@ class CrawlRepository:
         policy_version: str,
         event: CrawlFetchProvenance,
     ) -> None:
+        """Persist one fetch-event row for a crawl run.
+
+        Args:
+            crawl_run_id: Parent crawl run identifier.
+            policy_version: Crawl policy version recorded on the event.
+            event: Provenance for the HTTP fetch, including robots metadata.
+        """
+
         robots_payload = None
         if event.robots is not None:
             robots_payload = json.dumps(
@@ -207,6 +215,14 @@ class CrawlRepository:
         source_id: UUID,
         snapshot: WebSnapshotRecord,
     ) -> None:
+        """Persist one web snapshot row for a crawl run.
+
+        Args:
+            crawl_run_id: Parent crawl run identifier.
+            source_id: Document source that owns the snapshot.
+            snapshot: Canonical URL, hashes, and stored object path.
+        """
+
         self.connection.execute(
             """
             INSERT INTO app.web_snapshots (

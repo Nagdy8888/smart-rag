@@ -9,32 +9,18 @@ permissions:
   contents: read
 
 jobs:
-  nightly-fast:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d
-        with:
-          version: "0.11.23"
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with:
-          python-version: "3.11"
-      - uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3
-        with:
-          version: 9.15.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "20"
-          cache: pnpm
-      - run: uv sync --all-packages --group dev --python 3.11 --frozen
-      - run: pnpm install --frozen-lockfile
-      - name: Install Mermaid browser
-        run: pnpm exec puppeteer browsers install chrome-headless-shell
-      - name: Fast tier
-        run: uv run python scripts/check.py --tier fast --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json
-      - name: OpenAPI and migration static checks
-        run: |
-          uv run python scripts/ci/check_openapi.py
-          uv run python scripts/ci/check_migrations.py
-      # Future nightly: Playwright full, retrieval evals, Trivy, backup/restart, live-model opt-in.
+  preflight:
+    uses: ./.github/workflows/job-preflight.yml
+  format-lint:
+    uses: ./.github/workflows/job-format-lint.yml
+  types:
+    uses: ./.github/workflows/job-types.yml
+  unit:
+    uses: ./.github/workflows/job-unit.yml
+  contract:
+    uses: ./.github/workflows/job-contract.yml
+  docs-frontend:
+    uses: ./.github/workflows/job-docs-frontend.yml
+  openapi-migrations:
+    uses: ./.github/workflows/job-openapi-migrations.yml
+  # Future nightly: Playwright full, retrieval evals, Trivy, backup/restart, live-model opt-in.

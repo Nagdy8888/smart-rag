@@ -126,6 +126,12 @@ class Bm25ProjectionVerifier:
         )
 
     def _active_bm25_version(self) -> dict[str, str]:
+        """Load the active BM25 index version row, or the default pins.
+
+        Returns:
+            Mapping with ``normalization_version`` and ``index_schema_version``.
+        """
+
         with self._supabase.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
@@ -148,6 +154,15 @@ class Bm25ProjectionVerifier:
             }
 
     def _fetch_supabase_chunks(self, version_id: UUID) -> list[dict[str, object]]:
+        """Load current representative chunks for one document version.
+
+        Args:
+            version_id: Canonical document version identifier.
+
+        Returns:
+            Chunk rows with id, text, normalized text, and content hash.
+        """
+
         with self._supabase.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
@@ -163,6 +178,15 @@ class Bm25ProjectionVerifier:
             return [dict(row) for row in cursor.fetchall()]
 
     def _parade_content_hash(self, chunk_id: UUID) -> str | None:
+        """Return the ParadeDB content hash for one projected chunk.
+
+        Args:
+            chunk_id: Canonical chunk identifier.
+
+        Returns:
+            Stored hash string, or ``None`` when the row is missing.
+        """
+
         with self._parade.cursor() as cursor:
             cursor.execute(
                 "SELECT content_hash FROM bm25_chunks WHERE chunk_id = %s",

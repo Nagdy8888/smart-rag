@@ -3,23 +3,58 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 import pyarrow as pa
 import pytest
 from smart_rag_core.ingestion.chunking import chunk_parse_result
 from smart_rag_core.ingestion.parser.adapters import parse_file
+from smart_rag_core.ingestion.tables import parquet_io
 from smart_rag_core.ingestion.tables.duckdb_sandbox import (
     DuckdbSandbox,
     DuckdbSandboxError,
 )
-from smart_rag_core.ingestion.tables.parquet_io import write_parquet_artifact
 from smart_rag_core.ingestion.tables.schema import PROVENANCE_COLUMN, ROW_INDEX_COLUMN
 
 from tests.fixtures.parser import build_csv_fixture
 
 DOCUMENT_ID = uuid.UUID("55555555-5555-4555-8555-555555555555")
 VERSION_ID = uuid.UUID("66666666-6666-4666-8666-666666666666")
+
+
+def _arrow_type(name: str) -> object:
+    """Return one pyarrow dtype by name without relying on untyped stubs.
+
+    Args:
+        name: ``pyarrow`` factory attribute such as ``string``.
+
+    Returns:
+        The constructed dtype object.
+    """
+
+    factory: Callable[[], object] = getattr(pa, name)
+    return factory()
+
+
+def _write_parquet(
+    *,
+    columns: list[tuple[str, object]],
+    rows: list[dict[str, object]],
+) -> bytes:
+    """Write Parquet bytes through the production helper with explicit types.
+
+    Args:
+        columns: Logical column name and dtype pairs.
+        rows: Row dictionaries including provenance fields.
+
+    Returns:
+        In-memory Parquet payload.
+    """
+
+    writer: Callable[..., tuple[object, object]] = parquet_io.write_parquet_artifact
+    payload, _schema = writer(columns=columns, rows=rows)
+    return bytes(payload)
 
 
 def test_duckdb_sandbox_allows_exact_fixture_read(tmp_path: Path) -> None:
@@ -40,8 +75,8 @@ def test_duckdb_sandbox_allows_exact_fixture_read(tmp_path: Path) -> None:
 def test_duckdb_sandbox_blocks_path_traversal_and_mutations(tmp_path: Path) -> None:
     """Sandbox rejects traversal, URLs, ATTACH/COPY, and mutation attempts."""
 
-    payload, _ = write_parquet_artifact(
-        columns=[("name", pa.string())],
+    payload = _write_parquet(
+        columns=[("name", _arrow_type("string"))],
         rows=[
             {
                 "name": "x",

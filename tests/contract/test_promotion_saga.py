@@ -5,11 +5,10 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from dataclasses import replace
-from unittest.mock import MagicMock
 
 import psycopg
 import pytest
-from smart_rag_core.gateways.storage import StorageGateway
+from smart_rag_core.gateways.storage import StorageGateway, StorageObjectMetadata
 from smart_rag_core.ingestion.promotion import (
     PromotionContext,
     PromotionSaga,
@@ -42,14 +41,31 @@ def test_promotion_saga_replays_after_each_crash_point(
     calls: list[str] = []
 
     class _Storage(StorageGateway):
+        """Recording Storage gateway that never contacts the provider."""
+
         def copy_object(self, **kwargs: object) -> None:
+            """Record a copy call without performing Storage I/O."""
+
+            del kwargs
             calls.append("copy")
 
-        def verify_object(self, **kwargs: object) -> object:
+        def verify_object(self, **kwargs: object) -> StorageObjectMetadata:
+            """Record a verify call and return fixture metadata."""
+
+            del kwargs
             calls.append("verify")
-            return MagicMock()
+            return StorageObjectMetadata(
+                bucket="documents-originals",
+                path="documents/x/versions/y/a.txt",
+                byte_size=5,
+                content_hash_sha256="a" * 64,
+                media_type="text/plain",
+            )
 
         def delete_object(self, **kwargs: object) -> None:
+            """Record a delete call without performing Storage I/O."""
+
+            del kwargs
             calls.append("delete")
 
     storage = _Storage(

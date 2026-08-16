@@ -6,7 +6,9 @@ import csv
 import hashlib
 import io
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import fitz
 from docx import Document
@@ -21,6 +23,79 @@ def sha256_bytes(payload: bytes) -> str:
     """Return SHA-256 hex digest."""
 
     return hashlib.sha256(payload).hexdigest()
+
+
+def _call_vendor(
+    obj: object,
+    method: str,
+    *args: object,
+    **kwargs: object,
+) -> object:
+    """Call a named method on an untyped third-party object.
+
+    Args:
+        obj: Vendor instance such as a PyMuPDF document or page.
+        method: Method attribute name.
+        *args: Positional arguments forwarded to the method.
+        **kwargs: Keyword arguments forwarded to the method.
+
+    Returns:
+        The vendor method's return value.
+
+    Raises:
+        AttributeError: If ``obj`` has no attribute named ``method``.
+    """
+
+    caller = cast("Callable[..., object]", getattr(obj, method))
+    return caller(*args, **kwargs)
+
+
+def _vendor_attr(obj: object, name: str) -> object:
+    """Return a named attribute from an untyped third-party object.
+
+    Args:
+        obj: Vendor instance or module.
+        name: Attribute name.
+
+    Returns:
+        Attribute value boxed as ``object``.
+    """
+
+    return cast(object, getattr(obj, name))
+
+
+def _open_pdf(*, stream: bytes | None = None) -> object:
+    """Open a PyMuPDF document for fixture construction.
+
+    Args:
+        stream: Optional PDF bytes. ``None`` opens an empty document.
+
+    Returns:
+        Vendor document boxed as ``object``.
+    """
+
+    if stream is None:
+        return cast(object, fitz.open())
+    return cast(object, fitz.open(stream=stream, filetype="pdf"))
+
+
+def pdf_selectable_text(payload: bytes, page_index: int = 0) -> str:
+    """Return selectable text-layer content for one PDF page.
+
+    Args:
+        payload: PDF bytes.
+        page_index: Zero-based page index.
+
+    Returns:
+        Text extracted from the PDF text layer. Empty for image-only pages.
+    """
+
+    document = _open_pdf(stream=payload)
+    try:
+        page = _call_vendor(document, "__getitem__", page_index)
+        return cast(str, _call_vendor(page, "get_text", "text"))
+    finally:
+        _call_vendor(document, "close")
 
 
 def write_text_fixture(name: str, content: str) -> tuple[Path, str]:
@@ -117,14 +192,14 @@ def build_xlsx_fixture() -> tuple[bytes, str]:
 def build_pdf_text_fixture() -> tuple[bytes, str]:
     """Build simple text PDF with repeated header/footer."""
 
-    document = fitz.open()
+    document = _open_pdf()
     for page_number in range(2):
-        page = document.new_page()
-        page.insert_text((72, 50), "HEADER")
-        page.insert_text((72, 72), f"Body page {page_number + 1}")
-        page.insert_text((72, 750), "FOOTER")
-    payload = document.tobytes()
-    document.close()
+        page = _call_vendor(document, "new_page")
+        _call_vendor(page, "insert_text", (72, 50), "HEADER")
+        _call_vendor(page, "insert_text", (72, 72), f"Body page {page_number + 1}")
+        _call_vendor(page, "insert_text", (72, 750), "FOOTER")
+    payload = cast(bytes, _call_vendor(document, "tobytes"))
+    _call_vendor(document, "close")
     return payload, sha256_bytes(payload)
 
 
@@ -155,30 +230,41 @@ def build_archive_bomb() -> tuple[bytes, str]:
 def build_ocr_scanned_pdf() -> tuple[bytes, str]:
     """Build an image-only scanned PDF with no selectable text layer."""
 
-    source = fitz.open()
-    source_page = source.new_page()
-    source_page.insert_text((72, 120), "Scanned OCR fixture line", fontsize=28)
-    pixmap = source_page.get_pixmap(dpi=150)
-    source.close()
+    source = _open_pdf()
+    source_page = _call_vendor(source, "new_page")
+    _call_vendor(
+        source_page,
+        "insert_text",
+        (72, 120),
+        "Scanned OCR fixture line",
+        fontsize=28,
+    )
+    pixmap = _call_vendor(source_page, "get_pixmap", dpi=150)
+    _call_vendor(source, "close")
 
-    document = fitz.open()
-    page = document.new_page()
-    page.insert_image(page.rect, pixmap=pixmap)
-    payload = document.tobytes()
-    document.close()
+    document = _open_pdf()
+    page = _call_vendor(document, "new_page")
+    _call_vendor(page, "insert_image", _vendor_attr(page, "rect"), pixmap=pixmap)
+    payload = cast(bytes, _call_vendor(document, "tobytes"))
+    _call_vendor(document, "close")
     return payload, sha256_bytes(payload)
 
 
 def build_encrypted_pdf() -> tuple[bytes, str]:
     """Build a password-protected PDF that parsers must reject."""
 
-    document = fitz.open()
-    page = document.new_page()
-    page.insert_text((72, 72), "secret body")
-    payload = document.tobytes(
-        encryption=fitz.PDF_ENCRYPT_AES_256,
-        user_pw="secret",
-        owner_pw="owner",
+    document = _open_pdf()
+    page = _call_vendor(document, "new_page")
+    _call_vendor(page, "insert_text", (72, 72), "secret body")
+    payload = cast(
+        bytes,
+        _call_vendor(
+            document,
+            "tobytes",
+            encryption=cast(int, _vendor_attr(fitz, "PDF_ENCRYPT_AES_256")),
+            user_pw="secret",
+            owner_pw="owner",
+        ),
     )
-    document.close()
+    _call_vendor(document, "close")
     return payload, sha256_bytes(payload)

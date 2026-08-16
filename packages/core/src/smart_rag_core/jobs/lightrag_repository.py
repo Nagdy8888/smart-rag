@@ -317,6 +317,14 @@ class LightragIndexJobRepository:
         error_category: JobErrorCategory,
         last_error: str,
     ) -> None:
+        """Insert one LightRAG job into the shared dead-letter table.
+
+        Args:
+            job: Source LightRAG job row, including payload and attempt count.
+            error_category: Classified failure category.
+            last_error: Operator-visible error detail.
+        """
+
         dead_letter_key = f"dead-letter:{job['id']}:{job.get('attempt_count', 0)}"
         payload = dict(job.get("payload_ref") or {})
         payload["source_status"] = str(job.get("status"))

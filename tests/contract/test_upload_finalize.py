@@ -12,7 +12,7 @@ import pytest
 from tests.contract.integration_support import resolve_supabase_db_url, try_connect
 
 
-def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) -> None:
+def insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) -> None:
     """Insert one minimal auth user."""
 
     cursor.execute(
@@ -38,7 +38,7 @@ def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) ->
     )
 
 
-def _auth_version(cursor: psycopg.Cursor) -> int:
+def read_authorization_version(cursor: psycopg.Cursor) -> int:
     """Return live authorization version."""
 
     cursor.execute("SELECT app.current_authorization_version()")
@@ -71,8 +71,8 @@ def test_finalize_quarantine_upload_idempotent_and_wrong_path_denied(
     content = b"synthetic-fixture"
     digest = hashlib.sha256(content).hexdigest()
     with db_connection.cursor() as cursor:
-        _insert_auth_user(cursor, user_id, f"{user_id}@example.com")
-        _insert_auth_user(cursor, other_id, f"{other_id}@example.com")
+        insert_auth_user(cursor, user_id, f"{user_id}@example.com")
+        insert_auth_user(cursor, other_id, f"{other_id}@example.com")
         cursor.execute(
             """
             INSERT INTO app.profiles (user_id, role, upload_enabled, mfa_enrolled)
@@ -80,7 +80,7 @@ def test_finalize_quarantine_upload_idempotent_and_wrong_path_denied(
             """,
             (user_id, other_id),
         )
-        auth_version = _auth_version(cursor)
+        auth_version = read_authorization_version(cursor)
         cursor.execute("SET ROLE app_api")
         cursor.execute(
             """
@@ -171,7 +171,7 @@ def test_reserve_creates_uploading_version_before_finalize(
 
     user_id = uuid.uuid4()
     with db_connection.cursor() as cursor:
-        _insert_auth_user(cursor, user_id, f"{user_id}@example.com")
+        insert_auth_user(cursor, user_id, f"{user_id}@example.com")
         cursor.execute(
             """
             INSERT INTO app.profiles (user_id, role, upload_enabled, mfa_enrolled)
@@ -179,7 +179,7 @@ def test_reserve_creates_uploading_version_before_finalize(
             """,
             (user_id,),
         )
-        auth_version = _auth_version(cursor)
+        auth_version = read_authorization_version(cursor)
         cursor.execute("SET ROLE app_api")
         cursor.execute(
             """

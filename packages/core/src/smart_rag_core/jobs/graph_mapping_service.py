@@ -12,7 +12,7 @@ import inspect
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 from uuid import UUID
 
 import psycopg
@@ -585,7 +585,8 @@ class GraphMappingService:
         ordered = tuple(
             by_id[chunk_id] for chunk_id in ranked_ids if chunk_id in by_id
         )[:MAX_MAPPING_RERANK_POOL]
-        if len(ordered) < 2 or self._support_rerank is None:
+        support_rerank = self._support_rerank
+        if len(ordered) < 2 or support_rerank is None:
             return
         passages = tuple(
             RerankPassage(
@@ -604,7 +605,7 @@ class GraphMappingService:
         )
         rankings = await _invoke_maybe_threaded(
             lambda: run_support_rerank(
-                self._support_rerank,
+                support_rerank,
                 query=query,
                 passages=passages,
                 counts=self.counts,
@@ -1015,14 +1016,14 @@ def _as_mapping(value: object) -> Mapping[str, object]:
     """
 
     if isinstance(value, Mapping):
-        return value
+        return cast(Mapping[str, object], value)
     if isinstance(value, str):
         try:
             parsed = json.loads(value)
         except json.JSONDecodeError:
             return {}
         if isinstance(parsed, dict):
-            return parsed
+            return cast(dict[str, object], parsed)
     return {}
 
 
@@ -1042,7 +1043,7 @@ def _chunk_ids_payload(value: object) -> tuple[str, ...]:
         except json.JSONDecodeError:
             return ()
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        return tuple(str(item) for item in value if item)
+        return tuple(str(item) for item in cast(Sequence[object], value) if item)
     return ()
 
 

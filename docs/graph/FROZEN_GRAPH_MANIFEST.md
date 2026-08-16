@@ -54,7 +54,7 @@ flowchart TD
 | `chunk_overlap_token_size` | `100` |
 | `chunk_token_size` | `1200` |
 | `cleanup_sla_hours` | `24` |
-| `code_revision_git_sha` | `c546f9c2ff88fc9fd0e710f802fe61b0a9bb9f54` |
+| `code_revision_git_sha` | `52b331f06320a5086e1018c2fa1149abe72a33f8` |
 | `coverage_arabic_mixed_min` | `0.85` |
 | `coverage_overall_min` | `0.90` |
 | `dataset_schema` | `phase4-dataset-v1` |

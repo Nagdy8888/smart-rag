@@ -13,12 +13,29 @@ from smart_rag_core.ingestion.bm25_projection import Bm25ProjectionService
 from smart_rag_core.ingestion.scan import ObjectScanInput, scan_object_bytes
 from smart_rag_core.retrieval.bm25_indexer import Bm25ProjectionRow
 
+from tests.unit.typed_attrs import set_attr
+
 
 def test_storage_download_mid_crash_does_not_scan() -> None:
     """Storage mid-download failure never reaches ClamAV or scan evidence."""
 
     class _Storage:
+        """Storage double that fails before any bytes are returned."""
+
         def download_object(self, *, bucket: str, object_path: str) -> bytes:
+            """Raise StorageGatewayError without returning object bytes.
+
+            Args:
+                bucket: Unused bucket name.
+                object_path: Unused object path.
+
+            Returns:
+                Never returns; always raises.
+
+            Raises:
+                StorageGatewayError: Simulated mid-download crash.
+            """
+
             raise StorageGatewayError("connection reset mid-download")
 
     clamav = MagicMock(spec=ClamAvClient)
@@ -44,7 +61,19 @@ def test_scan_mid_crash_before_scan_event() -> None:
     digest = hashlib.sha256(payload).hexdigest()
 
     class _Storage:
+        """Storage double that returns fixture bytes then lets ClamAV crash."""
+
         def download_object(self, *, bucket: str, object_path: str) -> bytes:
+            """Return the fixture payload for hash comparison.
+
+            Args:
+                bucket: Unused bucket name.
+                object_path: Unused object path.
+
+            Returns:
+                The precomputed fixture bytes.
+            """
+
             return payload
 
     clamav = MagicMock(spec=ClamAvClient)
@@ -100,16 +129,43 @@ def test_bm25_mid_batch_crash_before_verify(monkeypatch: pytest.MonkeyPatch) -> 
     calls = {"upsert": 0, "verify": 0}
 
     class _Indexer:
+        """Indexer that crashes on the second upsert batch."""
+
         def ensure_projection_schema(self) -> None:
+            """No-op schema ensure for the crash-injection fixture."""
+
             return None
 
         def upsert_batch(self, batch: object) -> None:
+            """Increment the upsert counter and fail after the first batch.
+
+            Args:
+                batch: Unused projection batch.
+
+            Raises:
+                RuntimeError: Simulated mid-batch crash on the second call.
+            """
+
             calls["upsert"] += 1
             if calls["upsert"] > 1:
                 raise RuntimeError("bm25 mid-batch crash")
 
     class _Verifier:
+        """Verifier that must never run after a mid-batch crash."""
+
         def verify_version(self, _version_id: object) -> object:
+            """Fail the test if verify is reached after the upsert crash.
+
+            Args:
+                _version_id: Unused document version identifier.
+
+            Returns:
+                Never returns; always raises.
+
+            Raises:
+                AssertionError: Verify ran after a mid-batch crash.
+            """
+
             calls["verify"] += 1
             raise AssertionError("verify must not run after mid-batch crash")
 
@@ -136,14 +192,35 @@ def test_hybrid_ready_flip_blocked_before_bm25_verify() -> None:
     service = Bm25ProjectionService(MagicMock(), MagicMock())
 
     class _Indexer:
+        """Indexer that accepts every upsert without writing Hybrid Ready."""
+
         def ensure_projection_schema(self) -> None:
+            """No-op schema ensure for the failed-verify fixture."""
+
             return None
 
         def upsert_batch(self, _batch: object) -> None:
+            """Accept the batch without persisting a Hybrid Ready flip.
+
+            Args:
+                _batch: Unused projection batch.
+            """
+
             return None
 
     class _FailedVerifier:
+        """Verifier that always reports a failed BM25 check."""
+
         def verify_version(self, _version_id: object) -> object:
+            """Return a stub result with ``passed`` set to False.
+
+            Args:
+                _version_id: Unused document version identifier.
+
+            Returns:
+                MagicMock whose ``passed`` attribute is False.
+            """
+
             result = MagicMock()
             result.passed = False
             return result
@@ -153,6 +230,7 @@ def test_hybrid_ready_flip_blocked_before_bm25_verify() -> None:
     service._load_projection_rows = lambda _vid: [  # type: ignore[method-assign]
         _projection_row(version_id, uuid4())
     ]
-    service._supabase = MagicMock()
+    supabase = MagicMock()
+    set_attr(service, "_supabase", supabase)
     assert service.process_upsert_job(version_id=version_id, job_id=uuid4()) is False
-    service._supabase.cursor.assert_not_called()
+    supabase.cursor.assert_not_called()

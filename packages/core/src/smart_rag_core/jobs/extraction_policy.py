@@ -11,6 +11,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import cast
 
 from smart_rag_core.jobs.limits import GRAPH_PIPELINE_VERSION
 
@@ -129,11 +130,11 @@ def policy_from_row(row: Mapping[str, object]) -> ExtractionPolicySnapshot:
     types_raw = row.get("allowed_entity_types") or DEFAULT_ALLOWED_ENTITY_TYPES
     langs_raw = row.get("allowed_languages") or DEFAULT_ALLOWED_LANGUAGES
     return ExtractionPolicySnapshot(
-        entity_rules_generation=int(row.get("entity_rules_generation") or 1),
+        entity_rules_generation=_as_int(row.get("entity_rules_generation") or 1),
         extraction_policy_hash=str(row.get("extraction_policy_hash") or ""),
-        allowed_entity_types=tuple(str(item) for item in types_raw),
-        allowed_languages=tuple(str(item) for item in langs_raw),
-        entity_extract_max_gleaning=int(
+        allowed_entity_types=_as_str_tuple(types_raw),
+        allowed_languages=_as_str_tuple(langs_raw),
+        entity_extract_max_gleaning=_as_int(
             row.get("entity_extract_max_gleaning")
             or DEFAULT_ENTITY_EXTRACT_MAX_GLEANING
         ),
@@ -142,3 +143,38 @@ def policy_from_row(row: Mapping[str, object]) -> ExtractionPolicySnapshot:
             row.get("relation_label_policy") or DEFAULT_RELATION_LABEL_POLICY
         ),
     )
+
+
+def _as_int(value: object) -> int:
+    """Coerce a policy numeric column to int.
+
+    Args:
+        value: Database number, numeric string, or already an int.
+
+    Returns:
+        Integer form of ``value``.
+    """
+
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        return int(value)
+    return int(str(value))
+
+
+def _as_str_tuple(value: object) -> tuple[str, ...]:
+    """Return string items from a JSON/list column.
+
+    Args:
+        value: Database array, JSON list, or fallback tuple.
+
+    Returns:
+        Tuple of stringified items.
+    """
+
+    items = cast(Sequence[object], value)
+    return tuple(str(item) for item in items)

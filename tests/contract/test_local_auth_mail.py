@@ -116,7 +116,7 @@ def _mail_count(mailpit_url: str, recipient: str) -> int:
     return total
 
 
-def _await_mail(mailpit_url: str, recipient: str) -> None:
+def await_mail(mailpit_url: str, recipient: str) -> None:
     """Wait at most five seconds for local SMTP delivery."""
 
     deadline = time.monotonic() + 5.0
@@ -249,7 +249,7 @@ def test_invitation_and_admin_alert_reach_local_mailpit(
         invited_by=actor_id,
         upload_enabled=True,
     )
-    _await_mail(mailpit_url, recipient)
+    await_mail(mailpit_url, recipient)
 
     with psycopg.connect(postgres_url) as connection:
         metadata_row = connection.execute(
@@ -265,4 +265,4 @@ def test_invitation_and_admin_alert_reach_local_mailpit(
     assert metadata["invitation_token"] == created.raw_token
 
     _send_local_admin_alert(admin_recipient)
-    _await_mail(mailpit_url, admin_recipient)
+    await_mail(mailpit_url, admin_recipient)

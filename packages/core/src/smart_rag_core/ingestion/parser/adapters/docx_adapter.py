@@ -13,7 +13,12 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 
 from smart_rag_core.ingestion.parser.exceptions import ParserLimitExceeded
-from smart_rag_core.ingestion.parser.helpers import build_coverage, element_id
+from smart_rag_core.ingestion.parser.helpers import (
+    build_coverage,
+    element_id,
+    vendor_attr,
+    vendor_items,
+)
 from smart_rag_core.ingestion.parser.limits import (
     CLEANING_POLICY_VERSION,
     DOCX_MAX_BLOCKS,
@@ -36,7 +41,8 @@ def parse_docx(path: Path, content_hash: str, format_key: str) -> ParseResult:
     document = Document(str(path))
     elements: list[TypedElement] = []
     block_index = 0
-    for index, block in enumerate(document.element.body):
+    body = vendor_items(vendor_attr(vendor_attr(document, "element"), "body"))
+    for index, block in enumerate(body):
         if block_index > DOCX_MAX_BLOCKS:
             raise ParserLimitExceeded(
                 "blocks", f"block count exceeds {DOCX_MAX_BLOCKS}"
@@ -47,7 +53,9 @@ def parse_docx(path: Path, content_hash: str, format_key: str) -> ParseResult:
             text = paragraph.text.strip()
             if not text:
                 continue
-            style_name = paragraph.style.name if paragraph.style is not None else ""
+            style = paragraph.style
+            raw_name = style.name if style is not None else ""
+            style_name = raw_name if isinstance(raw_name, str) else ""
             kind = (
                 ElementKind.HEADING
                 if style_name.lower().startswith("heading")
@@ -100,7 +108,7 @@ def parse_docx(path: Path, content_hash: str, format_key: str) -> ParseResult:
                     block_index += 1
 
     elements_tuple = tuple(
-        TypedElement(**element.model_dump() | {"reading_order": index})
+        element.model_copy(update={"reading_order": index})
         for index, element in enumerate(elements)
     )
     config_hash = ParseResult.stable_config_hash(

@@ -5,11 +5,10 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-import pyarrow as pa
-import pyarrow.parquet as pq
-
+from smart_rag_core.ingestion.tables import arrow_facade as arrow
 from smart_rag_core.ingestion.tables.limits import (
     TABLE_ARTIFACT_COMPRESSION,
     TABLE_ARTIFACT_ROW_GROUP_SIZE,
@@ -26,9 +25,9 @@ from smart_rag_core.ingestion.tables.schema import (
 
 def write_parquet_artifact(
     *,
-    columns: list[tuple[str, pa.DataType]],
-    rows: list[dict[str, Any]],
-) -> tuple[bytes, pa.Schema]:
+    columns: Sequence[tuple[str, arrow.ArrowType]],
+    rows: Sequence[Mapping[str, Any]],
+) -> tuple[bytes, arrow.ArrowSchema]:
     """Write one typed Parquet artifact in memory.
 
     Args:
@@ -40,21 +39,21 @@ def write_parquet_artifact(
     """
 
     schema = build_table_schema(columns)
-    arrays: dict[str, pa.Array] = {}
+    arrays: dict[str, arrow.ArrowArray] = {}
     for name, dtype in columns:
-        arrays[name] = pa.array([row.get(name) for row in rows], type=dtype)
-    arrays[ROW_INDEX_COLUMN] = pa.array(
-        [int(row[ROW_INDEX_COLUMN]) for row in rows], type=pa.int64()
+        arrays[name] = arrow.array([row.get(name) for row in rows], dtype=dtype)
+    arrays[ROW_INDEX_COLUMN] = arrow.array(
+        [int(row[ROW_INDEX_COLUMN]) for row in rows], dtype=arrow.int64()
     )
-    arrays[PROVENANCE_COLUMN] = pa.array(
-        [str(row[PROVENANCE_COLUMN]) for row in rows], type=pa.string()
+    arrays[PROVENANCE_COLUMN] = arrow.array(
+        [str(row[PROVENANCE_COLUMN]) for row in rows], dtype=arrow.string()
     )
-    arrays["__schema_version"] = pa.array(
-        [TABLE_ARTIFACT_SCHEMA_VERSION for _ in rows], type=pa.string()
+    arrays["__schema_version"] = arrow.array(
+        [TABLE_ARTIFACT_SCHEMA_VERSION for _ in rows], dtype=arrow.string()
     )
-    table = pa.table(arrays, schema=schema)
+    table = arrow.table(arrays, schema=schema)
     buffer = io.BytesIO()
-    pq.write_table(
+    arrow.write_table(
         table,
         buffer,
         compression=TABLE_ARTIFACT_COMPRESSION,
@@ -65,7 +64,7 @@ def write_parquet_artifact(
     return buffer.getvalue(), schema
 
 
-def read_parquet_artifact(data: bytes) -> pa.Table:
+def read_parquet_artifact(data: bytes) -> arrow.ArrowTable:
     """Read one Parquet artifact without schema coercion.
 
     Args:
@@ -75,7 +74,7 @@ def read_parquet_artifact(data: bytes) -> pa.Table:
         Arrow table preserving stored types.
     """
 
-    return pq.read_table(io.BytesIO(data))
+    return arrow.read_table(data)
 
 
 def parquet_content_hash(data: bytes) -> str:
@@ -84,7 +83,7 @@ def parquet_content_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def provenance_json(payload: dict[str, Any]) -> str:
+def provenance_json(payload: Mapping[str, Any]) -> str:
     """Serialize one row provenance dictionary canonically."""
 
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))

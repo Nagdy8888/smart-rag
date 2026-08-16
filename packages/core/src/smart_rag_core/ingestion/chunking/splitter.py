@@ -71,6 +71,8 @@ def split_prose_segments(
     current_locators: list[dict[str, object]] = []
 
     def flush() -> None:
+        """Append the current token-bounded passage and leave buffers to the caller."""
+
         if not current_parts:
             return
         passages.append(

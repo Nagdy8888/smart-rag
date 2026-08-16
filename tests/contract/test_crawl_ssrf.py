@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import importlib.util
 import threading
+from collections.abc import Callable, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from unittest.mock import patch
+from typing import Protocol, cast
+from unittest.mock import MagicMock, patch
 
 import pytest
-from smart_rag_core.gateways.crawl_proxy import CrawlProxyGateway, ProxyFetchRequest
+from smart_rag_core.gateways.crawl_proxy import (
+    CrawlProxyGateway,
+    ProxyFetchRequest,
+    ProxyFetchResponse,
+)
 from smart_rag_core.ingestion.crawl.adapter import BoundedCrawlAdapter
 from smart_rag_core.ingestion.crawl.exceptions import CrawlPolicyError, CrawlProxyError
 from smart_rag_core.ingestion.crawl.policy import ApprovedCrawlScope, normalize_url
@@ -17,6 +23,8 @@ from smart_rag_core.ingestion.crawl.robots import (
     evaluate_robots,
     require_robots_allowed,
 )
+
+from tests.contract.integration_support import typed_module_attr
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROXY_SERVER = REPO_ROOT / "infra" / "crawl-proxy" / "server.py"
@@ -26,9 +34,13 @@ class _FixtureHandler(BaseHTTPRequestHandler):
     """Local fixture HTTP server for crawl contract tests."""
 
     def log_message(self, format: str, *args: object) -> None:
+        """Suppress default HTTP access logs during contracts."""
+
         return None
 
     def do_GET(self) -> None:
+        """Serve robots, redirect, gzip, and HTML fixture paths."""
+
         if self.path == "/robots.txt":
             body = b"User-agent: *\nDisallow:\n"
             self.send_response(200)
@@ -61,8 +73,19 @@ class _FixtureHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+class CrawlProxyModule(Protocol):
+    """Dynamically loaded crawl-proxy module surface used by contracts."""
+
+    FetchHandler: type[object]
+
+    def execute_fetch(self, payload: dict[str, object]) -> dict[str, object]:
+        """Execute one pinned fetch payload."""
+
+        ...
+
+
 @pytest.fixture
-def fixture_server() -> str:
+def fixture_server() -> Iterator[str]:
     """Start a localhost fixture HTTP server and return its base URL."""
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), _FixtureHandler)
@@ -73,23 +96,44 @@ def fixture_server() -> str:
     server.shutdown()
 
 
-def _load_proxy_module():
+def _load_proxy_module() -> CrawlProxyModule:
+    """Load the crawl-proxy server module from its source path.
+
+    Returns:
+        The loaded module, typed to the fetch contract used by these tests.
+    """
+
     spec = importlib.util.spec_from_file_location("crawl_proxy_server", PROXY_SERVER)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    return cast(CrawlProxyModule, module)
 
 
 class _RecordingProxy:
     """In-process proxy stand-in recording pinned fetch contracts."""
 
-    def __init__(self, module: object) -> None:
+    def __init__(self, module: CrawlProxyModule) -> None:
+        """Bind the loaded proxy module and an empty request log.
+
+        Args:
+            module: Dynamically loaded crawl-proxy module.
+        """
+
         self.module = module
         self.requests: list[dict[str, object]] = []
 
-    def fetch(self, request: ProxyFetchRequest):
-        payload = {
+    def fetch(self, request: ProxyFetchRequest) -> ProxyFetchResponse:
+        """Record one request and execute it through the loaded proxy module.
+
+        Args:
+            request: Pinned fetch contract.
+
+        Returns:
+            Normalized proxy response.
+        """
+
+        payload: dict[str, object] = {
             "url": request.url,
             "method": request.method,
             "host_header": request.host_header,
@@ -105,19 +149,17 @@ class _RecordingProxy:
         result = self.module.execute_fetch(payload)
         import base64
 
-        from smart_rag_core.gateways.crawl_proxy import ProxyFetchResponse
-
-        body = base64.b64decode(result["body_base64"].encode("ascii"))
+        body = base64.b64decode(str(result["body_base64"]).encode("ascii"))
         return ProxyFetchResponse(
-            status_code=int(result["status_code"]),
-            headers=dict(result["headers"]),
+            status_code=int(str(result["status_code"])),
+            headers=cast(dict[str, str], result["headers"]),
             body=body,
-            wire_bytes=int(result["wire_bytes"]),
-            decoded_bytes=int(result["decoded_bytes"]),
+            wire_bytes=int(str(result["wire_bytes"])),
+            decoded_bytes=int(str(result["decoded_bytes"])),
             peer_ip=str(result["peer_ip"]),
-            content_type=result.get("content_type"),
+            content_type=cast(str | None, result.get("content_type")),
             truncated=bool(result.get("truncated", False)),
-            error=result.get("error"),
+            error=cast(str | None, result.get("error")),
         )
 
 
@@ -149,25 +191,28 @@ def test_core_adapter_requires_proxy_gateway() -> None:
 @patch("smart_rag_core.ingestion.crawl.adapter.BoundedCrawlAdapter._fetch_page")
 @patch("smart_rag_core.ingestion.crawl.adapter.BoundedCrawlAdapter._robots_for")
 def test_approved_fixture_crawl_stores_snapshot(
-    mock_robots: object,
-    mock_fetch: object,
+    mock_robots: MagicMock,
+    mock_fetch: MagicMock,
 ) -> None:
     """Approved crawl stores bounded snapshot metadata and provenance."""
 
     from uuid import uuid4
 
-    from smart_rag_core.ingestion.crawl.adapter import (
-        CrawlFetchProvenance,
-        _FetchedPage,
-    )
+    from smart_rag_core.ingestion.crawl import adapter as crawl_adapter
+    from smart_rag_core.ingestion.crawl.adapter import CrawlFetchProvenance
 
+    fetched_page = typed_module_attr(
+        crawl_adapter,
+        "_FetchedPage",
+        cast("Callable[..., object]", None),
+    )
     target = normalize_url("https://example.com/")
     mock_robots.return_value = evaluate_robots(
         "User-agent: *\nDisallow:\n",
         "https://example.com/robots.txt",
         target,
     )
-    mock_fetch.return_value = _FetchedPage(
+    mock_fetch.return_value = fetched_page(
         url=target,
         body=b"<html><head><title>Fixture</title></head><body>ok</body></html>",
         title="Fixture",
@@ -190,7 +235,7 @@ def test_approved_fixture_crawl_stores_snapshot(
 
     module = _load_proxy_module()
     recording = _RecordingProxy(module)
-    adapter = BoundedCrawlAdapter(proxy=recording)  # type: ignore[arg-type]
+    adapter = BoundedCrawlAdapter(proxy=cast(CrawlProxyGateway, recording))
     scope = ApprovedCrawlScope(
         approval_id="a",
         source_id="s",
@@ -233,8 +278,12 @@ def test_proxy_bypass_denied_without_fetch_route() -> None:
 
     module = _load_proxy_module()
 
-    class _Handler(module.FetchHandler):
+    class _Handler:
+        """Stand-in with FetchHandler JSON helpers for POST /fetch."""
+
         def __init__(self) -> None:
+            """Bind the POST /fetch path and an empty JSON body."""
+
             self.path = "/fetch"
             self.headers = {"Content-Length": "2"}
             self.rfile = __import__("io").BytesIO(b"{}")
@@ -242,16 +291,57 @@ def test_proxy_bypass_denied_without_fetch_route() -> None:
             self.status = 0
 
         def send_response(self, code: int, message: str | None = None) -> None:
+            """Record the HTTP status that FetchHandler would send."""
+
+            del message
             self.status = code
 
         def send_header(self, keyword: str, value: str) -> None:
-            return None
+            """Ignore headers; only status is asserted."""
+
+            del keyword, value
 
         def end_headers(self) -> None:
+            """No-op header terminator."""
+
             return None
 
+        def _read_json_body(self) -> dict[str, object]:
+            """Parse the request body using production FetchHandler logic.
+
+            Returns:
+                Decoded JSON object from ``rfile``.
+            """
+
+            read_body = typed_module_attr(
+                module.FetchHandler,
+                "_read_json_body",
+                cast("Callable[[object], dict[str, object]]", None),
+            )
+            return read_body(self)
+
+        def _send_json(self, code: int, payload: dict[str, object]) -> None:
+            """Write status using production FetchHandler JSON helper.
+
+            Args:
+                code: HTTP status.
+                payload: JSON object to encode.
+            """
+
+            send_json = typed_module_attr(
+                module.FetchHandler,
+                "_send_json",
+                cast("Callable[[object, int, dict[str, object]], None]", None),
+            )
+            send_json(self, code, payload)
+
     handler = _Handler()
-    handler.do_POST()
+    do_post = typed_module_attr(
+        module.FetchHandler,
+        "do_POST",
+        cast("Callable[[object], None]", None),
+    )
+    do_post(handler)
     assert handler.status in {400, 502}
 
 
@@ -272,21 +362,46 @@ def test_crawl_proxy_gateway_requires_peer_ip() -> None:
     """Gateway rejects proxy responses missing peer metadata."""
 
     class _Client:
+        """httpx.Client stand-in that omits peer_ip from fetch JSON."""
+
         def __init__(self, *args: object, **kwargs: object) -> None:
-            pass
+            """Ignore constructor arguments used by the real client."""
+
+            del args, kwargs
 
         def __enter__(self) -> _Client:
+            """Return the context-managed client."""
+
             return self
 
         def __exit__(self, *args: object) -> None:
+            """No-op context exit."""
+
+            del args
             return None
 
         def post(self, url: str, json: dict[str, object]) -> object:
+            """Return a 200 JSON body missing peer metadata.
+
+            Args:
+                url: Unused proxy URL.
+                json: Unused fetch payload.
+
+            Returns:
+                Stub response object.
+            """
+
+            del url, json
+
             class _Resp:
+                """Minimal JSON response missing peer_ip."""
+
                 status_code = 200
 
                 @staticmethod
                 def json() -> dict[str, object]:
+                    """Return a proxy payload without peer metadata."""
+
                     return {"status_code": 200, "headers": {}, "body_base64": ""}
 
             return _Resp()

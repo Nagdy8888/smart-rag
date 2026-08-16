@@ -9,22 +9,50 @@ from __future__ import annotations
 
 import base64
 import gzip
+import importlib
 import io
 import json
 import socket
 import ssl
 import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Protocol, cast
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-try:
-    import brotli
-except ImportError:  # pragma: no cover - optional in slim image
-    brotli = None  # type: ignore[assignment]
-
 MAX_HEADER_BLOCK = 32_768
+
+
+class _BrotliModule(Protocol):
+    """Optional Brotli decoder used for ``Content-Encoding: br``."""
+
+    def decompress(self, data: bytes) -> bytes:
+        """Return decompressed Brotli bytes.
+
+        Args:
+            data: Wire bytes labeled ``br``.
+
+        Returns:
+            Decoded payload bytes.
+        """
+        ...
+
+
+def _load_brotli() -> _BrotliModule | None:
+    """Import Brotli when the optional extension is installed.
+
+    Returns:
+        Brotli module when import succeeds; otherwise ``None``.
+    """
+
+    try:
+        loaded = importlib.import_module("brotli")
+    except ImportError:  # pragma: no cover - optional in slim image
+        return None
+    return cast(_BrotliModule, loaded)
+
+
+brotli = _load_brotli()
 
 
 class FetchHandler(BaseHTTPRequestHandler):
@@ -46,7 +74,7 @@ class FetchHandler(BaseHTTPRequestHandler):
         rendered = format % args
         sys_stderr.write(f"{self.address_string()} - {rendered}\n")
 
-    def _send_json(self, code: int, payload: dict[str, Any]) -> None:
+    def _send_json(self, code: int, payload: dict[str, object]) -> None:
         """Write a JSON response."""
 
         body = json.dumps(payload).encode("utf-8")
@@ -56,17 +84,17 @@ class FetchHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _read_json_body(self) -> dict[str, Any]:
+    def _read_json_body(self) -> dict[str, object]:
         """Parse a JSON object request body."""
 
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0:
             raise ValueError("empty body")
         raw = self.rfile.read(length)
-        parsed = json.loads(raw.decode("utf-8"))
+        parsed: object = json.loads(raw.decode("utf-8"))
         if not isinstance(parsed, dict):
             raise ValueError("expected json object")
-        return parsed
+        return cast(dict[str, object], parsed)
 
     def do_GET(self) -> None:
         """Handle health checks and deny every other GET."""
@@ -115,7 +143,7 @@ class FetchError(Exception):
         self.peer_ip = peer_ip
 
 
-def execute_fetch(payload: dict[str, Any]) -> dict[str, Any]:
+def execute_fetch(payload: dict[str, Any]) -> dict[str, object]:
     """Perform one pinned HTTP(S) fetch with bounded decoding.
 
     Args:
@@ -135,9 +163,12 @@ def execute_fetch(payload: dict[str, Any]) -> dict[str, Any]:
     pin_ip = str(payload.get("pin_ip", "")).strip()
     port = int(payload.get("port", 443))
     use_tls = bool(payload.get("use_tls", True))
-    headers = payload.get("headers")
-    if not isinstance(headers, dict):
-        headers = {}
+    headers_raw: object = payload.get("headers")
+    headers: dict[str, str] = {}
+    if isinstance(headers_raw, dict):
+        for raw_key, raw_value in cast(dict[object, object], headers_raw).items():
+            if isinstance(raw_key, str) and isinstance(raw_value, str):
+                headers[raw_key] = raw_value
     max_wire = int(payload.get("max_wire_bytes", 2_097_152))
     max_decoded = int(payload.get("max_decoded_bytes", 5_242_880))
     max_ratio = int(payload.get("max_decompression_ratio", 50))

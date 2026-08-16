@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -36,7 +35,7 @@ from smart_rag_core.evaluation.ranked_ids import (
 )
 from smart_rag_core.evaluation.schema import EvaluationCase
 from smart_rag_core.security.identity import CallerContext, UserRole
-from smart_rag_core.settings import SharedSettings
+from smart_rag_core.settings import SharedSettings, setdefault_process_environ
 from smart_rag_core.tables.builder import compile_table_query
 from smart_rag_core.tables.executor import TableSandboxError, execute_compiled_query
 from smart_rag_core.tables.plan import (
@@ -75,7 +74,7 @@ def _load_repo_env() -> None:
         name = key.strip()
         if not name:
             continue
-        os.environ.setdefault(name, value.strip().strip('"').strip("'"))
+        setdefault_process_environ(name, value.strip().strip('"').strip("'"))
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:

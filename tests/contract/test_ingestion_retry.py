@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from decimal import Decimal
+from typing import cast
 from uuid import uuid4
 
+import httpx
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
@@ -19,6 +21,7 @@ from tests.contract.integration_support import (
     read_process_env,
     resolve_supabase_db_url,
     try_connect,
+    typed_module_attr,
 )
 
 
@@ -58,6 +61,16 @@ def worker_connection() -> Iterator[psycopg.Connection]:
 
 
 def _repository(connection: psycopg.Connection, owner: str) -> IngestionJobRepository:
+    """Build one ingestion job repository bound to ``owner``.
+
+    Args:
+        connection: Open ``app_worker`` connection.
+        owner: Lease owner identifier.
+
+    Returns:
+        Repository using a 120-second lease.
+    """
+
     return IngestionJobRepository(connection, lease_owner=owner, lease_seconds=120)
 
 
@@ -194,7 +207,12 @@ def test_member_retry_route_remains_forbidden(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setenv("APP_ENV", "test")
     with TestClient(create_app()) as client:
-        response = client.post(
+        post = typed_module_attr(
+            client,
+            "post",
+            cast("Callable[..., httpx.Response]", None),
+        )
+        response = post(
             "/ingestion/jobs/00000000-0000-4000-8000-000000000001/retry",
             headers={
                 "X-Test-User-Id": "00000000-0000-4000-8000-000000000002",
@@ -203,4 +221,5 @@ def test_member_retry_route_remains_forbidden(monkeypatch: pytest.MonkeyPatch) -
             },
         )
     assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
+    detail = response.json()["detail"]
+    assert detail == "forbidden"

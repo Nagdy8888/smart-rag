@@ -28,6 +28,18 @@ router = APIRouter(prefix="/ingestion", tags=["ingestion"])
 
 
 def _postgres_url(settings: BackendSettings) -> str:
+    """Return the configured Postgres URL or fail closed as unconfigured.
+
+    Args:
+        settings: Backend settings for this process.
+
+    Returns:
+        Postgres connection URL.
+
+    Raises:
+        HTTPException: When ``supabase_db_url`` is missing (HTTP 503).
+    """
+
     if settings.supabase_db_url is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -2,7 +2,7 @@
 title: Structured-table query contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-16
 audience: engineering, reviewers, security
 phase_packet: Phase 4 Packet 7
 ---
@@ -74,7 +74,7 @@ sequenceDiagram
 | Memory/temp/threads | `64MB` / `32MB` / 1 | DuckDB settings; not a hostile sandbox by themselves |
 | Output | 1000 rows, 1 MiB JSON, 100k scanned-row LIMIT | Packet 7 |
 | Timezone | `SET TimeZone='UTC'` | Packet 7 |
-| POSIX rlimit | `RLIMIT_AS` 512MiB and `RLIMIT_CPU` 4s when `resource` exists | Unverified on Windows |
+| POSIX rlimit | `RLIMIT_AS` 512MiB and `RLIMIT_CPU` 4s (`TABLE_STATEMENT_DEADLINE_SECONDS+1`) on the worker process (`python -m smart_rag_core.tables.sandbox_worker` / `main()`), not the parent API or pytest process | Windows has no `setrlimit` |
 
 DuckDB settings are defense in depth. Isolation is the combination of process
 boundary, catalog hash, exact path equality, Arrow register (no SQL path),
@@ -121,8 +121,9 @@ closed. Timeout is `statement_deadline`.
 - A symlink whose resolved path is not the authorized path fails
   `artifact_path_mismatch`.
 - Hung workers are terminated then killed. The process is discarded.
-- Windows cannot apply POSIX rlimits. Rely on DuckDB memory_limit plus the
-  parent deadline.
+- POSIX rlimits apply only in the worker process (`main()`), not the parent
+  API or in-process pytest payload calls. Windows has no `setrlimit`; rely
+  on DuckDB `memory_limit` plus the parent deadline.
 
 ## Verification
 

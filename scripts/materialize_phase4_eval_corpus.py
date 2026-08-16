@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,7 +31,7 @@ from smart_rag_core.evaluation.materialize import (
     write_sidecar,
 )
 from smart_rag_core.evaluation.schema import EvaluationCase
-from smart_rag_core.settings import SharedSettings
+from smart_rag_core.settings import SharedSettings, setdefault_process_environ
 
 DEFAULT_OUTPUT = _ROOT / "tests" / "fixtures" / "evaluation" / "phase4" / "runtime"
 
@@ -57,7 +56,7 @@ def _load_repo_env() -> None:
         name = key.strip()
         if not name:
             continue
-        os.environ.setdefault(name, value.strip().strip('"').strip("'"))
+        setdefault_process_environ(name, value.strip().strip('"').strip("'"))
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:

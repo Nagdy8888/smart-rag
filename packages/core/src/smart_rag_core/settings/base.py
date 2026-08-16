@@ -257,6 +257,58 @@ def snapshot_process_environ() -> dict[str, str]:
     return dict(os.environ)
 
 
+def get_process_environ(name: str, default: str | None = None) -> str | None:
+    """Return one process environment value from the settings boundary.
+
+    Args:
+        name: Environment variable name.
+        default: Value when ``name`` is unset. ``None`` means missing.
+
+    Returns:
+        The stored value, ``default`` when unset, or ``None``.
+    """
+
+    value = os.environ.get(name, default)
+    if value is None:
+        return None
+    return value
+
+
+def set_process_environ(name: str, value: str) -> None:
+    """Set one process environment value from the settings boundary.
+
+    Args:
+        name: Environment variable name.
+        value: Value to store. Callers must not log secrets.
+    """
+
+    os.environ[name] = value
+
+
+def pop_process_environ(name: str) -> None:
+    """Remove one process environment key when present.
+
+    Args:
+        name: Environment variable name to delete.
+    """
+
+    os.environ.pop(name, None)
+
+
+def setdefault_process_environ(name: str, value: str) -> str:
+    """Set one process environment value only when the key is missing.
+
+    Args:
+        name: Environment variable name.
+        value: Value to store when unset. Callers must not log secrets.
+
+    Returns:
+        The existing value, or ``value`` when the key was missing.
+    """
+
+    return os.environ.setdefault(name, value)
+
+
 SettingsT = TypeVar("SettingsT", bound=BaseSettings)
 
 
