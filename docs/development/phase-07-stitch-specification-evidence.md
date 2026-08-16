@@ -107,3 +107,57 @@ HTTP. Do not mock them.
 
 Delete the new frontend mapping/inventory/test/evidence rows and revert the
 docs-index and thin-UI links.
+
+## Packet 2 — Write copy-ready Stitch prompts, responsive LTR/RTL frames, Arabic/bidirectional behavior, information hierarchy, component inventory, localization decision, and design tokens
+
+### Requirement (quoted)
+
+> Write copy-ready Stitch prompts, responsive LTR/RTL frames,
+> Arabic/bidirectional behavior, information hierarchy, component inventory,
+> localization decision, and design tokens.
+
+### Concrete acceptance checks
+
+- Prompts are copy-ready and cover every canonical surface without mock
+  behavior.
+- LTR/RTL and mobile/desktop frames show equivalent task completion.
+- Localization, direction, logical text-offset, typography, and overflow
+  decisions are unambiguous.
+- Components and tokens are reusable by Stitch references and the fallback
+  system.
+- Blur, Tailwind CDN, invented API fields, and graph-only answering are
+  rejected.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `docs/frontend/STITCH_BRIEF.md` | Created — localization, tokens, prompts, frames, fixtures |
+| `tests/unit/test_phase07_stitch_brief.py` | Created — brief honesty checks |
+| `docs/frontend/API_UI_MAPPING.md` | Linked the brief |
+| `docs/README.md` | Indexed the brief |
+| `.cursor/plans/hybrid-graph-rag/07-phase-stitch-specification.md` | Packet 2 checkbox |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_phase07_stitch_brief.py tests/unit/test_phase07_api_ui_mapping.py -q` | 0 (8 passed) |
+| `uv run ruff check tests/unit/test_phase07_stitch_brief.py` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Localization / token decision
+
+- Chrome: English. Content: `dir="auto"` + bidi isolate. Codes/URLs: `dir="ltr"`.
+- One palette/radius/elevation/type/spacing set. Blur rejected.
+- Arabic chrome blocked on GAP-07-19 (no locale on `GET /me`).
+
+### Negative findings
+
+- Prompts forbid posting a client route (GAP-07-01).
+- XSS filename fixture is specified as escaped text.
+- No DESIGN.md existed; tokens are defined here rather than silently mixed.
+
+### Rollback
+
+Delete `STITCH_BRIEF.md` and the brief unit test; unlink from the index.

@@ -13,7 +13,8 @@ Canonical inventory of **real** Phase 2 Auth and Phase 6 FastAPI/SSE
 contracts for Stitch specification. This document does not invent endpoints,
 fields, or success paths. Unresolved gaps stay named.
 
-Related: [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
+Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
+[THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [api-ui-inventory.json](./api-ui-inventory.json) ·
 [openapi.foundation.json](../api/openapi.foundation.json) ·
 [SSE.md](../api/SSE.md) ·

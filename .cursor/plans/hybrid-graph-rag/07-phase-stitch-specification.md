@@ -40,7 +40,7 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
 1. [x] [Inventory real Phase 6 API, Auth, streaming, route-diagnostic, document, graph, tool, usage, and administration contracts.](./07-phase-stitch-specification/packets/01-inventory-real-phase-6-contracts.md)
-2. [ ] [Write copy-ready Stitch prompts, responsive LTR/RTL frames, Arabic/bidirectional behavior, information hierarchy, component inventory, localization decision, and design tokens.](./07-phase-stitch-specification/packets/02-write-stitch-prompts-and-frames.md)
+2. [x] [Write copy-ready Stitch prompts, responsive LTR/RTL frames, Arabic/bidirectional behavior, information hierarchy, component inventory, localization decision, and design tokens.](./07-phase-stitch-specification/packets/02-write-stitch-prompts-and-frames.md)
 3. [ ] [Specify every loading, empty, error, permission, quarantine, quota, compatibility, limitation, fallback, partial-readiness, budget, and degraded state.](./07-phase-stitch-specification/packets/03-specify-visible-states.md)
 4. [ ] [Map each visible action and field to a real typed API/Auth contract; identify gaps instead of inventing mock behavior.](./07-phase-stitch-specification/packets/04-map-ui-to-real-contracts.md)
 5. [ ] [Review accessibility, RTL keyboard/focus behavior, mobile layouts, mixed-direction citation/highlight interactions, safe text rendering, and security boundaries.](./07-phase-stitch-specification/packets/05-review-accessibility-and-security.md)
