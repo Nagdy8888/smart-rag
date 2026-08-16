@@ -50,8 +50,8 @@ flowchart TD
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `corpus_meta_file` | `671f096066fe86104a0e488512d387edfa0feae2636fa1ffba1f9088b23df6ba` |
-| `holdout_manifest_file` | `f5887ac8704bf4f97eb0e18bdaf76976265d2fed01e22ee4d977ea3a633d0fa6` |
+| `corpus_meta_file` | `887f770355041d65ed6238b1cd1f23ceacf13feadb964e07e5dabedd34399b7e` |
+| `holdout_manifest_file` | `afcd733c02f65d18d2b745933e0b74ca4aec165c6279d651bb2ba6d491a2b052` |
 | `hybrid_default_v1` | `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` |
 | `hybrid_default_v1_file` | `6fddae55bf127828192f93479f5454618ae1e5c71c2970d105ed868806f4aaa4` |
 | `manifest_development` | `9dcbe2c564d33a38fba096253d60d2c8172fb9dd6c76bf95627446c857f89264` |

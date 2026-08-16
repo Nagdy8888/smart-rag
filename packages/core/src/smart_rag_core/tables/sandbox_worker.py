@@ -19,6 +19,7 @@ from smart_rag_core.tables.limits import (
     TABLE_MEMORY_LIMIT,
     TABLE_STATEMENT_DEADLINE_SECONDS,
     TABLE_THREADS,
+    TABLE_WORKER_ADDRESS_SPACE_MIB,
     TIMEZONE,
 )
 
@@ -155,10 +156,11 @@ def _apply_os_limits() -> None:
     not change the parent process.
 
     Windows has no ``resource.setrlimit``. DuckDB ``memory_limit`` plus the
-    parent process deadline remain the Windows bounds. Address space is 512
-    MiB so CPython plus Arrow plus DuckDB can import; DuckDB's own cap stays
-    64MB. CPU soft and hard limits are ``TABLE_STATEMENT_DEADLINE_SECONDS``
-    plus one second.
+    parent process deadline remain the Windows bounds. Address space is
+    ``TABLE_WORKER_ADDRESS_SPACE_MIB`` virtual MiB because Arrow and DuckDB
+    reserve address space far above the 64MB DuckDB ``memory_limit``. CPU
+    soft and hard limits are ``TABLE_STATEMENT_DEADLINE_SECONDS`` plus one
+    second.
     """
 
     try:
@@ -166,7 +168,7 @@ def _apply_os_limits() -> None:
     except ImportError:
         return
     posix = cast(Any, resource)
-    address_bytes = 512 * 1024 * 1024
+    address_bytes = TABLE_WORKER_ADDRESS_SPACE_MIB * 1024 * 1024
     posix.setrlimit(posix.RLIMIT_AS, (address_bytes, address_bytes))
     cpu = int(TABLE_STATEMENT_DEADLINE_SECONDS) + 1
     posix.setrlimit(posix.RLIMIT_CPU, (cpu, cpu))

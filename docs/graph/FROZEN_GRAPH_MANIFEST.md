@@ -86,10 +86,10 @@ flowchart TD
 | Artifact | SHA-256 |
 | --- | --- |
 | `extraction_policy` | `b8719e2481b2f8ed85be76d13e19c092428e92ffdf3d36bcd5e5e9656c65bd08` |
-| `holdout_manifest_ids_only` | `f5887ac8704bf4f97eb0e18bdaf76976265d2fed01e22ee4d977ea3a633d0fa6` |
+| `holdout_manifest_ids_only` | `afcd733c02f65d18d2b745933e0b74ca4aec165c6279d651bb2ba6d491a2b052` |
 | `lightrag_wheel` | `81b8aa8b09c11e446f94b53dbbef8d6becd900a7a44685fca95ff59cf5c8e457` |
-| `manifest_development` | `e0691e5de6b1df4f5999ac38e74dbd151cd816b5ad647b909d7b1afe9826281e` |
-| `manifest_qualification` | `d4f91781bdfe3c333dd1ec77818ead241dbd6b066df824ae8a1fd1238a47d736` |
+| `manifest_development` | `077defdca7e31d7932960b0e57f0e6f96e4d6322a6fdb81c771ae55f793fd2c6` |
+| `manifest_qualification` | `afe1b83648e51a2cb9ff12ea66c9dd6ab5e31309da6dd8b82608ce8b9e329b09` |
 | `schema_fingerprint_v1` | `76f10dcd3b4f64736b5b1d32961f375b4b60f224ea865bd06dfa3e46114977dc` |
 | `workspace_config_generation` | `8222c35ccc95225538d081203d3453eab72ce203500d68b4216cf48e7867a850` |
 

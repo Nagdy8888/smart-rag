@@ -12,7 +12,7 @@ approval_date: "2026-08-12"
 
 ## Decision
 
-Within a major version, OpenAPI fields and SSE events evolve **additively**. Removals/renames require a major bump and staging version-skew proof (Phase 10). Snapshot: `docs/api/openapi.foundation.json` (health plus additive ingestion and glossary routes).
+Within a major version, OpenAPI fields and SSE events evolve **additively**. Removals/renames require a major bump and staging version-skew proof (Phase 10). Snapshot: `docs/api/openapi.foundation.json` (health plus additive ingestion, glossary, graph inspect, and entity-rules routes).
 
 ## Consequences
 

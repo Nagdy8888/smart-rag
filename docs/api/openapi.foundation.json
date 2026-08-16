@@ -277,6 +277,487 @@
         "title": "EnqueueWebsiteCrawlResponse",
         "type": "object"
       },
+      "EntityRuleConcurrencyRequest": {
+        "description": "Optimistic concurrency token for approve or revoke.",
+        "properties": {
+          "row_version": {
+            "minimum": 1.0,
+            "title": "Row Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row_version"
+        ],
+        "title": "EntityRuleConcurrencyRequest",
+        "type": "object"
+      },
+      "EntityRuleListItem": {
+        "description": "One rule row for owner/admin listing.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "alias_scope": {
+            "title": "Alias Scope",
+            "type": "string"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "canonical_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Name"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "display_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Label"
+          },
+          "do_not_merge": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Do Not Merge",
+            "type": "array"
+          },
+          "entity_type": {
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "relation_label_policy": {
+            "title": "Relation Label Policy",
+            "type": "string"
+          },
+          "row_version": {
+            "title": "Row Version",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "admin",
+              "feedback",
+              "model"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "suggested",
+              "approved",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "entity_type",
+          "canonical_name",
+          "display_label",
+          "aliases",
+          "do_not_merge",
+          "languages",
+          "alias_scope",
+          "relation_label_policy",
+          "status",
+          "active",
+          "row_version",
+          "source",
+          "reason",
+          "confidence",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EntityRuleListItem",
+        "type": "object"
+      },
+      "EntityRuleListResponse": {
+        "description": "Owner/admin listing of curated and suggested rules.",
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRuleListItem"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "title": "EntityRuleListResponse",
+        "type": "object"
+      },
+      "EntityRuleMutationResponse": {
+        "description": "Identifiers after a rule mutation. Alias text is omitted.",
+        "properties": {
+          "entity_rules_generation": {
+            "title": "Entity Rules Generation",
+            "type": "integer"
+          },
+          "invalidated": {
+            "default": false,
+            "title": "Invalidated",
+            "type": "boolean"
+          },
+          "rebuild_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rebuild Job Id"
+          },
+          "repair_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repair Job Id"
+          },
+          "row_version": {
+            "title": "Row Version",
+            "type": "integer"
+          },
+          "rule_id": {
+            "format": "uuid",
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "suggested",
+              "approved",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "status",
+          "row_version",
+          "entity_rules_generation"
+        ],
+        "title": "EntityRuleMutationResponse",
+        "type": "object"
+      },
+      "EntityRuleSuggestRequest": {
+        "description": "Inactive feedback or model candidate. Approval is a separate action.",
+        "properties": {
+          "alias_scope": {
+            "default": "company",
+            "enum": [
+              "company",
+              "synthetic_eval"
+            ],
+            "title": "Alias Scope",
+            "type": "string"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Aliases",
+            "type": "array"
+          },
+          "canonical_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Canonical Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_label": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Label"
+          },
+          "do_not_merge": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Do Not Merge",
+            "type": "array"
+          },
+          "entity_type": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Languages",
+            "type": "array"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Reason",
+            "type": "string"
+          },
+          "relation_label_policy": {
+            "default": "directed",
+            "enum": [
+              "directed",
+              "symmetric"
+            ],
+            "title": "Relation Label Policy",
+            "type": "string"
+          },
+          "source": {
+            "default": "feedback",
+            "enum": [
+              "admin",
+              "feedback",
+              "model"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "canonical_name"
+        ],
+        "title": "EntityRuleSuggestRequest",
+        "type": "object"
+      },
+      "EntityRuleUpsertRequest": {
+        "description": "Create or update one entity rule. Members cannot mutate rules.",
+        "properties": {
+          "alias_scope": {
+            "default": "company",
+            "enum": [
+              "company",
+              "synthetic_eval"
+            ],
+            "title": "Alias Scope",
+            "type": "string"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Aliases",
+            "type": "array"
+          },
+          "canonical_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Canonical Name",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "display_label": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Label"
+          },
+          "do_not_merge": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Do Not Merge",
+            "type": "array"
+          },
+          "entity_type": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8,
+            "title": "Languages",
+            "type": "array"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Reason",
+            "type": "string"
+          },
+          "relation_label_policy": {
+            "default": "directed",
+            "enum": [
+              "directed",
+              "symmetric"
+            ],
+            "title": "Relation Label Policy",
+            "type": "string"
+          },
+          "row_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Version"
+          },
+          "source": {
+            "default": "admin",
+            "enum": [
+              "admin",
+              "feedback",
+              "model"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "default": "approved",
+            "enum": [
+              "suggested",
+              "approved",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "canonical_name"
+        ],
+        "title": "EntityRuleUpsertRequest",
+        "type": "object"
+      },
       "GlossaryAliasRequest": {
         "description": "One alias in an import request.",
         "properties": {
@@ -456,6 +937,240 @@
           }
         },
         "title": "GraphHandoffDiagnostics",
+        "type": "object"
+      },
+      "GraphInspectLimitation": {
+        "description": "Typed inspection limitation without restricted names.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "GraphInspectLimitation",
+        "type": "object"
+      },
+      "GraphInspectLocator": {
+        "description": "Canonical locator coordinates. Never vendor chunk text.",
+        "properties": {
+          "chunk_id": {
+            "format": "uuid",
+            "title": "Chunk Id",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "range_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Range Ref"
+          },
+          "section_path": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Section Path",
+            "type": "array"
+          },
+          "sheet_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet Name"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chunk_id",
+          "document_id",
+          "version_id"
+        ],
+        "title": "GraphInspectLocator",
+        "type": "object"
+      },
+      "GraphInspectNodeResponse": {
+        "description": "One authorized inspection row.",
+        "properties": {
+          "chunk_id": {
+            "format": "uuid",
+            "title": "Chunk Id",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "hop": {
+            "title": "Hop",
+            "type": "integer"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "title": "Object Type",
+            "type": "string"
+          },
+          "support": {
+            "title": "Support",
+            "type": "number"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "object_type",
+          "object_id",
+          "chunk_id",
+          "document_id",
+          "version_id",
+          "support",
+          "hop"
+        ],
+        "title": "GraphInspectNodeResponse",
+        "type": "object"
+      },
+      "GraphInspectRequest": {
+        "additionalProperties": false,
+        "description": "Bounded inspection request. Native graph prose is not accepted.\n\nAttributes:\n    entity_keys: Application entity keys, at most 12.\n    document_id: Optional document seed. Results stay ACL-filtered.\n    depth: Hop cap, default 3, maximum 3.",
+        "properties": {
+          "depth": {
+            "default": 3,
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Depth",
+            "type": "integer"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "entity_keys": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Entity Keys",
+            "type": "array"
+          }
+        },
+        "title": "GraphInspectRequest",
+        "type": "object"
+      },
+      "GraphInspectResponse": {
+        "description": "Inspection payload. At most 200 rows.",
+        "properties": {
+          "depth": {
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Depth",
+            "type": "integer"
+          },
+          "limitations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/GraphInspectLimitation"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "locators": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/GraphInspectLocator"
+            },
+            "title": "Locators",
+            "type": "array"
+          },
+          "nodes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/GraphInspectNodeResponse"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "row_count": {
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Row Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row_count",
+          "depth"
+        ],
+        "title": "GraphInspectResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1342,6 +2057,780 @@
         "summary": "Rollback Glossary Import Route",
         "tags": [
           "glossary"
+        ]
+      }
+    },
+    "/admin/graph/entity-rules": {
+      "get": {
+        "description": "List curated and suggested entity rules. Members receive 403.\n\nArgs:\n    request: FastAPI request with backend settings.\n    caller: Authenticated caller context.\n\nReturns:\n    Rule listing. Native LightRAG names are not copied into Hybrid aliases.\n\nRaises:\n    HTTPException: 403 for members/viewers, 503 when unconfigured.",
+        "operationId": "list_entity_rules_route_admin_graph_entity_rules_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityRuleListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Entity Rules Route",
+        "tags": [
+          "graph-entity-rules"
+        ]
+      },
+      "post": {
+        "description": "Create an approved admin rule or a typed draft. Members receive 403.\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Rule payload. Feedback/model sources cannot be auto-approved.\n    caller: Authenticated caller context.\n\nReturns:\n    Mutation identifiers. Approved writes schedule rebuild isolation.\n\nRaises:\n    HTTPException: 403 for members/viewers, 400 for validation.",
+        "operationId": "create_entity_rule_route_admin_graph_entity_rules_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityRuleUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityRuleMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Entity Rule Route",
+        "tags": [
+          "graph-entity-rules"
+        ]
+      }
+    },
+    "/admin/graph/entity-rules/suggestions": {
+      "post": {
+        "description": "Store an inactive feedback/model suggestion. Never auto-approves.\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Suggestion payload with provenance/confidence.\n    caller: Authenticated caller context.\n\nReturns:\n    Identifiers with ``invalidated=false``.\n\nRaises:\n    HTTPException: 403 for members/viewers, 400 for validation.",
+        "operationId": "suggest_entity_rule_route_admin_graph_entity_rules_suggestions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityRuleSuggestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityRuleMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suggest Entity Rule Route",
+        "tags": [
+          "graph-entity-rules"
+        ]
+      }
+    },
+    "/admin/graph/entity-rules/{rule_id}": {
+      "patch": {
+        "description": "Update one rule with optimistic concurrency. Members receive 403.\n\nArgs:\n    request: FastAPI request with backend settings.\n    rule_id: Existing rule identifier.\n    body: Updated payload including ``row_version``.\n    caller: Authenticated caller context.\n\nReturns:\n    Mutation identifiers.\n\nRaises:\n    HTTPException: 403, 409 for stale versions, 400 for validation.",
+        "operationId": "update_entity_rule_route_admin_graph_entity_rules__rule_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityRuleUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityRuleMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Entity Rule Route",
+        "tags": [
+          "graph-entity-rules"
+        ]
+      }
+    },
+    "/admin/graph/entity-rules/{rule_id}/approve": {
+      "post": {
+        "description": "Explicitly approve a suggestion and schedule a clean rebuild.\n\nArgs:\n    request: FastAPI request with backend settings.\n    rule_id: Suggestion identifier.\n    body: Expected ``row_version``.\n    caller: Authenticated caller context.\n\nReturns:\n    Mutation identifiers with invalidation/rebuild job ids.\n\nRaises:\n    HTTPException: 403, 409, or 400.",
+        "operationId": "approve_entity_rule_route_admin_graph_entity_rules__rule_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityRuleConcurrencyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityRuleMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Entity Rule Route",
+        "tags": [
+          "graph-entity-rules"
+        ]
+      }
+    },
+    "/admin/graph/entity-rules/{rule_id}/revoke": {
+      "post": {
+        "description": "Revoke a rule. Approved revocations invalidate maps.\n\nArgs:\n    request: FastAPI request with backend settings.\n    rule_id: Rule identifier.\n    body: Expected ``row_version``.\n    caller: Authenticated caller context.\n\nReturns:\n    Mutation identifiers.\n\nRaises:\n    HTTPException: 403, 409, or 400.",
+        "operationId": "revoke_entity_rule_route_admin_graph_entity_rules__rule_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rule Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityRuleConcurrencyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityRuleMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Entity Rule Route",
+        "tags": [
+          "graph-entity-rules"
+        ]
+      }
+    },
+    "/graph/inspect": {
+      "post": {
+        "description": "Inspect authorized graph objects. Members and viewers are ACL-filtered.\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Seed entity keys and/or document id, depth at most 3.\n    caller: Authenticated caller context.\n\nReturns:\n    At most 200 rows and canonical locators. Native prose is omitted.\n\nRaises:\n    HTTPException: 401 via identity dependency, 400 for seed/deadline,\n        503 when the database URL is unset.",
+        "operationId": "inspect_graph_route_graph_inspect_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphInspectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphInspectResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect Graph Route",
+        "tags": [
+          "graph"
         ]
       }
     },

@@ -35,6 +35,12 @@ def main() -> int:
         "/admin/glossary/imports",
         "/admin/glossary/imports/{import_id}/approve",
         "/admin/glossary/imports/{import_id}/rollback",
+        "/admin/graph/entity-rules",
+        "/admin/graph/entity-rules/suggestions",
+        "/admin/graph/entity-rules/{rule_id}",
+        "/admin/graph/entity-rules/{rule_id}/approve",
+        "/admin/graph/entity-rules/{rule_id}/revoke",
+        "/graph/inspect",
     }
     unexpected = [path for path in paths if path not in allowed]
     if unexpected:

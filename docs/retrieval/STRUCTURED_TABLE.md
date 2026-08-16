@@ -74,7 +74,7 @@ sequenceDiagram
 | Memory/temp/threads | `64MB` / `32MB` / 1 | DuckDB settings; not a hostile sandbox by themselves |
 | Output | 1000 rows, 1 MiB JSON, 100k scanned-row LIMIT | Packet 7 |
 | Timezone | `SET TimeZone='UTC'` | Packet 7 |
-| POSIX rlimit | `RLIMIT_AS` 512MiB and `RLIMIT_CPU` 4s (`TABLE_STATEMENT_DEADLINE_SECONDS+1`) on the worker process (`python -m smart_rag_core.tables.sandbox_worker` / `main()`), not the parent API or pytest process | Windows has no `setrlimit` |
+| POSIX rlimit | `RLIMIT_AS` 2048MiB virtual (`TABLE_WORKER_ADDRESS_SPACE_MIB`) and `RLIMIT_CPU` 4s (`TABLE_STATEMENT_DEADLINE_SECONDS+1`) on the worker process (`python -m smart_rag_core.tables.sandbox_worker` / `main()`), not the parent API or pytest process | 512MiB VAS is below Arrow/DuckDB library maps; DuckDB `memory_limit` stays 64MB. Windows has no `setrlimit` |
 
 DuckDB settings are defense in depth. Isolation is the combination of process
 boundary, catalog hash, exact path equality, Arrow register (no SQL path),

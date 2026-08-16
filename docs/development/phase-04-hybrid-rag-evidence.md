@@ -850,7 +850,7 @@ No public HTTP route. Phase 6 owns API/SSE.
 | DuckDB memory / temp / threads | 64MB / 32MB / 1 |
 | Output rows / bytes / scanned LIMIT | 1000 / 1 MiB / 100000 |
 | Timezone | UTC |
-| POSIX `RLIMIT_AS` / `RLIMIT_CPU` | 512MiB / 4s when `resource` exists; unverified on Windows |
+| POSIX `RLIMIT_AS` / `RLIMIT_CPU` | 2048MiB virtual / 4s when `resource` exists; unverified on Windows. 512MiB VAS is below Arrow/DuckDB maps; DuckDB `memory_limit` stays 64MB |
 
 ### Commands
 

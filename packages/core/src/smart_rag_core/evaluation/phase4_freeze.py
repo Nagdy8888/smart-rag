@@ -189,7 +189,10 @@ class Phase4FreezeReport(BaseModel):
 
 
 def sha256_file(path: Path) -> str:
-    """Return the SHA-256 hex digest of a file's bytes.
+    """Return the SHA-256 hex digest of git-style LF file bytes.
+
+    Windows ``core.autocrlf`` working trees must not change freeze hashes.
+    The digest is over ``\\n``-normalized bytes so Linux CI matches.
 
     Args:
         path: File to hash.
@@ -201,7 +204,7 @@ def sha256_file(path: Path) -> str:
         FileNotFoundError: If ``path`` does not exist.
     """
 
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _require_holdout_denied() -> None:
