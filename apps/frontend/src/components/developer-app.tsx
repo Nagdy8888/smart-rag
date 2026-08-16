@@ -7,13 +7,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, Fragment } from "react";
 import {
   cancelRun,
     createConversation,
     deleteConversation,
     fetchMe,
     fetchMeta,
+    fetchReady,
     fetchUsageMe,
     fetchVersionStatus,
     listCitations,
@@ -41,7 +42,7 @@ import {
 import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
 import { displayText, formatProvenance, isSafeHttpUrl } from "../lib/safe-text";
 import { parseSseBuffer } from "../lib/sse";
-import { FEEDBACK_TAGS, type FeedbackTag } from "../lib/types";
+import { FEEDBACK_TAGS, type FeedbackTag, type ReadinessResponse } from "../lib/types";
 import styles from "./developer-app.module.css";
 
 function newIdempotencyKey(): string {
@@ -85,6 +86,80 @@ async function consumeSse(
 }
 
 /**
+ * Render live `GET /health/ready` so ParadeDB/Valkey/LightRAG outages are
+ * visible in the browser without treating unconfigured as healthy.
+ *
+ * @param ready - Readiness payload, or null when FastAPI is unreachable.
+ * @returns Readiness panel.
+ */
+function ReadinessPanel({ ready }: { ready: ReadinessResponse | null | undefined }) {
+  if (ready === undefined) {
+    return (
+      <section className={styles.panel} aria-label="API readiness">
+        <h2>API readiness</h2>
+        <p className={styles.muted}>Checking GET /health/ready.</p>
+      </section>
+    );
+  }
+  if (ready === null) {
+    return (
+      <section className={styles.panel} aria-label="API readiness">
+        <h2>API readiness</h2>
+        <p className={styles.banner} data-kind="error" role="status">
+          FastAPI GET /health/ready is unreachable. Outage copy below is still
+          the signed UI language when those events exist.
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section
+      className={styles.panel}
+      aria-label="API readiness"
+      data-testid="api-readiness"
+    >
+      <h2>API readiness</h2>
+      <p className={styles.muted}>{displayText(ready.detail)}</p>
+      <dl>
+        <dt>query_ready</dt>
+        <dd data-testid="query-ready">{String(ready.query_ready)}</dd>
+        <dt>status</dt>
+        <dd>{displayText(ready.status)}</dd>
+        <dt>rate_limit_degraded</dt>
+        <dd>{String(ready.rate_limit_degraded)}</dd>
+        {ready.dependencies.map((item) => (
+          <Fragment key={item.name}>
+            <dt>{displayText(item.name)}</dt>
+            <dd data-testid={`dep-${item.name}`}>{displayText(item.status)}</dd>
+          </Fragment>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/**
+ * Signed retrieval-outage sentences. Chat SSE still owns live codes; this
+ * catalog is always visible so a killed ParadeDB/LightRAG path cannot hide
+ * behind missing UI copy.
+ *
+ * @returns Outage-copy panel.
+ */
+function SignedOutageCopy() {
+  return (
+    <section className={styles.panel} aria-label="Signed outage copy">
+      <h2>Signed outage copy</h2>
+      <p className={styles.muted}>
+        ParadeDB loss uses bm25_unavailable. LightRAG loss uses graph_outage.
+        Valkey mutations fail closed; approved reads may degrade.
+      </p>
+      <p role="status">{limitationCopy("bm25_unavailable")}</p>
+      <p role="status">{limitationCopy("graph_outage")}</p>
+    </section>
+  );
+}
+
+/**
  * Render the thin developer UI for sign-in, upload status, chat, citations,
  * feedback, and conversation deletion.
  *
@@ -116,6 +191,12 @@ export function DeveloperApp() {
   const metaQuery = useQuery({
     queryKey: ["meta"],
     queryFn: () => fetchMeta(),
+  });
+
+  const readyQuery = useQuery({
+    queryKey: ["health-ready"],
+    queryFn: () => fetchReady(),
+    refetchInterval: 5000,
   });
 
   const meQuery = useQuery({
@@ -285,6 +366,11 @@ export function DeveloperApp() {
     );
   }, [auth, chat.runId, feedbackComment, feedbackTag]);
 
+  const mfaRequired =
+    meQuery.isError &&
+    meQuery.error instanceof Error &&
+    meQuery.error.message === "mfa_required";
+
   if (accessToken === null) {
     return (
       <div className={styles.shell}>
@@ -305,6 +391,8 @@ export function DeveloperApp() {
             {displayText(authError)}
           </p>
         ) : null}
+        <ReadinessPanel ready={readyQuery.data} />
+        <SignedOutageCopy />
         <form
           className={styles.panel}
           onSubmit={(event) => {
@@ -338,6 +426,25 @@ export function DeveloperApp() {
     );
   }
 
+  if (mfaRequired) {
+    return (
+      <div className={styles.shell}>
+        <header className={styles.row}>
+          <h1>Smart RAG developer console</h1>
+          <button type="button" onClick={() => void signOut()}>
+            Sign out
+          </button>
+        </header>
+        <p className={styles.banner} data-kind="error" role="alert">
+          MFA required. Owner, admin, and upload_enabled callers need a verified
+          TOTP session (aal2). Password JWTs stay aal1 until challenge/verify.
+        </p>
+        <ReadinessPanel ready={readyQuery.data} />
+        <SignedOutageCopy />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.shell}>
       <header className={styles.row}>
@@ -362,6 +469,17 @@ export function DeveloperApp() {
         <p className={styles.banner} data-kind="error" role="alert">
           Session rejected ({failure.detail}). Sign in again. UI state is not
           authorization.
+        </p>
+      ) : null}
+      {failure?.kind === "mfa" ? (
+        <p className={styles.banner} data-kind="error" role="alert">
+          MFA required. Verify TOTP so the JWT is aal2, then retry the upload.
+        </p>
+      ) : null}
+      {failure?.kind === "fail_closed" ? (
+        <p className={styles.banner} data-kind="error" role="alert">
+          Limiter fail-closed ({displayText(failure.detail)}). Approved reads
+          may degrade; cost mutations are denied.
         </p>
       ) : null}
       {failure?.kind === "deleted" || deleteMutation.isSuccess ? (
@@ -440,7 +558,10 @@ export function DeveloperApp() {
           ) : null}
           {uploadMutation.isError ? (
             <p className={styles.banner} data-kind="error" role="alert">
-              Upload reserve rejected. Server authorization is authoritative.
+              {uploadMutation.error instanceof Error &&
+              uploadMutation.error.message === "mfa_required"
+                ? "MFA required. Verify TOTP so the JWT is aal2, then retry the upload."
+                : "Upload reserve rejected. Server authorization is authoritative."}
             </p>
           ) : null}
           <ul className={styles.list}>
@@ -560,6 +681,8 @@ export function DeveloperApp() {
               {limitationCopy(code)}
             </p>
           ))}
+          <ReadinessPanel ready={readyQuery.data} />
+          <SignedOutageCopy />
           {chat.diagnostics.limitationCodes.includes("graph_updating") ? (
             <p className={styles.muted}>{graphNotReadyCopy(0)}</p>
           ) : null}

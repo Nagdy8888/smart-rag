@@ -21,6 +21,21 @@ export type CurrentUserResponse = {
   mfa_enrolled: boolean;
 };
 
+/** One named probe from `GET /health/ready`. */
+export type DependencyStatus = {
+  name: string;
+  status: string;
+};
+
+/** Public `GET /health/ready` body. ParadeDB down does not fake BM25 success. */
+export type ReadinessResponse = {
+  status: string;
+  query_ready: boolean;
+  detail: string;
+  rate_limit_degraded: boolean;
+  dependencies: DependencyStatus[];
+};
+
 /** `GET|POST /conversations` item. */
 export type ConversationResponse = {
   conversation_id: string;

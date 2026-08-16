@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import base64
+import json
+import shutil
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -13,15 +18,17 @@ import pytest
 from smart_rag_core.memory.reaper import search_conversation_lingering_ids
 
 from tests.contract.integration_support import (
+    DEFAULT_SUPABASE_DB_URL,
     local_supabase_status,
-    resolve_supabase_db_url,
     try_connect,
 )
+from tests.contract.rfc6238_totp import totp_window
 
 _FASTAPI_URL = "http://127.0.0.1:8000"
 _PASSWORD = "Phase6Ui9x"  # noqa: S105 - disposable local Auth user
 _CLIENT_VERSION = "0.1.0"
 _XSS_MESSAGE = "<script>alert(1)</script>"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _fastapi_live() -> bool:
@@ -74,35 +81,87 @@ def _json_object(value: object) -> dict[str, Any]:
     return value
 
 
-@pytest.fixture(scope="module")
-def live_stack() -> dict[str, str]:
-    """Yield local Auth status plus FastAPI origin, or skip.
+def _access_token_from_auth_json(body: dict[str, Any]) -> str:
+    """Extract an access token from a GoTrue JSON object.
+
+    Args:
+        body: Decoded Auth JSON.
 
     Returns:
-        Status keys from the pinned Supabase CLI plus ``fastapi_url``.
-        Callers must never print credential values.
+        Token string, or empty when absent.
     """
 
-    if not _fastapi_live():
-        pytest.skip("local FastAPI is unreachable at 127.0.0.1:8000")
-    postgres = try_connect(resolve_supabase_db_url())
-    if postgres is None:
-        pytest.skip("local Supabase Postgres is unreachable")
-    postgres.close()
-    status = local_supabase_status()
-    status = {**status, "fastapi_url": _FASTAPI_URL}
-    return status
+    token = str(body.get("access_token", ""))
+    if token:
+        return token
+    nested = body.get("data")
+    if isinstance(nested, dict):
+        return str(nested.get("access_token", ""))
+    return ""
 
 
-@pytest.fixture
-def live_member(live_stack: dict[str, str]) -> dict[str, str]:
-    """Create one local Auth user with an application profile.
+def _jwt_aal(token: str) -> str:
+    """Read the ``aal`` claim without verifying the signature.
+
+    Args:
+        token: Compact JWT.
+
+    Returns:
+        Assurance level string, defaulting to ``aal1``.
+    """
+
+    parts = token.split(".")
+    if len(parts) < 2:
+        return "aal1"
+    padded = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
+    payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+    if not isinstance(payload, dict):
+        return "aal1"
+    return str(payload.get("aal", "aal1"))
+
+
+def _upsert_profile(
+    user_id: str,
+    *,
+    upload_enabled: bool,
+    mfa_enrolled: bool,
+) -> None:
+    """Write the local ``app.profiles`` row used by FastAPI identity.
+
+    Args:
+        user_id: Auth user UUID.
+        upload_enabled: Upload capability flag.
+        mfa_enrolled: Application MFA enrollment flag.
+    """
+
+    with psycopg.connect(DEFAULT_SUPABASE_DB_URL) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO app.profiles (
+                  user_id, role, upload_enabled, mfa_enrolled, monthly_llm_budget_usd
+                )
+                VALUES (%s, 'member'::app.user_role, %s, %s, 100)
+                ON CONFLICT (user_id) DO UPDATE
+                  SET role = 'member'::app.user_role,
+                      upload_enabled = EXCLUDED.upload_enabled,
+                      mfa_enrolled = EXCLUDED.mfa_enrolled,
+                      monthly_llm_budget_usd = EXCLUDED.monthly_llm_budget_usd
+                """,
+                (user_id, upload_enabled, mfa_enrolled),
+            )
+        connection.commit()
+
+
+def _create_password_user(live_stack: dict[str, str]) -> dict[str, str]:
+    """Create a confirmed local Auth user and return a password-grant JWT.
 
     Args:
         live_stack: Module fixture with Auth URLs and keys.
 
     Returns:
-        ``access_token``, ``user_id``, ``fastapi_url``, and ``anon_key``.
+        ``access_token``, ``user_id``, ``fastapi_url``, ``anon_key``, and
+        ``auth_url``.
     """
 
     email = f"phase6-ui-{uuid4().hex}@example.com"
@@ -138,29 +197,172 @@ def live_member(live_stack: dict[str, str]) -> dict[str, str]:
         access_token = str(token_payload.get("access_token", ""))
         if access_token == "":
             pytest.fail("password grant omitted access_token")
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO app.profiles (
-                  user_id, role, upload_enabled, mfa_enrolled, monthly_llm_budget_usd
-                )
-                VALUES (%s, 'member'::app.user_role, false, false, 100)
-                ON CONFLICT (user_id) DO UPDATE
-                  SET role = 'member'::app.user_role,
-                      upload_enabled = false,
-                      mfa_enrolled = false,
-                      monthly_llm_budget_usd = EXCLUDED.monthly_llm_budget_usd
-                """,
-                (user_id,),
-            )
-        connection.commit()
     return {
         "access_token": access_token,
         "user_id": user_id,
         "fastapi_url": live_stack["fastapi_url"],
         "anon_key": anon,
+        "auth_url": auth_url,
     }
+
+
+def _enroll_and_verify_totp(
+    *,
+    auth_url: str,
+    anon: str,
+    access_token: str,
+) -> str:
+    """Enroll TOTP on the current session and return an aal2 access token.
+
+    Args:
+        auth_url: Local GoTrue origin.
+        anon: Anon API key.
+        access_token: aal1 password JWT.
+
+    Returns:
+        Access token after successful challenge/verify.
+
+    Raises:
+        pytest.skip.Exception: When local TOTP enroll is disabled until Auth
+            restarts with ``[auth.mfa.totp]``.
+    """
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "apikey": anon,
+        "Content-Type": "application/json",
+    }
+    with httpx.Client(timeout=15.0) as client:
+        enroll = client.post(
+            f"{auth_url}/auth/v1/factors",
+            headers=headers,
+            json={"factor_type": "totp", "friendly_name": "phase6-ui"},
+        )
+        if enroll.status_code >= 400:
+            pytest.skip(
+                "local TOTP enroll is unavailable; restart Auth after "
+                f"[auth.mfa.totp] ({enroll.status_code})"
+            )
+        enroll_body = _json_object(enroll.json())
+        totp = enroll_body.get("totp")
+        if not isinstance(totp, dict):
+            pytest.skip("GoTrue enroll omitted totp.secret")
+        secret = str(totp.get("secret", ""))
+        factor_id = str(enroll_body.get("id", ""))
+        if secret == "" or factor_id == "":
+            pytest.skip("GoTrue enroll omitted factor id or secret")
+        challenge = client.post(
+            f"{auth_url}/auth/v1/factors/{factor_id}/challenge",
+            headers=headers,
+            json={},
+        )
+        if challenge.status_code >= 400:
+            pytest.skip(f"GoTrue TOTP challenge failed ({challenge.status_code})")
+        challenge_id = str(_json_object(challenge.json()).get("id", ""))
+        if challenge_id == "":
+            pytest.skip("GoTrue challenge omitted id")
+        last_error = "verify failed"
+        for code in totp_window(secret):
+            verified = client.post(
+                f"{auth_url}/auth/v1/factors/{factor_id}/verify",
+                headers=headers,
+                json={"challenge_id": challenge_id, "code": code},
+            )
+            if verified.status_code < 400:
+                body = _json_object(verified.json())
+                next_token = _access_token_from_auth_json(body)
+                if next_token == "":
+                    pytest.fail("TOTP verify omitted access_token")
+                return next_token
+            last_error = f"{verified.status_code}"
+        pytest.fail(f"TOTP verify rejected codes in the skew window ({last_error})")
+
+
+def _compose(*args: str) -> subprocess.CompletedProcess[str]:
+    """Run ``docker compose`` against the repository compose file.
+
+    Args:
+        args: Compose subcommand arguments.
+
+    Returns:
+        Completed process with captured text output.
+    """
+
+    docker = shutil.which("docker")
+    if docker is None:
+        pytest.skip("docker CLI not found")
+    return subprocess.run(  # noqa: S603 - resolved docker executable
+        [docker, "compose", "-f", "docker-compose.yml", *args],
+        cwd=_REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
+def _ready_dependencies(api: str) -> dict[str, str]:
+    """Return ``GET /health/ready`` dependency name→status.
+
+    Args:
+        api: FastAPI origin.
+
+    Returns:
+        Status map. Empty when the payload is malformed.
+    """
+
+    response = httpx.get(f"{api}/health/ready", timeout=5.0)
+    payload = _json_object(response.json())
+    raw = payload.get("dependencies")
+    if not isinstance(raw, list):
+        return {}
+    out: dict[str, str] = {}
+    for item in raw:
+        if isinstance(item, dict):
+            name = str(item.get("name", ""))
+            if name:
+                out[name] = str(item.get("status", ""))
+    return out
+
+
+@pytest.fixture(scope="module")
+def live_stack() -> dict[str, str]:
+    """Yield local Auth status plus FastAPI origin, or skip.
+
+    Returns:
+        Status keys from the pinned Supabase CLI plus ``fastapi_url``.
+        Callers must never print credential values.
+    """
+
+    if not _fastapi_live():
+        pytest.skip("local FastAPI is unreachable at 127.0.0.1:8000")
+    postgres = try_connect(DEFAULT_SUPABASE_DB_URL)
+    if postgres is None:
+        pytest.skip("local Supabase Postgres is unreachable")
+    postgres.close()
+    status = local_supabase_status()
+    status = {**status, "fastapi_url": _FASTAPI_URL}
+    return status
+
+
+@pytest.fixture
+def live_member(live_stack: dict[str, str]) -> dict[str, str]:
+    """Create one local Auth user with an application profile.
+
+    Args:
+        live_stack: Module fixture with Auth URLs and keys.
+
+    Returns:
+        ``access_token``, ``user_id``, ``fastapi_url``, and ``anon_key``.
+    """
+
+    created = _create_password_user(live_stack)
+    _upsert_profile(
+        created["user_id"],
+        upload_enabled=False,
+        mfa_enrolled=False,
+    )
+    return created
 
 
 def _paid_headers(
@@ -225,8 +427,7 @@ def _consume_sse(
             buffer += chunk
             names = _event_names(buffer)
             if any(
-                name in {"completed", "cancelled", "error", "partial"}
-                for name in names
+                name in {"completed", "cancelled", "error", "partial"} for name in names
             ):
                 break
             if time.monotonic() > deadline:
@@ -340,7 +541,7 @@ def test_thin_ui_live_jwt_chat_idempotency_delete_upload(
         )
         assert resume.status_code == 404
 
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(DEFAULT_SUPABASE_DB_URL) as connection:
         connection.execute("SET ROLE app_api")
         lingering = search_conversation_lingering_ids(
             connection,
@@ -402,6 +603,123 @@ def test_thin_ui_live_five_composite_streams(live_member: dict[str, str]) -> Non
             names = _event_names(body)
             assert "schema" in names
             assert any(
-                name in {"completed", "cancelled", "error", "partial"}
-                for name in names
+                name in {"completed", "cancelled", "error", "partial"} for name in names
             )
+
+
+def test_upload_enabled_aal1_is_mfa_required(live_stack: dict[str, str]) -> None:
+    """Upload-enabled password JWTs stay aal1 and must not look like success."""
+
+    created = _create_password_user(live_stack)
+    assert _jwt_aal(created["access_token"]) == "aal1"
+    _upsert_profile(created["user_id"], upload_enabled=True, mfa_enrolled=True)
+    api = created["fastapi_url"]
+    token = created["access_token"]
+    with httpx.Client(timeout=15.0) as client:
+        me = client.get(f"{api}/me", headers={"Authorization": f"Bearer {token}"})
+        assert me.status_code == 403
+        assert _json_object(me.json()).get("detail") == "MFA required"
+        upload_key = f"upload-{uuid4()}"
+        reserved = client.post(
+            f"{api}/documents/uploads",
+            headers=_paid_headers(token, idempotency_key=upload_key),
+            json={"declared_bytes": 1024, "idempotency_key": upload_key},
+        )
+        assert reserved.status_code == 403
+        assert _json_object(reserved.json()).get("detail") == "MFA required"
+
+
+def test_mfa_aal2_upload_reserve_signed_url_is_null(
+    live_stack: dict[str, str],
+) -> None:
+    """Verified TOTP (aal2) plus upload_enabled reserves with signed_url null."""
+
+    created = _create_password_user(live_stack)
+    _upsert_profile(created["user_id"], upload_enabled=False, mfa_enrolled=False)
+    aal2_token = _enroll_and_verify_totp(
+        auth_url=created["auth_url"],
+        anon=created["anon_key"],
+        access_token=created["access_token"],
+    )
+    assert _jwt_aal(aal2_token) == "aal2"
+    _upsert_profile(created["user_id"], upload_enabled=True, mfa_enrolled=True)
+    api = created["fastapi_url"]
+    upload_key = f"upload-{uuid4()}"
+    with httpx.Client(timeout=15.0) as client:
+        me = client.get(
+            f"{api}/me",
+            headers={"Authorization": f"Bearer {aal2_token}"},
+        )
+        assert me.status_code == 200, me.text
+        me_body = _json_object(me.json())
+        assert me_body.get("upload_enabled") is True
+        reserved = client.post(
+            f"{api}/documents/uploads",
+            headers=_paid_headers(aal2_token, idempotency_key=upload_key),
+            json={"declared_bytes": 1024, "idempotency_key": upload_key},
+        )
+        assert reserved.status_code == 200, reserved.text
+        body = _json_object(reserved.json())
+        assert body.get("signed_url") is None
+        assert body.get("reservation_id")
+
+
+def test_live_compose_outage_visible_on_ready(live_stack: dict[str, str]) -> None:
+    """Stopped ParadeDB or Valkey is visible on GET /health/ready for the UI.
+
+    Host uvicorn without those URLs reports unconfigured. That is honest, not
+    a mock success. Compose stop is asserted only when the running API already
+    probes the dependency as ok.
+    """
+
+    api = live_stack["fastapi_url"]
+    origin = httpx.get(
+        f"{api}/health/ready",
+        headers={"Origin": "http://127.0.0.1:3010"},
+        timeout=5.0,
+    )
+    assert origin.status_code == 200
+    assert origin.headers.get("access-control-allow-origin") == (
+        "http://127.0.0.1:3010"
+    )
+    payload = _json_object(origin.json())
+    assert payload.get("query_ready") is False
+    deps = _ready_dependencies(api)
+    assert "paradedb" in deps
+    assert "valkey_limits" in deps
+    assert "lightrag" in deps
+    if deps.get("paradedb") != "ok" and deps.get("valkey_limits") != "ok":
+        pytest.skip(
+            "running API does not probe ParadeDB or Valkey as ok; "
+            f"paradedb={deps.get('paradedb')} valkey_limits={deps.get('valkey_limits')}"
+        )
+    if deps.get("paradedb") == "ok":
+        stopped = _compose("stop", "paradedb")
+        if stopped.returncode != 0:
+            pytest.skip("docker compose stop paradedb failed")
+        try:
+            deadline = time.monotonic() + 30
+            status = deps["paradedb"]
+            while time.monotonic() < deadline:
+                status = _ready_dependencies(api).get("paradedb", "")
+                if status == "down":
+                    break
+                time.sleep(1)
+            assert status == "down"
+        finally:
+            _compose("start", "paradedb")
+    if deps.get("valkey_limits") == "ok":
+        stopped = _compose("stop", "valkey-limits")
+        if stopped.returncode != 0:
+            pytest.skip("docker compose stop valkey-limits failed")
+        try:
+            deadline = time.monotonic() + 30
+            status = deps["valkey_limits"]
+            while time.monotonic() < deadline:
+                status = _ready_dependencies(api).get("valkey_limits", "")
+                if status == "down":
+                    break
+                time.sleep(1)
+            assert status == "down"
+        finally:
+            _compose("start", "valkey-limits")

@@ -22,7 +22,8 @@ Related: [SSE.md](../api/SSE.md) ·
 Sign-in, conversation list/create/delete, Auto Composite chat with fetch SSE,
 reconnect/cancel, diagnostics from the accepted event catalog, citations,
 unmerged feedback tags, upload reservation, version status including BM25
-index/lag, and usage totals.
+index/lag, live `GET /health/ready` (ParadeDB/Valkey/LightRAG), MFA-required
+upload, and usage totals.
 
 ```mermaid
 flowchart TD
@@ -35,6 +36,8 @@ flowchart TD
   jwt --> upload["POST documents uploads"]
   jwt --> status["GET ingestion versions status"]
   status --> bm25["BM25 index lag queues"]
+  browser --> ready["GET health ready"]
+  ready --> deps["ParadeDB Valkey LightRAG"]
 ```
 
 ## Contracts the UI does not invent
@@ -51,6 +54,8 @@ flowchart TD
 | Citations | `GET /runs/{id}/citations` (no snippets) |
 | Upload reserve | `POST /documents/uploads`; local `signed_url` is null |
 | Version status | `GET /ingestion/versions/{id}/status` for Hybrid/BM25/graph-handoff |
+| Readiness | `GET /health/ready`; ParadeDB `down` is visible and is not BM25 success |
+| MFA | `403 MFA required` for owner/admin/`upload_enabled` until TOTP aal2 |
 
 Paid chat uses JSON 202 so `run_id` is in the body, then the same GET EventSource
 path as reconnect. That is one paid reservation. Unknown SSE event types are
@@ -71,6 +76,17 @@ from an upload reservation. Graph-not-ready copy is
 “N relevant recent documents are not yet represented in the graph” and never
 includes restricted or ineligible counts.
 
+`GET /health/ready` is public. The console polls it so a stopped ParadeDB,
+Valkey limits, or unattached LightRAG process is visible in the browser. Signed
+`bm25_unavailable` and `graph_outage` copy is always on the console; live SSE
+still owns per-run codes. Host uvicorn without `PARADEDB_URL` /
+`VALKEY_LIMITS_URL` reports `unconfigured`, which is not a fake-healthy probe.
+
+Owner/admin and `upload_enabled` callers need MFA. A password JWT is `aal1`;
+the UI shows **MFA required** instead of a successful upload. After TOTP
+verify (`aal2`) plus `mfa_enrolled` and `upload_enabled`, local reserve still
+returns `signed_url=null`.
+
 ## Environment
 
 | Variable | Purpose |
@@ -90,11 +106,21 @@ pnpm --filter smart-rag-frontend test
 pnpm --filter smart-rag-frontend lint
 pnpm --filter smart-rag-frontend exec tsc --noEmit
 pnpm --filter smart-rag-frontend build
+pnpm --filter smart-rag-frontend exec playwright install chromium
+pnpm --filter smart-rag-frontend exec playwright test tests/e2e/login.spec.ts
 ```
 
-Playwright `tests/e2e/login.spec.ts` checks the sign-in heading. Live JWT chat,
-upload `signed_url=null`, lingering-ID search after DELETE, and five Composite
-EventSource connections are `tests/contract/test_thin_developer_ui_live.py`
-against local FastAPI + Auth. Five-run heartbeat/lag remains
+Playwright `tests/e2e/login.spec.ts` checks the sign-in heading, signed outage
+copy, and (when FastAPI is up) that the readiness panel matches
+`GET /health/ready`. The frontend quality tier installs Chromium and runs
+those tests; it no longer stops at `playwright --version`. Live JWT chat,
+aal2 upload `signed_url=null`, lingering-ID search after DELETE, five Composite
+EventSource connections, and compose outage-on-ready are
+`tests/contract/test_thin_developer_ui_live.py` against local FastAPI + Auth.
+Five-run heartbeat/lag remains
 `tests/contract/test_sse_heartbeat.py` because live mock Composite often
 finishes before the 15s heartbeat interval.
+
+QT-EVAL-009 live Combined +10pp, live OpenAI, hosted Auth throttling, and
+Phase 10 CDN/CloudFront remain unverified. Do not treat this UI as those
+proofs.

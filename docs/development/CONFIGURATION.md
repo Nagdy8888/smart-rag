@@ -102,6 +102,26 @@ Phase 6 packet 1 query admission still uses
 classifies that bucket as `COST_MUTATION` (Valkey then Postgres, never
 fail-open).
 
+## Local Auth MFA (developer UI uploads)
+
+Owner, admin, and `upload_enabled` callers require a verified TOTP session
+(`aal2`). Local password grants are `aal1`. Enable TOTP in
+`supabase/config.toml`:
+
+```toml
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+```
+
+Restart Auth after changing that file: `npx supabase stop && npx supabase start`.
+Do not `db reset`. Playwright uses origin `http://127.0.0.1:3010`, which is
+listed in `additional_redirect_urls`. Local upload reserve still returns
+`signed_url=null` (CloudFront is Phase 10).
+
 ## Worker-only variables
 
 | Variable | Type / default | Security | Contract |

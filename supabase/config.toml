@@ -45,12 +45,26 @@ additional_redirect_urls = [
   "http://localhost:3000",
   "http://127.0.0.1:3000/auth/callback",
   "http://localhost:3000/auth/callback",
+  "http://127.0.0.1:3010",
+  "http://localhost:3010",
+  "http://127.0.0.1:3010/auth/callback",
+  "http://localhost:3010/auth/callback",
 ]
 enable_signup = true
 enable_anonymous_sign_ins = false
 jwt_expiry = 3600
 minimum_password_length = 8
 password_requirements = "lower_upper_letters_digits"
+
+# TOTP is the local MFA factor for owner/admin and upload_enabled callers.
+# Restart Auth after changing this file: `npx supabase stop && npx supabase start`.
+# Do not `db reset`.
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
 
 [auth.email]
 enable_signup = true

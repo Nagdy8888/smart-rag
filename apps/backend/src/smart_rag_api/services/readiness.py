@@ -31,6 +31,8 @@ class ReadinessResponse(BaseModel):
         status: ``unconfigured``, ``not_ready``, ``degraded``, or ``ready``.
         query_ready: True only when DB, Valkey, real models, and LightRAG
             attach are all healthy. Mock mode never sets this true.
+            ParadeDB down is reported but does not block query_ready;
+            Hybrid then degrades to dense+term.
         detail: Short operator-facing reason.
         rate_limit_degraded: True when the emergency limiter was used.
         dependencies: Named probe results.
@@ -65,6 +67,21 @@ def _probe_postgres(url: str | None) -> str:
     return "ok"
 
 
+def _probe_paradedb(url: str | None) -> str:
+    """Probe the private ParadeDB projection database.
+
+    Unavailability is an approved Hybrid degradation, not a liveness failure.
+
+    Args:
+        url: Optional ParadeDB DSN from ``PARADEDB_URL``.
+
+    Returns:
+        ``unconfigured``, ``ok``, or ``down``.
+    """
+
+    return _probe_postgres(url)
+
+
 def _probe_valkey(client: ValkeyClient | None) -> str:
     """Probe a Valkey client.
 
@@ -91,6 +108,7 @@ def build_readiness(
     lightrag_attached: bool,
     rate_limit_degraded: bool,
     postgres_probe: str | None = None,
+    paradedb_probe: str | None = None,
 ) -> ReadinessResponse:
     """Compose an honest readiness document.
 
@@ -101,10 +119,13 @@ def build_readiness(
         lightrag_attached: True when the runtime adapter is bound.
         rate_limit_degraded: Emergency limiter flag.
         postgres_probe: Optional precomputed DB probe for tests.
+        paradedb_probe: Optional precomputed ParadeDB probe for tests.
 
     Returns:
         Readiness payload. ``query_ready`` is false in mock mode, when
-        LightRAG is unconfigured, or when DB/Valkey are not ok.
+        LightRAG is unconfigured, or when DB/Valkey are not ok. ParadeDB
+        ``down`` is visible on the payload and does not by itself clear
+        ``query_ready``.
     """
 
     if settings is None:
@@ -116,6 +137,7 @@ def build_readiness(
                 DependencyStatus(name="database", status="unconfigured"),
                 DependencyStatus(name="valkey_limits", status="unconfigured"),
                 DependencyStatus(name="valkey_cache", status="unconfigured"),
+                DependencyStatus(name="paradedb", status="unconfigured"),
                 DependencyStatus(name="model_gateway", status="unconfigured"),
                 DependencyStatus(name="lightrag", status="unconfigured"),
             ),
@@ -127,6 +149,14 @@ def build_readiness(
         else None
     )
     database = postgres_probe if postgres_probe is not None else _probe_postgres(db_url)
+    paradedb_url = (
+        settings.paradedb_url.get_secret_value()
+        if settings.paradedb_url is not None
+        else None
+    )
+    paradedb = (
+        paradedb_probe if paradedb_probe is not None else _probe_paradedb(paradedb_url)
+    )
     limits = _probe_valkey(valkey_limits)
     cache = _probe_valkey(valkey_cache)
     model = "mock" if settings.mock_model_mode else "ok"
@@ -135,6 +165,7 @@ def build_readiness(
         DependencyStatus(name="database", status=database),
         DependencyStatus(name="valkey_limits", status=limits),
         DependencyStatus(name="valkey_cache", status=cache),
+        DependencyStatus(name="paradedb", status=paradedb),
         DependencyStatus(name="model_gateway", status=model),
         DependencyStatus(name="lightrag", status=graph),
     )
@@ -153,6 +184,9 @@ def build_readiness(
     elif database == "down":
         status_value = "not_ready"
         detail = "Database probe failed."
+    elif query_ready and paradedb == "down":
+        status_value = "degraded"
+        detail = "ParadeDB is down; Hybrid degrades to dense plus exact/trigram term."
     elif query_ready:
         status_value = "ready"
         detail = "Dependencies healthy."

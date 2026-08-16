@@ -5,6 +5,7 @@ describe("limitationCopy", () => {
   it("uses signed historical-graph language", () => {
     expect(limitationCopy("temporal_graph_limitation")).toContain("Hybrid");
     expect(limitationCopy("bm25_unavailable")).toContain("dense plus exact");
+    expect(limitationCopy("graph_outage")).toContain("relabeled to Hybrid");
   });
 });
 

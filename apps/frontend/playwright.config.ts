@@ -14,8 +14,10 @@ export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
   retries: 0,
+  timeout: 60_000,
   use: {
     baseURL: "http://127.0.0.1:3010",
+    browserName: "chromium",
   },
   webServer: {
     command: "pnpm dev --port 3010 --hostname 127.0.0.1",

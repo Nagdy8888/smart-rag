@@ -46,7 +46,7 @@ JWKS-verified `CallerContext` (test bypass only when `APP_ENV=test`).
 | Method | Path | Caller | Authorization | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/health/live` | public | process up | No dependency probe |
-| GET | `/health/ready` | public | probes DB/Valkey/model/graph | `query_ready` only when real models, LightRAG attached, DB+Valkey ok |
+| GET | `/health/ready` | public | probes DB/Valkey/ParadeDB/model/graph | `query_ready` only when real models, LightRAG attached, DB+Valkey ok. ParadeDB `down` degrades Hybrid to dense+term |
 | GET | `/api/meta` | public | handshake fields | Packet 6 enforces `min_client_version` |
 | GET | `/me` | authenticated | live profile role | Client role claims ignored |
 | POST | `/admin/invitations` | owner/admin | live role + privileged Auth settings | FastAPI AUTH_ADJACENT limiter |

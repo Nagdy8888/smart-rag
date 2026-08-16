@@ -2,7 +2,7 @@
 title: Tool and dependency versions (Phase 1)
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering
 ---
 
@@ -75,7 +75,7 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | typescript | 5.9.3 |
 | eslint-config-next | 16.3.0 |
 | Vitest | 4.1.10 |
-| Playwright Test | 1.62.1 |
+| Playwright Test | 1.62.1; frontend tier runs `playwright install chromium` then `playwright test` |
 | markdownlint-cli2 (root) | 0.23.2 |
 | Mermaid CLI (root) | 11.16.0 |
 | Puppeteer (root) | 25.6.0 |

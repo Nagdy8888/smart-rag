@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -112,6 +113,29 @@ class CheckRunner:
         self._python = sys.executable
         self._pnpm = shutil.which("pnpm") or "pnpm"
         self._mermaid_puppeteer_config = mermaid_puppeteer_config
+
+    def _playwright_install_chromium(self) -> tuple[str, ...]:
+        """Install only Chromium for the frontend Playwright suite.
+
+        Linux CI uses ``--with-deps``. Windows hosts skip that flag because
+        Playwright documents it for Debian/Ubuntu package dependencies.
+
+        Returns:
+            Exact argument vector for ``playwright install chromium``.
+        """
+
+        arguments = [
+            self._pnpm,
+            "--filter",
+            "smart-rag-frontend",
+            "exec",
+            "playwright",
+            "install",
+        ]
+        if os.name != "nt":
+            arguments.append("--with-deps")
+        arguments.append("chromium")
+        return tuple(arguments)
 
     def run_tier(self, tier: Tier) -> int:
         """Run one tier, stopping at its first required failure.
@@ -260,14 +284,18 @@ class CheckRunner:
                     (self._pnpm, "--filter", "smart-rag-frontend", "build"),
                 ),
                 Command(
-                    "Playwright installation contract",
+                    "Playwright Chromium install",
+                    self._playwright_install_chromium(),
+                ),
+                Command(
+                    "Playwright Chromium e2e",
                     (
                         self._pnpm,
                         "--filter",
                         "smart-rag-frontend",
                         "exec",
                         "playwright",
-                        "--version",
+                        "test",
                     ),
                 ),
             ),

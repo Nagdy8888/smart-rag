@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyApiError,
+  fetchReady,
   paidMutationHeaders,
   resumeHeaders,
   startMessageStream,
@@ -42,11 +43,26 @@ describe("classifyApiError", () => {
     });
   });
 
+  it("maps 403 MFA required to an MFA banner", () => {
+    expect(classifyApiError(403, { detail: "MFA required" })).toEqual({
+      kind: "mfa",
+      detail: "MFA required",
+    });
+  });
+
   it("maps 401 to session-revoked auth", () => {
     expect(classifyApiError(401, { detail: "session_revoked" })).toEqual({
       kind: "auth",
       status: 401,
       detail: "session_revoked",
+    });
+  });
+
+  it("maps 503 to limiter fail-closed", () => {
+    expect(classifyApiError(503, { detail: "limiter_unavailable" })).toEqual({
+      kind: "fail_closed",
+      status: 503,
+      detail: "limiter_unavailable",
     });
   });
 
@@ -106,5 +122,30 @@ describe("startMessageStream", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]?.startsWith("POST")).toBe(true);
     expect(calls[1]?.startsWith("GET")).toBe(true);
+  });
+});
+
+describe("fetchReady", () => {
+  it("maps GET /health/ready including paradedb", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          status: "degraded",
+          query_ready: false,
+          detail: "mock",
+          rate_limit_degraded: false,
+          dependencies: [
+            { name: "paradedb", status: "down" },
+            { name: "lightrag", status: "unconfigured" },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const ready = await fetchReady(fetchImpl);
+    expect(ready?.query_ready).toBe(false);
+    expect(ready?.dependencies).toEqual([
+      { name: "paradedb", status: "down" },
+      { name: "lightrag", status: "unconfigured" },
+    ]);
   });
 });

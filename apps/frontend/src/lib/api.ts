@@ -16,6 +16,7 @@ import type {
   SubmitMessageResponse,
   UsageResponse,
   IngestionStatusVersion,
+  ReadinessResponse,
 } from "./types";
 
 /** Headers shared by paid POST bodies. Resume GET omits the version. */
@@ -91,11 +92,27 @@ export type AuthFailure = {
   detail: string;
 };
 
+export type MfaFailure = {
+  kind: "mfa";
+  detail: string;
+};
+
+export type FailClosedFailure = {
+  kind: "fail_closed";
+  status: number;
+  detail: string;
+};
+
 export type DeletedFailure = {
   kind: "deleted";
 };
 
-export type ApiFailure = HandshakeFailure | AuthFailure | DeletedFailure;
+export type ApiFailure =
+  | HandshakeFailure
+  | AuthFailure
+  | MfaFailure
+  | FailClosedFailure
+  | DeletedFailure;
 
 /**
  * Parse a FastAPI error body into a typed UI failure.
@@ -121,9 +138,17 @@ export function classifyApiError(
       sseSchemaVersion: schema,
     };
   }
+  if (status === 403 && body.detail === "MFA required") {
+    return { kind: "mfa", detail: "MFA required" };
+  }
   if (status === 401 || status === 403) {
     const detail = typeof body.detail === "string" ? body.detail : "unauthorized";
     return { kind: "auth", status, detail };
+  }
+  if (status === 503) {
+    const detail =
+      typeof body.detail === "string" ? body.detail : "limiter_unavailable";
+    return { kind: "fail_closed", status, detail };
   }
   if (status === 404) {
     return { kind: "deleted" };
@@ -141,6 +166,51 @@ async function readJsonObject(response: Response): Promise<Record<string, unknow
     return {};
   }
   return {};
+}
+
+/**
+ * GET `/health/ready` without authentication.
+ *
+ * @param fetchImpl - Injected fetch.
+ * @returns Readiness payload, or null when the API is unreachable.
+ */
+export async function fetchReady(
+  fetchImpl: typeof fetch = fetch,
+): Promise<ReadinessResponse | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3000);
+  try {
+    const response = await fetchImpl(apiUrl("/health/ready"), {
+      signal: controller.signal,
+    });
+    const body = await readJsonObject(response);
+    if (!response.ok) {
+      return null;
+    }
+    const rawDeps = body.dependencies;
+    const dependencies = Array.isArray(rawDeps)
+      ? rawDeps
+          .filter(
+            (item): item is Record<string, unknown> =>
+              item !== null && typeof item === "object" && !Array.isArray(item),
+          )
+          .map((item) => ({
+            name: String(item.name ?? ""),
+            status: String(item.status ?? ""),
+          }))
+      : [];
+    return {
+      status: String(body.status ?? ""),
+      query_ready: Boolean(body.query_ready),
+      detail: String(body.detail ?? ""),
+      rate_limit_degraded: Boolean(body.rate_limit_degraded),
+      dependencies,
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -177,6 +247,10 @@ export async function fetchMe(
   });
   const body = await readJsonObject(response);
   if (!response.ok) {
+    const classified = classifyApiError(response.status, body);
+    if (classified?.kind === "mfa") {
+      throw new Error("mfa_required");
+    }
     throw new Error("me_failed");
   }
   return {
@@ -295,6 +369,11 @@ export async function reserveUpload(
     }),
   });
   if (!response.ok) {
+    const body = await readJsonObject(response);
+    const classified = classifyApiError(response.status, body);
+    if (classified?.kind === "mfa") {
+      throw new Error("mfa_required");
+    }
     throw new Error("upload_reserve_failed");
   }
   return (await response.json()) as SignedUploadResponse;
