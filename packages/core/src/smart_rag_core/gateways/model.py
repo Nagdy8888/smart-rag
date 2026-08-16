@@ -3,19 +3,33 @@
 from __future__ import annotations
 
 import socket
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 from unittest.mock import patch
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from smart_rag_core.gateways.openai_answer import (
+    execute_openai_answer,
+    execute_openai_verifier,
+)
 from smart_rag_core.gateways.openai_rerank import (
     execute_openai_rerank,
 )
 from smart_rag_core.observability.langsmith_tracing import (
     configure_langsmith,
     model_call_traceable,
+)
+from smart_rag_core.query_answer.models import AtomicLink
+from smart_rag_core.query_answer.verifier import mock_verifier_payload
+from smart_rag_core.query_answer.versions import (
+    ANSWER_MODEL_ID,
+    ANSWER_PROMPT_SHA256,
+    ANSWER_PROMPT_VERSION,
+    VERIFIER_MODEL_ID,
+    VERIFIER_PROMPT_SHA256,
+    VERIFIER_PROMPT_VERSION,
 )
 from smart_rag_core.query_profile.models import ModelInferredProfile
 from smart_rag_core.query_profile.versions import (
@@ -31,6 +45,24 @@ from smart_rag_core.retrieval.rerank_versions import (
 from smart_rag_core.settings import SharedSettings
 
 OPENAI_API_HOST = "api.openai.com"
+
+
+def _string_tuple(value: object) -> tuple[str, ...]:
+    """Coerce a JSON array field to a string tuple.
+
+    Args:
+        value: Mapping value, typically a list of IDs or ranges.
+
+    Returns:
+        String tuple. Empty when the value is missing or not a sequence.
+    """
+
+    if value is None or isinstance(value, (str, bytes)):
+        return ()
+    if isinstance(value, (list, tuple)):
+        sequence = cast(Sequence[object], value)
+        return tuple(str(item) for item in sequence)
+    return ()
 
 
 class ModelGatewayUnavailableError(RuntimeError):
@@ -163,6 +195,110 @@ class RerankModelResponse(BaseModel):
     retrieval_performed: Literal[False] = False
 
 
+class AnswerModelRequest(BaseModel):
+    """Bounded structured answer request. No tools or retrieval.
+
+    Attributes:
+        operation: Must be ``answer``.
+        query: Original user query.
+        prompt_version: Pinned answer prompt version.
+        prompt_sha256: Hash of that prompt file.
+        prompt_text: Prompt body used as Responses instructions.
+        model_id: Allow-listed model.
+        source_records: Delimited untrusted canonical records.
+        chunk_ids: Canonical IDs the model may cite.
+        table_ids: Table IDs the model may cite.
+        remaining_deadline_seconds: Client timeout bound.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: Literal["answer"] = "answer"
+    query: str = Field(min_length=1, max_length=2000)
+    prompt_version: str = ANSWER_PROMPT_VERSION
+    prompt_sha256: str = ANSWER_PROMPT_SHA256
+    prompt_text: str = Field(min_length=1, max_length=16_384)
+    model_id: str = ANSWER_MODEL_ID
+    source_records: str = Field(max_length=65_536)
+    chunk_ids: tuple[str, ...] = ()
+    table_ids: tuple[str, ...] = ()
+    remaining_deadline_seconds: float = Field(gt=0, le=50)
+
+
+class AnswerModelResponse(BaseModel):
+    """Structured answer payload plus usage for one operation.
+
+    Attributes:
+        mode: Adapter mode.
+        payload: JSON object awaiting application ID filtering.
+        request_id: Provider or fixture id.
+        input_tokens: Usage input tokens.
+        output_tokens: Usage output tokens.
+        model_calls: Always 1 when this response is returned.
+        retrieval_performed: Always false.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["mock", "openai"]
+    payload: dict[str, object]
+    request_id: str = Field(min_length=1, max_length=128)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    model_calls: Literal[1] = 1
+    retrieval_performed: Literal[False] = False
+
+
+class VerifierModelRequest(BaseModel):
+    """Bounded structured verifier request. No tools or retrieval.
+
+    Attributes:
+        operation: Must be ``verifier``.
+        prompt_version: Pinned verifier prompt version.
+        prompt_sha256: Hash of that prompt file.
+        prompt_text: Prompt body used as Responses instructions.
+        model_id: Allow-listed small model.
+        source_records: Delimited untrusted canonical records.
+        links: At most six atomic-link mappings.
+        remaining_deadline_seconds: Client timeout bound.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: Literal["verifier"] = "verifier"
+    prompt_version: str = VERIFIER_PROMPT_VERSION
+    prompt_sha256: str = VERIFIER_PROMPT_SHA256
+    prompt_text: str = Field(min_length=1, max_length=16_384)
+    model_id: str = VERIFIER_MODEL_ID
+    source_records: str = Field(max_length=65_536)
+    links: tuple[dict[str, object], ...] = Field(max_length=6)
+    remaining_deadline_seconds: float = Field(gt=0, le=50)
+
+
+class VerifierModelResponse(BaseModel):
+    """Structured verifier payload plus usage for one operation.
+
+    Attributes:
+        mode: Adapter mode.
+        payload: JSON object awaiting application filtering.
+        request_id: Provider or fixture id.
+        input_tokens: Usage input tokens.
+        output_tokens: Usage output tokens.
+        model_calls: Always 1 when this response is returned.
+        retrieval_performed: Always false.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["mock", "openai"]
+    payload: dict[str, object]
+    request_id: str = Field(min_length=1, max_length=128)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    model_calls: Literal[1] = 1
+    retrieval_performed: Literal[False] = False
+
+
 class LightRagLlmRequest(BaseModel):
     """Bounded LightRAG callback request. Never a user-facing answer.
 
@@ -270,6 +406,32 @@ class ModelAdapter(Protocol):
 
         Returns:
             Structured rerank response.
+        """
+
+        ...
+
+    async def generate_answer(self, request: AnswerModelRequest) -> AnswerModelResponse:
+        """Generate at most one structured answer payload.
+
+        Args:
+            request: Validated answer request.
+
+        Returns:
+            Structured answer response.
+        """
+
+        ...
+
+    async def generate_verifier(
+        self, request: VerifierModelRequest
+    ) -> VerifierModelResponse:
+        """Generate at most one structured verifier payload.
+
+        Args:
+            request: Validated verifier request.
+
+        Returns:
+            Structured verifier response.
         """
 
         ...
@@ -425,6 +587,138 @@ class MockModelAdapter:
             output_tokens=0,
         )
 
+    async def generate_answer(self, request: AnswerModelRequest) -> AnswerModelResponse:
+        """Return a fixture answer citing only supplied IDs. No network.
+
+        Args:
+            request: Structured answer request.
+
+        Returns:
+            Mock payload citing supplied chunk and table IDs.
+
+        Raises:
+            ValueError: If versions or the input bound fail.
+
+        Side Effects:
+            None. No network, retrieval, or tool calls.
+        """
+
+        if (
+            request.prompt_version != ANSWER_PROMPT_VERSION
+            or request.prompt_sha256 != ANSWER_PROMPT_SHA256
+        ):
+            raise ValueError("answer_prompt_version_mismatch")
+        joined = request.query + request.source_records
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        citations: list[dict[str, object]] = [
+            {
+                "chunk_id": chunk_id,
+                "table_id": None,
+                "span": None,
+                "source_ranges": [],
+                "inference": False,
+                "atomic_link_id": f"link-{index}",
+            }
+            for index, chunk_id in enumerate(request.chunk_ids, start=1)
+        ]
+        table_citations: list[dict[str, object]] = [
+            {
+                "chunk_id": None,
+                "table_id": table_id,
+                "span": None,
+                "source_ranges": [],
+                "inference": False,
+                "atomic_link_id": f"table-{index}",
+            }
+            for index, table_id in enumerate(request.table_ids, start=1)
+        ]
+        links: list[dict[str, object]] = [
+            {
+                "link_id": f"link-{index}",
+                "claim": f"Canonical passage {chunk_id}",
+                "chunk_ids": [chunk_id],
+                "table_id": None,
+                "source_ranges": [],
+                "kind": "fact",
+                "priority": index,
+            }
+            for index, chunk_id in enumerate(request.chunk_ids, start=1)
+        ]
+        payload: dict[str, object] = {
+            "answer_text": "Frozen answer fixture citing supplied canonical IDs.",
+            "citations": citations,
+            "atomic_links": links,
+            "composed_conclusion": None,
+            "table_citations": table_citations,
+            "status": "complete"
+            if request.chunk_ids or request.table_ids
+            else "refused",
+            "refused_links": [],
+        }
+        return AnswerModelResponse(
+            mode="mock",
+            payload=payload,
+            request_id=f"mock-answer-{self._fixture_id}",
+            input_tokens=0,
+            output_tokens=0,
+        )
+
+    async def generate_verifier(
+        self, request: VerifierModelRequest
+    ) -> VerifierModelResponse:
+        """Return identity-support verifier verdicts without a network call.
+
+        Args:
+            request: Structured verifier request.
+
+        Returns:
+            Mock payload covering at most six links.
+
+        Raises:
+            ValueError: If versions, batch size, or the input bound fail.
+
+        Side Effects:
+            None. No network, retrieval, or tool calls.
+        """
+
+        if (
+            request.prompt_version != VERIFIER_PROMPT_VERSION
+            or request.prompt_sha256 != VERIFIER_PROMPT_SHA256
+        ):
+            raise ValueError("verifier_prompt_version_mismatch")
+        if len(request.links) > 6:
+            raise ValueError("verifier_batch_cap")
+        if len(request.source_records) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        links = tuple(
+            AtomicLink(
+                link_id=str(item.get("link_id") or f"link-{index}"),
+                claim=str(item.get("claim") or "claim"),
+                chunk_ids=_string_tuple(item.get("chunk_ids")),
+                table_id=(
+                    str(item["table_id"]) if item.get("table_id") is not None else None
+                ),
+                source_ranges=_string_tuple(item.get("source_ranges")),
+                kind="inference_link"
+                if item.get("kind") == "inference_link"
+                else "fact",
+            )
+            for index, item in enumerate(request.links, start=1)
+        )
+        verdicts = mock_verifier_payload(links)
+        return VerifierModelResponse(
+            mode="mock",
+            payload=verdicts.model_dump(mode="json"),
+            request_id=f"mock-verifier-{self._fixture_id}",
+            input_tokens=0,
+            output_tokens=0,
+        )
+
     async def generate_lightrag_llm(
         self, request: LightRagLlmRequest
     ) -> LightRagLlmResponse:
@@ -550,6 +844,91 @@ class OpenAIRerankAdapter:
             output_tokens=output_tokens,
         )
 
+    async def generate_answer(self, request: AnswerModelRequest) -> AnswerModelResponse:
+        """Execute one Responses answer operation.
+
+        Args:
+            request: Bounded answer request.
+
+        Returns:
+            Provider JSON payload plus usage.
+
+        Raises:
+            OpenAIAnswerError: Typed provider failure.
+            ValueError: Input bound errors.
+
+        Side Effects:
+            One HTTPS call with ``max_retries=0``.
+        """
+
+        joined = request.query + request.source_records
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        payload, request_id, input_tokens, output_tokens = execute_openai_answer(
+            api_key=self._api_key,
+            prompt_text=request.prompt_text,
+            prompt_sha256=request.prompt_sha256,
+            prompt_version=request.prompt_version,
+            model_id=request.model_id,
+            user_query=request.query,
+            source_records=request.source_records,
+            timeout_seconds=request.remaining_deadline_seconds,
+        )
+        return AnswerModelResponse(
+            mode="openai",
+            payload=payload,
+            request_id=request_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+    async def generate_verifier(
+        self, request: VerifierModelRequest
+    ) -> VerifierModelResponse:
+        """Execute one Responses verifier operation.
+
+        Args:
+            request: Bounded verifier request.
+
+        Returns:
+            Provider JSON payload plus usage.
+
+        Raises:
+            OpenAIAnswerError: Typed provider failure.
+            ValueError: Batch cap or input bound errors.
+
+        Side Effects:
+            One HTTPS call with ``max_retries=0``.
+        """
+
+        if len(request.links) > 6:
+            raise ValueError("verifier_batch_cap")
+        if len(request.source_records) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        link_ids = tuple(str(item.get("link_id") or "") for item in request.links)
+        payload, request_id, input_tokens, output_tokens = execute_openai_verifier(
+            api_key=self._api_key,
+            prompt_text=request.prompt_text,
+            prompt_sha256=request.prompt_sha256,
+            prompt_version=request.prompt_version,
+            model_id=request.model_id,
+            source_records=request.source_records,
+            link_payload=list(request.links),
+            link_ids=link_ids,
+            timeout_seconds=request.remaining_deadline_seconds,
+        )
+        return VerifierModelResponse(
+            mode="openai",
+            payload=payload,
+            request_id=request_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
     async def generate_lightrag_llm(
         self, request: LightRagLlmRequest
     ) -> LightRagLlmResponse:
@@ -630,6 +1009,42 @@ class ModelGateway:
         """
 
         return await self._adapter.generate_rerank(request)
+
+    @model_call_traceable(name="model.answer")
+    async def generate_answer(self, request: AnswerModelRequest) -> AnswerModelResponse:
+        """Delegate one structured answer request. Never a hidden retry.
+
+        Args:
+            request: Bounded answer request.
+
+        Returns:
+            Structured answer response plus usage.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            ValueError: If a deployable bound is exceeded.
+        """
+
+        return await self._adapter.generate_answer(request)
+
+    @model_call_traceable(name="model.verifier")
+    async def generate_verifier(
+        self, request: VerifierModelRequest
+    ) -> VerifierModelResponse:
+        """Delegate one structured verifier request. Never a second batch.
+
+        Args:
+            request: Bounded verifier request.
+
+        Returns:
+            Structured verifier response plus usage.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            ValueError: If a deployable bound is exceeded.
+        """
+
+        return await self._adapter.generate_verifier(request)
 
     @model_call_traceable(name="model.lightrag_llm")
     async def generate_lightrag_llm(

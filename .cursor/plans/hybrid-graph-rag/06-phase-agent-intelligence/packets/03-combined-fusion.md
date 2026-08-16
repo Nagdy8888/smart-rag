@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 3
-status: pending
+status: complete
 title: "Implement resolved-path Combined fusion and ablation, deterministic table composition, canonical answer evidence, inference-link citations, and layered verification."
 requirement_ids: [P06-03]
 ---

@@ -11,8 +11,10 @@ phase_packet: Phase 6 Packet 2
 
 Packet 2 prepares one typed query, compiles the deterministic route and
 limitation matrix, executes bounded retrieval branches, and applies at most
-one global correction. Combined fusion, answer generation, and the verifier
-are [packet 3](../development/phase-06-agent-intelligence-evidence.md).
+one global correction. Packet 3 fuses resolved paths, composes tables,
+generates one answer, and verifies citations
+([COMBINED_FUSION.md](./COMBINED_FUSION.md),
+[ANSWER_VERIFICATION.md](./ANSWER_VERIFICATION.md)).
 
 Packet 1 `admit_query_run` reserves a **route envelope** before profiling.
 The client route is not authorization. Normal Auto chat should reserve the
@@ -25,6 +27,8 @@ reserved envelope. Persist `requested_route` vs `effective_route` vs
 
 Related: [QUERY_ADMISSION.md](./QUERY_ADMISSION.md) ·
 [QUERY_BUDGETS.md](./QUERY_BUDGETS.md) ·
+[COMBINED_FUSION.md](./COMBINED_FUSION.md) ·
+[ANSWER_VERIFICATION.md](./ANSWER_VERIFICATION.md) ·
 [PHASE6_HANDOFF.md](../graph/PHASE6_HANDOFF.md) ·
 [docs index](../README.md)
 
@@ -107,6 +111,10 @@ sequenceDiagram
   participant Plan as compile_plan
   participant Br as execute_branches
   participant Corr as apply_correction
+  participant Fuse as fuse_evidence
+  participant Tables as compose_tables
+  participant Ans as generate_answer
+  participant Ver as verify_answer
 
   Admit->>Admit: copy packet 1 ceilings
   Admit->>Mem: last 12 creator messages
@@ -128,6 +136,10 @@ sequenceDiagram
   else exhausted
     Corr->>Corr: insufficient evidence not an answer
   end
+  Corr->>Fuse: Hybrid ranks and resolved paths
+  Fuse->>Tables: canonical evidence
+  Tables->>Ans: one counted answer call
+  Ans->>Ver: deterministic checks then one six-link verifier
 ```
 
 Independent required branches run with `BRANCH_CONCURRENCY=2`. A fourth
@@ -140,5 +152,7 @@ blindness counts are disclosed only on the authorized visibility path.
 ## LangGraph
 
 `enforce_admission` → `load_memory` → `prepare_query` → `compile_plan` →
-`execute_branches` → `apply_correction` → END. There is no answer node.
-Health/ready stays unconfigured.
+`execute_branches` → `apply_correction` → `fuse_evidence` →
+`compose_tables` → `generate_answer` → `verify_answer` → END.
+Health/ready stays unconfigured. SSE and the public chat UI remain later
+packets.

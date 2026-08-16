@@ -120,7 +120,7 @@ erDiagram
 | `conversations` | `app` | authority | chat API | creator (+ audit) | 90d undeleted | per user | immediate delete path Pkt 6 | conversation `id` | 2 schema / 6 agent |
 | `messages` | `app` | authority | chat API | creator via `app.load_query_memory` (packet 2); creator (+ audit) SELECT | with conversation | last 12 on query path | cascade | message `id` | 6 packet 2 memory |
 | `runs` | `app` | authority | admit RPC (`app_api` EXECUTE) | creator (+ audit) | 30d payloads | concurrent runs cap 5 | cascade | `(creator_user_id, conversation_id, idempotency_key)` plus global key unique | 6 packet 1 admission |
-| `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade | `(run_id, citation_index)` | 6 agent |
+| `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade | `(run_id, citation_index)` | 6 packet 3 provenance jsonb |
 | `user_feedback` | `app` | authority | chat UI | eval pipelines | 12 months | sparse | cascade | feedback `id` | 6 agent |
 | `tool_catalog` / `tool_versions` / `tool_permissions` / `tool_usage_events` | `app` | authority | admin/catalog | progressive disclosure | catalog lifetime | small | deactivate/delete | tool_key unique | 6 agent |
 
@@ -171,6 +171,7 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
 - `app.runs` also has unique `(creator_user_id, conversation_id, idempotency_key)` where the key is not null. The global `runs_idempotency_key_uq` remains.
 - `app.load_query_memory` is SECURITY DEFINER, `validate_caller_context`, creator-only, fails on deleted conversations, returns at most 12 recent messages, EXECUTE to `app_api` only. No summary store (packet 7). Never joins source documents.
+- `app.citations.provenance` jsonb (existing column, expand-only payload) stores fusion algorithm, config hash, hybrid/graph ranks, combined score, requested/effective route, atomic-link id, and inference flag. Packet 3 added no citation table or column. `chunk_id` remains nullable so table-range citations can persist without a passage.
 - `audit_events` rejects UPDATE/DELETE (append-only trigger).
 - `llm_usage` rejects UPDATE/DELETE (append-only trigger). Runtime roles have no table DML; query usage is inserted only through `app.record_query_llm_usage`.
 - RLS is enabled on all exposed tables; Storage quarantine INSERT is reservation-scoped; no authenticated SELECT on quarantine.
@@ -214,4 +215,6 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [RETRIEVAL.md](../graph/RETRIEVAL.md)
 - [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md)
 - [QUERY_BUDGETS.md](../agent/QUERY_BUDGETS.md)
+- [COMBINED_FUSION.md](../agent/COMBINED_FUSION.md)
+- [ANSWER_VERIFICATION.md](../agent/ANSWER_VERIFICATION.md)
 - [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md)

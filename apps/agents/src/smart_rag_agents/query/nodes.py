@@ -1,10 +1,40 @@
-"""Query graph nodes for packet 2. Admission stays first; no answer node."""
+"""Query graph nodes for packets 2-3. Admission stays first."""
 
 from __future__ import annotations
 
-from smart_rag_core.query_admission.ceilings import assert_call_available
+from datetime import UTC, datetime
+from uuid import uuid4
+
+from smart_rag_core.query_admission.ceilings import (
+    assert_call_available,
+    assert_deadline_open,
+)
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryCeilingError
+from smart_rag_core.query_admission.usage import execute_counted_model_call
+from smart_rag_core.query_answer.deterministic import deterministic_check_answer
+from smart_rag_core.query_answer.exceptions import AnswerError
+from smart_rag_core.query_answer.generate import generate_answer
+from smart_rag_core.query_answer.models import (
+    AnswerPayload,
+    AtomicLink,
+    TableComposition,
+    VerificationResult,
+    VerifierPayload,
+)
+from smart_rag_core.query_answer.tables import compose_tables
+from smart_rag_core.query_answer.verifier import run_verifier_batch
+from smart_rag_core.query_answer.versions import (
+    ANSWER_MODEL_ID,
+    ANSWER_PROMPT_SHA256,
+    ANSWER_PROMPT_VERSION,
+    VERIFIER_PROMPT_SHA256,
+    VERIFIER_PROMPT_VERSION,
+)
+from smart_rag_core.query_fusion import SELECTED_FUSION_ALGORITHM, fuse_evidence
+from smart_rag_core.query_fusion.assemble import fusion_input_from_branches
+from smart_rag_core.query_fusion.exceptions import FusionError
+from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.branches import execute_branches
 from smart_rag_core.query_routing.constants import FALLBACK_MEMORY_UNAVAILABLE
 from smart_rag_core.query_routing.correction import (
@@ -381,7 +411,7 @@ def apply_correction_node(
         deps: Retrievers for the optional extra branch.
 
     Returns:
-        Terminal packet-2 state. No answer node follows.
+        State after the single correction. Packet 3 nodes follow.
     """
 
     if _skip_if_closed(state):
@@ -447,12 +477,12 @@ def apply_correction_node(
                 }
     combined = (*results, *extra)
     terminal = "correction_applied"
-    detail = "one correction applied; answering is not implemented"
+    detail = "one correction applied; fusion and answering follow"
     if not decision.applied:
-        detail = "no correction; answering is not implemented"
+        detail = "no correction; fusion and answering follow"
     if decision.exhausted_status == "insufficient_evidence":
         terminal = "insufficient_evidence"
-        detail = "insufficient evidence; answering is not implemented"
+        detail = "insufficient evidence; verified partial follows"
     whole_refused = any(
         item.fallback_reason == "section_coverage_below_1" for item in combined
     )
@@ -475,3 +505,572 @@ def apply_correction_node(
         "keyword_extract_count": sum(item.keyword_extract_count for item in combined),
         "catalog_llm_call_count": 0,
     }
+
+
+def fuse_evidence_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
+    """Fuse Hybrid ranks with resolved graph paths. Never graph-only answers.
+
+    State inputs:
+        ``branch_results``, ``requested_route``, ``effective_route``,
+        ``keyword_extract_count``.
+
+    State outputs:
+        ``fusion``, ``selected_algorithm``, ``fusion_config_hash``,
+        possibly ``effective_route=hybrid`` with a typed graph reason.
+
+    Persistence writes:
+        None. Scores are stored on graph state for citation provenance.
+
+    External/model calls:
+        None. Fusion weights are frozen constants.
+
+    Budget/deadline behavior:
+        Deadline exhaustion yields verified partial without fabricating
+        relationship evidence.
+
+    Failure/fallback route:
+        Unusable graph (timeout, survival < 0.50, outage) keeps
+        ``requested_route`` and sets ``effective_route=hybrid``. Hidden
+        LightRAG keyword/answer counters fail closed.
+
+    Args:
+        state: State after the single correction.
+        deps: Unused; fusion is pure. Present for node signature symmetry.
+
+    Returns:
+        State with a ``FusionResult`` mapping.
+    """
+
+    del deps
+    if _skip_if_closed(state):
+        return state
+    if state["status"] in {"refused"}:
+        return state
+    try:
+        results = branch_results_from_state(state.get("branch_results"))
+        fusion_input = fusion_input_from_branches(
+            results,
+            requested_route=str(state.get("requested_route") or "hybrid"),
+            effective_route=str(state.get("effective_route") or "hybrid"),
+        )
+        fusion = fuse_evidence(fusion_input, algorithm=SELECTED_FUSION_ALGORITHM)
+    except (FusionError, QueryRoutingError, ValueError) as exc:
+        reason = getattr(exc, "reason", str(exc) or "fusion_failed")
+        return {
+            **state,
+            "status": "insufficient_evidence",
+            "detail": str(reason),
+            "fusion": None,
+        }
+    return {
+        **state,
+        "status": "fused",
+        "detail": "canonical evidence fused",
+        "fusion": fusion.model_dump(mode="json"),
+        "effective_route": fusion.effective_route,
+        "requested_route": fusion.requested_route,
+        "selected_algorithm": fusion.algorithm.value,
+        "fusion_config_hash": fusion.config_hash,
+        "keyword_extract_count": 0,
+        "catalog_llm_call_count": 0,
+    }
+
+
+def compose_tables_node(
+    state: QueryGraphState, deps: QueryGraphDeps
+) -> QueryGraphState:
+    """Compose StructuredTable sandbox results as a separate evidence type.
+
+    State inputs:
+        ``branch_results`` after fusion.
+
+    State outputs:
+        ``table_composition`` with exact cell/range provenance.
+
+    Persistence writes:
+        None.
+
+    External/model calls:
+        None. The answer model must not calculate totals from prose.
+
+    Budget/deadline behavior:
+        No reservation consume.
+
+    Failure/fallback route:
+        Missing ranges or prose arithmetic fail closed.
+
+    Args:
+        state: State after fusion.
+        deps: Unused.
+
+    Returns:
+        State with table composition.
+    """
+
+    del deps
+    if _skip_if_closed(state):
+        return state
+    try:
+        results = branch_results_from_state(state.get("branch_results"))
+        composition = compose_tables(results)
+    except AnswerError as exc:
+        return {
+            **state,
+            "status": "insufficient_evidence",
+            "detail": exc.reason,
+            "table_composition": None,
+        }
+    return {
+        **state,
+        "status": "tables_composed",
+        "detail": "deterministic table provenance composed",
+        "table_composition": composition.model_dump(mode="json"),
+    }
+
+
+def generate_answer_node(
+    state: QueryGraphState, deps: QueryGraphDeps
+) -> QueryGraphState:
+    """Generate exactly one answer from canonical passages and table values.
+
+    State inputs:
+        ``fusion``, ``table_composition``, ``user_query``, ``retrieval_plan``,
+        ``remaining_model_calls``.
+
+    State outputs:
+        ``answer`` and decremented ``remaining_model_calls`` when a counted
+        ``usage_kind=answer`` call ran.
+
+    Persistence writes:
+        Counted ``answer`` usage when a connection and gateway are bound.
+
+    External/model calls:
+        Zero or one answer generation. Never a second. LightRAG
+        ``answer_generate`` stays 0.
+
+    Budget/deadline behavior:
+        Uses ``execute_counted_model_call`` against the run-local reservation
+        when a live adapter runs. Deadline exhaustion is verified partial.
+
+    Failure/fallback route:
+        Empty evidence, NoRetrieval, and graph inspection refuse without a
+        fake success. Unbound adapters use the extractive mock.
+
+    Args:
+        state: State after table composition.
+        deps: Optional gateway, prompt text, and connection.
+
+    Returns:
+        State with an ``AnswerPayload`` mapping.
+    """
+
+    if _skip_if_closed(state):
+        return state
+    context = _runtime(state)
+    fusion = _fusion_from_state(state.get("fusion"))
+    tables = _tables_from_state(state.get("table_composition"))
+    plan = None
+    if state.get("retrieval_plan") is not None:
+        try:
+            plan = plan_from_state(state["retrieval_plan"])
+        except ValueError:
+            plan = None
+    company_forbidden = plan.company_claim_forbidden if plan is not None else False
+    graph_forbidden = plan.graph_as_answer_forbidden if plan is not None else False
+    remaining = state["remaining_model_calls"]
+    answer_calls = state.get("answer_call_count") or 0
+    needs_model = bool(fusion.evidence or tables.records) and not (
+        company_forbidden or graph_forbidden
+    )
+    if needs_model:
+        try:
+            remaining = assert_call_available(remaining)
+        except QueryCeilingError:
+            return {
+                **state,
+                "status": "verified_partial",
+                "detail": "model_call_exhausted",
+                "answer": AnswerPayload(
+                    answer_text="Verified partial: model-call ceiling exhausted.",
+                    status="partial",
+                ).model_dump(mode="json"),
+            }
+        if context is not None:
+            try:
+                assert_deadline_open(
+                    now=datetime.now(UTC), deadline_at=context.deadline_at
+                )
+            except QueryCeilingError:
+                return {
+                    **state,
+                    "status": "verified_partial",
+                    "detail": "deadline_exhausted",
+                    "answer": AnswerPayload(
+                        answer_text="Verified partial: deadline exhausted.",
+                        status="partial",
+                    ).model_dump(mode="json"),
+                }
+    caller = None
+    if needs_model and deps.model_gateway is not None and deps.answer_prompt_text:
+
+        def _send() -> AnswerPayload:
+            """Invoke the shared gateway answer operation.
+
+            Returns:
+                Parsed answer payload.
+            """
+
+            return _gateway_answer(
+                deps,
+                query=str(state.get("user_query") or ""),
+                fusion=fusion,
+                tables=tables.records,
+                remaining=remaining,
+            )
+
+        if deps.connection is not None and context is not None:
+            payload, _consumed, _usage_id = execute_counted_model_call(
+                deps.connection,
+                caller=caller_from_runtime(context),
+                run_id=context.run_id,
+                reservation_id=context.reservation_id,
+                expected_version=context.optimistic_version,
+                usage_kind="answer",
+                model_id=ANSWER_MODEL_ID,
+                provider_attempt_id=str(uuid4()),
+                send=_send,
+            )
+            answer = payload
+        else:
+            answer = _send()
+        answer_calls = 1
+    else:
+        try:
+            answer = generate_answer(
+                fusion=fusion,
+                tables=tables.records,
+                user_query=str(state.get("user_query") or "query"),
+                caller=caller,
+                already_generated=answer_calls,
+                company_claim_forbidden=company_forbidden,
+                graph_as_answer_forbidden=graph_forbidden,
+            )
+        except AnswerError as exc:
+            return {
+                **state,
+                "status": "insufficient_evidence",
+                "detail": exc.reason,
+            }
+        if needs_model:
+            answer_calls = 1
+    status = "answered"
+    if answer.status == "refused" and not fusion.evidence and not tables.records:
+        status = "insufficient_evidence"
+    return {
+        **state,
+        "status": status,
+        "detail": "one answer generated from canonical evidence",
+        "answer": answer.model_dump(mode="json"),
+        "remaining_model_calls": remaining,
+        "answer_call_count": answer_calls,
+        "catalog_llm_call_count": 0,
+        "keyword_extract_count": 0,
+    }
+
+
+def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
+    """Deterministic citation checks, then at most one six-link verifier call.
+
+    State inputs:
+        ``answer``, ``fusion``, ``table_composition``,
+        ``remaining_model_calls``, ``verifier_call_count``.
+
+    State outputs:
+        ``verification`` and possibly decremented remaining calls.
+
+    Persistence writes:
+        Counted ``verifier`` usage when a connection and gateway are bound.
+        Citation provenance may be inserted when a connection is bound.
+
+    External/model calls:
+        Zero or one small verifier call covering at most six material
+        links. A seventh link is omitted. Never a second verifier call.
+
+    Budget/deadline behavior:
+        Deadline/step exhaustion emits verified partial, not fake success.
+
+    Failure/fallback route:
+        Unsupported links are removed or refused. Unsupported chains drop
+        the composed conclusion. Inspection/NoRetrieval stay refused.
+
+    Args:
+        state: State after answer generation.
+        deps: Optional gateway and connection.
+
+    Returns:
+        Terminal verified state.
+    """
+
+    if _skip_if_closed(state):
+        return state
+    fusion = _fusion_from_state(state.get("fusion"))
+    tables = _tables_from_state(state.get("table_composition"))
+    raw_answer = state.get("answer")
+    if raw_answer is None:
+        return {
+            **state,
+            "status": "insufficient_evidence",
+            "detail": "missing_answer",
+        }
+    payload = AnswerPayload.model_validate(raw_answer)
+    checked, failures = deterministic_check_answer(
+        payload, fusion=fusion, tables=tables.records
+    )
+    remaining = state["remaining_model_calls"]
+    verifier_calls = state.get("verifier_call_count") or 0
+    omitted: tuple[str, ...] = ()
+    if checked.atomic_links:
+        caller = None
+        if deps.model_gateway is not None and deps.verifier_prompt_text:
+
+            def _verifier_caller(links: tuple[AtomicLink, ...]) -> VerifierPayload:
+                """Invoke one verifier batch through the bound gateway.
+
+                Args:
+                    links: At most six material links.
+
+                Returns:
+                    Structured verifier payload.
+                """
+
+                return _gateway_verifier(
+                    deps,
+                    links=links,
+                    fusion=fusion,
+                    tables=tables.records,
+                    remaining=remaining,
+                )
+
+            caller = _verifier_caller
+        try:
+            if caller is not None:
+                remaining = assert_call_available(remaining)
+            checked, verifier_calls, omitted = run_verifier_batch(
+                checked,
+                caller=caller,
+                already_called=verifier_calls,
+            )
+        except (AnswerError, QueryCeilingError) as exc:
+            reason = getattr(exc, "reason", str(exc) or "verifier_failed")
+            if str(reason) == "model_call_exhausted":
+                return {
+                    **state,
+                    "status": "verified_partial",
+                    "detail": "model_call_exhausted",
+                    "answer": checked.model_dump(mode="json"),
+                }
+            return {
+                **state,
+                "status": "verified_partial",
+                "detail": str(reason),
+                "answer": checked.model_dump(mode="json"),
+            }
+    terminal = "verified_partial"
+    if checked.status == "refused" and not fusion.evidence and not tables.records:
+        terminal = "insufficient_evidence"
+        detail = "insufficient authorized evidence"
+    elif checked.status == "refused":
+        terminal = "refused"
+        detail = "answer refused after verification"
+    elif checked.status == "partial" or failures or omitted:
+        terminal = "verified_partial"
+        detail = "verified partial after citation checks"
+    else:
+        terminal = "verified"
+        detail = "answer verified"
+    result = VerificationResult(
+        answer=checked,
+        deterministic_failures=failures,
+        verifier_call_count=1 if verifier_calls else 0,
+        omitted_link_ids=omitted,
+        status=terminal
+        if terminal
+        in {"verified", "verified_partial", "refused", "insufficient_evidence"}
+        else "verified_partial",
+    )
+    return {
+        **state,
+        "status": terminal,
+        "detail": detail,
+        "answer": checked.model_dump(mode="json"),
+        "verification": result.model_dump(mode="json"),
+        "remaining_model_calls": remaining,
+        "verifier_call_count": verifier_calls,
+        "catalog_llm_call_count": 0,
+        "keyword_extract_count": 0,
+    }
+
+
+def _fusion_from_state(raw: object) -> FusionResult:
+    """Rebuild fusion output from graph state.
+
+    Args:
+        raw: Mapping or None.
+
+    Returns:
+        Fusion result. Empty Hybrid-effective result when missing.
+    """
+
+    if raw is None:
+        return FusionResult(
+            algorithm=SELECTED_FUSION_ALGORITHM,
+            config_hash="0" * 64,
+            requested_route="hybrid",
+            effective_route="hybrid",
+            evidence=(),
+            graph_discovered_only_ratio=0.0,
+        )
+    return FusionResult.model_validate(raw)
+
+
+def _tables_from_state(raw: object) -> TableComposition:
+    """Rebuild table composition from graph state.
+
+    Args:
+        raw: Mapping or None.
+
+    Returns:
+        Table composition, empty when missing.
+    """
+
+    if raw is None:
+        return TableComposition()
+    return TableComposition.model_validate(raw)
+
+
+def _gateway_answer(
+    deps: QueryGraphDeps,
+    *,
+    query: str,
+    fusion: FusionResult,
+    tables: tuple[object, ...],
+    remaining: int,
+) -> AnswerPayload:
+    """Run one async gateway answer call from the sync graph.
+
+    Args:
+        deps: Bound gateway and prompt.
+        query: User query.
+        fusion: Canonical evidence.
+        tables: Table records.
+        remaining: Remaining model calls, unused except as a timeout proxy.
+
+    Returns:
+        Parsed answer payload.
+
+    Raises:
+        AnswerError: If the gateway is unbound.
+    """
+
+    from typing import Any, cast
+
+    from smart_rag_core.gateways.model import AnswerModelRequest
+    from smart_rag_core.query_answer.assembly import assemble_source_records
+    from smart_rag_core.query_answer.generate import filter_invented_ids
+    from smart_rag_core.query_routing.models import TableEvidenceRecord
+
+    typed_tables = tuple(
+        item
+        if isinstance(item, TableEvidenceRecord)
+        else TableEvidenceRecord.model_validate(item)
+        for item in tables
+    )
+    records = assemble_source_records(fusion, typed_tables)
+    request = AnswerModelRequest(
+        query=query or "query",
+        prompt_version=ANSWER_PROMPT_VERSION,
+        prompt_sha256=ANSWER_PROMPT_SHA256,
+        prompt_text=str(deps.answer_prompt_text or "answer"),
+        source_records=records or " ",
+        chunk_ids=tuple(item.chunk_id for item in fusion.evidence),
+        table_ids=tuple(item.table_id for item in typed_tables),
+        remaining_deadline_seconds=max(0.1, min(45.0, float(remaining or 1))),
+    )
+    gateway = deps.model_gateway
+    if gateway is None:
+        raise AnswerError("model_gateway_unbound")
+    response = cast(Any, _run_coro(cast(Any, gateway).generate_answer(request)))
+    payload = AnswerPayload.model_validate(response.payload)
+    return filter_invented_ids(payload, fusion, typed_tables)
+
+
+def _gateway_verifier(
+    deps: QueryGraphDeps,
+    *,
+    links: tuple[AtomicLink, ...],
+    fusion: FusionResult,
+    tables: tuple[object, ...],
+    remaining: int,
+) -> VerifierPayload:
+    """Run one async gateway verifier call from the sync graph.
+
+    Args:
+        deps: Bound gateway and prompt.
+        links: At most six atomic links.
+        fusion: Canonical evidence.
+        tables: Table records.
+        remaining: Remaining model calls, unused except as a timeout proxy.
+
+    Returns:
+        ``VerifierPayload``.
+
+    Raises:
+        AnswerError: If the gateway is unbound.
+    """
+
+    from typing import Any, cast
+
+    from smart_rag_core.gateways.model import VerifierModelRequest
+    from smart_rag_core.query_answer.assembly import assemble_source_records
+    from smart_rag_core.query_answer.models import VerifierPayload
+    from smart_rag_core.query_routing.models import TableEvidenceRecord
+
+    typed_tables = tuple(
+        item
+        if isinstance(item, TableEvidenceRecord)
+        else TableEvidenceRecord.model_validate(item)
+        for item in tables
+    )
+    records = assemble_source_records(fusion, typed_tables)
+    request = VerifierModelRequest(
+        prompt_version=VERIFIER_PROMPT_VERSION,
+        prompt_sha256=VERIFIER_PROMPT_SHA256,
+        prompt_text=str(deps.verifier_prompt_text or "verifier"),
+        source_records=records or " ",
+        links=tuple(
+            cast(dict[str, object], item.model_dump(mode="json")) for item in links
+        ),
+        remaining_deadline_seconds=max(0.1, min(45.0, float(remaining or 1))),
+    )
+    gateway = deps.model_gateway
+    if gateway is None:
+        raise AnswerError("model_gateway_unbound")
+    response = cast(Any, _run_coro(cast(Any, gateway).generate_verifier(request)))
+    return VerifierPayload.model_validate(response.payload)
+
+
+def _run_coro(coro: object) -> object:
+    """Run one async gateway call from the sync query graph.
+
+    Args:
+        coro: Awaitable from ``ModelGateway``.
+
+    Returns:
+        Result.
+    """
+
+    import asyncio
+
+    if asyncio.iscoroutine(coro):
+        return asyncio.run(coro)
+    return coro

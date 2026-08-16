@@ -37,13 +37,18 @@ honest. They are not optional footnotes.
 - **Combined +10 pp (QT-EVAL-009) must use live mapping/extraction** on the
   15 labeled documents (or a newly collected set). CoverageSlice fixture
   language floors in [PHASE5_GRAPH_EVAL.md](../evaluation/PHASE5_GRAPH_EVAL.md)
-  are **not** Combined quality and are **not** live extraction P/R.
-- **Query graph and frontend remain scaffolds.** Chat, SSE, Combined
-  fusion, and Stitch UI are not implemented. Do not pretend answering
-  works.
+  are **not** Combined quality and are **not** live extraction P/R. Packet 3
+  implemented resolved-path fusion and recorded live +10pp as **unverified**.
+- **SSE and the testing UI remain unimplemented.** Packet 3 wired
+  `fuse_evidence` → `compose_tables` → `generate_answer` → `verify_answer`
+  on the query graph. Do not treat that as launch Combined quality, chat
+  streaming, or Stitch UI. See [COMBINED_FUSION.md](../agent/COMBINED_FUSION.md)
+  and [ANSWER_VERIFICATION.md](../agent/ANSWER_VERIFICATION.md).
 
 Related: [FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
 [PHASE5_GRAPH_EVAL.md](../evaluation/PHASE5_GRAPH_EVAL.md) ·
+[COMBINED_FUSION.md](../agent/COMBINED_FUSION.md) ·
+[ANSWER_VERIFICATION.md](../agent/ANSWER_VERIFICATION.md) ·
 [RETRIEVAL.md](./RETRIEVAL.md) ·
 [GRAPH_MAPPING_CONTRACT.md](./GRAPH_MAPPING_CONTRACT.md) ·
 [ENTITY_RULES.md](./ENTITY_RULES.md) ·

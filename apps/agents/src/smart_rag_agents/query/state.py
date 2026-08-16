@@ -1,4 +1,4 @@
-"""Typed query graph state for Phase 6 packets 1-2."""
+"""Typed query graph state for Phase 6 packets 1-3."""
 
 from __future__ import annotations
 
@@ -40,6 +40,14 @@ class QueryGraphState(TypedDict):
         keyword_extract_count: Must stay 0.
         catalog_llm_call_count: Must stay 0.
         correction_applied: Guard against a second correction.
+        fusion: ``FusionResult`` mapping.
+        table_composition: ``TableComposition`` mapping.
+        answer: ``AnswerPayload`` mapping.
+        verification: ``VerificationResult`` mapping.
+        answer_call_count: Must be 0 or 1.
+        verifier_call_count: Must be 0 or 1.
+        selected_algorithm: Fusion or naive union.
+        fusion_config_hash: Frozen configuration digest.
     """
 
     status: Literal[
@@ -51,6 +59,12 @@ class QueryGraphState(TypedDict):
         "planned",
         "branches_executed",
         "correction_applied",
+        "fused",
+        "tables_composed",
+        "answered",
+        "verified",
+        "verified_partial",
+        "refused",
         "routing_rejected",
         "insufficient_evidence",
     ]
@@ -81,6 +95,14 @@ class QueryGraphState(TypedDict):
     keyword_extract_count: int
     catalog_llm_call_count: int
     correction_applied: bool
+    fusion: dict[str, object] | None
+    table_composition: dict[str, object] | None
+    answer: dict[str, object] | None
+    verification: dict[str, object] | None
+    answer_call_count: int
+    verifier_call_count: int
+    selected_algorithm: str | None
+    fusion_config_hash: str | None
 
 
 QueryStateGraph: TypeAlias = StateGraph[
@@ -145,4 +167,12 @@ def pending_query_state(
         "keyword_extract_count": 0,
         "catalog_llm_call_count": 0,
         "correction_applied": False,
+        "fusion": None,
+        "table_composition": None,
+        "answer": None,
+        "verification": None,
+        "answer_call_count": 0,
+        "verifier_call_count": 0,
+        "selected_algorithm": None,
+        "fusion_config_hash": None,
     }

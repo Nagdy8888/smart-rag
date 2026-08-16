@@ -12,6 +12,11 @@ from typing import Literal, Protocol
 from smart_rag_core.query_admission.ceilings import assert_deadline_open
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryCeilingError
+from smart_rag_core.query_fusion.models import (
+    GraphPassage,
+    GraphPathInput,
+    HybridPassage,
+)
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.constants import (
     BRANCH_CONCURRENCY,
@@ -29,6 +34,7 @@ from smart_rag_core.query_routing.models import (
     BranchSpec,
     QueryPreparation,
     RetrievalPlan,
+    TableEvidenceRecord,
 )
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.security.identity import CallerContext, UserRole
@@ -389,8 +395,17 @@ def _run_spec(
                 status="degraded",
                 fallback_reason=FALLBACK_RETRIEVERS_UNBOUND,
             )
-        table_executor(spec, caller)
-        return _inherited_result(spec, runtime, status="ok")
+        table_result = table_executor(spec, caller)
+        return BranchResult(
+            branch_id=spec.branch_id,
+            kind=spec.kind,
+            family=spec.family,
+            run_id=runtime.run_id,
+            reservation_id=runtime.reservation_id,
+            query_text=spec.query_text,
+            status="ok",
+            table_evidence=_table_evidence(table_result),
+        )
     return _inherited_result(spec, runtime, status="ok")
 
 
@@ -489,6 +504,7 @@ def _run_hybrid(
         status=status,
         bm25_snippets_used=False,
         graph_prose_used=False,
+        hybrid_evidence=_hybrid_evidence(outcome),
     )
 
 
@@ -571,8 +587,11 @@ def _run_graph(
         raise QueryRoutingError("branch_fan_out")
     counters = getattr(lead_set, "counters", None)
     extract_count = getattr(counters, "keyword_extract", 0) if counters else 0
+    answer_count = getattr(counters, "answer_generate", 0) if counters else 0
     if extract_count:
         raise QueryRoutingError("hidden_keyword_call")
+    if answer_count:
+        raise QueryRoutingError("hidden_lightrag_answer")
     blindness = getattr(lead_set, "acl_blindness_count", None)
     published = None
     if isinstance(blindness, int):
@@ -582,6 +601,21 @@ def _run_graph(
             authorized_visibility=True,
         )
     survival = getattr(lead_set, "graph_survival_ratio", None)
+    limitation_codes = _limitation_codes(lead_set)
+    timeout = (
+        "graph_deadline" in limitation_codes or "graph_cancelled" in limitation_codes
+    )
+    fallback_reason = None
+    if timeout:
+        fallback_reason = "graph_deadline"
+    paths, passages = _graph_snapshots(lead_set)
+    if spec.kind is BranchKind.GRAPH_GLOBAL_STEERING:
+        paths = tuple(
+            item.model_copy(update={"steering_only": True, "fully_mapped": False})
+            for item in paths
+        )
+        if "global_steering_only" not in limitation_codes:
+            limitation_codes = ("global_steering_only", *limitation_codes)
     return BranchResult(
         branch_id=spec.branch_id,
         kind=spec.kind,
@@ -591,12 +625,15 @@ def _run_graph(
         query_text=spec.query_text,
         status="ok",
         keyword_extract_count=0,
+        lightrag_answer_generate_count=0,
         acl_blindness_count=published,
         graph_survival_ratio=survival if isinstance(survival, float) else None,
-        limitations=("global_steering_only",)
-        if spec.kind is BranchKind.GRAPH_GLOBAL_STEERING
-        else (),
+        limitations=limitation_codes,
         graph_prose_used=False,
+        graph_paths=paths,
+        graph_passages=passages,
+        graph_timeout=timeout,
+        fallback_reason=fallback_reason,
     )
 
 
@@ -635,6 +672,183 @@ def _run_async(coro: object) -> object:
     if asyncio.iscoroutine(coro):
         return asyncio.run(coro)
     return coro
+
+
+def _hybrid_evidence(outcome: object) -> tuple[HybridPassage, ...]:
+    """Snapshot Hybrid evidence units with 1-based post-rerank ranks.
+
+    When evidence units are absent, RRF ``ranked_ids`` supply the allowed
+    skip/fallback ranks without citation text.
+
+    Args:
+        outcome: Hybrid retrieve result.
+
+    Returns:
+        Canonical Hybrid passages. BM25 snippets are never copied.
+    """
+
+    units = getattr(outcome, "evidence", ())
+    records: list[HybridPassage] = []
+    if units:
+        for index, unit in enumerate(units, start=1):
+            locator = getattr(unit, "locator", None)
+            records.append(
+                HybridPassage(
+                    chunk_id=str(unit.chunk_id),
+                    document_id=str(unit.document_id),
+                    version_id=str(unit.version_id),
+                    citation_text=str(getattr(unit, "citation_text", "") or ""),
+                    hybrid_rank=index,
+                    section_path=tuple(getattr(locator, "section_path", ()) or ()),
+                    page_number=getattr(locator, "page_number", None),
+                    sheet_name=getattr(locator, "sheet_name", None),
+                    range_ref=getattr(locator, "range_ref", None),
+                    source_url=getattr(locator, "source_url", None),
+                )
+            )
+        return tuple(records)
+    for index, chunk_id in enumerate(getattr(outcome, "ranked_ids", ()), start=1):
+        records.append(
+            HybridPassage(
+                chunk_id=str(chunk_id),
+                document_id=str(chunk_id),
+                version_id=str(chunk_id),
+                citation_text="",
+                hybrid_rank=index,
+            )
+        )
+    return tuple(records)
+
+
+def _limitation_codes(outcome: object) -> tuple[str, ...]:
+    """Normalize graph limitation codes from a retrieve result.
+
+    Args:
+        outcome: Graph retrieve result.
+
+    Returns:
+        Limitation code strings.
+    """
+
+    raw = getattr(outcome, "limitations", ())
+    codes: list[str] = []
+    for item in raw or ():
+        code = getattr(item, "code", item)
+        value = getattr(code, "value", code)
+        codes.append(str(value))
+    return tuple(codes)
+
+
+def _graph_snapshots(
+    outcome: object,
+) -> tuple[tuple[GraphPathInput, ...], tuple[GraphPassage, ...]]:
+    """Capture resolved paths and canonical locators. Never vendor prose.
+
+    Args:
+        outcome: GraphRetrievalResult-like object, or a lead set without paths.
+
+    Returns:
+        Path inputs and canonical locators.
+    """
+
+    candidates = getattr(outcome, "candidates", ())
+    support_by_id = {
+        str(getattr(item, "object_id", "")): float(getattr(item, "support", 0.0) or 0.0)
+        for item in candidates or ()
+        if getattr(item, "object_id", None)
+    }
+    chunks_by_id = {
+        str(getattr(item, "object_id", "")): tuple(
+            str(chunk) for chunk in getattr(item, "canonical_chunk_ids", ()) or ()
+        )
+        for item in candidates or ()
+        if getattr(item, "object_id", None)
+    }
+    paths: list[GraphPathInput] = []
+    for path in getattr(outcome, "paths", ()) or ():
+        statement_ids = tuple(
+            str(item) for item in getattr(path, "statement_ids", ()) or ()
+        )
+        hops = int(getattr(path, "hops", len(statement_ids) or 1))
+        supports = tuple(
+            support_by_id.get(statement_id, 0.0) for statement_id in statement_ids
+        )
+        missing = any(
+            statement_id not in support_by_id or support_by_id[statement_id] <= 0.0
+            for statement_id in statement_ids
+        )
+        edge_chunks = tuple(
+            chunks_by_id.get(statement_id, ()) for statement_id in statement_ids
+        )
+        canonical = tuple(
+            str(chunk) for chunk in getattr(path, "canonical_chunk_ids", ()) or ()
+        )
+        if not canonical:
+            canonical = tuple(
+                dict.fromkeys(chunk for group in edge_chunks for chunk in group)
+            )
+        paths.append(
+            GraphPathInput(
+                statement_ids=statement_ids,
+                hops=max(1, min(hops, 3)),
+                canonical_chunk_ids=canonical,
+                edge_chunk_ids=edge_chunks,
+                edge_supports=supports,
+                fully_mapped=bool(statement_ids) and not missing,
+                unmapped=not statement_ids or missing,
+                missing_edge_support=missing,
+                steering_only=False,
+            )
+        )
+    locators: list[GraphPassage] = []
+    for locator in getattr(outcome, "locators", ()) or ():
+        locators.append(
+            GraphPassage(
+                chunk_id=str(locator.chunk_id),
+                document_id=str(locator.document_id),
+                version_id=str(locator.version_id),
+                citation_text="",
+                section_path=tuple(getattr(locator, "section_path", ()) or ()),
+                page_number=getattr(locator, "page_number", None),
+                sheet_name=getattr(locator, "sheet_name", None),
+                range_ref=getattr(locator, "range_ref", None),
+                source_url=getattr(locator, "source_url", None),
+            )
+        )
+    return tuple(paths), tuple(locators)
+
+
+def _table_evidence(outcome: object) -> TableEvidenceRecord | None:
+    """Snapshot a structured-table result. Prose arithmetic is forbidden.
+
+    Args:
+        outcome: ``TableQueryResult`` or None.
+
+    Returns:
+        Table evidence record, or None when the executor returned nothing.
+    """
+
+    if outcome is None:
+        return None
+    table_id = getattr(outcome, "table_id", None)
+    if table_id is None:
+        return None
+    rows_raw = getattr(outcome, "rows", ()) or ()
+    rows = tuple(dict(item) for item in rows_raw)
+    return TableEvidenceRecord(
+        table_id=str(table_id),
+        version_id=str(getattr(outcome, "version_id", "") or ""),
+        document_id=str(getattr(outcome, "document_id", "") or ""),
+        source_ranges=tuple(
+            str(item) for item in getattr(outcome, "source_ranges", ()) or ()
+        ),
+        operation=str(getattr(outcome, "operation", "table") or "table"),
+        rows=rows,
+        sheet=getattr(outcome, "sheet", None),
+        workbook=getattr(outcome, "workbook", None),
+        units=getattr(outcome, "units", None),
+        from_prose=False,
+    )
 
 
 def _ranked_ids(outcome: object) -> tuple[str, ...]:

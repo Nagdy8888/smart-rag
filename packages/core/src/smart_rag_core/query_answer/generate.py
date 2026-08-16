@@ -1,0 +1,214 @@
+"""One counted answer generation from canonical passages and table values."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from smart_rag_core.query_answer.assembly import (
+    allowed_chunk_ids,
+    allowed_table_ids,
+    assemble_source_records,
+)
+from smart_rag_core.query_answer.exceptions import AnswerError
+from smart_rag_core.query_answer.models import (
+    AnswerCitation,
+    AnswerPayload,
+    AtomicLink,
+    ComposedConclusion,
+)
+from smart_rag_core.query_answer.versions import MAX_ANSWER_GENERATIONS
+from smart_rag_core.query_fusion.models import FusionResult
+from smart_rag_core.query_routing.models import TableEvidenceRecord
+
+AnswerCaller = Callable[
+    [str, FusionResult, tuple[TableEvidenceRecord, ...]], AnswerPayload
+]
+
+
+def generate_answer(
+    *,
+    fusion: FusionResult,
+    tables: tuple[TableEvidenceRecord, ...],
+    user_query: str,
+    caller: AnswerCaller | None,
+    already_generated: int,
+    company_claim_forbidden: bool,
+    graph_as_answer_forbidden: bool,
+) -> AnswerPayload:
+    """Generate exactly one answer from canonical evidence.
+
+    Args:
+        fusion: Combined or Hybrid-effective evidence.
+        tables: Deterministic table snapshots.
+        user_query: Original user text. Untrusted.
+        caller: Structured answer adapter. None uses the extractive mock.
+        already_generated: Existing answer count. A second call fails.
+        company_claim_forbidden: True for NoRetrieval.
+        graph_as_answer_forbidden: True for graph-only inspection.
+
+    Returns:
+        Structured answer citing only supplied IDs.
+
+    Raises:
+        AnswerError: Second answer generation, graph-only answering, or
+            company claims on NoRetrieval.
+    """
+
+    if already_generated >= MAX_ANSWER_GENERATIONS:
+        raise AnswerError("second_answer_generation")
+    if graph_as_answer_forbidden:
+        return AnswerPayload(
+            answer_text="Graph inspection cannot answer from graph leads.",
+            status="refused",
+        )
+    if company_claim_forbidden:
+        return AnswerPayload(
+            answer_text="No company-knowledge claim is authorized for this query.",
+            status="refused",
+        )
+    if not fusion.evidence and not tables:
+        return AnswerPayload(
+            answer_text="Insufficient authorized evidence.",
+            status="refused",
+        )
+    records = assemble_source_records(fusion, tables)
+    if caller is None:
+        payload = mock_answer_payload(fusion, tables, user_query=user_query)
+    else:
+        payload = caller(records, fusion, tables)
+    return filter_invented_ids(payload, fusion, tables)
+
+
+def filter_invented_ids(
+    payload: AnswerPayload,
+    fusion: FusionResult,
+    tables: tuple[TableEvidenceRecord, ...],
+) -> AnswerPayload:
+    """Drop citations and links that invent IDs not in supplied evidence.
+
+    Args:
+        payload: Model or mock answer.
+        fusion: Canonical evidence.
+        tables: Table snapshots.
+
+    Returns:
+        Payload citing only supplied IDs.
+    """
+
+    chunks = allowed_chunk_ids(fusion)
+    table_ids = allowed_table_ids(tables)
+    citations = tuple(
+        item
+        for item in payload.citations
+        if item.chunk_id is None or item.chunk_id in chunks
+    )
+    table_citations = tuple(
+        item
+        for item in payload.table_citations
+        if item.table_id is None or item.table_id in table_ids
+    )
+    links = tuple(
+        item.model_copy(
+            update={
+                "chunk_ids": tuple(
+                    chunk_id for chunk_id in item.chunk_ids if chunk_id in chunks
+                )
+            }
+        )
+        for item in payload.atomic_links
+        if (
+            not item.chunk_ids or any(chunk_id in chunks for chunk_id in item.chunk_ids)
+        )
+        or (item.table_id is not None and item.table_id in table_ids)
+    )
+    return payload.model_copy(
+        update={
+            "citations": citations,
+            "table_citations": table_citations,
+            "atomic_links": links,
+        }
+    )
+
+
+def mock_answer_payload(
+    fusion: FusionResult,
+    tables: tuple[TableEvidenceRecord, ...],
+    *,
+    user_query: str,
+) -> AnswerPayload:
+    """Build a deterministic fixture answer that cites supplied evidence IDs.
+
+    This is mock-mode output, not a live company-knowledge claim. Table
+    values are copied, never recalculated from prose.
+
+    Args:
+        fusion: Canonical evidence.
+        tables: Deterministic table snapshots.
+        user_query: Original user text.
+
+    Returns:
+        Structured answer citing every supplied passage and table range.
+    """
+
+    del user_query
+    citations = tuple(
+        AnswerCitation(
+            chunk_id=item.chunk_id, span=None, atomic_link_id=f"link-{index}"
+        )
+        for index, item in enumerate(fusion.evidence, start=1)
+    )
+    table_citations = tuple(
+        AnswerCitation(
+            table_id=item.table_id,
+            source_ranges=item.source_ranges,
+            atomic_link_id=f"table-{index}",
+        )
+        for index, item in enumerate(tables, start=1)
+    )
+    links: list[AtomicLink] = [
+        AtomicLink(
+            link_id=f"link-{index}",
+            claim=item.citation_text[:400] or f"Canonical passage {item.chunk_id}",
+            chunk_ids=(item.chunk_id,),
+            kind="inference_link" if item.statement_ids else "fact",
+            priority=index,
+        )
+        for index, item in enumerate(fusion.evidence, start=1)
+    ]
+    for index, item in enumerate(tables, start=1):
+        links.append(
+            AtomicLink(
+                link_id=f"table-{index}",
+                claim=item.operation,
+                table_id=item.table_id,
+                source_ranges=item.source_ranges,
+                kind="fact",
+                priority=100 + index,
+            )
+        )
+    conclusion = None
+    inference_ids = tuple(
+        item.link_id for item in links if item.kind == "inference_link"
+    )
+    if len(inference_ids) >= 2:
+        conclusion = ComposedConclusion(
+            text="Composed multi-hop inference from the cited atomic links.",
+            kind="inference",
+            link_ids=inference_ids,
+        )
+    prose_parts = [
+        item.citation_text.strip()
+        for item in fusion.evidence
+        if item.citation_text.strip()
+    ]
+    for item in tables:
+        prose_parts.append(f"{item.operation} {item.source_ranges} {item.rows}")
+    status: str = "complete" if prose_parts else "partial"
+    return AnswerPayload(
+        answer_text=" ".join(prose_parts)[:8000] or "Insufficient authorized evidence.",
+        citations=citations,
+        atomic_links=tuple(links),
+        composed_conclusion=conclusion,
+        table_citations=table_citations,
+        status="complete" if status == "complete" else "partial",
+    )

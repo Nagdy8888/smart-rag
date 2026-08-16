@@ -12,8 +12,12 @@ phase_packet: Phase 6 Packet 1
 Packet 1 admits one authenticated query run, reserves the server-owned route
 envelope once, and hands FastAPI/core a typed `AuthorizedRuntimeContext`.
 Packet 2 owns preparation, the route matrix, and one correction
-([QUERY_ROUTING.md](./QUERY_ROUTING.md)). Answering, SSE, and the public chat
-router remain later packets. `/health/ready` stays `unconfigured`.
+([QUERY_ROUTING.md](./QUERY_ROUTING.md)). Packet 3 owns Combined fusion,
+one answer, and the verifier
+([COMBINED_FUSION.md](./COMBINED_FUSION.md),
+[ANSWER_VERIFICATION.md](./ANSWER_VERIFICATION.md)).
+SSE and the public chat router remain later packets. `/health/ready` stays
+`unconfigured`.
 
 Client JWT role, client USD, Valkey, cache, BM25, and graph output never
 authorize, enlarge a budget, or bypass canonical Postgres checks.

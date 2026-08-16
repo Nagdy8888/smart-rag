@@ -1,7 +1,7 @@
 """LangGraph agents package for query and ingestion workflows.
 
-The query graph enforces authorized admission and does not claim retrieval
-or answering. Ingestion remains a lease/ledger probe graph.
+The query graph admits, retrieves, fuses, answers, and verifies. SSE and the
+public chat UI remain later packets. Ingestion remains a lease/ledger probe.
 """
 
 from __future__ import annotations

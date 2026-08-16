@@ -1,7 +1,6 @@
-"""Query LangGraph: admission, memory, preparation, routing, retrieve, one correction.
+"""Query LangGraph: admission through Combined fusion, answer, and verifier.
 
-Packet 3 owns Combined fusion, answer generation, and the verifier. This
-module compiles without sockets or OpenAI clients.
+This module compiles without sockets or OpenAI clients.
 """
 
 from __future__ import annotations
@@ -15,9 +14,13 @@ from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.nodes import (
     apply_correction_node,
     compile_plan_node,
+    compose_tables_node,
     execute_branches_node,
+    fuse_evidence_node,
+    generate_answer_node,
     load_memory_node,
     prepare_query_node,
+    verify_answer_node,
 )
 from smart_rag_agents.query.state import (
     CompiledQueryGraph,
@@ -143,6 +146,21 @@ def _route_after_prepare(state: QueryGraphState) -> str:
     return "compile_plan"
 
 
+def _route_after_correction(state: QueryGraphState) -> str:
+    """Continue to fusion unless admission or routing already failed closed.
+
+    Args:
+        state: State after ``apply_correction``.
+
+    Returns:
+        ``fuse_evidence`` or ``end``.
+    """
+
+    if state["status"] in {"admission_rejected", "routing_rejected"}:
+        return "end"
+    return "fuse_evidence"
+
+
 def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
     """Construct the packet 2 query ``StateGraph`` (not yet compiled).
 
@@ -152,16 +170,16 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
 
     Returns:
         An uncompiled graph: admission → memory → prepare → plan →
-        branches → one correction → END.
+        branches → one correction → fuse → tables → answer → verify → END.
 
     Notes:
         State inputs: ``QueryGraphState``.
-        State outputs: routed retrieve diagnostics, never an answer.
-        Persistence writes: counted prep consume when a model is used.
-        External/model calls: at most one prep call plus retrievers.
+        State outputs: fused evidence, one answer, and layered verification.
+        Persistence writes: counted prep/answer/verifier consume when used.
+        External/model calls: at most one prep, one answer, one verifier.
         Budget/deadline behavior: copies server ceilings; never enlarges.
         Failure/fallback route: ``admission_rejected`` / ``routing_rejected``
-            / ``insufficient_evidence`` then END.
+            / ``insufficient_evidence`` / ``verified_partial`` then END.
     """
 
     bound = deps or QueryGraphDeps()
@@ -226,10 +244,58 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
             state: State after branches.
 
         Returns:
-            Terminal packet-2 state.
+            State after the single correction.
         """
 
         return apply_correction_node(state, bound)
+
+    def fuse_evidence(state: QueryGraphState) -> QueryGraphState:
+        """LangGraph wrapper for Combined fusion.
+
+        Args:
+            state: State after correction.
+
+        Returns:
+            State with fused canonical evidence.
+        """
+
+        return fuse_evidence_node(state, bound)
+
+    def compose_tables(state: QueryGraphState) -> QueryGraphState:
+        """LangGraph wrapper for deterministic table composition.
+
+        Args:
+            state: State after fusion.
+
+        Returns:
+            State with table provenance.
+        """
+
+        return compose_tables_node(state, bound)
+
+    def generate_answer(state: QueryGraphState) -> QueryGraphState:
+        """LangGraph wrapper for one canonical answer generation.
+
+        Args:
+            state: State after table composition.
+
+        Returns:
+            State with one answer payload.
+        """
+
+        return generate_answer_node(state, bound)
+
+    def verify_answer(state: QueryGraphState) -> QueryGraphState:
+        """LangGraph wrapper for layered verification.
+
+        Args:
+            state: State after answer generation.
+
+        Returns:
+            Terminal verified state.
+        """
+
+        return verify_answer_node(state, bound)
 
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "enforce_admission",
@@ -255,6 +321,22 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
         "apply_correction",
         apply_correction,
     )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "fuse_evidence",
+        fuse_evidence,
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "compose_tables",
+        compose_tables,
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "generate_answer",
+        generate_answer,
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "verify_answer",
+        verify_answer,
+    )
     builder.add_edge(START, "enforce_admission")
     builder.add_conditional_edges(
         "enforce_admission",
@@ -269,7 +351,15 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
     )
     builder.add_edge("compile_plan", "execute_branches")
     builder.add_edge("execute_branches", "apply_correction")
-    builder.add_edge("apply_correction", END)
+    builder.add_conditional_edges(
+        "apply_correction",
+        _route_after_correction,
+        {"fuse_evidence": "fuse_evidence", "end": END},
+    )
+    builder.add_edge("fuse_evidence", "compose_tables")
+    builder.add_edge("compose_tables", "generate_answer")
+    builder.add_edge("generate_answer", "verify_answer")
+    builder.add_edge("verify_answer", END)
     return builder
 
 

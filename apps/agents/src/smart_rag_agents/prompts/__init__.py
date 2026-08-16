@@ -8,6 +8,10 @@ QUERY_PROFILE_PROMPT_VERSION = "query_profile_v1"
 QUERY_PROFILE_PROMPT_PATH = Path(__file__).resolve().parent / "query_profile_v1.md"
 RERANK_PROMPT_VERSION = "rerank_v1"
 RERANK_PROMPT_PATH = Path(__file__).resolve().parent / "rerank_v1.md"
+ANSWER_PROMPT_VERSION = "answer_v1"
+ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "answer_v1.md"
+VERIFIER_PROMPT_VERSION = "verifier_v1"
+VERIFIER_PROMPT_PATH = Path(__file__).resolve().parent / "verifier_v1.md"
 
 
 def query_profile_prompt_text() -> str:
@@ -34,3 +38,29 @@ def rerank_prompt_text() -> str:
     """
 
     return RERANK_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def answer_prompt_text() -> str:
+    """Return the Packet 3 canonical answer prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return ANSWER_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def verifier_prompt_text() -> str:
+    """Return the Packet 3 atomic-link verifier prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return VERIFIER_PROMPT_PATH.read_text(encoding="utf-8")

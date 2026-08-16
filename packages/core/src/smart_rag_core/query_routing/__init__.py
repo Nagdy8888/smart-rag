@@ -32,6 +32,7 @@ from smart_rag_core.query_routing.models import (
     QueryPreparation,
     RetrievalPlan,
     RoutingSurface,
+    TableEvidenceRecord,
 )
 from smart_rag_core.query_routing.preparation import (
     assert_preparation_schema,
@@ -62,6 +63,7 @@ __all__ = [
     "QueryRoutingError",
     "RetrievalPlan",
     "RoutingSurface",
+    "TableEvidenceRecord",
     "apply_correction_to_plan",
     "assert_preparation_schema",
     "branch_results_from_state",

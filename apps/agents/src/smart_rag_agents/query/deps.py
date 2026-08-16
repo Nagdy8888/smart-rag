@@ -29,6 +29,9 @@ class QueryGraphDeps:
         model_caller: One structured rewrite-plus-profile adapter.
         force_model: Spend the one prep call even when deterministic.
         cancel_check: Cooperative cancellation probe.
+        answer_prompt_text: Pinned ``answer_v1`` body when a live adapter runs.
+        verifier_prompt_text: Pinned ``verifier_v1`` body when a live adapter runs.
+        model_gateway: Optional ``ModelGateway``. Compile constructs none.
     """
 
     connection: psycopg.Connection | None = None
@@ -38,3 +41,6 @@ class QueryGraphDeps:
     model_caller: PrepModelCaller | None = None
     force_model: bool = False
     cancel_check: Callable[[], bool] | None = None
+    answer_prompt_text: str | None = None
+    verifier_prompt_text: str | None = None
+    model_gateway: object | None = None

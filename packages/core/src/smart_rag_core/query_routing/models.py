@@ -9,6 +9,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from smart_rag_core.evaluation.schema import ExpectedProfile
+from smart_rag_core.query_fusion.models import (
+    GraphPassage,
+    GraphPathInput,
+    HybridPassage,
+)
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.constants import (
     BRANCH_CONCURRENCY,
@@ -368,8 +373,38 @@ class RetrievalPlan(BaseModel):
         return self
 
 
+class TableEvidenceRecord(BaseModel):
+    """Deterministic structured-table snapshot. Never model-calculated prose math.
+
+    Attributes:
+        table_id: Canonical table UUID string.
+        version_id: Current version UUID string.
+        document_id: Owning document UUID string.
+        source_ranges: Exact cell or range provenance.
+        operation: Aggregations and comparison summary.
+        rows: JSON-safe result dictionaries.
+        sheet: Sheet name.
+        workbook: Workbook or CSV name.
+        units: Result unit.
+        from_prose: Must stay false. Prose arithmetic is forbidden.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    table_id: str = Field(min_length=1, max_length=36)
+    version_id: str = Field(min_length=1, max_length=36)
+    document_id: str = Field(min_length=1, max_length=36)
+    source_ranges: tuple[str, ...] = ()
+    operation: str = Field(min_length=1, max_length=256)
+    rows: tuple[dict[str, object], ...] = ()
+    sheet: str | None = None
+    workbook: str | None = None
+    units: str | None = None
+    from_prose: Literal[False] = False
+
+
 class BranchResult(BaseModel):
-    """Retrieval outcome for one branch. Fusion and answering are packet 3.
+    """Retrieval outcome for one branch, including packet 3 evidence snapshots.
 
     Attributes:
         branch_id: Matching spec id.
@@ -392,6 +427,13 @@ class BranchResult(BaseModel):
         graph_prose_used: Always false.
         company_claim: Always false on NoRetrieval.
         status: ``ok``, ``degraded``, ``refused``, or ``failed``.
+        hybrid_evidence: Canonical Hybrid passages with post-rerank ranks.
+        graph_paths: Resolved application paths. Native prose is forbidden.
+        graph_passages: Canonical locators for graph chunk IDs.
+        table_evidence: Deterministic table provenance when this is a table
+            branch.
+        graph_timeout: True when LightRAG missed its deadline.
+        lightrag_answer_generate_count: Must stay 0.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -416,6 +458,12 @@ class BranchResult(BaseModel):
     graph_prose_used: Literal[False] = False
     company_claim: Literal[False] = False
     status: Literal["ok", "degraded", "refused", "failed"] = "ok"
+    hybrid_evidence: tuple[HybridPassage, ...] = ()
+    graph_paths: tuple[GraphPathInput, ...] = ()
+    graph_passages: tuple[GraphPassage, ...] = ()
+    table_evidence: TableEvidenceRecord | None = None
+    graph_timeout: bool = False
+    lightrag_answer_generate_count: Literal[0] = 0
 
 
 class CorrectionDecision(BaseModel):

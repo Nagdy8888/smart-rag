@@ -7,6 +7,8 @@ from smart_rag_core.gateways.embedding import (
     create_embedding_gateway,
 )
 from smart_rag_core.gateways.model import (
+    AnswerModelRequest,
+    AnswerModelResponse,
     LightRagLlmRequest,
     LightRagLlmResponse,
     MockModelAdapter,
@@ -19,11 +21,15 @@ from smart_rag_core.gateways.model import (
     QueryProfileModelResponse,
     RerankModelRequest,
     RerankModelResponse,
+    VerifierModelRequest,
+    VerifierModelResponse,
     block_openai_network,
     create_model_gateway,
 )
 
 __all__ = [
+    "AnswerModelRequest",
+    "AnswerModelResponse",
     "EmbeddingGateway",
     "EmbeddingRequest",
     "EmbeddingResponse",
@@ -39,6 +45,8 @@ __all__ = [
     "QueryProfileModelResponse",
     "RerankModelRequest",
     "RerankModelResponse",
+    "VerifierModelRequest",
+    "VerifierModelResponse",
     "block_openai_network",
     "create_embedding_gateway",
     "create_model_gateway",

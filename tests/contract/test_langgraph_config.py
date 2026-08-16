@@ -108,12 +108,18 @@ def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
             user_query="What is the status of INV-SR-1001?",
         )
     )
-    assert routed["status"] in {"correction_applied", "insufficient_evidence"}
+    assert routed["status"] in {
+        "verified",
+        "verified_partial",
+        "insufficient_evidence",
+        "refused",
+    }
     assert routed["effective_route"] == "hybrid"
     assert routed["keyword_extract_count"] == 0
     assert routed["catalog_llm_call_count"] == 0
-    assert routed.get("answer") is None
-    assert "not implemented" in routed["detail"]
+    assert routed.get("answer") is not None
+    assert routed["answer_call_count"] == 0
+    assert routed["verifier_call_count"] == 0
     assert routed["preparation"] is not None
     assert routed["retrieval_plan"] is not None
 

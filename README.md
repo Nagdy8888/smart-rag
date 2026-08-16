@@ -51,4 +51,8 @@ Full index (owner / status / last-reviewed): [docs/README.md](docs/README.md)
 
 ## Status
 
-Phase 1 foundation was accepted on 2026-08-12 and passed local re-verification on 2026-08-13; the updated remote CI run is still pending. Phase 2 identity/data is pending final acceptance, and later phases remain planned. See the docs index for current evidence.
+Phase 1 foundation was accepted on 2026-08-12. Phases 2–5 have local evidence
+and remain pending or accepted per the docs index. Phase 6 packets 1–3 are
+implemented (admission, routing, Combined fusion/answer/verifier) and are
+**not** a phase-complete claim. SSE, optional tools, and the testing UI
+remain later packets. See [docs/README.md](docs/README.md).
