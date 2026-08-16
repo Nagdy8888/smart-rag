@@ -232,6 +232,19 @@ full-rebuild cost exists (`max(USD 800, 4 × measured)`). Details:
 | QT-CAP-005-P8 | 15 open-split labeled `graph_mapping` documents; bulk onboarding blocked | document versions (reduced) | Phase 5 Packet 8; QT-GR-002 | accepted | user (Cursor chat) | 2026-08-16 | Phase 5 Packet 8; raise only after measured rebuild | Do not advertise 2,000 until rebuild/cost are measured |
 | QT-CAP-006-P8 | Unverified; not 200,000 | chunks (reduced) | Phase 5 Packet 8 | accepted | user (Cursor chat) | 2026-08-16 | Phase 5 Packet 8 / Phase 9 | Do not claim 200,000 source chunks |
 
+## 15. Phase 6 engineering defaults (not signed QT replacements)
+
+Packet 1 stores per-call USD and token caps so a query reservation can be
+reserved once. These numbers are **engineering defaults** derived from
+QT-COST-001 and QT-MC-*/QT-DL-*. They are not client-signed replacements of
+the rows above. Canonical tables: [QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md)
+and [QUERY_ADMISSION.md](./agent/QUERY_ADMISSION.md).
+
+Assumptions recorded in Packet 1: `no_retrieval` and `scoped_refusal` use the
+Hybrid 25-second / 7-call envelope because QUALITY_TARGETS has no sixth
+deadline. Optional manifests remain three per the global contract (no
+`QT-TL-004` row).
+
 ## Decision record
 
 | Field | Value |

@@ -2,7 +2,7 @@
 title: Audit hash chain
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-16
 audience: engineering, security
 phase_packet: Phase 2 Packet 6
 ---
@@ -52,6 +52,7 @@ fields, redacted payload, `previous_hash`, and `created_at`.
 | --- | --- | --- |
 | `app.append_audit_event(...)` | `SECURITY DEFINER`; `EXECUTE` for `app_api`, `app_audit_writer` | Fixed `search_path`; PUBLIC revoked |
 | `app.authorize_restricted_read(...)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` only | Revalidates typed context, ACL, restricted visibility, and current version; atomically appends purpose/resource/session metadata |
+| `app.record_run_restricted_evidence(...)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` only | Same content-minimized chain for evidence included in a completed run; stores actor, version, run, citation, purpose; no passage text |
 | `app.verify_audit_chain(limit_n)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` | Returns first broken `id` or `NULL` |
 | `app.redact_audit_payload(jsonb)` | internal helper | PUBLIC revoked |
 

@@ -37,6 +37,8 @@ erDiagram
   document_chunks ||--o| lightrag_chunk_map : maps
   conversations ||--|{ messages : contains
   conversations ||--|{ runs : executes
+  runs ||--o| budget_reservations : query_run
+  runs ||--o{ llm_usage : records
   runs ||--o{ citations : cites
   runs ||--o{ user_feedback : receives
   ingestion_jobs }o--|| document_versions : targets
@@ -117,7 +119,7 @@ erDiagram
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `conversations` | `app` | authority | chat API | creator (+ audit) | 90d undeleted | per user | immediate delete path Pkt 6 | conversation `id` | 2 schema / 6 agent |
 | `messages` | `app` | authority | chat API | creator (+ audit) | with conversation | many | cascade | message `id` | 6 agent |
-| `runs` | `app` | authority | LangGraph/API | creator (+ audit) | 30d payloads | concurrent runs cap | cascade | optional idempotency | 6 agent |
+| `runs` | `app` | authority | admit RPC (`app_api` EXECUTE) | creator (+ audit) | 30d payloads | concurrent runs cap 5 | cascade | `(creator_user_id, conversation_id, idempotency_key)` plus global key unique | 6 packet 1 admission |
 | `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade | `(run_id, citation_index)` | 6 agent |
 | `user_feedback` | `app` | authority | chat UI | eval pipelines | 12 months | sparse | cascade | feedback `id` | 6 agent |
 | `tool_catalog` / `tool_versions` / `tool_permissions` / `tool_usage_events` | `app` | authority | admin/catalog | progressive disclosure | catalog lifetime | small | deactivate/delete | tool_key unique | 6 agent |
@@ -126,8 +128,8 @@ erDiagram
 
 | Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `llm_usage` | `app` | authority | model gateway | dashboards | 24mo aggregates | high append | none (aggregate) | usage row `id` | 6 agent |
-| `budget_reservations` | `app` | authority | API reserve/commit | gateway | until settled | active reservations | release/commit | reservation `id` | 6 agent |
+| `llm_usage` | `app` | authority | `record_query_llm_usage` only | dashboards | 24mo aggregates | high append | UPDATE/DELETE blocked | `(provider_attempt_id)` when set | 6 packet 1 |
+| `budget_reservations` | `app` | authority | admit/consume/true-up RPCs | gateway | until settled | active reservations | release/commit/expire | reservation `id`; `query_run` kind | 6 packet 1 |
 | `upload_quota_reservations` | `app` | authority | upload API (`reserve`/`finalize`) | Storage admit + cleanup | 15m admission; effective capability `min(reservation, JWT exp)` | active uploads | expire/release + Storage API cleanup | `(user_id, idempotency_key)` unique when key set | 2 schema / 5 storage |
 | `retention_holds` | `app` | authority | admin/compliance | purge planners | until released | sparse | release only | hold `id` | 2 structure / later purge |
 | `offboarding_requests` | `app` | authority | isolated Auth Admin boundary | ops | until completed | per subject | status machine | request `id` | 2 security effects / later export-purge |
@@ -167,7 +169,9 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
 - Pending glossary imports never write `search_aliases`; approval projects aliases; rollback deletes that projection.
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
+- `app.runs` also has unique `(creator_user_id, conversation_id, idempotency_key)` where the key is not null. The global `runs_idempotency_key_uq` remains.
 - `audit_events` rejects UPDATE/DELETE (append-only trigger).
+- `llm_usage` rejects UPDATE/DELETE (append-only trigger). Runtime roles have no table DML; query usage is inserted only through `app.record_query_llm_usage`.
 - RLS is enabled on all exposed tables; Storage quarantine INSERT is reservation-scoped; no authenticated SELECT on quarantine.
 - `document_scan_events` is append-only; `result=clean` inserts are blocked for non-`app_worker` roles until Phase 3.
 - ACL/visibility downgrade clears `graph_eligible` and atomically enqueues `graph_acl_remove`.
@@ -192,7 +196,7 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
   `config_generation`, return Graph Ready versions to `graph_pending`, and
   enqueue `company_default__rebuild` without switching the pointer.
 - `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. Packet 4 may set `active` when maps verify and the pointer already names the workspace. This is Graph Ready on the version, not a Packet 7 switch.
-- `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, or `graph_maintenance`. The kinds never share caps.
+- `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, `graph_maintenance`, or `query_run`. The kinds never share caps. `query_run` consume uses run-local optimistic version and never `SELECT FOR UPDATE` on `company_settings` or `profiles`.
 
 ## Related docs
 
@@ -207,4 +211,6 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [MAPPING.md](../graph/MAPPING.md)
 - [ENTITY_RULES.md](../graph/ENTITY_RULES.md)
 - [RETRIEVAL.md](../graph/RETRIEVAL.md)
+- [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md)
+- [QUERY_BUDGETS.md](../agent/QUERY_BUDGETS.md)
 - [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md)

@@ -1,7 +1,7 @@
 """LangGraph agents package for query and ingestion workflows.
 
-Phase 1 exports only foundation graph scaffolds. Graphs load for configuration
-qualification and must not claim retrieval, answering, or ingestion completion.
+The query graph enforces authorized admission and does not claim retrieval
+or answering. Ingestion remains a lease/ledger probe graph.
 """
 
 from __future__ import annotations

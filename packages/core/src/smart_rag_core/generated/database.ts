@@ -267,11 +267,16 @@ export type Database = {
       budget_reservations: {
         Row: {
           amount_usd: number
+          committed_amount_usd: number | null
           committed_at: string | null
           created_at: string
           expires_at: string
           id: string
+          optimistic_version: number
           released_at: string | null
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number | null
           reservation_kind: string
           run_id: string | null
           status: Database["app"]["Enums"]["budget_reservation_status"]
@@ -280,11 +285,16 @@ export type Database = {
         }
         Insert: {
           amount_usd: number
+          committed_amount_usd?: number | null
           committed_at?: string | null
           created_at?: string
           expires_at: string
           id?: string
+          optimistic_version?: number
           released_at?: string | null
+          remaining_completion_tokens?: number
+          remaining_prompt_tokens?: number
+          remaining_usd?: number | null
           reservation_kind: string
           run_id?: string | null
           status?: Database["app"]["Enums"]["budget_reservation_status"]
@@ -293,11 +303,16 @@ export type Database = {
         }
         Update: {
           amount_usd?: number
+          committed_amount_usd?: number | null
           committed_at?: string | null
           created_at?: string
           expires_at?: string
           id?: string
+          optimistic_version?: number
           released_at?: string | null
+          remaining_completion_tokens?: number
+          remaining_prompt_tokens?: number
+          remaining_usd?: number | null
           reservation_kind?: string
           run_id?: string | null
           status?: Database["app"]["Enums"]["budget_reservation_status"]
@@ -2297,8 +2312,12 @@ export type Database = {
           metadata: Json
           model_id: string
           prompt_tokens: number
+          provider_attempt_id: string | null
           recorded_at: string
+          reservation_id: string | null
+          reservation_version: number | null
           run_id: string | null
+          timeout_after_send: boolean
           total_tokens: number
           usage_kind: string
           user_id: string | null
@@ -2310,8 +2329,12 @@ export type Database = {
           metadata?: Json
           model_id: string
           prompt_tokens?: number
+          provider_attempt_id?: string | null
           recorded_at?: string
+          reservation_id?: string | null
+          reservation_version?: number | null
           run_id?: string | null
+          timeout_after_send?: boolean
           total_tokens?: number
           usage_kind: string
           user_id?: string | null
@@ -2323,13 +2346,24 @@ export type Database = {
           metadata?: Json
           model_id?: string
           prompt_tokens?: number
+          provider_attempt_id?: string | null
           recorded_at?: string
+          reservation_id?: string | null
+          reservation_version?: number | null
           run_id?: string | null
+          timeout_after_send?: boolean
           total_tokens?: number
           usage_kind?: string
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "llm_usage_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "budget_reservations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "llm_usage_run_id_fkey"
             columns: ["run_id"]
@@ -2504,6 +2538,7 @@ export type Database = {
         Row: {
           actor_user_id: string | null
           audit_event_id: string | null
+          citation_id: string | null
           created_at: string
           document_id: string | null
           id: string
@@ -2515,6 +2550,7 @@ export type Database = {
         Insert: {
           actor_user_id?: string | null
           audit_event_id?: string | null
+          citation_id?: string | null
           created_at?: string
           document_id?: string | null
           id?: string
@@ -2526,6 +2562,7 @@ export type Database = {
         Update: {
           actor_user_id?: string | null
           audit_event_id?: string | null
+          citation_id?: string | null
           created_at?: string
           document_id?: string | null
           id?: string
@@ -2540,6 +2577,13 @@ export type Database = {
             columns: ["audit_event_id"]
             isOneToOne: false
             referencedRelation: "audit_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "restricted_read_events_citation_id_fkey"
+            columns: ["citation_id"]
+            isOneToOne: false
+            referencedRelation: "citations"
             referencedColumns: ["id"]
           },
           {
@@ -2617,37 +2661,76 @@ export type Database = {
         Row: {
           completed_at: string | null
           conversation_id: string
+          correction_ceiling: number | null
           created_at: string
           creator_user_id: string
+          deadline_at: string | null
+          discovery_ceiling: number | null
           graph_name: string | null
+          heartbeat_at: string | null
           id: string
           idempotency_key: string | null
+          manifest_ceiling: number | null
+          model_call_ceiling: number | null
+          recursion_limit: number | null
+          request_payload_hash: string | null
+          reservation_id: string | null
+          route_family: string | null
+          side_effect_ceiling: number | null
           started_at: string | null
           status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number | null
+          tool_ceiling: number | null
           updated_at: string
         }
         Insert: {
           completed_at?: string | null
           conversation_id: string
+          correction_ceiling?: number | null
           created_at?: string
           creator_user_id: string
+          deadline_at?: string | null
+          discovery_ceiling?: number | null
           graph_name?: string | null
+          heartbeat_at?: string | null
           id?: string
           idempotency_key?: string | null
+          manifest_ceiling?: number | null
+          model_call_ceiling?: number | null
+          recursion_limit?: number | null
+          request_payload_hash?: string | null
+          reservation_id?: string | null
+          route_family?: string | null
+          side_effect_ceiling?: number | null
           started_at?: string | null
           status?: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling?: number | null
+          tool_ceiling?: number | null
           updated_at?: string
         }
         Update: {
           completed_at?: string | null
           conversation_id?: string
+          correction_ceiling?: number | null
           created_at?: string
           creator_user_id?: string
+          deadline_at?: string | null
+          discovery_ceiling?: number | null
           graph_name?: string | null
+          heartbeat_at?: string | null
           id?: string
           idempotency_key?: string | null
+          manifest_ceiling?: number | null
+          model_call_ceiling?: number | null
+          recursion_limit?: number | null
+          request_payload_hash?: string | null
+          reservation_id?: string | null
+          route_family?: string | null
+          side_effect_ceiling?: number | null
           started_at?: string | null
           status?: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling?: number | null
+          tool_ceiling?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -2656,6 +2739,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "runs_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "budget_reservations"
             referencedColumns: ["id"]
           },
         ]
@@ -3375,6 +3465,42 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admit_query_run: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+          p_idempotency_key: string
+          p_payload_hash: string
+          p_route_family: string
+          p_session_id?: string
+          p_token_issued_at?: string
+        }
+        Returns: {
+          correction_ceiling: number
+          deadline_at: string
+          discovery_ceiling: number
+          heartbeat_at: string
+          manifest_ceiling: number
+          model_call_ceiling: number
+          optimistic_version: number
+          reconnect: boolean
+          recursion_limit: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          request_payload_hash: string
+          reservation_id: string
+          reserved_amount_usd: number
+          route_family: string
+          run_id: string
+          side_effect_ceiling: number
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number
+          tool_ceiling: number
+        }[]
+      }
       advance_promotion_saga_step: {
         Args: { p_expected_step: string; p_new_step: string; p_saga_id: string }
         Returns: boolean
@@ -3520,6 +3646,37 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_bm25_reconcile_job: {
+        Args: { p_lease_seconds: number; p_owner: string }
+        Returns: {
+          attempt_count: number
+          chunk_id: string | null
+          created_at: string
+          error_category: Database["app"]["Enums"]["job_error_category"] | null
+          estimated_size_bytes: number
+          heartbeat_at: string | null
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          lease_token: string | null
+          max_attempts: number
+          next_attempt_at: string | null
+          operation: Database["app"]["Enums"]["bm25_job_operation"]
+          payload_ref: Json
+          priority: Database["app"]["Enums"]["job_priority"]
+          status: Database["app"]["Enums"]["job_status"]
+          updated_at: string
+          version_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "bm25_index_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       claim_ingestion_job: {
         Args: { p_lease_seconds: number; p_owner: string }
         Returns: {
@@ -3606,6 +3763,25 @@ export type Database = {
           p_version_id: string
         }
         Returns: boolean
+      }
+      consume_query_reservation: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_amount_usd: number
+          p_completion_tokens: number
+          p_expected_version: number
+          p_prompt_tokens: number
+          p_reservation_id: string
+        }
+        Returns: {
+          optimistic_version: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          reservation_id: string
+        }[]
       }
       count_authorized_retrievable_chunks: {
         Args: {
@@ -3890,6 +4066,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      heartbeat_query_run: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: string
+      }
       import_glossary_batch: {
         Args: {
           caller_authorization_version: number
@@ -4028,6 +4213,23 @@ export type Database = {
         Args: { object_name: string }
         Returns: boolean
       }
+      query_route_envelope: {
+        Args: { p_route_family: string }
+        Returns: {
+          correction_ceiling: number
+          deadline_seconds: number
+          discovery_ceiling: number
+          envelope_completion_tokens: number
+          envelope_prompt_tokens: number
+          envelope_usd: number
+          manifest_ceiling: number
+          model_call_ceiling: number
+          recursion_limit: number
+          side_effect_ceiling: number
+          subquestion_ceiling: number
+          tool_ceiling: number
+        }[]
+      }
       recheck_retrieval_candidates: {
         Args: {
           caller_authorization_version: number
@@ -4041,6 +4243,7 @@ export type Database = {
           version_id: string
         }[]
       }
+      reconcile_expired_query_runs: { Args: never; Returns: number }
       record_embedding_ledger: {
         Args: {
           p_actual_usd?: number
@@ -4076,6 +4279,39 @@ export type Database = {
           p_operation_key: string
           p_result_ref?: Json
           p_status: string
+        }
+        Returns: string
+      }
+      record_query_llm_usage: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_completion_tokens: number
+          p_cost_usd: number
+          p_model_id: string
+          p_prompt_tokens: number
+          p_provider_attempt_id: string
+          p_reservation_id: string
+          p_reservation_version: number
+          p_run_id: string
+          p_timeout_after_send: boolean
+          p_usage_kind: string
+        }
+        Returns: string
+      }
+      record_run_restricted_evidence: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_citation_id?: string
+          p_document_id: string
+          p_purpose?: string
+          p_run_id: string
+          p_session_id: string
+          p_signed_url_expires_at?: string
+          p_version_id: string
         }
         Returns: string
       }
@@ -4300,6 +4536,29 @@ export type Database = {
           p_workspace_key: string
         }
         Returns: string
+      }
+      true_up_query_reservation: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_reservation_id: string
+        }
+        Returns: {
+          already_settled: boolean
+          committed_amount_usd: number
+          reservation_id: string
+          status: Database["app"]["Enums"]["budget_reservation_status"]
+        }[]
+      }
+      true_up_query_reservation_internal: {
+        Args: { p_reservation_id: string }
+        Returns: {
+          already_settled: boolean
+          committed_amount_usd: number
+          reservation_id: string
+          status: Database["app"]["Enums"]["budget_reservation_status"]
+        }[]
       }
       upsert_graph_cleanup_tombstone: {
         Args: {

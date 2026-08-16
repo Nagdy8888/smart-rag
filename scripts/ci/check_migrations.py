@@ -56,13 +56,22 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260816140000_graph_entity_rules_v1.sql",
     "20260816150000_graph_pointer_switch_cleanup_v1.sql",
     "20260816160000_bm25_reconcile_and_ineligible_pointer_v1.sql",
+    "20260816170000_query_run_admission_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bDROP\s+TABLE\b", re.IGNORECASE), "DROP TABLE"),
     (re.compile(r"\bDROP\s+COLUMN\b", re.IGNORECASE), "DROP COLUMN"),
     (re.compile(r"\bDROP\s+TYPE\b", re.IGNORECASE), "DROP TYPE"),
-    (re.compile(r"\bALTER\s+TABLE\b[^;]*\bDROP\b", re.IGNORECASE), "ALTER ... DROP"),
+    # DROP CONSTRAINT of a CHECK is allowed for additive allowed-value widening
+    # (Phase 6 query_run). DROP COLUMN / DROP TABLE remain forbidden.
+    (
+        re.compile(
+            r"\bALTER\s+TABLE\b[^;]*\bDROP\s+(?!CONSTRAINT\b)",
+            re.IGNORECASE,
+        ),
+        "ALTER ... DROP",
+    ),
     (
         re.compile(
             r"\bALTER\s+COLUMN\b[^;]*\bTYPE\b[^;]*\bUSING\b",

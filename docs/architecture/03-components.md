@@ -2,7 +2,7 @@
 title: C4 — Components
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-16
 audience: engineering
 ---
 
@@ -28,7 +28,7 @@ flowchart LR
 | Component | Ownership | Phase status |
 | --- | --- | --- |
 | FastAPI routers/middleware | `apps/backend` | foundation live/ready |
-| LangGraph query/ingestion scaffolds | `apps/agents` | loadable, unconfigured business |
+| LangGraph query admission / ingestion probe | `apps/agents` | query: `enforce_admission`; ingestion: lease/ledger probe |
 | Worker entrypoint | `apps/worker` | process contract only |
 | Settings / logging / model gateway / LangSmith | `packages/core` | Gateway tracing live; production query-graph feedback is Phase 6 |
 | Hybrid retrieval / BM25 / LightRAG | `packages/core` | Phase 4 Packet 2–7 dense/BM25/term/rerank/coverage/tables; LightRAG Phase 5 |

@@ -48,6 +48,29 @@ def test_security_definer_requires_explicit_search_path() -> None:
     assert find_migration_violations(safe, Path("safe.sql")) == []
 
 
+def test_drop_check_constraint_is_allowed_for_additive_widening() -> None:
+    """CHECK widening via DROP CONSTRAINT / ADD CONSTRAINT is expand-only."""
+
+    sql = """
+        ALTER TABLE app.budget_reservations
+          DROP CONSTRAINT budget_reservations_kind_allowed;
+        ALTER TABLE app.budget_reservations
+          ADD CONSTRAINT budget_reservations_kind_allowed
+          CHECK (reservation_kind IN ('ingestion_daily', 'query_run'));
+    """
+
+    assert find_migration_violations(sql, Path("widen_check.sql")) == []
+
+
+def test_alter_table_drop_column_still_fails_policy() -> None:
+    """Widening CHECK must not weaken the DROP COLUMN prohibition."""
+
+    sql = "ALTER TABLE app.budget_reservations DROP COLUMN amount_usd;"
+    violations = find_migration_violations(sql, Path("drop_column.sql"))
+
+    assert any("DROP COLUMN" in item or "ALTER ... DROP" in item for item in violations)
+
+
 def test_comments_cannot_create_false_destructive_findings() -> None:
     """Documentation examples in SQL comments must not fail migration lint."""
 

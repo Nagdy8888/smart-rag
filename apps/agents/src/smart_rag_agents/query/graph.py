@@ -1,98 +1,203 @@
-"""Foundation query graph scaffold for LangGraph configuration qualification.
+"""Query LangGraph: admission enforcement only (Phase 6 packet 1).
 
-This module intentionally does not perform retrieval, routing, answering, or
-budget enforcement. Invocation only records that the Phase 1 foundation graph
-is unconfigured for business work.
+Profiling, retrieval, fusion, and answering are packet 2+. Missing
+``AuthorizedRuntimeContext`` fails closed. Compile constructs no sockets
+or OpenAI clients.
 """
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias, TypedDict
+from typing import Literal, TypeAlias, TypedDict, cast
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 
 
-class QueryFoundationState(TypedDict):
-    """Minimal state for the Phase 1 query graph scaffold.
+class QueryGraphState(TypedDict):
+    """Typed query state for admission. Later packets add profile fields.
 
     Attributes:
-        status: Always ``unconfigured`` for foundation qualification.
-        detail: Human-readable explanation that business query work is absent.
+        status: ``pending``, ``admitted``, or ``admission_rejected``.
+        detail: Safe diagnostic text. Never an answer claim.
+        authorized_runtime: Server-derived context mapping, or null.
+        route_family: Copied from context when admitted.
+        deadline_at: ISO-8601 deadline copied from context.
+        recursion_limit: Superstep cap copied from context.
+        remaining_corrections: Remaining correction slots.
+        remaining_subquestions: Remaining subquestion slots.
+        remaining_model_calls: Remaining counted gateway calls.
+        remaining_tool_calls: Remaining tool executions.
+        remaining_discovery_rounds: Remaining optional discovery rounds.
+        remaining_manifests: Remaining optional manifests.
+        remaining_side_effects: Remaining side-effecting tools.
+        remaining_recursion_steps: Remaining LangGraph supersteps.
     """
 
-    status: Literal["unconfigured"]
+    status: Literal["pending", "admitted", "admission_rejected"]
     detail: str
+    authorized_runtime: dict[str, object] | None
+    route_family: str | None
+    deadline_at: str | None
+    recursion_limit: int
+    remaining_corrections: int
+    remaining_subquestions: int
+    remaining_model_calls: int
+    remaining_tool_calls: int
+    remaining_discovery_rounds: int
+    remaining_manifests: int
+    remaining_side_effects: int
+    remaining_recursion_steps: int
 
 
 QueryStateGraph: TypeAlias = StateGraph[
-    QueryFoundationState,
+    QueryGraphState,
     None,
-    QueryFoundationState,
-    QueryFoundationState,
+    QueryGraphState,
+    QueryGraphState,
 ]
 CompiledQueryGraph: TypeAlias = CompiledStateGraph[
-    QueryFoundationState,
+    QueryGraphState,
     None,
-    QueryFoundationState,
-    QueryFoundationState,
+    QueryGraphState,
+    QueryGraphState,
 ]
 
 
-def mark_unconfigured(state: QueryFoundationState) -> QueryFoundationState:
-    """Return an honest unconfigured status without claiming query success.
+def pending_query_state(
+    authorized_runtime: dict[str, object] | None = None,
+) -> QueryGraphState:
+    """Return a pending graph input that does not claim retrieval success.
 
     Args:
-        state: Incoming foundation state (ignored for business fields).
+        authorized_runtime: Optional server-derived context mapping.
 
     Returns:
-        State with ``status`` set to ``unconfigured`` and an explanatory detail.
-
-    Side Effects:
-        None. No model calls, persistence writes, or external I/O.
-
-    Failure / Fallback:
-        This node cannot fail for missing infrastructure; it is the degraded
-        foundation path until later phases implement real query nodes.
+        Minimal pending state for compile/invoke tests.
     """
 
     return {
-        "status": "unconfigured",
-        "detail": (
-            "Phase 1 query graph scaffold only; retrieval and answering are "
-            "not implemented."
-        ),
+        "status": "pending",
+        "detail": "",
+        "authorized_runtime": authorized_runtime,
+        "route_family": None,
+        "deadline_at": None,
+        "recursion_limit": 0,
+        "remaining_corrections": 0,
+        "remaining_subquestions": 0,
+        "remaining_model_calls": 0,
+        "remaining_tool_calls": 0,
+        "remaining_discovery_rounds": 0,
+        "remaining_manifests": 0,
+        "remaining_side_effects": 0,
+        "remaining_recursion_steps": 0,
+    }
+
+
+def enforce_admission(state: QueryGraphState) -> QueryGraphState:
+    """Require ``AuthorizedRuntimeContext`` and copy server ceilings into state.
+
+    State inputs:
+        ``authorized_runtime`` mapping produced by FastAPI/core, or null.
+
+    State outputs:
+        ``status=admitted`` with ceiling counters copied from context, or
+        ``status=admission_rejected`` with no retrieval/answer claim.
+
+    Persistence writes:
+        None. Durable admit already happened in FastAPI/core.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        Copies server-assigned deadline and remaining ceilings. Does not
+        enlarge them. Client role, BM25, graph, cache, and Valkey fields in
+        extra mapping keys are ignored by Pydantic ``extra=forbid``.
+
+    Failure/fallback route:
+        Missing or invalid context sets ``admission_rejected`` and ends.
+        This node never claims an answer.
+
+    Args:
+        state: Incoming query graph state.
+
+    Returns:
+        State with admission status and copied ceilings.
+    """
+
+    rejected: QueryGraphState = {
+        **state,
+        "status": "admission_rejected",
+        "detail": "authorized runtime context missing or invalid",
+        "route_family": None,
+        "deadline_at": None,
+        "recursion_limit": 0,
+        "remaining_corrections": 0,
+        "remaining_subquestions": 0,
+        "remaining_model_calls": 0,
+        "remaining_tool_calls": 0,
+        "remaining_discovery_rounds": 0,
+        "remaining_manifests": 0,
+        "remaining_side_effects": 0,
+        "remaining_recursion_steps": 0,
+    }
+    raw = state.get("authorized_runtime")
+    try:
+        context = AuthorizedRuntimeContext.from_mapping(raw)
+    except (ValueError, TypeError):
+        return rejected
+
+    dumped = cast(dict[str, object], context.model_dump(mode="json"))
+    deadline = context.deadline_at.isoformat()
+    return {
+        **state,
+        "status": "admitted",
+        "detail": "admission accepted; profiling is not implemented",
+        "authorized_runtime": dumped,
+        "route_family": context.route_family.value,
+        "deadline_at": deadline,
+        "recursion_limit": context.recursion_limit,
+        "remaining_corrections": context.correction_ceiling,
+        "remaining_subquestions": context.subquestion_ceiling,
+        "remaining_model_calls": context.model_call_ceiling,
+        "remaining_tool_calls": context.tool_ceiling,
+        "remaining_discovery_rounds": context.discovery_ceiling,
+        "remaining_manifests": context.manifest_ceiling,
+        "remaining_side_effects": context.side_effect_ceiling,
+        "remaining_recursion_steps": context.recursion_limit,
     }
 
 
 def build_query_graph() -> QueryStateGraph:
-    """Construct the foundation query ``StateGraph`` (not yet compiled).
+    """Construct the packet 1 query ``StateGraph`` (not yet compiled).
 
     Returns:
-        An uncompiled ``StateGraph`` with a single unconfigured marker node.
+        An uncompiled graph with a single ``enforce_admission`` node.
 
     Notes:
-        State inputs: ``QueryFoundationState``.
-        State outputs: same shape with ``status=unconfigured``.
+        State inputs: ``QueryGraphState``.
+        State outputs: admitted or admission_rejected.
         Persistence writes: none.
         External/model calls: none.
-        Budget/deadline behavior: none (foundation only).
-        Failure/fallback route: always marks unconfigured.
+        Budget/deadline behavior: copies server ceilings; fails closed
+            without authorized context.
+        Failure/fallback route: ``admission_rejected`` then END.
     """
 
     builder: QueryStateGraph = StateGraph(
-        QueryFoundationState,
-        input_schema=QueryFoundationState,
-        output_schema=QueryFoundationState,
+        QueryGraphState,
+        input_schema=QueryGraphState,
+        output_schema=QueryGraphState,
     )
     builder.add_node(  # pyright: ignore[reportUnknownMemberType] - upstream optional hooks use Any
-        "mark_unconfigured",
-        mark_unconfigured,
+        "enforce_admission",
+        enforce_admission,
     )
-    builder.add_edge(START, "mark_unconfigured")
-    builder.add_edge("mark_unconfigured", END)
+    builder.add_edge(START, "enforce_admission")
+    builder.add_edge("enforce_admission", END)
     return builder
 
 
 graph: CompiledQueryGraph = build_query_graph().compile()  # pyright: ignore[reportUnknownMemberType] - upstream optional hooks use Any
-"""Compiled foundation query graph for ``langgraph.json`` registration."""
+"""Compiled query graph for ``langgraph.json`` registration."""

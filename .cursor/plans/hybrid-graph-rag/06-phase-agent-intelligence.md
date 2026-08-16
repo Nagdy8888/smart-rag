@@ -46,7 +46,7 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
-1. [ ] [Implement authenticated, idempotent run admission with server-derived database authorization, deadlines, recursion/model/tool ceilings, durable reservations, read-access auditing, and authorized runtime context.](./06-phase-agent-intelligence/packets/01-admission-budgets.md)
+1. [x] [Implement authenticated, idempotent run admission with server-derived database authorization, deadlines, recursion/model/tool ceilings, durable reservations, read-access auditing, and authorized runtime context.](./06-phase-agent-intelligence/packets/01-admission-budgets.md)
 2. [ ] [Implement memory rewrite, extended typed profiling, the complete deterministic route/limitation matrix, one global correction, and bounded parallel branches.](./06-phase-agent-intelligence/packets/02-profiling-routing.md)
 3. [ ] [Implement resolved-path Combined fusion and ablation, deterministic table composition, canonical answer evidence, inference-link citations, and layered verification.](./06-phase-agent-intelligence/packets/03-combined-fusion.md)
 4. [ ] [Implement the optional-tool registry/disclosure contract while keeping core retrieval and verification outside catalog discovery.](./06-phase-agent-intelligence/packets/04-optional-tools.md)

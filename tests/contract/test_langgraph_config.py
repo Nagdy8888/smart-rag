@@ -37,15 +37,68 @@ def test_langgraph_cli_validate_config_file() -> None:
 
 
 def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
-    """Graph exports import and compile; query remains unconfigured."""
+    """Query graph rejects missing context and does not claim answers."""
+
+    from datetime import UTC, datetime
+    from decimal import Decimal
+    from uuid import uuid4
 
     from smart_rag_agents.query.graph import graph as query_graph
+    from smart_rag_agents.query.graph import pending_query_state
+    from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+    from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+    from smart_rag_core.security.identity import UserRole
 
-    query_result = query_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
-        {"status": "unconfigured", "detail": ""}
+    rejected = query_graph.invoke(pending_query_state())  # pyright: ignore[reportUnknownMemberType]
+    assert rejected["status"] == "admission_rejected"
+    assert "missing or invalid" in rejected["detail"]
+
+    cache_poisoned = pending_query_state()
+    cache_poisoned["detail"] = "cache_hit=true bm25=true graph=true valkey=true"
+    poisoned = query_graph.invoke(cache_poisoned)  # pyright: ignore[reportUnknownMemberType]
+    assert poisoned["status"] == "admission_rejected"
+
+    extra_rejected = query_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+        pending_query_state({"client_role": "owner", "route_family": "composite"})
     )
-    assert query_result["status"] == "unconfigured"
-    assert "not implemented" in query_result["detail"]
+    assert extra_rejected["status"] == "admission_rejected"
+
+    now = datetime(2026, 8, 16, 12, 0, tzinfo=UTC)
+    context = AuthorizedRuntimeContext(
+        user_id=uuid4(),
+        role=UserRole.MEMBER,
+        authorization_version=1,
+        conversation_id=uuid4(),
+        run_id=uuid4(),
+        reservation_id=uuid4(),
+        reconnect=False,
+        route_family=Phase6RouteFamily.HYBRID,
+        deadline_at=now,
+        recursion_limit=24,
+        correction_ceiling=1,
+        subquestion_ceiling=3,
+        model_call_ceiling=7,
+        tool_ceiling=4,
+        discovery_ceiling=1,
+        manifest_ceiling=3,
+        side_effect_ceiling=1,
+        reserved_amount_usd=Decimal("2.80"),
+        remaining_usd=Decimal("2.80"),
+        remaining_prompt_tokens=56000,
+        remaining_completion_tokens=14000,
+        optimistic_version=1,
+        heartbeat_at=now,
+        payload_hash="a" * 64,
+        status="pending",
+    )
+    admitted = query_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+        pending_query_state(context.model_dump(mode="json"))
+    )
+    assert admitted["status"] == "admitted"
+    assert admitted["route_family"] == "hybrid"
+    assert admitted["remaining_model_calls"] == 7
+    assert "profiling is not implemented" in admitted["detail"]
+    assert "answer" not in admitted["detail"]
 
 
 def test_ingestion_graph_marks_invalid_lease_without_postgres_config() -> None:

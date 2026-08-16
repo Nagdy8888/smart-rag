@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 1
-status: pending
+status: complete
 title: "Implement authenticated, idempotent run admission with server-derived database authorization, deadlines, recursion/model/tool ceilings, durable reservations, read-access auditing, and authorized runtime context."
 requirement_ids: [P06-01]
 ---

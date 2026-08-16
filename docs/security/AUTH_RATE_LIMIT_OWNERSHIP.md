@@ -2,7 +2,7 @@
 title: Auth rate-limit ownership
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-16
 audience: engineering, security, ops
 ---
 
@@ -17,7 +17,8 @@ claim to protect browser-direct Supabase Auth traffic.
 | --- | --- | --- | --- |
 | Email/password sign-in, OAuth, password reset, MFA challenge | Hosted Supabase Auth controls / captcha (selected plan) | **Not enforced** by local Supabase CLI stack | Documented only; `local_auth_throttling_proven=False` |
 | Invitation accept (FastAPI-mediated) | FastAPI → optional Valkey → Postgres `private.auth_rate_limit_buckets` | Postgres degraded path when Valkey unset | `test_auth_rate_limits.py` |
-| Upload/crawl/chat/admin mutations (later phases) | FastAPI Valkey fast path + Postgres fallback | Same degraded Postgres path | Documented contract; full routes in Phase 6 |
+| Query admission (Phase 6 packet 1 slice) | FastAPI Postgres `query-admission:{user_id}` then durable admit RPC | Does **not** throttle hosted Auth. 429/unavailable insert no reservation | `test_query_run_admission.py` |
+| Upload/crawl/chat/admin mutations (later phases) | FastAPI Valkey fast path + Postgres fallback | Same degraded Postgres path | Documented contract; chat router in Phase 6 packet 5 |
 | Anonymous sign-in | Disabled (`enable_anonymous_sign_ins = false`) | N/A | `supabase/config.toml` |
 
 ## Degraded Postgres path

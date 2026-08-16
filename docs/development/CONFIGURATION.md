@@ -103,6 +103,11 @@ Queue and retrieval settings remain owned by later phases. Graph runtime DSN
 is Packet 2 above. Packet 3 reuses `JOB_LEASE_SECONDS` for graph job and
 writer leases. Graph Ready remains Packet 4.
 
+Phase 6 packet 1 query admission adds **no new environment variables**. FastAPI
+rate limits use documented constants
+(`QUERY_ADMISSION_RATE_MAX_ATTEMPTS=20` / 60s window). Packet 5 may replace
+those with signed policy.
+
 ## Managed proof-operation variables
 
 The destructive JWKS rollover script loads its values through
