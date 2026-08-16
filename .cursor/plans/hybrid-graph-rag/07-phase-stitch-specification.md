@@ -1,7 +1,7 @@
 ---
 name: hybrid-graph-rag-phase-07-stitch-specification
 phase: 7
-status: pending
+status: in_progress
 split_source: true
 depends_on: [1, 2, 3, 4, 5, 6]
 source_plan: ../hybrid-graph-rag_ab5281ef.plan.md
@@ -39,7 +39,7 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
-1. [ ] [Inventory real Phase 6 API, Auth, streaming, route-diagnostic, document, graph, tool, usage, and administration contracts.](./07-phase-stitch-specification/packets/01-inventory-real-phase-6-contracts.md)
+1. [x] [Inventory real Phase 6 API, Auth, streaming, route-diagnostic, document, graph, tool, usage, and administration contracts.](./07-phase-stitch-specification/packets/01-inventory-real-phase-6-contracts.md)
 2. [ ] [Write copy-ready Stitch prompts, responsive LTR/RTL frames, Arabic/bidirectional behavior, information hierarchy, component inventory, localization decision, and design tokens.](./07-phase-stitch-specification/packets/02-write-stitch-prompts-and-frames.md)
 3. [ ] [Specify every loading, empty, error, permission, quarantine, quota, compatibility, limitation, fallback, partial-readiness, budget, and degraded state.](./07-phase-stitch-specification/packets/03-specify-visible-states.md)
 4. [ ] [Map each visible action and field to a real typed API/Auth contract; identify gaps instead of inventing mock behavior.](./07-phase-stitch-specification/packets/04-map-ui-to-real-contracts.md)

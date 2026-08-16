@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 5
-status: complete
+status: pending
 title: "Implement thin FastAPI routers/services, Supabase-Auth/FastAPI rate ownership, authorization-safe retrieval caching, endpoint-specific authorization, CPU offload, and prompt/data isolation."
 requirement_ids: [P06-05]
 ---

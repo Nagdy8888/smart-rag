@@ -11,7 +11,8 @@ audience: engineering, frontend
 Authenticated Next.js console for local RAG testing. This is **not** Stitch
 and **not** the production frontend (Phases 7–8).
 
-Related: [SSE.md](../api/SSE.md) ·
+Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
+[SSE.md](../api/SSE.md) ·
 [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md) ·
 [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
@@ -101,7 +102,7 @@ frontend on `:3000`. FastAPI CORS allow-lists that origin.
 
 ## Verification
 
-```
+```text
 pnpm --filter smart-rag-frontend test
 pnpm --filter smart-rag-frontend lint
 pnpm --filter smart-rag-frontend exec tsc --noEmit

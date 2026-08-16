@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 6
-status: complete
+status: pending
 title: "Implement versioned additive API/SSE contracts, compatibility handshake, resumable fetch SSE with persisted sequence IDs, heartbeats, cancellation, reconnect, sanitized errors, and deadline/partial events."
 requirement_ids: [P06-06]
 ---

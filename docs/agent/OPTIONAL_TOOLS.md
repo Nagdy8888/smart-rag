@@ -78,16 +78,16 @@ IDs from composition, format, role, quotas, and idempotency.
 sequenceDiagram
   participant Graph as Query graph
   participant Table as structured_table_query
-  participant Opt as Optional tools
+  participant Catalog as Optional tools
   participant Exec as Executor
   Graph->>Table: Deterministic bind from profile
   Table-->>Graph: Authorized table IDs and ranges
-  Graph->>Opt: export_csv or ambiguous export
-  Opt->>Opt: Map or one search of export cards
-  Opt->>Opt: Load one selected export manifest
-  Opt->>Exec: Recheck live role, table ID, format
+  Graph->>Catalog: export_csv or ambiguous export
+  Catalog->>Catalog: Map or one search of export cards
+  Catalog->>Catalog: Load one selected export manifest
+  Catalog->>Exec: Recheck live role, table ID, format
   Exec-->>Graph: Bounded export payload or reject
-  Note over Opt: Viewers never see member or admin cards
+  Note over Catalog: Viewers never see member or admin cards
 ```
 
 ## Next-call tool binding

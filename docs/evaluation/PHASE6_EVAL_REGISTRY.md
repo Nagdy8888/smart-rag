@@ -72,7 +72,7 @@ Live retrieval evals and unbounded OpenAI remain future nightly work.
 
 ## Verification
 
-```
+```text
 uv run python scripts/ci/check_phase6_eval_registry.py
 uv run python -m pytest tests/unit/test_phase6_eval_registry.py -q
 ```

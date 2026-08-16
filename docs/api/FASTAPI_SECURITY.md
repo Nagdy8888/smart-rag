@@ -140,13 +140,13 @@ in [STREAMING_TIMEOUTS.md](../deployment/STREAMING_TIMEOUTS.md).
 
 ## Verification
 
-```
+```text
 uv run python scripts/ci/check_openapi.py
 uv run python -m pytest tests/unit/test_fastapi_security.py tests/contract/test_query_admission_api.py tests/contract/test_retrieval_cache.py tests/unit/test_package_imports.py tests/contract/test_import_boundaries.py tests/unit/test_backend_middleware.py -q
 ```
 
 Packet 6 SSE:
 
-```
+```text
 uv run python -m pytest tests/unit/test_sse_protocol.py tests/contract/test_sse_resume.py tests/contract/test_sse_heartbeat.py tests/contract/test_streaming_timeout_contract.py -q
 ```

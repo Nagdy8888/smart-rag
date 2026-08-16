@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 2
-status: complete
+status: pending
 title: "Implement memory rewrite, extended typed profiling, the complete deterministic route/limitation matrix, one global correction, and bounded parallel branches."
 requirement_ids: [P06-02]
 ---

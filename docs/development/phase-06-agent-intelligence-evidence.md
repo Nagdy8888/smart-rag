@@ -1036,11 +1036,10 @@ unknown additive types.
 
 Wire format (FastAPI 0.141 has no `EventSourceResponse`):
 
-```
+```text
 id: {sequence}
 event: {allowlisted_type}
 data: {json}
-
 ```
 
 SSE headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`,
@@ -1544,6 +1543,3 @@ not a mock `page.route` 503.
 
 **Please accept Phase 6** if the local Done-when evidence is enough, or keep
 the table above as explicit blockers.
-
-
-

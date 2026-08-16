@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 4
-status: complete
+status: pending
 title: "Implement the optional-tool registry/disclosure contract while keeping core retrieval and verification outside catalog discovery."
 requirement_ids: [P06-04]
 ---

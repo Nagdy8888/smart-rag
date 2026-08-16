@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 8
-status: complete
+status: pending
 title: "Ship the thin authenticated developer UI and prove route, fallback, injection, idempotency, budget, outage, event-loop, and privacy gates."
 requirement_ids: [P06-08]
 ---

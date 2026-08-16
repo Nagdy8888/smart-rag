@@ -37,6 +37,6 @@ Caddy buffering is disabled with `flush_interval -1`.
 
 ## Verification
 
-```
+```text
 uv run python -m pytest tests/contract/test_streaming_timeout_contract.py -q
 ```
