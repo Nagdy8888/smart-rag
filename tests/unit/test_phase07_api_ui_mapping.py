@@ -82,3 +82,39 @@ def test_mapping_rejects_client_authority_and_bm25_evidence() -> None:
     assert "FastAPI throttles browser-direct Auth" in mapping
     assert "Graph-only answering" in mapping
     assert "`dangerouslySetInnerHTML`" in mapping
+
+
+def test_visible_controls_map_to_contracts_or_gaps() -> None:
+    """Packet 4: each Stitch screen family has mapped controls or GAP ids."""
+
+    mapping = MAPPING_PATH.read_text(encoding="utf-8")
+    brief = (ROOT / "docs" / "frontend" / "STITCH_BRIEF.md").read_text(
+        encoding="utf-8"
+    )
+    assert "## Visible control mapping (P07-04)" in mapping
+    for marker in (
+        "### A. Sign in",
+        "### B. Sign up",
+        "### F. Main chat (Auto)",
+        "### J. Graph explorer",
+        "### M. Usage, audit, profile, company settings",
+    ):
+        assert marker in brief, marker
+    for control in (
+        "signInWithPassword",
+        "POST /admin/invitations",
+        "X-Client-Version",
+        "Idempotency-Key",
+        "GET /runs/{id}/events?after=",
+        "GAP-07-01",
+        "GAP-07-02",
+        "GAP-07-07",
+        "GAP-07-09",
+        "signed_url",
+        "GET /usage/company",
+        "FORBIDDEN_PAYLOAD_KEYS",
+        "Duplicate send",
+        "Forged admin role",
+    ):
+        assert control in mapping, control
+    assert "UI hiding is convenience" in mapping

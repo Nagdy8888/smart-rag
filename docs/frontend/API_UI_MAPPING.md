@@ -336,11 +336,121 @@ The Phase 6 console (`DeveloperApp`) is a prerequisite, not Stitch.
 `docs/stitch_smart_rag_enterprise_console/` is excluded from docs checks and
 is **not** current implementation evidence ([QUALITY_COMMANDS.md](../development/QUALITY_COMMANDS.md)).
 
-## Field mapping index
+## Visible control mapping (P07-04)
 
-Packet 4 expands every visible Stitch control to a row in this file. Until
-then, every FastAPI path above is the typed owner for its listed fields.
-Controls without a path must use a GAP-07-* id.
+Every Stitch control in [STITCH_BRIEF.md](./STITCH_BRIEF.md) and every state
+in [STITCH_STATES.md](./STITCH_STATES.md) maps here. Authorization is always
+the server column; UI hiding is convenience. Idempotency/reconnect apply only
+where listed.
+
+### Auth-direct (not FastAPI)
+
+| Screen | Control | Contract | Authz | Terminal / fallback |
+| --- | --- | --- | --- | --- |
+| A Sign in | email, password, Sign in | `signInWithPassword` | Auth | generic fail; FastAPI does not throttle |
+| A Sign in | ready pills | `GET /health/ready` | public | informational |
+| B Sign up | email, password | `signUp` | Auth | membership still needs invite/profile |
+| C Forgot | email | `resetPasswordForEmail` | Auth | Inbucket locally |
+| C Reset | new password | Auth update | Auth | |
+| C Callback | waiting | `exchangeCodeForSession` | Auth | |
+| D MFA enroll | QR + code | `mfa.enroll` / `verify` | Auth TOTP | |
+| D MFA challenge | code | `mfa.challenge` / `verify` | Auth | |
+| D MFA required | banner, Sign out | 403 `MFA required` + `signOut` | FastAPI identity + Auth | no fake TOTP success |
+| D Recovery | any control | GAP-07-07 | none | Unavailable |
+| A Google | Continue with Google | `signInWithOAuth` | GAP-07-04 disabled locally | disabled button |
+
+### FastAPI identity and team
+
+| Screen | Control | Contract | Authz | Idempotency |
+| --- | --- | --- | --- | --- |
+| Shell | role, user_id, upload, mfa | `GET /me` | live profile | n/a |
+| E Invite create | email, role, upload_enabled | `POST /admin/invitations` | owner/admin | AUTH_ADJACENT |
+| E Invite token | `raw_token` once | response field | owner/admin | n/a |
+| E Accept | token | `POST /invitations/accept` | JWT email, not body email | AUTH_ADJACENT |
+| E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin AAL2 | AUTH_ADJACENT |
+| E Owner setup | bootstrap | GAP-07-08 | none | Unavailable |
+| E Member directory | list | none | none | no HTTP; do not mock |
+
+### Chat, SSE, citations, feedback
+
+| Screen | Control | Contract | Authz | Idempotency / resume |
+| --- | --- | --- | --- | --- |
+| F List | conversations | `GET /conversations` | creator | n/a |
+| F New | title optional | `POST /conversations` | creator | COST_MUTATION |
+| F Delete | delete | `DELETE /conversations/{id}` | creator or owner/admin; 204/404 | n/a |
+| F Handshake | version | `GET /api/meta` then `X-Client-Version` | public then paid POST | 426 blocks reserve |
+| F Send | message | `POST .../messages` body `message` | creator | `Idempotency-Key` |
+| F Route | Auto label | 202 `route_family` | server-derived | no client override GAP-07-01 |
+| F Advanced Hybrid/Combined/Table/Inspect buttons | — | GAP-07-01 | — | display-only of events |
+| F Stream | EventSource | `GET /runs/{id}/events?after=` | creator Bearer | Last-Event-ID; no version header |
+| F Cancel | cancel | `POST /runs/{id}/cancel` | creator | 409 if terminal |
+| F Tokens | text | SSE `token_delta.delta` | creator | n/a |
+| F Limitations | callout | SSE `limitation.code` | creator | signed copy |
+| F Correction | diagnostic | `route_correction` | creator | one correction |
+| F Cache | diagnostic | `cache.status` | creator | IDs only |
+| F Coverage | score | `coverage.coverage_score` | creator | null hidden |
+| F Tools | chips | `optional_tool_disclosure.tool_keys` | creator | n/a |
+| F Heartbeat | count | `heartbeat` 15s | creator | not assertive |
+| F Citations | chips | `citation_preview` then `GET /runs/{id}/citations` | creator | no snippets |
+| F Source drawer | preview/download | GAP-07-09 | — | IDs/provenance only |
+| F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | exact 10 tags |
+| F Usage strip | totals | `GET /usage/me` | caller | no prompt text |
+| F Profile rewrite / candidates / BM25 bytes / rerank / inferences / latency | — | GAP-07-02 | — | do not invent |
+| G 426/402/429/503 | banners | HTTP details above | — | no paid retry on 426/402 |
+
+Unknown additive SSE types: log and ignore. One terminal among
+`completed|cancelled|error|partial`.
+
+### Documents and ingestion
+
+| Screen | Control | Contract | Authz | Idempotency |
+| --- | --- | --- | --- | --- |
+| H List | cards | `GET /documents` | ACL | n/a |
+| H Detail open | card | `GET /documents/{id}` | ACL else 404 | n/a |
+| H Reserve | declared_bytes | `POST /documents/uploads` | upload_enabled + MFA | `idempotency_key` |
+| H signed_url | display | response `signed_url` | local **null** | Phase 10 |
+| H Finalize | hash, bytes, category, policy | `POST /documents/uploads/finalize` | same | `idempotency_key` |
+| H Crawl | url, domain | `POST /ingestion/crawls` | owner/admin | `idempotency_key` |
+| H Status | pills + BM25 + handoff | `GET /ingestion/versions/{id}/status` | authenticated | n/a |
+| H Retry | retry | `POST /ingestion/jobs/{id}/retry` | owner/admin when `retry_allowed` | n/a |
+| H Graph not-ready copy | sentence | `graphNotReadyCopy(n)` from authorized counts only | never restricted | n/a |
+| H Delete document | — | GAP-07-14 | — | Unavailable |
+| I Restricted preview | — | GAP-07-09 | — | Unavailable |
+| I Graph tab | inspect | `POST /graph/inspect` `document_id` | ACL | n/a |
+| I Tables tab | list | `GET /tables` | ACL | n/a |
+
+### Graph, tables, tools, usage, settings
+
+| Screen | Control | Contract | Authz | Bounds |
+| --- | --- | --- | --- | --- |
+| J Search | q, limit | `GET /graph/entities/search` | ACL | limit ≤25 |
+| J Inspect | keys, depth | `POST /graph/inspect` | ACL | keys ≤12, depth ≤3, rows ≤200 |
+| J ETA | — | GAP-07-10 | — | handoff counts only |
+| K Analyze | plan | `POST /tables/analyze` | ACL | `TableQueryPlan` extra=forbid |
+| K Export | — | optional tool after disclosure | live role recheck | no button otherwise |
+| L Catalog | cards | `GET /tools` | role-filtered | omit unauthorized names |
+| L Enable | active | `POST /admin/tools/{key}/enable` | owner/admin | allow-listed keys |
+| L Permissions | role, permission | `POST /admin/tools/{key}/permissions` | owner/admin | executor rechecks |
+| L Glossary | import/approve/rollback | `/admin/glossary/imports*` | owner/admin | `idempotency_key` |
+| L Entity rules | CRUD/suggest/approve/revoke | `/admin/graph/entity-rules*` | owner/admin | `row_version` |
+| M Usage company | totals | `GET /usage/company` | owner/admin | 403 else |
+| M Budget editor | — | GAP-07-11 | — | 402 only |
+| M Audit | — | GAP-07-12 | — | Unavailable |
+| M Profile editor | name/locale | GAP-07-19 | — | `/me` five fields only |
+| M Company settings | — | GAP-07-13 | — | Unavailable |
+
+### Negative mapping tests
+
+| Attempt | Required mapping |
+| --- | --- |
+| Duplicate send | same `Idempotency-Key` → same `run_id` |
+| Reconnect after sequence loss | `after` / `Last-Event-ID`; 404 if tombstone |
+| Unknown SSE type | ignore |
+| Client below min | 426; no reservation |
+| Forged admin role | server 403; UI hide is convenience |
+| Unauthorized source URL | GAP-07-09; no privileged href |
+| Browser ParadeDB/Valkey/OpenAI keys | forbidden; only `NEXT_PUBLIC_*` anon |
+| Internal traces | forbidden in SSE (`FORBIDDEN_PAYLOAD_KEYS`) |
 
 ## Verification
 

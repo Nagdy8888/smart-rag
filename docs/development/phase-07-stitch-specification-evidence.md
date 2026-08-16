@@ -197,3 +197,35 @@ Delete `STITCH_BRIEF.md` and the brief unit test; unlink from the index.
 ### Rollback
 
 Delete `STITCH_STATES.md` and its unit test; unlink from the brief.
+
+## Packet 4 — Map each visible action and field to a real typed API/Auth contract; identify gaps instead of inventing mock behavior
+
+### Requirement (quoted)
+
+> Map each visible action and field to a real typed API/Auth contract;
+> identify gaps instead of inventing mock behavior.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `docs/frontend/API_UI_MAPPING.md` | P07-04 visible control tables |
+| `tests/unit/test_phase07_api_ui_mapping.py` | Bidirectional coverage assertions |
+| Phase 7 wrapper | Packet 4 checkbox |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_phase07_api_ui_mapping.py -q` | 0 (5 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Negative mapping tests
+
+Duplicate submit, resume after sequence, unknown SSE, 426, forged role,
+unauthorized source, privileged keys, and internal traces are mapped to
+denial or GAP rows. No mock endpoints added.
+
+### Rollback
+
+Revert the P07-04 section of `API_UI_MAPPING.md`.

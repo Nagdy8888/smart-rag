@@ -16,7 +16,7 @@
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/06-sse-compatibility-resume.md": "b23f211b9d3d466170f7e31d28e895031b61d6c54ad2d159b90f06ed26e859c3",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md": "35052a49685140e3f6e58629464dd6db565a717efdd3ca6b48cfb8c70e2c9433",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/08-thin-developer-ui.md": "a8f41dd631ea1a3f5945757fcc49b8797f5745abeaafb6e235286f2ca9836b63",
-    ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification.md": "389509f191e37cba0fcc66b066d052cafd200f7cf85aef4fe89de7fa98c79bdb",
+    ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification.md": "2434e54fe8220178071328eddd68485c5109fda32d94d8a6fb851523fb0b6d62",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/00-shared-contracts.md": "7eb5eb8b74e1b6d7616590f85fc5262a751d317c723902450f12d906a7a7e833",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/01-inventory-real-phase-6-contracts.md": "bf200adfc3baa800c0ce5a8c11117570e8ac8ad19e21b6c2fb60cf32600bcf3b",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/02-write-stitch-prompts-and-frames.md": "f01c30cf36efe424e5826c2ebd161541a81eaec29c61fffdfab5028b657aba45",
@@ -83,6 +83,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-08-16T22:19:25.996477+00:00",
+  "generated_at": "2026-08-16T22:23:25.963537+00:00",
   "schema_version": 1
 }
