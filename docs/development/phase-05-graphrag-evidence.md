@@ -1,7 +1,7 @@
 ---
 title: Phase 5 GraphRAG evidence
 owner: engineering-lead
-status: pending
+status: accepted
 last-reviewed: 2026-08-16
 audience: engineering, reviewers
 phase: 5
@@ -11,9 +11,9 @@ phase: 5
 
 Canonical packet evidence and exit record for
 [Phase 5](../../.cursor/plans/hybrid-graph-rag/05-phase-graphrag.md).
-Packet 1 creates this file; later packets append. Phase status remains
-`pending`. Holdout stays sealed. Packets 2–8 follow the identity-envelope
-unblocker below.
+Packet 1 created this file; later packets appended. Phase status is
+`complete` after user acceptance on 2026-08-16. Holdout stays sealed.
+Combined answer quality remains Phase 6.
 
 Related: [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) ·
 [ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·
@@ -1253,8 +1253,8 @@ unexecuted Phase 6 label is not a Packet 8 pass.
 | Low-survival Hybrid handoff | `low_survival` + PHASE6_HANDOFF codes |
 | Phase 6 frozen fixtures/interfaces; no holdout leakage; no Combined quality claim | PHASE6_HANDOFF + `P8-HOLDOUT` + `P8-COMBINED` deferred |
 
-Phase status remains `pending`. This packet does **not** flip
-`05-phase-graphrag.md` to `status: complete`.
+Phase status was `pending` until user acceptance. This packet did **not**
+flip `05-phase-graphrag.md` by itself.
 
 ### Import-cycle deviation (required for freeze)
 
@@ -1349,11 +1349,10 @@ Please confirm each item. **Do not** treat this file as acceptance.
    version canonicals, one retrieve, one support rerank). Query-time Hybrid
    remains forbidden.
 
-**Packet 8 implementation is complete pending user acceptance.** The Packet 4
-worker Hybrid hole is closed in the remaining mapping Hybrid section below.
-Holdout remains sealed. Do not mark Phase 5 complete. Phase 6 may start only
-after this checklist is accepted — and Phase 6 owns Combined fusion, verifier/
-citations, holdout, and the +10pp gain, not this packet.
+**Accepted 2026-08-16.** User confirmed the reduced close and asked to push
+(`okay push`). Wrapper status is now `complete`. Holdout remains sealed.
+Phase 6 owns Combined fusion, verifier/citations, holdout, and the +10pp
+gain.
 
 ## Remaining Phase 5 — production mapping Hybrid wiring
 
@@ -1388,7 +1387,7 @@ citations, holdout, and the +10pp gain, not this packet.
 
 ### Commands and results
 
-No push. Holdout remains sealed. Phase status remains `pending`. No
+No push until user acceptance (recorded below). Holdout remains sealed. No
 `uv sync --package smart-rag-core`. No new migration.
 
 | Command | Exit |
@@ -1423,6 +1422,15 @@ No push. Holdout remains sealed. Phase status remains `pending`. No
 
 ### Handoff
 
-This closes the Packet 4 worker Hybrid hole. It does **not** mark Phase 5
-complete. User acceptance of the Packet 8 checklist plus this wiring is
-still required before `status: complete` and `git push`.
+This closed the Packet 4 worker Hybrid hole. Combined fusion, SSE, and
+query-agent remain Phase 6.
+
+## Phase close
+
+- Phase wrapper `status`: `complete` (`completed: 2026-08-16`).
+- Accepted when the user said `okay push` after the reduced-envelope
+  explanation in Cursor chat on 2026-08-16.
+- Advertised envelope remains **15 documents**, chunks **unverified**, bulk
+  graph onboarding **blocked**, maintenance reserve **USD 800**.
+- Live extraction P/R remains unverified. Combined quality remains a Phase 6
+  no-claim. Holdout stays sealed.

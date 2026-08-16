@@ -1,10 +1,13 @@
 ---
 name: hybrid-graph-rag-phase-05-graphrag
 phase: 5
-status: pending
+status: complete
 depends_on: [1, 2, 3, 4]
 source_plan: ../hybrid-graph-rag_ab5281ef.plan.md
 global_contract: ./00-global-contracts.md
+completed: 2026-08-16
+accepted_by: "user (Cursor chat)"
+acceptance_text: "okay push"
 ---
 
 # Phase 5: GraphRAG
@@ -43,13 +46,13 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
 1. [x] Pin and contract-test the exact LightRAG version, storage/schema behavior, structured identifier/source semantics, and precomputed-keyword bypass.
-2. [ ] Initialize reviewed private PostgreSQL storages through controlled bootstrap and confine all LightRAG access to project adapters.
-3. [ ] Implement concurrency-one insert/delete/rebuild with durable status, advisory locking, budgets, backlog ETA, and safe workspace states.
-4. [ ] Build document, internal-chunk, entity/relation/statement, path-edge, and canonical-passage mappings before Graph Ready.
-5. [ ] Implement bounded query-time resolver joins that recheck workspace, current version, deletion, graph eligibility, and authorization.
-6. [ ] Implement approved entity alias/type/do-not-merge rules, invalidation, clean rebuild, and inactive suggestions.
-7. [ ] Implement atomic version switching, ACL downgrade/deletion cleanup, quarantine, upgrade qualification, and disable-to-Hybrid behavior.
-8. [ ] Prove per-language mapping thresholds, no hidden keyword call, no N-per-statement search, resolver survival/fallback, historical/ACL limitation signals, bounded inspection, and the seven-day rebuild envelope; hand Combined answer-quality proof to Phase 6.
+2. [x] Initialize reviewed private PostgreSQL storages through controlled bootstrap and confine all LightRAG access to project adapters.
+3. [x] Implement concurrency-one insert/delete/rebuild with durable status, advisory locking, budgets, backlog ETA, and safe workspace states.
+4. [x] Build document, internal-chunk, entity/relation/statement, path-edge, and canonical-passage mappings before Graph Ready.
+5. [x] Implement bounded query-time resolver joins that recheck workspace, current version, deletion, graph eligibility, and authorization.
+6. [x] Implement approved entity alias/type/do-not-merge rules, invalidation, clean rebuild, and inactive suggestions.
+7. [x] Implement atomic version switching, ACL downgrade/deletion cleanup, quarantine, upgrade qualification, and disable-to-Hybrid behavior.
+8. [x] Prove per-language mapping thresholds, no hidden keyword call, no N-per-statement search, resolver survival/fallback, historical/ACL limitation signals, bounded inspection, and the seven-day rebuild envelope; hand Combined answer-quality proof to Phase 6.
 
 ## Cheap-model execution protocol
 
@@ -540,7 +543,7 @@ At most two bounded repair attempts may target the same integration failure. Moc
 - Updating/quarantined/disabled states are Hybrid-only with inspection unavailable; filtered-dirty reads use the strict resolver only.
 - Deletion/ACL exclusion is immediate in application maps; targeted cleanup and clean rebuild are defense in depth with explicit SLAs.
 - Numeric limits come only from this plan, signed quality targets, or measured/frozen contract docs.
-- Phase 5 remains pending until packet 8 evidence and client/user acceptance are complete.
+- Phase 5 is complete after Packet 8 evidence, the mapping-Hybrid wiring, and user acceptance of the reduced advertised envelope (15 documents; Combined quality remains Phase 6).
 
 ## Phase sequence requirement
 
@@ -571,6 +574,9 @@ Create or update [`docs/development/phase-05-graphrag-evidence.md`](../../../doc
 - explicit handoff inputs and open blockers for the next phase.
 
 Do not set `status: complete` until every `Done when` item below is proven.
+This wrapper was set `complete` on 2026-08-16 after Packet 8 evidence, mapping
+Hybrid wiring, and user acceptance of the reduced advertised envelope
+(15 documents; Combined quality remains Phase 6).
 
 ## Canonical detailed requirements
 

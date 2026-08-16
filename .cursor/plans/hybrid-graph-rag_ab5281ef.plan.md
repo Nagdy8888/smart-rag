@@ -16,7 +16,7 @@ todos:
     status: pending
   - id: phase-05-graphrag
     content: Execute Phase 5: GraphRAG from its dedicated plan file.
-    status: pending
+    status: completed
   - id: phase-06-agent-intelligence
     content: Execute Phase 6: Agent intelligence from its dedicated plan file.
     status: pending
