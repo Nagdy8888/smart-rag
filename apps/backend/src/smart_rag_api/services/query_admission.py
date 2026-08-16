@@ -18,11 +18,13 @@ from smart_rag_core.query_admission.service import (
     admit_query_run,
 )
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.runtime.valkey import ValkeyClient
 from smart_rag_core.security.identity import CallerContext
 
 from smart_rag_api.services.auth_rate_limits import (
     AuthRateLimitExceededError,
     AuthRateLimitUnavailableError,
+    RateLimitKind,
     check_auth_rate_limit,
 )
 
@@ -57,6 +59,7 @@ def admit_query_run_for_caller(
     token_issued_at: datetime | None = None,
     postgres_rate_limit_url: SecretStr | None = None,
     valkey_limits_url: SecretStr | None = None,
+    valkey_client: ValkeyClient | None = None,
 ) -> QueryAdmissionResult:
     """Apply FastAPI rate limits, then admit through the durable RPC.
 
@@ -74,7 +77,10 @@ def admit_query_run_for_caller(
         token_issued_at: JWT ``iat`` for profile-wide revocation.
         postgres_rate_limit_url: Degraded limiter URL. Defaults to
             ``postgres_url``. Missing backends fail closed.
-        valkey_limits_url: Optional unused fast path. Never authorizes spend.
+        valkey_limits_url: Optional unused URL retained for packet 1 callers.
+            Never authorizes spend.
+        valkey_client: Optional limits client. Timeouts fall back to Postgres
+            then fail closed.
 
     Returns:
         Authorized runtime context from the durable admit RPC.
@@ -96,6 +102,8 @@ def admit_query_run_for_caller(
             window_seconds=QUERY_ADMISSION_RATE_WINDOW_SECONDS,
             postgres_url=limiter_url,
             valkey_limits_url=valkey_limits_url,
+            valkey_client=valkey_client,
+            kind=RateLimitKind.COST_MUTATION,
         )
     except AuthRateLimitExceededError as exc:
         raise QueryAdmissionError("rate_limited") from exc

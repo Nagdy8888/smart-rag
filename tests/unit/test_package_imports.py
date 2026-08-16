@@ -25,6 +25,7 @@ def test_backend_app_import_exposes_unconfigured_readiness() -> None:
     assert app.title == "Smart RAG API"
     payload = ready()
     assert payload["status"] == "unconfigured"
+    assert payload["query_ready"] is False
 
 
 def test_worker_main_returns_zero_without_claiming_jobs(

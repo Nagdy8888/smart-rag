@@ -117,7 +117,7 @@ erDiagram
 
 | Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `conversations` | `app` | authority | chat API | creator (+ audit) | 90d undeleted | per user | immediate delete path Pkt 6 | conversation `id` | 2 schema / 6 agent |
+| `conversations` | `app` | authority | chat API | creator (+ audit) | 90d undeleted | per user | packet 7 delete/reaper; packet 5 DELETE is 501 | conversation `id` | 2 schema / 6 agent |
 | `messages` | `app` | authority | chat API | creator via `app.load_query_memory` (packet 2); creator (+ audit) SELECT | with conversation | last 12 on query path | cascade | message `id` | 6 packet 2 memory |
 | `runs` | `app` | authority | admit RPC (`app_api` EXECUTE) | creator (+ audit) | 30d payloads | concurrent runs cap 5 | cascade | `(creator_user_id, conversation_id, idempotency_key)` plus global key unique | 6 packet 1 admission |
 | `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade | `(run_id, citation_index)` | 6 packet 3 provenance jsonb |
@@ -199,6 +199,7 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
   enqueue `company_default__rebuild` without switching the pointer.
 - `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. Packet 4 may set `active` when maps verify and the pointer already names the workspace. This is Graph Ready on the version, not a Packet 7 switch.
 - `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, `graph_maintenance`, or `query_run`. The kinds never share caps. `query_run` consume uses run-local optimistic version and never `SELECT FOR UPDATE` on `company_settings` or `profiles`.
+- Phase 6 packet 5 adds SECURITY DEFINER RPCs (`app.create_conversation`, `app.get_conversation`, `app.get_query_run`, `app.cancel_query_run`, `app.list_run_citations`, `app.submit_run_feedback`, `app.summarize_caller_usage`, `app.summarize_company_usage`, `app.list_authorized_table_manifests`, `app.get_visible_document`, `app.search_graph_entities`, `app.upsert_tool_catalog_seed`, `app.set_tool_permission`) with `SET search_path = pg_catalog, app` and `EXECUTE` to `app_api` only. Conversation deletion remains packet 7. Retrieval cache is Valkey IDs/ranks only; `app.recheck_retrieval_candidates` stays authority.
 
 ## Related docs
 
@@ -217,4 +218,5 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [QUERY_BUDGETS.md](../agent/QUERY_BUDGETS.md)
 - [COMBINED_FUSION.md](../agent/COMBINED_FUSION.md)
 - [ANSWER_VERIFICATION.md](../agent/ANSWER_VERIFICATION.md)
+- [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md)
 - [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md)

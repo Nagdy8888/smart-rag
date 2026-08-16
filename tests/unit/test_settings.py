@@ -53,6 +53,28 @@ def test_backend_settings_load_documented_environment_aliases(
     assert "sk-this-value" not in repr(settings)
 
 
+def test_wildcard_cors_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Credentialed wildcard CORS cannot be configured."""
+
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example,*")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
+
+
+def test_backend_cache_ttl_and_api_version_defaults() -> None:
+    """Packet 5 cache TTLs and handshake versions have signed defaults."""
+
+    settings = BackendSettings()
+    assert settings.retrieval_cache_result_ttl_seconds == 30
+    assert settings.retrieval_cache_profile_ttl_seconds == 300
+    assert settings.api_version == "0.1.0"
+    assert settings.sse_schema_version == "1"
+    assert settings.parsed_cors_origins() == (
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+    )
+
+
 def test_settings_validation_error_omits_invalid_source_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

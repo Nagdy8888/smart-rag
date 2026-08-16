@@ -17,12 +17,14 @@ from smart_rag_core.security.identity import UserRole
 from smart_rag_core.settings import BackendSettings
 
 from smart_rag_api.dependencies.identity import CallerContextDep
+from smart_rag_api.dependencies.services import enforce_rate_limit
 from smart_rag_api.schemas.ingestion_status import (
     DocumentIngestionStatusResponse,
     IngestionJobSummary,
     IngestionStatusResponse,
     RetryIngestionJobResponse,
 )
+from smart_rag_api.services.auth_rate_limits import RateLimitKind
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"])
 
@@ -135,6 +137,12 @@ def retry_ingestion_job(
 
     if caller.role not in {UserRole.OWNER, UserRole.ADMIN}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    enforce_rate_limit(
+        request,
+        bucket_key=f"ingestion-retry:{caller.user_id}",
+        kind=RateLimitKind.COST_MUTATION,
+        max_attempts=20,
+    )
 
     settings: BackendSettings = request.app.state.settings
     with psycopg.connect(_postgres_url(settings)) as connection:

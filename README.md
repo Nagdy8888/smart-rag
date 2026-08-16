@@ -52,7 +52,8 @@ Full index (owner / status / last-reviewed): [docs/README.md](docs/README.md)
 ## Status
 
 Phase 1 foundation was accepted on 2026-08-12. Phases 2–5 have local evidence
-and remain pending or accepted per the docs index. Phase 6 packets 1–4 are
+and remain pending or accepted per the docs index. Phase 6 packets 1–5 are
 implemented (admission, routing, Combined fusion/answer/verifier, optional
-tools) and are **not** a phase-complete claim. SSE and the testing UI remain
-later packets. See [docs/README.md](docs/README.md).
+tools, FastAPI security) and are **not** a phase-complete claim. SSE,
+conversation deletion, and the testing UI remain later packets. See
+[docs/README.md](docs/README.md).

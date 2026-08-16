@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Protocol, cast, runtime_checkable
 
 from fastapi.testclient import TestClient
@@ -26,11 +27,32 @@ def json_object(value: object) -> dict[str, object]:
     return cast(dict[str, object], value)
 
 
+def json_object_list(value: object) -> list[dict[str, object]]:
+    """Narrow a decoded JSON value to a list of objects.
+
+    Args:
+        value: Decoded JSON value.
+
+    Returns:
+        List of string-keyed mappings.
+
+    Raises:
+        TypeError: If the value is not a JSON array of objects.
+    """
+
+    if not isinstance(value, list):
+        raise TypeError("expected JSON array")
+    items = cast(list[object], value)
+    return [json_object(item) for item in items]
+
+
 @runtime_checkable
 class JsonResponse(Protocol):
     """HTTP response with JSON decoding used by OpenAPI unit tests."""
 
     status_code: int
+    text: str
+    headers: Mapping[str, str]
 
     def json(self) -> object:
         """Return the decoded JSON body."""
@@ -41,11 +63,17 @@ class JsonResponse(Protocol):
 class OpenAPIClient(Protocol):
     """Subset of TestClient used by OpenAPI registration and RBAC tests."""
 
-    def get(self, url: str) -> JsonResponse:
+    def get(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> JsonResponse:
         """Send one GET request.
 
         Args:
             url: Request path.
+            headers: Optional request headers.
         """
         ...
 
@@ -55,12 +83,28 @@ class OpenAPIClient(Protocol):
         *,
         json: object | None = None,
         headers: dict[str, str] | None = None,
+        content: bytes | None = None,
     ) -> JsonResponse:
         """Send one POST request.
 
         Args:
             url: Request path.
             json: Optional JSON body.
+            headers: Optional request headers.
+            content: Optional raw body.
+        """
+        ...
+
+    def delete(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> JsonResponse:
+        """Send one DELETE request.
+
+        Args:
+            url: Request path.
             headers: Optional request headers.
         """
         ...
@@ -73,10 +117,10 @@ def as_openapi_client(client: object) -> OpenAPIClient:
         client: Entered FastAPI TestClient.
 
     Returns:
-        The same client typed for ``get`` / ``post``.
+        The same client typed for ``get`` / ``post`` / ``delete``.
 
     Raises:
-        TypeError: If the object does not provide ``get`` and ``post``.
+        TypeError: If the object does not provide the expected methods.
     """
 
     if not isinstance(client, OpenAPIClient):

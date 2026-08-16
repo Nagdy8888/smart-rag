@@ -9,10 +9,12 @@ from smart_rag_core.security.identity import UserRole
 from smart_rag_core.settings import BackendSettings
 
 from smart_rag_api.dependencies.identity import CallerContextDep
+from smart_rag_api.dependencies.services import enforce_rate_limit
 from smart_rag_api.schemas.ingestion_crawl import (
     EnqueueWebsiteCrawlRequest,
     EnqueueWebsiteCrawlResponse,
 )
+from smart_rag_api.services.auth_rate_limits import RateLimitKind
 from smart_rag_api.services.crawl_enqueue import (
     CrawlEnqueueError,
     enqueue_approved_website_crawl,
@@ -48,6 +50,12 @@ def enqueue_website_crawl(
 
     if caller.role not in {UserRole.OWNER, UserRole.ADMIN}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    enforce_rate_limit(
+        request,
+        bucket_key=f"crawl-start:{caller.user_id}",
+        kind=RateLimitKind.COST_MUTATION,
+        max_attempts=10,
+    )
     settings: BackendSettings = request.app.state.settings
     if settings.supabase_db_url is None:
         raise HTTPException(

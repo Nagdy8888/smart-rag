@@ -28,8 +28,8 @@ Validation errors list field paths and categories but omit source values.
 | `LANGSMITH_ENDPOINT` | optional HTTP URL | internal | Override for a non-default LangSmith API; unset uses the hosted default |
 | `MOCK_MODEL_FIXTURE_ID` | safe identifier; `phase-1-foundation-v1` | internal | Included in fixture provenance; does not imply retrieval |
 | `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 16,384 | public | Deployable gateway input bound |
-| `VALKEY_LIMITS_URL` | optional URL | secret | May contain credentials; not connected during Packet 4 |
-| `VALKEY_CACHE_URL` | optional URL | secret | May contain credentials; not connected during Packet 4 |
+| `VALKEY_LIMITS_URL` | optional URL | secret | Rate-limit Valkey. Packet 5 connects per command at request time, never at import. Unset falls back to Postgres for mutations |
+| `VALKEY_CACHE_URL` | optional URL | secret | Cache Valkey. Never authority; retrieval hits recheck Postgres |
 | `PARADEDB_URL` | optional URL | secret | Worker/API ParadeDB DSN. Packet 8 host pytest uses `docker-compose.packet8.yml` loopback `:54329` |
 | `CRAWL_PROXY_URL` | optional HTTP URL | internal | Private deny-by-default proxy endpoint. Packet 8 overlay publishes `http://127.0.0.1:18080` |
 | `CLAMAV_HOST` / `CLAMAV_PORT` | hostname / Packet 8 overlay `13310` | internal | Worker uses Compose DNS `clamav:3310`. Packet 8 overlay publishes host `13310` |
@@ -83,6 +83,20 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
 | `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api` |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. |
+| `CORS_ALLOW_ORIGINS` | comma-separated exact origins; `http://127.0.0.1:3000,http://localhost:3000` | public | Wildcards forbidden. Never pair `*` with credentials |
+| `API_VERSION` | `major.minor.patch`; `0.1.0` | public | Published by `GET /api/meta` |
+| `SSE_SCHEMA_VERSION` | safe token; `1` | public | Packet 6 handshake. Packet 5 only publishes it |
+| `MIN_CLIENT_VERSION` | `major.minor.patch`; `0.1.0` | public | Packet 6 handshake. Packet 5 only publishes it |
+| `RETRIEVAL_CACHE_RESULT_TTL_SECONDS` | 1–300; `30` | public | ID/rank cache TTL |
+| `RETRIEVAL_CACHE_PROFILE_TTL_SECONDS` | 1–3600; `300` | public | Profile/embedding cache TTL |
+| `REQUEST_MAX_BODY_BYTES` | 1024–16_777_216; `1048576` | public | JSON/body cap; oversized → 413 |
+| `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |
+| `RATE_LIMIT_RETRY_AFTER_SECONDS` | 1–3600; `60` | public | `Retry-After` on limiter 429/503 |
+
+Phase 6 packet 1 query admission still uses
+`QUERY_ADMISSION_RATE_MAX_ATTEMPTS=20` / 60s as engineering defaults. Packet 5
+classifies that bucket as `COST_MUTATION` (Valkey then Postgres, never
+fail-open).
 
 ## Worker-only variables
 
@@ -103,10 +117,10 @@ Queue and retrieval settings remain owned by later phases. Graph runtime DSN
 is Packet 2 above. Packet 3 reuses `JOB_LEASE_SECONDS` for graph job and
 writer leases. Graph Ready remains Packet 4.
 
-Phase 6 packet 1 query admission adds **no new environment variables**. FastAPI
-rate limits use documented constants
-(`QUERY_ADMISSION_RATE_MAX_ATTEMPTS=20` / 60s window). Packet 5 may replace
-those with signed policy.
+Phase 6 packet 1 query admission adds **no new environment variables** beyond
+the packet 5 backend table above. FastAPI rate limits use
+`QUERY_ADMISSION_RATE_MAX_ATTEMPTS=20` / 60s window classified as
+`COST_MUTATION`.
 
 ## Managed proof-operation variables
 

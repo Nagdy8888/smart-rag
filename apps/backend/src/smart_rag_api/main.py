@@ -12,15 +12,46 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
+from pydantic import SecretStr
 from smart_rag_core.gateways import block_openai_network, create_model_gateway
 from smart_rag_core.observability import configure_json_logging, correlation_context
 from smart_rag_core.retrieval.lightrag_adapter import bind_process_runtime_adapter
+from smart_rag_core.runtime.valkey import SocketValkeyClient
 from smart_rag_core.security.jwks import JwksVerifier
 from smart_rag_core.settings import BackendSettings, load_backend_settings
 
-from smart_rag_api.middleware import normalized_request_id
+from smart_rag_api.middleware import (
+    add_cors,
+    add_security_headers,
+    install_error_handlers,
+    limit_preauth_ip,
+    limit_request_body,
+    normalized_request_id,
+)
+from smart_rag_api.services.readiness import build_readiness, readiness_as_dict
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _bind_valkey_client(
+    url: SecretStr | None, *, timeout_seconds: float
+) -> SocketValkeyClient | None:
+    """Construct a per-command Valkey client without opening a socket.
+
+    Args:
+        url: Optional Redis-protocol URL secret.
+        timeout_seconds: Connect/command timeout.
+
+    Returns:
+        Client or None when the URL is unset.
+    """
+
+    if url is None:
+        return None
+    secret = url.get_secret_value()
+    if not secret:
+        return None
+    return SocketValkeyClient(secret, timeout_seconds=timeout_seconds)
 
 
 @asynccontextmanager
@@ -43,8 +74,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         Configures process logging, LangSmith hide/tracing flags via the model
         gateway factory, and, in mock mode, denies OpenAI DNS access.
         When ``LIGHTRAG_DB_URL`` is set, attaches the runtime LightRAG adapter
-        without calling schema-admin ``initialize_storages``. Finalizes the
-        adapter on shutdown.
+        without calling schema-admin ``initialize_storages``. Constructs Valkey
+        clients without connecting. Finalizes the adapter on shutdown.
     """
 
     settings = load_backend_settings()
@@ -54,6 +85,16 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         level=settings.log_level.value,
     )
     application.state.settings = settings
+    application.state.rate_limit_degraded = False
+    application.state.offload_executor = None
+    application.state.valkey_limits_client = _bind_valkey_client(
+        settings.valkey_limits_url,
+        timeout_seconds=settings.valkey_timeout_seconds,
+    )
+    application.state.valkey_cache_client = _bind_valkey_client(
+        settings.valkey_cache_url,
+        timeout_seconds=settings.valkey_timeout_seconds,
+    )
     application.state.jwks_verifier = JwksVerifier(
         supabase_url=str(settings.supabase_url),
         audience=settings.supabase_jwt_audience,
@@ -68,8 +109,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         async with block_openai_network(settings.mock_model_mode):
             application.state.model_gateway = create_model_gateway(settings)
             LOGGER.info(
-                "Backend foundation startup is unconfigured",
-                extra={"event": "backend.startup.unconfigured"},
+                "Backend foundation startup",
+                extra={"event": "backend.startup"},
             )
             yield
             LOGGER.info(
@@ -119,8 +160,8 @@ def create_app() -> FastAPI:
     """Create the import-safe FastAPI transport application.
 
     Returns:
-        FastAPI application with liveness, honest unconfigured readiness, and
-        correlation middleware.
+        FastAPI application with thin routers, security middleware, and
+        dependency-aware readiness. Settings and sockets stay in lifespan.
 
     Side Effects:
         Creates in-memory FastAPI routing objects only. Settings validation and
@@ -131,25 +172,47 @@ def create_app() -> FastAPI:
         title="Smart RAG API",
         version="0.1.0",
         description=(
-            "Phase 1 foundation transport scaffold. Business routes are not "
-            "implemented; readiness is unconfigured until later phases."
+            "Authenticated RAG API. SSE event transport is packet 6. "
+            "Readiness is dependency-aware and never query-ready in mock mode."
         ),
         lifespan=lifespan,
     )
     application.middleware("http")(add_correlation_context)
-    application.get("/health/live", tags=["health"])(live)
-    application.get("/health/ready", tags=["health"])(ready)
+    application.middleware("http")(limit_preauth_ip)
+    application.middleware("http")(limit_request_body)
+    application.middleware("http")(add_security_headers)
+    application.middleware("http")(add_cors)
+    install_error_handlers(application)
+
+    from smart_rag_api.routers.auth_team import router as auth_team_router
+    from smart_rag_api.routers.conversations import router as conversations_router
+    from smart_rag_api.routers.documents import router as documents_router
     from smart_rag_api.routers.entity_rules import router as entity_rules_router
     from smart_rag_api.routers.glossary import router as glossary_router
     from smart_rag_api.routers.graph_inspect import router as graph_inspect_router
     from smart_rag_api.routers.ingestion_crawl import router as ingestion_crawl_router
     from smart_rag_api.routers.ingestion_status import router as ingestion_status_router
+    from smart_rag_api.routers.ops import router as ops_router
+    from smart_rag_api.routers.query_runs import router as query_runs_router
+    from smart_rag_api.routers.tables import router as tables_router
+    from smart_rag_api.routers.tools import admin_router as tools_admin_router
+    from smart_rag_api.routers.tools import catalog_router as tools_catalog_router
+    from smart_rag_api.routers.usage import router as usage_router
 
+    application.include_router(ops_router)
+    application.include_router(auth_team_router)
+    application.include_router(documents_router)
+    application.include_router(conversations_router)
+    application.include_router(query_runs_router)
     application.include_router(ingestion_status_router)
     application.include_router(ingestion_crawl_router)
     application.include_router(glossary_router)
     application.include_router(graph_inspect_router)
     application.include_router(entity_rules_router)
+    application.include_router(tables_router)
+    application.include_router(tools_catalog_router)
+    application.include_router(tools_admin_router)
+    application.include_router(usage_router)
     return application
 
 
@@ -163,17 +226,24 @@ def live() -> dict[str, str]:
     return {"status": "live"}
 
 
-def ready() -> dict[str, str]:
-    """Call the honest unconfigured readiness behavior for direct smoke tests.
+def ready() -> dict[str, object]:
+    """Import-time readiness: settings are not bound, so status is unconfigured.
+
+    HTTP ``GET /health/ready`` uses request-scoped probes. This helper stays
+    honest for package-import tests that never start lifespan.
 
     Returns:
-        A mapping with ``status=unconfigured``.
+        Readiness mapping with ``status=unconfigured`` and ``query_ready=false``.
     """
 
-    return {
-        "status": "unconfigured",
-        "detail": "Phase 1 foundation scaffold; dependencies not wired.",
-    }
+    payload = build_readiness(
+        None,
+        valkey_limits=None,
+        valkey_cache=None,
+        lightrag_attached=False,
+        rate_limit_degraded=False,
+    )
+    return readiness_as_dict(payload)
 
 
 app = create_app()

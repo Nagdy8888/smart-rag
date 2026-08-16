@@ -82,14 +82,19 @@ ceilings into state and ends. The node does not retrieve or answer.
 
 ## FastAPI slice
 
-`admit_query_run_for_caller` applies the Postgres degraded limiter
-(`private.consume_auth_rate_limit`) with bucket `query-admission:{user_id}`
-before cost. Packet 1 does not throttle hosted Supabase Auth and does not
-add a public streaming chat endpoint. Packet 5 owns router breadth and
-provider-versus-FastAPI Auth ownership.
+`admit_query_run_for_caller` applies FastAPI-owned `COST_MUTATION` limits
+(Valkey when configured, else Postgres `private.consume_auth_rate_limit`,
+bucket `query-admission:{user_id}`) before cost. Dual Valkey+Postgres
+failure returns limiter unavailable and inserts no reservation. FastAPI does
+not throttle hosted Supabase Auth.
 
-Rate-limit and limiter-unavailable failures insert no reservation.
-Concurrency is the durable five-run SQL cap (`QT-CAP-004`), not Valkey.
+`POST /conversations/{id}/messages` admits Auto chat as
+`Phase6RouteFamily.COMPOSITE` and returns `{run_id, stream_path}` where
+`stream_path` is `/runs/{run_id}/events`. Packet 6 owns the EventSource
+body. `GET /health/ready` is dependency-aware and never sets `query_ready`
+in mock mode or when LightRAG is unattached.
+
+See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 
 ## Related
 
@@ -97,4 +102,5 @@ Concurrency is the durable five-run SQL cap (`QT-CAP-004`), not Valkey.
 - [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
 - [AUDIT_CHAIN.md](../security/AUDIT_CHAIN.md)
 - [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md)
+- [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md)
 - [phase-06-agent-intelligence-evidence.md](../development/phase-06-agent-intelligence-evidence.md)

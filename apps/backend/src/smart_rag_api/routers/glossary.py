@@ -11,7 +11,9 @@ from smart_rag_core.security.identity import UserRole
 from smart_rag_core.settings import BackendSettings
 
 from smart_rag_api.dependencies.identity import CallerContextDep
+from smart_rag_api.dependencies.services import enforce_rate_limit
 from smart_rag_api.schemas.glossary import GlossaryImportResponse, ImportGlossaryRequest
+from smart_rag_api.services.auth_rate_limits import RateLimitKind
 from smart_rag_api.services.glossary_import import (
     approve_glossary,
     import_glossary,
@@ -57,6 +59,22 @@ def _require_owner_admin(caller: CallerContextDep) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
 
+def _rate_admin_mutation(request: Request, caller: CallerContextDep) -> None:
+    """Apply FastAPI-owned admin mutation limits.
+
+    Args:
+        request: Active request.
+        caller: Authenticated owner/admin.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"glossary-admin:{caller.user_id}",
+        kind=RateLimitKind.AUTH_ADJACENT,
+        max_attempts=20,
+    )
+
+
 @router.post(
     "/imports",
     response_model=GlossaryImportResponse,
@@ -83,6 +101,7 @@ def create_glossary_import(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         outcome = import_glossary(
             _postgres_url(request),
@@ -128,6 +147,7 @@ def approve_glossary_import_route(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         outcome = approve_glossary(
             _postgres_url(request),
@@ -173,6 +193,7 @@ def rollback_glossary_import_route(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         outcome = rollback_glossary(
             _postgres_url(request),

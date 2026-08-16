@@ -7,6 +7,11 @@ from smart_rag_core.retrieval.bm25_query import (
     Bm25StructuredQuery,
     build_bm25_query,
 )
+from smart_rag_core.retrieval.cache_store import (
+    CachedRetrieval,
+    CacheEvent,
+    RetrievalCacheStore,
+)
 from smart_rag_core.retrieval.dense import DenseRetriever
 from smart_rag_core.retrieval.fusion import fuse_channels
 from smart_rag_core.retrieval.graph import (
@@ -77,6 +82,8 @@ __all__ = [
     "Bm25RetrievalResult",
     "Bm25Retriever",
     "Bm25StructuredQuery",
+    "CacheEvent",
+    "CachedRetrieval",
     "DenseMode",
     "DenseRetrievalResult",
     "DenseRetriever",
@@ -94,6 +101,7 @@ __all__ = [
     "HybridRetriever",
     "HybridRunResult",
     "RecheckRejectedError",
+    "RetrievalCacheStore",
     "RetrievalCandidate",
     "RetrievalFallbackReason",
     "RetrievalSessionError",

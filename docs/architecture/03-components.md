@@ -28,7 +28,7 @@ flowchart LR
 
 | Component | Ownership | Phase status |
 | --- | --- | --- |
-| FastAPI routers/middleware | `apps/backend` | foundation live/ready |
+| FastAPI routers/middleware | `apps/backend` | packet 5 thin routers; dependency-aware `/health/ready`; SSE transport packet 6 |
 | LangGraph query admission / routing / fusion / optional tools / answer / verifier / ingestion probe | `apps/agents` | query: `enforce_admission` → memory → prepare → plan → branches → one correction → fuse → tables → optional tools → answer → verify; ingestion: lease/ledger probe |
 | Worker entrypoint | `apps/worker` | process contract only |
 | Settings / logging / model gateway / LangSmith | `packages/core` | Gateway tracing live; production query-graph feedback is Phase 6 |
@@ -46,4 +46,5 @@ flowchart LR
 - [Combined fusion](../agent/COMBINED_FUSION.md)
 - [Answer verification](../agent/ANSWER_VERIFICATION.md)
 - [Optional tools](../agent/OPTIONAL_TOOLS.md)
+- [FastAPI security](../api/FASTAPI_SECURITY.md)
 - [docs index](../README.md)

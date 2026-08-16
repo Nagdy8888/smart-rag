@@ -11,6 +11,7 @@ from smart_rag_core.security.identity import UserRole
 from smart_rag_core.settings import BackendSettings
 
 from smart_rag_api.dependencies.identity import CallerContextDep
+from smart_rag_api.dependencies.services import enforce_rate_limit
 from smart_rag_api.schemas.entity_rules import (
     EntityRuleConcurrencyRequest,
     EntityRuleListResponse,
@@ -18,6 +19,7 @@ from smart_rag_api.schemas.entity_rules import (
     EntityRuleSuggestRequest,
     EntityRuleUpsertRequest,
 )
+from smart_rag_api.services.auth_rate_limits import RateLimitKind
 from smart_rag_api.services.entity_rules import (
     approve_entity_rule_http,
     create_entity_rule_suggestion,
@@ -68,6 +70,22 @@ def _require_owner_admin(caller: CallerContextDep) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
 
+def _rate_admin_mutation(request: Request, caller: CallerContextDep) -> None:
+    """Apply FastAPI-owned admin mutation limits.
+
+    Args:
+        request: Active request.
+        caller: Authenticated owner/admin.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"entity-rules-admin:{caller.user_id}",
+        kind=RateLimitKind.AUTH_ADJACENT,
+        max_attempts=20,
+    )
+
+
 def _raise_rule_error(exc: EntityRuleRejectedError | GraphEntityRuleError) -> None:
     """Map rule failures to sanitized HTTP errors.
 
@@ -109,6 +127,7 @@ def list_entity_rules_route(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         return list_entity_rules_http(
             _postgres_url(request),
@@ -146,6 +165,7 @@ def create_entity_rule_route(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         return create_or_update_entity_rule(
             _postgres_url(request),
@@ -182,6 +202,7 @@ def update_entity_rule_route(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         return create_or_update_entity_rule(
             _postgres_url(request),
@@ -221,6 +242,7 @@ def suggest_entity_rule_route(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         return create_entity_rule_suggestion(
             _postgres_url(request),
@@ -257,6 +279,7 @@ def approve_entity_rule_route(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         return approve_entity_rule_http(
             _postgres_url(request),
@@ -294,6 +317,7 @@ def revoke_entity_rule_route(
     """
 
     _require_owner_admin(caller)
+    _rate_admin_mutation(request, caller)
     try:
         return revoke_entity_rule_http(
             _postgres_url(request),

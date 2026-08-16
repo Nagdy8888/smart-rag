@@ -71,3 +71,97 @@ def test_missing_backends_fail_closed() -> None:
             window_seconds=60,
             postgres_url=None,
         )
+
+
+def test_valkey_unset_cost_mutation_uses_postgres_not_fail_open() -> None:
+    """Valkey unset still requires Postgres; skipping the limiter fails the test."""
+
+    from smart_rag_api.services.auth_rate_limits import (
+        AuthRateLimitUnavailableError,
+        RateLimitKind,
+    )
+
+    with pytest.raises(AuthRateLimitUnavailableError):
+        check_auth_rate_limit(
+            bucket_key="cost-no-backends",
+            max_attempts=3,
+            window_seconds=60,
+            postgres_url=None,
+            valkey_client=None,
+            kind=RateLimitKind.COST_MUTATION,
+        )
+
+
+def test_dual_valkey_postgres_outage_fail_closed() -> None:
+    """Bound Valkey timeout plus missing Postgres is 503, never allow."""
+
+    from smart_rag_api.services.auth_rate_limits import (
+        AuthRateLimitUnavailableError,
+        RateLimitKind,
+    )
+    from smart_rag_core.runtime.valkey import MemoryValkeyClient
+
+    client = MemoryValkeyClient(fail_closed=True)
+    with pytest.raises(AuthRateLimitUnavailableError):
+        check_auth_rate_limit(
+            bucket_key="dual-outage",
+            max_attempts=3,
+            window_seconds=60,
+            postgres_url=None,
+            valkey_client=client,
+            kind=RateLimitKind.COST_MUTATION,
+        )
+
+
+def test_valkey_fast_path_enforces_ttl_counter() -> None:
+    """Valkey INCR+TTL denies the overflowing attempt."""
+
+    from smart_rag_api.services.auth_rate_limits import (
+        AuthRateLimitExceededError,
+        RateLimitKind,
+    )
+    from smart_rag_core.runtime.valkey import MemoryValkeyClient
+
+    client = MemoryValkeyClient()
+    for _ in range(2):
+        decision = check_auth_rate_limit(
+            bucket_key="valkey-fast",
+            max_attempts=2,
+            window_seconds=60,
+            postgres_url=None,
+            valkey_client=client,
+            kind=RateLimitKind.COST_MUTATION,
+        )
+        assert decision.owner == "fastapi_valkey"
+        assert decision.allowed is True
+    with pytest.raises(AuthRateLimitExceededError):
+        check_auth_rate_limit(
+            bucket_key="valkey-fast",
+            max_attempts=2,
+            window_seconds=60,
+            postgres_url=None,
+            valkey_client=client,
+            kind=RateLimitKind.COST_MUTATION,
+        )
+
+
+def test_low_risk_read_emergency_limiter_is_audited() -> None:
+    """Valkey-down reads use the emergency limiter and mark degraded."""
+
+    from smart_rag_api.services.auth_rate_limits import RateLimitKind
+    from smart_rag_core.runtime.valkey import MemoryValkeyClient
+
+    flags: list[str] = []
+    client = MemoryValkeyClient(fail_closed=True)
+    decision = check_auth_rate_limit(
+        bucket_key=f"read-{uuid.uuid4()}",
+        max_attempts=3,
+        window_seconds=60,
+        postgres_url=None,
+        valkey_client=client,
+        kind=RateLimitKind.LOW_RISK_READ,
+        on_degraded=lambda: flags.append("rate_limit_degraded"),
+    )
+    assert decision.degraded is True
+    assert decision.owner == "fastapi_emergency"
+    assert flags == ["rate_limit_degraded"]

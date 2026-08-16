@@ -72,6 +72,7 @@ def test_correlation_header_round_trips_without_claiming_readiness() -> None:
     assert response.status_code == 200
     assert response.headers["X-Request-ID"] == "request-123"
     assert ready()["status"] == "unconfigured"
+    assert ready()["query_ready"] is False
 
 
 def test_unsafe_correlation_header_is_replaced() -> None:
@@ -82,3 +83,17 @@ def test_unsafe_correlation_header_is_replaced() -> None:
     generated = response.headers["X-Request-ID"]
     assert generated != "unsafe value with spaces"
     assert re.fullmatch(r"[0-9a-f]{32}", generated)
+
+
+def test_security_headers_are_present_on_live() -> None:
+    """Security headers attach to JSON health responses."""
+
+    from fastapi.testclient import TestClient
+    from smart_rag_api.main import create_app
+
+    with TestClient(create_app()) as client:
+        response = client.get("/health/live")
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "text/html" not in response.headers.get("content-type", "")

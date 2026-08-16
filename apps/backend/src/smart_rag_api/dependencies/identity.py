@@ -19,6 +19,8 @@ _AUTHORIZATION_HEADER = "Authorization"
 _TEST_USER_ID_HEADER = "X-Test-User-Id"
 _TEST_ROLE_HEADER = "X-Test-Role"
 _TEST_AUTHZ_VERSION_HEADER = "X-Test-Authorization-Version"
+_TEST_EMAIL_HEADER = "X-Test-Email"
+_TEST_AAL_HEADER = "X-Test-AAL"
 
 
 def _extract_bearer_token(authorization: str | None) -> str | None:
@@ -64,6 +66,8 @@ def resolve_caller_context(
     x_test_authorization_version: Annotated[
         int | None, Header(alias=_TEST_AUTHZ_VERSION_HEADER)
     ] = None,
+    x_test_email: Annotated[str | None, Header(alias=_TEST_EMAIL_HEADER)] = None,
+    x_test_aal: Annotated[str | None, Header(alias=_TEST_AAL_HEADER)] = None,
 ) -> CallerContext:
     """Resolve typed caller context from JWKS and live profile state.
 
@@ -73,6 +77,8 @@ def resolve_caller_context(
         x_test_user_id: Test-only subject bypass when ``APP_ENV=test``.
         x_test_role: Test-only role bypass when ``APP_ENV=test``.
         x_test_authorization_version: Test-only authorization snapshot bypass.
+        x_test_email: Test-only email used by invitation accept.
+        x_test_aal: Test-only assurance level for offboarding (``aal1``/``aal2``).
 
     Returns:
         Frozen ``CallerContext`` for RPC argument binding.
@@ -95,6 +101,8 @@ def resolve_caller_context(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Caller disabled",
             )
+        request.state.caller_email = x_test_email
+        request.state.assurance_level = x_test_aal or "aal1"
         return bypass
 
     token = _extract_bearer_token(authorization)
@@ -112,6 +120,10 @@ def resolve_caller_context(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid access token",
         ) from exc
+
+    email_claim = verified.raw_claims.get("email")
+    request.state.caller_email = email_claim if isinstance(email_claim, str) else None
+    request.state.assurance_level = verified.assurance_level
 
     db_url = settings.supabase_db_url
     if db_url is None:

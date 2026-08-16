@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, NoReturn
+from typing import Literal, NoReturn, cast
 from uuid import UUID
 
 import psycopg
@@ -504,3 +504,204 @@ def record_run_restricted_evidence(
     if row is None:
         raise QueryAdmissionError("restricted_evidence_returned_no_row")
     return UUID(str(row[0]))
+
+
+@dataclass(frozen=True, slots=True)
+class QueryRunRecord:
+    """Authorized run fetch payload.
+
+    Attributes:
+        run_id: Run primary key.
+        conversation_id: Owning conversation.
+        creator_user_id: Run owner.
+        status: Durable ``app.run_status`` text.
+        reservation_id: Run-local reservation when present.
+        created_at: Insert timestamp when returned.
+    """
+
+    run_id: UUID
+    conversation_id: UUID
+    creator_user_id: UUID
+    status: str
+    reservation_id: UUID | None
+    created_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RunCitationRecord:
+    """Citation identifiers without passage text.
+
+    Attributes:
+        citation_id: Citation row.
+        citation_index: Display index.
+        chunk_id: Canonical chunk when present.
+        provenance: JSON object without source HTML.
+    """
+
+    citation_id: UUID
+    citation_index: int
+    chunk_id: UUID | None
+    provenance: dict[str, object]
+
+
+def get_query_run(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+) -> QueryRunRecord:
+    """Fetch one run owned by the caller.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived identity.
+        run_id: Run primary key.
+
+    Returns:
+        Run record. Foreign or missing runs raise ``not_found``.
+
+    Raises:
+        QueryAdmissionError: Authorization or lookup failure.
+    """
+
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT *
+                FROM app.get_query_run(%s, %s, %s, %s)
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    run_id,
+                ),
+            )
+            row = cursor.fetchone()
+    except psycopg.Error as exc:
+        _raise_admission(exc)
+    if row is None:
+        raise QueryAdmissionError("not_found")
+    reservation = row.get("reservation_id")
+    return QueryRunRecord(
+        run_id=row["id"],
+        conversation_id=row["conversation_id"],
+        creator_user_id=row["creator_user_id"],
+        status=str(row["status"]),
+        reservation_id=reservation,
+        created_at=row.get("created_at"),
+    )
+
+
+def cancel_query_run(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+) -> QueryRunRecord:
+    """Cancel one owned pending/running query run and true-up its reservation.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived owner.
+        run_id: Run to cancel.
+
+    Returns:
+        Updated run record with status ``cancelled``.
+
+    Raises:
+        QueryAdmissionError: When the caller does not own the run or it is
+            not cancellable.
+
+    Side Effects:
+        Sets ``app.runs.status`` to ``cancelled`` and settles the reservation.
+        Does not implement SSE cancel transport (packet 6).
+    """
+
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT *
+                FROM app.cancel_query_run(%s, %s, %s, %s)
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    run_id,
+                ),
+            )
+            row = cursor.fetchone()
+    except psycopg.Error as exc:
+        _raise_admission(exc)
+    if row is None:
+        raise QueryAdmissionError("not_found")
+    reservation = row.get("reservation_id")
+    return QueryRunRecord(
+        run_id=row["id"],
+        conversation_id=row["conversation_id"],
+        creator_user_id=row["creator_user_id"],
+        status=str(row["status"]),
+        reservation_id=reservation,
+        created_at=row.get("created_at"),
+    )
+
+
+def list_run_citations(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+) -> tuple[RunCitationRecord, ...]:
+    """List citation IDs for an owned run. Passage text is omitted.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived owner.
+        run_id: Run primary key.
+
+    Returns:
+        Citation identifiers and provenance maps.
+
+    Raises:
+        QueryAdmissionError: When the run is missing or not owned.
+    """
+
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT citation_id, citation_index, chunk_id, provenance
+                FROM app.list_run_citations(%s, %s, %s, %s)
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    run_id,
+                ),
+            )
+            rows = cursor.fetchall()
+    except psycopg.Error as exc:
+        _raise_admission(exc)
+    records: list[RunCitationRecord] = []
+    for row in rows:
+        provenance_raw = row.get("provenance")
+        provenance: dict[str, object] = (
+            cast(dict[str, object], provenance_raw)
+            if isinstance(provenance_raw, dict)
+            else {}
+        )
+        chunk = row.get("chunk_id")
+        chunk_id = UUID(str(chunk)) if chunk is not None else None
+        records.append(
+            RunCitationRecord(
+                citation_id=UUID(str(row["citation_id"])),
+                citation_index=int(str(row["citation_index"])),
+                chunk_id=chunk_id,
+                provenance=provenance,
+            )
+        )
+    return tuple(records)
