@@ -1099,6 +1099,19 @@ def _is_fatal_initialize_warning(message: str) -> bool:
     return any(marker in lowered for marker in fatal_markers)
 
 
+def is_fatal_initialize_warning(message: str) -> bool:
+    """Return whether an initialize warning means incomplete migration.
+
+    Args:
+        message: Warning or log text.
+
+    Returns:
+        True when bootstrap or qualification must fail closed.
+    """
+
+    return _is_fatal_initialize_warning(message)
+
+
 class _ListHandler(logging.Handler):
     """In-memory log handler for initialize warning capture."""
 
@@ -1116,6 +1129,21 @@ class _ListHandler(logging.Handler):
         """
 
         self.messages.append(self.format(record))
+
+
+async def initialize_storages_capturing_warnings(
+    rag: LightRagRuntime,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Initialize storages while capturing warnings and log records.
+
+    Args:
+        rag: Constructed ``LightRAG`` instance.
+
+    Returns:
+        Python warning messages and logger warning messages.
+    """
+
+    return await _initialize_capturing_warnings(rag)
 
 
 async def _initialize_capturing_warnings(

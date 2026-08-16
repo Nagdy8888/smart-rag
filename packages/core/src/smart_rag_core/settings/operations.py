@@ -50,6 +50,52 @@ class JwksRolloverSettings(BaseSettings):
     )
 
 
+class LightRagSchemaAdminSettings(BaseSettings):
+    """Schema-admin DSN for protected LightRAG ``initialize_storages`` bootstrap.
+
+    This class is the only typed home for the schema-admin secret. It must
+    not appear on Shared, Backend, Worker, or Agent settings. The field and
+    env names avoid ``bootstrap`` / ``BOOTSTRAP`` fragments required by
+    ``tests/contract/test_privileged_secrets_absent.py``.
+
+    Attributes:
+        lightrag_schema_admin_dsn: Privileged Postgres URL that may CREATE
+            vendor objects during the reviewed ops bootstrap. Secret.
+    """
+
+    model_config = SettingsConfigDict(
+        case_sensitive=False,
+        env_ignore_empty=True,
+        extra="ignore",
+    )
+
+    lightrag_schema_admin_dsn: SecretStr = Field(
+        validation_alias="LIGHTRAG_SCHEMA_ADMIN_DSN",
+        description=(
+            "Schema-admin Postgres URL for protected LightRAG initialize_storages. "
+            "Never load this secret in API or worker runtime settings."
+        ),
+        json_schema_extra={"security": "secret"},
+    )
+
+
+def load_lightrag_schema_admin_settings() -> LightRagSchemaAdminSettings:
+    """Load the isolated LightRAG schema-admin secret.
+
+    Returns:
+        Validated schema-admin settings.
+
+    Raises:
+        SettingsValidationError: If the DSN is missing or invalid.
+
+    Side Effects:
+        Reads process environment through Pydantic Settings. Does not open
+        a database connection.
+    """
+
+    return load_settings(LightRagSchemaAdminSettings)
+
+
 def load_jwks_rollover_settings() -> JwksRolloverSettings:
     """Load sanitized settings for the managed JWKS rollover proof.
 

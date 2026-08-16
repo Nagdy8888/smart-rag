@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: developers, operators
 ---
 
@@ -44,23 +44,33 @@ Validation errors list field paths and categories but omit source values.
 | `ADMIN_ALERT_SMTP_FROM` | email; `alerts@localhost` | public | Envelope from for metadata-only admin alerts |
 | `ADMIN_ALERT_SMTP_TO` | email; `owner@localhost` | public | Owner/admin mailbox captured by Inbucket |
 
-## Phase 5 Packet 1 LightRAG qualification (tests only)
+## Phase 5 LightRAG settings
 
-These variables are applied by contract tests via `monkeypatch.setenv` because
-the pinned LightRAG PostgreSQL client reads `os.environ`. Production modules
-do not read them; Packet 1 does not add Graph deployable settings.
+Packet 1 qualification still applies `POSTGRES_*` through tests only. Packet 2
+adds deployable DSNs. Runtime never sets `POSTGRES_WORKSPACE`. Passwords are
+never logged. See [ADAPTER_LIFECYCLE.md](../graph/ADAPTER_LIFECYCLE.md) and
+[ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md).
+
+| Variable | Type / default | Security | Contract |
+| --- | --- | --- | --- |
+| `LIGHTRAG_DB_URL` | optional secret URL | secret | Backend and Worker only. Session/direct Postgres for runtime attach as `app_lightrag` via `SET ROLE`. Unset keeps the adapter unconfigured. Never schema-admin. Cap 4. |
+| `LIGHTRAG_SCHEMA_ADMIN_DSN` | required for ops bootstrap | secret | `LightRagSchemaAdminSettings` only. Forbidden on Shared/Backend/Worker/Agent. Used by `scripts/ops/bootstrap_lightrag_schema.py`. |
+
+Qualification-only (tests still apply these; production modules set them from the typed DSN):
 
 | Variable | Qualification value | Contract |
 | --- | --- | --- |
-| `POSTGRES_HOST` / `PORT` / `USER` / `PASSWORD` / `DATABASE` | Parsed from `SUPABASE_DB_URL` | Never logged. Tests only. |
-| `POSTGRES_MAX_CONNECTIONS` | `2` | Caps the process-wide `ClientManager` pool (vendor default 50). |
+| `POSTGRES_HOST` / `PORT` / `USER` / `PASSWORD` / `DATABASE` | Parsed from the typed DSN | Never logged. |
+| `POSTGRES_MAX_CONNECTIONS` | `2` in qualification; `4` runtime cap | Process-wide `ClientManager` pool. |
 | `POSTGRES_CONNECTION_RETRIES` | `0` | Vendor default 10 is unbounded; application owns retry. |
-| `POSTGRES_SERVER_SETTINGS` | `search_path={schema},extensions,public` | Disposable schema first; pgvector lives in `extensions`. |
+| `POSTGRES_SERVER_SETTINGS` | `search_path=lightrag,extensions,public` | Private schema first; pgvector lives in `extensions`. |
 | (harness, not env) | `install_pgvector_codec_schema_fallback` | LightRAG calls `register_vector` with `schema='public'`; local Supabase type is `extensions.vector`. |
-| (harness, not env) | `cosine_better_than_threshold=-1.0` | Qualification only. Mock embeddings are not semantic; do not copy into production Graph settings. |
-| `POSTGRES_WORKSPACE` | unset except the override test | When set, overrides constructor workspace and collapses isolation. |
-| `WORKSPACE` | unset in tests | LightRAG constructor default also reads this name. |
-| `MOCK_MODEL_MODE` | `true` (default) | Qualification embeddings/LLM stay on frozen fixtures. |
+| (harness, not env) | `cosine_better_than_threshold=-1.0` | Qualification only. Do not copy into production Graph settings (`0.2` vendor default). |
+| `POSTGRES_WORKSPACE` | unset except the override test | When set, runtime attach fails closed. |
+| `WORKSPACE` | unset | LightRAG constructor default also reads this name. |
+
+Incompatible embedding model/dimension instances must run in isolated
+processes. This process pins `text-embedding-3-large` at 1024.
 
 See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 
@@ -70,6 +80,9 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | --- | --- | --- | --- |
 | `API_BIND_HOST` | non-empty string; `0.0.0.0` | public | Uvicorn bind address used only by the console entrypoint |
 | `API_BIND_PORT` | integer 1–65,535; `8000` | public | Uvicorn container port |
+| `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
+| `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api` |
+| `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. |
 
 ## Worker-only variables
 
@@ -83,9 +96,11 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `JOB_POLL_INTERVAL_SECONDS` | integer 1–60; `5` | public | Idle delay between queue polls |
 | `WORKER_CONCURRENCY` | integer 1–8; `2` | public | Maximum concurrently processed ingestion jobs |
 | `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Checkpointer DSN; defaults to `SUPABASE_DB_URL`. Role `app_checkpointer`, schema `langgraph`. Runtime never auto-migrates. |
+| `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. Cap 4. |
 
 Agent settings currently add only a stable, non-environment service name.
-Queue, ingestion, retrieval, and graph settings remain owned by later phases.
+Queue and retrieval settings remain owned by later phases. Graph runtime DSN
+is Packet 2 above; Graph Ready remains later.
 
 ## Managed proof-operation variables
 
@@ -98,6 +113,9 @@ The destructive JWKS rollover script loads its values through
 | `SUPABASE_PROJECT_REF` | required safe identifier | internal | Explicit managed project target |
 | `SUPABASE_MANAGED_URL` | required HTTP URL | internal | Managed Auth/JWKS origin |
 | `SUPABASE_ANON_KEY` | required key | secret | Publishable Auth key redacted from settings representations |
+
+Protected LightRAG bootstrap loads `LIGHTRAG_SCHEMA_ADMIN_DSN` through
+`LightRagSchemaAdminSettings` only. See the Phase 5 LightRAG settings table.
 
 ## Local Compose-only variables
 

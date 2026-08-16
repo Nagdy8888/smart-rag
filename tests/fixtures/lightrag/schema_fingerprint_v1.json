@@ -1,0 +1,23 @@
+{
+  "pin_version": "1.5.6",
+  "schema_name": "lightrag",
+  "search_path": "lightrag,extensions,public",
+  "embedding_model": "text-embedding-3-large",
+  "embedding_dimensions": 1024,
+  "tables": [
+    "lightrag_doc_chunks",
+    "lightrag_doc_full",
+    "lightrag_doc_status",
+    "lightrag_entity_chunks",
+    "lightrag_full_entities",
+    "lightrag_full_relations",
+    "lightrag_graph_edges",
+    "lightrag_graph_nodes",
+    "lightrag_llm_cache",
+    "lightrag_relation_chunks",
+    "lightrag_vdb_chunks_text_embedding_3_large_1024d",
+    "lightrag_vdb_entity_text_embedding_3_large_1024d",
+    "lightrag_vdb_relation_text_embedding_3_large_1024d",
+    "schema_capture_status"
+  ]
+}

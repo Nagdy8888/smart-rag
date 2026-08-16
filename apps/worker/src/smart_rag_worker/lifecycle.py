@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import socket
 import threading
@@ -34,6 +35,10 @@ from smart_rag_agents.ingestion.scan_graph import (
 )
 from smart_rag_core.jobs.exceptions import JobLeaseError, JobRepositoryError
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
+from smart_rag_core.retrieval.lightrag_adapter import (
+    LightRagRuntimeAdapter,
+    bind_process_runtime_adapter,
+)
 from smart_rag_core.schema.enums import JobErrorCategory
 from smart_rag_core.schema.tables import IngestionJobRecord
 from smart_rag_core.settings.worker import WorkerSettings
@@ -55,11 +60,14 @@ class WorkerLifecycle:
         Side Effects:
             Opens a Postgres checkpointer pool when a database URL is
             configured. Runtime never calls ``PostgresSaver.setup()``.
+            When ``LIGHTRAG_DB_URL`` is set, attaches the runtime LightRAG
+            adapter without schema-admin ``initialize_storages``.
         """
 
         self._settings = settings
         self._stop_event = threading.Event()
         self._checkpointer: IngestionCheckpointer | None = None
+        self._lightrag_adapter: LightRagRuntimeAdapter | None = None
         saver = None
         checkpoint_dsn = settings.resolved_checkpoint_dsn()
         if checkpoint_dsn is not None:
@@ -68,11 +76,22 @@ class WorkerLifecycle:
                 max_size=settings.worker_concurrency,
             )
             saver = self._checkpointer.saver
-        self._probe_graph = build_probe_ingestion_graph(checkpointer=saver)
-        self._scan_graph = build_scan_promote_ingestion_graph(checkpointer=saver)
-        self._crawl_graph = build_crawl_ingestion_graph(checkpointer=saver)
-        self._index_graph = build_index_ingestion_graph(checkpointer=saver)
-        self._bm25_loop = Bm25WorkerLoop(settings)
+        if settings.lightrag_db_url is not None:
+            self._lightrag_adapter = asyncio.run(
+                bind_process_runtime_adapter(
+                    dsn=settings.lightrag_db_url,
+                    settings=settings,
+                )
+            )
+        try:
+            self._probe_graph = build_probe_ingestion_graph(checkpointer=saver)
+            self._scan_graph = build_scan_promote_ingestion_graph(checkpointer=saver)
+            self._crawl_graph = build_crawl_ingestion_graph(checkpointer=saver)
+            self._index_graph = build_index_ingestion_graph(checkpointer=saver)
+            self._bm25_loop = Bm25WorkerLoop(settings)
+        except BaseException:
+            self.stop()
+            raise
 
     def run_forever(self) -> None:
         """Poll and process jobs until stopped."""
@@ -105,9 +124,17 @@ class WorkerLifecycle:
                     break
 
     def stop(self) -> None:
-        """Signal the poll loop to exit and close the checkpointer pool."""
+        """Signal the poll loop to exit and close session-mode pools.
+
+        Side Effects:
+            Closes the checkpointer pool and finalizes LightRAG storages when
+            they were opened. Does not call schema-admin initialize.
+        """
 
         self._stop_event.set()
+        if self._lightrag_adapter is not None:
+            asyncio.run(self._lightrag_adapter.finalize())
+            self._lightrag_adapter = None
         if self._checkpointer is not None:
             self._checkpointer.close()
             self._checkpointer = None

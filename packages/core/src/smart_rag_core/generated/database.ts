@@ -1329,6 +1329,35 @@ export type Database = {
           },
         ]
       }
+      graph_active_workspace_pointer: {
+        Row: {
+          generation: number
+          id: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          generation?: number
+          id: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          generation?: number
+          id?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_active_workspace_pointer_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "graph_workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       graph_entity_rules: {
         Row: {
           active: boolean
@@ -1390,6 +1419,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      graph_workspaces: {
+        Row: {
+          config_snapshot: Json
+          created_at: string
+          embedding_dimensions: number
+          embedding_model: string
+          id: string
+          schema_fingerprint: Json
+          state: Database["app"]["Enums"]["graph_workspace_state"]
+          updated_at: string
+          workspace_key: string
+        }
+        Insert: {
+          config_snapshot?: Json
+          created_at?: string
+          embedding_dimensions?: number
+          embedding_model?: string
+          id?: string
+          schema_fingerprint?: Json
+          state: Database["app"]["Enums"]["graph_workspace_state"]
+          updated_at?: string
+          workspace_key: string
+        }
+        Update: {
+          config_snapshot?: Json
+          created_at?: string
+          embedding_dimensions?: number
+          embedding_model?: string
+          id?: string
+          schema_fingerprint?: Json
+          state?: Database["app"]["Enums"]["graph_workspace_state"]
+          updated_at?: string
+          workspace_key?: string
+        }
+        Relationships: []
+      }
+      graph_writer_lease: {
+        Row: {
+          expires_at: string | null
+          id: string
+          owner: string | null
+          token: string | null
+          updated_at: string
+        }
+        Insert: {
+          expires_at?: string | null
+          id: string
+          owner?: string | null
+          token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          expires_at?: string | null
+          id?: string
+          owner?: string | null
+          token?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       ingestion_jobs: {
         Row: {
@@ -3017,6 +3106,7 @@ export type Database = {
           is_search_representative: boolean
           page_number: number
           parent_chunk_id: string
+          provenance: Json
           raw_text: string
           section_path: string[]
           token_count: number
@@ -3257,6 +3347,27 @@ export type Database = {
           version_id: string
         }[]
       }
+      resolve_structured_table: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_table_id: string
+          p_version_id: string
+        }
+        Returns: {
+          column_count: number
+          document_id: string
+          parquet_bucket: string
+          parquet_path: string
+          provenance: Json
+          row_count: number
+          sheet_name: string
+          table_id: string
+          table_name: string
+          version_id: string
+        }[]
+      }
       retrieval_exact_row_cap: { Args: never; Returns: number }
       retrieve_dense_candidates: {
         Args: {
@@ -3430,6 +3541,14 @@ export type Database = {
         | "approved"
         | "rolled_back"
         | "rejected"
+      graph_workspace_state:
+        | "building"
+        | "active"
+        | "updating"
+        | "filtered_dirty"
+        | "quarantined"
+        | "disabled"
+        | "retired"
       job_error_category:
         | "transient"
         | "permanent"
@@ -5302,6 +5421,15 @@ export const Constants = {
         "rolled_back",
         "rejected",
       ],
+      graph_workspace_state: [
+        "building",
+        "active",
+        "updating",
+        "filtered_dirty",
+        "quarantined",
+        "disabled",
+        "retired",
+      ],
       job_error_category: [
         "transient",
         "permanent",
@@ -5375,4 +5503,3 @@ export const Constants = {
     },
   },
 } as const
-

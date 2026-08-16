@@ -25,6 +25,9 @@ class BackendSettings(SharedSettings):
             600 seconds.
         supabase_db_url: Transaction-pooled Postgres URL for profile reads as
             ``app_api``. Secret.
+        lightrag_db_url: Optional session/direct Postgres URL for the runtime
+            LightRAG adapter as ``app_lightrag``. Secret. When unset, the
+            graph adapter stays unconfigured. Never a schema-admin DSN.
     """
 
     service_name: ClassVar[Literal["backend"]] = "backend"
@@ -70,6 +73,15 @@ class BackendSettings(SharedSettings):
         default=None,
         validation_alias="SUPABASE_DB_URL",
         description="Postgres URL for server-side profile reads as app_api.",
+        json_schema_extra={"security": "secret"},
+    )
+    lightrag_db_url: SecretStr | None = Field(
+        default=None,
+        validation_alias="LIGHTRAG_DB_URL",
+        description=(
+            "Session/direct Postgres URL for the LightRAG runtime adapter. "
+            "Role app_lightrag via SET ROLE. Never schema-admin."
+        ),
         json_schema_extra={"security": "secret"},
     )
 

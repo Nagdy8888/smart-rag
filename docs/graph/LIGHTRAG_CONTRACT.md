@@ -4,20 +4,23 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-16
 audience: engineering, reviewers
-phase_packet: Phase 5 Packet 1
+phase_packet: Phase 5 Packets 1–2
 ---
 
 # LightRAG pin and qualification contract
 
-Immutable pin, public/private API matrix, source/ID semantics, callbacks, and
-rejected assumptions for GraphRAG Packet 1. Production insert/query wiring,
-private-schema bootstrap migrations, and Graph Ready mappings are later packets.
+Immutable pin, public/private API matrix, source/ID semantics, callbacks,
+rejected assumptions, and Packet 2 private-schema attach. Production
+`ainsert`/query wiring and Graph Ready mappings remain later packets.
 
 Related: [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
+[ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [TOOL_VERSIONS.md](../development/TOOL_VERSIONS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·
+[ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md) ·
 [ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md) ·
+[lightrag-schema-bootstrap.md](../runbooks/lightrag-schema-bootstrap.md) ·
 [ADR index](../adr/README.md) ·
 [docs index](../README.md)
 
@@ -64,9 +67,9 @@ flowchart TD
   proto["GraphRetriever and GraphIndexer protocols"]
   apps["apps agents backend worker"]
   coreGraph["smart_rag_core.retrieval.graph"]
-  adapter["lightrag_pin callbacks qualification"]
+  adapter["lightrag_adapter bootstrap pin callbacks"]
   vendor["lightrag-hku 1.5.6 PGTableGraphStorage"]
-  pg["local PostgreSQL pgvector in extensions"]
+  pg["private schema lightrag"]
   apps --> proto
   proto --> coreGraph
   coreGraph --> adapter
@@ -75,7 +78,8 @@ flowchart TD
 ```
 
 `apps/*` and `retrieval/graph.py` must not import `lightrag`. Only the core
-adapter/qualification modules may import vendor classes.
+adapter, bootstrap, pin, callback, and qualification modules may import vendor
+classes. The ops script calls core bootstrap and does not import `lightrag`.
 
 ## Public API matrix (qualified)
 
@@ -208,6 +212,21 @@ required on role LLM configs.
 `apply_query_bounds` clamps `top_k` / `chunk_top_k` to 12, token budgets, and a
 45s deadline. Native engine settings do not replace these controls.
 
+## Packet 2 private schema and runtime attach
+
+Reviewed vendor tables live only in schema `lightrag` (plus
+`schema_capture_status`). Vector tables are suffixed
+`text_embedding_3_large_1024d`. AGE is absent. Browser, `anon`,
+`authenticated`, and `service_role` have no vendor-table access.
+
+Runtime attach (`runtime_attach_without_ddl`) skips vendor CREATE/ALTER and
+`SET ROLE app_lightrag` on pooled connections. API/worker never call
+`initialize_storages` with schema-admin credentials. See
+[ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md).
+
+Application-owned `app.graph_workspaces`, `app.graph_active_workspace_pointer`,
+and `app.graph_writer_lease` are Packet 2 schema only. They are not Graph Ready.
+
 ## Rejected assumptions
 
 - AGE / `PGGraphStorage` as a fallback engine
@@ -216,13 +235,16 @@ required on role LLM configs.
   source hashes, or normalized names as citations or idempotency keys
 - Runtime `pipmaster.install`
 - Floating to newest LightRAG
-- Production `initialize_storages` on API/worker startup (Packet 2)
+- Production `initialize_storages` on API/worker startup
+- DDL/CREATE for `app_lightrag`
+- Vendor tables in `public`
+- `POSTGRES_WORKSPACE` in runtime
 - Weakening the identical-content independence gate
 
 ## Verification
 
 ```powershell
-uv run python -m pytest tests/unit/test_lightrag_pin.py tests/contract/test_lightrag_contract.py -q
+uv run python -m pytest tests/unit/test_lightrag_pin.py tests/unit/test_lightrag_adapter.py tests/contract/test_lightrag_contract.py tests/contract/test_lightrag_bootstrap.py -q
 ```
 
 Contract tests skip when local Supabase Postgres is down unless

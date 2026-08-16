@@ -2,7 +2,7 @@
 title: Runbook backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-16
 audience: operations
 ---
 
@@ -19,6 +19,7 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 | ParadeDB projection rebuild/fallback | 4/9 | BM25 outbox | planned | rebuild timing | eng-lead |
 | Local/in-app admin alerts | 6/8 | alert contract | planned | ack path | eng-lead |
 | Origin-secret dual rotation | 10 | CloudFront | planned | skew test | eng-lead |
+| LightRAG private-schema bootstrap | 5 | Packet 1 pin + Packet 2 migrations | draft | fingerprint + role matrix | eng-lead |
 | LightRAG workspace cleanup/rebuild | 5/9 | graph ready | planned | quarantine drill | eng-lead |
 | Embedding parallel rebuild | 2/4 | embedding ADR | planned | dual-index cutover | eng-lead |
 | Dead-letter replay | 3 | queues | planned | idempotent replay | eng-lead |

@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from smart_rag_core.gateways import block_openai_network, create_model_gateway
 from smart_rag_core.observability import configure_json_logging, correlation_context
+from smart_rag_core.retrieval.lightrag_adapter import bind_process_runtime_adapter
 from smart_rag_core.security.jwks import JwksVerifier
 from smart_rag_core.settings import BackendSettings, load_backend_settings
 
@@ -41,7 +42,9 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
     Side Effects:
         Configures process logging, LangSmith hide/tracing flags via the model
         gateway factory, and, in mock mode, denies OpenAI DNS access.
-        No provider or database client is constructed.
+        When ``LIGHTRAG_DB_URL`` is set, attaches the runtime LightRAG adapter
+        without calling schema-admin ``initialize_storages``. Finalizes the
+        adapter on shutdown.
     """
 
     settings = load_backend_settings()
@@ -56,17 +59,27 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         audience=settings.supabase_jwt_audience,
         cache_seconds=settings.jwks_cache_seconds,
     )
-    async with block_openai_network(settings.mock_model_mode):
-        application.state.model_gateway = create_model_gateway(settings)
-        LOGGER.info(
-            "Backend foundation startup is unconfigured",
-            extra={"event": "backend.startup.unconfigured"},
-        )
-        yield
-        LOGGER.info(
-            "Backend foundation shutdown",
-            extra={"event": "backend.shutdown"},
-        )
+    adapter = await bind_process_runtime_adapter(
+        dsn=settings.lightrag_db_url,
+        settings=settings,
+    )
+    application.state.lightrag_adapter = adapter
+    try:
+        async with block_openai_network(settings.mock_model_mode):
+            application.state.model_gateway = create_model_gateway(settings)
+            LOGGER.info(
+                "Backend foundation startup is unconfigured",
+                extra={"event": "backend.startup.unconfigured"},
+            )
+            yield
+            LOGGER.info(
+                "Backend foundation shutdown",
+                extra={"event": "backend.shutdown"},
+            )
+    finally:
+        if adapter is not None:
+            await adapter.finalize()
+            application.state.lightrag_adapter = None
 
 
 async def add_correlation_context(

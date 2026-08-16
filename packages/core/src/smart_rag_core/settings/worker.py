@@ -30,6 +30,9 @@ class WorkerSettings(SharedSettings):
         worker_instance_id: Stable lease owner identifier for this process.
         langgraph_checkpoint_url: Optional dedicated checkpointer DSN. When
             unset, the worker reuses ``SUPABASE_DB_URL``.
+        lightrag_db_url: Optional session/direct Postgres URL for the runtime
+            LightRAG adapter as ``app_lightrag``. Secret. When unset, the
+            graph adapter stays unconfigured. Never a schema-admin DSN.
     """
 
     service_name: ClassVar[Literal["worker"]] = "worker"
@@ -118,6 +121,15 @@ class WorkerSettings(SharedSettings):
             "Optional Postgres DSN for LangGraph checkpoints. Defaults to "
             "SUPABASE_DB_URL. Must use the session/direct port; runtime never "
             "auto-migrates the langgraph schema."
+        ),
+        json_schema_extra={"security": "secret"},
+    )
+    lightrag_db_url: SecretStr | None = Field(
+        default=None,
+        validation_alias="LIGHTRAG_DB_URL",
+        description=(
+            "Session/direct Postgres URL for the LightRAG runtime adapter. "
+            "Role app_lightrag via SET ROLE. Never schema-admin."
         ),
         json_schema_extra={"security": "secret"},
     )

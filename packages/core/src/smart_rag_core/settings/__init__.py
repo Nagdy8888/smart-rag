@@ -16,7 +16,9 @@ from smart_rag_core.settings.evaluation import (
 )
 from smart_rag_core.settings.operations import (
     JwksRolloverSettings,
+    LightRagSchemaAdminSettings,
     load_jwks_rollover_settings,
+    load_lightrag_schema_admin_settings,
 )
 from smart_rag_core.settings.worker import WorkerSettings, load_worker_settings
 
@@ -26,6 +28,7 @@ __all__ = [
     "Environment",
     "EvaluationSettings",
     "JwksRolloverSettings",
+    "LightRagSchemaAdminSettings",
     "LogLevel",
     "SettingsValidationError",
     "SharedSettings",
@@ -34,6 +37,7 @@ __all__ = [
     "load_backend_settings",
     "load_evaluation_settings",
     "load_jwks_rollover_settings",
+    "load_lightrag_schema_admin_settings",
     "load_settings",
     "load_worker_settings",
     "snapshot_process_environ",

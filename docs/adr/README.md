@@ -2,7 +2,7 @@
 title: ADR index and backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering
 ---
 
@@ -23,6 +23,7 @@ audience: engineering
 | CVE pin patch (lxml/Pillow; pyarrow advisory) | accepted | 4 | [ADR-cve-pin-patch-2026-08.md](./ADR-cve-pin-patch-2026-08.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
+| LightRAG runtime attach without DDL | accepted | 5 | [ADR-lightrag-runtime-attach-without-ddl.md](./ADR-lightrag-runtime-attach-without-ddl.md) |
 | Graph eligibility / ACL isolation | planned | 2/5 | TBD |
 | PGTableGraphStorage | accepted with identity envelope | 5 | [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) · [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | Canonical vs inference grounding | planned | 5/6 | TBD |

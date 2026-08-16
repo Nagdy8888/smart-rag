@@ -53,6 +53,8 @@ ALLOWED_LIGHTRAG_IMPORT_PARTS: tuple[str, ...] = (
     "smart_rag_core/retrieval/lightrag_pin.py",
     "smart_rag_core/retrieval/lightrag_callbacks.py",
     "smart_rag_core/retrieval/lightrag_qualification.py",
+    "smart_rag_core/retrieval/lightrag_adapter.py",
+    "smart_rag_core/retrieval/lightrag_bootstrap.py",
 )
 
 
@@ -145,6 +147,7 @@ def test_apps_backend_worker_agents_do_not_import_lightrag() -> None:
         REPO_ROOT / "apps" / "backend" / "src",
         REPO_ROOT / "apps" / "worker" / "src",
         REPO_ROOT / "apps" / "agents" / "src",
+        REPO_ROOT / "scripts" / "ops",
     )
     offenders: list[str] = []
     for root in roots:
@@ -155,7 +158,7 @@ def test_apps_backend_worker_agents_do_not_import_lightrag() -> None:
 
 
 def test_core_lightrag_imports_stay_in_adapter_modules() -> None:
-    """Only pin/callback/qualification modules may import LightRAG."""
+    """Only pin/callback/qualification/adapter/bootstrap modules may import LightRAG."""
 
     core_root = REPO_ROOT / "packages" / "core" / "src" / "smart_rag_core"
     offenders: list[str] = []

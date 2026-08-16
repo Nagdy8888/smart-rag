@@ -110,6 +110,22 @@ class LightragJobOperation(StrEnum):
     REBUILD = "rebuild"
 
 
+class GraphWorkspaceState(StrEnum):
+    """Application-owned LightRAG workspace lifecycle states.
+
+    Packet 2 creates the durable rows only. Packet 3 owns writer transitions.
+    These states are not Graph Ready and do not authorize citations.
+    """
+
+    BUILDING = "building"
+    ACTIVE = "active"
+    UPDATING = "updating"
+    FILTERED_DIRTY = "filtered_dirty"
+    QUARANTINED = "quarantined"
+    DISABLED = "disabled"
+    RETIRED = "retired"
+
+
 class RunStatus(StrEnum):
     """LangGraph/API run lifecycle."""
 
