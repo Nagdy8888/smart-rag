@@ -25,6 +25,8 @@ loading, empty, error, permission, quarantine, quota, compatibility,
 limitation, fallback, partial-readiness, budget, and degraded state.
 [STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md) is the accessibility
 and security review.
+[STITCH_REVIEW.md](./STITCH_REVIEW.md) records the component-system
+fallback (no approved Stitch export).
 
 ## Localization decision
 

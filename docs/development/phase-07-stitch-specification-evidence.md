@@ -263,3 +263,68 @@ gaps. Warning color used with body text `#0F172A`.
 ### Rollback
 
 Delete the a11y review document and test.
+
+## Packet 6 — Timebox user generation/review to five business days and two rounds; record approval or explicitly select the component-system fallback
+
+### Requirement (quoted)
+
+> Timebox user generation/review to five business days and two rounds;
+> record approval or explicitly select the component-system fallback.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `docs/frontend/STITCH_REVIEW.md` | Created — fallback + Phase 8 handoff |
+| `docs/frontend/STITCH_BRIEF.md` | Linked review |
+| `tests/unit/test_phase07_stitch_review.py` | Created |
+| `docs/README.md` | Indexed |
+| `README.md` | Status line |
+| Phase 7 wrapper | Packet 6 checkbox; status remains pending user accept |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_phase07_stitch_review.py tests/unit/test_phase07_api_ui_mapping.py tests/unit/test_phase07_stitch_brief.py tests/unit/test_phase07_stitch_states.py tests/unit/test_phase07_stitch_a11y.py -q` | 0 (16 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Decision
+
+Component-system fallback selected on 2026-08-17. Zero Stitch revision
+rounds. No approved frames. Phase 8 implements native HTML + brief tokens.
+
+### Rollback
+
+Delete `STITCH_REVIEW.md`. Do not un-check packets 1–5.
+
+## Phase 7 exit record
+
+### Done when
+
+| Item | Proof |
+| --- | --- |
+| Reviewed `STITCH_BRIEF.md` and `API_UI_MAPPING.md` exist and are linked | docs index + reciprocal links |
+| Brief has copy-ready prompts, LTR/RTL frames, localization, mixed fixtures, hierarchy, components, copy, a11y | `STITCH_BRIEF.md` + packet 2 tests |
+| Every loading/empty/error/limitation state | `STITCH_STATES.md` (part of brief) |
+| API/UI map to real Phase 2/6 contracts + gaps | `API_UI_MAPPING.md` + inventory JSON + unit tests |
+| Five days / two rounds: approve Stitch **or** fallback | `STITCH_REVIEW.md` fallback on 2026-08-17, 0 rounds |
+
+### Unverified / blockers for Phase 8
+
+- User acceptance of this fallback (wrapper status stays pending until accepted).
+- Owning-phase HTTP: GAP-07-07, 08, 09, 10, 11, 12, 13, 14, 19.
+- Hosted Auth throttling (GAP-07-20 / Phase 10).
+- CloudFront `signed_url` (Phase 10).
+- Phase 6 wrapper user acceptance.
+
+### Deviations
+
+None to security/data/cost. Design generation skipped in favor of the
+planned fallback because no implementable Stitch export existed in the
+bounded window.
+
+### Phase 8 handoff
+
+Implement production UI from the five frontend docs above. Do not restart
+Stitch. Do not mock GAP rows. Keep Auto as default chat.
