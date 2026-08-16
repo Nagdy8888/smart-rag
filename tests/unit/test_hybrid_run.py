@@ -65,12 +65,18 @@ def _caller(*, disabled: bool = False) -> CallerContext:
     )
 
 
-def _candidate(*, rank: int = 1, chunk: UUID | None = None) -> RetrievalCandidate:
+def _candidate(
+    *,
+    rank: int = 1,
+    chunk: UUID | None = None,
+    version_id: UUID | None = None,
+) -> RetrievalCandidate:
     """Build one synthetic authorized candidate.
 
     Args:
         rank: Channel rank.
         chunk: Optional chunk id.
+        version_id: Optional document version.
 
     Returns:
         Frozen candidate.
@@ -80,7 +86,7 @@ def _candidate(*, rank: int = 1, chunk: UUID | None = None) -> RetrievalCandidat
     return RetrievalCandidate(
         chunk_id=ident,
         document_id=uuid4(),
-        version_id=uuid4(),
+        version_id=version_id or uuid4(),
         channel_rank=rank,
         channel_score=1.0,
     )
@@ -686,3 +692,32 @@ def test_locators_from_provenance_round_trip_sheet_and_url() -> None:
         )
     )
     assert inventory == ("Payroll/Overtime", "Benefits")
+
+
+def test_restrict_version_id_drops_other_versions() -> None:
+    """Mapping retrieve keeps one document version and drops the rest."""
+
+    keep_version = uuid4()
+    other_version = uuid4()
+    kept = _candidate(rank=1, version_id=keep_version)
+    dropped = _candidate(rank=2, version_id=other_version)
+    contexts = {
+        kept.chunk_id: _context(kept, text="canonical kept"),
+        dropped.chunk_id: _context(dropped, text="canonical dropped"),
+    }
+    retriever = _retriever(contexts=contexts)
+    result = retriever.retrieve(
+        query="annual leave policy",
+        caller=_caller(),
+        restrict_version_id=keep_version,
+        channel_jobs={
+            "dense": lambda: (kept, dropped),
+            "bm25": lambda: Bm25RetrievalResult(
+                scanned_ids=(kept.chunk_id, dropped.chunk_id),
+                candidates=(kept, dropped),
+            ),
+            "term": lambda: (kept, dropped),
+        },
+    )
+    assert kept.chunk_id in result.ranked_ids
+    assert dropped.chunk_id not in result.ranked_ids

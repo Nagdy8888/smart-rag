@@ -29,6 +29,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [graph/LIGHTRAG_CONTRACT.md](./graph/LIGHTRAG_CONTRACT.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [graph/ADAPTER_LIFECYCLE.md](./graph/ADAPTER_LIFECYCLE.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [graph/WORKSPACE_LIFECYCLE.md](./graph/WORKSPACE_LIFECYCLE.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
+| [graph/MAPPING.md](./graph/MAPPING.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
+| [graph/GRAPH_MAPPING_CONTRACT.md](./graph/GRAPH_MAPPING_CONTRACT.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [architecture/07-bm25-projection.md](./architecture/07-bm25-projection.md) | engineering-lead | proven | 2026-08-13 | eng |
 | [security/PROTECTED_MIGRATION_CREDENTIALS.md](./security/PROTECTED_MIGRATION_CREDENTIALS.md) | engineering-lead | proven-local | 2026-08-13 | eng, security, ops |
 | [security/AUDIT_CHAIN.md](./security/AUDIT_CHAIN.md) | engineering-lead | proven | 2026-08-13 | eng, security |

@@ -1,8 +1,9 @@
 """Process one claimed LightRAG job under the single-writer guard.
 
 Work runs outside the claim transaction. Vendor ``processed`` never writes
-mapping tables or public Graph Ready. After a successful index the workspace
-stays ``updating`` until Packet 4.
+mapping tables or public Graph Ready by itself. After a successful index the
+mapper runs in this service; workspace ``updating`` becomes ``active`` only
+when maps verify and the pointer already names this workspace.
 """
 
 from __future__ import annotations
@@ -19,10 +20,12 @@ from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_MODEL,
 )
 from smart_rag_core.jobs.exceptions import (
+    GraphMappingError,
     GraphWriterLostError,
     JobAdmissionError,
     JobLeaseError,
 )
+from smart_rag_core.jobs.graph_mapping_service import GraphMappingService
 from smart_rag_core.jobs.graph_source_text import (
     GraphSourceTextError,
     load_version_graph_text,
@@ -83,6 +86,8 @@ class GraphJobOutcome(BaseModel):
         reservation_id: Graph budget reservation when created.
         reservation_kind: ``graph_index`` or ``graph_maintenance``.
         workspace_state: Workspace state after the attempt.
+        maps_verified: True only when Packet 4 mapping gates passed.
+        mapping_reason: Mapping failure reason when maps are not verified.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -94,6 +99,8 @@ class GraphJobOutcome(BaseModel):
     reservation_id: UUID | None = None
     reservation_kind: str | None = None
     workspace_state: str | None = None
+    maps_verified: bool = False
+    mapping_reason: str = ""
 
 
 class GraphIndexService:
@@ -106,6 +113,7 @@ class GraphIndexService:
         indexer: LightRagGraphIndexer,
         writer: GraphWriterGuard,
         repository: LightragIndexJobRepository,
+        mapper: GraphMappingService | None = None,
     ) -> None:
         """Bind application connection, indexer, and writer guard.
 
@@ -114,12 +122,20 @@ class GraphIndexService:
             indexer: Concrete graph indexer.
             writer: Occupied writer guard holding the session lock.
             repository: LightRAG job repository on the same connection.
+            mapper: Optional mapping service. Defaults to one bound to the
+                indexer adapter. Mapping runs after vendor terminal success
+                and before job complete.
         """
 
         self._connection = connection
         self._indexer = indexer
         self._writer = writer
         self._repository = repository
+        self._mapper = mapper or GraphMappingService(
+            connection,
+            vendor_reader=indexer.adapter,
+            writer=writer,
+        )
 
     async def process_claimed_job(
         self,
@@ -287,15 +303,32 @@ class GraphIndexService:
             job_lease_token=job_lease_token,
         )
         self._assert_version_still_pending(version_id)
-        self._writer.transition_state(
-            from_states=(GraphWorkspaceState.UPDATING,),
-            to_state=GraphWorkspaceState.UPDATING,
-            snapshot={
-                "last_vendor_status": result.status,
-                "last_indexed_version_id": identity,
-                "maps_verified": False,
-            },
-        )
+        maps_verified = False
+        mapping_reason = ""
+        workspace_state = GraphWorkspaceState.UPDATING.value
+        try:
+            mapping = await self._mapper.map_after_vendor_success(
+                document_id=document_id,
+                version_id=version_id,
+            )
+            maps_verified = mapping.maps_verified
+            mapping_reason = mapping.reason
+            workspace_state = mapping.workspace_state
+        except GraphMappingError as exc:
+            maps_verified = False
+            mapping_reason = exc.reason
+            workspace_state = GraphWorkspaceState.UPDATING.value
+        if workspace_state != GraphWorkspaceState.ACTIVE.value:
+            self._writer.transition_state(
+                from_states=(GraphWorkspaceState.UPDATING,),
+                to_state=GraphWorkspaceState.UPDATING,
+                snapshot={
+                    "last_vendor_status": result.status,
+                    "last_indexed_version_id": identity,
+                    "maps_verified": maps_verified,
+                    "mapping_reason": mapping_reason,
+                },
+            )
         self._repository.admission.true_up_graph_reservation(
             reservation_id,
             reservation_kind="graph_index",
@@ -307,7 +340,9 @@ class GraphIndexService:
             vendor_status=result.status,
             reservation_id=reservation_id,
             reservation_kind="graph_index",
-            workspace_state=GraphWorkspaceState.UPDATING.value,
+            workspace_state=workspace_state,
+            maps_verified=maps_verified,
+            mapping_reason=mapping_reason,
         )
 
     async def _delete(

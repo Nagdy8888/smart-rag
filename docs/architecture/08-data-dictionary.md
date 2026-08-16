@@ -31,6 +31,9 @@ erDiagram
   glossary_entries ||--o{ search_aliases : projects
   documents ||--o{ document_acl : grants
   documents ||--o{ lightrag_source_map : maps
+  document_versions ||--o{ lightrag_chunk_map : maps
+  document_chunks ||--o{ graph_evidence_map : supports
+  graph_workspaces ||--o{ graph_map_repair_jobs : repairs
   document_chunks ||--o| lightrag_chunk_map : maps
   conversations ||--|{ messages : contains
   conversations ||--|{ runs : executes
@@ -91,9 +94,11 @@ erDiagram
 
 | Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `lightrag_source_map` | `app` | authority | graph worker | resolver | while graph indexed | ≤ graph docs | cascade on document | document_id PK | 5 graph |
-| `lightrag_chunk_map` | `app` | authority | graph worker | resolver | while mapped | graph chunks | cascade | chunk_id PK | 5 graph |
-| `graph_evidence_map` | `app` | authority | graph indexer | Combined fusion | while valid | many-to-many | cascade | object+chunk unique | 5 graph |
+| `lightrag_source_map` | `app` | authority | graph worker | resolver | while graph indexed | ≤ graph docs | cascade on document | `document_id` PK plus replay unique on version/workspace/pipeline | 5 packet 4 |
+| `lightrag_chunk_map` | `app` | authority | graph worker | resolver | while mapped | graph chunks | cascade | `chunk_id` PK plus replay unique on workspace/version/vendor chunk | 5 packet 4 |
+| `graph_evidence_map` | `app` | authority | graph mapper | Combined fusion | while valid and support ≥ 0.80 | many-to-many | cascade | object+chunk unique plus replay unique | 5 packet 4 |
+| `graph_map_repair_jobs` | `app` | authority | graph mapper | worker | until repaired | per unavailable object/config | cascade | unique workspace/object/map_kind/config | 5 packet 4 |
+| `graph_mapping_telemetry` | `app` | derived | graph mapper | ops | mapping runs | per language/type | cascade | append | 5 packet 4 |
 | `graph_entity_rules` | `app` | authority | admin curation | graph indexer | until deactivated | small ruleset | soft deactivate | rule `id` | 5 graph |
 | `graph_workspaces` | `app` | authority | graph worker (Pkt 3) | worker RW; API SELECT | until retired | few workspaces | state to `retired` | `workspace_key` unique | 5 packet 2 schema |
 | `graph_active_workspace_pointer` | `app` | authority | graph worker (Pkt 7 FOR UPDATE) | worker RW; API SELECT | singleton | 1 row | none | fixed UUID | 5 packet 2 schema |
@@ -163,7 +168,12 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - ACL/visibility downgrade clears `graph_eligible` and atomically enqueues `graph_acl_remove`.
 - Company retention defaults: `retention_days=365`, `quarantine_ttl_hours=24`, `legal_hold_enabled=false` (Phase 1 signed defaults).
 - Packet 2 vendor tables are private to schema `lightrag` with FORCE RLS and `app_lightrag` DML only. `anon` / `authenticated` / `service_role` have no vendor access. AGE is absent.
-- `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. This is not Graph Ready.
+- Packet 4 expands map tables with `version_id`, `workspace_key`,
+  `pipeline_version`, `config_generation`, hashes, spans, method, score,
+  support, language, and provenance. Queryable evidence rows have
+  `support >= 0.80`. Packet 4 adds `graph_map_repair_jobs` and
+  `graph_mapping_telemetry`. Expand-only; no DROP.
+- `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. Packet 4 may set `active` when maps verify and the pointer already names the workspace. This is Graph Ready on the version, not a Packet 7 switch.
 - `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, or `graph_maintenance`. The kinds never share caps.
 
 ## Related docs
@@ -176,4 +186,5 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [ADR-expand-contract-migrations](../adr/ADR-expand-contract-migrations.md)
 - [ADAPTER_LIFECYCLE.md](../graph/ADAPTER_LIFECYCLE.md)
 - [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md)
+- [MAPPING.md](../graph/MAPPING.md)
 - [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md)

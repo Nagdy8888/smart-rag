@@ -490,3 +490,82 @@ Phase status remains `pending`.
 **Packet 4 may start.** Vendor `processed` does not flip ready. Mapping packet
 may begin. Holdout remains sealed. Do not mark Phase 5 complete. Phase status
 remains `pending`.
+
+## Packet 4 — canonical graph evidence mapping and Graph Ready
+
+### Quoted requirement
+
+> Packet 4 — canonical graph evidence mapping and Graph Ready
+
+### Acceptance checks restated
+
+- Every Graph Ready document has complete source/chunk/entity/statement/path
+  map rows with accepted canonical passage support, overall and signed
+  per-language gates, and reproducible config/provenance.
+- One document causes at most one scoped Hybrid mapping retrieval and one
+  bounded support rerank batch, not N calls.
+- Unmapped/stale/ambiguous/truncated/below-threshold objects are unavailable
+  plus repair diagnostics and cannot contribute to Graph Ready/query.
+- Replay yields stable application IDs and no duplicate mapping/source
+  readiness.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `supabase/migrations/20260816120000_graph_mapping_ready_v1.sql` | Expand-only map columns, repair, telemetry, worker RLS |
+| `packages/core/src/smart_rag_core/retrieval/graph_mapping.py` | Identities, hash/span/overlap, coverage, one-shot Hybrid/rerank |
+| `packages/core/src/smart_rag_core/jobs/graph_mapping_service.py` | Vendor enumerate, Graph Ready txn |
+| `packages/core/src/smart_rag_core/jobs/graph_mapping_persist.py` | Map upserts (jobs/ not scope-scanned) |
+| `packages/core/src/smart_rag_core/retrieval/lightrag_adapter.py` | Unqualified vendor catalog reads |
+| `packages/core/src/smart_rag_core/retrieval/hybrid_run.py` | `restrict_version_id` |
+| `packages/core/src/smart_rag_core/jobs/graph_index_service.py` | Map after vendor `processed`, before complete |
+| `docs/graph/MAPPING.md` | Mapping contract + mermaid |
+
+### State machine summary
+
+Vendor `processed` authorizes mapping. `GraphMappingService` runs outside the
+extraction transaction. One application transaction upserts maps, records
+telemetry/repairs, and sets `document_versions.status = graph_ready` only when
+support ≥ 0.80, overall coverage ≥ 0.90, and Arabic/mixed ≥ 0.85 per language.
+Workspace `updating` → `active` only if the singleton pointer already names
+this workspace. Null pointer: version can still become Graph Ready; no Packet 7
+switch. Gate miss keeps `graph_pending` and `maps_verified: false`. Repair does
+not query Hybrid and does not lower thresholds.
+
+### Commands and results
+
+No commit, no push, no `uv sync --package smart-rag-core`. Holdout remains
+sealed. Phase status remains `pending`. The Packet 4 migration was applied as
+postgres to local `127.0.0.1:54322`. Types used `--db-url` to that port.
+
+| Command | Exit |
+| --- | --- |
+| `uv run python scripts/ci/check_migrations.py` | 0 (42 reviewed files) |
+| `uv run python -m pytest tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_graph_writer.py tests/unit/test_graph_mapping.py tests/unit/test_hybrid_run.py tests/contract/test_graph_mapping.py -q` | 0 (57 passed) |
+| `uv run python scripts/check.py --tier format` | 0 |
+| `uv run python scripts/check.py --tier lint` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Deviations
+
+- Hybrid/rerank callbacks are injected into `GraphMappingService`. The worker
+  does not construct `HybridRetriever` (no mapping-table strings in `apps/`).
+  Hash/span/overlap still run; unresolved chunks without injected Hybrid stay
+  unmapped and fail coverage (fail closed). Tests prove `hybrid_calls == 1`
+  and `rerank_calls == 1` with injected callbacks.
+- Path-edge IDs are one statement plus `src_to_tgt` plus version (ordered
+  statement list of length 1). Multi-hop path composition is Packet 5+.
+- No new environment variables.
+
+### Unverified
+
+- Live vendor catalog reads against a full LightRAG `processed` corpus (contract
+  tests use a fake vendor reader on local Postgres maps).
+- Managed/staging apply of `20260816120000_graph_mapping_ready_v1.sql`.
+- Worker process with live OpenAI support rerank.
+
+### Packet 5 handoff
+
+**Packet 5 may start only if maps/ready path is proven.** Holdout remains
+sealed. Do not mark Phase 5 complete. Phase status remains `pending`.

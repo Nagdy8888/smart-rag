@@ -196,6 +196,7 @@ class HybridRetriever:
         visibility_generation: int = 1,
         deadline_seconds: float | None = None,
         channel_jobs: dict[str, Callable[[], object]] | None = None,
+        restrict_version_id: UUID | None = None,
     ) -> HybridRunResult:
         """Run one Hybrid retrieve and return ranked IDs plus locators.
 
@@ -207,6 +208,9 @@ class HybridRetriever:
             visibility_generation: ACL/visibility generation for the cache key.
             deadline_seconds: Retrieval+rerank slice. Defaults to 8.0 seconds.
             channel_jobs: Per-call job override for tests.
+            restrict_version_id: When set, drop authorized candidates whose
+                ``version_id`` does not match. Mapping uses this to keep one
+                document version in a single retrieve.
 
         Returns:
             Ranked authorized IDs, ≤12 evidence units, coverage, fallback,
@@ -270,6 +274,12 @@ class HybridRetriever:
                 fallback_reason=RetrievalFallbackReason.TIMEOUT,
             )
             bm25_fallback = RetrievalFallbackReason.TIMEOUT
+        dense_lists, bm25_result, term_lists = _restrict_channel_candidates(
+            dense_lists,
+            bm25_result,
+            term_lists,
+            restrict_version_id,
+        )
         fallback = _compose_fallback(
             dense_reason=dense_reason,
             term_reason=term_reason,
@@ -797,6 +807,56 @@ def _collect_term_lists(
         elif isinstance(result, tuple):
             lists.append(result)
     return tuple(lists)
+
+
+def _restrict_channel_candidates(
+    dense_lists: tuple[tuple[RetrievalCandidate, ...], ...],
+    bm25_result: Bm25RetrievalResult,
+    term_lists: tuple[tuple[RetrievalCandidate, ...], ...],
+    version_id: UUID | None,
+) -> tuple[
+    tuple[tuple[RetrievalCandidate, ...], ...],
+    Bm25RetrievalResult,
+    tuple[tuple[RetrievalCandidate, ...], ...],
+]:
+    """Keep only candidates whose version matches the caller filter.
+
+    Args:
+        dense_lists: Per-variant dense lists.
+        bm25_result: Authorized BM25 survivors.
+        term_lists: Per-variant term lists.
+        version_id: Version filter, or ``None`` to keep every candidate.
+
+    Returns:
+        Filtered dense lists, BM25 result, and term lists.
+    """
+
+    if version_id is None:
+        return dense_lists, bm25_result, term_lists
+
+    def _keep(
+        candidates: tuple[RetrievalCandidate, ...],
+    ) -> tuple[RetrievalCandidate, ...]:
+        """Filter one candidate list to ``version_id``.
+
+        Args:
+            candidates: Authorized candidates.
+
+        Returns:
+            Candidates for the requested version only.
+        """
+
+        return tuple(item for item in candidates if item.version_id == version_id)
+
+    filtered_dense = tuple(_keep(variant) for variant in dense_lists)
+    filtered_bm25_candidates = _keep(bm25_result.candidates)
+    filtered_bm25 = Bm25RetrievalResult(
+        scanned_ids=tuple(item.chunk_id for item in filtered_bm25_candidates),
+        candidates=filtered_bm25_candidates,
+        fallback_reason=bm25_result.fallback_reason,
+    )
+    filtered_term = tuple(_keep(variant) for variant in term_lists)
+    return filtered_dense, filtered_bm25, filtered_term
 
 
 def _flatten_channel_candidates(

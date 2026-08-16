@@ -4,6 +4,7 @@ from smart_rag_core.jobs.admission import JobAdmissionService
 from smart_rag_core.jobs.backoff import compute_retry_delay_seconds
 from smart_rag_core.jobs.dead_letter import DeadLetterService
 from smart_rag_core.jobs.exceptions import (
+    GraphMappingError,
     GraphWriterLostError,
     JobAdmissionError,
     JobLeaseError,
@@ -36,6 +37,7 @@ __all__ = [
     "MAX_ESTIMATED_JOB_SIZE_BYTES",
     "MAX_PENDING_INGESTION_JOBS",
     "DeadLetterService",
+    "GraphMappingError",
     "GraphMetricsService",
     "GraphQueueMetrics",
     "GraphWriterGuard",

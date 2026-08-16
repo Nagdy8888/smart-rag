@@ -1404,26 +1404,65 @@ export type Database = {
         Row: {
           chunk_id: string
           confidence: number
+          config_generation: string | null
           graph_object_id: string
           graph_object_type: string
           id: string
+          language: string | null
           mapped_at: string
+          method: string | null
+          pipeline_version: string | null
+          provenance: Json
+          score: number | null
+          source_hash: string | null
+          source_span: Json
+          support: number | null
+          target_hash: string | null
+          target_span: Json
+          version_id: string | null
+          workspace_key: string | null
         }
         Insert: {
           chunk_id: string
           confidence?: number
+          config_generation?: string | null
           graph_object_id: string
           graph_object_type: string
           id?: string
+          language?: string | null
           mapped_at?: string
+          method?: string | null
+          pipeline_version?: string | null
+          provenance?: Json
+          score?: number | null
+          source_hash?: string | null
+          source_span?: Json
+          support?: number | null
+          target_hash?: string | null
+          target_span?: Json
+          version_id?: string | null
+          workspace_key?: string | null
         }
         Update: {
           chunk_id?: string
           confidence?: number
+          config_generation?: string | null
           graph_object_id?: string
           graph_object_type?: string
           id?: string
+          language?: string | null
           mapped_at?: string
+          method?: string | null
+          pipeline_version?: string | null
+          provenance?: Json
+          score?: number | null
+          source_hash?: string | null
+          source_span?: Json
+          support?: number | null
+          target_hash?: string | null
+          target_span?: Json
+          version_id?: string | null
+          workspace_key?: string | null
         }
         Relationships: [
           {
@@ -1431,6 +1470,145 @@ export type Database = {
             columns: ["chunk_id"]
             isOneToOne: false
             referencedRelation: "document_chunks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_evidence_map_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_map_repair_jobs: {
+        Row: {
+          config_generation: string
+          created_at: string
+          document_id: string | null
+          graph_object_id: string
+          graph_object_type: string
+          id: string
+          map_kind: string
+          payload_ref: Json
+          reason: string
+          status: Database["app"]["Enums"]["job_status"]
+          updated_at: string
+          version_id: string | null
+          workspace_key: string
+        }
+        Insert: {
+          config_generation: string
+          created_at?: string
+          document_id?: string | null
+          graph_object_id: string
+          graph_object_type: string
+          id?: string
+          map_kind: string
+          payload_ref?: Json
+          reason: string
+          status?: Database["app"]["Enums"]["job_status"]
+          updated_at?: string
+          version_id?: string | null
+          workspace_key: string
+        }
+        Update: {
+          config_generation?: string
+          created_at?: string
+          document_id?: string | null
+          graph_object_id?: string
+          graph_object_type?: string
+          id?: string
+          map_kind?: string
+          payload_ref?: Json
+          reason?: string
+          status?: Database["app"]["Enums"]["job_status"]
+          updated_at?: string
+          version_id?: string | null
+          workspace_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_map_repair_jobs_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_map_repair_jobs_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_mapping_telemetry: {
+        Row: {
+          config_generation: string
+          created_at: string
+          denominator: number
+          document_id: string | null
+          exclusion_count: number
+          failure_reason: string | null
+          id: string
+          language: string | null
+          method: string | null
+          numerator: number
+          object_type: string
+          pipeline_version: string
+          truncation_count: number
+          version_id: string | null
+          workspace_key: string
+        }
+        Insert: {
+          config_generation: string
+          created_at?: string
+          denominator?: number
+          document_id?: string | null
+          exclusion_count?: number
+          failure_reason?: string | null
+          id?: string
+          language?: string | null
+          method?: string | null
+          numerator?: number
+          object_type: string
+          pipeline_version: string
+          truncation_count?: number
+          version_id?: string | null
+          workspace_key: string
+        }
+        Update: {
+          config_generation?: string
+          created_at?: string
+          denominator?: number
+          document_id?: string | null
+          exclusion_count?: number
+          failure_reason?: string | null
+          id?: string
+          language?: string | null
+          method?: string | null
+          numerator?: number
+          object_type?: string
+          pipeline_version?: string
+          truncation_count?: number
+          version_id?: string | null
+          workspace_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_mapping_telemetry_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_mapping_telemetry_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -1618,21 +1796,60 @@ export type Database = {
       lightrag_chunk_map: {
         Row: {
           chunk_id: string
+          config_generation: string | null
+          language: string | null
           lightrag_chunk_id: string
           lightrag_doc_id: string
           mapped_at: string
+          method: string | null
+          pipeline_version: string | null
+          provenance: Json
+          score: number | null
+          source_hash: string | null
+          source_span: Json
+          support: number | null
+          target_hash: string | null
+          target_span: Json
+          version_id: string | null
+          workspace_key: string | null
         }
         Insert: {
           chunk_id: string
+          config_generation?: string | null
+          language?: string | null
           lightrag_chunk_id: string
           lightrag_doc_id: string
           mapped_at?: string
+          method?: string | null
+          pipeline_version?: string | null
+          provenance?: Json
+          score?: number | null
+          source_hash?: string | null
+          source_span?: Json
+          support?: number | null
+          target_hash?: string | null
+          target_span?: Json
+          version_id?: string | null
+          workspace_key?: string | null
         }
         Update: {
           chunk_id?: string
+          config_generation?: string | null
+          language?: string | null
           lightrag_chunk_id?: string
           lightrag_doc_id?: string
           mapped_at?: string
+          method?: string | null
+          pipeline_version?: string | null
+          provenance?: Json
+          score?: number | null
+          source_hash?: string | null
+          source_span?: Json
+          support?: number | null
+          target_hash?: string | null
+          target_span?: Json
+          version_id?: string | null
+          workspace_key?: string | null
         }
         Relationships: [
           {
@@ -1640,6 +1857,13 @@ export type Database = {
             columns: ["chunk_id"]
             isOneToOne: true
             referencedRelation: "document_chunks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightrag_chunk_map_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -1730,22 +1954,64 @@ export type Database = {
       }
       lightrag_source_map: {
         Row: {
+          config_generation: string | null
           document_id: string
+          language: string | null
           lightrag_doc_id: string
           lightrag_workspace: string
           mapped_at: string
+          method: string | null
+          pipeline_version: string | null
+          provenance: Json
+          score: number | null
+          source_content_hash: string | null
+          source_hash: string | null
+          source_span: Json
+          support: number | null
+          target_hash: string | null
+          target_span: Json
+          version_id: string | null
+          workspace_key: string | null
         }
         Insert: {
+          config_generation?: string | null
           document_id: string
+          language?: string | null
           lightrag_doc_id: string
           lightrag_workspace?: string
           mapped_at?: string
+          method?: string | null
+          pipeline_version?: string | null
+          provenance?: Json
+          score?: number | null
+          source_content_hash?: string | null
+          source_hash?: string | null
+          source_span?: Json
+          support?: number | null
+          target_hash?: string | null
+          target_span?: Json
+          version_id?: string | null
+          workspace_key?: string | null
         }
         Update: {
+          config_generation?: string | null
           document_id?: string
+          language?: string | null
           lightrag_doc_id?: string
           lightrag_workspace?: string
           mapped_at?: string
+          method?: string | null
+          pipeline_version?: string | null
+          provenance?: Json
+          score?: number | null
+          source_content_hash?: string | null
+          source_hash?: string | null
+          source_span?: Json
+          support?: number | null
+          target_hash?: string | null
+          target_span?: Json
+          version_id?: string | null
+          workspace_key?: string | null
         }
         Relationships: [
           {
@@ -1753,6 +2019,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: true
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lightrag_source_map_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
             referencedColumns: ["id"]
           },
         ]

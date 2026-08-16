@@ -34,6 +34,21 @@ class JobRetryNotAllowedError(JobRepositoryError):
     """Raised when a job is not in a retryable dead-letter, failed, or backoff state."""
 
 
+class GraphMappingError(JobRepositoryError):
+    """Raised when canonical graph mapping cannot become Graph Ready."""
+
+    def __init__(self, reason: str) -> None:
+        """Initialize with a stable machine-readable mapping reason.
+
+        Args:
+            reason: Short reason such as ``vendor_not_processed`` or
+                ``language_gate``.
+        """
+
+        super().__init__(reason)
+        self.reason = reason
+
+
 class GraphWriterLostError(JobLeaseError):
     """Raised when the graph writer lease or session advisory lock is lost."""
 

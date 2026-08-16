@@ -11,11 +11,13 @@ phase_packet: Phase 5 Packets 1–2
 
 Immutable pin, public/private API matrix, source/ID semantics, callbacks,
 rejected assumptions, and Packet 2 private-schema attach. Production
-`ainsert`/query wiring and Graph Ready mappings remain later packets.
+`ainsert`/query wiring lives in Packet 3. Canonical Graph Ready mapping is
+Packet 4 ([MAPPING.md](./MAPPING.md)).
 
 Related: [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
+[MAPPING.md](./MAPPING.md) ·
 [TOOL_VERSIONS.md](../development/TOOL_VERSIONS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·

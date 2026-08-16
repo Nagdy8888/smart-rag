@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering, ops
 ---
 
@@ -10,7 +10,7 @@ audience: engineering, ops
 
 Single source of truth for Phase 3 durable job, worker, admission, and graph-handoff bounds. Values fixed by [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) or the global contract require ADR approval to change. Unspecified defaults are conservative placeholders with explicit review triggers.
 
-Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md)
+Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [MAPPING.md](../graph/MAPPING.md)
 
 ## Limit registry
 
@@ -213,6 +213,25 @@ Primary references: [OpenAI embeddings](https://platform.openai.com/docs/guides/
 | Deletion cleanup priority | band | `high` | `critical` | Plan Packet 7 | worker | immediate enqueue | Stale candidate leak |
 
 ParadeDB writer credentials: `PARADEDB_URL` on worker only (Compose `paradedb_writer`). Supabase remains authoritative; ParadeDB holds rebuildable projection rows keyed by canonical chunk IDs.
+
+## Graph mapping bounds (Packet 4)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Mapping support | ratio | 0.80 | 0.80 | Phase 5 Packet 4 | mapper | object unavailable + repair | Owner sign-off to change |
+| Overall mapping coverage | ratio | 0.90 | 0.90 | Phase 5 Packet 4 | mapper | stay `graph_pending` | English-only corpus review |
+| Arabic/mixed coverage | ratio | 0.85 | 0.85 | Phase 5 Packet 4 per-language | mapper | `language_gate` repair | Arabic fixture miss |
+| Overlap accept | Jaccard | 0.50 | 0.50 | Packet 4 hash/span/overlap | mapper | fall through to Hybrid batch | Near-dup false merge |
+| Vendor chunks per document | count | 500 | 500 | Packet 4 budget | mapper | `mapping_budget_chunks` | Large-doc split policy |
+| Entities per document | count | 200 | 200 | Packet 4 budget | mapper | `mapping_budget_entities` | Extraction flood |
+| Relations per document | count | 200 | 200 | Packet 4 budget | mapper | `mapping_budget_relations` | Extraction flood |
+| Hybrid mapping retrieve | calls/doc | 1 | 1 | Packet 4 one-shot | mapper | `mapping_budget_hybrid` | Per-relation retrieve regression |
+| Support rerank | calls/doc | 1 | 1 | Packet 4 OpenAI-only | mapper | `mapping_budget_rerank` | Local-model proposal |
+| Support rerank pool | passages | 20 | 20 | Hybrid rerank pool | mapper | skip rerank if &lt; 2 | Pool drift |
+| Source ids per entity | count | 200 | 200 | Packet 1 `GRAPH_FIELD_SEP` | mapper | truncated unavailable | Silent provenance |
+| Source ids per relation | count | 200 | 200 | Packet 1 `GRAPH_FIELD_SEP` | mapper | truncated unavailable | Silent provenance |
+
+Repair jobs are keyed by workspace/object/map_kind/config generation. Repair must not query Hybrid and must not lower these thresholds. See [MAPPING.md](../graph/MAPPING.md).
 
 ## Verification commands
 

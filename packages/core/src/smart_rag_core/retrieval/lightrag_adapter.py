@@ -881,6 +881,179 @@ class LightRagRuntimeAdapter:
             raise LightRagAdapterError("runtime_role_query_failed")
         return str(row["role_name"])
 
+    async def _vendor_query(
+        self,
+        sql: str,
+        params: list[object],
+    ) -> list[dict[str, object]]:
+        """Run one unqualified vendor catalog query on the runtime pool.
+
+        Args:
+            sql: Parameterized SQL using ``$1`` placeholders. Table names are
+                unqualified on search_path ``lightrag,extensions,public``.
+            params: Query parameters.
+
+        Returns:
+            Row mappings. Empty when the catalog has no matches.
+
+        Raises:
+            LightRagAdapterError: If ClientManager is missing or query fails.
+        """
+
+        from lightrag.kg.postgres_impl import ClientManager
+
+        instances_raw = getattr(ClientManager, "_instances", None)
+        if not isinstance(instances_raw, dict):
+            raise LightRagAdapterError("client_manager_uninitialized")
+        instances = cast(dict[str, object], instances_raw)
+        db = instances.get("db")
+        if db is None:
+            raise LightRagAdapterError("client_manager_uninitialized")
+        query = getattr(db, "query", None)
+        if not callable(query):
+            raise LightRagAdapterError("client_manager_query_unavailable")
+        rows = await query(sql, params, True)
+        if rows is None:
+            return []
+        if isinstance(rows, dict):
+            return [cast(dict[str, object], rows)]
+        if isinstance(rows, list):
+            return [cast(dict[str, object], row) for row in rows]
+        raise LightRagAdapterError("vendor_query_shape")
+
+    async def list_vendor_doc_chunks(
+        self,
+        *,
+        workspace: str,
+        document_id: str,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        """Return vendor document chunks for one source id.
+
+        Args:
+            workspace: Constructor workspace.
+            document_id: Canonical version UUID string (``full_doc_id``).
+            limit: Inclusive cap plus one so callers can detect overflow.
+
+        Returns:
+            Chunk rows with ``id``, ``content``, ``full_doc_id``, ``file_path``.
+        """
+
+        return await self._vendor_query(
+            """
+            SELECT id, workspace, full_doc_id, content, file_path, chunk_order_index
+            FROM lightrag_doc_chunks
+            WHERE workspace = $1 AND full_doc_id = $2
+            ORDER BY chunk_order_index
+            LIMIT $3
+            """,
+            [workspace, document_id, limit],
+        )
+
+    async def list_vendor_entity_joins(
+        self,
+        *,
+        workspace: str,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        """Return entity-to-chunk joins for one workspace.
+
+        Args:
+            workspace: Constructor workspace.
+            limit: Inclusive cap plus one so callers can detect overflow.
+
+        Returns:
+            Rows with ``id`` (entity name) and ``chunk_ids`` jsonb.
+        """
+
+        return await self._vendor_query(
+            """
+            SELECT id, workspace, chunk_ids, count
+            FROM lightrag_entity_chunks
+            WHERE workspace = $1
+            LIMIT $2
+            """,
+            [workspace, limit],
+        )
+
+    async def list_vendor_relation_joins(
+        self,
+        *,
+        workspace: str,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        """Return relation-to-chunk joins for one workspace.
+
+        Args:
+            workspace: Constructor workspace.
+            limit: Inclusive cap plus one so callers can detect overflow.
+
+        Returns:
+            Rows with sorted endpoint keys and ``chunk_ids`` jsonb.
+        """
+
+        return await self._vendor_query(
+            """
+            SELECT id, workspace, chunk_ids, count
+            FROM lightrag_relation_chunks
+            WHERE workspace = $1
+            LIMIT $2
+            """,
+            [workspace, limit],
+        )
+
+    async def list_vendor_graph_nodes(
+        self,
+        *,
+        workspace: str,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        """Return graph nodes including source_id properties.
+
+        Args:
+            workspace: Constructor workspace.
+            limit: Inclusive cap plus one so callers can detect overflow.
+
+        Returns:
+            Node rows. Callers read ``properties`` jsonb, never rendered prose.
+        """
+
+        return await self._vendor_query(
+            """
+            SELECT id, workspace, properties
+            FROM lightrag_graph_nodes
+            WHERE workspace = $1
+            LIMIT $2
+            """,
+            [workspace, limit],
+        )
+
+    async def list_vendor_graph_edges(
+        self,
+        *,
+        workspace: str,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        """Return graph edges including structured relation fields.
+
+        Args:
+            workspace: Constructor workspace.
+            limit: Inclusive cap plus one so callers can detect overflow.
+
+        Returns:
+            Edge rows. Relation labels come from ``properties.keywords``.
+        """
+
+        return await self._vendor_query(
+            """
+            SELECT src_id, tgt_id, workspace, properties
+            FROM lightrag_graph_edges
+            WHERE workspace = $1
+            LIMIT $2
+            """,
+            [workspace, limit],
+        )
+
 
 class LightRagRuntimeAdapterContext(
     AbstractAsyncContextManager[LightRagRuntimeAdapter]

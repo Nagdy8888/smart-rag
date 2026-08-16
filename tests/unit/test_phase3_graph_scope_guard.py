@@ -17,7 +17,9 @@ ALLOWED_PATH_PARTS: tuple[str, ...] = (
     ".cursor/plans/",
     "docs/",
     "supabase/migrations/20260812135053_lightrag_maps_v1.sql",
+    "supabase/migrations/20260816120000_graph_mapping_ready_v1.sql",
     "packages/core/src/smart_rag_core/schema/",
+    "packages/core/src/smart_rag_core/retrieval/graph_mapping.py",
 )
 
 

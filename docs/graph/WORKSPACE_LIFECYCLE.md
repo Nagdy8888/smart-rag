@@ -16,6 +16,7 @@ Packet 4.
 
 Related: [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
+[MAPPING.md](./MAPPING.md) ·
 [JOB_STATE_MACHINE.md](../ingestion/JOB_STATE_MACHINE.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
@@ -62,7 +63,11 @@ sequenceDiagram
 Durable states: `building`, `active`, `updating`, `filtered_dirty`,
 `quarantined`, `disabled`, `retired`. Only one verified generation is
 intended to be `active`. Packet 3 never returns `active` after insert
-because maps are unverified. Successful index leaves `updating`.
+because maps are unverified. Successful index leaves `updating`. Packet 4
+marks the version Graph Ready in one application transaction and may set
+workspace `active` when maps verify **and** the singleton pointer already
+names this workspace. A null pointer still allows Graph Ready on the version
+and does not bump generation (Packet 7).
 
 ```mermaid
 stateDiagram-v2
@@ -75,6 +80,7 @@ stateDiagram-v2
   active --> quarantined: lock lease or unverified status
   active --> disabled: Packet 7
   updating --> updating: index success maps unverified
+  updating --> active: Packet4 maps verified and pointer attached
   updating --> filtered_dirty: targeted delete or ACL success
   updating --> quarantined: lock lease crash or failed vendor status
   filtered_dirty --> updating: later index
@@ -95,7 +101,7 @@ isolates that workspace only; corpus reindex is Packet 7.
 
 | Operation | Kind | Budget kind | Pause | Success workspace |
 | --- | --- | --- | --- | --- |
-| `index` | normal | `graph_index` | skipped when pending index greater than 50 | stay `updating` |
+| `index` | normal | `graph_index` | skipped when pending index greater than 50 | `updating`, or `active` after Packet 4 maps verify and the pointer already names this workspace |
 | `remove` | maintenance | `graph_maintenance` | always claimable | `filtered_dirty` |
 | `graph_acl_remove` | maintenance | `graph_maintenance` | always claimable | `filtered_dirty` |
 | `rebuild` | maintenance | `graph_maintenance` | always claimable | isolated `building`, pointer unchanged |
@@ -126,7 +132,8 @@ Identity is `str(version_id)`. Basename is `g-{version_id}.txt`. Envelope
 Chunker overlay 1200/100 `gpt-4o-mini` is stored on `config_snapshot`.
 
 Vendor statuses `processed` and `failed` are terminal. `processed` does not
-change `document_versions.status` (stays `graph_pending`). Replay that finds
+by itself change `document_versions.status`. Packet 4 mapping may set
+`graph_ready` in the same job after maps verify. Replay that finds
 an existing `processed` row skips a second insert.
 
 ## Budgets
@@ -152,7 +159,7 @@ row exists; a duplicate insert is not issued.
 | Lock or lease loss during mutation | cancel new writes; `quarantined`; reconciliation job |
 | `ainsert` timeout after send | poll existing vendor row; ledger possible bill |
 | Vendor `failed` or unverifiable status | `quarantined`; no public ready |
-| Vendor `processed` | job completed; workspace `updating`; Packet 4 may map |
+| Vendor `processed` | job completed; Packet 4 maps; Graph Ready only if gates pass |
 | Worker shutdown | session lock drops; reclaim plus quarantine if partial |
 
 ## Metrics

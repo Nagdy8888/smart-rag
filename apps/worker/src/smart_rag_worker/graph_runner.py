@@ -229,7 +229,8 @@ class GraphWorkerLoop:
                 result={
                     "vendor_status": outcome.vendor_status,
                     "workspace_state": outcome.workspace_state,
-                    "maps_verified": False,
+                    "maps_verified": outcome.maps_verified,
+                    "mapping_reason": outcome.mapping_reason,
                     "reservation_kind": outcome.reservation_kind,
                 },
             )
