@@ -18,6 +18,7 @@ Related: [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
 [MAPPING.md](./MAPPING.md) ·
+[RETRIEVAL.md](./RETRIEVAL.md) ·
 [TOOL_VERSIONS.md](../development/TOOL_VERSIONS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·
@@ -214,6 +215,11 @@ required on role LLM configs.
 
 `apply_query_bounds` clamps `top_k` / `chunk_top_k` to 12, token budgets, and a
 45s deadline. Native engine settings do not replace these controls.
+Inspection uses a 10-second adapter deadline. Query-time
+`LightRagRuntimeAdapter.aquery_data_structured` sets both keyword lists,
+`only_need_context=True`, `enable_rerank=False`, and `include_references=False`.
+Modes are only `local`, `hybrid`, and `global`. Global output is clamped to
+three steering topics and is never evidence. See [RETRIEVAL.md](./RETRIEVAL.md).
 
 ## Packet 2 private schema and runtime attach
 

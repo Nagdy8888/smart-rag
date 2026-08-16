@@ -233,6 +233,25 @@ ParadeDB writer credentials: `PARADEDB_URL` on worker only (Compose `paradedb_wr
 
 Repair jobs are keyed by workspace/object/map_kind/config generation. Repair must not query Hybrid and must not lower these thresholds. See [MAPPING.md](../graph/MAPPING.md).
 
+## Graph query and inspection bounds (Packet 5)
+
+| Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Graph candidates | count | 12 | 12 | Phase 5 Packet 5 | retrieval | clamp then drop | Owner sign-off |
+| Graph hops | hops | 3 | 3 | Phase 5 Packet 5 | retrieval | path truncated | Owner sign-off |
+| Graph paths | count | 6 | 6 | Phase 5 Packet 5 | retrieval | path truncated | Owner sign-off |
+| Global steering topics | count | 3 | 3 | Phase 5 Packet 5 | retrieval | `global_steering_only` | Owner sign-off |
+| Query adapter deadline | seconds | 45 | 45 | `GraphQueryBounds` | retrieval | `graph_deadline` | Combined budget |
+| Inspection deadline | seconds | 10 | 10 | Phase 5 Packet 5 | API | `graph_deadline` | Owner sign-off |
+| Inspection depth | hops | 3 | 3 | Phase 5 Packet 5 | SQL | clamp | Owner sign-off |
+| Inspection rows | count | 200 | 200 | Phase 5 Packet 5 | SQL | LIMIT | Owner sign-off |
+| Inspection statement_timeout | seconds | 3 | 3 | Phase 5 Packet 5 | SQL | statement timeout | Owner sign-off |
+| Mapping support (query) | ratio | 0.80 | 0.80 | Packet 4 threshold | resolver | whole-candidate drop | Owner sign-off |
+| Survival fallback | ratio | 0.50 | 0.50 | Phase 5 Packet 5 | retrieval | `graph_survival_below_threshold` | Combined packet |
+| Survival rolling window | samples | 20 | 20 | Phase 5 Packet 5 | retrieval | recorded mean only | Combined packet |
+
+Query-time repair uses `map_kind=query_resolve` and never Hybrid. See [RETRIEVAL.md](../graph/RETRIEVAL.md).
+
 ## Verification commands
 
 ```bash

@@ -12,12 +12,19 @@ from smart_rag_core.retrieval.fusion import fuse_channels
 from smart_rag_core.retrieval.graph import (
     GraphIndexer,
     GraphLeadSet,
+    GraphLimitationCode,
     GraphQueryBounds,
     GraphRetriever,
     apply_query_bounds,
     bind_graph_source_text,
+    clamp_graph_leads,
+    graph_survival_ratio,
     opaque_graph_source_basename,
     strip_graph_source_envelope,
+)
+from smart_rag_core.retrieval.graph_results import (
+    GraphInspectResult,
+    GraphRetrievalResult,
 )
 from smart_rag_core.retrieval.hybrid import HybridRetrievalResult, assemble_hybrid
 from smart_rag_core.retrieval.hybrid_run import (
@@ -76,8 +83,11 @@ __all__ = [
     "EvidenceLocator",
     "EvidenceUnit",
     "GraphIndexer",
+    "GraphInspectResult",
     "GraphLeadSet",
+    "GraphLimitationCode",
     "GraphQueryBounds",
+    "GraphRetrievalResult",
     "GraphRetriever",
     "HnswProfileId",
     "HybridRetrievalResult",
@@ -93,7 +103,9 @@ __all__ = [
     "assemble_hybrid",
     "bind_graph_source_text",
     "build_bm25_query",
+    "clamp_graph_leads",
     "fuse_channels",
+    "graph_survival_ratio",
     "opaque_graph_source_basename",
     "recheck_retrieval_candidates",
     "retrieval_transaction",

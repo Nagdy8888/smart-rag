@@ -17,6 +17,10 @@ rules.
 Do not treat `lightrag_source_map` alone as evidence. Do not parse rendered
 `only_need_context` prose. Do not use vendor `processed` as Graph Ready.
 
+Query-time resolution, survival, and inspection are specified in
+[RETRIEVAL.md](./RETRIEVAL.md). Mapping rows are never citations by themselves.
+
 Related: [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
+[RETRIEVAL.md](./RETRIEVAL.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md)

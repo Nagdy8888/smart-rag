@@ -140,12 +140,14 @@ def create_app() -> FastAPI:
     application.get("/health/live", tags=["health"])(live)
     application.get("/health/ready", tags=["health"])(ready)
     from smart_rag_api.routers.glossary import router as glossary_router
+    from smart_rag_api.routers.graph_inspect import router as graph_inspect_router
     from smart_rag_api.routers.ingestion_crawl import router as ingestion_crawl_router
     from smart_rag_api.routers.ingestion_status import router as ingestion_status_router
 
     application.include_router(ingestion_status_router)
     application.include_router(ingestion_crawl_router)
     application.include_router(glossary_router)
+    application.include_router(graph_inspect_router)
     return application
 
 

@@ -45,7 +45,10 @@ from smart_rag_core.retrieval.graph import (
     SELECTED_VECTOR_STORAGE,
     GraphIndexDeleteResult,
     GraphIndexEnqueueResult,
+    GraphLeadSet,
+    GraphQueryBounds,
     bind_graph_source_text,
+    clamp_global_steering,
 )
 from smart_rag_core.retrieval.lightrag_callbacks import CountedLightRagCallbacks
 from smart_rag_core.retrieval.lightrag_qualification import (
@@ -66,6 +69,11 @@ from smart_rag_core.retrieval.lightrag_qualification import (
     reset_process_client_manager,
     status_record_mapping,
     vendor_env_pairs,
+)
+from smart_rag_core.retrieval.lightrag_structured import (
+    as_string_mapping,
+    parse_aquery_data_payload,
+    to_graph_leads,
 )
 from smart_rag_core.settings.base import SharedSettings, snapshot_process_environ
 
@@ -1052,6 +1060,149 @@ class LightRagRuntimeAdapter:
             LIMIT $2
             """,
             [workspace, limit],
+        )
+
+    async def aquery_data_structured(
+        self,
+        *,
+        query: str,
+        mode: Literal["local", "hybrid", "global"],
+        hl_keywords: tuple[str, ...],
+        ll_keywords: tuple[str, ...],
+        bounds: GraphQueryBounds,
+    ) -> GraphLeadSet:
+        """Run ``aquery_data`` with both keyword lists and adapter bounds.
+
+        Args:
+            query: Original user query.
+            mode: ``local``, graph ``hybrid``, or ``global``. Never ``naive``
+                or ``mix``.
+            hl_keywords: Non-empty high-level keywords.
+            ll_keywords: Non-empty low-level keywords.
+            bounds: Adapter-owned candidate and token limits.
+
+        Returns:
+            Structured leads. Descriptions and file paths are not identifiers.
+
+        Raises:
+            LightRagAdapterError: Empty keywords or unsupported mode.
+            LightRagQueryFailure: Vendor payload is not a success envelope.
+
+        Side Effects:
+            One vendor ``aquery_data`` call. Native rerank stays disabled.
+        """
+
+        from lightrag import QueryParam
+
+        if mode not in {"local", "hybrid", "global"}:
+            raise LightRagAdapterError("unsupported_graph_mode")
+        high = tuple(item.strip() for item in hl_keywords if item.strip())
+        low = tuple(item.strip() for item in ll_keywords if item.strip())
+        if not high or not low:
+            raise LightRagAdapterError("both_keyword_lists_required")
+        param = QueryParam(
+            mode=mode,
+            only_need_context=True,
+            only_need_prompt=False,
+            stream=False,
+            top_k=bounds.top_k,
+            chunk_top_k=bounds.chunk_top_k,
+            max_entity_tokens=bounds.max_entity_tokens,
+            max_relation_tokens=bounds.max_relation_tokens,
+            max_total_tokens=bounds.max_total_tokens,
+            hl_keywords=list(high),
+            ll_keywords=list(low),
+            enable_rerank=False,
+            include_references=False,
+        )
+        raw = await self.rag.aquery_data(query, param)
+        leads = to_graph_leads(parse_aquery_data_payload(as_string_mapping(raw)))
+        if mode == "global":
+            return clamp_global_steering(leads)
+        return leads
+
+    async def retrieve_local(
+        self,
+        *,
+        query: str,
+        hl_keywords: tuple[str, ...],
+        ll_keywords: tuple[str, ...],
+        bounds: GraphQueryBounds,
+    ) -> GraphLeadSet:
+        """Return local-mode entity-centered leads.
+
+        Args:
+            query: Original user query text.
+            hl_keywords: Non-empty high-level keywords.
+            ll_keywords: Non-empty low-level keywords.
+            bounds: Adapter-owned limits.
+
+        Returns:
+            Structured local leads.
+        """
+
+        return await self.aquery_data_structured(
+            query=query,
+            mode="local",
+            hl_keywords=hl_keywords,
+            ll_keywords=ll_keywords,
+            bounds=bounds,
+        )
+
+    async def retrieve_hybrid(
+        self,
+        *,
+        query: str,
+        hl_keywords: tuple[str, ...],
+        ll_keywords: tuple[str, ...],
+        bounds: GraphQueryBounds,
+    ) -> GraphLeadSet:
+        """Return graph-hybrid leads. This is not application Hybrid RAG.
+
+        Args:
+            query: Original user query text.
+            hl_keywords: Non-empty high-level keywords.
+            ll_keywords: Non-empty low-level keywords.
+            bounds: Adapter-owned limits.
+
+        Returns:
+            Structured graph-hybrid leads.
+        """
+
+        return await self.aquery_data_structured(
+            query=query,
+            mode="hybrid",
+            hl_keywords=hl_keywords,
+            ll_keywords=ll_keywords,
+            bounds=bounds,
+        )
+
+    async def retrieve_global_steering(
+        self,
+        *,
+        query: str,
+        hl_keywords: tuple[str, ...],
+        ll_keywords: tuple[str, ...],
+        bounds: GraphQueryBounds,
+    ) -> GraphLeadSet:
+        """Return at most three topic/entity steering expansions.
+
+        Args:
+            query: Original user query text.
+            hl_keywords: Non-empty high-level keywords.
+            ll_keywords: Non-empty low-level keywords.
+            bounds: Adapter-owned limits.
+
+        Returns:
+            Steering leads only. Never evidence.
+        """
+
+        return await self.aquery_data_structured(
+            query=query,
+            mode="global",
+            hl_keywords=hl_keywords,
+            ll_keywords=ll_keywords,
+            bounds=bounds,
         )
 
 

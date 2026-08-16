@@ -173,6 +173,13 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
   support, language, and provenance. Queryable evidence rows have
   `support >= 0.80`. Packet 4 adds `graph_map_repair_jobs` and
   `graph_mapping_telemetry`. Expand-only; no DROP.
+- Packet 5 adds `app.graph_survival_samples` (latest 20
+  `graph_survival_ratio` rows; recorded window, not a live alerter),
+  `app.graph_visibility_counts` (authorized partial-readiness and
+  authorized-only ACL-blindness), `app.inspect_graph_neighborhood`
+  (depth 3, 200 rows, `statement_timeout='3s'`, no vendor prose), and
+  `app.enqueue_graph_map_repair` (`map_kind=query_resolve`, never Hybrid).
+  `app_api` may SELECT map tables; ACL is rechecked in resolver SQL.
 - `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. Packet 4 may set `active` when maps verify and the pointer already names the workspace. This is Graph Ready on the version, not a Packet 7 switch.
 - `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, or `graph_maintenance`. The kinds never share caps.
 
@@ -187,4 +194,5 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [ADAPTER_LIFECYCLE.md](../graph/ADAPTER_LIFECYCLE.md)
 - [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md)
 - [MAPPING.md](../graph/MAPPING.md)
+- [RETRIEVAL.md](../graph/RETRIEVAL.md)
 - [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md)

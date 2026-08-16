@@ -17,6 +17,7 @@ Packet 4.
 Related: [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [MAPPING.md](./MAPPING.md) ·
+[RETRIEVAL.md](./RETRIEVAL.md) ·
 [JOB_STATE_MACHINE.md](../ingestion/JOB_STATE_MACHINE.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
@@ -89,6 +90,12 @@ stateDiagram-v2
   disabled --> retired: Packet 7
   retired --> [*]
 ```
+
+Query-time retrieval and inspection require `active` plus an attached
+pointer. `updating` emits `graph_updating`, `filtered_dirty` emits
+`graph_filtered_dirty`, and every other non-queryable state emits
+`graph_outage`. Combined fallback is Phase 6; Packet 5 returns the typed
+limitation and does not call the vendor.
 
 Pointer switch with `SELECT ... FOR UPDATE` on generation is Packet 7.
 Packet 3 may attach `company_default` when the pointer is null without

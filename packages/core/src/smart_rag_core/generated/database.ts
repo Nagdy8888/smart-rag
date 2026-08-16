@@ -1613,6 +1613,27 @@ export type Database = {
           },
         ]
       }
+      graph_survival_samples: {
+        Row: {
+          id: string
+          query_mode: string
+          recorded_at: string
+          survival_ratio: number
+        }
+        Insert: {
+          id?: string
+          query_mode: string
+          recorded_at?: string
+          survival_ratio: number
+        }
+        Update: {
+          id?: string
+          query_mode?: string
+          recorded_at?: string
+          survival_ratio?: number
+        }
+        Relationships: []
+      }
       graph_workspaces: {
         Row: {
           config_snapshot: Json
@@ -3345,6 +3366,19 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_graph_map_repair: {
+        Args: {
+          p_config_generation: string
+          p_document_id: string
+          p_map_kind: string
+          p_object_id: string
+          p_object_type: string
+          p_reason: string
+          p_version_id: string
+          p_workspace_key: string
+        }
+        Returns: string
+      }
       enqueue_graph_pending_handoff: {
         Args: {
           p_content_hash?: string
@@ -3512,6 +3546,18 @@ export type Database = {
         Returns: boolean
       }
       glossary_payload_has_cycle: { Args: { payload: Json }; Returns: boolean }
+      graph_visibility_counts: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_relevant_version_ids?: string[]
+        }
+        Returns: {
+          acl_blindness_count: number
+          partial_readiness_count: number
+        }[]
+      }
       heartbeat_graph_writer_lease: {
         Args: { p_lease_seconds: number; p_owner: string; p_token: string }
         Returns: boolean
@@ -3549,6 +3595,28 @@ export type Database = {
           entry_count: number
           import_id: string
           status: Database["app"]["Enums"]["glossary_import_status"]
+        }[]
+      }
+      inspect_graph_neighborhood: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_config_generation: string
+          p_depth: number
+          p_document_id: string
+          p_entity_keys: string[]
+          p_row_limit: number
+          p_workspace_key: string
+        }
+        Returns: {
+          chunk_id: string
+          document_id: string
+          hop: number
+          object_id: string
+          object_type: string
+          support: number
+          version_id: string
         }[]
       }
       list_quarantine_cleanup_candidates: {

@@ -49,6 +49,21 @@ class GraphMappingError(JobRepositoryError):
         self.reason = reason
 
 
+class GraphResolverError(JobRepositoryError):
+    """Raised when query-time graph resolution cannot complete safely."""
+
+    def __init__(self, reason: str) -> None:
+        """Initialize with a stable machine-readable resolver reason.
+
+        Args:
+            reason: Short reason such as ``graph_deadline`` or
+                ``hidden_keyword_or_answer_call``.
+        """
+
+        super().__init__(reason)
+        self.reason = reason
+
+
 class GraphWriterLostError(JobLeaseError):
     """Raised when the graph writer lease or session advisory lock is lost."""
 

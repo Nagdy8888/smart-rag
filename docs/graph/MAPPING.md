@@ -16,6 +16,7 @@ marks a document version Graph Ready in one application transaction. Vendor
 Related: [GRAPH_MAPPING_CONTRACT.md](./GRAPH_MAPPING_CONTRACT.md) ·
 [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
+[RETRIEVAL.md](./RETRIEVAL.md) ·
 [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
@@ -113,9 +114,13 @@ contribute to Graph Ready or later query.
 ## Security
 
 Mapping SQL uses `SET ROLE app_worker` for canonical tables and adapter
-`SET ROLE app_lightrag` for unqualified vendor catalog reads. RLS policies
-on the three map tables plus repair/telemetry are worker-only. `apps/` must
-not import `lightrag` or mention mapping table names.
+`SET ROLE app_lightrag` for unqualified vendor catalog reads. Worker RLS
+remains the write path. Packet 5 grants `app_api` SELECT on the map tables
+(`USING true`) so the resolver/inspection RPCs can join; ACL, current
+pointer, deletion, and support are rechecked in SQL and never leaked as
+restricted names. Query-time repair upserts use `app.enqueue_graph_map_repair`
+as `app_api`. `apps/` must not import `lightrag` or mention mapping table
+names.
 
 ## Verification
 

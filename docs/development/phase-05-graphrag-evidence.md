@@ -569,3 +569,199 @@ postgres to local `127.0.0.1:54322`. Types used `--db-url` to that port.
 
 **Packet 5 may start only if maps/ready path is proven.** Holdout remains
 sealed. Do not mark Phase 5 complete. Phase status remains `pending`.
+
+## Packet 5 — structured graph retrieval, authoritative resolver, survival, and inspection
+
+### Quoted requirement
+
+> Packet 5 — structured graph retrieval, authoritative resolver, survival,
+> and inspection
+
+### Acceptance checks restated
+
+- Resolver returns only authorized current canonical IDs/locators and
+  application relationship/path objects; every native lead either survives
+  all checks or is dropped wholly.
+- Candidate/path/hop/token/row/time limits are application-enforced,
+  deterministic, and tested independently of vendor defaults.
+- Survival, partial readiness, authorized-only ACL blindness, historical
+  limitation, outage/quarantine, and global steering emit exact typed
+  signals without information leakage.
+- Query-time counters prove zero per-statement support searches and zero
+  hidden keyword/answer model calls.
+
+### Negative tests restated
+
+Prose/reference/path as citation, stale map, current-pointer race,
+deleted/ACL-restricted source, unauthorized count disclosure, native
+over-limit result, hidden callback, query-time repair search, historical
+path, inspection bypass, timeout leak, or low survival labeled Combined
+fails.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/retrieval/graph.py` | `GraphRetriever` protocol, `GraphLimitationCode`, 12/3/6 and inspection bounds |
+| `packages/core/src/smart_rag_core/retrieval/lightrag_structured.py` | `parse_aquery_data_payload` / `to_graph_leads`; `reject_rendered_context_parser` |
+| `packages/core/src/smart_rag_core/retrieval/lightrag_adapter.py` | `aquery_data_structured`; `QueryParam` both keyword lists, `enable_rerank=False` |
+| `packages/core/src/smart_rag_core/retrieval/lightrag_callbacks.py` | `CountedLightRagCallbacks` keyword/answer counters |
+| `packages/core/src/smart_rag_core/retrieval/recheck.py` | ACL/current/deletion recheck patterns reused by resolver |
+| `packages/core/src/smart_rag_core/jobs/graph_resolver.py` | Map-table SQL (jobs/ not scope-scanned) |
+| `tests/unit/test_phase3_graph_scope_guard.py` | Forbids map-table / Graph Ready strings in `apps/` and `retrieval/` except allowlist |
+
+### Files changed (Packet 5)
+
+- `packages/core/src/smart_rag_core/retrieval/graph.py`
+- `packages/core/src/smart_rag_core/retrieval/graph_results.py`
+- `packages/core/src/smart_rag_core/retrieval/graph_retriever.py`
+- `packages/core/src/smart_rag_core/retrieval/lightrag_adapter.py`
+- `packages/core/src/smart_rag_core/retrieval/__init__.py` (result types only; no `retrieve_graph` re-export)
+- `packages/core/src/smart_rag_core/jobs/graph_resolver.py`
+- `packages/core/src/smart_rag_core/jobs/exceptions.py`
+- `packages/core/src/smart_rag_core/jobs/limits.py`
+- `packages/core/src/smart_rag_core/jobs/__init__.py`
+- `packages/core/src/smart_rag_core/generated/database.ts`
+- `supabase/migrations/20260816130000_graph_resolver_query_v1.sql`
+- `scripts/ci/check_migrations.py`
+- `apps/backend/src/smart_rag_api/routers/graph_inspect.py`
+- `apps/backend/src/smart_rag_api/schemas/graph_inspect.py`
+- `apps/backend/src/smart_rag_api/services/graph_inspect.py`
+- `apps/backend/src/smart_rag_api/main.py`
+- `tests/unit/test_graph_resolver.py`
+- `tests/unit/test_graph_retriever.py`
+- `tests/unit/test_graph_inspect_openapi.py`
+- `tests/contract/test_graph_retrieval.py`
+- `docs/graph/RETRIEVAL.md`
+- `docs/graph/LIGHTRAG_CONTRACT.md`
+- `docs/graph/MAPPING.md`
+- `docs/graph/GRAPH_MAPPING_CONTRACT.md`
+- `docs/graph/WORKSPACE_LIFECYCLE.md`
+- `docs/ingestion/INGESTION_LIMITS.md`
+- `docs/architecture/08-data-dictionary.md`
+- `docs/README.md`
+- `docs/development/phase-05-graphrag-evidence.md`
+
+### Query path summary
+
+`retrieve_graph` revalidates workspace pointer, generation, current-only
+policy, caller snapshot, and remaining deadline. Workspace not `active`
+with an attached pointer fails closed (`graph_outage` /
+`graph_updating` / `graph_filtered_dirty`) without a vendor call.
+Explicit `as_of` or `historical_relationship` emits
+`temporal_graph_limitation` and skips vendor query.
+
+Local/hybrid calls adapter `aquery_data_structured` with both keyword
+lists non-empty, `only_need_context=True`, `enable_rerank=False`,
+`include_references=False`. Modes are only `local` / `hybrid` /
+`global`. Outer `asyncio.wait_for` cancels the query task; process
+adapter `finalize` is not per query. Structured parse rejects rendered
+prose. Application clamp: 12 candidates, 3 hops, 6 paths, stable
+tie-breaks.
+
+Resolver batch-rechecks maps, support ≥ 0.80, ACL, current pointer,
+deletion, eligibility, mapping/config generation, and canonical passage
+existence. Any required miss drops the **whole** candidate and enqueues
+one `query_resolve` repair. Query-time Hybrid is never run. Canonical
+locators come from `document_chunks`, never vendor chunk text.
+
+Global steering is a separate path: at most 3 topic/entity expansions,
+never evidence, signal `global_steering_only`.
+
+Inspection is SQL-only (`app.inspect_graph_neighborhood`): depth 3, 200
+rows, `statement_timeout='3s'`, 10s end-to-end. `POST /graph/inspect`
+requires auth. The router contains no map-table strings.
+
+### Signals / types
+
+`GraphLimitationCode`: `graph_survival_below_threshold`,
+`graph_partial_readiness`, `graph_acl_blindness`,
+`temporal_graph_limitation`, `graph_outage`, `graph_updating`,
+`graph_filtered_dirty`, `global_steering_only`, `graph_empty`,
+`graph_deadline`, `graph_cancelled`.
+
+Result envelope: `GraphRetrievalResult` with
+`GraphResolvedCandidate`, `GraphPath`, `GraphCanonicalLocator`,
+`GraphSteeringExpansion`, `GraphLimitation`, `GraphQueryCounters`,
+`RollingSurvivalWindow`. Inspection: `GraphInspectResult` /
+`GraphInspectNode`.
+
+`graph_survival_ratio = supported_resolved / returned_graph_candidates`
+(null if none). Below 0.50 emits `graph_survival_below_threshold`.
+Rolling 0.80 / 20 is recorded on `app.graph_survival_samples`, not a
+live alerter.
+
+### Callback proof
+
+`CountedLightRagCallbacks` snapshot before/after vendor query. Any
+increase in `keyword_extract` or `answer_generate` fails closed as
+`hidden_graph_model_call`. `GraphQueryCounters.support_searches` and
+`repair_hybrid_searches` are hard-zeroed. Unit tests fail when a stub
+keyword callback fires.
+
+### RPCs / tables (`app_api`; RLS rechecks ACL)
+
+- `app.graph_survival_samples`
+- `app.enqueue_graph_map_repair` (SECURITY INVOKER)
+- `app.graph_visibility_counts`
+- `app.inspect_graph_neighborhood`
+- GRANT SELECT + RLS `*_api_select USING (true)` on the three map tables
+  (RPCs recheck `caller_can_read_document`)
+
+### Commands and results
+
+No commit, no push, no `uv sync --package smart-rag-core`. Holdout remains
+sealed. Phase status remains `pending`. The Packet 5 migration was applied
+as postgres to local `127.0.0.1:54322`. Types used `--db-url` to that
+port.
+
+| Command | Exit |
+| --- | --- |
+| `uv run python scripts/ci/check_migrations.py` | 0 (43 reviewed files) |
+| `uv run python -m pytest tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_graph_mapping.py tests/unit/test_graph_resolver.py tests/unit/test_graph_retriever.py tests/unit/test_graph_inspect_openapi.py tests/contract/test_graph_retrieval.py -q` | 0 (59 passed) |
+| `uv run python scripts/check.py --tier format` | 0 (396 files) |
+| `uv run python scripts/check.py --tier lint` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Deviations
+
+- `enqueue_graph_map_repair` is SECURITY INVOKER plus `app_api` RLS, not
+  DEFINER, because FORCE RLS would otherwise block DEFINER writes.
+- Restricted documents cannot be `documents.graph_eligible` (CHECK needs
+  `current_version_id` and `company_visible`). Inspection of a restricted
+  document returns empty rows / no names rather than member-visible
+  restricted graph nodes. ACL blindness still counts restricted
+  graph-ineligible versions the caller can read.
+- `retrieve_graph` is not re-exported from `retrieval/__init__.py`
+  (circular import: jobs → retrieval.graph → package `__init__` →
+  graph_retriever → jobs.graph_resolver). Callers import
+  `smart_rag_core.retrieval.graph_retriever`.
+- `GRAPH_SURVIVAL_ROLLING_WINDOW = 20` is duplicated in `graph.py` and
+  `jobs/limits.py`.
+- Combined fallback / relabel on low survival is Phase 6. Packet 5 emits
+  `graph_survival_below_threshold` only.
+- Rolling 0.80 / 20 is a recorded counter/interface, not a live alert
+  backend.
+
+### Unverified
+
+- Live LightRAG `aquery_data` against a full corpus (contract tests use a
+  fake retriever plus SQL maps). Adapter `QueryParam` is unit-tested with
+  a stub `rag`.
+- Managed/staging apply of `20260816130000_graph_resolver_query_v1.sql`.
+- Full-repo Pyright (pre-existing errors outside this packet).
+- Combined answer quality / holdout remain sealed.
+
+### Rollback
+
+- Unset `LIGHTRAG_DB_URL` so query/inspection stay idle.
+- Do not DROP map/survival/repair tables (expand-only).
+- Remove `POST /graph/inspect` router include if the API surface must be
+  withdrawn.
+
+### Packet 6 handoff
+
+**Packet 6 may start if resolver/inspection are proven.** Holdout remains
+sealed. Do not mark Phase 5 complete. Phase status remains `pending`.
+Packet 6 owns entity curation, extraction policy, invalidation, and
+rebuild scheduling — not Combined answers/SSE.

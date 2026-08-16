@@ -10,6 +10,7 @@ Production insert/query wiring is intentionally absent from this module.
 from __future__ import annotations
 
 import re
+from enum import StrEnum
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -46,6 +47,14 @@ ADAPTER_MAX_GRAPH_CANDIDATES = 12
 ADAPTER_MAX_HOPS = 3
 ADAPTER_MAX_PATHS = 6
 ADAPTER_DEFAULT_DEADLINE_SECONDS = 45.0
+GLOBAL_STEERING_MAX = 3
+INSPECTION_MAX_DEPTH = 3
+INSPECTION_MAX_ROWS = 200
+INSPECTION_STATEMENT_TIMEOUT = "3s"
+INSPECTION_DEADLINE_SECONDS = 10.0
+GRAPH_SURVIVAL_FALLBACK_THRESHOLD = 0.50
+GRAPH_SURVIVAL_ROLLING_ALERT_THRESHOLD = 0.80
+GRAPH_SURVIVAL_ROLLING_WINDOW = 20
 GRAPH_SOURCE_ENVELOPE_VERSION = "graph_source_envelope_v1"
 _GRAPH_SOURCE_ENVELOPE_PREFIX = "<<smart-rag-graph-source:"
 
@@ -163,11 +172,27 @@ class GraphIndexDeleteResult(BaseModel):
     message: str = Field(default="", max_length=2_048)
 
 
+class GraphLimitationCode(StrEnum):
+    """Typed query-time graph limitation signals. Payloads never leak ACL."""
+
+    GRAPH_SURVIVAL_BELOW_THRESHOLD = "graph_survival_below_threshold"
+    GRAPH_PARTIAL_READINESS = "graph_partial_readiness"
+    GRAPH_ACL_BLINDNESS = "graph_acl_blindness"
+    TEMPORAL_GRAPH_LIMITATION = "temporal_graph_limitation"
+    GRAPH_OUTAGE = "graph_outage"
+    GRAPH_UPDATING = "graph_updating"
+    GRAPH_FILTERED_DIRTY = "graph_filtered_dirty"
+    GLOBAL_STEERING_ONLY = "global_steering_only"
+    GRAPH_EMPTY = "graph_empty"
+    GRAPH_DEADLINE = "graph_deadline"
+    GRAPH_CANCELLED = "graph_cancelled"
+
+
 class GraphRetriever(Protocol):
     """Project protocol for structured graph lead retrieval.
 
-    Implementations live in later packets. This packet defines the contract
-    only so application and LangGraph nodes never import vendor classes.
+    The runtime adapter implements these methods. Callers resolve leads
+    through the authoritative resolver before treating anything as evidence.
     """
 
     async def retrieve_local(
@@ -330,6 +355,158 @@ def apply_query_bounds(
         max_relation_tokens=min(max_relation_tokens, 16_000),
         max_total_tokens=min(max_total_tokens, 60_000),
         deadline_seconds=min(deadline_seconds, ADAPTER_DEFAULT_DEADLINE_SECONDS),
+    )
+
+
+def inspection_query_bounds() -> GraphQueryBounds:
+    """Return adapter bounds clamped to the inspection 10-second deadline.
+
+    Returns:
+        Frozen bounds with inspection deadline and candidate maxima.
+    """
+
+    return apply_query_bounds(
+        top_k=ADAPTER_MAX_GRAPH_CANDIDATES,
+        chunk_top_k=ADAPTER_MAX_GRAPH_CANDIDATES,
+        max_entity_tokens=12_000,
+        max_relation_tokens=16_000,
+        max_total_tokens=60_000,
+        deadline_seconds=INSPECTION_DEADLINE_SECONDS,
+    )
+
+
+def clamp_graph_leads(leads: GraphLeadSet, bounds: GraphQueryBounds) -> GraphLeadSet:
+    """Apply application candidate caps and stable lexicographic tie-breaks.
+
+    Native engine ``top_k`` does not replace this clamp. Relation leads are
+    the graph candidates when present; otherwise entity leads are. Endpoint
+    entities of kept relations are retained for resolution and do not count
+    as extra candidates.
+
+    Args:
+        leads: Structured vendor leads after parse.
+        bounds: Adapter-owned candidate limits.
+
+    Returns:
+        Frozen lead set within application maxima.
+    """
+
+    relations = tuple(
+        sorted(leads.relations, key=lambda item: (item.src_id, item.tgt_id))
+    )[: bounds.top_k]
+    if relations:
+        needed = {item.src_id for item in relations} | {
+            item.tgt_id for item in relations
+        }
+        entities = tuple(
+            item
+            for item in sorted(leads.entities, key=lambda item: item.entity_name)
+            if item.entity_name in needed
+        )
+        source_tokens = {token for rel in relations for token in rel.source_ids}
+    else:
+        entities = tuple(sorted(leads.entities, key=lambda item: item.entity_name))[
+            : bounds.top_k
+        ]
+        source_tokens = {token for ent in entities for token in ent.source_ids}
+    referenced = tuple(
+        item
+        for item in sorted(leads.chunks, key=lambda item: item.chunk_id)
+        if item.chunk_id in source_tokens
+    )[: bounds.chunk_top_k]
+    chunks = (
+        referenced
+        or tuple(sorted(leads.chunks, key=lambda item: item.chunk_id))[
+            : bounds.chunk_top_k
+        ]
+    )
+    return GraphLeadSet(
+        mode=leads.mode,
+        entities=entities,
+        relations=relations,
+        chunks=chunks,
+        high_level_keywords=leads.high_level_keywords,
+        low_level_keywords=leads.low_level_keywords,
+    )
+
+
+def returned_graph_candidate_count(leads: GraphLeadSet) -> int:
+    """Count application graph candidates after the lead clamp.
+
+    Args:
+        leads: Clamped lead set.
+
+    Returns:
+        Relation count, or entity count when there are no relations.
+    """
+
+    if leads.relations:
+        return len(leads.relations)
+    return len(leads.entities)
+
+
+def graph_survival_ratio(*, supported: int, returned: int) -> float | None:
+    """Return supported/returned, or ``None`` when no candidates were returned.
+
+    Args:
+        supported: Leads that survived every resolver check.
+        returned: Clamped vendor candidates before resolver drops.
+
+    Returns:
+        Closed unit interval, or ``None`` when ``returned`` is zero.
+    """
+
+    if returned <= 0:
+        return None
+    return supported / returned
+
+
+def workspace_limitation_code(
+    state: str | None, *, pointer_attached: bool
+) -> GraphLimitationCode | None:
+    """Map workspace pointer/state to a fail-closed limitation, if any.
+
+    Combined fallback is Phase 6. Packet 5 returns the typed signal only.
+
+    Args:
+        state: Durable workspace state, or ``None`` when the row is missing.
+        pointer_attached: Whether the singleton pointer names a workspace.
+
+    Returns:
+        Limitation code, or ``None`` when the workspace is queryable.
+    """
+
+    if not pointer_attached or state is None:
+        return GraphLimitationCode.GRAPH_OUTAGE
+    if state == "active":
+        return None
+    if state == "updating":
+        return GraphLimitationCode.GRAPH_UPDATING
+    if state == "filtered_dirty":
+        return GraphLimitationCode.GRAPH_FILTERED_DIRTY
+    return GraphLimitationCode.GRAPH_OUTAGE
+
+
+def clamp_global_steering(leads: GraphLeadSet) -> GraphLeadSet:
+    """Keep at most three topic/entity expansions and drop evidence fields.
+
+    Args:
+        leads: Parsed global-mode leads.
+
+    Returns:
+        Steering-only lead set. Relations and chunks are cleared.
+    """
+
+    entities = tuple(sorted(leads.entities, key=lambda item: item.entity_name))[
+        :GLOBAL_STEERING_MAX
+    ]
+    return GraphLeadSet(
+        mode="global",
+        entities=entities,
+        relations=(),
+        chunks=(),
+        high_level_keywords=leads.high_level_keywords,
+        low_level_keywords=leads.low_level_keywords,
     )
 
 
