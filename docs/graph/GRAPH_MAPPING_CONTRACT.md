@@ -20,7 +20,9 @@ Do not treat `lightrag_source_map` alone as evidence. Do not parse rendered
 Query-time resolution, survival, and inspection are specified in
 [RETRIEVAL.md](./RETRIEVAL.md). Mapping rows are never citations by themselves.
 Entity-rule canonical keys, inactive suggestions, and rebuild scheduling are
-specified in [ENTITY_RULES.md](./ENTITY_RULES.md).
+specified in [ENTITY_RULES.md](./ENTITY_RULES.md). Production mapping Hybrid
+wiring (worker `bind_mapping_support`, in-memory version canonicals, no
+query-time Hybrid) is specified in [MAPPING.md](./MAPPING.md).
 
 Related: [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·

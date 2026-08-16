@@ -7,6 +7,7 @@ Repair never performs query-time Hybrid and never lowers thresholds.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 from collections.abc import Mapping, Sequence
@@ -544,6 +545,10 @@ class GraphMappingService:
     ) -> None:
         """Run at most one Hybrid retrieve and one support rerank batch.
 
+        Hybrid ``ranked_ids`` order and cap the support-rerank pool. Empty
+        ranked IDs or fewer than two survivors skip rerank rather than
+        scoring every canonical in the version.
+
         Args:
             unresolved: Vendor chunks still unmatched after hash/span/overlap.
             chunk_rows: Mutable per-chunk mapping rows.
@@ -552,7 +557,8 @@ class GraphMappingService:
 
         Side Effects:
             Increments Hybrid/rerank counters at most once each and may attach
-            ``hybrid_support`` matches onto unresolved chunk rows.
+            ``hybrid_support`` matches onto unresolved chunk rows. Hybrid and
+            rerank callbacks that use ``asyncio.run`` run on a worker thread.
         """
 
         if not unresolved:
@@ -573,10 +579,13 @@ class GraphMappingService:
             hybrid_calls=self.counts.hybrid_retrieve,
             rerank_calls=self.counts.support_rerank,
         )
-        result = self._hybrid_retrieve(query, version_id)
-        if inspect.isawaitable(result):
-            await result
-        if self._support_rerank is None:
+        result = await _invoke_maybe_threaded(self._hybrid_retrieve, query, version_id)
+        ranked_ids = _ranked_chunk_ids(result)
+        by_id = {item.chunk_id: item for item in canonicals}
+        ordered = tuple(
+            by_id[chunk_id] for chunk_id in ranked_ids if chunk_id in by_id
+        )[:MAX_MAPPING_RERANK_POOL]
+        if len(ordered) < 2 or self._support_rerank is None:
             return
         passages = tuple(
             RerankPassage(
@@ -591,13 +600,15 @@ class GraphMappingService:
                 excerpt=excerpt_text(item.raw_text),
                 chunk_index=item.chunk_index,
             )
-            for index, item in enumerate(canonicals[:MAX_MAPPING_RERANK_POOL])
+            for index, item in enumerate(ordered)
         )
-        rankings = run_support_rerank(
-            self._support_rerank,
-            query=query,
-            passages=passages,
-            counts=self.counts,
+        rankings = await _invoke_maybe_threaded(
+            lambda: run_support_rerank(
+                self._support_rerank,
+                query=query,
+                passages=passages,
+                counts=self.counts,
+            )
         )
         accepted = assign_hybrid_support(rankings, canonicals)
         unused = list(accepted.values())
@@ -1259,3 +1270,49 @@ def _repair_rows(
             }
         )
     return repairs
+
+
+async def _invoke_maybe_threaded(func: Any, *args: Any) -> Any:
+    """Call a sync mapping callback off the running event loop.
+
+    Hybrid retrieve and support rerank use ``asyncio.run`` internally. Mapping
+    already runs inside ``asyncio.run(process_claimed_job)``, so those
+    callbacks must execute on a worker thread.
+
+    Args:
+        func: Sync or async callable.
+        *args: Positional arguments.
+
+    Returns:
+        Callback result.
+    """
+
+    if inspect.iscoroutinefunction(func):
+        return await func(*args)
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return func(*args)
+    return await asyncio.to_thread(func, *args)
+
+
+def _ranked_chunk_ids(result: object) -> tuple[UUID, ...]:
+    """Extract Hybrid ranked chunk IDs from a retrieve result.
+
+    Args:
+        result: ``HybridRunResult`` or a test double with ``ranked_ids``.
+
+    Returns:
+        Ordered canonical chunk IDs. Empty when Hybrid found nothing.
+    """
+
+    ranked = getattr(result, "ranked_ids", None)
+    if ranked is None:
+        return ()
+    ids: list[UUID] = []
+    for item in ranked:
+        try:
+            ids.append(item if isinstance(item, UUID) else UUID(str(item)))
+        except (TypeError, ValueError):
+            continue
+    return tuple(ids)

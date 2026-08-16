@@ -226,8 +226,10 @@ ParadeDB writer credentials: `PARADEDB_URL` on worker only (Compose `paradedb_wr
 | Entities per document | count | 200 | 200 | Packet 4 budget | mapper | `mapping_budget_entities` | Extraction flood |
 | Relations per document | count | 200 | 200 | Packet 4 budget | mapper | `mapping_budget_relations` | Extraction flood |
 | Hybrid mapping retrieve | calls/doc | 1 | 1 | Packet 4 one-shot | mapper | `mapping_budget_hybrid` | Per-relation retrieve regression |
+| Mapping Hybrid candidate cap | IDs | 100 | 100 | Dense candidate cap reuse | mapper | cap then RRF | Channel-cap drift |
 | Support rerank | calls/doc | 1 | 1 | Packet 4 OpenAI-only | mapper | `mapping_budget_rerank` | Local-model proposal |
 | Support rerank pool | passages | 20 | 20 | Hybrid rerank pool | mapper | skip rerank if &lt; 2 | Pool drift |
+| Support rerank deadline | seconds | 8 | 8 | Retrieval slice | mapper | identity ranks support 0.0 | Deadline change |
 | Source ids per entity | count | 200 | 200 | Packet 1 `GRAPH_FIELD_SEP` | mapper | truncated unavailable | Silent provenance |
 | Source ids per relation | count | 200 | 200 | Packet 1 `GRAPH_FIELD_SEP` | mapper | truncated unavailable | Silent provenance |
 

@@ -150,7 +150,9 @@ Chunker overlay 1200/100 `gpt-4o-mini` is stored on `config_snapshot`.
 
 Vendor statuses `processed` and `failed` are terminal. `processed` does not
 by itself change `document_versions.status`. Packet 4 mapping may set
-`graph_ready` in the same job after maps verify. Replay that finds
+`graph_ready` in the same job after maps verify. The worker injects
+version-scoped Hybrid retrieve and one support rerank through
+`bind_mapping_support`; see [MAPPING.md](./MAPPING.md). Replay that finds
 an existing `processed` row skips a second insert.
 
 ## Budgets

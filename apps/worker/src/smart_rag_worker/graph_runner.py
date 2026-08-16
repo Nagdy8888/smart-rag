@@ -17,6 +17,7 @@ from uuid import UUID
 import psycopg
 from smart_rag_core.jobs.exceptions import GraphWriterLostError, JobLeaseError
 from smart_rag_core.jobs.graph_index_service import GraphIndexService
+from smart_rag_core.jobs.graph_mapping_hybrid import bind_mapping_support
 from smart_rag_core.jobs.graph_writer import (
     GraphWriterGuard,
     heartbeat_graph_writer_lease,
@@ -212,6 +213,7 @@ class GraphWorkerLoop:
                         lease_owner=self._lease_owner(),
                         lease_seconds=self._settings.job_lease_seconds,
                     ),
+                    mapping_support=bind_mapping_support(work_conn, self._settings),
                 )
                 outcome = asyncio.run(
                     service.process_claimed_job(

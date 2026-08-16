@@ -66,6 +66,59 @@ One document causes at most **one** Hybrid retrieve scoped to that
 `version_id` and **one** OpenAI support rerank batch (pool ≤ 20, returned IDs
 must equal the supplied set). Mapping never calls Hybrid per relation.
 
+## Production Hybrid wiring
+
+The worker loop calls `bind_mapping_support` on the `app_worker` connection
+and passes the callbacks into `GraphIndexService`. `apps/` never constructs
+`HybridRetriever` and never names map tables. Repair still refuses attached
+Hybrid/rerank callbacks.
+
+```mermaid
+sequenceDiagram
+  participant Worker as GraphWorkerLoop
+  participant Bind as bind_mapping_support
+  participant Mapper as GraphMappingService
+  participant Hybrid as HybridRetriever
+  participant Rerank as rerank_pool
+  Worker->>Bind: work connection plus WorkerSettings
+  Bind-->>Worker: callbacks or None
+  Worker->>Mapper: GraphIndexService mapping_support
+  Mapper->>Mapper: hash then span then overlap
+  alt unresolved vendor chunks
+    Mapper->>Hybrid: one version-scoped retrieve
+    Hybrid-->>Mapper: ranked_ids
+    alt ranked_ids at least 2
+      Mapper->>Rerank: one support batch pool 20
+      Rerank-->>Mapper: support scores
+    else empty or single ranked_id
+      Mapper->>Mapper: skip rerank fail closed
+    end
+  end
+```
+
+Production mapping Hybrid:
+
+- Loads the document owner's `CallerContext` plus company
+  `authorization_version`. Disabled owners fail closed.
+- Builds dense/BM25/term channel jobs from **in-memory** version canonicals
+  (cap 100). It does **not** pass `supabase_dsn` (that would `SET ROLE
+  postgres` during Hybrid temporal loads) and does not require ParadeDB.
+- Sets Hybrid `rerank=None`. Mapping owns the one OpenAI support rerank via
+  `rerank_pool` and pinned `rerank_v1.md`.
+- Orders the support-rerank pool from Hybrid `ranked_ids` (cap 20). Empty
+  ranked IDs or fewer than two survivors skip rerank; the mapper does not
+  score every canonical in the version.
+- Provider/rerank failure returns identity ranks with support `0.0`, which
+  stays below 0.80.
+- Gateway or prompt load failure returns `None` callbacks. Hash/span/overlap
+  still run; unresolved chunks then fail coverage.
+- Hybrid retrieve and `rerank_pool` use `asyncio.run` internally. Mapping
+  already runs inside `asyncio.run(process_claimed_job)`, so those callbacks
+  execute on a worker thread.
+
+This mapping retrieve is not query-time Hybrid. Query resolution still drops
+whole unmapped candidates and never searches per statement.
+
 ## Gates
 
 | Gate | Threshold | Failure |
@@ -127,6 +180,6 @@ names.
 
 ```powershell
 uv run python scripts/ci/check_migrations.py
-uv run python -m pytest tests/unit/test_graph_mapping.py tests/contract/test_graph_mapping.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_hybrid_run.py -q
+uv run python -m pytest tests/unit/test_graph_mapping.py tests/unit/test_graph_mapping_hybrid.py tests/contract/test_graph_mapping.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_hybrid_run.py -q
 uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json
 ```

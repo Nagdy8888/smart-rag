@@ -549,11 +549,11 @@ postgres to local `127.0.0.1:54322`. Types used `--db-url` to that port.
 
 ### Deviations
 
-- Hybrid/rerank callbacks are injected into `GraphMappingService`. The worker
-  does not construct `HybridRetriever` (no mapping-table strings in `apps/`).
-  Hash/span/overlap still run; unresolved chunks without injected Hybrid stay
-  unmapped and fail coverage (fail closed). Tests prove `hybrid_calls == 1`
-  and `rerank_calls == 1` with injected callbacks.
+- Hybrid/rerank callbacks are injected into `GraphMappingService`. Packet 4
+  originally left worker construction of `HybridRetriever` unwired so `apps/`
+  would not contain mapping-table strings. That hole is **resolved** by
+  `bind_mapping_support` in `jobs/` (see remaining mapping Hybrid section
+  below). Hash/span/overlap still run when callbacks are `None`.
 - Path-edge IDs are one statement plus `src_to_tgt` plus version (ordered
   statement list of length 1). Multi-hop path composition is Packet 5+.
 - No new environment variables.
@@ -1345,8 +1345,84 @@ Please confirm each item. **Do not** treat this file as acceptance.
 6. Scaling options at `docs/graph/SCALING_OPTIONS.md` are options only;
    none are implemented.
 7. Holdout stays sealed. Phase 5 `status` stays `pending` until you accept.
+8. Production mapping Hybrid is wired through `bind_mapping_support` (in-memory
+   version canonicals, one retrieve, one support rerank). Query-time Hybrid
+   remains forbidden.
 
-**Packet 8 implementation is complete pending user acceptance.** Holdout
-remains sealed. Do not mark Phase 5 complete. Phase 6 may start only after
-this checklist is accepted — and Phase 6 owns Combined fusion, verifier/
+**Packet 8 implementation is complete pending user acceptance.** The Packet 4
+worker Hybrid hole is closed in the remaining mapping Hybrid section below.
+Holdout remains sealed. Do not mark Phase 5 complete. Phase 6 may start only
+after this checklist is accepted — and Phase 6 owns Combined fusion, verifier/
 citations, holdout, and the +10pp gain, not this packet.
+
+## Remaining Phase 5 — production mapping Hybrid wiring
+
+### Quoted requirement
+
+> Batch unresolved internal chunks and relation statements for that document
+> into one scoped Hybrid RPC using chunk text plus entity/relation labels;
+> retrieve only canonical chunks from that version, then apply one bounded
+> support rerank through the same OpenAI-only `Reranker` gateway.
+
+### Acceptance checks restated
+
+- Worker mapping after vendor `processed` injects one version-scoped Hybrid
+  retrieve and one OpenAI support rerank without naming map tables in `apps/`.
+- Hybrid `ranked_ids` order/cap the support-rerank pool; empty or single
+  ranked IDs skip rerank instead of scoring every canonical.
+- Nested `asyncio.run` inside `process_claimed_job` does not fail.
+- Gateway/prompt load failure returns `None` callbacks (hash/span/overlap
+  still run; coverage fails closed).
+- Repair still refuses attached Hybrid/rerank callbacks.
+
+### Inspected files / pins
+
+| Path | Role |
+| --- | --- |
+| `packages/core/src/smart_rag_core/jobs/graph_mapping_hybrid.py` | `bind_mapping_support`; in-memory Hybrid; OpenAI support rerank |
+| `packages/core/src/smart_rag_core/jobs/graph_mapping_service.py` | Hybrid ranked_ids pool; `asyncio.to_thread` |
+| `packages/core/src/smart_rag_core/jobs/graph_index_service.py` | Injects `mapping_support` into default mapper |
+| `apps/worker/src/smart_rag_worker/graph_runner.py` | Calls `bind_mapping_support` |
+| `packages/core/src/smart_rag_core/jobs/limits.py` | Candidate cap 100; support rerank deadline 8s |
+| `docs/graph/MAPPING.md` | Production Hybrid wiring + sequence diagram |
+
+### Commands and results
+
+No push. Holdout remains sealed. Phase status remains `pending`. No
+`uv sync --package smart-rag-core`. No new migration.
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_graph_mapping.py tests/unit/test_graph_mapping_hybrid.py tests/unit/test_phase3_graph_scope_guard.py tests/contract/test_graph_mapping.py -q` | 0 (28 passed) |
+| `uv run python -m pytest tests/unit/test_hybrid_run.py tests/unit/test_graph_mapping.py tests/unit/test_graph_mapping_hybrid.py tests/unit/test_phase3_graph_scope_guard.py tests/contract/test_graph_mapping.py -q` | 0 (46 passed) |
+| `uv run python scripts/check.py --tier format` | 0 (418 files) |
+| `uv run python scripts/check.py --tier lint` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (89 markdown files; Mermaid render) |
+
+### Deviations
+
+- Mapping Hybrid uses in-memory version canonicals as dense/BM25/term channel
+  jobs rather than live ParadeDB/pgvector RPCs. Canonical text is already
+  loaded for hash/span/overlap; a second DB retrieve would `SET ROLE postgres`
+  via Hybrid `_load_temporal_records` if `supabase_dsn` were passed.
+- Combined fusion, SSE, query-agent, live extraction P/R, 2k-document rebuild,
+  and holdout remain out of scope.
+
+### Unverified
+
+- Live OpenAI support rerank against a processed LightRAG corpus.
+- Mapping-verified documents/hour and full-rebuild cost.
+- Managed/staging apply of Phase 5 migrations (already recorded).
+- Snapshot restore of a production-sized LightRAG copy into a second Postgres.
+
+### Rollback
+
+- Omit `mapping_support` (or let `bind_mapping_support` return `None`) so
+  unresolved chunks stay unmapped and coverage fails closed.
+- Unset `LIGHTRAG_DB_URL` to keep the graph adapter idle.
+
+### Handoff
+
+This closes the Packet 4 worker Hybrid hole. It does **not** mark Phase 5
+complete. User acceptance of the Packet 8 checklist plus this wiring is
+still required before `status: complete` and `git push`.

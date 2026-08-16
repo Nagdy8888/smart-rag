@@ -101,7 +101,9 @@ Cited tests:
 - `tests/unit/test_graph_retriever.py::test_hidden_keyword_callback_fails_closed`
 - `tests/unit/test_graph_retriever.py::test_survival_below_threshold_signal`
 - `tests/unit/test_graph_mapping.py::test_unresolved_batch_uses_one_hybrid_and_one_rerank`
+- `tests/unit/test_graph_mapping.py::test_empty_hybrid_skips_support_rerank`
 - `tests/unit/test_graph_mapping.py::test_repair_must_not_query_hybrid`
+- `tests/unit/test_graph_mapping_hybrid.py::test_graph_runner_binds_mapping_support_without_map_tables`
 
 ## Bound benchmarks (not Combined stream p95)
 

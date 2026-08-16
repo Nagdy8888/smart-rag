@@ -39,6 +39,7 @@ from smart_rag_core.jobs.graph_cleanup import (
     verify_vendor_removed,
 )
 from smart_rag_core.jobs.graph_lifecycle import delete_status_fails_closed
+from smart_rag_core.jobs.graph_mapping_hybrid import MappingSupportCallbacks
 from smart_rag_core.jobs.graph_mapping_service import GraphMappingService
 from smart_rag_core.jobs.graph_pointer_switch import (
     switch_active_workspace,
@@ -136,6 +137,7 @@ class GraphIndexService:
         writer: GraphWriterGuard,
         repository: LightragIndexJobRepository,
         mapper: GraphMappingService | None = None,
+        mapping_support: MappingSupportCallbacks | None = None,
     ) -> None:
         """Bind application connection, indexer, and writer guard.
 
@@ -147,17 +149,32 @@ class GraphIndexService:
             mapper: Optional mapping service. Defaults to one bound to the
                 indexer adapter. Mapping runs after vendor terminal success
                 and before job complete.
+            mapping_support: Optional Hybrid retrieve plus support rerank
+                callbacks from ``bind_mapping_support``. When omitted,
+                unresolved chunks stay unmapped. Repair must not attach these
+                callbacks.
         """
 
         self._connection = connection
         self._indexer = indexer
         self._writer = writer
         self._repository = repository
-        self._mapper = mapper or GraphMappingService(
-            connection,
-            vendor_reader=indexer.adapter,
-            writer=writer,
-        )
+        if mapper is not None:
+            self._mapper = mapper
+        else:
+            hybrid = (
+                mapping_support.hybrid_retrieve if mapping_support is not None else None
+            )
+            rerank = (
+                mapping_support.support_rerank if mapping_support is not None else None
+            )
+            self._mapper = GraphMappingService(
+                connection,
+                vendor_reader=indexer.adapter,
+                writer=writer,
+                hybrid_retrieve=hybrid,
+                support_rerank=rerank,
+            )
 
     async def process_claimed_job(
         self,
