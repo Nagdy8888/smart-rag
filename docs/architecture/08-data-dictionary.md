@@ -43,6 +43,8 @@ erDiagram
   bm25_index_jobs }o--|| document_chunks : projects
   lightrag_index_jobs }o--|| document_versions : indexes
   graph_workspaces ||--o| graph_active_workspace_pointer : active
+  documents ||--o{ graph_cleanup_tombstones : cleanup
+  document_versions ||--o{ graph_cleanup_tombstones : tombstones
   company_settings ||--|| profiles : governs
 ```
 
@@ -94,15 +96,17 @@ erDiagram
 
 | Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `lightrag_source_map` | `app` | authority | graph worker | resolver | while graph indexed | ≤ graph docs | cascade on document | `document_id` PK plus replay unique on version/workspace/pipeline | 5 packet 4 |
-| `lightrag_chunk_map` | `app` | authority | graph worker | resolver | while mapped | graph chunks | cascade | `chunk_id` PK plus replay unique on workspace/version/vendor chunk | 5 packet 4 |
-| `graph_evidence_map` | `app` | authority | graph mapper | Combined fusion | while valid and support ≥ 0.80 | many-to-many | cascade | object+chunk unique plus replay unique | 5 packet 4 |
+| `lightrag_source_map` | `app` | authority | graph worker | resolver | while graph indexed | ≤ graph docs | cascade on document | `document_id` PK plus replay unique on version/workspace/pipeline; `retrieval_eligible` gates resolver | 5 packet 4 / 7 eligibility |
+| `lightrag_chunk_map` | `app` | authority | graph worker | resolver | while mapped | graph chunks | cascade | `chunk_id` PK plus replay unique; `retrieval_eligible` false until Packet 7 switch | 5 packet 4 / 7 eligibility |
+| `graph_evidence_map` | `app` | authority | graph mapper | Combined fusion | while valid and support ≥ 0.80 | many-to-many | cascade | object+chunk unique plus replay unique; `retrieval_eligible` required at resolve/inspect | 5 packet 4 / 7 eligibility |
 | `graph_map_repair_jobs` | `app` | authority | graph mapper | worker | until repaired | per unavailable object/config | cascade | unique workspace/object/map_kind/config | 5 packet 4 |
 | `graph_mapping_telemetry` | `app` | derived | graph mapper | ops | mapping runs | per language/type | cascade | append | 5 packet 4 |
 | `graph_entity_rules` | `app` | authority | owner/admin RPCs | graph indexer (approved only) | until revoked | small ruleset | soft revoke | rule `id`; approved `(entity_type, normalized canonical)` unique | 5 packet 6 |
 | `graph_extraction_policy` | `app` | authority | owner/admin RPCs on rule change | mapper/resolver | singleton | 1 row | none | fixed UUID | 5 packet 6 |
 | `graph_workspaces` | `app` | authority | graph worker (Pkt 3) | worker RW; API SELECT | until retired | few workspaces | state to `retired` | `workspace_key` unique | 5 packet 2 schema |
-| `graph_active_workspace_pointer` | `app` | authority | graph worker (Pkt 7 FOR UPDATE) | worker RW; API SELECT | singleton | 1 row | none | fixed UUID | 5 packet 2 schema |
+| `graph_active_workspace_pointer` | `app` | authority | graph worker (Pkt 7 FOR UPDATE CAS) | worker RW; API SELECT | singleton | 1 row | none | fixed UUID; generation ≥ 1 | 5 packet 2 schema / 7 switch |
+| `graph_cleanup_tombstones` | `app` | authority | graph worker | worker RW; API SELECT | until verified/failed | open unique `(version_id, workspace_key, reason)` | cascade on document/version | 24h target cleanup; 7-day surviving rebuild | 5 packet 7 |
+| `graph_upgrade_qualifications` | `app` | derived | graph worker | worker RW; API SELECT | qualification history | append | none | same-schema attempts recorded `refused_same_schema` | 5 packet 7 |
 | `graph_writer_lease` | `app` | authority | graph worker (Pkt 3 writer RPCs) | worker only | singleton | 1 row | none | fixed UUID | 5 packet 3 occupy/heartbeat/release |
 | `lightrag.schema_capture_status` | `lightrag` | derived | schema-admin bootstrap | `app_lightrag` | pin lifetime | 1 row | none | capture row | 5 packet 2 |
 | `lightrag.lightrag_*` vendor tables | `lightrag` | derived | LightRAG runtime DML | `app_lightrag` only | rebuildable | vendor keys | workspace rebuild | vendor PKs | 5 packet 2 capture |

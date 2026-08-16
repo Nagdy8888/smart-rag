@@ -20,12 +20,30 @@ from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_MODEL,
 )
 from smart_rag_core.jobs.exceptions import (
+    GraphLifecycleError,
     GraphMappingError,
     GraphWriterLostError,
     JobAdmissionError,
     JobLeaseError,
 )
+from smart_rag_core.jobs.graph_cleanup import (
+    CleanupReason,
+    CleanupRecoveryPhase,
+    allowed_delete_from_states,
+    emit_deletion_cleanup_failed,
+    enqueue_surviving_rebuild,
+    graph_maintenance_rebuild_funded,
+    persist_recovery_phase,
+    recheck_canonical_exclusion,
+    verify_application_residue,
+    verify_vendor_removed,
+)
+from smart_rag_core.jobs.graph_lifecycle import delete_status_fails_closed
 from smart_rag_core.jobs.graph_mapping_service import GraphMappingService
+from smart_rag_core.jobs.graph_pointer_switch import (
+    switch_active_workspace,
+    switch_document_version,
+)
 from smart_rag_core.jobs.graph_source_text import (
     GraphSourceTextError,
     load_version_graph_text,
@@ -33,6 +51,7 @@ from smart_rag_core.jobs.graph_source_text import (
 from smart_rag_core.jobs.graph_writer import (
     GraphWriterGuard,
     allowed_index_from_states,
+    load_workspace_row,
 )
 from smart_rag_core.jobs.lightrag_repository import LightragIndexJobRepository
 from smart_rag_core.jobs.limits import (
@@ -72,6 +91,9 @@ GRAPH_VALIDATION_REASONS = {
     "version_text_empty",
     "graph_budget_exhausted",
     "invalid_estimated_cost",
+    "canonical_not_excluded",
+    "stale_generation",
+    "current_version_mismatch",
 }
 
 
@@ -184,9 +206,10 @@ class GraphIndexService:
                     payload=payload,
                 )
             if operation is LightragJobOperation.REBUILD:
-                return self._isolate_rebuild_workspace(
+                return self._handle_rebuild(
                     job_id=job_id,
                     job_lease_token=job_lease_token,
+                    payload=payload,
                 )
             reservation_id = self._reserve(reservation_kind, estimate)
             self._connection.commit()
@@ -250,7 +273,38 @@ class GraphIndexService:
                 reservation_id=reservation_id,
                 reservation_kind=reservation_kind,
             )
-        except JobLeaseError as exc:
+        except GraphLifecycleError as exc:
+            if (
+                exc.reason in GRAPH_VALIDATION_REASONS
+                or exc.reason == "unfunded_rebuild"
+            ):
+                if reservation_id is not None:
+                    self._repository.admission.release_graph_reservation(
+                        reservation_id,
+                        reservation_kind=reservation_kind,
+                    )
+                    self._connection.commit()
+                if exc.reason == "unfunded_rebuild":
+                    return self._quarantine_outcome(
+                        job_id=job_id,
+                        reason=exc.reason,
+                        reservation_id=reservation_id,
+                        reservation_kind=reservation_kind,
+                    )
+                return GraphJobOutcome(
+                    kind="failed",
+                    error_category=JobErrorCategory.VALIDATION,
+                    last_error=exc.reason,
+                    reservation_id=reservation_id,
+                    reservation_kind=reservation_kind,
+                )
+            return self._quarantine_outcome(
+                job_id=job_id,
+                reason=exc.reason[:512],
+                reservation_id=reservation_id,
+                reservation_kind=reservation_kind,
+            )
+        except (JobLeaseError, TimeoutError) as exc:
             return self._quarantine_outcome(
                 job_id=job_id,
                 reason=str(exc)[:512],
@@ -259,6 +313,16 @@ class GraphIndexService:
             )
 
     def _reserve(self, reservation_kind: str, estimate: Decimal) -> UUID:
+        """Reserve graph index or maintenance budget for this job.
+
+        Args:
+            reservation_kind: ``graph_index`` or ``graph_maintenance``.
+            estimate: Positive estimated spend.
+
+        Returns:
+            New reservation id.
+        """
+
         return self._repository.admission.create_graph_budget_reservation(
             reservation_kind=reservation_kind,
             estimated_cost_usd=estimate,
@@ -273,6 +337,19 @@ class GraphIndexService:
         job_lease_token: str,
         reservation_id: UUID,
     ) -> GraphJobOutcome:
+        """Insert one version outside the pointer transaction, then maybe switch.
+
+        Args:
+            job: Claimed index job row.
+            payload: Job payload including optional ``switch_after_verify``.
+            job_id: Claimed job id.
+            job_lease_token: Job lease token.
+            reservation_id: ``graph_index`` reservation.
+
+        Returns:
+            Completed outcome, or mapping-unverified ``updating``.
+        """
+
         document_id, version_id = _require_ids(job)
         self._revalidate_index_eligibility(
             document_id=document_id,
@@ -314,6 +391,17 @@ class GraphIndexService:
             maps_verified = mapping.maps_verified
             mapping_reason = mapping.reason
             workspace_state = mapping.workspace_state
+            if (
+                mapping.pending_switch
+                and mapping.maps_verified
+                and payload.get("switch_after_verify") is True
+            ):
+                self._switch_pending_version(
+                    document_id=document_id,
+                    new_version_id=version_id,
+                )
+                workspace_state = GraphWorkspaceState.ACTIVE.value
+                mapping_reason = "version_switched"
         except GraphMappingError as exc:
             maps_verified = False
             mapping_reason = exc.reason
@@ -354,15 +442,158 @@ class GraphIndexService:
         reservation_id: UUID,
         reservation_kind: str,
     ) -> GraphJobOutcome:
-        _document_id, version_id = _require_ids(job)
+        """Delete one vendor document after canonical exclusion recheck.
+
+        Args:
+            job: Claimed ``remove`` or ``graph_acl_remove`` row.
+            job_id: Claimed job id.
+            job_lease_token: Job lease token.
+            reservation_id: ``graph_maintenance`` reservation.
+            reservation_kind: Must be ``graph_maintenance``.
+
+        Returns:
+            ``filtered_dirty`` on verified cleanup, or quarantined on failure.
+
+        Raises:
+            GraphIndexerError: When canonical exclusion is not already true.
+        """
+
+        document_id, version_id = _require_ids(job)
+        payload = dict(job.get("payload_ref") or {})
+        reason = (
+            CleanupReason.ACL_DOWNGRADE
+            if str(job.get("operation")) == LightragJobOperation.GRAPH_ACL_REMOVE.value
+            else CleanupReason.DELETION
+        )
+        if payload.get("reason") == "version_supersede":
+            reason = CleanupReason.VERSION_SUPERSEDE
+        workspace_key = self._writer.workspace_key
+        exclusion = recheck_canonical_exclusion(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+        )
+        if not exclusion.excluded:
+            raise GraphIndexerError("canonical_not_excluded")
+        persist_recovery_phase(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+            workspace_key=workspace_key,
+            reason=reason,
+            phase=CleanupRecoveryPhase.PRECHECK,
+        )
+        self._writer.transition_state(
+            from_states=allowed_delete_from_states(),
+            to_state=GraphWorkspaceState.UPDATING,
+            snapshot={"cleanup_phase": CleanupRecoveryPhase.PRECHECK.value},
+        )
+        self._connection.commit()
         self._writer.verify_lock_and_lease(
             job_id=job_id,
             job_lease_token=job_lease_token,
         )
         self._connection.commit()
-        result = await self._indexer.delete_document(document_id=str(version_id))
-        if result.status == "not_allowed":
-            raise GraphIndexerError("vendor_delete_not_allowed")
+        persist_recovery_phase(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+            workspace_key=workspace_key,
+            reason=reason,
+            phase=CleanupRecoveryPhase.VENDOR_DELETE,
+        )
+        self._connection.commit()
+        try:
+            result = await self._indexer.delete_document(document_id=str(version_id))
+        except (TimeoutError, OSError, GraphIndexerError) as exc:
+            return self._cleanup_failed(
+                job_id=job_id,
+                document_id=document_id,
+                version_id=version_id,
+                reservation_id=reservation_id,
+                reservation_kind=reservation_kind,
+                reason=reason,
+                detail=getattr(exc, "reason", str(exc))[:512],
+            )
+        if delete_status_fails_closed(result.status):
+            return self._cleanup_failed(
+                job_id=job_id,
+                document_id=document_id,
+                version_id=version_id,
+                reservation_id=reservation_id,
+                reservation_kind=reservation_kind,
+                reason=reason,
+                detail=f"vendor_delete_{result.status}",
+            )
+        persist_recovery_phase(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+            workspace_key=workspace_key,
+            reason=reason,
+            phase=CleanupRecoveryPhase.VENDOR_VERIFY,
+            vendor_status=result.status,
+        )
+        self._connection.commit()
+        vendor_check = await verify_vendor_removed(
+            self._indexer.adapter,
+            version_id=version_id,
+            workspace_key=workspace_key,
+        )
+        if not vendor_check.clean and result.status != "not_found":
+            return self._cleanup_failed(
+                job_id=job_id,
+                document_id=document_id,
+                version_id=version_id,
+                reservation_id=reservation_id,
+                reservation_kind=reservation_kind,
+                detail=vendor_check.residue,
+                reason=reason,
+            )
+        if not vendor_check.clean and result.status == "not_found":
+            return self._cleanup_failed(
+                job_id=job_id,
+                document_id=document_id,
+                version_id=version_id,
+                reservation_id=reservation_id,
+                reservation_kind=reservation_kind,
+                reason=reason,
+                detail="not_found_with_residue",
+            )
+        persist_recovery_phase(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+            workspace_key=workspace_key,
+            reason=reason,
+            phase=CleanupRecoveryPhase.MAP_FILTER,
+            vendor_status=result.status,
+        )
+        self._connection.commit()
+        maps = verify_application_residue(
+            self._connection,
+            version_id=version_id,
+            workspace_key=workspace_key,
+        )
+        if not maps.clean:
+            return self._cleanup_failed(
+                job_id=job_id,
+                document_id=document_id,
+                version_id=version_id,
+                reservation_id=reservation_id,
+                reservation_kind=reservation_kind,
+                detail=maps.residue,
+                reason=reason,
+            )
+        persist_recovery_phase(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+            workspace_key=workspace_key,
+            reason=reason,
+            phase=CleanupRecoveryPhase.TOMBSTONE,
+            vendor_status=result.status,
+        )
         self._writer.verify_lock_and_lease(
             job_id=job_id,
             job_lease_token=job_lease_token,
@@ -376,6 +607,46 @@ class GraphIndexService:
             ),
             to_state=GraphWorkspaceState.FILTERED_DIRTY,
             snapshot={"last_vendor_delete_status": result.status},
+        )
+        funded = graph_maintenance_rebuild_funded(self._connection)
+        if not funded:
+            persist_recovery_phase(
+                self._connection,
+                document_id=document_id,
+                version_id=version_id,
+                workspace_key=workspace_key,
+                reason=reason,
+                phase=CleanupRecoveryPhase.TOMBSTONE,
+                vendor_status=result.status,
+                status="unfunded",
+            )
+            self._repository.admission.true_up_graph_reservation(
+                reservation_id,
+                reservation_kind=reservation_kind,
+                actual_cost_usd=Decimal("0.01"),
+            )
+            self._connection.commit()
+            return self._quarantine_outcome(
+                job_id=job_id,
+                reason="unfunded_rebuild",
+                reservation_id=reservation_id,
+                reservation_kind=reservation_kind,
+            )
+        rebuild_id = enqueue_surviving_rebuild(
+            self._connection,
+            workspace_key=workspace_key,
+            funded=True,
+        )
+        persist_recovery_phase(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+            workspace_key=workspace_key,
+            reason=reason,
+            phase=CleanupRecoveryPhase.VERIFIED,
+            vendor_status=result.status,
+            status="rebuild_scheduled",
+            payload={"rebuild_job_id": str(rebuild_id) if rebuild_id else ""},
         )
         self._repository.admission.true_up_graph_reservation(
             reservation_id,
@@ -391,6 +662,56 @@ class GraphIndexService:
             workspace_state=GraphWorkspaceState.FILTERED_DIRTY.value,
         )
 
+    def _cleanup_failed(
+        self,
+        *,
+        job_id: UUID,
+        document_id: UUID,
+        version_id: UUID,
+        reservation_id: UUID,
+        reservation_kind: str,
+        reason: CleanupReason,
+        detail: str,
+    ) -> GraphJobOutcome:
+        """Quarantine after unverifiable vendor/map cleanup.
+
+        Args:
+            job_id: Claimed job id.
+            document_id: Canonical document.
+            version_id: Version whose cleanup failed.
+            reservation_id: Maintenance reservation to release.
+            reservation_kind: ``graph_maintenance``.
+            reason: Tombstone reason.
+            detail: Bounded diagnostic without corpus text.
+
+        Returns:
+            Quarantined outcome. Combined/inspection already emit
+            ``graph_outage``.
+        """
+
+        persist_recovery_phase(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+            workspace_key=self._writer.workspace_key,
+            reason=reason,
+            phase=CleanupRecoveryPhase.TOMBSTONE,
+            status="failed",
+            payload={"detail": detail[:512]},
+        )
+        emit_deletion_cleanup_failed(
+            self._connection,
+            document_id=document_id,
+            version_id=version_id,
+            detail=detail,
+        )
+        return self._quarantine_outcome(
+            job_id=job_id,
+            reason=detail[:512],
+            reservation_id=reservation_id,
+            reservation_kind=reservation_kind,
+        )
+
     async def _reconcile(
         self,
         *,
@@ -398,6 +719,17 @@ class GraphIndexService:
         job_lease_token: str,
         payload: dict[str, Any],
     ) -> GraphJobOutcome:
+        """Inspect vendor status after lock/lease loss. Stay quarantined.
+
+        Args:
+            job_id: Claimed reconciliation job id.
+            job_lease_token: Job lease token.
+            payload: May include ``version_id`` for status inspection.
+
+        Returns:
+            Completed inspection that does not clear quarantine.
+        """
+
         self._writer.verify_lock_and_lease(
             job_id=job_id,
             job_lease_token=job_lease_token,
@@ -415,22 +747,133 @@ class GraphIndexService:
             last_error="reconciliation_inspected",
         )
 
-    def _isolate_rebuild_workspace(
+    def _handle_rebuild(
         self,
         *,
         job_id: UUID,
         job_lease_token: str,
+        payload: dict[str, Any],
     ) -> GraphJobOutcome:
+        """Isolate a rebuild workspace or perform a verified pointer switch.
+
+        Args:
+            job_id: Claimed rebuild job id.
+            job_lease_token: Job lease token.
+            payload: ``isolate_only`` (default) or ``verified_switch``.
+
+        Returns:
+            Isolation-only ``building`` or switched ``active``.
+        """
+
         self._writer.verify_lock_and_lease(
             job_id=job_id,
             job_lease_token=job_lease_token,
         )
+        if payload.get("verified_switch") is True:
+            return self._switch_rebuild_workspace(payload=payload)
         isolated_id = self._writer.ensure_building_rebuild_workspace()
         self._connection.commit()
         return GraphJobOutcome(
             kind="completed",
             last_error=f"rebuild_isolation_only:{isolated_id}",
             workspace_state=GraphWorkspaceState.BUILDING.value,
+        )
+
+    def _switch_rebuild_workspace(self, *, payload: dict[str, Any]) -> GraphJobOutcome:
+        """CAS the singleton onto a verified rebuild workspace.
+
+        Args:
+            payload: Expected generation and workspace keys.
+
+        Returns:
+            Switched ``active`` outcome.
+
+        Raises:
+            GraphLifecycleError: Stale generation or mixed embeddings.
+        """
+
+        expected_generation = int(payload.get("expected_generation") or 0)
+        if expected_generation < 1:
+            expected_generation = self._writer.load_pointer_generation()
+        live_key = str(payload.get("workspace_key") or self._writer.workspace_key)
+        target_key = str(payload.get("rebuild_workspace_key") or f"{live_key}__rebuild")
+        live = load_workspace_row(self._connection, workspace_key=live_key)
+        target = load_workspace_row(self._connection, workspace_key=target_key)
+        result = switch_active_workspace(
+            self._connection,
+            expected_generation=expected_generation,
+            expected_workspace_key=live_key,
+            target_workspace_key=target_key,
+            target_embedding_model=str(target["embedding_model"]),
+            target_embedding_dimensions=int(target["embedding_dimensions"]),
+            source_embedding_model=str(live["embedding_model"]),
+            source_embedding_dimensions=int(live["embedding_dimensions"]),
+        )
+        self._connection.commit()
+        return GraphJobOutcome(
+            kind="completed",
+            last_error=f"workspace_switched:{result.new_generation}",
+            workspace_state=GraphWorkspaceState.ACTIVE.value,
+        )
+
+    def _switch_pending_version(
+        self,
+        *,
+        document_id: UUID,
+        new_version_id: UUID,
+    ) -> None:
+        """Flip exactly one current version after maps verify.
+
+        Args:
+            document_id: Canonical document.
+            new_version_id: Verified replacement version.
+
+        Raises:
+            GraphLifecycleError: Missing current version or SQL CAS refusal.
+        """
+
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT current_version_id
+                FROM app.documents
+                WHERE id = %s
+                """,
+                (document_id,),
+            )
+            row = cursor.fetchone()
+        if row is None or row[0] is None:
+            raise GraphLifecycleError("current_version_mismatch")
+        old_version_id = UUID(str(row[0]))
+        switch_document_version(
+            self._connection,
+            document_id=document_id,
+            new_version_id=new_version_id,
+            old_version_id=old_version_id,
+            expected_generation=self._writer.load_pointer_generation(),
+            expected_workspace_key=self._writer.workspace_key,
+        )
+
+    def _isolate_rebuild_workspace(
+        self,
+        *,
+        job_id: UUID,
+        job_lease_token: str,
+    ) -> GraphJobOutcome:
+        """Create ``{workspace_key}__rebuild`` in ``building`` without switching.
+
+        Args:
+            job_id: Claimed rebuild job id.
+            job_lease_token: Job lease token.
+
+        Returns:
+            Isolation-only outcome.
+        """
+
+        return self._handle_rebuild(
+            job_id=job_id,
+            job_lease_token=job_lease_token,
+            payload={"isolate_only": True},
         )
 
     def _revalidate_index_eligibility(
@@ -440,12 +883,42 @@ class GraphIndexService:
         version_id: UUID,
         payload: dict[str, Any],
     ) -> None:
+        """Recheck Hybrid/graph gates before vendor insert.
+
+        Non-current versions use the build gate so pending-switch index can
+        land in the target workspace. Live query still uses current_version_id.
+
+        Args:
+            document_id: Canonical document.
+            version_id: Version being indexed.
+            payload: May include expected hashes, pin, and generation.
+
+        Raises:
+            GraphIndexerError: Eligibility, pin, or generation mismatch.
+        """
+
         with self._connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT current_version_id FROM app.documents WHERE id = %s",
+                (document_id,),
+            )
+            current_row = cursor.fetchone()
+            current_id = (
+                UUID(str(current_row[0]))
+                if current_row is not None and current_row[0]
+                else None
+            )
             try:
-                cursor.execute(
-                    "SELECT app.assert_graph_index_allowed(%s, %s)",
-                    (document_id, version_id),
-                )
+                if current_id is not None and current_id != version_id:
+                    cursor.execute(
+                        "SELECT app.assert_graph_build_index_allowed(%s, %s)",
+                        (document_id, version_id),
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT app.assert_graph_index_allowed(%s, %s)",
+                        (document_id, version_id),
+                    )
             except psycopg.errors.RaiseException as exc:
                 raise GraphIndexerError("not_graph_eligible") from exc
             cursor.execute(
@@ -513,6 +986,15 @@ class GraphIndexService:
                 raise GraphIndexerError("workspace_generation_mismatch")
 
     def _assert_version_still_pending(self, version_id: UUID) -> None:
+        """Refuse insert when the version left ``graph_pending``.
+
+        Args:
+            version_id: Version just inserted.
+
+        Raises:
+            GraphIndexerError: Missing version or status drift.
+        """
+
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -536,6 +1018,18 @@ class GraphIndexService:
         reservation_id: UUID | None,
         reservation_kind: str | None,
     ) -> GraphJobOutcome:
+        """Persist ``quarantined`` and release an unused reservation.
+
+        Args:
+            job_id: Claimed job id.
+            reason: Machine-readable quarantine reason.
+            reservation_id: Optional reservation to release.
+            reservation_kind: Reservation kind when releasing.
+
+        Returns:
+            Quarantined outcome.
+        """
+
         if reservation_id is not None and reservation_kind is not None:
             self._repository.admission.release_graph_reservation(
                 reservation_id,
@@ -554,6 +1048,18 @@ class GraphIndexService:
 
 
 def _require_ids(job: dict[str, Any]) -> tuple[UUID, UUID]:
+    """Return document and version ids from a claimed job row.
+
+    Args:
+        job: Claimed ``lightrag_index_jobs`` mapping.
+
+    Returns:
+        ``(document_id, version_id)``.
+
+    Raises:
+        GraphIndexerError: When either id is missing.
+    """
+
     document_raw = job.get("document_id")
     version_raw = job.get("version_id")
     if document_raw is None or version_raw is None:
@@ -566,6 +1072,16 @@ def _actual_from_callbacks(
     *,
     estimate_floor: bool,
 ) -> Decimal:
+    """Derive a positive actual cost from counted gateway callbacks.
+
+    Args:
+        indexer: Indexer whose adapter callbacks were used.
+        estimate_floor: When true, charge at least one unit.
+
+    Returns:
+        Positive USD amount for true-up.
+    """
+
     counts = indexer.adapter.callbacks.counts
     units = counts.embed + counts.entity_extract + counts.other
     actual = Decimal("0.01") * Decimal(str(max(units, 1 if estimate_floor else 0)))

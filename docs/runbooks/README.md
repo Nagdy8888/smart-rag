@@ -20,7 +20,8 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 | Local/in-app admin alerts | 6/8 | alert contract | planned | ack path | eng-lead |
 | Origin-secret dual rotation | 10 | CloudFront | planned | skew test | eng-lead |
 | LightRAG private-schema bootstrap | 5 | Packet 1 pin + Packet 2 migrations | draft | fingerprint + role matrix | eng-lead |
-| LightRAG workspace cleanup/rebuild | 5/9 | graph ready | planned | quarantine drill | eng-lead |
+| LightRAG workspace cleanup/rebuild | 5 | Packet 7 pointer/delete | draft | switch + tombstone tests | eng-lead |
+| LightRAG snapshot restore / pointer rollback | 5 | Packet 7 isolated copy | draft | same-schema refuse + restore script | eng-lead |
 | Embedding parallel rebuild | 2/4 | embedding ADR | planned | dual-index cutover | eng-lead |
 | Dead-letter replay | 3 | queues | planned | idempotent replay | eng-lead |
 | Conversation deletion verification | 6 | chat schema | planned | delete audit | privacy |
@@ -28,4 +29,6 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 | Backup/restore DB+Storage | 9/10 | backups | planned | restore drill | eng-lead |
 | Incident response / rollback | 9–11 | staging | planned | tabletop | eng-lead |
 
+[lightrag-schema-bootstrap.md](./lightrag-schema-bootstrap.md) ·
+[GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](./GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) ·
 [docs index](../README.md)

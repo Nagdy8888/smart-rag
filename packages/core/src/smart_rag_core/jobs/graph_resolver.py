@@ -693,6 +693,7 @@ def _load_chunk_maps(
                 AND lcm.workspace_key = %s
                 AND lcm.config_generation = %s
                 AND lcm.support >= %s
+                AND COALESCE(lcm.retrieval_eligible, true) IS TRUE
                 AND c.deleted_at IS NULL
                 AND d.deleted_at IS NULL
                 AND dv.deleted_at IS NULL
@@ -706,6 +707,8 @@ def _load_chunk_maps(
                 WHEN lcm.chunk_id IS NULL THEN 'unmapped'
                 WHEN lcm.config_generation IS DISTINCT FROM %s THEN 'stale_config'
                 WHEN COALESCE(lcm.support, 0) < %s THEN 'below_threshold'
+                WHEN COALESCE(lcm.retrieval_eligible, true) IS NOT TRUE
+                  THEN 'map_ineligible'
                 WHEN c.deleted_at IS NOT NULL
                   OR d.deleted_at IS NOT NULL
                   OR dv.deleted_at IS NOT NULL THEN 'deleted'
@@ -804,6 +807,7 @@ def _load_evidence_maps(
                 gem.support >= %s
                 AND gem.config_generation = %s
                 AND gem.workspace_key = %s
+                AND COALESCE(gem.retrieval_eligible, true) IS TRUE
                 AND c.deleted_at IS NULL
                 AND d.deleted_at IS NULL
                 AND dv.deleted_at IS NULL

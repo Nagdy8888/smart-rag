@@ -4,7 +4,7 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-16
 audience: engineering, reviewers
-phase_packet: Phase 5 Packet 3
+phase_packet: Phase 5 Packet 7
 ---
 
 # Graph workspace lifecycle
@@ -22,6 +22,7 @@ Related: [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [ENTITY_RULES.md](./ENTITY_RULES.md) ·
+[GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](../runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [docs index](../README.md)
 
@@ -77,18 +78,19 @@ stateDiagram-v2
   building --> updating: first index mutation
   building --> quarantined: lock or lease loss
   building --> building: rebuild isolation only
-  active --> updating: normal index starts
+  building --> active: Packet 7 verified workspace switch
+  active --> updating: normal index or targeted delete starts
   active --> filtered_dirty: targeted delete or ACL success
-  active --> quarantined: lock lease or unverified status
-  active --> disabled: Packet 7
+  active --> quarantined: lock lease unverified delete or unfunded rebuild
+  active --> disabled: upgrade disable review
   updating --> updating: index success maps unverified
-  updating --> active: Packet4 maps verified and pointer attached
+  updating --> active: Packet 4 maps verified and pointer attached
   updating --> filtered_dirty: targeted delete or ACL success
-  updating --> quarantined: lock lease crash or failed vendor status
+  updating --> quarantined: lock lease crash failed vendor or residue
   filtered_dirty --> updating: later index
-  filtered_dirty --> quarantined: lock lease or failed cleanup
-  quarantined --> disabled: Packet 7
-  disabled --> retired: Packet 7
+  filtered_dirty --> quarantined: lock lease failed cleanup or unfunded rebuild
+  quarantined --> disabled: two failed upgrades or seven-day survival alerts
+  disabled --> retired: replaced workspace
   retired --> [*]
 ```
 
@@ -98,12 +100,14 @@ pointer. `updating` emits `graph_updating`, `filtered_dirty` emits
 `graph_outage`. Combined fallback is Phase 6; Packet 5 returns the typed
 limitation and does not call the vendor.
 
-Pointer switch with `SELECT ... FOR UPDATE` on generation is Packet 7.
-Packet 3 may attach `company_default` when the pointer is null without
-bumping generation and without marking `active`. Rebuild uses a separate
-`{workspace_key}__rebuild` row in `building` and does not switch the
-pointer. A second LightRAG instance cannot share this process, so Packet 3
-isolates that workspace only; corpus reindex is Packet 7.
+Pointer switch uses a short application transaction: transaction advisory
+lock, `SELECT ... FOR UPDATE` on the singleton and source rows, compare
+expected generation / current version / workspace, recheck deletion/ACL,
+then commit. Vendor insert/delete and model calls stay outside that
+transaction. Packet 3 may attach `company_default` when the pointer is
+null without bumping generation. Rebuild isolation uses
+`{workspace_key}__rebuild` in `building`. Packet 6 schedules that isolate
+job; Packet 7 performs the verified switch.
 
 Packet 6 approved entity-rule changes enqueue that isolated rebuild and
 invalidate live maps immediately. They do not switch the pointer.
@@ -115,7 +119,7 @@ invalidate live maps immediately. They do not switch the pointer.
 | `index` | normal | `graph_index` | skipped when pending index greater than 50 | `updating`, or `active` after Packet 4 maps verify and the pointer already names this workspace |
 | `remove` | maintenance | `graph_maintenance` | always claimable | `filtered_dirty` |
 | `graph_acl_remove` | maintenance | `graph_maintenance` | always claimable | `filtered_dirty` |
-| `rebuild` | maintenance | `graph_maintenance` | always claimable | isolated `building`, pointer unchanged |
+| `rebuild` | maintenance | `graph_maintenance` | always claimable | isolate_only: `{workspace}__rebuild` in `building`; `verified_switch`: pointer CAS to that workspace |
 | reconciliation payload | maintenance | none extra | low priority | inspect vendor status; stay `quarantined` |
 
 Claims already order `critical` then `high` then `normal` then `low`.
@@ -193,11 +197,78 @@ Derived only from durable rows (`GraphMetricsService`):
 idle. The worker polls graph jobs on every cycle, including while ingestion
 is busy. Graph writer concurrency remains one via lease plus advisory lock.
 
+## Version switch (short transaction)
+
+New canonical versions arrive with `is_current=false` and graph retrieval
+maps ineligible until the switch commits. Index/map/verify runs in the
+target workspace with frozen config **outside** the pointer transaction.
+
+```mermaid
+sequenceDiagram
+  participant Worker as GraphIndexService
+  participant SQL as switchGraphDocumentVersion
+  participant Pointer as graphActiveWorkspacePointer
+  participant Docs as documentsCurrentVersion
+  Worker->>Worker: verify maps outside txn
+  Worker->>SQL: expected generation plus old and new version
+  SQL->>Pointer: xact lock plus FOR UPDATE
+  SQL->>Docs: CAS current_version_id
+  SQL->>SQL: Hybrid BM25 visibility plus map eligibility plus tombstone
+  SQL-->>Worker: exactly one current version
+  Worker->>Worker: after commit adelete_by_doc_id old vendor id
+```
+
+Same-workspace version flip does **not** bump pointer generation (map
+`config_generation` stays valid). Workspace rebuild/upgrade switch **does**
+bump generation, retires the old workspace, and activates the target.
+Crashes expose the old or new generation/version, never mixed or zero
+current versions. Failed post-flip cleanup leaves old derived rows
+filtered and retryable.
+
+## Deletion and ACL
+
+Canonical exclusion is immediate authority. Recheck it before
+`adelete_by_doc_id(..., delete_llm_cache=True)`. Do not delete entities or
+relations by graph surgery.
+
+```mermaid
+flowchart TD
+  exclude["Phase 3 canonical exclusion"] --> recheck["recheck before vendor mutate"]
+  recheck --> updating["workspace updating"]
+  updating --> vendor["adelete_by_doc_id plus cache"]
+  vendor -->|success and residue clean| dirty["filtered_dirty plus 24h tombstone"]
+  dirty --> rebuild["7-day surviving-source rebuild"]
+  vendor -->|not_allowed fail timeout residue| quarantined["quarantined plus deletion-cleanup-failed"]
+  quarantined --> outage["resolver graph_outage"]
+```
+
+Shared entities keep only surviving current graph-eligible sources.
+Deleted or restricted text must not remain `retrieval_eligible` on maps.
+ACL expansion never auto-indexes; owner/admin must approve a new versioned
+index job. Unfunded maintenance reserve quarantines after a successful
+canonical delete.
+
+## Upgrade, rollback, disable
+
+Embedding/model/chunker/extraction/entity/mapping changes build a parallel
+workspace with one homogeneous pin (`text-embedding-3-large` / 1024) and
+switch only after verification. In-place mixed embeddings are forbidden.
+
+LightRAG package/schema upgrade restores a production-sized snapshot into a
+**separate database or schema**, never a second workspace in runtime
+`lightrag`. Snapshot/restore is the vendor schema rollback boundary;
+pointer rollback covers only application data compatible with the current
+schema. Two consecutive failed qualifications or survival alerts persisting
+seven days open disable review. Disabled/quarantined routes stay Hybrid-only
+via `graph_outage`; inspection is unavailable; repair/admin rows remain.
+
+See [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](../runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md).
+
 ## Verification
 
 ```powershell
-uv run python -m pytest tests/unit/test_graph_writer.py tests/unit/test_lightrag_indexer.py tests/unit/test_graph_metrics.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py -q
-uv run python -m pytest tests/contract/test_graph_writer.py tests/contract/test_job_leases.py -q
+uv run python -m pytest tests/unit/test_graph_lifecycle.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_graph_resolver.py -q
+uv run python -m pytest tests/contract/test_graph_lifecycle.py -q
 ```
 
 [docs index](../README.md)

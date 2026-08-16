@@ -5,6 +5,7 @@ from smart_rag_core.jobs.backoff import compute_retry_delay_seconds
 from smart_rag_core.jobs.dead_letter import DeadLetterService
 from smart_rag_core.jobs.exceptions import (
     GraphEntityRuleError,
+    GraphLifecycleError,
     GraphMappingError,
     GraphResolverError,
     GraphWriterLostError,
@@ -40,6 +41,7 @@ __all__ = [
     "MAX_PENDING_INGESTION_JOBS",
     "DeadLetterService",
     "GraphEntityRuleError",
+    "GraphLifecycleError",
     "GraphMappingError",
     "GraphMetricsService",
     "GraphQueueMetrics",

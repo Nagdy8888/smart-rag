@@ -1373,6 +1373,75 @@ export type Database = {
           },
         ]
       }
+      graph_cleanup_tombstones: {
+        Row: {
+          clean_rebuild_at: string
+          created_at: string
+          document_id: string
+          id: string
+          payload: Json
+          reason: string
+          rebuild_job_id: string | null
+          recovery_phase: string
+          status: string
+          target_cleanup_at: string
+          updated_at: string
+          vendor_delete_status: string | null
+          verified_at: string | null
+          version_id: string
+          workspace_key: string
+        }
+        Insert: {
+          clean_rebuild_at: string
+          created_at?: string
+          document_id: string
+          id?: string
+          payload?: Json
+          reason: string
+          rebuild_job_id?: string | null
+          recovery_phase?: string
+          status?: string
+          target_cleanup_at: string
+          updated_at?: string
+          vendor_delete_status?: string | null
+          verified_at?: string | null
+          version_id: string
+          workspace_key: string
+        }
+        Update: {
+          clean_rebuild_at?: string
+          created_at?: string
+          document_id?: string
+          id?: string
+          payload?: Json
+          reason?: string
+          rebuild_job_id?: string | null
+          recovery_phase?: string
+          status?: string
+          target_cleanup_at?: string
+          updated_at?: string
+          vendor_delete_status?: string | null
+          verified_at?: string | null
+          version_id?: string
+          workspace_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_cleanup_tombstones_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_cleanup_tombstones_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       graph_entity_rules: {
         Row: {
           active: boolean
@@ -1495,6 +1564,7 @@ export type Database = {
           method: string | null
           pipeline_version: string | null
           provenance: Json
+          retrieval_eligible: boolean
           score: number | null
           source_hash: string | null
           source_span: Json
@@ -1516,6 +1586,7 @@ export type Database = {
           method?: string | null
           pipeline_version?: string | null
           provenance?: Json
+          retrieval_eligible?: boolean
           score?: number | null
           source_hash?: string | null
           source_span?: Json
@@ -1537,6 +1608,7 @@ export type Database = {
           method?: string | null
           pipeline_version?: string | null
           provenance?: Json
+          retrieval_eligible?: boolean
           score?: number | null
           source_hash?: string | null
           source_span?: Json
@@ -1752,6 +1824,48 @@ export type Database = {
         }
         Relationships: []
       }
+      graph_upgrade_qualifications: {
+        Row: {
+          candidate_database: string
+          candidate_schema: string
+          consecutive_failures: number
+          created_at: string
+          embedding_dimensions: number
+          embedding_model: string
+          id: string
+          notes: string
+          runtime_database: string
+          runtime_schema: string
+          status: string
+        }
+        Insert: {
+          candidate_database: string
+          candidate_schema: string
+          consecutive_failures?: number
+          created_at?: string
+          embedding_dimensions?: number
+          embedding_model?: string
+          id?: string
+          notes?: string
+          runtime_database: string
+          runtime_schema: string
+          status: string
+        }
+        Update: {
+          candidate_database?: string
+          candidate_schema?: string
+          consecutive_failures?: number
+          created_at?: string
+          embedding_dimensions?: number
+          embedding_model?: string
+          id?: string
+          notes?: string
+          runtime_database?: string
+          runtime_schema?: string
+          status?: string
+        }
+        Relationships: []
+      }
       graph_workspaces: {
         Row: {
           config_snapshot: Json
@@ -1943,6 +2057,7 @@ export type Database = {
           method: string | null
           pipeline_version: string | null
           provenance: Json
+          retrieval_eligible: boolean
           score: number | null
           source_hash: string | null
           source_span: Json
@@ -1962,6 +2077,7 @@ export type Database = {
           method?: string | null
           pipeline_version?: string | null
           provenance?: Json
+          retrieval_eligible?: boolean
           score?: number | null
           source_hash?: string | null
           source_span?: Json
@@ -1981,6 +2097,7 @@ export type Database = {
           method?: string | null
           pipeline_version?: string | null
           provenance?: Json
+          retrieval_eligible?: boolean
           score?: number | null
           source_hash?: string | null
           source_span?: Json
@@ -2102,6 +2219,7 @@ export type Database = {
           method: string | null
           pipeline_version: string | null
           provenance: Json
+          retrieval_eligible: boolean
           score: number | null
           source_content_hash: string | null
           source_hash: string | null
@@ -2122,6 +2240,7 @@ export type Database = {
           method?: string | null
           pipeline_version?: string | null
           provenance?: Json
+          retrieval_eligible?: boolean
           score?: number | null
           source_content_hash?: string | null
           source_hash?: string | null
@@ -2142,6 +2261,7 @@ export type Database = {
           method?: string | null
           pipeline_version?: string | null
           provenance?: Json
+          retrieval_eligible?: boolean
           score?: number | null
           source_content_hash?: string | null
           source_hash?: string | null
@@ -3316,6 +3436,10 @@ export type Database = {
           status: Database["app"]["Enums"]["graph_entity_rule_status"]
         }[]
       }
+      assert_graph_build_index_allowed: {
+        Args: { p_document_id: string; p_version_id: string }
+        Returns: boolean
+      }
       assert_graph_index_allowed: {
         Args: { p_document_id: string; p_version_id?: string }
         Returns: boolean
@@ -3493,6 +3617,10 @@ export type Database = {
         Returns: number
       }
       current_authorization_version: { Args: never; Returns: number }
+      disable_graph_workspace: {
+        Args: { p_reason: string; p_workspace_key: string }
+        Returns: string
+      }
       emit_admin_notification: {
         Args: {
           body: string
@@ -3880,6 +4008,10 @@ export type Database = {
           start_url: string
         }[]
       }
+      mark_graph_maps_ineligible_for_version: {
+        Args: { p_version_id: string }
+        Returns: number
+      }
       mark_quarantine_cleanup_done: {
         Args: { p_reservation_id: string }
         Returns: undefined
@@ -3922,6 +4054,17 @@ export type Database = {
           p_result_ref?: Json
           p_status: string
           p_version_id: string
+        }
+        Returns: string
+      }
+      record_graph_upgrade_qualification: {
+        Args: {
+          p_candidate_database: string
+          p_candidate_schema: string
+          p_notes?: string
+          p_runtime_database: string
+          p_runtime_schema: string
+          p_status?: string
         }
         Returns: string
       }
@@ -4115,6 +4258,32 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      switch_graph_active_workspace: {
+        Args: {
+          p_expected_generation: number
+          p_expected_workspace_key: string
+          p_target_workspace_key: string
+        }
+        Returns: {
+          new_generation: number
+          new_workspace_id: string
+          old_workspace_id: string
+        }[]
+      }
+      switch_graph_document_version: {
+        Args: {
+          p_document_id: string
+          p_expected_generation: number
+          p_expected_workspace_key: string
+          p_new_version_id: string
+          p_old_version_id: string
+        }
+        Returns: {
+          new_generation: number
+          switched: boolean
+          workspace_id: string
+        }[]
+      }
       transition_document_version_status: {
         Args: {
           p_expected_status: Database["app"]["Enums"]["document_status"]
@@ -4128,6 +4297,19 @@ export type Database = {
           p_from_states: Database["app"]["Enums"]["graph_workspace_state"][]
           p_snapshot?: Json
           p_to_state: Database["app"]["Enums"]["graph_workspace_state"]
+          p_workspace_key: string
+        }
+        Returns: string
+      }
+      upsert_graph_cleanup_tombstone: {
+        Args: {
+          p_document_id: string
+          p_payload?: Json
+          p_reason: string
+          p_recovery_phase?: string
+          p_status?: string
+          p_vendor_delete_status?: string
+          p_version_id: string
           p_workspace_key: string
         }
         Returns: string

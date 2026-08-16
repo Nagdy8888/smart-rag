@@ -132,12 +132,13 @@ class MappingOutcome:
 
     Attributes:
         ready: True only when every Graph Ready gate passed.
-        maps_verified: Same as ``ready`` for job result jsonb.
+        maps_verified: Coverage gates passed, including pending-switch maps.
         reason: Machine-readable failure, empty on success.
         workspace_state: Workspace state after the attempt.
         hybrid_calls: Hybrid retrieve count (0 or 1).
         rerank_calls: Support rerank count (0 or 1).
         coverage: Per-language/type slices persisted as telemetry.
+        pending_switch: True when maps are verified but current_version waits.
     """
 
     ready: bool
@@ -147,6 +148,7 @@ class MappingOutcome:
     hybrid_calls: int
     rerank_calls: int
     coverage: tuple[CoverageSlice, ...] = ()
+    pending_switch: bool = False
 
 
 @dataclass
@@ -843,9 +845,12 @@ class GraphMappingService:
             document_id=document_id,
             version_id=version_id,
         )
+        pending_switch = drift == "pending_switch"
+        coverage_passed = ready
         if drift is not None:
             ready = False
             reason = drift
+        retrieval_eligible = ready
         persist.delete_version_maps(
             self._connection,
             version_id=version_id,
@@ -859,6 +864,7 @@ class GraphMappingService:
             language=language,
             config_generation=config_generation,
             source_identity=source_identity,
+            retrieval_eligible=retrieval_eligible,
         )
         for row in chunk_rows:
             if row.match is None:
@@ -872,6 +878,7 @@ class GraphMappingService:
                 vendor_chunk_id=row.vendor_chunk_id,
                 internal_key=row.internal_key,
                 match=row.match,
+                retrieval_eligible=retrieval_eligible,
             )
         for item in objects:
             persist.insert_evidence_row(
@@ -881,6 +888,7 @@ class GraphMappingService:
                 language=language,
                 config_generation=config_generation,
                 item=item,
+                retrieval_eligible=retrieval_eligible,
             )
         persist.insert_telemetry(
             self._connection,
@@ -937,14 +945,16 @@ class GraphMappingService:
                 self._connection.rollback()
                 raise
         self._connection.commit()
+        maps_verified = coverage_passed and (ready or pending_switch)
         return MappingOutcome(
             ready=ready,
-            maps_verified=ready,
+            maps_verified=maps_verified,
             reason=reason,
             workspace_state=workspace_state,
             hybrid_calls=self.counts.hybrid_retrieve,
             rerank_calls=self.counts.support_rerank,
             coverage=tuple(coverage),
+            pending_switch=pending_switch and coverage_passed,
         )
 
     def _enqueue_repair_only(

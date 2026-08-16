@@ -54,6 +54,7 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260816120000_graph_mapping_ready_v1.sql",
     "20260816130000_graph_resolver_query_v1.sql",
     "20260816140000_graph_entity_rules_v1.sql",
+    "20260816150000_graph_pointer_switch_cleanup_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

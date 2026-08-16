@@ -93,6 +93,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [api/openapi.foundation.json](./api/openapi.foundation.json) | engineering-lead | draft | 2026-08-14 | eng |
 | [api/GLOSSARY_IMPORT.md](./api/GLOSSARY_IMPORT.md) | engineering-lead | draft | 2026-08-14 | eng, security |
 | [runbooks/README.md](./runbooks/README.md) | engineering-lead | draft | 2026-08-16 | ops |
+| [runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](./runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) | engineering-lead | draft | 2026-08-16 | eng, ops |
 | [runbooks/lightrag-schema-bootstrap.md](./runbooks/lightrag-schema-bootstrap.md) | engineering-lead | draft | 2026-08-16 | eng, ops |
 | [reviews/2026-08-12-hybrid-graph-rag-plan-review.md](./reviews/2026-08-12-hybrid-graph-rag-plan-review.md) | engineering-lead | verified | 2026-08-12 | eng |
 

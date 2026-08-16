@@ -897,3 +897,150 @@ with separate `--schema` flags (comma-joined `--schema` produced an empty
 sealed. Do not mark Phase 5 complete. Phase status remains `pending`.
 Packet 7 owns atomic version switching, deletion/ACL cleanup, upgrade,
 rollback, and disablement — not Combined answers/SSE.
+
+## Packet 7 — atomic version switching, deletion/ACL cleanup, upgrade, rollback, and disablement
+
+### Quoted requirement
+
+> Packet 7 — atomic version switching, deletion/ACL cleanup, upgrade,
+> rollback, and disablement
+
+### Acceptance checks restated
+
+- Pointer crashes expose old or new generation, never mixed/zero current
+  versions; post-flip cleanup is retryable and filtered.
+- Deletion/ACL exclusion is immediate at resolver, targeted deletion/cache
+  cleanup verifies within 24 hours, and clean rebuild from surviving sources
+  verifies within seven days.
+- Shared-entity and identical-content fixtures prove no deleted/restricted
+  evidence survives canonical resolution/inspection.
+- Upgrade qualification uses a restored isolated copy; failed
+  migration/rebuild can restore/disable safely; embedding configs never mix.
+
+### Negative tests restated
+
+Crash before/during/after pointer commit, stale generation, concurrent
+delete, delete `not_found`/`not_allowed`/`fail`, recovery-phase crash, cache
+residue, source residue, shared-entity contamination, ACL race, unfunded
+rebuild, schema warning/drift, incompatible rollback, or automatic ACL
+expansion all fail safe.
+
+### Pointer CAS contract
+
+Short application transaction only. Vendor/model work stays outside it.
+
+1. `pg_advisory_xact_lock(hashtext('smart-rag-graph-pointer-v1'), hashtext(workspace_key))`
+2. Lock `app.graph_active_workspace_pointer` and source rows `FOR UPDATE`
+3. Compare expected generation / current version / workspace; recheck
+   deletion/ACL
+4. Same-workspace version flip: `documents.current_version_id`, `is_current`,
+   Hybrid/BM25 visibility generation, map `retrieval_eligible`, tombstone,
+   audit. **Does not bump generation** (map `config_generation` stays valid)
+5. Workspace rebuild/upgrade flip: CAS `generation = generation + 1`, retire
+   old workspace, activate target, homogeneous embedding pin
+6. After commit: serialized `adelete_by_doc_id` for the old vendor document;
+   failure leaves old derived rows filtered and retryable
+
+Crashes expose exactly one current version and one positive generation.
+
+### Delete / ACL / tombstone SLAs
+
+| Gate | Behavior |
+| --- | --- |
+| Immediate | Phase 3 canonical exclusion / `retrieval_eligible=false` is resolver authority. Recheck before vendor mutate |
+| Vendor | `adelete_by_doc_id(..., delete_llm_cache=True)`. Persist every recovery phase. No entity/relation graph surgery |
+| Success | Workspace `filtered_dirty`; tombstone `target_cleanup_at` = now+24h; `clean_rebuild_at` = now+7d; surviving-source rebuild `isolate_only=true` |
+| Fail closed | `not_allowed` / `fail` / timeout / residue / resolver failure → `quarantined` + `Deletion cleanup failed`. Inspection/Combined already `graph_outage` |
+| `not_found` | Clean only after residue verification; residue → `not_found_with_residue` quarantine |
+| Unfunded rebuild | Canonical exclusion remains; enqueue refused; workspace quarantines until funded |
+| ACL expansion | `set_document_visibility` restricted→company_visible does **not** insert `index` or `graph_acl_remove` |
+
+### Upgrade isolation
+
+- Parallel versioned workspace, one homogeneous config
+  (`text-embedding-3-large` / 1024). Table CHECKs refuse in-place mix.
+- LightRAG package/schema upgrade: restore a production-sized snapshot into
+  a **separate database** (preferred) or different schema. A second workspace
+  in runtime `lightrag` records `refused_same_schema`.
+- Ops: `scripts/ops/restore_lightrag_upgrade_copy.py` plus
+  [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](../runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md)
+- Snapshot/restore = vendor schema rollback. Pointer rollback = application
+  data compatible with the current schema only.
+- Two consecutive failed qualifications or survival alerts below 0.80 for
+  seven days → disable review. No silent provider substitution.
+
+### Schema / jobs
+
+Expand-only `20260816150000_graph_pointer_switch_cleanup_v1.sql`:
+
+- `retrieval_eligible` on source/chunk/evidence maps
+- `app.graph_cleanup_tombstones`, `app.graph_upgrade_qualifications`
+- `assert_graph_build_index_allowed` for non-current pending-switch index
+- `switch_graph_document_version`, `switch_graph_active_workspace`,
+  `disable_graph_workspace`, `record_graph_upgrade_qualification`,
+  `upsert_graph_cleanup_tombstone`, exclusion triggers
+- Inspection RPC also requires `retrieval_eligible`
+
+Local `supabase_migrations.schema_migrations` now includes
+`20260816130000` (Packet 5 objects already existed) and `20260816150000`.
+`20260816140000` was already recorded. Old migrations were not rewritten.
+
+### Commands and results
+
+No commit, no push, no `uv sync --package smart-rag-core`. Holdout remains
+sealed. Phase status remains `pending`. The Packet 7 migration was applied
+as postgres to local `127.0.0.1:54322`. Types used `--db-url` to that port
+with separate `--schema` flags.
+
+| Command | Exit |
+| --- | --- |
+| `uv run python scripts/ci/check_migrations.py` | 0 (45 reviewed files) |
+| `uv run python -m pytest tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_graph_resolver.py tests/unit/test_entity_rules.py tests/unit/test_graph_lifecycle.py tests/contract/test_graph_lifecycle.py -q` | 0 (66 passed) |
+| `uv run python -m pytest tests/unit/test_graph_mapping.py -q` (with the suite above) | 0 (80 passed including mapping) |
+| `uv run python scripts/ops/restore_lightrag_upgrade_copy.py --candidate-database postgres --candidate-schema lightrag --runtime-database postgres --runtime-schema lightrag` | 2 (`upgrade_same_schema_insufficient`) |
+| `uv run python scripts/check.py --tier format` | 0 (413 files) |
+| `uv run python scripts/check.py --tier lint` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Deviations
+
+- `lightrag_source_map` remains PK `document_id`. Pending-switch maps do not
+  overwrite a live eligible row; the version-switch txn retargets that
+  singleton onto the new `version_id` and sets it eligible.
+- Same-workspace version switch does not bump pointer generation so live map
+  `config_generation` digests stay valid. Workspace switch does bump it.
+- SQL pointer xact lock uses `hashtext`; Python tests use SHA-256 helpers
+  for the writer-style key pair and do not need to match `hashtext`.
+- `record_graph_upgrade_qualification` records `refused_same_schema` and
+  returns the row id instead of raising, so the refuse is durable in the
+  caller transaction. Python `assert_isolated_upgrade_environment` still
+  fail-closes before SQL.
+- Local dump restore into a second Postgres database is ops-scripted; this
+  host may lack `createdb`/`pg_restore`. Same-schema refuse is the local
+  proof.
+
+### Unverified
+
+- Live LightRAG `adelete_by_doc_id` against vendor tables for post-flip
+  cleanup (SQL/map residue and fail-closed statuses are tested).
+- Production-sized snapshot restore into a disposable second database.
+- Managed/staging apply of `20260816150000_graph_pointer_switch_cleanup_v1.sql`.
+- Full-repo Pyright (pre-existing errors outside this packet).
+- Combined answer quality / holdout remain sealed.
+
+### Rollback
+
+- Do not DROP `retrieval_eligible`, tombstones, or qualification tables
+  (expand-only).
+- Disable the workspace or unset `LIGHTRAG_DB_URL` so query/inspection stay
+  idle (`graph_outage`).
+- Vendor schema rollback is snapshot restore into an isolated copy, then a
+  verified pointer switch or disable. Pointer rollback cannot undo an
+  incompatible vendor schema.
+
+### Packet 8 handoff
+
+**Packet 8 may start if switch+delete+quarantine are proven.** Holdout
+remains sealed. Do not mark Phase 5 complete. Phase status remains
+`pending`. Packet 8 owns graph evaluation, envelope proof, scaling options,
+and the Phase 6 handoff — not Combined answers/SSE.

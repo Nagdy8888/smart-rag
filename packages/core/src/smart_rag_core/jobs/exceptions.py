@@ -91,3 +91,18 @@ class GraphEntityRuleError(JobRepositoryError):
 
         super().__init__(reason)
         self.reason = reason
+
+
+class GraphLifecycleError(JobRepositoryError):
+    """Raised when pointer switch, cleanup, or upgrade qualification fails closed."""
+
+    def __init__(self, reason: str) -> None:
+        """Initialize with a stable machine-readable lifecycle reason.
+
+        Args:
+            reason: Short reason such as ``stale_generation`` or
+                ``upgrade_same_schema_insufficient``.
+        """
+
+        super().__init__(reason)
+        self.reason = reason

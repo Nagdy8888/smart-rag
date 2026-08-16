@@ -65,8 +65,12 @@ def upsert_source_map(
     language: str,
     config_generation: str,
     source_identity: str,
+    retrieval_eligible: bool = True,
 ) -> None:
     """Upsert the document-level source map row.
+
+    Pending-switch maps are written ineligible and must not overwrite a live
+    eligible row for a different current version.
 
     Args:
         connection: ``app_worker`` connection inside the mapping txn.
@@ -76,6 +80,7 @@ def upsert_source_map(
         language: Version language.
         config_generation: Mapping config digest.
         source_identity: Application source identity hash.
+        retrieval_eligible: False until Packet 7 switch commits.
     """
 
     with connection.cursor() as cursor:
@@ -85,10 +90,11 @@ def upsert_source_map(
               document_id, lightrag_workspace, lightrag_doc_id, version_id,
               workspace_key, pipeline_version, config_generation,
               source_content_hash, language, method, score, support,
-              source_hash, target_hash, provenance
+              source_hash, target_hash, provenance, retrieval_eligible
             )
             VALUES (
-              %s, %s, %s, %s, %s, %s, %s, %s, %s, 'hash', 1.0, 1.0, %s, %s, %s::jsonb
+              %s, %s, %s, %s, %s, %s, %s, %s, %s, 'hash', 1.0, 1.0, %s, %s,
+              %s::jsonb, %s
             )
             ON CONFLICT (document_id) DO UPDATE SET
               lightrag_workspace = EXCLUDED.lightrag_workspace,
@@ -105,7 +111,11 @@ def upsert_source_map(
               source_hash = EXCLUDED.source_hash,
               target_hash = EXCLUDED.target_hash,
               provenance = EXCLUDED.provenance,
+              retrieval_eligible = EXCLUDED.retrieval_eligible,
               mapped_at = timezone('utc', now())
+            WHERE app.lightrag_source_map.version_id
+                    IS NOT DISTINCT FROM EXCLUDED.version_id
+               OR app.lightrag_source_map.retrieval_eligible IS FALSE
             """,
             (
                 document_id,
@@ -125,6 +135,7 @@ def upsert_source_map(
                         "config_generation": config_generation,
                     }
                 ),
+                retrieval_eligible,
             ),
         )
 
@@ -139,6 +150,7 @@ def insert_chunk_map(
     vendor_chunk_id: str,
     internal_key: str,
     match: ChunkMatch,
+    retrieval_eligible: bool = True,
 ) -> None:
     """Insert or replace one canonical chunk map row.
 
@@ -151,6 +163,7 @@ def insert_chunk_map(
         vendor_chunk_id: Internal LightRAG chunk token.
         internal_key: Workspace-qualified chunk key.
         match: ``ChunkMatch`` with canonical passage and scores.
+        retrieval_eligible: False until Packet 7 switch commits.
     """
 
     if not isinstance(match, ChunkMatch):
@@ -163,11 +176,11 @@ def insert_chunk_map(
               chunk_id, lightrag_doc_id, lightrag_chunk_id, version_id,
               workspace_key, pipeline_version, config_generation, language,
               method, score, support, source_hash, target_hash,
-              source_span, target_span, provenance
+              source_span, target_span, provenance, retrieval_eligible
             )
             VALUES (
               %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-              %s::jsonb, %s::jsonb, %s::jsonb
+              %s::jsonb, %s::jsonb, %s::jsonb, %s
             )
             ON CONFLICT (chunk_id) DO UPDATE SET
               lightrag_doc_id = EXCLUDED.lightrag_doc_id,
@@ -185,6 +198,7 @@ def insert_chunk_map(
               source_span = EXCLUDED.source_span,
               target_span = EXCLUDED.target_span,
               provenance = EXCLUDED.provenance,
+              retrieval_eligible = EXCLUDED.retrieval_eligible,
               mapped_at = timezone('utc', now())
             """,
             (
@@ -204,6 +218,7 @@ def insert_chunk_map(
                 json.dumps(match.source_span),
                 json.dumps(match.target_span),
                 json.dumps({"internal_chunk_key": internal_key}),
+                retrieval_eligible,
             ),
         )
 
@@ -216,6 +231,7 @@ def insert_evidence_row(
     language: str,
     config_generation: str,
     item: ObjectMapping,
+    retrieval_eligible: bool = True,
 ) -> None:
     """Insert one accepted evidence map row.
 
@@ -226,6 +242,7 @@ def insert_evidence_row(
         language: Version language.
         config_generation: Mapping config digest.
         item: Accepted object mapping with a chunk match.
+        retrieval_eligible: False until Packet 7 switch commits.
     """
 
     if not item.available or item.chunk_id is None or item.match is None:
@@ -238,11 +255,11 @@ def insert_evidence_row(
               graph_object_type, graph_object_id, chunk_id, confidence,
               version_id, workspace_key, pipeline_version, config_generation,
               language, method, score, support, source_hash, target_hash,
-              source_span, target_span, provenance
+              source_span, target_span, provenance, retrieval_eligible
             )
             VALUES (
               %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-              %s::jsonb, %s::jsonb, %s::jsonb
+              %s::jsonb, %s::jsonb, %s::jsonb, %s
             )
             ON CONFLICT (graph_object_type, graph_object_id, chunk_id) DO UPDATE SET
               confidence = EXCLUDED.confidence,
@@ -259,6 +276,7 @@ def insert_evidence_row(
               source_span = EXCLUDED.source_span,
               target_span = EXCLUDED.target_span,
               provenance = EXCLUDED.provenance,
+              retrieval_eligible = EXCLUDED.retrieval_eligible,
               mapped_at = timezone('utc', now())
             """,
             (
@@ -279,6 +297,7 @@ def insert_evidence_row(
                 json.dumps(match.source_span),
                 json.dumps(match.target_span),
                 json.dumps(item.provenance),
+                retrieval_eligible,
             ),
         )
 
@@ -462,7 +481,7 @@ def load_eligibility_reason(
     if not version_elig or not doc_elig:
         return "not_graph_eligible"
     if current is None or UUID(str(current)) != version_id:
-        return "stale_version"
+        return "pending_switch"
     return None
 
 
