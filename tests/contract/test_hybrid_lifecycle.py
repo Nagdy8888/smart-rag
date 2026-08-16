@@ -362,3 +362,144 @@ def test_hybrid_ready_blocked_without_processing_bm25_job() -> None:
             assert row[1] is None
             assert row[2] is None
         connection.rollback()
+
+
+def test_finalize_hybrid_ready_sets_current_for_graph_ineligible() -> None:
+    """Production finalize points retrieval at graph-ineligible Hybrid Ready."""
+
+    version_id = uuid4()
+    document_id = uuid4()
+    job_id = uuid4()
+    with psycopg.connect(resolve_supabase_db_url()) as connection:
+        connection.execute("SET ROLE postgres")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO app.documents (id, title, visibility, graph_eligible)
+                VALUES (%s, 'Ineligible pointer', 'restricted', false)
+                """,
+                (document_id,),
+            )
+            cursor.execute(
+                """
+                INSERT INTO app.document_versions (
+                  id, document_id, version_number, status, graph_eligible,
+                  chunk_set_hash, is_current
+                )
+                VALUES (%s, %s, 1, 'parsing', false, 'hash-ineligible', false)
+                """,
+                (version_id, document_id),
+            )
+            cursor.execute(
+                """
+                INSERT INTO app.bm25_index_jobs (
+                  id, version_id, operation, status, idempotency_key
+                )
+                VALUES (
+                  %s, %s, 'upsert'::app.bm25_job_operation,
+                  'processing'::app.job_status, %s
+                )
+                """,
+                (job_id, version_id, f"bm25:upsert:{version_id}:hash-ineligible"),
+            )
+        connection.execute("SET ROLE app_worker")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT app.finalize_hybrid_ready(%s, 'hash-ineligible', %s)",
+                (version_id, job_id),
+            )
+            cursor.execute(
+                """
+                SELECT d.current_version_id, dv.is_current, dv.status
+                FROM app.documents AS d
+                JOIN app.document_versions AS dv ON dv.id = %s
+                WHERE d.id = %s
+                """,
+                (version_id, document_id),
+            )
+            row = cursor.fetchone()
+        connection.rollback()
+    assert row is not None
+    assert row[0] == version_id
+    assert row[1] is True
+    assert row[2] == "graph_ineligible"
+
+
+def test_finalize_hybrid_ready_keeps_graph_eligible_non_current() -> None:
+    """Graph-eligible replacements must not become current in Phase 3 finalize."""
+
+    document_id = uuid4()
+    old_id = uuid4()
+    new_id = uuid4()
+    job_id = uuid4()
+    with psycopg.connect(resolve_supabase_db_url()) as connection:
+        connection.execute("SET ROLE postgres")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO app.documents (id, title, visibility, graph_eligible)
+                VALUES (%s, 'Eligible pointer', 'company_visible', false)
+                """,
+                (document_id,),
+            )
+            cursor.execute(
+                """
+                INSERT INTO app.document_versions (
+                  id, document_id, version_number, status, graph_eligible,
+                  chunk_set_hash, is_current
+                )
+                VALUES
+                  (%s, %s, 1, 'hybrid_ready', true, 'hash-old', true),
+                  (%s, %s, 2, 'parsing', true, 'hash-new', false)
+                """,
+                (old_id, document_id, new_id, document_id),
+            )
+            cursor.execute(
+                """
+                UPDATE app.documents
+                SET current_version_id = %s, graph_eligible = true
+                WHERE id = %s
+                """,
+                (old_id, document_id),
+            )
+            cursor.execute(
+                """
+                INSERT INTO app.bm25_index_jobs (
+                  id, version_id, operation, status, idempotency_key
+                )
+                VALUES (
+                  %s, %s, 'upsert'::app.bm25_job_operation,
+                  'processing'::app.job_status, %s
+                )
+                """,
+                (job_id, new_id, f"bm25:upsert:{new_id}:hash-new"),
+            )
+        connection.execute("SET ROLE app_worker")
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT app.finalize_hybrid_ready(%s, 'hash-new', %s)",
+                (new_id, job_id),
+            )
+            cursor.execute(
+                "SELECT current_version_id FROM app.documents WHERE id = %s",
+                (document_id,),
+            )
+            current = cursor.fetchone()
+            cursor.execute(
+                "SELECT is_current, status FROM app.document_versions WHERE id = %s",
+                (new_id,),
+            )
+            new_row = cursor.fetchone()
+            cursor.execute(
+                "SELECT is_current FROM app.document_versions WHERE id = %s",
+                (old_id,),
+            )
+            old_row = cursor.fetchone()
+        connection.rollback()
+    assert current is not None
+    assert current[0] == old_id
+    assert new_row is not None
+    assert new_row[0] is False
+    assert new_row[1] == "graph_pending"
+    assert old_row is not None
+    assert old_row[0] is True

@@ -24,12 +24,12 @@ audience: engineering
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | LightRAG runtime attach without DDL | accepted | 5 | [ADR-lightrag-runtime-attach-without-ddl.md](./ADR-lightrag-runtime-attach-without-ddl.md) |
-| Graph eligibility / ACL isolation | planned | 2/5 | TBD |
+| Graph eligibility / ACL isolation | documented (canonical) | 2/5 | [AUTHORIZATION_MODEL.md](../security/AUTHORIZATION_MODEL.md) · [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md) — restricted never `graph_eligible`; resolver rechecks ACL/current/deletion. No separate ADR unless the CHECK or ACL contract changes. |
 | PGTableGraphStorage | accepted with identity envelope | 5 | [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) · [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
-| Canonical vs inference grounding | planned | 5/6 | TBD |
-| Structured-table execution | planned | 4 | TBD |
+| Canonical vs inference grounding | documented (canonical) | 5 | [RETRIEVAL.md](../graph/RETRIEVAL.md) · [GRAPH_MAPPING_CONTRACT.md](../graph/GRAPH_MAPPING_CONTRACT.md) · [MAPPING.md](../graph/MAPPING.md) — LightRAG prose and BM25 snippets are leads/search forms, not citations; resolver maps to canonical chunk UUIDs. Implemented; do not open a new ADR unless the resolver contract changes. |
+| Structured-table execution | documented (canonical) | 4 | [STRUCTURED_TABLE.md](../retrieval/STRUCTURED_TABLE.md) — sandboxed DuckDB, no HTTP table route, no catalog discovery. Packet 9 table Parquet eval is `not_run`. |
 | Reserve-once durable budgets | planned | 6 | TBD |
-| Database workload isolation | planned | 2/10 | TBD |
+| Database workload isolation | documented (canonical) | 2/10 | [06-database-workload-isolation.md](../architecture/06-database-workload-isolation.md) — role timeouts/`work_mem`/`application_name` applied; replica/dedicated LightRAG Postgres remain later-phase options. |
 | Egress enforcement | planned | 3/10 | TBD |
 | Multi-host availability | planned | trigger | see availability doc |
 

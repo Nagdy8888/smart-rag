@@ -17,6 +17,11 @@ from smart_rag_core.jobs.exceptions import (
 from smart_rag_core.jobs.graph_metrics import GraphMetricsService
 from smart_rag_core.jobs.graph_writer import GraphWriterGuard, graph_advisory_lock_keys
 from smart_rag_core.jobs.lightrag_repository import LightragIndexJobRepository
+from smart_rag_core.jobs.limits import (
+    DEFAULT_DAILY_GRAPH_INDEX_BUDGET_USD,
+    DEFAULT_DAILY_INGESTION_BUDGET_USD,
+    DEFAULT_MONTHLY_GRAPH_MAINTENANCE_BUDGET_USD,
+)
 from smart_rag_core.schema.enums import GraphWorkspaceState, JobErrorCategory
 
 from tests.contract.integration_support import (
@@ -52,7 +57,12 @@ def worker_connection() -> Iterator[psycopg.Connection]:
 
 @pytest.fixture(autouse=True)
 def isolate_graph_writer(worker_connection: psycopg.Connection) -> Iterator[None]:
-    """Reset writer lease and graph budget rows without dropping workspaces."""
+    """Reset writer lease, jobs, and budget rows without dropping workspaces.
+
+    Truncates every ``app.budget_reservations`` kind, including leftover
+    ``ingestion_daily`` spend on a dirty shared local database. Graph kind
+    isolation must not depend on that leftover daily total.
+    """
 
     worker_connection.execute("SET ROLE postgres")
     with worker_connection.cursor() as cursor:
@@ -72,13 +82,23 @@ def isolate_graph_writer(worker_connection: psycopg.Connection) -> Iterator[None
         )
         cursor.execute(
             """
-            DELETE FROM app.budget_reservations
-            WHERE reservation_kind IN ('graph_index', 'graph_maintenance')
-            """
+            UPDATE app.company_settings
+            SET
+              daily_ingestion_budget_usd = %s,
+              daily_graph_index_budget_usd = %s,
+              monthly_graph_maintenance_budget_usd = %s
+            WHERE id = '00000000-0000-0000-0000-000000000001'::uuid
+            """,
+            (
+                DEFAULT_DAILY_INGESTION_BUDGET_USD,
+                DEFAULT_DAILY_GRAPH_INDEX_BUDGET_USD,
+                DEFAULT_MONTHLY_GRAPH_MAINTENANCE_BUDGET_USD,
+            ),
         )
         cursor.execute(
             """
-            TRUNCATE app.lightrag_index_jobs RESTART IDENTITY CASCADE
+            TRUNCATE app.budget_reservations, app.lightrag_index_jobs
+            RESTART IDENTITY CASCADE
             """
         )
     worker_connection.execute("SET ROLE app_worker")
@@ -193,12 +213,21 @@ def test_lease_loss_quarantines_workspace(
 def test_graph_budget_kinds_are_isolated(
     worker_connection: psycopg.Connection,
 ) -> None:
-    """Graph index spend must not consume ingestion_daily or maintenance."""
+    """Graph index spend must not consume ingestion_daily or maintenance.
 
-    admission = JobAdmissionService(worker_connection)
-    ingestion = admission.create_ingestion_budget_reservation(
-        estimated_cost_usd=Decimal("20")
+    Seeds committed ``ingestion_daily`` spend at the company cap first so a
+    dirty shared local database cannot make this assertion depend on leftover
+    Hybrid ingest totals. Graph kinds must still admit; Hybrid ingest must
+    remain exhausted; ``ingestion_daily`` is not a valid graph kind.
+    """
+
+    _seed_committed_budget(
+        worker_connection,
+        reservation_kind="ingestion_daily",
+        amount_usd=Decimal(str(DEFAULT_DAILY_INGESTION_BUDGET_USD)),
     )
+    worker_connection.commit()
+    admission = JobAdmissionService(worker_connection)
     graph_index = admission.create_graph_budget_reservation(
         reservation_kind="graph_index",
         estimated_cost_usd=Decimal("0.50"),
@@ -208,14 +237,18 @@ def test_graph_budget_kinds_are_isolated(
         estimated_cost_usd=Decimal("0.10"),
     )
     worker_connection.commit()
-    assert ingestion != graph_index
     assert graph_index != maintenance
-    with pytest.raises(JobAdmissionError) as caught:
+    with pytest.raises(JobAdmissionError) as invalid_kind:
         admission.create_graph_budget_reservation(
             reservation_kind="ingestion_daily",
             estimated_cost_usd=Decimal("0.01"),
         )
-    assert caught.value.reason == "invalid_graph_reservation_kind"
+    assert invalid_kind.value.reason == "invalid_graph_reservation_kind"
+    with pytest.raises(JobAdmissionError) as ingestion_exhausted:
+        admission.create_ingestion_budget_reservation(
+            estimated_cost_usd=Decimal("0.01"),
+        )
+    assert ingestion_exhausted.value.reason == "budget_exhausted"
 
 
 def test_metrics_insufficient_sample_until_maps(
@@ -286,6 +319,48 @@ def test_runtime_role_still_denied_ddl(
         cursor.execute("RELEASE SAVEPOINT denied_ddl")
         cursor.execute("RESET ROLE")
     worker_connection.execute("SET ROLE app_worker")
+
+
+def _seed_committed_budget(
+    connection: psycopg.Connection,
+    *,
+    reservation_kind: str,
+    amount_usd: Decimal,
+) -> None:
+    """Insert one committed reservation so leftover spend is explicit.
+
+    Args:
+        connection: Open connection; role switches to ``postgres`` for insert.
+        reservation_kind: Durable budget kind such as ``ingestion_daily``.
+        amount_usd: Positive committed amount in USD.
+
+    Side Effects:
+        Inserts one ``app.budget_reservations`` row and restores ``app_worker``.
+        Postgres remains the spend authority; Valkey is not consulted.
+    """
+
+    connection.execute("SET ROLE postgres")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO app.budget_reservations (
+              reservation_kind,
+              amount_usd,
+              status,
+              expires_at,
+              committed_at
+            )
+            VALUES (
+              %s,
+              %s,
+              'committed'::app.budget_reservation_status,
+              timezone('utc', now()) + interval '2 hours',
+              timezone('utc', now())
+            )
+            """,
+            (reservation_kind, amount_usd),
+        )
+    connection.execute("SET ROLE app_worker")
 
 
 def _claim_dummy_job(

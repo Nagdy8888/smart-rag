@@ -10,6 +10,8 @@ audience: engineering, reviewers
 
 Canonical packet evidence for Phase 1. Each packet appends its handoff. Do not check a packet from file presence alone.
 
+Cross-phase review: [2026-08-16 Phases 1–5 implementation review](../reviews/2026-08-16-phases-01-05-implementation-review.md) · [close-out](../reviews/2026-08-16-phases-01-05-closeout.md).
+
 ## Packet 1 — targets, budgets, and human sign-off
 
 ### Requirement (quoted)

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "measured_at": "2026-08-16",
+  "pyright_version": "1.1.411",
+  "type_checking_mode": "strict",
+  "command": "uv run pyright --outputjson",
+  "exit_code": 1,
+  "files_analyzed": 414,
+  "error_count": 882,
+  "warning_count": 0,
+  "files_with_errors": 76,
+  "by_tree": {
+    "tests": 488,
+    "packages/core": 348,
+    "apps/agents": 19,
+    "apps/worker": 16,
+    "infra": 11,
+    "apps/backend": 0,
+    "scripts": 0
+  }
+}

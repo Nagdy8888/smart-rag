@@ -162,7 +162,11 @@ an existing `processed` row skips a second insert.
 - `graph_index` against `company_settings.daily_graph_index_budget_usd` (default 20)
 - `graph_maintenance` against `monthly_graph_maintenance_budget_usd` (default 800)
 
-Normal jobs must not consume the maintenance reserve. Every gateway callback
+Normal jobs must not consume the maintenance reserve. Contract
+`tests/contract/test_graph_writer.py::test_graph_budget_kinds_are_isolated`
+truncates `app.budget_reservations` (including leftover `ingestion_daily`)
+and restores company caps before asserting kind isolation, so a dirty shared
+local database cannot exhaust the fixture. Every gateway callback
 goes through `CountedLightRagCallbacks`. Vendor retries stay zero;
 application code owns one retry. Timeout-after-send is ledgers if a vendor
 row exists; a duplicate insert is not issued.

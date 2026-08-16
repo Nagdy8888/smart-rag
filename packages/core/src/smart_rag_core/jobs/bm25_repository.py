@@ -48,6 +48,29 @@ class Bm25IndexJobRepository:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def claim_reconcile(self) -> dict[str, Any] | None:
+        """Claim one stuck processing BM25 job whose lease is null or expired.
+
+        Returns:
+            Claimed job mapping, or ``None`` when no unowned processing row
+            exists. Live leases are not stolen.
+
+        Side Effects:
+            Worker-role ``claim_bm25_reconcile_job`` RPC. Caller commits.
+            Does not increment ``attempt_count``.
+        """
+
+        with self._connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT *
+                FROM app.claim_bm25_reconcile_job(%s, %s)
+                """,
+                (self._lease_owner, self._lease_seconds),
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
     def heartbeat(self, job_id: UUID, lease_token: str) -> None:
         """Renew an active BM25 job lease."""
 
@@ -71,9 +94,27 @@ class Bm25IndexJobRepository:
                 raise JobLeaseError("heartbeat_rejected")
 
     def complete(self, job_id: UUID, lease_token: str) -> dict[str, Any]:
-        """Mark one BM25 job completed."""
+        """Mark one BM25 job completed.
 
-        return self._transition(job_id, lease_token, status=JobStatus.COMPLETED)
+        Args:
+            job_id: Outbox identifier.
+            lease_token: Active lease token from claim or reconcile claim.
+
+        Returns:
+            Updated job row. A second call against an already-completed row is
+            a no-op that returns the current row.
+
+        Raises:
+            JobLeaseError: Lease mismatch while the job is still processing.
+        """
+
+        try:
+            return self._transition(job_id, lease_token, status=JobStatus.COMPLETED)
+        except JobLeaseError:
+            job = self._get_job(job_id)
+            if str(job.get("status")) == JobStatus.COMPLETED.value:
+                return job
+            raise
 
     def fail(
         self,
@@ -131,6 +172,20 @@ class Bm25IndexJobRepository:
         *,
         status: JobStatus,
     ) -> dict[str, Any]:
+        """Apply one terminal status while the lease still owns processing.
+
+        Args:
+            job_id: Outbox identifier.
+            lease_token: Active lease token.
+            status: Target status, typically ``completed``.
+
+        Returns:
+            Updated job row.
+
+        Raises:
+            JobLeaseError: When the lease does not own a processing row.
+        """
+
         with self._connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
@@ -144,6 +199,7 @@ class Bm25IndexJobRepository:
                   updated_at = timezone('utc', now())
                 WHERE id = %s
                   AND lease_token = %s
+                  AND status = 'processing'::app.job_status
                 RETURNING *
                 """,
                 (status.value, job_id, lease_token),
@@ -154,6 +210,18 @@ class Bm25IndexJobRepository:
             return dict(row)
 
     def _get_job(self, job_id: UUID) -> dict[str, Any]:
+        """Load one outbox row by id.
+
+        Args:
+            job_id: Outbox identifier.
+
+        Returns:
+            Job mapping.
+
+        Raises:
+            JobNotFoundError: When the row does not exist.
+        """
+
         with self._connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 "SELECT * FROM app.bm25_index_jobs WHERE id = %s",

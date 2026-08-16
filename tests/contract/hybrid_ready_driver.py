@@ -253,10 +253,9 @@ def promote_graph_ineligible_current(
     """Point retrieval RPCs at a graph-ineligible Hybrid Ready version.
 
     Dense/term/recheck require ``documents.current_version_id`` to equal the
-    chunk version. ``app.activate_graph_ineligible_version`` only accepts
-    status ``hybrid_ready``, but ``finalize_hybrid_ready`` already moved
-    non-graph rows to ``graph_ineligible``. This is the Phase 3 current-pointer
-    flip for those versions.
+    chunk version. Production ``app.finalize_hybrid_ready`` now sets that
+    pointer for graph-ineligible versions. This helper remains an idempotent
+    eval-driver flip when a test path skips that RPC.
 
     Args:
         supabase: Superuser-capable connection.

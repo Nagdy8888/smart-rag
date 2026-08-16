@@ -2,7 +2,7 @@
 title: Phase 4 ranked-ID evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering, reviewers
 ---
 
@@ -11,7 +11,19 @@ audience: engineering, reviewers
 Packet 9 Wave 2 harness for **Phase-4-owned open splits**. Holdout stays sealed.
 Occupancy scoring in `coverage_eval.py` is not Recall@K.
 
-Related: [DATASET_SPEC.md](./DATASET_SPEC.md) · [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [runtime sidecar README](../../tests/fixtures/evaluation/phase4/runtime/README.md)
+## Claim hygiene (do not over-claim)
+
+Packet 9 live ranked-ID used **identity rerank**, not OpenAI Responses
+rerank (`rerank_call_count=0`). The published Recall@10 / exact-code@5 /
+alias@10 numbers are synthetic open-split scores on a compact markdown
+corpus with sidecar-mapped UUIDs. Holdout remains sealed. Locator
+correctness is **not** citation-assembler completeness. Structured-table
+Parquet eval did **not** run (`execute_compiled_query` count 0). Do not
+quote these percents as launch Hybrid quality, Combined gain, or live
+OpenAI rerank evidence. Frozen `hybrid_default_v1` was not retuned. See
+[HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md).
+
+Related: [DATASET_SPEC.md](./DATASET_SPEC.md) · [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md) · [runtime sidecar README](../../tests/fixtures/evaluation/phase4/runtime/README.md)
 
 ## Metric formulas
 
@@ -101,15 +113,20 @@ This harness does not open holdout, start Phase 5, or set wrapper
 ## Live Packet 9 measurements (2026-08-15)
 
 Phase-4-owned open splits only. `holdout_opened=false`. Frozen
-`hybrid_default_v1` not retuned. Sidecar SHA-256 development
+`hybrid_default_v1` not retuned. **Identity rerank**
+(`rerank_call_count=0`); live OpenAI Responses rerank was not in this
+run. Locator column is locator correctness, not citation completeness.
+Table lane: 11/4 cases dispatched; `{case_id}.parquet` was not
+materialized so `execute_compiled_query` ran **0** times (table p95
+`not_run`). Sidecar SHA-256 development
 `b5e8728da85bd227ebc956bfeab9bbd1de668ca39a77468d707fb9adcd40fea8`,
 qualification
 `8786aa5051f16c7abefe087101dc21a872f898fda2980e0bb3f95536bcea7dbd`.
 
-| Split | Recall@10 | Exact-code@5 | Alias@10 | Locator | First-evidence p95 |
-| --- | --- | --- | --- | --- | --- |
-| development | 0.902 | 1.00 | 1.00 | 1.00 | 785 ms |
-| qualification | 0.868 | 1.00 | 1.00 | 1.00 | 601 ms |
+| Split | Recall@10 | Exact-code@5 | Alias@10 | Locator | First-evidence p95 | Rerank |
+| --- | --- | --- | --- | --- | --- | --- |
+| development | 0.902 | 1.00 | 1.00 | 1.00 | 785 ms | identity (`rerank_call_count=0`) |
+| qualification | 0.868 | 1.00 | 1.00 | 1.00 | 601 ms | identity (`rerank_call_count=0`) |
 
 See [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
 Packet 9.

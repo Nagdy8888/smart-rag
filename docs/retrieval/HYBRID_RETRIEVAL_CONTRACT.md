@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -19,7 +19,27 @@ Packet 6 freezes per-class ``coverage_score`` thresholds at ``0.65`` in the
 hashed artifact ``retrieval/frozen/hybrid_default_v1.json``. Packet 8 froze
 those values as the winning profile and recorded a holdout **no-go**. Holdout is never
 used for tuning. Unequal RRF weights and a different ``rrf_k`` were **not**
-selected.
+selected. Frozen profile values in this file were **not** retuned after Packet 9.
+
+## Claim hygiene (Packet 9 metrics)
+
+Do not quote Hybrid Recall@10 / exact-code@5 / alias@10 as launch, Combined,
+or production quality without these qualifiers. Profile numbers above stay
+frozen; this section does not retune them.
+
+- Corpus and labels are synthetic (`synthetic_provisional`); compact
+  markdown; sidecar-mapped UUIDs. Holdout remains sealed
+  (`holdout_opened=false`).
+- Packet 9 live ranked-ID used **identity rerank**
+  (`rerank_call_count=0`), not live OpenAI Responses rerank. The rerank
+  contract in this file exists; the published Recall@K numbers do not
+  include it.
+- Locator correctness is not citation-assembler completeness (QT-EVAL-002
+  locators ≠ citation completeness).
+- Structured-table labeled Parquet eval did **not** run
+  (`execute_compiled_query` count 0); table p95 is `not_run`.
+
+See [PHASE4_RANKED_IDS.md](../evaluation/PHASE4_RANKED_IDS.md).
 
 Related: [ARABIC_NORMALIZATION.md](./ARABIC_NORMALIZATION.md) ·
 [BM25_PROJECTION_CONTRACT.md](./BM25_PROJECTION_CONTRACT.md) ·
@@ -34,6 +54,7 @@ Related: [ARABIC_NORMALIZATION.md](./ARABIC_NORMALIZATION.md) ·
 [PHASE4_FREEZE.md](../evaluation/PHASE4_FREEZE.md) ·
 [PHASE4_ABLATIONS.md](../evaluation/PHASE4_ABLATIONS.md) ·
 [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md) ·
+[PHASE4_RANKED_IDS.md](../evaluation/PHASE4_RANKED_IDS.md) ·
 [phase-04 evidence](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Protocol
@@ -270,7 +291,7 @@ and [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md). Winning profile remain
 | --- | --- | --- |
 | Cache TTLs / Valkey store | 8 | still interface only; IDs/ranks plus mandatory recheck |
 | Unequal RRF channel weights | 8 | not selected; no ranked-ID evidence |
-| Live Hybrid Recall@10 / citation percents | 8 | Packet 8 unverified; Packet 9 measured Phase-4-owned open-split Recall@K (holdout sealed) |
+| Live Hybrid Recall@10 / citation percents | 8 | Packet 8 unverified; Packet 9 measured synthetic open-split Recall@K with **identity rerank** (`rerank_call_count=0`); holdout sealed; locators ≠ citation completeness; table Parquet eval `not_run` |
 
 ## Authorization negatives
 

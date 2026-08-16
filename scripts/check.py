@@ -110,7 +110,7 @@ class CheckRunner:
                     return result
             return 0
 
-        for command in self._commands_for_tier(tier):
+        for command in self.commands_for_tier(tier):
             print(f"[{tier}] {command.label}", flush=True)
             print(f"$ {' '.join(command.arguments)}", flush=True)
             try:
@@ -130,7 +130,7 @@ class CheckRunner:
                 return completed.returncode
         return 0
 
-    def _commands_for_tier(self, tier: Tier) -> tuple[Command, ...]:
+    def commands_for_tier(self, tier: Tier) -> tuple[Command, ...]:
         """Build exact child commands for a non-composite tier.
 
         Args:
@@ -163,7 +163,13 @@ class CheckRunner:
                     (*python_module, "ruff", "check", "."),
                 ),
             ),
-            "types": (Command("Pyright strict typing", (*python_module, "pyright")),),
+            "types": (
+                Command(
+                    "Pyright error-count ratchet",
+                    (self._python, "scripts/ci/check_pyright_baseline.py"),
+                ),
+                Command("Pyright strict typing", (*python_module, "pyright")),
+            ),
             "unit": (
                 Command(
                     "Python unit tests",

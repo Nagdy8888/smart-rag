@@ -1,10 +1,13 @@
 ---
 name: hybrid-graph-rag-phase-04-hybrid-rag
 phase: 4
-status: pending
+status: complete
 depends_on: [1, 2, 3]
 source_plan: ../hybrid-graph-rag_ab5281ef.plan.md
 global_contract: ./00-global-contracts.md
+completed: 2026-08-16
+accepted_by: "user (Cursor chat)"
+acceptance_text: "2026-08-16 review close-out: engineering-complete; holdout sealed; not production v1"
 ---
 
 # Phase 4: Hybrid RAG
@@ -52,7 +55,9 @@ Complete these in order. A checked box requires committed implementation evidenc
 6. [x] Calibrate coverage/refusal by query class before the immutable holdout and prohibit unsupported advanced methods.
 7. [x] Implement the declarative, sandboxed structured-table path with exact workbook/sheet/range provenance.
 8. [x] Publish ablations, quality, latency, cost, citation, ACL, and fallback evidence; freeze winning versioned profiles.
-9. [ ] Close Hybrid engineering gates on Phase-4-owned open splits: end-to-end retrieve, live ranked-ID recall, citation locators, first-evidence p95, and the holdout-waiver ADR; do not open the synthetic holdout.
+9. [x] Close Hybrid engineering gates on Phase-4-owned open splits: end-to-end retrieve, live ranked-ID recall, citation locators, first-evidence p95, and the holdout-waiver ADR; do not open the synthetic holdout.
+
+Packet 9 is engineering-close per [`docs/adr/ADR-phase4-engineering-close.md`](../../../docs/adr/ADR-phase4-engineering-close.md). Phase 4 is **engineering-complete** (holdout sealed; not production v1). The independently SME-sealed v1 holdout remains a launch blocker.
 
 ## Cheap-model execution protocol
 
@@ -568,7 +573,7 @@ Every inferred/normalized field carries typed value, confidence in `[0,1]`, and 
 - Phase 6 owns final query LangGraph, route/correction/escalation budgets, Combined/Composite composition, answer/verifier/summary prompts, SSE/API, production tracing/redaction, feedback, and online evaluators.
 - Phase 8 owns the complete frontend/tool UX and client-side rendering tests.
 - A label for later-phase behavior is not implementation or passing evidence in Phase 4.
-- Phase 4 remains pending until packet 9 evidence and client/user acceptance are complete. Packet 8 no-go plus packet 9 engineering close is the accepted path when the SME holdout is waived for Phase 4 only.
+- Phase 4 is engineering-complete after Packet 9 evidence and user acceptance on 2026-08-16. Packet 8 no-go plus Packet 9 engineering close is the accepted path when the SME holdout is waived for Phase 4 only. The v1 holdout remains sealed and is still a launch blocker; this close is not production v1.
 
 ## Phase sequence requirement
 

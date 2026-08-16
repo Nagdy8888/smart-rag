@@ -111,6 +111,29 @@ def test_graph_index_budget_ignores_ingestion_daily() -> None:
     assert inserted[1] != "ingestion_daily"
 
 
+def test_graph_index_budget_ignores_exhausted_ingestion_daily() -> None:
+    """Graph index admission must not read leftover ``ingestion_daily`` spend."""
+
+    connection = MagicMock()
+    cursor = MagicMock()
+    connection.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchone.side_effect = [
+        (Decimal("20"),),
+        (Decimal("0"),),
+    ]
+    service = JobAdmissionService(connection)
+    reservation_id = service.create_graph_budget_reservation(
+        reservation_kind="graph_index",
+        estimated_cost_usd=Decimal("0.50"),
+    )
+    assert reservation_id is not None
+    kind_filters = [
+        str(call.args[0]) for call in cursor.execute.call_args_list if call.args
+    ]
+    assert any("graph_index" in sql for sql in kind_filters)
+    assert not any("ingestion_daily" in sql for sql in kind_filters)
+
+
 def test_graph_maintenance_kind_rejected_as_index() -> None:
     """Unknown graph reservation kinds fail closed."""
 

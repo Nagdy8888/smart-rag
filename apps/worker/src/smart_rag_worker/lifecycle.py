@@ -45,6 +45,7 @@ from smart_rag_core.settings.worker import WorkerSettings
 
 from smart_rag_worker.bm25_runner import Bm25WorkerLoop
 from smart_rag_worker.graph_runner import GraphWorkerLoop
+from smart_rag_worker.privileged_storage import load_worker_privileged_storage_secret
 
 LOGGER = logging.getLogger(__name__)
 
@@ -152,13 +153,21 @@ class WorkerLifecycle:
         return postgres_url.get_secret_value()
 
     def _graph_config(self) -> dict[str, object]:
-        """Build configurable graph settings from worker env."""
+        """Build configurable graph settings from worker env.
 
-        storage_secret = (
-            self._settings.supabase_storage_admin_secret.get_secret_value()
-            if self._settings.supabase_storage_admin_secret is not None
-            else None
-        )
+        Returns:
+            LangGraph ``configurable`` mapping. ``storage_admin_secret`` comes
+            from the isolated worker Storage loader, never ``WorkerSettings``.
+
+        Raises:
+            JobRepositoryError: If ``SUPABASE_DB_URL`` is unset.
+
+        Side Effects:
+            Reads ``SUPABASE_STORAGE_ADMIN_SECRET`` through
+            ``load_worker_privileged_storage_secret``.
+        """
+
+        storage_secret = load_worker_privileged_storage_secret()
         crawl_proxy = (
             str(self._settings.crawl_proxy_url)
             if self._settings.crawl_proxy_url is not None

@@ -10,6 +10,8 @@ audience: engineering, reviewers
 
 Canonical packet evidence. Packet 1 creates this file; later packets append.
 
+Cross-phase review: [2026-08-16 Phases 1–5 implementation review](../reviews/2026-08-16-phases-01-05-implementation-review.md) · [close-out](../reviews/2026-08-16-phases-01-05-closeout.md).
+
 ## Packet 1 — capability and embedding qualification
 
 ### Requirement

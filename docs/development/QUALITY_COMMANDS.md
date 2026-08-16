@@ -2,7 +2,7 @@
 title: Quality commands
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering
 ---
 
@@ -45,6 +45,19 @@ uv run python scripts/ci/check_phase2_integration.py
 ```
 
 Tiers hard-fail (no `|| true`). Zero collected tests fail the unit/contract tiers.
+The `types` tier stays in `FAST_TIERS` and still invokes `python -m pyright`
+strict over `apps/`, `packages/core`, `scripts`, `tests`, and `infra/crawl-proxy`
+(`pyproject.toml` `[tool.pyright]`). Packet-scoped “zero new errors” is not a
+pass. Full-repo Pyright was **882** errors on 2026-08-16 (exit 1); the types
+tier remains red until that count is 0. The same tier also runs
+`scripts/ci/check_pyright_baseline.py`, which fails only when the count
+**increases** above the recorded baseline. The ratchet is not a waiver. See
+[PYRIGHT_BASELINE.md](./PYRIGHT_BASELINE.md).
+
+```powershell
+uv run python scripts/ci/check_pyright_baseline.py
+```
+
 The frontend tier runs `next typegen` before standalone `tsc --noEmit`, so
 route-aware `PageProps` and `LayoutProps` are available on a clean checkout.
 Markdown checks cover maintained documentation. Preserved historical reviews in
@@ -66,4 +79,4 @@ docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb30
 pre-buffering that Python bindings do not expose. Packet 8 keeps
 `pyarrow==19.0.1`. See [ADR-cve-pin-patch-2026-08.md](../adr/ADR-cve-pin-patch-2026-08.md).
 
-[docs index](../README.md) · [CI tiers](./CI_TIERS.md)
+[docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md)

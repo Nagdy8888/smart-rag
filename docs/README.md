@@ -24,7 +24,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [development/phase-01-foundation-evidence.md](./development/phase-01-foundation-evidence.md) | engineering-lead | accepted | 2026-08-13 | eng, reviewers |
 | [development/phase-02-identity-data-evidence.md](./development/phase-02-identity-data-evidence.md) | engineering-lead | accepted | 2026-08-13 | eng, reviewers |
 | [development/phase-03-ingestion-evidence.md](./development/phase-03-ingestion-evidence.md) | engineering-lead | accepted | 2026-08-15 | eng, reviewers |
-| [development/phase-04-hybrid-rag-evidence.md](./development/phase-04-hybrid-rag-evidence.md) | engineering-lead | pending | 2026-08-15 | eng, reviewers |
+| [development/phase-04-hybrid-rag-evidence.md](./development/phase-04-hybrid-rag-evidence.md) | engineering-lead | accepted | 2026-08-16 | eng, reviewers |
 | [development/phase-05-graphrag-evidence.md](./development/phase-05-graphrag-evidence.md) | engineering-lead | accepted | 2026-08-16 | eng, reviewers |
 | [graph/LIGHTRAG_CONTRACT.md](./graph/LIGHTRAG_CONTRACT.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [graph/ADAPTER_LIFECYCLE.md](./graph/ADAPTER_LIFECYCLE.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
@@ -50,6 +50,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/WORKSPACE_BOUNDARIES.md](./development/WORKSPACE_BOUNDARIES.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/QUALITY_COMMANDS.md](./development/QUALITY_COMMANDS.md) | engineering-lead | draft | 2026-08-15 | eng |
+| [development/PYRIGHT_BASELINE.md](./development/PYRIGHT_BASELINE.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [development/CI_TIERS.md](./development/CI_TIERS.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/DEPENDENCY_UPDATES.md](./development/DEPENDENCY_UPDATES.md) | engineering-lead | draft | 2026-08-15 | eng |
 | [adr/README.md](./adr/README.md) | engineering-lead | draft | 2026-08-15 | eng |
@@ -100,5 +101,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](./runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) | engineering-lead | draft | 2026-08-16 | eng, ops |
 | [runbooks/lightrag-schema-bootstrap.md](./runbooks/lightrag-schema-bootstrap.md) | engineering-lead | draft | 2026-08-16 | eng, ops |
 | [reviews/2026-08-12-hybrid-graph-rag-plan-review.md](./reviews/2026-08-12-hybrid-graph-rag-plan-review.md) | engineering-lead | verified | 2026-08-12 | eng |
+| [reviews/2026-08-16-phases-01-05-implementation-review.md](./reviews/2026-08-16-phases-01-05-implementation-review.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
+| [reviews/2026-08-16-phases-01-05-closeout.md](./reviews/2026-08-16-phases-01-05-closeout.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
 
 Back to [root README](../README.md).

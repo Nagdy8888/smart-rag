@@ -2,7 +2,7 @@
 title: BM25 projection architecture
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-16
 audience: engineering
 phase_packet: Phase 2 Packet 6
 ---
@@ -80,6 +80,30 @@ flowchart TB
   ids --> recheck["Supabase ACL/current-version RPC"]
   recheck --> fusion["Hybrid fusion"]
 ```
+
+## Outbox reconcile (P2-4)
+
+The Supabase-to-ParadeDB boundary is a two-database saga. A worker can finish a
+verified ParadeDB upsert (and even Hybrid Ready finalize) and still leave
+`app.bm25_index_jobs.status = processing` if it crashes before `complete()`, or
+if a driver marks the row `processing` without a lease.
+
+`Bm25WorkerLoop.process_once` therefore:
+
+1. Claims stuck `processing` rows whose lease is **null or expired** via
+   `app.claim_bm25_reconcile_job` (`app_worker` only; live leases are not stolen).
+2. Re-runs the Hybrid Ready ParadeDB verify contract (row IDs, content hashes,
+   active index/normalization version, deterministic sample queries). Delete jobs
+   verify absence.
+3. Marks `completed` only when verify still holds. Pre-hybrid versions may call
+   `finalize_hybrid_ready` after that verify. Verify failure uses the existing
+   fail/retry/dead-letter path and **never** fabricates Hybrid Ready.
+4. A second reconcile against an already-completed row is a no-op.
+
+Pending jobs still use `app.claim_bm25_index_job` and the upsert/delete path.
+
+Related worker: `apps/worker/src/smart_rag_worker/bm25_runner.py`. Core adapter
+and verify stay in `packages/core`.
 
 ## Verification
 

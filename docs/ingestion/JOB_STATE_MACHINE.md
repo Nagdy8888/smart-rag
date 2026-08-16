@@ -2,7 +2,7 @@
 title: Durable job state machine
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: engineering
 ---
 
@@ -81,7 +81,16 @@ stateDiagram-v2
   bm25_pending --> bm25_proc: worker claim high priority deletes first
   bm25_proc --> bm25_done: ParadeDB projection verified
   bm25_proc --> bm25_pending: transient fail
+  bm25_proc --> bm25_done: reconcile verify still holds
+  bm25_proc --> bm25_pending: reconcile verify fail plus backoff
 ```
+
+Stuck `processing` rows with a null or expired lease are claimed by
+`app.claim_bm25_reconcile_job`. The worker loop reconciles one such row before
+claiming a pending upsert so a verified projection cannot sit in `processing`
+forever. Verify uses the same ID/hash/index-version/sample-query contract as
+Hybrid Ready. The worker does not mark `completed` unless that verify still
+holds.
 
 ## Graph handoff (LightRAG index jobs)
 
@@ -150,7 +159,8 @@ stateDiagram-v2
 
 Retrieval RPCs (`retrieve_dense_candidates`, `retrieve_term_candidates`,
 `recheck_retrieval_candidates`) only read chunks whose version equals
-`documents.current_version_id`. Graph-ineligible Hybrid Ready versions must
-receive that pointer (`promote_graph_ineligible_current` in the Hybrid Ready
-driver) because `app.activate_graph_ineligible_version` still requires status
-`hybrid_ready` and finalize already moved ineligible rows to `graph_ineligible`.
+`documents.current_version_id`. Production `app.finalize_hybrid_ready` sets that
+pointer for **graph-ineligible** versions (and `is_current`) in the same
+transaction as Hybrid Ready. **Graph-eligible** replacements stay non-current
+until Phase 5 `switch_graph_document_version`. `app.activate_graph_ineligible_version`
+remains the explicit Phase 3 RPC and accepts `hybrid_ready` or `graph_ineligible`.

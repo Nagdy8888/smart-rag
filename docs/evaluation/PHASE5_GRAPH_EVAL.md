@@ -14,6 +14,16 @@ infrastructure. Live LightRAG extraction precision/recall on a
 company corpus is **unverified**. Combined answer quality is
 **not claimed**. Holdout stays sealed.
 
+## Fixture floors are not Combined quality
+
+Per-language CoverageSlice floors below (en 1.00, ar/mixed 0.85) prove
+**fixture mapping/support/survival gates**, not live extraction P/R and
+not Combined answer quality. Phase 6 must **not** score QT-EVAL-009
+(+10 pp relationship/multi-hop gain) against these floors. Combined +10 pp
+requires live mapping/extraction on the 15 labeled `graph_mapping`
+documents (or a newly collected set). `P8-EXTRACT-LIVE` remains
+`unverified`. See [PHASE6_HANDOFF.md](../graph/PHASE6_HANDOFF.md).
+
 Related: [FROZEN_GRAPH_MANIFEST.md](../graph/FROZEN_GRAPH_MANIFEST.md) ·
 [PHASE6_HANDOFF.md](../graph/PHASE6_HANDOFF.md) ·
 [SCALING_OPTIONS.md](../graph/SCALING_OPTIONS.md) ·
@@ -67,7 +77,8 @@ flowchart TD
 GRAPH_MAPPING qualification rows are labeled queries, not
 extraction gold. ARABIC_MIXED rows are Phase 4 Hybrid labels.
 Arabic/mixed mapping floors are proven by CoverageSlice fixtures,
-not by live LightRAG output on those queries.
+not by live LightRAG output on those queries. Do not treat those
+fixture ratios as Combined quality or as live extraction P/R.
 
 ## Per-language and per-type fixture metrics
 
@@ -167,5 +178,5 @@ No live mapping-verified documents/hour or full-rebuild cost. Sequential jobs at
 | `P8-CALLBACKS` | Hidden keyword/answer and per-statement Hybrid | `pass_fixture` | keyword_extract=0; answer_generate=0; query support_searches=0 | contract callback spy plus retrieve_graph fail-closed hidden callback |
 | `P8-ENVELOPE` | Seven-day rebuild envelope | `reduced` | 2000 docs / 200000 chunks | reduced to 15 labeled graph_mapping documents; 2k/200k unproven; bulk onboarding blocked |
 | `P8-RESERVE` | Graph maintenance reserve | `pass_fixture` | max(USD 800, 4 x measured full-rebuild cost) | measured rebuild cost unavailable so floor USD 800 applies; unfunded rebuild already quarantines (Packet 7) |
-| `P8-COMBINED` | Combined relationship/multi-hop +10pp | `deferred_phase_6` | ≥10 percentage points over Hybrid (QT-EVAL-009) | Phase 5 proves graph infrastructure, mapping, resolver, and envelope only. Phase 6 owns Combined fusion, verifier/citations, holdout, and the at-least-10-point relationship/multi-hop gain. This packet does not claim Combined answer quality. |
+| `P8-COMBINED` | Combined relationship/multi-hop +10pp | `deferred_phase_6` | ≥10 percentage points over Hybrid (QT-EVAL-009) | Phase 5 proves graph infrastructure, mapping, resolver, and envelope only. Phase 6 owns Combined fusion, verifier/citations, holdout, and the at-least-10-point relationship/multi-hop gain. This packet does not claim Combined answer quality. CoverageSlice fixture floors must not be used as Combined quality. Live extraction P/R is unverified (`P8-EXTRACT-LIVE`). |
 | `P8-HOLDOUT` | Launch holdout sealed | `pass_fixture` | HoldoutAccess.denied(); no holdout labels | development and qualification loaders only |

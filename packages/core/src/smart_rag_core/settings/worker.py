@@ -91,14 +91,8 @@ class WorkerSettings(SharedSettings):
     supabase_url: str | None = Field(
         default=None,
         validation_alias="SUPABASE_URL",
-        description="Supabase project URL for privileged Storage operations.",
+        description="Supabase project URL for Storage HTTP operations.",
         json_schema_extra={"security": "internal"},
-    )
-    supabase_storage_admin_secret: SecretStr | None = Field(
-        default=None,
-        validation_alias="SUPABASE_STORAGE_ADMIN_SECRET",
-        description="Storage Admin secret for worker promotion/copy/delete.",
-        json_schema_extra={"security": "secret"},
     )
     clamav_host: str = Field(
         default="clamav",

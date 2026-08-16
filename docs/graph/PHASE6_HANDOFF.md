@@ -14,6 +14,34 @@ infrastructure, mapping, resolver, and envelope only.
 
 **Phase 5 does not claim Combined answer quality.** Phase 6 owns Combined fusion, verifier/citations in final answers, the immutable launch holdout, and the at-least-10-point relationship/multi-hop gain over Hybrid (QT-EVAL-009). An unexecuted Phase 6 label is not a Packet 8 pass.
 
+## Claim hygiene (do not over-claim)
+
+Phase 6 query, SSE, Combined fusion, and UI copy must keep these lines
+honest. They are not optional footnotes.
+
+- **Real company content stays prohibited.** Deny-by-default external
+  processing remains in force until provider matrix rows are `verified`.
+  Do not ingest client files on the answering path. See
+  [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md).
+- **Hybrid Recall@10 / exact-code@5 / alias@10 are synthetic open-split
+  numbers with identity rerank and a sealed holdout.** Packet 9 used
+  `rerank_call_count=0` (not live OpenAI Responses rerank), compact
+  markdown, sidecar-mapped UUIDs. Do not quote those percents as launch
+  Hybrid quality or Combined gain. See
+  [PHASE4_RANKED_IDS.md](../evaluation/PHASE4_RANKED_IDS.md) and
+  [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md).
+- **Advertised GraphRAG envelope is 15 labeled `graph_mapping` documents.**
+  Source-chunk capacity is unverified. Bulk onboarding is blocked. Do not
+  show 2,000 documents / 200,000 chunks as current capacity. See
+  [SCALING_OPTIONS.md](./SCALING_OPTIONS.md).
+- **Combined +10 pp (QT-EVAL-009) must use live mapping/extraction** on the
+  15 labeled documents (or a newly collected set). CoverageSlice fixture
+  language floors in [PHASE5_GRAPH_EVAL.md](../evaluation/PHASE5_GRAPH_EVAL.md)
+  are **not** Combined quality and are **not** live extraction P/R.
+- **Query graph and frontend remain scaffolds.** Chat, SSE, Combined
+  fusion, and Stitch UI are not implemented. Do not pretend answering
+  works.
+
 Related: [FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
 [PHASE5_GRAPH_EVAL.md](../evaluation/PHASE5_GRAPH_EVAL.md) ·
 [RETRIEVAL.md](./RETRIEVAL.md) ·
@@ -22,6 +50,11 @@ Related: [FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
 [SCALING_OPTIONS.md](./SCALING_OPTIONS.md) ·
 [DATASET_SPEC.md](../evaluation/DATASET_SPEC.md) ·
+[PHASE4_RANKED_IDS.md](../evaluation/PHASE4_RANKED_IDS.md) ·
+[HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md) ·
+[OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) ·
+[ADR-hybrid-pilot-release-cut.md](../adr/ADR-hybrid-pilot-release-cut.md) ·
+[RISK_REGISTER.md](../development/RISK_REGISTER.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [docs index](../README.md)
 
@@ -119,13 +152,14 @@ opening exists. Holdout default remains `HoldoutAccess.denied()`.
 | Class | Runtime owner | Phase 5 use | Phase 6 use |
 | --- | --- | --- | --- |
 | `graph_mapping` | Phase 5 | Fixture mapping/survival, not live extraction P/R | Repair/mapping regressions |
-| `relationship` | Phase 5 and 6 | Labels only; no Combined fusion | Combined vs Hybrid +10pp |
-| `multi_hop` | Phase 5 and 6 | Labels only | Combined vs Hybrid +10pp |
+| `relationship` | Phase 5 and 6 | Labels only; no Combined fusion | Combined vs Hybrid +10pp on **live** mapping/extraction, not CoverageSlice fixtures |
+| `multi_hop` | Phase 5 and 6 | Labels only | Combined vs Hybrid +10pp on **live** mapping/extraction, not CoverageSlice fixtures |
 | `arabic_mixed` | Phase 4 | Mapping language gate fixtures | Profile/retrieval, not graph gold |
 
 Live LightRAG extraction precision/recall on the qualification corpus is
 **unverified** in Packet 8. Do not treat fixture CoverageSlice gates as
-that measurement.
+that measurement. Combined +10 pp (QT-EVAL-009) must use live
+mapping/extraction on the 15 labeled documents, not these fixture floors.
 
 ## Explicit ownership split
 

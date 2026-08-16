@@ -29,9 +29,9 @@ The signed Phase 1 graph envelope is 2,000 current documents and 200,000
 graph source chunks with a seven-day clean rebuild. Packet 8 did not measure
 a full rebuild. Sequential jobs at the 600-second index deadline cannot
 finish 2,000 documents in seven days. The advertised envelope is therefore
-**reduced** to qualification-scale labeled `graph_mapping` volume and bulk
-onboarding is blocked. Crossing a trigger below opens an ADR that compares
-these options with continued Hybrid-only disablement.
+**reduced to 15 labeled `graph_mapping` documents** (source-chunk capacity
+unverified) and bulk onboarding is blocked. Crossing a trigger below opens
+an ADR that compares these options with continued Hybrid-only disablement.
 
 ```mermaid
 flowchart TD
@@ -133,4 +133,5 @@ tombstone age, reserve remaining, and whether Combined is even enabled
 - Implementing any option above
 - Query-agent, SSE, or Combined fusion (Phase 6)
 - Claiming the 2,000 / 200,000 envelope is proven
+- Advertising more than 15 labeled `graph_mapping` documents as current GraphRAG capacity
 - Raising Combined relationship/multi-hop quality by 10 percentage points

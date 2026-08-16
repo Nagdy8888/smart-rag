@@ -2,7 +2,7 @@
 title: Protected migration and privileged credentials
 owner: engineering-lead
 status: proven-local / unverified-managed
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-16
 audience: engineering, security, ops
 phase_packet: Phase 2 Packet 6
 ---
@@ -17,10 +17,10 @@ phase_packet: Phase 2 Packet 6
 | Supabase CLI | `npx supabase db reset` / `migration up` using local stack credentials |
 | Runtime containers | `api` / `worker` / `frontend` receive only least-privilege URLs (`app_api`, BM25 reader/writer, Valkey) |
 | Auth Admin secret | Isolated boundary module only (`apps/backend/.../auth_admin/`); absent from `SharedSettings` / `BackendSettings` |
-| Storage Admin secret | Isolated boundary module only (`apps/backend/.../storage_admin/`); absent from general settings |
+| Storage Admin secret | Isolated boundary modules only (`apps/backend/.../storage_admin/` and worker `privileged_storage`); absent from `SharedSettings` / `BackendSettings` / `WorkerSettings` / `AgentSettings` |
 | `service_role` | Never declared on general runtime settings; never shipped to frontend |
 
-Contract: `tests/contract/test_privileged_secrets_absent.py` plus Packet 4/5 secret-scan tests.
+Contract: `tests/contract/test_privileged_secrets_absent.py` plus Packet 4/5 secret-scan tests. That contract inspects runtime settings **field names and env aliases only**; isolated package or loader names such as `storage_admin` / `load_privileged_storage_settings` are not treated as secret declarations.
 
 ## Runtime must not load bootstrap
 

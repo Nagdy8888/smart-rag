@@ -135,9 +135,11 @@ These placeholders are consumed by Docker Compose rather than Python settings:
 `LANGSMITH_API_KEY` is a typed SharedSettings secret, still optional while
 tracing is off. Backend Packet 4+ reads `SUPABASE_URL` /
 JWKS settings through `BackendSettings`. Privileged secrets
-`SUPABASE_AUTH_ADMIN_SECRET` and `SUPABASE_STORAGE_ADMIN_SECRET` load only
-inside `smart_rag_api.auth_admin` and `smart_rag_api.storage_admin`
-respectively—never through `SharedSettings`.
+`SUPABASE_AUTH_ADMIN_SECRET` and `SUPABASE_STORAGE_ADMIN_SECRET` are never
+declared on `SharedSettings`, `BackendSettings`, `WorkerSettings`, or
+`AgentSettings`. Auth Admin loads through `smart_rag_api.auth_admin`. Storage
+Admin loads through `smart_rag_api.storage_admin` (API) and
+`smart_rag_worker.privileged_storage` (worker).
 
 ## Failure and security behavior
 

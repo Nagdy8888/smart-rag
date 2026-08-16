@@ -10,10 +10,10 @@ todos:
     status: completed
   - id: phase-03-ingestion
     content: Execute Phase 3: Ingestion from its dedicated plan file.
-    status: pending
+    status: completed
   - id: phase-04-hybrid-rag
     content: Execute Phase 4: Hybrid RAG from its dedicated plan file.
-    status: pending
+    status: completed
   - id: phase-05-graphrag
     content: Execute Phase 5: GraphRAG from its dedicated plan file.
     status: completed

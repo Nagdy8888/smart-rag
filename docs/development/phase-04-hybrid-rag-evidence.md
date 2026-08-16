@@ -1,8 +1,8 @@
 ---
 title: Phase 4 hybrid RAG evidence
 owner: engineering-lead
-status: pending
-last-reviewed: 2026-08-15
+status: accepted
+last-reviewed: 2026-08-16
 audience: engineering, reviewers
 phase: 4
 ---
@@ -11,8 +11,11 @@ phase: 4
 
 Canonical packet evidence and exit record for
 [Phase 4](../../.cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md).
-Packet 1 creates this file; later packets append. Phase status remains
-`pending` until Packet 9 evidence and explicit user acceptance.
+Packet 1 created this file; later packets appended. Phase 4 is
+**engineering-complete** after Packet 9 evidence and explicit user
+acceptance on 2026-08-16. The synthetic holdout stays sealed. This is
+not production v1. Packet 8 `launch_decision=no_go` remains the holdout
+record.
 
 Related: [DATASET_SPEC.md](../evaluation/DATASET_SPEC.md) ·
 [QUERY_PROFILE_LABELING.md](../evaluation/QUERY_PROFILE_LABELING.md) ·
@@ -23,6 +26,8 @@ Related: [DATASET_SPEC.md](../evaluation/DATASET_SPEC.md) ·
 [PHASE4_ABLATIONS.md](../evaluation/PHASE4_ABLATIONS.md) ·
 [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md) ·
 [HYBRID_TUNING.md](../retrieval/HYBRID_TUNING.md) ·
+[2026-08-16 Phases 1–5 implementation review](../reviews/2026-08-16-phases-01-05-implementation-review.md) ·
+[close-out](../reviews/2026-08-16-phases-01-05-closeout.md) ·
 [docs index](../README.md)
 
 ## Prerequisites
@@ -1204,3 +1209,86 @@ force a pass.
 **Request for user acceptance:** Packet 9 engineering-close evidence is
 ready. Phase 4 wrapper checkbox 9 and `status: complete` stay unchecked
 until you accept this record. Phase 5 will not start in this change.
+
+**Accepted 2026-08-16:** user (Cursor chat) accepted this Packet 9
+record via the 2026-08-16 Phases 1–5 implementation-review close-out.
+See the [Phase 4 engineering-complete exit record](#phase-4-engineering-complete-exit-record-accepted-2026-08-16)
+below. Holdout remains sealed. This is not production v1.
+
+## Phase 4 engineering-complete exit record (accepted 2026-08-16)
+
+**Posture:** engineering-complete. Holdout sealed. Not production v1.
+
+The user accepted this close-out by asking to apply the 2026-08-16
+Phases 1–5 implementation review’s recommended ledger fix (findings
+P1-1, P1-3, P3-1). Wrapper Packet 9 is checked against the Packet 9
+evidence already in this file. The synthetic holdout was not opened.
+
+Related: [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md)
+· [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md)
+· [2026-08-16 review](../reviews/2026-08-16-phases-01-05-implementation-review.md)
+· [close-out](../reviews/2026-08-16-phases-01-05-closeout.md)
+
+### Packet 9 checkbox vs existing evidence (P1-3)
+
+| Packet 9 acceptance check | Existing Packet 9 evidence |
+| --- | --- |
+| Single `HybridRetriever.retrieve` returns authorized canonical IDs and locators; BM25 snippets are never evidence | `hybrid_run.py`; locator **1.000** on both open splits |
+| Phase-4-owned open-split Recall@10 / exact-code@5 / alias@10 meet QT-EVAL-006/007/008 or an honest miss | development **0.902 / 1.000 / 1.000**; qualification **0.868 / 1.000 / 1.000**; two development repairs then one qualification confirm; frozen `hybrid_default_v1` not retuned |
+| Locator correctness on canonical rows | **1.000** both splits |
+| First-evidence p95 is QT-LAT-001 (retrieve path) | development **785 ms**; qualification **601 ms** (≤2 s) |
+| `holdout_opened=false`; freeze still refuses holdout | both live runs `false`; Packet 8 freeze `HoldoutSealedError` |
+| ADR engineering-close recorded; this packet did not start Phase 5 | [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) accepted 2026-08-15; Packet 9 recorded Phase 5 not started |
+| Table fixtures or honest bounded miss | honest miss: 11/4 table cases dispatched; `execute_compiled_query` ran **0** times (`{case_id}.parquet` not materialized) |
+| Live rerank used in ranked-ID | identity rerank (`rerank_call_count=0`); OpenAI rerank code exists but is **not** in these numbers |
+
+### Done when → evidence map
+
+| Done when clause (summary) | Evidence | Residual / not claimed |
+| --- | --- | --- |
+| Phase 3 chunk/projection re-confirmed on representative fixtures | Packet 8 chunking unit tests; Packet 9 compact Hybrid Ready materialize | Live Hybrid Ready E2E not re-run in Packet 8 |
+| 405-case source-family-disjoint splits; holdout sealed unless independently SME-sealed | Packet 1 manifests; Packet 8 `launch_decision=no_go`, `holdout_opened=false`; Packet 9 both runs `holdout_opened=false` | Independently SME-sealed holdout (QT-HOLD-001) still absent |
+| Profile fields including negation/document/media/historical on open splits | Packets 3 and 8 query-profile eval (QT-QP-001–006) | — |
+| Identity protocols, HNSW settings, typed BM25, batched recheck, 100/75/30, 205-union, 300-scan, exact-fallback | Packets 2–4 contracts plus Packet 9 live retrieve | Envelope p95/cost unverified |
+| Normalized Arabic/mixed BM25 and UTC temporal beat baselines | Packet 4; Packet 9 `as_of` repair | Arabic mixed still misses on both open splits |
+| Killed/incompatible/late ParadeDB dense+term degradation | Packets 2/4 | Not re-run in Packet 9 |
+| Full-document section coverage `1.0` or scoped refusal | Packets 4/6 | — |
+| Negation without confident inversion | Packets 4/6 | — |
+| Media-dependent signed limitation | Packets 4/6 | — |
+| Strict-set-equality OpenAI rerank, RRF fallback, MMR/quotas, parent cap 12 | Packet 5 contract/unit/contract tests | Live ranked-ID used identity rerank, not OpenAI rerank |
+| Coverage/refusal thresholds frozen | Packet 6; Packet 8 freeze `hybrid_default_v1` SHA-256 `def45b69…940c` | — |
+| OS-isolated declarative table path | Packet 7 | Structured-table labeled p95 / Parquet eval artifacts not run |
+| Citations are typed locators, not BM25 snippets | Packet 9 locator **1.000** | Citation **assembler** completeness (QT-EVAL-003) is Phase 6 |
+| No local reranker, prohibited advanced method, ungrounded map-reduce, or later-phase runtime in Phase 4 | Packets 5–9; Phase 5 started only after this engineering close | — |
+| Packet 9 open-split ranked-ID, locators, ACL, table fixtures, first-evidence p95 | Packet 9 live table above; ACL leaks **0** | Table parquet p95 honest miss; embedding USD `cost=null` |
+| First-answer-token / completion p95 and answer faithfulness remain Phase 6/9 | Not measured here | QT-LAT-002/003, QT-EVAL-004 |
+| v1 launch holdout remains a launch blocker | Packet 8 no-go kept as the holdout record | Do not open the current synthetic holdout |
+| ADR may accept engineering-complete without opening the synthetic holdout | ADR accepted 2026-08-15; wrapper `status: complete` 2026-08-16 | Relabeling as production v1 is forbidden |
+| Revised estimate plus continue/pilot checkpoint and explicit user acceptance | Continue toward production v1 with reduced GraphRAG recorded 2026-08-16 in [ADR-hybrid-pilot-release-cut.md](../adr/ADR-hybrid-pilot-release-cut.md); Phase 5 already accepted 2026-08-16; this record accepted via the 2026-08-16 review close-out | Not a 0.x Hybrid Pilot; calendar dates 2026-08-22 / 2026-11-07 were planning anchors only |
+
+### Residual launch blockers (not production v1)
+
+- Independently SME-sealed holdout (QT-HOLD-001). Packet 8 **no-go** stays the holdout record. Opening the current synthetic holdout to print Recall@10 remains forbidden.
+- First-answer-token / completion p95 (QT-LAT-002/003) — Phase 6/9.
+- Answer faithfulness (QT-EVAL-004) — Phase 6/9.
+- Structured-table labeled p95 and missing `{case_id}.parquet` eval artifacts (QT-LAT-006).
+- Live ranked-ID used identity rerank, not OpenAI rerank.
+- Real company content remains prohibited until provider rows are `verified`.
+- Named Knowledge Owner hours; corpus remains `synthetic_provisional`.
+- Citation assembler completeness (QT-EVAL-003) — Phase 6.
+- Advertised GraphRAG envelope is 15 labeled `graph_mapping` documents; source-chunk capacity unverified; bulk onboarding blocked (QT-CAP-005-P8 / QT-CAP-006-P8). Phase 1 QT-CAP-005/006 stay the 2,000 / 200,000 aspiration.
+
+### Acceptance
+
+| Field | Value |
+| --- | --- |
+| Decision | Accept Phase 4 as engineering-complete; holdout sealed; not production v1 |
+| Approver | user (Cursor chat) |
+| Approval date | 2026-08-16 |
+| Mandate | Close review findings P1-1, P1-3, and P3-1 |
+| Holdout | Sealed; Packet 8 `launch_decision=no_go` unchanged |
+| Production v1 | Not claimed |
+
+The Phase 4 wrapper may therefore be `status: complete` with Packet 9
+checked. Canonical plan-index todos for Phases 1–5 may be `completed`.
+Phase 6 was not started in this change.

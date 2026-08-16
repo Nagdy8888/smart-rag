@@ -229,8 +229,8 @@ full-rebuild cost exists (`max(USD 800, 4 × measured)`). Details:
 
 | ID | Target | Unit | Provenance | Approval | Approver | Approval date | Measure in | On failure |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| QT-CAP-005-P8 | 15 open-split labeled `graph_mapping` documents; bulk onboarding blocked | document versions (reduced) | Phase 5 Packet 8; QT-GR-002 | pending user acceptance | — | — | Phase 5 Packet 8; raise only after measured rebuild | Do not advertise 2,000 until rebuild/cost are measured |
-| QT-CAP-006-P8 | Unverified; not 200,000 | chunks (reduced) | Phase 5 Packet 8 | pending user acceptance | — | — | Phase 5 Packet 8 / Phase 9 | Do not claim 200,000 source chunks |
+| QT-CAP-005-P8 | 15 open-split labeled `graph_mapping` documents; bulk onboarding blocked | document versions (reduced) | Phase 5 Packet 8; QT-GR-002 | accepted | user (Cursor chat) | 2026-08-16 | Phase 5 Packet 8; raise only after measured rebuild | Do not advertise 2,000 until rebuild/cost are measured |
+| QT-CAP-006-P8 | Unverified; not 200,000 | chunks (reduced) | Phase 5 Packet 8 | accepted | user (Cursor chat) | 2026-08-16 | Phase 5 Packet 8 / Phase 9 | Do not claim 200,000 source chunks |
 
 ## Decision record
 

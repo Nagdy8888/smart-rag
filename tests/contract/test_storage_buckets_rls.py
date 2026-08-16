@@ -217,15 +217,21 @@ def test_quarantine_select_list_denied_and_wrong_bucket_denied(
 
 
 def test_shared_settings_reject_storage_admin_secret() -> None:
-    """Runtime SharedSettings/BackendSettings must not load Storage Admin secret."""
+    """Runtime Shared/Backend/Worker settings must not load Storage Admin secret."""
 
     from smart_rag_api.main import live, ready
-    from smart_rag_core.settings import BackendSettings, SharedSettings, load_settings
+    from smart_rag_core.settings import (
+        BackendSettings,
+        SharedSettings,
+        WorkerSettings,
+        load_settings,
+    )
 
     shared_fields = SharedSettings.model_fields
     backend_fields = BackendSettings.model_fields
     assert "supabase_storage_admin_secret" not in shared_fields
     assert "supabase_storage_admin_secret" not in backend_fields
+    assert "supabase_storage_admin_secret" not in WorkerSettings.model_fields
 
     health = {**live(), **ready()}
     assert "storage_admin" not in str(health).lower()

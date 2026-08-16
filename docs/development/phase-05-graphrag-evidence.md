@@ -23,6 +23,8 @@ Related: [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) ·
 [TOOL_VERSIONS.md](./TOOL_VERSIONS.md) ·
 [CONFIGURATION.md](./CONFIGURATION.md) ·
 [ADR index](../adr/README.md) ·
+[2026-08-16 Phases 1–5 implementation review](../reviews/2026-08-16-phases-01-05-implementation-review.md) ·
+[close-out](../reviews/2026-08-16-phases-01-05-closeout.md) ·
 [docs index](../README.md)
 
 ## Prerequisites
