@@ -281,7 +281,7 @@ def sha256_file(path: Path) -> str:
     """Return the SHA-256 hex digest of git-style LF file bytes.
 
     Windows ``core.autocrlf`` working trees must not change freeze hashes.
-    The digest is over ``\\n``-normalized bytes so Linux CI matches.
+    The digest is over LF-normalized bytes so Linux CI matches.
 
     Args:
         path: File to hash.
