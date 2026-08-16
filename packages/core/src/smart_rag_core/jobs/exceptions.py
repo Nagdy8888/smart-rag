@@ -32,3 +32,18 @@ class JobAdmissionError(JobRepositoryError):
 
 class JobRetryNotAllowedError(JobRepositoryError):
     """Raised when a job is not in a retryable dead-letter, failed, or backoff state."""
+
+
+class GraphWriterLostError(JobLeaseError):
+    """Raised when the graph writer lease or session advisory lock is lost."""
+
+    def __init__(self, reason: str) -> None:
+        """Initialize with a stable machine-readable reason.
+
+        Args:
+            reason: Short reason such as ``advisory_lock_lost`` or
+                ``writer_lease_lost``.
+        """
+
+        super().__init__(reason)
+        self.reason = reason

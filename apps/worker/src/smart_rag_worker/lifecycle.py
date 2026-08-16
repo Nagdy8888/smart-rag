@@ -44,6 +44,7 @@ from smart_rag_core.schema.tables import IngestionJobRecord
 from smart_rag_core.settings.worker import WorkerSettings
 
 from smart_rag_worker.bm25_runner import Bm25WorkerLoop
+from smart_rag_worker.graph_runner import GraphWorkerLoop
 
 LOGGER = logging.getLogger(__name__)
 
@@ -89,6 +90,10 @@ class WorkerLifecycle:
             self._crawl_graph = build_crawl_ingestion_graph(checkpointer=saver)
             self._index_graph = build_index_ingestion_graph(checkpointer=saver)
             self._bm25_loop = Bm25WorkerLoop(settings)
+            self._graph_loop = GraphWorkerLoop(
+                settings,
+                adapter=self._lightrag_adapter,
+            )
         except BaseException:
             self.stop()
             raise
@@ -107,6 +112,7 @@ class WorkerLifecycle:
             in_flight: set[Future[None]] = set()
             while not self._stop_event.is_set():
                 in_flight = {future for future in in_flight if not future.done()}
+                self._graph_loop.process_once()
                 if len(in_flight) >= self._settings.worker_concurrency:
                     time.sleep(1)
                     continue

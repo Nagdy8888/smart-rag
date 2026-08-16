@@ -10,7 +10,7 @@ audience: engineering
 
 State transitions for Phase 3 durable queues: ingestion, BM25 projection, LightRAG graph handoff, deletion/ACL cleanup, and dead-letter handling. Queue authority is Supabase Postgres only; Valkey is never authoritative.
 
-Related: [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md)
+Related: [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md)
 
 ## Shared lifecycle
 
@@ -85,7 +85,9 @@ stateDiagram-v2
 
 ## Graph handoff (LightRAG index jobs)
 
-Phase 3 stops at durable `Graph Pending` handoff; Phase 5 owns graph mutation.
+Phase 3 stops at durable `Graph Pending` handoff. Phase 5 Packet 3 performs
+the vendor mutation under a single writer. Public status stays `graph_pending`
+until Packet 4. See [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md).
 
 ```mermaid
 stateDiagram-v2

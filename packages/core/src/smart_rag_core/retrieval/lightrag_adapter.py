@@ -43,10 +43,15 @@ from smart_rag_core.retrieval.graph import (
     SELECTED_GRAPH_STORAGE,
     SELECTED_KV_STORAGE,
     SELECTED_VECTOR_STORAGE,
+    GraphIndexDeleteResult,
+    GraphIndexEnqueueResult,
+    bind_graph_source_text,
 )
 from smart_rag_core.retrieval.lightrag_callbacks import CountedLightRagCallbacks
 from smart_rag_core.retrieval.lightrag_qualification import (
     QUALIFICATION_COSINE_BETTER_THAN_THRESHOLD,
+    DocumentStatusView,
+    LightRagDeletionResult,
     LightRagPostgresParams,
     LightRagQualificationError,
     LightRagRuntime,
@@ -54,10 +59,12 @@ from smart_rag_core.retrieval.lightrag_qualification import (
     VendorPostgresOverrides,
     age_extension_present,
     capture_schema_fingerprint,
+    coerce_deletion_status,
     fingerprint_drift,
     install_pgvector_codec_schema_fallback,
     parse_postgres_url,
     reset_process_client_manager,
+    status_record_mapping,
     vendor_env_pairs,
 )
 from smart_rag_core.settings.base import SharedSettings, snapshot_process_environ
@@ -690,6 +697,120 @@ class LightRagRuntimeAdapter:
     fingerprint: SchemaFingerprint
     max_connections: int
     _finalized: bool = field(default=False, init=False, repr=False)
+
+    async def enqueue_insert(
+        self,
+        *,
+        document_id: str,
+        text: str,
+        source_token: str,
+        track_id: str,
+    ) -> GraphIndexEnqueueResult:
+        """Insert envelope-bound version text through qualified ``ainsert``.
+
+        Args:
+            document_id: Canonical document version ID used as vendor ``ids``.
+            text: Normalized version text, not yet envelope-bound.
+            source_token: Unique opaque basename token.
+            track_id: Fresh monitoring token. Never an idempotency key.
+
+        Returns:
+            Monitoring metadata including the vendor track id and status
+            label from enqueue. Terminal polling is the caller's job.
+
+        Side Effects:
+            Calls vendor ``ainsert``. ``track_id`` is monitoring only.
+        """
+
+        enveloped = bind_graph_source_text(
+            document_version_id=document_id,
+            normalized_text=text,
+        )
+        returned = await self.rag.ainsert(
+            enveloped,
+            ids=[document_id],
+            file_paths=[source_token],
+            track_id=track_id,
+        )
+        status_view = await self.vendor_document_status(document_id)
+        status_label = status_view.status if status_view is not None else "pending"
+        return GraphIndexEnqueueResult(
+            document_id=document_id,
+            track_id=str(returned or track_id),
+            status=status_label,
+        )
+
+    async def vendor_document_status(
+        self,
+        document_id: str,
+    ) -> DocumentStatusView | None:
+        """Return vendor document status for one canonical version ID.
+
+        Args:
+            document_id: Canonical document version ID.
+
+        Returns:
+            Narrow status view, or ``None`` when the vendor has no row.
+        """
+
+        payload = await self.rag.aget_docs_by_ids(document_id)
+        if not payload:
+            return None
+        record = payload.get(document_id)
+        if record is None and len(payload) == 1:
+            record = next(iter(payload.values()))
+        if record is None:
+            return None
+        mapping = status_record_mapping(record)
+        raw_status = mapping.get("status")
+        status = str(raw_status) if raw_status is not None else "pending"
+        raw_track = mapping.get("track_id")
+        raw_path = mapping.get("file_path")
+        return DocumentStatusView(
+            document_id=document_id,
+            status=status,
+            track_id=str(raw_track) if raw_track is not None else None,
+            file_path=str(raw_path) if raw_path is not None else None,
+            is_duplicate=bool(mapping.get("is_duplicate", False)),
+            duplicate_kind=(
+                str(mapping["duplicate_kind"])
+                if mapping.get("duplicate_kind") is not None
+                else None
+            ),
+        )
+
+    async def delete_document(
+        self,
+        *,
+        document_id: str,
+        delete_llm_cache: bool = True,
+    ) -> GraphIndexDeleteResult:
+        """Delete one vendor document and optionally its LLM cache.
+
+        Args:
+            document_id: Canonical document version ID.
+            delete_llm_cache: When true, request privacy cache deletion.
+
+        Returns:
+            Vendor deletion status. Unsupported statuses fail closed.
+
+        Raises:
+            LightRagQualificationError: If the vendor status is undocumented.
+        """
+
+        result = cast(
+            LightRagDeletionResult,
+            await self.rag.adelete_by_doc_id(
+                document_id,
+                delete_llm_cache=delete_llm_cache,
+            ),
+        )
+        status = coerce_deletion_status(str(result.status))
+        return GraphIndexDeleteResult(
+            document_id=str(result.doc_id or document_id),
+            status=status,
+            message=str(result.message or ""),
+        )
 
     async def finalize(self) -> None:
         """Release vendor storage pools. Safe to call twice.

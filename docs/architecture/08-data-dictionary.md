@@ -97,7 +97,7 @@ erDiagram
 | `graph_entity_rules` | `app` | authority | admin curation | graph indexer | until deactivated | small ruleset | soft deactivate | rule `id` | 5 graph |
 | `graph_workspaces` | `app` | authority | graph worker (Pkt 3) | worker RW; API SELECT | until retired | few workspaces | state to `retired` | `workspace_key` unique | 5 packet 2 schema |
 | `graph_active_workspace_pointer` | `app` | authority | graph worker (Pkt 7 FOR UPDATE) | worker RW; API SELECT | singleton | 1 row | none | fixed UUID | 5 packet 2 schema |
-| `graph_writer_lease` | `app` | authority | graph worker (Pkt 3 writer) | worker only | singleton | 1 row | none | fixed UUID | 5 packet 2 schema only |
+| `graph_writer_lease` | `app` | authority | graph worker (Pkt 3 writer RPCs) | worker only | singleton | 1 row | none | fixed UUID | 5 packet 3 occupy/heartbeat/release |
 | `lightrag.schema_capture_status` | `lightrag` | derived | schema-admin bootstrap | `app_lightrag` | pin lifetime | 1 row | none | capture row | 5 packet 2 |
 | `lightrag.lightrag_*` vendor tables | `lightrag` | derived | LightRAG runtime DML | `app_lightrag` only | rebuildable | vendor keys | workspace rebuild | vendor PKs | 5 packet 2 capture |
 
@@ -163,7 +163,8 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - ACL/visibility downgrade clears `graph_eligible` and atomically enqueues `graph_acl_remove`.
 - Company retention defaults: `retention_days=365`, `quarantine_ttl_hours=24`, `legal_hold_enabled=false` (Phase 1 signed defaults).
 - Packet 2 vendor tables are private to schema `lightrag` with FORCE RLS and `app_lightrag` DML only. `anon` / `authenticated` / `service_role` have no vendor access. AGE is absent.
-- `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. This is not Graph Ready.
+- `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. This is not Graph Ready.
+- `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, or `graph_maintenance`. The kinds never share caps.
 
 ## Related docs
 
@@ -174,4 +175,5 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md)
 - [ADR-expand-contract-migrations](../adr/ADR-expand-contract-migrations.md)
 - [ADAPTER_LIFECYCLE.md](../graph/ADAPTER_LIFECYCLE.md)
+- [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md)
 - [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md)

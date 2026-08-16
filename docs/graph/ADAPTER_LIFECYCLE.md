@@ -13,6 +13,7 @@ Runtime attach without DDL, pool caps, search_path, finalize, and the
 protected bootstrap boundary. This is not Graph Ready.
 
 Related: [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
+[WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
 [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md) ·
 [lightrag-schema-bootstrap.md](../runbooks/lightrag-schema-bootstrap.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
@@ -60,10 +61,12 @@ Runtime patches:
 Pool cap is 4 per API process and 4 per worker process. Qualification tests
 may keep `POSTGRES_MAX_CONNECTIONS=2`. `POSTGRES_CONNECTION_RETRIES=0`.
 
-## Workspace rows (schema only)
+## Workspace rows
 
-Packet 2 creates application-owned rows. Packet 3 owns the writer. States are
-not Graph Ready.
+Packet 2 created application-owned rows. Packet 3 owns the writer: occupy,
+heartbeat, and release on `app.graph_writer_lease`, session advisory lock,
+and state transitions. See [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md).
+Successful index stays `updating` until Packet 4. This is not Graph Ready.
 
 ```mermaid
 stateDiagram-v2

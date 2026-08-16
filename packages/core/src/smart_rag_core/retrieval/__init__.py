@@ -16,6 +16,7 @@ from smart_rag_core.retrieval.graph import (
     GraphRetriever,
     apply_query_bounds,
     bind_graph_source_text,
+    opaque_graph_source_basename,
     strip_graph_source_envelope,
 )
 from smart_rag_core.retrieval.hybrid import HybridRetrievalResult, assemble_hybrid
@@ -93,6 +94,7 @@ __all__ = [
     "bind_graph_source_text",
     "build_bm25_query",
     "fuse_channels",
+    "opaque_graph_source_basename",
     "recheck_retrieval_candidates",
     "retrieval_transaction",
     "strip_graph_source_envelope",

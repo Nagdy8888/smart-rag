@@ -10,7 +10,9 @@ import psycopg
 
 from smart_rag_core.jobs.exceptions import JobAdmissionError
 from smart_rag_core.jobs.limits import (
+    DEFAULT_DAILY_GRAPH_INDEX_BUDGET_USD,
     DEFAULT_DAILY_INGESTION_BUDGET_USD,
+    DEFAULT_MONTHLY_GRAPH_MAINTENANCE_BUDGET_USD,
     INGESTION_BUDGET_RESERVATION_TTL_MINUTES,
     MAX_ESTIMATED_JOB_SIZE_BYTES,
     MAX_PENDING_INGESTION_JOBS,
@@ -226,3 +228,189 @@ class JobAdmissionService:
             used_today = Decimal(str(used_row[0])) if used_row else Decimal("0")
             if used_today + estimated_cost_usd > daily_budget:
                 raise JobAdmissionError("budget_exhausted")
+
+    def create_graph_budget_reservation(
+        self,
+        *,
+        reservation_kind: str,
+        estimated_cost_usd: Decimal,
+    ) -> UUID:
+        """Reserve graph index or maintenance budget without using ingestion_daily.
+
+        Args:
+            reservation_kind: ``graph_index`` or ``graph_maintenance``.
+            estimated_cost_usd: Positive estimated spend.
+
+        Returns:
+            New ``app.budget_reservations.id``.
+
+        Raises:
+            JobAdmissionError: When the kind is invalid or the cap is exhausted.
+        """
+
+        if reservation_kind not in {"graph_index", "graph_maintenance"}:
+            raise JobAdmissionError("invalid_graph_reservation_kind")
+        if estimated_cost_usd <= 0:
+            raise JobAdmissionError("invalid_estimated_cost")
+        self._assert_graph_budget_available(
+            reservation_kind=reservation_kind,
+            estimated_cost_usd=estimated_cost_usd,
+        )
+        reservation_id = uuid4()
+        expires_at = datetime.now(tz=UTC) + timedelta(
+            minutes=INGESTION_BUDGET_RESERVATION_TTL_MINUTES
+        )
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO app.budget_reservations (
+                  id,
+                  reservation_kind,
+                  amount_usd,
+                  expires_at
+                )
+                VALUES (%s, %s, %s, %s)
+                """,
+                (
+                    reservation_id,
+                    reservation_kind,
+                    estimated_cost_usd,
+                    expires_at,
+                ),
+            )
+        return reservation_id
+
+    def true_up_graph_reservation(
+        self,
+        reservation_id: UUID,
+        *,
+        reservation_kind: str,
+        actual_cost_usd: Decimal,
+    ) -> None:
+        """Commit a graph reservation to the measured actual cost.
+
+        Args:
+            reservation_id: Previously created reservation id.
+            reservation_kind: Must match the reserved kind.
+            actual_cost_usd: Measured spend.
+
+        Side Effects:
+            Updates ``app.budget_reservations`` to ``committed``.
+        """
+
+        if reservation_kind not in {"graph_index", "graph_maintenance"}:
+            raise JobAdmissionError("invalid_graph_reservation_kind")
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE app.budget_reservations
+                SET
+                  status = 'committed'::app.budget_reservation_status,
+                  amount_usd = LEAST(amount_usd, %s),
+                  committed_at = timezone('utc', now()),
+                  updated_at = timezone('utc', now())
+                WHERE id = %s
+                  AND reservation_kind = %s
+                  AND status = 'reserved'::app.budget_reservation_status
+                """,
+                (actual_cost_usd, reservation_id, reservation_kind),
+            )
+
+    def release_graph_reservation(
+        self,
+        reservation_id: UUID,
+        *,
+        reservation_kind: str,
+    ) -> None:
+        """Release an unused graph reservation.
+
+        Args:
+            reservation_id: Reservation row to release.
+            reservation_kind: Must match the reserved kind.
+
+        Side Effects:
+            Updates ``app.budget_reservations`` to ``released``.
+        """
+
+        if reservation_kind not in {"graph_index", "graph_maintenance"}:
+            raise JobAdmissionError("invalid_graph_reservation_kind")
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE app.budget_reservations
+                SET
+                  status = 'released'::app.budget_reservation_status,
+                  released_at = timezone('utc', now()),
+                  updated_at = timezone('utc', now())
+                WHERE id = %s
+                  AND reservation_kind = %s
+                  AND status = 'reserved'::app.budget_reservation_status
+                """,
+                (reservation_id, reservation_kind),
+            )
+
+    def _assert_graph_budget_available(
+        self,
+        *,
+        reservation_kind: str,
+        estimated_cost_usd: Decimal,
+    ) -> None:
+        with self._connection.cursor() as cursor:
+            if reservation_kind == "graph_index":
+                cursor.execute(
+                    """
+                    SELECT COALESCE(cs.daily_graph_index_budget_usd, %s)
+                    FROM app.company_settings AS cs
+                    WHERE cs.id = '00000000-0000-0000-0000-000000000001'::uuid
+                    """,
+                    (DEFAULT_DAILY_GRAPH_INDEX_BUDGET_USD,),
+                )
+                budget_row = cursor.fetchone()
+                cap = (
+                    Decimal(str(budget_row[0]))
+                    if budget_row
+                    else Decimal(str(DEFAULT_DAILY_GRAPH_INDEX_BUDGET_USD))
+                )
+                cursor.execute(
+                    """
+                    SELECT COALESCE(sum(amount_usd), 0)
+                    FROM app.budget_reservations
+                    WHERE reservation_kind = 'graph_index'
+                      AND status IN (
+                        'reserved'::app.budget_reservation_status,
+                        'committed'::app.budget_reservation_status
+                      )
+                      AND created_at >= date_trunc('day', timezone('utc', now()))
+                    """
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT COALESCE(cs.monthly_graph_maintenance_budget_usd, %s)
+                    FROM app.company_settings AS cs
+                    WHERE cs.id = '00000000-0000-0000-0000-000000000001'::uuid
+                    """,
+                    (DEFAULT_MONTHLY_GRAPH_MAINTENANCE_BUDGET_USD,),
+                )
+                budget_row = cursor.fetchone()
+                cap = (
+                    Decimal(str(budget_row[0]))
+                    if budget_row
+                    else Decimal(str(DEFAULT_MONTHLY_GRAPH_MAINTENANCE_BUDGET_USD))
+                )
+                cursor.execute(
+                    """
+                    SELECT COALESCE(sum(amount_usd), 0)
+                    FROM app.budget_reservations
+                    WHERE reservation_kind = 'graph_maintenance'
+                      AND status IN (
+                        'reserved'::app.budget_reservation_status,
+                        'committed'::app.budget_reservation_status
+                      )
+                      AND created_at >= date_trunc('month', timezone('utc', now()))
+                    """
+                )
+            used_row = cursor.fetchone()
+            used = Decimal(str(used_row[0])) if used_row else Decimal("0")
+            if used + estimated_cost_usd > cap:
+                raise JobAdmissionError("graph_budget_exhausted")

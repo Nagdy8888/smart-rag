@@ -100,7 +100,8 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 
 Agent settings currently add only a stable, non-environment service name.
 Queue and retrieval settings remain owned by later phases. Graph runtime DSN
-is Packet 2 above; Graph Ready remains later.
+is Packet 2 above. Packet 3 reuses `JOB_LEASE_SECONDS` for graph job and
+writer leases. Graph Ready remains Packet 4.
 
 ## Managed proof-operation variables
 

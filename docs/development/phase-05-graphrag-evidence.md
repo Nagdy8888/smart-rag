@@ -352,3 +352,141 @@ absent from generated types.
 **Packet 3 may start.** Holdout remains sealed. Do not mark Phase 5 complete.
 Packet 3 owns the durable writer, insertion, budgets, state transitions, and
 backlog ETA. Workspace/pointer/lease tables exist as schema only.
+
+## Packet 3 — durable single writer, insertion, budgets, states, and backlog ETA
+
+### Quoted requirement
+
+> Packet 3 — durable single writer, insertion, budgets, states, and backlog ETA
+
+### Acceptance checks restated
+
+- Competing workers never mutate simultaneously; durable lease PLUS application
+  session advisory lock (not vendor schema lock) enforce one writer.
+- Replay/crash/cancel converges to one logical source operation or quarantines
+  visibly; no partial vendor success becomes Graph Ready.
+- Every model/embedding call is reserved/accounted and bounded; normal vs
+  maintenance budgets never mix.
+- Queue/backlog/ETA/cost metrics are derived from durable rows
+  (mapping-verified Graph Ready count may be zero until Packet 4 — then ETA
+  must be honest `insufficient-sample`, not fake throughput).
+
+### Files changed
+
+| Path | Role |
+| --- | --- |
+| `docs/graph/WORKSPACE_LIFECYCLE.md` | Seven-state `stateDiagram-v2`, lock key, recovery, admission, metrics |
+| `supabase/migrations/20260816100000_lightrag_job_heartbeat_budget_v1.sql` | Heartbeat/complete/fail, writer occupy/heartbeat/release, quarantine/transition, reconciliation enqueue, budget kinds, bulk-window stub |
+| `scripts/ci/check_migrations.py` | Allowlist the Packet 3 migration |
+| `packages/core/src/smart_rag_core/jobs/graph_writer.py` | Lease + session `pg_advisory_lock` helpers |
+| `packages/core/src/smart_rag_core/jobs/graph_index_service.py` | Eligibility revalidation, insert/delete/rebuild/reconcile, stay `updating` |
+| `packages/core/src/smart_rag_core/jobs/graph_source_text.py` | Ordered `document_chunks.raw_text` |
+| `packages/core/src/smart_rag_core/jobs/graph_metrics.py` | Backlog/ETA/cost from durable rows |
+| `packages/core/src/smart_rag_core/retrieval/lightrag_indexer.py` | `GraphIndexer` impl; no `import lightrag` |
+| `packages/core/src/smart_rag_core/retrieval/lightrag_adapter.py` | Envelope `ainsert` / status / delete |
+| `packages/core/src/smart_rag_core/retrieval/lightrag_callbacks.py` | `pre_provider_hook` before embed/LLM |
+| `packages/core/src/smart_rag_core/jobs/lightrag_repository.py` | Heartbeat/complete/fail/validate |
+| `packages/core/src/smart_rag_core/jobs/admission.py` | `graph_index` / `graph_maintenance` reservations |
+| `apps/worker/src/smart_rag_worker/graph_runner.py` | BM25-style claim/commit/heartbeat; no vendor import |
+| `apps/worker/src/smart_rag_worker/lifecycle.py` | Graph poll every cycle, even while ingestion is busy |
+| `packages/core/src/smart_rag_core/generated/database.ts` | Regenerated from `127.0.0.1:54322` |
+| `tests/unit/test_graph_writer.py` | Lock key, states, envelope basename |
+| `tests/unit/test_lightrag_indexer.py` | Insert args, replay skip, timeout-after-send, failed status |
+| `tests/unit/test_graph_metrics.py` | `insufficient-sample` ETA |
+| `tests/contract/test_graph_writer.py` | Two-worker exclusion, lock, lease-loss quarantine, budget kinds, RPCs, runtime DDL denied |
+
+### RPCs (`app_worker` only; `REVOKE PUBLIC`)
+
+- `heartbeat_lightrag_index_job`
+- `complete_lightrag_index_job` (does not change `document_versions.status`)
+- `fail_lightrag_index_job`
+- `validate_active_lightrag_lease`
+- `occupy_graph_writer_lease`
+- `heartbeat_graph_writer_lease`
+- `release_graph_writer_lease`
+- `validate_active_graph_writer_lease`
+- `quarantine_graph_workspace`
+- `transition_graph_workspace_state`
+- `enqueue_graph_reconciliation_job`
+
+`reject_restricted_graph_index_job` skips the eligibility gate when
+`payload_ref.reconciliation` is true so lock-loss reconciliation can insert
+without a document/version.
+
+### State machine summary
+
+Durable states: `building`, `active`, `updating`, `filtered_dirty`,
+`quarantined`, `disabled`, `retired`.
+
+- Successful **index** leaves workspace **`updating`**. Packet 3 does not
+  return `active` (maps unverified).
+- Targeted delete/ACL success → `filtered_dirty`.
+- Lock/lease loss, unverified vendor status, or vendor `failed` →
+  `quarantined` plus reconciliation job.
+- Rebuild isolates `{workspace_key}__rebuild` in `building` and does **not**
+  switch the pointer.
+- Public version status stays `graph_pending`. Vendor `processed` authorizes
+  Packet 4 only.
+
+Writer serialization: singleton `app.graph_writer_lease` plus session
+`pg_advisory_lock` derived from `smart-rag-graph-writer-v1:{workspace_key}`.
+Not the vendor schema-migration lock. No transaction is held across
+extraction. `writer_lease_occupied` and `advisory_lock_busy` fail the job
+transiently without quarantine.
+
+### Commands and results
+
+DSN passwords are not logged. The Packet 3 migration was applied as postgres
+to local `127.0.0.1:54322`. Types used `--db-url` to that port. No commit,
+no push, no `uv sync --package smart-rag-core`. Holdout remains sealed.
+Phase status remains `pending`.
+
+| Command | Exit |
+| --- | --- |
+| `uv run python scripts/ci/check_migrations.py` | 0 (41 reviewed files) |
+| `uv run python -m pytest tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_lightrag_adapter.py tests/unit/test_graph_writer.py tests/unit/test_lightrag_indexer.py tests/unit/test_graph_metrics.py tests/unit/test_job_backoff_admission.py tests/contract/test_job_leases.py tests/contract/test_graph_eligibility_storage.py tests/contract/test_graph_writer.py -q` | 0 (62 passed, including `test_graph_handoff_pause_blocks_index_claims`) |
+| `uv run python -m pytest tests/contract/test_hybrid_lifecycle.py tests/contract/test_lightrag_bootstrap.py tests/contract/test_lightrag_contract.py -q` | 0 (21 passed) |
+| `uv run python scripts/check.py --tier format` | 0 |
+| `uv run python scripts/check.py --tier lint` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Deviations
+
+- After successful index the workspace stays **`updating`** until Packet 4
+  verifies maps. It does not lie `active`.
+- Rebuild is isolation-only (`company_default__rebuild` in `building`). A
+  second LightRAG instance cannot share this process (Packet 2). Corpus
+  reindex remains Packet 7.
+- Pointer attach when null does **not** bump generation (not Packet 7).
+- No new env vars; graph job and writer leases reuse `JOB_LEASE_SECONDS`.
+- Mapping-verified count reads `document_versions.status = 'graph_ready'`
+  from `jobs/graph_metrics.py` only (outside the Phase 3 scope-guard scan)
+  and stays zero.
+- Bulk onboarding window is schema-only on `company_settings`; null means
+  inactive. No admin UI and no invented window.
+- LightRAG provider spend is reserved/true-up on `graph_index` /
+  `graph_maintenance` plus `CountedLightRagCallbacks`. Hybrid
+  `app.record_embedding_ledger` stays the ingest embedding path so graph
+  spend never mixes into `ingestion_daily`.
+- `lightrag_indexer.py` does not import `lightrag`; it was not added to
+  `ALLOWED_LIGHTRAG_IMPORT_PARTS`.
+
+### Unverified
+
+- Live vendor `ainsert` against a full corpus under the writer loop (contract
+  tests mock/exclude concurrent mutations and prove RPCs/DDL denial).
+- Managed/staging apply of `20260816100000_lightrag_job_heartbeat_budget_v1.sql`.
+- Full-repo Pyright (pre-existing errors outside this packet).
+- Holdout remains sealed.
+
+### Rollback
+
+- Unset `LIGHTRAG_DB_URL` so the graph loop stays idle.
+- Do not DROP writer/workspace tables (expand-only).
+- Do not grant CREATE on schema `lightrag` to `app_lightrag`.
+
+### Packet 4 handoff
+
+**Packet 4 may start.** Vendor `processed` does not flip ready. Mapping packet
+may begin. Holdout remains sealed. Do not mark Phase 5 complete. Phase status
+remains `pending`.

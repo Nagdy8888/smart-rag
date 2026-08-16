@@ -374,10 +374,15 @@ export type Database = {
           authorization_version: number
           company_name: string | null
           created_at: string
+          daily_graph_index_budget_usd: number
           daily_ingestion_budget_usd: number | null
           default_document_visibility: Database["app"]["Enums"]["document_visibility"]
+          graph_bulk_approved_at: string | null
+          graph_bulk_window_ends_at: string | null
+          graph_bulk_window_starts_at: string | null
           id: string
           legal_hold_enabled: boolean
+          monthly_graph_maintenance_budget_usd: number
           monthly_llm_budget_usd: number | null
           quarantine_byte_cap: number | null
           quarantine_ttl_hours: number
@@ -391,10 +396,15 @@ export type Database = {
           authorization_version?: number
           company_name?: string | null
           created_at?: string
+          daily_graph_index_budget_usd?: number
           daily_ingestion_budget_usd?: number | null
           default_document_visibility?: Database["app"]["Enums"]["document_visibility"]
+          graph_bulk_approved_at?: string | null
+          graph_bulk_window_ends_at?: string | null
+          graph_bulk_window_starts_at?: string | null
           id?: string
           legal_hold_enabled?: boolean
+          monthly_graph_maintenance_budget_usd?: number
           monthly_llm_budget_usd?: number | null
           quarantine_byte_cap?: number | null
           quarantine_ttl_hours?: number
@@ -408,10 +418,15 @@ export type Database = {
           authorization_version?: number
           company_name?: string | null
           created_at?: string
+          daily_graph_index_budget_usd?: number
           daily_ingestion_budget_usd?: number | null
           default_document_visibility?: Database["app"]["Enums"]["document_visibility"]
+          graph_bulk_approved_at?: string | null
+          graph_bulk_window_ends_at?: string | null
+          graph_bulk_window_starts_at?: string | null
           id?: string
           legal_hold_enabled?: boolean
+          monthly_graph_maintenance_budget_usd?: number
           monthly_llm_budget_usd?: number | null
           quarantine_byte_cap?: number | null
           quarantine_ttl_hours?: number
@@ -2981,6 +2996,15 @@ export type Database = {
         Args: { p_job_id: string; p_lease_token: string; p_owner: string }
         Returns: boolean
       }
+      complete_lightrag_index_job: {
+        Args: {
+          p_job_id: string
+          p_lease_token: string
+          p_owner: string
+          p_result?: Json
+        }
+        Returns: boolean
+      }
       complete_promotion_db_switch: {
         Args: {
           p_byte_size: number
@@ -3057,6 +3081,14 @@ export type Database = {
         }
         Returns: string
       }
+      enqueue_graph_reconciliation_job: {
+        Args: {
+          p_reason: string
+          p_source_job_id: string
+          p_workspace_key: string
+        }
+        Returns: string
+      }
       exclude_version_from_retrieval: {
         Args: { p_reason?: string; p_version_id: string }
         Returns: {
@@ -3091,6 +3123,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      fail_lightrag_index_job: {
+        Args: {
+          p_error_category: Database["app"]["Enums"]["job_error_category"]
+          p_job_id: string
+          p_last_error: string
+          p_lease_token: string
+          p_next_attempt_at: string
+          p_owner: string
+          p_status: Database["app"]["Enums"]["job_status"]
+        }
+        Returns: boolean
       }
       fetch_authorized_chunk_context: {
         Args: {
@@ -3195,7 +3239,20 @@ export type Database = {
         Returns: boolean
       }
       glossary_payload_has_cycle: { Args: { payload: Json }; Returns: boolean }
+      heartbeat_graph_writer_lease: {
+        Args: { p_lease_seconds: number; p_owner: string; p_token: string }
+        Returns: boolean
+      }
       heartbeat_ingestion_job: {
+        Args: {
+          p_job_id: string
+          p_lease_seconds: number
+          p_lease_token: string
+          p_owner: string
+        }
+        Returns: boolean
+      }
+      heartbeat_lightrag_index_job: {
         Args: {
           p_job_id: string
           p_lease_seconds: number
@@ -3278,6 +3335,14 @@ export type Database = {
         Args: { p_reservation_id: string }
         Returns: undefined
       }
+      occupy_graph_writer_lease: {
+        Args: { p_lease_seconds: number; p_owner: string; p_token: string }
+        Returns: boolean
+      }
+      quarantine_graph_workspace: {
+        Args: { p_reason: string; p_workspace_key: string }
+        Returns: string
+      }
       quarantine_upload_path_allowed: {
         Args: { object_name: string }
         Returns: boolean
@@ -3326,6 +3391,10 @@ export type Database = {
       release_expired_upload_reservations: {
         Args: { as_of?: string }
         Returns: number
+      }
+      release_graph_writer_lease: {
+        Args: { p_owner: string; p_token: string }
+        Returns: boolean
       }
       reserve_upload_quota: {
         Args: {
@@ -3486,6 +3555,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      transition_graph_workspace_state: {
+        Args: {
+          p_from_states: Database["app"]["Enums"]["graph_workspace_state"][]
+          p_snapshot?: Json
+          p_to_state: Database["app"]["Enums"]["graph_workspace_state"]
+          p_workspace_key: string
+        }
+        Returns: string
+      }
       upsert_promotion_saga_intent: {
         Args: {
           p_destination_bucket: string
@@ -3499,6 +3577,14 @@ export type Database = {
           p_version_id: string
         }
         Returns: string
+      }
+      validate_active_graph_writer_lease: {
+        Args: { p_owner: string; p_token: string }
+        Returns: boolean
+      }
+      validate_active_lightrag_lease: {
+        Args: { p_job_id: string; p_lease_token: string; p_owner: string }
+        Returns: boolean
       }
       validate_caller_context: {
         Args: {
@@ -5503,3 +5589,4 @@ export const Constants = {
     },
   },
 } as const
+

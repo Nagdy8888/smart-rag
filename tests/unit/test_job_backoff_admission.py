@@ -88,3 +88,36 @@ def test_admission_budget_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     assert caught.value.reason == "budget_exhausted"
+
+
+def test_graph_index_budget_ignores_ingestion_daily() -> None:
+    """Graph index reservations must not share the Hybrid ingestion cap."""
+
+    connection = MagicMock()
+    cursor = MagicMock()
+    connection.cursor.return_value.__enter__.return_value = cursor
+    cursor.fetchone.side_effect = [
+        (Decimal("20"),),
+        (Decimal("0"),),
+    ]
+    service = JobAdmissionService(connection)
+    reservation_id = service.create_graph_budget_reservation(
+        reservation_kind="graph_index",
+        estimated_cost_usd=Decimal("0.50"),
+    )
+    assert reservation_id is not None
+    inserted = cursor.execute.call_args.args[1]
+    assert inserted[1] == "graph_index"
+    assert inserted[1] != "ingestion_daily"
+
+
+def test_graph_maintenance_kind_rejected_as_index() -> None:
+    """Unknown graph reservation kinds fail closed."""
+
+    service = JobAdmissionService(MagicMock())
+    with pytest.raises(JobAdmissionError) as caught:
+        service.create_graph_budget_reservation(
+            reservation_kind="ingestion_daily",
+            estimated_cost_usd=Decimal("0.50"),
+        )
+    assert caught.value.reason == "invalid_graph_reservation_kind"

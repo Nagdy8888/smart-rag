@@ -442,3 +442,43 @@ def strip_graph_source_envelope(text: str) -> str:
     if match is None:
         return text
     return text[match.end() :]
+
+
+def opaque_graph_source_basename(document_version_id: str) -> str:
+    """Return a unique opaque non-secret basename token for one version.
+
+    The token is derived from the canonical version ID. It is never a signed
+    URL and must not be reused across versions.
+
+    Args:
+        document_version_id: Canonical document version ID.
+
+    Returns:
+        Basename such as ``g-{version_id}.txt``.
+
+    Raises:
+        GraphSourceEnvelopeError: If the ID is empty or not a safe token.
+    """
+
+    if not _DOCUMENT_VERSION_ID_RE.fullmatch(document_version_id):
+        raise GraphSourceEnvelopeError("graph_source_basename_invalid_document_id")
+    return f"g-{document_version_id}.txt"
+
+
+def graph_chunker_config_snapshot() -> dict[str, object]:
+    """Return the pinned LightRAG chunker overlay recorded on workspace rows.
+
+    Returns:
+        JSON-safe mapping of chunk token size, overlap, tokenizer, and pin.
+    """
+
+    return {
+        "lightrag_version": LIGHTRAG_PINNED_VERSION,
+        "graph_pipeline_version": "graph_pipeline_v1",
+        "chunk_token_size": LIGHTRAG_CHUNK_TOKEN_SIZE,
+        "chunk_overlap_token_size": LIGHTRAG_CHUNK_OVERLAP_TOKEN_SIZE,
+        "tiktoken_model_name": LIGHTRAG_TIKTOKEN_MODEL,
+        "llm_model_max_async": 1,
+        "embedding_func_max_async": 1,
+        "max_parallel_insert": 1,
+    }

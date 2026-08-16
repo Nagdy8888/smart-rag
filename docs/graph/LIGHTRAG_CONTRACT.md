@@ -15,6 +15,7 @@ rejected assumptions, and Packet 2 private-schema attach. Production
 
 Related: [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
+[WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
 [TOOL_VERSIONS.md](../development/TOOL_VERSIONS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·
@@ -225,7 +226,9 @@ Runtime attach (`runtime_attach_without_ddl`) skips vendor CREATE/ALTER and
 [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md).
 
 Application-owned `app.graph_workspaces`, `app.graph_active_workspace_pointer`,
-and `app.graph_writer_lease` are Packet 2 schema only. They are not Graph Ready.
+and `app.graph_writer_lease` are written by Packet 3. Successful vendor
+`processed` leaves the workspace `updating` and the document `graph_pending`.
+See [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md).
 
 ## Rejected assumptions
 

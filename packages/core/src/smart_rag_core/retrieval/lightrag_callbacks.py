@@ -8,6 +8,7 @@ added here; ``max_retries`` stays zero on provider adapters.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -69,6 +70,9 @@ class CountedLightRagCallbacks:
         timeout_seconds: Per-callback timeout bound recorded for evidence.
         extract_gate: Optional event the extract callback waits on. Used only
             by cancellation qualification. ``None`` on production paths.
+        pre_provider_hook: Optional synchronous guard invoked before every
+            embedding or LLM provider call so Packet 3 can verify lock and
+            lease without holding a transaction.
     """
 
     embedding_gateway: EmbeddingGateway
@@ -76,6 +80,7 @@ class CountedLightRagCallbacks:
     counts: CallbackCounts = field(default_factory=CallbackCounts)
     timeout_seconds: float = 30.0
     extract_gate: asyncio.Event | None = None
+    pre_provider_hook: Callable[[], None] | None = None
 
     async def embedding_texts(self, texts: list[str]) -> np.ndarray:
         """Embed one batch through the shared gateway at the pinned dimension.
@@ -95,6 +100,7 @@ class CountedLightRagCallbacks:
 
         if not texts:
             raise ValueError("lightrag_embedding_batch_empty")
+        self._run_pre_provider_hook()
         request = EmbeddingRequest(
             operation_key=f"lightrag-embed-{LIGHTRAG_PINNED_VERSION}",
             inputs=tuple(texts),
@@ -129,6 +135,7 @@ class CountedLightRagCallbacks:
         """
 
         del history_messages
+        self._run_pre_provider_hook()
         gate = self.extract_gate
         if gate is not None:
             await gate.wait()
@@ -164,6 +171,7 @@ class CountedLightRagCallbacks:
         """
 
         del history_messages
+        self._run_pre_provider_hook()
         self.counts.keyword_extract += 1
         response = await self.model_gateway.generate_lightrag_llm(
             LightRagLlmRequest(
@@ -197,6 +205,7 @@ class CountedLightRagCallbacks:
         """
 
         del history_messages
+        self._run_pre_provider_hook()
         self.counts.answer_generate += 1
         response = await self.model_gateway.generate_lightrag_llm(
             LightRagLlmRequest(
@@ -227,3 +236,15 @@ class CountedLightRagCallbacks:
 
         self.counts.rerank += 1
         raise RuntimeError("lightrag_native_rerank_not_qualified")
+
+    def _run_pre_provider_hook(self) -> None:
+        """Invoke the optional lock/lease guard before a provider call.
+
+        Raises:
+            Exception: Propagates whatever the hook raises, typically a
+                writer-lock loss error from Packet 3.
+        """
+
+        hook = self.pre_provider_hook
+        if hook is not None:
+            hook()

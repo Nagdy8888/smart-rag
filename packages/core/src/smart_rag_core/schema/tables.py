@@ -71,6 +71,11 @@ class CompanySettingsRecord(BaseModel):
     visibility_generation: int = Field(default=1, ge=1)
     monthly_llm_budget_usd: float | None = None
     daily_ingestion_budget_usd: float | None = None
+    daily_graph_index_budget_usd: float | None = None
+    monthly_graph_maintenance_budget_usd: float | None = None
+    graph_bulk_window_starts_at: datetime | None = None
+    graph_bulk_window_ends_at: datetime | None = None
+    graph_bulk_approved_at: datetime | None = None
     upload_quota_bytes: int | None = None
     quarantine_byte_cap: int | None = None
     retention_days: int = Field(default=365, ge=1)

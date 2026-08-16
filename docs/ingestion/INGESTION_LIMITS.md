@@ -77,6 +77,8 @@ When `COUNT(*) FROM app.lightrag_index_jobs WHERE status = 'pending' AND operati
 
 Daily ingestion spend uses durable `app.budget_reservations` with `reservation_kind = 'ingestion_daily'`. Enqueue reserves an estimated USD amount against `app.company_settings.daily_ingestion_budget_usd` (default from QT-COST-002). Completion/failure true-ups adjust committed/released amounts without bypassing the daily cap.
 
+Graph mutations use separate kinds: `graph_index` (daily cap `daily_graph_index_budget_usd`, default 20) and `graph_maintenance` (monthly cap `monthly_graph_maintenance_budget_usd`, default 800). Normal graph index must not consume the maintenance reserve or `ingestion_daily`. See [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md).
+
 ## Crawl bounds (Packet 4)
 
 | Limit | Unit | Default | Hard max | Source / benchmark | Owner | Failure route | Review trigger |
