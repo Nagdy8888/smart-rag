@@ -165,6 +165,17 @@ declared on `SharedSettings`, `BackendSettings`, `WorkerSettings`, or
 Admin loads through `smart_rag_api.storage_admin` (API) and
 `smart_rag_worker.privileged_storage` (worker).
 
+## Frontend public variables
+
+Browser bundles may only contain publishable values. See
+[THIN_DEVELOPER_UI.md](../frontend/THIN_DEVELOPER_UI.md).
+
+| Variable | Type / default | Security | Contract |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | HTTP origin; `http://127.0.0.1:8000` | public | FastAPI origin for Bearer fetch SSE |
+| `NEXT_PUBLIC_SUPABASE_URL` | HTTP origin | public | Browser-direct Auth. Never a service-role URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | publishable anon key | public | Browser Auth only. Never the service role |
+
 ## Failure and security behavior
 
 - Real-model mode without `OPENAI_API_KEY` fails startup.

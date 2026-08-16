@@ -1,9 +1,11 @@
 /**
- * Honest capability marker for the Phase 1 frontend foundation.
+ * Honest capability marker for the Phase 6 thin developer UI.
  *
- * No authentication, retrieval, ingestion, or model success is represented.
+ * Retrieval quality is proven by API/eval packets, not by this shell.
+ * Stitch and production frontend remain later phases.
  */
 export const foundationCapability = {
-  status: "unconfigured",
+  status: "thin_developer_ui",
   retrievalImplemented: false,
+  stitchImplemented: false,
 } as const;

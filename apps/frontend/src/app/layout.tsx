@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AppProviders } from "../components/providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Smart RAG",
+  title: "Smart RAG developer console",
   description:
-    "Phase 1 foundation frontend scaffold. Auth and retrieval are not implemented.",
+    "Thin authenticated developer UI for Hybrid/Graph RAG. Not the production frontend.",
 };
 
 /**
- * Render the shared HTML shell for foundation routes.
+ * Render the shared HTML shell for developer-console routes.
  *
  * @param children - App Router content for the active route.
  * @returns The root document structure with local font variables.
@@ -27,7 +28,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <AppProviders>{children}</AppProviders>
+      </body>
     </html>
   );
 }

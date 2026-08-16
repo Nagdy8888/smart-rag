@@ -1344,3 +1344,90 @@ Post-launch regression sets are not the immutable holdout.
 - Do **not** mark Phase 6 complete until the wrapper `Done when` gate is
   proven and the user accepts it.
 
+## Packet 8 — thin authenticated developer UI
+
+### Quoted requirement
+
+> Ship the thin authenticated developer UI and prove route, fallback,
+> injection, idempotency, budget, outage, event-loop, and privacy gates.
+
+### Acceptance checks restated
+
+- Thin UI for sign-in, upload/status, safe stream/reconnect/cancel,
+  route/limitation diagnostics, citations, and feedback. No Stitch or
+  production frontend.
+- Route/fallback/injection/idempotency/budget/outage/privacy cases use
+  real local API contracts; UI fixtures do not replace packets 1–7.
+- One-paid-run across double send/reconnect; handshake before paid POST;
+  conversation delete 204 with content-free acknowledgment.
+- Five Composite streams: p95 event-loop lag `<50 ms`, heartbeat jitter
+  `<2 s`, zero missed 15 s heartbeats.
+- XSS-safe rendering; no `dangerouslySetInnerHTML`.
+
+### Implemented
+
+- Browser-direct `@supabase/ssr` `createBrowserClient` password sign-in.
+  FastAPI receives `Authorization: Bearer`.
+- Auto Composite chat: `X-Client-Version: 0.1.0`, stable
+  `Idempotency-Key` until terminal, fetch SSE, reconnect
+  `GET /runs/{id}/events?after=` without the version header, cancel POST.
+- Unknown SSE types logged and ignored. Token/entity text via React text
+  nodes + `displayText`. Citation `href` requires `isSafeHttpUrl`.
+- Signed limitation copy including `temporal_graph_limitation`. Graph
+  not-ready sentence never mentions restricted/ineligible counts.
+- Unmerged packet-7 feedback tags. DELETE conversation acknowledgment
+  without source text.
+- Document list from `GET /documents`. Upload finalize remains API-side;
+  graph ready is never inferred from upload. Local `signed_url` stays
+  Phase 10.
+
+SSE catalog payloads do **not** include BM25 index/lag. The console shows
+cache/coverage/route_correction/limitation/tool/citation/usage/heartbeat
+fields that exist on the accepted event types.
+
+### Commands and exit codes
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend test` | 0 (20 passed) |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend exec next typegen` | 0 |
+| `pnpm --filter smart-rag-frontend exec tsc --noEmit` | 0 |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+| `pnpm --filter smart-rag-frontend exec playwright --version` | 0 (`Version 1.62.1`) |
+
+### Wrapper gate map
+
+| Gate | Evidence | Status |
+| --- | --- | --- |
+| Handshake / 426 | `classifyApiError` + `paidMutationHeaders` unit tests | proven (client) |
+| Idempotency key reuse | `chat-view.test.ts` + send() ref | proven (client) |
+| Unknown SSE ignore | `applySseFrame` future_metric test | proven (client) |
+| XSS / javascript: href | `safe-text.test.ts` | proven (client) |
+| Route/fusion/tools/reaper/deletion | Packets 1–7 pytest | proven (API) |
+| Five Composite UI streams | Packet 6 API heartbeat tests; no 5-browser run | **unverified through UI** |
+| Live JWT chat + delete lingering-ID | Requires local Auth session in the browser | **unverified** |
+| ParadeDB/LightRAG/Valkey outage via UI | Packets 4–6 API; not re-driven from the console | **unverified through UI** |
+| Stitch / production frontend | Out of scope | not started |
+
+### Deviations
+
+- No TanStack Query codegen from OpenAPI; types are a hand-maintained
+  subset of `openapi.foundation.json`.
+- Playwright `login.spec.ts` exists but is not in `scripts/check.py`
+  (CI still only asserts `playwright --version`).
+- Packet 8 wrapper checkbox stays **unchecked** until live browser JWT
+  chat, deletion lingering-ID, and five Composite UI streams are proven.
+
+### Rollback
+
+- Revert the frontend App Router console to the Phase 1 scaffold.
+- Remove `NEXT_PUBLIC_API_BASE_URL` from docs/env example.
+
+### Phase status
+
+Phase 6 wrapper `status` remains **`pending`**. Do not start Stitch
+(Phase 7) or production UI (Phase 8) from this packet. User acceptance
+is still required for the wrapper `Done when` gate.
+
+
