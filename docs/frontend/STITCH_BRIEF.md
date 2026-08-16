@@ -15,12 +15,14 @@ production console. This is specification only. Phase 8 implements against
 diagnostics, or mock quotas as API contracts.
 
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
+[STITCH_STATES.md](./STITCH_STATES.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
 [docs index](../README.md)
 
-State matrices, accessibility review, and Stitch approval/fallback are
-appended in later Phase 7 packets and linked from this brief when they exist.
+[STITCH_STATES.md](./STITCH_STATES.md) is part of this brief: every
+loading, empty, error, permission, quarantine, quota, compatibility,
+limitation, fallback, partial-readiness, budget, and degraded state.
 
 ## Localization decision
 

@@ -161,3 +161,39 @@ docs-index and thin-UI links.
 ### Rollback
 
 Delete `STITCH_BRIEF.md` and the brief unit test; unlink from the index.
+
+## Packet 3 — Specify every loading, empty, error, permission, quarantine, quota, compatibility, limitation, fallback, partial-readiness, budget, and degraded state
+
+### Requirement (quoted)
+
+> Specify every loading, empty, error, permission, quarantine, quota,
+> compatibility, limitation, fallback, partial-readiness, budget, and
+> degraded state.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `docs/frontend/STITCH_STATES.md` | Created — per-surface matrix |
+| `docs/frontend/STITCH_BRIEF.md` | Linked states as part of the brief |
+| `tests/unit/test_phase07_stitch_states.py` | Coverage + negative leak checks |
+| `docs/README.md` | Indexed states |
+| Phase 7 wrapper | Packet 3 checkbox |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_phase07_stitch_states.py tests/unit/test_phase07_stitch_brief.py -q` | 0 (7 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Negative findings
+
+- Graph-only answering is not a success state.
+- ACL blindness reveals no unauthorized titles/counts.
+- Auth-direct login is not FastAPI-throttled.
+- Source preview, audit, budgets, settings, document delete remain GAPs.
+
+### Rollback
+
+Delete `STITCH_STATES.md` and its unit test; unlink from the brief.
