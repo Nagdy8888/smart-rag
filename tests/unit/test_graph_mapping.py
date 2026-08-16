@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 import pytest
 from smart_rag_core.ingestion.chunking.normalize import content_hash
 from smart_rag_core.jobs.exceptions import GraphMappingError
+from smart_rag_core.jobs.extraction_policy import ExtractionPolicySnapshot
 from smart_rag_core.jobs.graph_mapping_service import GraphMappingService
 from smart_rag_core.jobs.limits import (
     GRAPH_PIPELINE_VERSION,
@@ -397,6 +398,22 @@ class _StubWriter:
         return uuid4()
 
 
+def _stub_extraction_policy(_connection: object) -> ExtractionPolicySnapshot:
+    """Return generation-1 policy so Packet 4 unit tests need no Postgres.
+
+    Args:
+        _connection: Unused fake mapping connection.
+
+    Returns:
+        Snapshot with an empty hash so mapping digests stay stable.
+    """
+
+    del _connection
+    return ExtractionPolicySnapshot(
+        entity_rules_generation=1, extraction_policy_hash=""
+    )
+
+
 def test_processed_only_is_not_graph_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     """Vendor PROCESSED without accepted maps cannot mark Graph Ready."""
 
@@ -431,6 +448,10 @@ def test_processed_only_is_not_graph_ready(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_entity_rules",
         lambda _connection: (),
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.jobs.graph_mapping_service.load_extraction_policy",
+        _stub_extraction_policy,
     )
     monkeypatch.setattr(GraphMappingService, "_persist", _persist)
     monkeypatch.setattr(
@@ -518,6 +539,10 @@ def test_unresolved_batch_uses_one_hybrid_and_one_rerank(
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_mapping_persist.load_entity_rules",
         lambda _connection: (),
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.jobs.graph_mapping_service.load_extraction_policy",
+        _stub_extraction_policy,
     )
     monkeypatch.setattr(GraphMappingService, "_persist", _persist)
     monkeypatch.setattr(

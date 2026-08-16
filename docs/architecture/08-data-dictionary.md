@@ -99,7 +99,8 @@ erDiagram
 | `graph_evidence_map` | `app` | authority | graph mapper | Combined fusion | while valid and support ≥ 0.80 | many-to-many | cascade | object+chunk unique plus replay unique | 5 packet 4 |
 | `graph_map_repair_jobs` | `app` | authority | graph mapper | worker | until repaired | per unavailable object/config | cascade | unique workspace/object/map_kind/config | 5 packet 4 |
 | `graph_mapping_telemetry` | `app` | derived | graph mapper | ops | mapping runs | per language/type | cascade | append | 5 packet 4 |
-| `graph_entity_rules` | `app` | authority | admin curation | graph indexer | until deactivated | small ruleset | soft deactivate | rule `id` | 5 graph |
+| `graph_entity_rules` | `app` | authority | owner/admin RPCs | graph indexer (approved only) | until revoked | small ruleset | soft revoke | rule `id`; approved `(entity_type, normalized canonical)` unique | 5 packet 6 |
+| `graph_extraction_policy` | `app` | authority | owner/admin RPCs on rule change | mapper/resolver | singleton | 1 row | none | fixed UUID | 5 packet 6 |
 | `graph_workspaces` | `app` | authority | graph worker (Pkt 3) | worker RW; API SELECT | until retired | few workspaces | state to `retired` | `workspace_key` unique | 5 packet 2 schema |
 | `graph_active_workspace_pointer` | `app` | authority | graph worker (Pkt 7 FOR UPDATE) | worker RW; API SELECT | singleton | 1 row | none | fixed UUID | 5 packet 2 schema |
 | `graph_writer_lease` | `app` | authority | graph worker (Pkt 3 writer RPCs) | worker only | singleton | 1 row | none | fixed UUID | 5 packet 3 occupy/heartbeat/release |
@@ -180,6 +181,12 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
   (depth 3, 200 rows, `statement_timeout='3s'`, no vendor prose), and
   `app.enqueue_graph_map_repair` (`map_kind=query_resolve`, never Hybrid).
   `app_api` may SELECT map tables; ACL is rechecked in resolver SQL.
+- Packet 6 expands `graph_entity_rules` with status, typed aliases,
+  do-not-merge, optimistic `row_version`, and dual-written `rule jsonb`.
+  Suggested/revoked rows never load. Approved changes bump
+  `graph_extraction_policy.entity_rules_generation`, invalidate map
+  `config_generation`, return Graph Ready versions to `graph_pending`, and
+  enqueue `company_default__rebuild` without switching the pointer.
 - `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. Packet 4 may set `active` when maps verify and the pointer already names the workspace. This is Graph Ready on the version, not a Packet 7 switch.
 - `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, or `graph_maintenance`. The kinds never share caps.
 
@@ -194,5 +201,6 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - [ADAPTER_LIFECYCLE.md](../graph/ADAPTER_LIFECYCLE.md)
 - [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md)
 - [MAPPING.md](../graph/MAPPING.md)
+- [ENTITY_RULES.md](../graph/ENTITY_RULES.md)
 - [RETRIEVAL.md](../graph/RETRIEVAL.md)
 - [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md)

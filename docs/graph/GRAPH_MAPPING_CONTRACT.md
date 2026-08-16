@@ -19,6 +19,8 @@ Do not treat `lightrag_source_map` alone as evidence. Do not parse rendered
 
 Query-time resolution, survival, and inspection are specified in
 [RETRIEVAL.md](./RETRIEVAL.md). Mapping rows are never citations by themselves.
+Entity-rule canonical keys, inactive suggestions, and rebuild scheduling are
+specified in [ENTITY_RULES.md](./ENTITY_RULES.md).
 
 Related: [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·

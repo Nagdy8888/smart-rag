@@ -521,36 +521,76 @@ def load_canonical_passages(
 
 
 def load_entity_rules(connection: psycopg.Connection) -> tuple[EntityRuleView, ...]:
-    """Load active entity rules. Unresolved names stay separate.
+    """Load approved, currently effective entity rules.
+
+    Suggested and revoked rows are ignored. Unresolved names stay separate.
+    Hybrid aliases are never copied from LightRAG.
 
     Args:
         connection: ``app_worker`` connection.
 
     Returns:
-        Active rule views. Hybrid aliases are never copied from LightRAG.
+        Active approved rule views.
     """
 
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT entity_type, rule
+            SELECT
+              entity_type,
+              canonical_name,
+              aliases,
+              do_not_merge,
+              languages,
+              relation_label_policy::text,
+              status::text,
+              rule
             FROM app.graph_entity_rules
-            WHERE active IS TRUE
+            WHERE status = 'approved'::app.graph_entity_rule_status
+              AND active IS TRUE
+              AND (
+                effective_from IS NULL
+                OR effective_from <= timezone('utc', now())
+              )
+              AND (
+                effective_until IS NULL
+                OR effective_until > timezone('utc', now())
+              )
             """
         )
         rows = cursor.fetchall()
     views: list[EntityRuleView] = []
-    for entity_type, raw_rule in rows:
+    for row in rows:
+        (
+            entity_type,
+            canonical_name,
+            aliases_raw,
+            blocked_raw,
+            languages_raw,
+            relation_policy,
+            status,
+            raw_rule,
+        ) = row
         rule = raw_rule if isinstance(raw_rule, dict) else {}
-        aliases = tuple(str(item) for item in rule.get("aliases", []) if item)
-        blocked = tuple(str(item) for item in rule.get("do_not_merge", []) if item)
-        canonical = rule.get("canonical_name")
+        aliases = tuple(
+            str(item) for item in (aliases_raw or rule.get("aliases", []) or []) if item
+        )
+        blocked = tuple(
+            str(item)
+            for item in (blocked_raw or rule.get("do_not_merge", []) or [])
+            if item
+        )
+        languages = tuple(str(item) for item in (languages_raw or []) if item)
+        canonical = canonical_name or rule.get("canonical_name")
         views.append(
             EntityRuleView(
                 entity_type=str(entity_type),
                 canonical_name=str(canonical) if canonical else None,
                 aliases=aliases,
                 do_not_merge=blocked,
+                languages=languages,
+                relation_label_policy=str(relation_policy or "directed"),
+                status=str(status or "approved"),
             )
         )
     return tuple(views)

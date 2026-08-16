@@ -14,6 +14,7 @@ not appear in Git, logs, traces, or HTTP error bodies.
 
 Related: [DATASET_SPEC.md](../evaluation/DATASET_SPEC.md) ·
 [08-data-dictionary.md](../architecture/08-data-dictionary.md) ·
+[ENTITY_RULES.md](../graph/ENTITY_RULES.md) ·
 [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Routes

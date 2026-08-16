@@ -17,6 +17,7 @@ Related: [GRAPH_MAPPING_CONTRACT.md](./GRAPH_MAPPING_CONTRACT.md) ·
 [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
 [RETRIEVAL.md](./RETRIEVAL.md) ·
+[ENTITY_RULES.md](./ENTITY_RULES.md) ·
 [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
@@ -32,7 +33,7 @@ prose, or a native predicate id.
 | --- | --- |
 | Source | `document_version_id` + SHA-256 of pipeline and config generation |
 | Internal chunk key | `workspace:config_generation:vendor_chunk_id` (not a cross-version app ID) |
-| Canonical entity | versioned type + canonical name after active `graph_entity_rules` |
+| Canonical entity | `{TYPE}::{normalized_name}` after approved `graph_entity_rules`; hashed with `graph_pipeline_v1` |
 | Statement | pipeline + subject key + object key + normalized **keywords** label |
 | Path-edge | ordered statement IDs + direction + version |
 

@@ -17,6 +17,7 @@ from uuid import UUID
 import psycopg
 
 from smart_rag_core.jobs import graph_mapping_persist as persist
+from smart_rag_core.jobs.entity_rule_service import load_extraction_policy
 from smart_rag_core.jobs.exceptions import GraphMappingError
 from smart_rag_core.jobs.graph_writer import GraphWriterGuard
 from smart_rag_core.jobs.limits import (
@@ -54,6 +55,7 @@ from smart_rag_core.retrieval.graph_mapping import (
     map_vendor_chunk,
     mapping_config_generation,
     normalize_relation_label,
+    ordered_statement_endpoints,
     parse_object_source_ids,
     resolve_entity_name,
     run_support_rerank,
@@ -298,10 +300,13 @@ class GraphMappingService:
         """
 
         workspace_key = self._writer.workspace_key
+        policy = load_extraction_policy(self._connection)
         config_generation = mapping_config_generation(
             workspace_key=workspace_key,
             pointer_generation=self._writer.load_pointer_generation(),
             chunker_snapshot=graph_chunker_config_snapshot(),
+            entity_rules_generation=policy.entity_rules_generation,
+            extraction_policy_hash=policy.extraction_policy_hash,
         )
         source_identity = canonical_source_identity(
             version_id=version_id,
@@ -405,6 +410,7 @@ class GraphMappingService:
                 entity_keys=entity_keys,
                 language=language,
                 version_id=version_id,
+                relation_label_policy=policy.relation_label_policy,
             )
         )
         coverage = _coverage_slices(chunk_rows, objects, language=language)
@@ -680,6 +686,7 @@ class GraphMappingService:
         entity_keys: Mapping[object, object],
         language: str,
         version_id: UUID,
+        relation_label_policy: str = "directed",
     ) -> list[ObjectMapping]:
         """Derive statement and path-edge IDs from structured relation fields.
 
@@ -692,6 +699,7 @@ class GraphMappingService:
                 entities.
             language: Version language.
             version_id: Canonical version.
+            relation_label_policy: Directed or symmetric endpoint ordering.
 
         Returns:
             Statement and path-edge mappings.
@@ -733,9 +741,14 @@ class GraphMappingService:
                     )
                 )
                 continue
+            ordered_subject, ordered_object = ordered_statement_endpoints(
+                subject,
+                obj,
+                relation_label_policy=relation_label_policy,
+            )
             statement_id = graph_statement_id(
-                subject_key=subject,
-                object_key=obj,
+                subject_key=ordered_subject,
+                object_key=ordered_object,
                 relation_label_key=relation_key,
             )
             rel_join_key = GRAPH_FIELD_SEP.join(sorted((src, tgt)))

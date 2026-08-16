@@ -765,3 +765,135 @@ port.
 sealed. Do not mark Phase 5 complete. Phase status remains `pending`.
 Packet 6 owns entity curation, extraction policy, invalidation, and
 rebuild scheduling — not Combined answers/SSE.
+
+## Packet 6 — entity curation, extraction policy, invalidation, and rebuild scheduling
+
+### Quoted requirement
+
+> Packet 6 — entity curation, extraction policy, invalidation, and rebuild
+> scheduling
+
+### Acceptance checks restated
+
+- Approved rules deterministically affect canonical keys/extraction on
+  rebuild; ambiguous/do-not-merge entities never silently merge.
+- Suggested/revoked rules cannot affect active graph results; changes
+  invalidate mappings and schedule versioned clean rebuild.
+- Rule CRUD is authorized/audited and cannot broaden graph eligibility or
+  Hybrid aliases.
+
+### Negative tests restated
+
+Member/viewer mutation, stale concurrent update, cross-type alias, cycle,
+auto-approval, inactive suggestion use, direct vendor patch, native-to-Hybrid
+alias copy, or rule change without invalidation/rebuild fails.
+
+### Canonical keys
+
+Application merge identity is `{TYPE}::{normalized_name}` after
+`normalize_for_dedup` (type uppercased). `PROJECT::atlas` is never
+`PRODUCT::atlas`. `canonical_entity_key` hashes `graph_pipeline_v1` plus
+that typed key. Do-not-merge wins. Missing vendor type does not consume a
+typed alias. Suggested/revoked rows are not loaded.
+
+### Schema / RPCs
+
+Expand-only `20260816140000_graph_entity_rules_v1.sql` on stub
+`app.graph_entity_rules` (kept `rule jsonb`, dual-written from typed
+columns). Added status `suggested|approved|revoked`, aliases, do-not-merge,
+languages, alias scope/effective dates, display labels, relation-label
+policy, `row_version`, reason/source/confidence/provenance, and
+`app.graph_extraction_policy` singleton.
+
+- `app.upsert_graph_entity_rule` / `approve_graph_entity_rule` /
+  `revoke_graph_entity_rule` / `list_graph_entity_rules`
+- `app.apply_entity_rule_graph_invalidation` (DEFINER; worker execute)
+- Feedback/model cannot INSERT as approved (`auto_approval_forbidden`)
+- `active` iff `status = approved`
+
+### Invalidation and rebuild
+
+`GRAPH_PIPELINE_VERSION` stays `graph_pipeline_v1`. Approved
+create/update/approve/revoke bumps `entity_rules_generation`, prefixes live
+map `config_generation` with `invalidated:`, sets Graph Ready versions to
+`graph_pending`, upserts `map_repair`, and enqueues
+`graph_entity_rules_rebuild:{workspace}:{generation}` with
+`isolate_only=true`. Isolation workspace is `company_default__rebuild` in
+`building`. Pointer generation is unchanged. Packet 7 owns the switch.
+
+Generation `1` with an empty extraction hash keeps Packet 5 mapping digests
+until the first bump. Default extraction overlay hash is
+`b8719e2481b2f8ed85be76d13e19c092428e92ffdf3d36bcd5e5e9656c65bd08`.
+
+### Authorization / audit
+
+Owner/admin only via `CallerContextDep` plus SQL `validate_caller_context`.
+Members/viewers receive `403 forbidden`. MFA is inherited from
+`profile_loader` (owner/admin already require enrolled MFA + AAL2). Stale
+`row_version` is `409`. Append-only `app.audit_events` records
+`graph.entity_rules.upserted|approved|revoked` without corpus text. Rules
+cannot set `graph_eligible` or write `search_aliases`.
+
+### Routes
+
+`GET/POST /admin/graph/entity-rules`, `PATCH /{id}`,
+`POST /suggestions`, `POST /{id}/approve`, `POST /{id}/revoke`.
+
+### Commands and results
+
+No commit, no push, no `uv sync --package smart-rag-core`. Holdout remains
+sealed. Phase status remains `pending`. The Packet 6 migration was applied
+as postgres to local `127.0.0.1:54322`. Types used `--db-url` to that port
+with separate `--schema` flags (comma-joined `--schema` produced an empty
+`Database`).
+
+| Command | Exit |
+| --- | --- |
+| `uv run python scripts/ci/check_migrations.py` | 0 (44 reviewed files) |
+| `uv run python -m pytest tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_graph_mapping.py tests/unit/test_graph_resolver.py tests/unit/test_entity_rules.py tests/unit/test_entity_rules_openapi.py tests/contract/test_entity_rules.py -q` | 0 (65 passed) |
+| `uv run python scripts/check.py --tier format` | 0 (406 files) |
+| `uv run python scripts/check.py --tier lint` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Deviations
+
+- `canonical_entity_key` now hashes the typed `{TYPE}::{name}` string
+  instead of separate type+name digest parts.
+- `mapping_config_generation` omits `entity_rules_generation` /
+  `extraction_policy_hash` at generation `1` so Packet 5 map digests stay
+  stable until the first approved-rule bump.
+- Rule CRUD is SECURITY DEFINER (glossary equivalent), not INVOKER, because
+  `app_api` cannot UPDATE map tables.
+- Isolated entity-rule rebuild jobs (`document_id` null,
+  `payload_ref.isolate_only=true`) skip `assert_graph_index_allowed`,
+  matching the existing reconciliation skip. They do not attach a document
+  or broaden `graph_eligible`.
+- SQL treats alias-equal-to-canonical (after `arabic_norm_v1`) as redundant,
+  not `duplicate_alias`. Self-edges are excluded from cycle detection.
+- Invalidation returns every `graph_ready` version to `graph_pending`, not
+  only the live workspace.
+
+### Unverified
+
+- Live LightRAG rebuild against `company_default__rebuild` (Packet 7 switch
+  is not this packet).
+- Managed/staging apply of `20260816140000_graph_entity_rules_v1.sql`.
+- `supabase_migrations.schema_migrations` still lacks `20260816130000`
+  (Packet 5 objects exist; Packet 6 recorded `20260816140000` only).
+- Full-repo Pyright (pre-existing errors outside this packet).
+- Combined answer quality / holdout remain sealed.
+
+### Rollback
+
+- Do not DROP expanded `graph_entity_rules` columns or
+  `graph_extraction_policy` (expand-only).
+- Remove `entity_rules_router` include if the API surface must be withdrawn.
+- Revoke approved rules to stop them loading; maps stay invalidated until a
+  later rebuild/switch.
+
+### Packet 7 handoff
+
+**Packet 7 may start if rules+invalidation are proven.** Holdout remains
+sealed. Do not mark Phase 5 complete. Phase status remains `pending`.
+Packet 7 owns atomic version switching, deletion/ACL cleanup, upgrade,
+rollback, and disablement — not Combined answers/SSE.

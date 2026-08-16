@@ -77,3 +77,17 @@ class GraphWriterLostError(JobLeaseError):
 
         super().__init__(reason)
         self.reason = reason
+
+
+class GraphEntityRuleError(JobRepositoryError):
+    """Raised when entity-rule authorization or validation fails closed."""
+
+    def __init__(self, reason: str) -> None:
+        """Initialize with a stable machine-readable rule reason.
+
+        Args:
+            reason: Short reason such as ``forbidden`` or ``stale_row_version``.
+        """
+
+        super().__init__(reason)
+        self.reason = reason

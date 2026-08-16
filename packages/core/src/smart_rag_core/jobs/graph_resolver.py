@@ -13,6 +13,7 @@ from uuid import UUID
 
 import psycopg
 
+from smart_rag_core.jobs.entity_rule_service import load_extraction_policy
 from smart_rag_core.jobs.exceptions import GraphResolverError
 from smart_rag_core.jobs.limits import (
     GRAPH_POINTER_ID,
@@ -168,6 +169,7 @@ def load_query_workspace(connection: psycopg.Connection) -> QueryWorkspaceSnapsh
                 (GRAPH_POINTER_ID,),
             )
             row = cursor.fetchone()
+        policy = load_extraction_policy(connection)
     if row is None:
         return QueryWorkspaceSnapshot(
             workspace_key="",
@@ -186,6 +188,8 @@ def load_query_workspace(connection: psycopg.Connection) -> QueryWorkspaceSnapsh
             workspace_key=workspace_key,
             pointer_generation=generation,
             chunker_snapshot=graph_chunker_config_snapshot(),
+            entity_rules_generation=policy.entity_rules_generation,
+            extraction_policy_hash=policy.extraction_policy_hash,
         )
         if workspace_key
         else ""

@@ -113,12 +113,19 @@ class EntityRuleView:
         canonical_name: Optional curated display/canonical name.
         aliases: Names that map to ``canonical_name``.
         do_not_merge: Names that must stay separate.
+        languages: Optional language scope; empty means all.
+        relation_label_policy: ``directed`` or ``symmetric``.
+        status: ``approved`` views only affect mapping. Suggested/revoked
+            views must not be loaded into this structure.
     """
 
     entity_type: str
     canonical_name: str | None
     aliases: tuple[str, ...]
     do_not_merge: tuple[str, ...]
+    languages: tuple[str, ...] = ()
+    relation_label_policy: str = "directed"
+    status: str = "approved"
 
 
 @dataclass
@@ -192,24 +199,37 @@ def mapping_config_generation(
     workspace_key: str,
     pointer_generation: int,
     chunker_snapshot: Mapping[str, object],
+    entity_rules_generation: int = 1,
+    extraction_policy_hash: str = "",
 ) -> str:
     """Hash workspace generation with the pinned chunker/pipeline snapshot.
+
+    ``graph_pipeline_v1`` is never rewritten. Approved entity-rule changes bump
+    ``entity_rules_generation`` instead of mixing embeddings. Generation ``1``
+    with an empty policy hash keeps Packet 5 map digests stable until the
+    first approved-rule invalidation.
 
     Args:
         workspace_key: Application workspace identifier.
         pointer_generation: Active pointer generation, defaulting to 1.
         chunker_snapshot: ``graph_chunker_config_snapshot`` mapping.
+        entity_rules_generation: Stored approved-rule generation.
+        extraction_policy_hash: Extraction overlay digest after generation 1.
 
     Returns:
         Lowercase SHA-256 hex digest.
     """
 
-    payload = {
+    payload: dict[str, object] = {
         "workspace_key": workspace_key,
         "pointer_generation": pointer_generation,
         "pipeline": GRAPH_PIPELINE_VERSION,
         "chunker": dict(chunker_snapshot),
     }
+    if entity_rules_generation > 1:
+        payload["entity_rules_generation"] = entity_rules_generation
+    if extraction_policy_hash:
+        payload["extraction_policy_hash"] = extraction_policy_hash
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
@@ -286,6 +306,25 @@ def normalize_relation_label(keywords: str | None) -> str:
     return normalized
 
 
+def typed_canonical_key(*, entity_type: str, name: str) -> str:
+    """Return ``{TYPE}::{normalized_name}`` so homonyms stay type-qualified.
+
+    ``PROJECT::atlas`` is never equal to ``PRODUCT::atlas``. Mapping storage
+    still hashes this identity; the typed form is the merge key.
+
+    Args:
+        entity_type: Vendor or curated type.
+        name: Canonical or vendor name.
+
+    Returns:
+        Type-qualified canonical key.
+    """
+
+    type_part = normalize_for_dedup(entity_type).replace(" ", "_").upper()
+    name_part = normalize_for_dedup(name)
+    return f"{type_part}::{name_part}"
+
+
 def canonical_entity_key(*, entity_type: str, canonical_name: str) -> str:
     """Hash a versioned type plus canonical name.
 
@@ -294,13 +333,12 @@ def canonical_entity_key(*, entity_type: str, canonical_name: str) -> str:
         canonical_name: Rule canonical or vendor name.
 
     Returns:
-        SHA-256 entity key.
+        SHA-256 entity key derived from the typed canonical key.
     """
 
     return _stable_digest(
         GRAPH_PIPELINE_VERSION,
-        normalize_for_dedup(entity_type),
-        normalize_for_dedup(canonical_name),
+        typed_canonical_key(entity_type=entity_type, name=canonical_name),
     )
 
 
@@ -361,31 +399,44 @@ def resolve_entity_name(
 ) -> str | None:
     """Return a canonical entity name or ``None`` when the name is ambiguous.
 
-    Unresolved names stay separate. Ambiguous alias/do-not-merge collisions
-    are unavailable rather than auto-merged. Hybrid aliases are not copied.
+    Unresolved names stay separate. Do-not-merge wins over aliases. Cross-type
+    homonyms such as ``PROJECT::atlas`` and ``PRODUCT::atlas`` never merge.
+    Suggested or revoked rules must not be supplied. Hybrid aliases are not
+    copied.
 
     Args:
         vendor_name: LightRAG entity id/name.
-        vendor_type: Optional vendor type.
-        rules: Active ``graph_entity_rules`` views.
+        vendor_type: Optional vendor type. Typed rules require a match.
+        rules: Active approved ``graph_entity_rules`` views.
 
     Returns:
-        Canonical name, or ``None`` when ambiguous.
+        Canonical name, or ``None`` when ambiguous or blocked.
     """
 
     normalized = normalize_for_dedup(vendor_name)
+    vendor_type_norm = (
+        normalize_for_dedup(vendor_type).replace(" ", "_").upper()
+        if vendor_type
+        else ""
+    )
     matches: list[str] = []
     blocked = False
     for rule in rules:
-        aliases = {normalize_for_dedup(item) for item in rule.aliases}
-        aliases.add(normalize_for_dedup(rule.canonical_name or ""))
-        do_not_merge = {normalize_for_dedup(item) for item in rule.do_not_merge}
-        if normalized in do_not_merge and aliases.intersection(do_not_merge):
+        if rule.status and rule.status != "approved":
+            continue
+        rule_type = normalize_for_dedup(rule.entity_type).replace(" ", "_").upper()
+        if rule_type and vendor_type_norm and rule_type != vendor_type_norm:
+            continue
+        if rule_type and not vendor_type_norm:
+            continue
+        aliases = {normalize_for_dedup(item) for item in rule.aliases if item}
+        if rule.canonical_name:
+            aliases.add(normalize_for_dedup(rule.canonical_name))
+        do_not_merge = {normalize_for_dedup(item) for item in rule.do_not_merge if item}
+        if normalized in do_not_merge:
             blocked = True
-        type_ok = (
-            not vendor_type or not rule.entity_type or vendor_type == rule.entity_type
-        )
-        if type_ok and normalized in aliases and rule.canonical_name:
+            continue
+        if normalized in aliases and rule.canonical_name:
             matches.append(rule.canonical_name)
     unique = tuple(dict.fromkeys(matches))
     if blocked or len(unique) > 1:
@@ -393,6 +444,30 @@ def resolve_entity_name(
     if unique:
         return unique[0]
     return vendor_name
+
+
+def ordered_statement_endpoints(
+    subject_key: str,
+    object_key: str,
+    *,
+    relation_label_policy: str = "directed",
+) -> tuple[str, str]:
+    """Order statement endpoints according to relation-label policy.
+
+    Args:
+        subject_key: Canonical subject entity key.
+        object_key: Canonical object entity key.
+        relation_label_policy: ``directed`` preserves order; ``symmetric``
+            sorts keys so undirected labels share one statement id.
+
+    Returns:
+        Ordered ``(subject_key, object_key)`` pair.
+    """
+
+    if relation_label_policy == "symmetric":
+        first, second = sorted((subject_key, object_key))
+        return (first, second)
+    return (subject_key, object_key)
 
 
 def _token_jaccard(left: str, right: str) -> float:

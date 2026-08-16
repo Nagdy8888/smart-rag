@@ -1376,29 +1376,111 @@ export type Database = {
       graph_entity_rules: {
         Row: {
           active: boolean
+          alias_scope: string
+          aliases: string[]
+          approved_at: string | null
+          approved_by: string | null
+          canonical_name: string | null
+          confidence: number | null
           created_at: string
+          created_by: string | null
+          display_label: string | null
+          do_not_merge: string[]
+          effective_from: string | null
+          effective_until: string | null
           entity_type: string
           id: string
+          languages: string[]
+          provenance: Json
+          reason: string
+          relation_label_policy: Database["app"]["Enums"]["graph_relation_label_policy"]
+          revoked_at: string | null
+          revoked_by: string | null
+          row_version: number
           rule: Json
+          source: Database["app"]["Enums"]["graph_entity_rule_source"]
+          status: Database["app"]["Enums"]["graph_entity_rule_status"]
           updated_at: string
         }
         Insert: {
           active?: boolean
+          alias_scope?: string
+          aliases?: string[]
+          approved_at?: string | null
+          approved_by?: string | null
+          canonical_name?: string | null
+          confidence?: number | null
           created_at?: string
+          created_by?: string | null
+          display_label?: string | null
+          do_not_merge?: string[]
+          effective_from?: string | null
+          effective_until?: string | null
           entity_type: string
           id?: string
+          languages?: string[]
+          provenance?: Json
+          reason?: string
+          relation_label_policy?: Database["app"]["Enums"]["graph_relation_label_policy"]
+          revoked_at?: string | null
+          revoked_by?: string | null
+          row_version?: number
           rule?: Json
+          source?: Database["app"]["Enums"]["graph_entity_rule_source"]
+          status?: Database["app"]["Enums"]["graph_entity_rule_status"]
           updated_at?: string
         }
         Update: {
           active?: boolean
+          alias_scope?: string
+          aliases?: string[]
+          approved_at?: string | null
+          approved_by?: string | null
+          canonical_name?: string | null
+          confidence?: number | null
           created_at?: string
+          created_by?: string | null
+          display_label?: string | null
+          do_not_merge?: string[]
+          effective_from?: string | null
+          effective_until?: string | null
           entity_type?: string
           id?: string
+          languages?: string[]
+          provenance?: Json
+          reason?: string
+          relation_label_policy?: Database["app"]["Enums"]["graph_relation_label_policy"]
+          revoked_at?: string | null
+          revoked_by?: string | null
+          row_version?: number
           rule?: Json
+          source?: Database["app"]["Enums"]["graph_entity_rule_source"]
+          status?: Database["app"]["Enums"]["graph_entity_rule_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "graph_entity_rules_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "graph_entity_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "graph_entity_rules_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       graph_evidence_map: {
         Row: {
@@ -1480,6 +1562,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      graph_extraction_policy: {
+        Row: {
+          allowed_entity_types: string[]
+          allowed_languages: string[]
+          entity_extract_max_gleaning: number
+          entity_rules_generation: number
+          extraction_policy_hash: string
+          id: string
+          json_mode: boolean
+          relation_label_policy: Database["app"]["Enums"]["graph_relation_label_policy"]
+          updated_at: string
+        }
+        Insert: {
+          allowed_entity_types: string[]
+          allowed_languages: string[]
+          entity_extract_max_gleaning?: number
+          entity_rules_generation?: number
+          extraction_policy_hash: string
+          id: string
+          json_mode?: boolean
+          relation_label_policy?: Database["app"]["Enums"]["graph_relation_label_policy"]
+          updated_at?: string
+        }
+        Update: {
+          allowed_entity_types?: string[]
+          allowed_languages?: string[]
+          entity_extract_max_gleaning?: number
+          entity_rules_generation?: number
+          extraction_policy_hash?: string
+          id?: string
+          json_mode?: boolean
+          relation_label_policy?: Database["app"]["Enums"]["graph_relation_label_policy"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       graph_map_repair_jobs: {
         Row: {
@@ -3079,6 +3197,33 @@ export type Database = {
       }
     }
     Functions: {
+      _graph_entity_rule_require_admin: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: {
+          created_at: string
+          daily_ingestion_budget_usd: number | null
+          disabled_at: string | null
+          display_name: string | null
+          mfa_enrolled: boolean
+          monthly_llm_budget_usd: number | null
+          role: Database["app"]["Enums"]["user_role"]
+          session_revoked_at: string | null
+          updated_at: string
+          upload_enabled: boolean
+          upload_quota_bytes: number | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       _validate_job_lease_seconds: {
         Args: { p_lease_seconds: number }
         Returns: undefined
@@ -3130,6 +3275,14 @@ export type Database = {
         }
         Returns: string
       }
+      apply_entity_rule_graph_invalidation: {
+        Args: { p_reason: string }
+        Returns: {
+          entity_rules_generation: number
+          rebuild_job_id: string
+          repair_job_id: string
+        }[]
+      }
       approve_glossary_import: {
         Args: {
           caller_authorization_version: number
@@ -3142,6 +3295,25 @@ export type Database = {
           entry_count: number
           import_id: string
           status: Database["app"]["Enums"]["glossary_import_status"]
+        }[]
+      }
+      approve_graph_entity_rule: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_payload: Json
+          p_row_version: number
+          p_rule_id: string
+        }
+        Returns: {
+          entity_rules_generation: number
+          invalidated: boolean
+          rebuild_job_id: string
+          repair_job_id: string
+          row_version: number
+          rule_id: string
+          status: Database["app"]["Enums"]["graph_entity_rule_status"]
         }[]
       }
       assert_graph_index_allowed: {
@@ -3546,6 +3718,16 @@ export type Database = {
         Returns: boolean
       }
       glossary_payload_has_cycle: { Args: { payload: Json }; Returns: boolean }
+      graph_entity_rule_has_conflict: {
+        Args: {
+          p_aliases: string[]
+          p_canonical: string
+          p_do_not_merge: string[]
+          p_entity_type: string
+          p_rule_id: string
+        }
+        Returns: string
+      }
       graph_visibility_counts: {
         Args: {
           caller_authorization_version: number
@@ -3617,6 +3799,32 @@ export type Database = {
           object_type: string
           support: number
           version_id: string
+        }[]
+      }
+      list_graph_entity_rules: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: {
+          active: boolean
+          alias_scope: string
+          aliases: string[]
+          canonical_name: string
+          confidence: number
+          created_at: string
+          display_label: string
+          do_not_merge: string[]
+          entity_type: string
+          id: string
+          languages: string[]
+          reason: string
+          relation_label_policy: Database["app"]["Enums"]["graph_relation_label_policy"]
+          row_version: number
+          source: Database["app"]["Enums"]["graph_entity_rule_source"]
+          status: Database["app"]["Enums"]["graph_entity_rule_status"]
+          updated_at: string
         }[]
       }
       list_quarantine_cleanup_candidates: {
@@ -3842,6 +4050,25 @@ export type Database = {
           version_id: string
         }[]
       }
+      revoke_graph_entity_rule: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_payload: Json
+          p_row_version: number
+          p_rule_id: string
+        }
+        Returns: {
+          entity_rules_generation: number
+          invalidated: boolean
+          rebuild_job_id: string
+          repair_job_id: string
+          row_version: number
+          rule_id: string
+          status: Database["app"]["Enums"]["graph_entity_rule_status"]
+        }[]
+      }
       revoke_session: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
@@ -3904,6 +4131,25 @@ export type Database = {
           p_workspace_key: string
         }
         Returns: string
+      }
+      upsert_graph_entity_rule: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_payload: Json
+          p_row_version: number
+          p_rule_id: string
+        }
+        Returns: {
+          entity_rules_generation: number
+          invalidated: boolean
+          rebuild_job_id: string
+          repair_job_id: string
+          row_version: number
+          rule_id: string
+          status: Database["app"]["Enums"]["graph_entity_rule_status"]
+        }[]
       }
       upsert_promotion_saga_intent: {
         Args: {
@@ -3968,6 +4214,9 @@ export type Database = {
         | "approved"
         | "rolled_back"
         | "rejected"
+      graph_entity_rule_source: "admin" | "feedback" | "model"
+      graph_entity_rule_status: "suggested" | "approved" | "revoked"
+      graph_relation_label_policy: "directed" | "symmetric"
       graph_workspace_state:
         | "building"
         | "active"
@@ -5848,6 +6097,9 @@ export const Constants = {
         "rolled_back",
         "rejected",
       ],
+      graph_entity_rule_source: ["admin", "feedback", "model"],
+      graph_entity_rule_status: ["suggested", "approved", "revoked"],
+      graph_relation_label_policy: ["directed", "symmetric"],
       graph_workspace_state: [
         "building",
         "active",

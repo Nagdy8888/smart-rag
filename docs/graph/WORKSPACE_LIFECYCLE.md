@@ -21,6 +21,7 @@ Related: [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [JOB_STATE_MACHINE.md](../ingestion/JOB_STATE_MACHINE.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
+[ENTITY_RULES.md](./ENTITY_RULES.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [docs index](../README.md)
 
@@ -103,6 +104,9 @@ bumping generation and without marking `active`. Rebuild uses a separate
 `{workspace_key}__rebuild` row in `building` and does not switch the
 pointer. A second LightRAG instance cannot share this process, so Packet 3
 isolates that workspace only; corpus reindex is Packet 7.
+
+Packet 6 approved entity-rule changes enqueue that isolated rebuild and
+invalidate live maps immediately. They do not switch the pointer.
 
 ## Job types and priority
 
