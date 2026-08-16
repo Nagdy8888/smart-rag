@@ -2,7 +2,7 @@
 title: Quality, capacity, cost, and launch targets
 owner: product-owner / engineering-lead
 status: accepted
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-16
 audience: client-approver, engineering
 provenance: .cursor/plans/hybrid-graph-rag/00-global-contracts.md (provisional measurable targets)
 approval_status: accepted
@@ -211,6 +211,27 @@ The following require explicit user approval before Packet 1 and Phase 1 can adv
 | QT-RET-002 | Never-finalized quarantine TTL default 24 hours (`quarantine_ttl_hours`) | hours | Phase 2 Packet 5 | accepted as Phase 1 default | engineering-lead | 2026-08-13 | Packet 5 cleanup | Raise only via company_settings |
 | QT-RET-003 | Company legal hold flag default false (`legal_hold_enabled`); holds table is Phase 2 structure only | policy | Phase 2 Packet 5 | accepted | engineering-lead | 2026-08-13 | Later purge/offboarding | Purge must honor holds when implemented |
 
+## 14. Packet 8 supported graph envelope (reduced)
+
+Phase 1 signed QT-CAP-005/006 remain 2,000 documents / 200,000 source chunks
+as the aspiration to raise toward after a measured rebuild. Packet 8 did
+**not** prove a seven-day full rebuild of that envelope. Sequential jobs at
+the 600-second graph-index deadline cap 1,008 documents in seven days.
+Live mapping-verified documents/hour is `insufficient-sample`. Packet 8
+therefore **reduces the advertised supported envelope** to **15**
+open-split labeled `graph_mapping` documents and blocks
+bulk graph onboarding. Source-chunk capacity is unverified and is not
+200,000. Maintenance reserve stays the USD 800 floor until a measured
+full-rebuild cost exists (`max(USD 800, 4 × measured)`). Details:
+[PHASE5_GRAPH_EVAL.md](./evaluation/PHASE5_GRAPH_EVAL.md) ·
+[SCALING_OPTIONS.md](./graph/SCALING_OPTIONS.md) ·
+[FROZEN_GRAPH_MANIFEST.md](./graph/FROZEN_GRAPH_MANIFEST.md).
+
+| ID | Target | Unit | Provenance | Approval | Approver | Approval date | Measure in | On failure |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| QT-CAP-005-P8 | 15 open-split labeled `graph_mapping` documents; bulk onboarding blocked | document versions (reduced) | Phase 5 Packet 8; QT-GR-002 | pending user acceptance | — | — | Phase 5 Packet 8; raise only after measured rebuild | Do not advertise 2,000 until rebuild/cost are measured |
+| QT-CAP-006-P8 | Unverified; not 200,000 | chunks (reduced) | Phase 5 Packet 8 | pending user acceptance | — | — | Phase 5 Packet 8 / Phase 9 | Do not claim 200,000 source chunks |
+
 ## Decision record
 
 | Field | Value |
@@ -229,3 +250,7 @@ The following require explicit user approval before Packet 1 and Phase 1 can adv
 - [Availability and isolation triggers](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md)
 - [Phase 1 foundation evidence](./development/phase-01-foundation-evidence.md)
 - [Evaluation dataset specification](./evaluation/DATASET_SPEC.md)
+- [Phase 5 Packet 8 graph evaluation](./evaluation/PHASE5_GRAPH_EVAL.md)
+- [Frozen graph manifest](./graph/FROZEN_GRAPH_MANIFEST.md)
+- [Graph scaling options](./graph/SCALING_OPTIONS.md)
+- [Phase 6 graph handoff](./graph/PHASE6_HANDOFF.md)

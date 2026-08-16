@@ -17,6 +17,8 @@ explicit approve. Packet 7 performs the atomic workspace pointer switch.
 Related: [MAPPING.md](./MAPPING.md) ·
 [GRAPH_MAPPING_CONTRACT.md](./GRAPH_MAPPING_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
+[FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
+[PHASE6_HANDOFF.md](./PHASE6_HANDOFF.md) ·
 [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [docs index](../README.md)

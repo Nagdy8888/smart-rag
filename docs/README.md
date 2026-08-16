@@ -12,7 +12,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 
 | Document | Owner | Status | Last reviewed | Audience |
 | --- | --- | --- | --- | --- |
-| [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-15 | client, engineering |
+| [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-16 | client, engineering |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-08-14 | eng |
@@ -33,6 +33,10 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [graph/GRAPH_MAPPING_CONTRACT.md](./graph/GRAPH_MAPPING_CONTRACT.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [graph/RETRIEVAL.md](./graph/RETRIEVAL.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [graph/ENTITY_RULES.md](./graph/ENTITY_RULES.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
+| [graph/FROZEN_GRAPH_MANIFEST.md](./graph/FROZEN_GRAPH_MANIFEST.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
+| [graph/SCALING_OPTIONS.md](./graph/SCALING_OPTIONS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
+| [graph/PHASE6_HANDOFF.md](./graph/PHASE6_HANDOFF.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
+| [evaluation/PHASE5_GRAPH_EVAL.md](./evaluation/PHASE5_GRAPH_EVAL.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
 | [architecture/07-bm25-projection.md](./architecture/07-bm25-projection.md) | engineering-lead | proven | 2026-08-13 | eng |
 | [security/PROTECTED_MIGRATION_CREDENTIALS.md](./security/PROTECTED_MIGRATION_CREDENTIALS.md) | engineering-lead | proven-local | 2026-08-13 | eng, security, ops |
 | [security/AUDIT_CHAIN.md](./security/AUDIT_CHAIN.md) | engineering-lead | proven | 2026-08-13 | eng, security |

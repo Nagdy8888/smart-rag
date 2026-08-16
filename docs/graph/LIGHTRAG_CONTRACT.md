@@ -25,6 +25,7 @@ Related: [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md) ·
 [ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md) ·
 [lightrag-schema-bootstrap.md](../runbooks/lightrag-schema-bootstrap.md) ·
+[FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
 [ADR index](../adr/README.md) ·
 [docs index](../README.md)
 

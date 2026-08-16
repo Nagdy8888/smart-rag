@@ -23,6 +23,8 @@ Related: [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [ENTITY_RULES.md](./ENTITY_RULES.md) ·
 [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](../runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) ·
+[SCALING_OPTIONS.md](./SCALING_OPTIONS.md) ·
+[PHASE6_HANDOFF.md](./PHASE6_HANDOFF.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [docs index](../README.md)
 

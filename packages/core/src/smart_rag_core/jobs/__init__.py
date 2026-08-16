@@ -1,4 +1,8 @@
-"""Durable job queue repositories, admission, and lease helpers."""
+"""Durable job queue repositories, admission, and lease helpers.
+
+Graph-writer symbols are lazy exports. Importing ``jobs.limits`` during
+evaluation-package init must not pull ``retrieval.graph``.
+"""
 
 from smart_rag_core.jobs.admission import JobAdmissionService
 from smart_rag_core.jobs.backoff import compute_retry_delay_seconds
@@ -16,10 +20,6 @@ from smart_rag_core.jobs.exceptions import (
     JobRetryNotAllowedError,
 )
 from smart_rag_core.jobs.graph_metrics import GraphMetricsService, GraphQueueMetrics
-from smart_rag_core.jobs.graph_writer import (
-    GraphWriterGuard,
-    graph_advisory_lock_keys,
-)
 from smart_rag_core.jobs.hybrid_enqueue import (
     enqueue_hybrid_index_job,
     hybrid_index_idempotency_key,
@@ -62,3 +62,31 @@ __all__ = [
     "graph_advisory_lock_keys",
     "hybrid_index_idempotency_key",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Lazily export graph-writer symbols to avoid evaluation import cycles.
+
+    ``jobs.limits`` is imported while the evaluation package is still
+    initializing. Eagerly importing ``graph_writer`` pulls ``retrieval.graph``
+    and re-enters ``evaluation.loader``.
+
+    Args:
+        name: Attribute requested from ``smart_rag_core.jobs``.
+
+    Returns:
+        The requested graph-writer symbol.
+
+    Raises:
+        AttributeError: If ``name`` is not a lazy export.
+    """
+
+    if name == "GraphWriterGuard":
+        from smart_rag_core.jobs.graph_writer import GraphWriterGuard
+
+        return GraphWriterGuard
+    if name == "graph_advisory_lock_keys":
+        from smart_rag_core.jobs.graph_writer import graph_advisory_lock_keys
+
+        return graph_advisory_lock_keys
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

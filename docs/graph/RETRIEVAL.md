@@ -19,6 +19,8 @@ Related: [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [GRAPH_MAPPING_CONTRACT.md](./GRAPH_MAPPING_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
 [ENTITY_RULES.md](./ENTITY_RULES.md) ·
+[FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
+[PHASE6_HANDOFF.md](./PHASE6_HANDOFF.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [docs index](../README.md)

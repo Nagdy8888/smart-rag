@@ -10,7 +10,7 @@ audience: engineering, SME, reviewers
 
 Canonical labeled-corpus contract for Hybrid RAG. Runtime retrieval is Packet 2+. This file freezes schema, class minima, split isolation, holdout access, and synthetic SME posture.
 
-Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
+Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md) · [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md) · [EMBEDDING_QUALIFICATION_REPORT.md](./EMBEDDING_QUALIFICATION_REPORT.md) · [COVERAGE_CALIBRATION.md](./COVERAGE_CALIBRATION.md) · [COVERAGE_QUALIFICATION.md](./COVERAGE_QUALIFICATION.md) · [PHASE4_FREEZE.md](./PHASE4_FREEZE.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md) · [PHASE5_GRAPH_EVAL.md](./PHASE5_GRAPH_EVAL.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) · [phase-04-hybrid-rag-evidence.md](../development/phase-04-hybrid-rag-evidence.md)
 
 ## Schema version
 

@@ -25,4 +25,7 @@ specified in [ENTITY_RULES.md](./ENTITY_RULES.md).
 Related: [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
 [RETRIEVAL.md](./RETRIEVAL.md) ·
-[phase-05 evidence](../development/phase-05-graphrag-evidence.md)
+[FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
+[PHASE5_GRAPH_EVAL.md](../evaluation/PHASE5_GRAPH_EVAL.md) ·
+[phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
+[docs index](../README.md)

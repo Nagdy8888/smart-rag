@@ -20,6 +20,7 @@ from smart_rag_core.jobs.graph_resolver import (
     visibility_counts,
 )
 from smart_rag_core.ingestion.chunking.normalize import content_hash
+from smart_rag_core.jobs.entity_rule_service import load_extraction_policy
 from smart_rag_core.jobs.limits import GRAPH_POINTER_ID, GRAPH_QUERY_REPAIR_MAP_KIND
 from smart_rag_core.retrieval.graph import (
     GraphLeadEntity,
@@ -203,10 +204,13 @@ def _seed(connection: psycopg.Connection) -> tuple[_GraphQuerySeed, object, obje
             """,
             (workspace_id, GRAPH_POINTER_ID),
         )
+        policy = load_extraction_policy(connection)
         config_generation = mapping_config_generation(
             workspace_key=workspace_key,
             pointer_generation=1,
             chunker_snapshot=graph_chunker_config_snapshot(),
+            entity_rules_generation=policy.entity_rules_generation,
+            extraction_policy_hash=policy.extraction_policy_hash,
         )
         cursor.execute(
             """
