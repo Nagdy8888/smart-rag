@@ -15,6 +15,8 @@ one global correction. Packet 3 fuses resolved paths, composes tables,
 generates one answer, and verifies citations
 ([COMBINED_FUSION.md](./COMBINED_FUSION.md),
 [ANSWER_VERIFICATION.md](./ANSWER_VERIFICATION.md)).
+Packet 4 discloses optional tools after tables
+([OPTIONAL_TOOLS.md](./OPTIONAL_TOOLS.md)).
 
 Packet 1 `admit_query_run` reserves a **route envelope** before profiling.
 The client route is not authorization. Normal Auto chat should reserve the
@@ -153,6 +155,7 @@ blindness counts are disclosed only on the authorized visibility path.
 
 `enforce_admission` → `load_memory` → `prepare_query` → `compile_plan` →
 `execute_branches` → `apply_correction` → `fuse_evidence` →
-`compose_tables` → `generate_answer` → `verify_answer` → END.
+`compose_tables` → `disclose_optional_tools` → `generate_answer` →
+`verify_answer` → END.
 Health/ready stays unconfigured. SSE and the public chat UI remain later
 packets.

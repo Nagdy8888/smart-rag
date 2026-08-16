@@ -17,6 +17,7 @@ uncited claims. SSE and the public chat UI remain later packets.
 Related: [COMBINED_FUSION.md](./COMBINED_FUSION.md) ·
 [QUERY_ROUTING.md](./QUERY_ROUTING.md) ·
 [QUERY_BUDGETS.md](./QUERY_BUDGETS.md) ·
+[OPTIONAL_TOOLS.md](./OPTIONAL_TOOLS.md) ·
 [phase-06 evidence](../development/phase-06-agent-intelligence-evidence.md) ·
 [docs index](../README.md)
 
@@ -60,7 +61,8 @@ SHA-256 in `smart_rag_core.query_answer.versions`.
 
 After `apply_correction`:
 
-`fuse_evidence` → `compose_tables` → `generate_answer` → `verify_answer` → END.
+`fuse_evidence` → `compose_tables` → `disclose_optional_tools` →
+`generate_answer` → `verify_answer` → END.
 
 Compile still constructs no sockets or OpenAI clients. Mock mode works
 without network.
@@ -75,7 +77,8 @@ flowchart TD
   verify[One verifier call]
   omit[Omit extra links]
   fuse --> tables
-  tables --> answer
+  tables --> optional[disclose_optional_tools]
+  optional --> answer
   answer --> det
   det --> batch
   batch --> verify

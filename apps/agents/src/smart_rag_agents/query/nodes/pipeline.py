@@ -1,4 +1,4 @@
-"""Query graph nodes for packets 2-3. Admission stays first."""
+"""Query graph nodes for packets 2-4. Admission stays first."""
 
 from __future__ import annotations
 
@@ -85,6 +85,32 @@ def _skip_if_closed(state: QueryGraphState) -> bool:
     """
 
     return state["status"] in {"admission_rejected", "routing_rejected"}
+
+
+def runtime_from_state(state: QueryGraphState) -> AuthorizedRuntimeContext | None:
+    """Parse authorized runtime from graph state for sibling node modules.
+
+    Args:
+        state: Query graph state.
+
+    Returns:
+        Frozen context, or None when missing/invalid.
+    """
+
+    return _runtime(state)
+
+
+def skip_closed_nodes(state: QueryGraphState) -> bool:
+    """Return whether later nodes must pass through without work.
+
+    Args:
+        state: Query graph state.
+
+    Returns:
+        True when admission or routing already failed closed.
+    """
+
+    return _skip_if_closed(state)
 
 
 def load_memory_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
@@ -773,7 +799,7 @@ def generate_answer_node(
         "answer": answer.model_dump(mode="json"),
         "remaining_model_calls": remaining,
         "answer_call_count": answer_calls,
-        "catalog_llm_call_count": 0,
+        "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
         "keyword_extract_count": 0,
     }
 
@@ -906,7 +932,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         "verification": result.model_dump(mode="json"),
         "remaining_model_calls": remaining,
         "verifier_call_count": verifier_calls,
-        "catalog_llm_call_count": 0,
+        "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
         "keyword_extract_count": 0,
     }
 

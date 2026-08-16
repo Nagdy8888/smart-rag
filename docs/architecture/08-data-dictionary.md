@@ -122,7 +122,7 @@ erDiagram
 | `runs` | `app` | authority | admit RPC (`app_api` EXECUTE) | creator (+ audit) | 30d payloads | concurrent runs cap 5 | cascade | `(creator_user_id, conversation_id, idempotency_key)` plus global key unique | 6 packet 1 admission |
 | `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade | `(run_id, citation_index)` | 6 packet 3 provenance jsonb |
 | `user_feedback` | `app` | authority | chat UI | eval pipelines | 12 months | sparse | cascade | feedback `id` | 6 agent |
-| `tool_catalog` / `tool_versions` / `tool_permissions` / `tool_usage_events` | `app` | authority | admin/catalog | progressive disclosure | catalog lifetime | small | deactivate/delete | tool_key unique | 6 agent |
+| `tool_catalog` / `tool_versions` / `tool_permissions` / `tool_usage_events` | `app` | authority (Phase 2 schema) | admin/catalog | progressive disclosure | catalog lifetime | small | deactivate/delete | tool_key unique | 6 packet 4 uses the **in-code** `optional_tools_v1` allow-list as runtime authority; DB rows are expand-ready for later admin UI seed |
 
 ## Usage, audit, checkpoints
 

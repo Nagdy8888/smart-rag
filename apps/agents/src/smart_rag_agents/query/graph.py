@@ -1,4 +1,4 @@
-"""Query LangGraph: admission through Combined fusion, answer, and verifier.
+"""Query LangGraph: admission through optional tools, answer, and verifier.
 
 This module compiles without sockets or OpenAI clients.
 """
@@ -15,6 +15,7 @@ from smart_rag_agents.query.nodes import (
     apply_correction_node,
     compile_plan_node,
     compose_tables_node,
+    disclose_optional_tools_node,
     execute_branches_node,
     fuse_evidence_node,
     generate_answer_node,
@@ -170,7 +171,8 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
 
     Returns:
         An uncompiled graph: admission → memory → prepare → plan →
-        branches → one correction → fuse → tables → answer → verify → END.
+        branches → one correction → fuse → tables → optional tools →
+        answer → verify → END.
 
     Notes:
         State inputs: ``QueryGraphState``.
@@ -277,13 +279,25 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
         """LangGraph wrapper for one canonical answer generation.
 
         Args:
-            state: State after table composition.
+            state: State after optional tools.
 
         Returns:
             State with one answer payload.
         """
 
         return generate_answer_node(state, bound)
+
+    def disclose_optional_tools(state: QueryGraphState) -> QueryGraphState:
+        """LangGraph wrapper for optional-tool disclosure and execution.
+
+        Args:
+            state: State after table composition.
+
+        Returns:
+            State with optional-tool telemetry and maybe one execution.
+        """
+
+        return disclose_optional_tools_node(state, bound)
 
     def verify_answer(state: QueryGraphState) -> QueryGraphState:
         """LangGraph wrapper for layered verification.
@@ -330,6 +344,10 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
         compose_tables,
     )
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "disclose_optional_tools",
+        disclose_optional_tools,
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "generate_answer",
         generate_answer,
     )
@@ -357,7 +375,8 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
         {"fuse_evidence": "fuse_evidence", "end": END},
     )
     builder.add_edge("fuse_evidence", "compose_tables")
-    builder.add_edge("compose_tables", "generate_answer")
+    builder.add_edge("compose_tables", "disclose_optional_tools")
+    builder.add_edge("disclose_optional_tools", "generate_answer")
     builder.add_edge("generate_answer", "verify_answer")
     builder.add_edge("verify_answer", END)
     return builder

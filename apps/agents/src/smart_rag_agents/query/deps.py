@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import psycopg
 from smart_rag_core.query_routing.branches import (
@@ -12,13 +12,16 @@ from smart_rag_core.query_routing.branches import (
     TableExecuteLike,
 )
 from smart_rag_core.query_routing.preparation import PrepModelCaller
+from smart_rag_core.security.identity import UserRole
+from smart_rag_core.tools.compare import RUNTIME_SELECTION_POLICY
+from smart_rag_core.tools.models import SelectionPolicy
 
 
 @dataclass(slots=True)
 class QueryGraphDeps:
-    """Injectable adapters for memory, prep, and retrieve nodes.
+    """Injectable adapters for memory, prep, retrieve, and optional tools.
 
-    All fields default to None so ``graph.py`` can compile without sockets or
+    All fields default so ``graph.py`` can compile without sockets or
     OpenAI clients. Tests and later packets bind real adapters.
 
     Attributes:
@@ -32,6 +35,12 @@ class QueryGraphDeps:
         answer_prompt_text: Pinned ``answer_v1`` body when a live adapter runs.
         verifier_prompt_text: Pinned ``verifier_v1`` body when a live adapter runs.
         model_gateway: Optional ``ModelGateway``. Compile constructs none.
+        optional_policy: Frozen mapping-versus-discovery policy.
+        force_discovery: Test hook for the one catalog round.
+        chat_model: Optional langchain-core chat model for next-call bind.
+        live_role_override: Test hook for role-change-after-plan.
+        last_bound_runnable: Last next-call bind, for contract tests.
+        unbound_model: Original model after bind, for unbind proofs.
     """
 
     connection: psycopg.Connection | None = None
@@ -44,3 +53,9 @@ class QueryGraphDeps:
     answer_prompt_text: str | None = None
     verifier_prompt_text: str | None = None
     model_gateway: object | None = None
+    optional_policy: SelectionPolicy = RUNTIME_SELECTION_POLICY
+    force_discovery: bool = False
+    chat_model: object | None = None
+    live_role_override: UserRole | None = None
+    last_bound_runnable: object | None = field(default=None)
+    unbound_model: object | None = field(default=None)

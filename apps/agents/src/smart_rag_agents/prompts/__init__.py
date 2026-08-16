@@ -12,6 +12,10 @@ ANSWER_PROMPT_VERSION = "answer_v1"
 ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "answer_v1.md"
 VERIFIER_PROMPT_VERSION = "verifier_v1"
 VERIFIER_PROMPT_PATH = Path(__file__).resolve().parent / "verifier_v1.md"
+OPTIONAL_CATALOG_PROMPT_VERSION = "optional_catalog_v1"
+OPTIONAL_CATALOG_PROMPT_PATH = (
+    Path(__file__).resolve().parent / "optional_catalog_v1.md"
+)
 
 
 def query_profile_prompt_text() -> str:
@@ -64,3 +68,16 @@ def verifier_prompt_text() -> str:
     """
 
     return VERIFIER_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def optional_catalog_prompt_text() -> str:
+    """Return the Packet 4 Level 0 optional-catalog prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return OPTIONAL_CATALOG_PROMPT_PATH.read_text(encoding="utf-8")

@@ -1,4 +1,4 @@
-"""Query graph package: admission through Combined fusion, answer, and verifier.
+"""Query graph package: admission through optional tools, answer, and verifier.
 
 The compiled default graph constructs no sockets or OpenAI clients. SSE and
 the public chat UI remain later packets.

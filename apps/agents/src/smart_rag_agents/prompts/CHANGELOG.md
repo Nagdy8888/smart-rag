@@ -8,8 +8,8 @@ audience: engineering
 
 # Prompt changelog
 
-Phase 6 Packet 3 adds the canonical answer and atomic-link verifier
-prompts. Summary, optional-tool, and SSE prompts remain later packets.
+Phase 6 Packet 4 adds the Level 0 optional-catalog disclosure prompt.
+Runtime v1 uses deterministic mapping; discovery is not retained.
 
 | Version | Date | Change |
 | --- | --- | --- |
@@ -17,9 +17,11 @@ prompts. Summary, optional-tool, and SSE prompts remain later packets.
 | `rerank_v1` | 2026-08-14 | Structured top-20 rerank. No answer generation or tools. |
 | `answer_v1` | 2026-08-16 | One grounded answer from canonical passages and deterministic table values. |
 | `verifier_v1` | 2026-08-16 | One batched check of at most six atomic links. No second call. |
+| `optional_catalog_v1` | 2026-08-16 | Level 0 catalog capabilities and immutable safety rules. No core retrieve tools. |
 
 Related: [QUERY_PROFILE_EVAL.md](../../../../../docs/evaluation/QUERY_PROFILE_EVAL.md) ·
 [COMBINED_FUSION.md](../../../../../docs/agent/COMBINED_FUSION.md) ·
-[ANSWER_VERIFICATION.md](../../../../../docs/agent/ANSWER_VERIFICATION.md)
+[ANSWER_VERIFICATION.md](../../../../../docs/agent/ANSWER_VERIFICATION.md) ·
+[OPTIONAL_TOOLS.md](../../../../../docs/agent/OPTIONAL_TOOLS.md)
 
 [docs index](../../../../../docs/README.md)

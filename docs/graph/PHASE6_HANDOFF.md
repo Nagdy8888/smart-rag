@@ -39,16 +39,19 @@ honest. They are not optional footnotes.
   language floors in [PHASE5_GRAPH_EVAL.md](../evaluation/PHASE5_GRAPH_EVAL.md)
   are **not** Combined quality and are **not** live extraction P/R. Packet 3
   implemented resolved-path fusion and recorded live +10pp as **unverified**.
-- **SSE and the testing UI remain unimplemented.** Packet 3 wired
-  `fuse_evidence` → `compose_tables` → `generate_answer` → `verify_answer`
-  on the query graph. Do not treat that as launch Combined quality, chat
-  streaming, or Stitch UI. See [COMBINED_FUSION.md](../agent/COMBINED_FUSION.md)
-  and [ANSWER_VERIFICATION.md](../agent/ANSWER_VERIFICATION.md).
+- **SSE and the testing UI remain unimplemented.** Packet 4 wired
+  `fuse_evidence` → `compose_tables` → `disclose_optional_tools` →
+  `generate_answer` → `verify_answer` on the query graph. Do not treat that
+  as launch Combined quality, chat streaming, or Stitch UI. See
+  [COMBINED_FUSION.md](../agent/COMBINED_FUSION.md),
+  [ANSWER_VERIFICATION.md](../agent/ANSWER_VERIFICATION.md), and
+  [OPTIONAL_TOOLS.md](../agent/OPTIONAL_TOOLS.md).
 
 Related: [FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
 [PHASE5_GRAPH_EVAL.md](../evaluation/PHASE5_GRAPH_EVAL.md) ·
 [COMBINED_FUSION.md](../agent/COMBINED_FUSION.md) ·
 [ANSWER_VERIFICATION.md](../agent/ANSWER_VERIFICATION.md) ·
+[OPTIONAL_TOOLS.md](../agent/OPTIONAL_TOOLS.md) ·
 [RETRIEVAL.md](./RETRIEVAL.md) ·
 [GRAPH_MAPPING_CONTRACT.md](./GRAPH_MAPPING_CONTRACT.md) ·
 [ENTITY_RULES.md](./ENTITY_RULES.md) ·

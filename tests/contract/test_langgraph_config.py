@@ -117,6 +117,7 @@ def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
     assert routed["effective_route"] == "hybrid"
     assert routed["keyword_extract_count"] == 0
     assert routed["catalog_llm_call_count"] == 0
+    assert routed.get("optional_selection_mode") in {None, "skipped"}
     assert routed.get("answer") is not None
     assert routed["answer_call_count"] == 0
     assert routed["verifier_call_count"] == 0

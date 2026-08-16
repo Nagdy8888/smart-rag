@@ -1,4 +1,4 @@
-"""Typed query graph state for Phase 6 packets 1-3."""
+"""Typed query graph state for Phase 6 packets 1-4."""
 
 from __future__ import annotations
 
@@ -38,10 +38,16 @@ class QueryGraphState(TypedDict):
         effective_route: Planner-selected family.
         corrected_route: Family after the one correction.
         keyword_extract_count: Must stay 0.
-        catalog_llm_call_count: Must stay 0.
+        catalog_llm_call_count: Must stay 0 on the core path.
         correction_applied: Guard against a second correction.
         fusion: ``FusionResult`` mapping.
         table_composition: ``TableComposition`` mapping.
+        optional_selection_mode: skipped, deterministic_mapping, or catalog_discovery.
+        optional_prompt_capture: Selected disclosure only.
+        optional_bound_tool_names: Names bound for the next model call.
+        optional_selected_keys: Loaded optional tool keys.
+        optional_result: Executor payload mapping.
+        optional_telemetry: Visible-set counters only.
         answer: ``AnswerPayload`` mapping.
         verification: ``VerificationResult`` mapping.
         answer_call_count: Must be 0 or 1.
@@ -61,6 +67,7 @@ class QueryGraphState(TypedDict):
         "correction_applied",
         "fused",
         "tables_composed",
+        "optional_tools_resolved",
         "answered",
         "verified",
         "verified_partial",
@@ -97,6 +104,12 @@ class QueryGraphState(TypedDict):
     correction_applied: bool
     fusion: dict[str, object] | None
     table_composition: dict[str, object] | None
+    optional_selection_mode: str | None
+    optional_prompt_capture: str
+    optional_bound_tool_names: list[str]
+    optional_selected_keys: list[str]
+    optional_result: dict[str, object] | None
+    optional_telemetry: dict[str, object] | None
     answer: dict[str, object] | None
     verification: dict[str, object] | None
     answer_call_count: int
@@ -169,6 +182,12 @@ def pending_query_state(
         "correction_applied": False,
         "fusion": None,
         "table_composition": None,
+        "optional_selection_mode": None,
+        "optional_prompt_capture": "",
+        "optional_bound_tool_names": [],
+        "optional_selected_keys": [],
+        "optional_result": None,
+        "optional_telemetry": None,
         "answer": None,
         "verification": None,
         "answer_call_count": 0,
