@@ -83,7 +83,7 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
 | `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api` |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. |
-| `CORS_ALLOW_ORIGINS` | comma-separated exact origins; `http://127.0.0.1:3000,http://localhost:3000` | public | Wildcards forbidden. Never pair `*` with credentials |
+| `CORS_ALLOW_ORIGINS` | comma-separated exact origins; `http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010` | public | Wildcards forbidden. Never pair `*` with credentials. `:3010` is the Playwright developer-console origin so tests do not reuse Compose `:3000` |
 | `API_VERSION` | `major.minor.patch`; `0.1.0` | public | Published by `GET /api/meta` |
 | `SSE_SCHEMA_VERSION` | safe token; `1` | public | Published by `GET /api/meta` and the first SSE `schema` event |
 | `MIN_CLIENT_VERSION` | `major.minor.patch`; `0.1.0` | public | Clients send `X-Client-Version` on new paid POST. Missing/below → 426 `client_version_unsupported` before admit. Resume GET does not require the header |

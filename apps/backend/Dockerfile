@@ -13,6 +13,9 @@ WORKDIR /app
 # Cache dependency resolution from workspace metadata only.
 COPY pyproject.toml uv.lock ./
 COPY packages/core/pyproject.toml packages/core/pyproject.toml
+# Hatchling force-includes this frozen profile during the first uv sync.
+COPY packages/core/src/smart_rag_core/retrieval/frozen/hybrid_default_v1.json \
+    packages/core/src/smart_rag_core/retrieval/frozen/hybrid_default_v1.json
 COPY apps/agents/pyproject.toml apps/agents/pyproject.toml
 COPY apps/backend/pyproject.toml apps/backend/pyproject.toml
 COPY apps/worker/pyproject.toml apps/worker/pyproject.toml

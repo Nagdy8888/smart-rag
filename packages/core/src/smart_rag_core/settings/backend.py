@@ -103,7 +103,10 @@ class BackendSettings(SharedSettings):
         json_schema_extra={"security": "secret"},
     )
     cors_allow_origins: str = Field(
-        default="http://127.0.0.1:3000,http://localhost:3000",
+        default=(
+            "http://127.0.0.1:3000,http://localhost:3000,"
+            "http://127.0.0.1:3010,http://localhost:3010"
+        ),
         validation_alias="CORS_ALLOW_ORIGINS",
         min_length=0,
         max_length=4096,

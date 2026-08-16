@@ -61,9 +61,12 @@ def test_wildcard_cors_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
         load_backend_settings()
 
 
-def test_backend_cache_ttl_and_api_version_defaults() -> None:
+def test_backend_cache_ttl_and_api_version_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Packet 5 cache TTLs and handshake versions have signed defaults."""
 
+    monkeypatch.delenv("CORS_ALLOW_ORIGINS", raising=False)
     settings = BackendSettings()
     assert settings.retrieval_cache_result_ttl_seconds == 30
     assert settings.retrieval_cache_profile_ttl_seconds == 300
@@ -72,6 +75,8 @@ def test_backend_cache_ttl_and_api_version_defaults() -> None:
     assert settings.parsed_cors_origins() == (
         "http://127.0.0.1:3000",
         "http://localhost:3000",
+        "http://127.0.0.1:3010",
+        "http://localhost:3010",
     )
 
 

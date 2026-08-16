@@ -8,6 +8,8 @@ const LIMITATION_COPY: Record<string, string> = {
     "Historical and as-of relationship questions stay on Hybrid. The graph is current-version only.",
   graph_outage:
     "Graph retrieval is unavailable. Combined is relabeled to Hybrid; answers are not graph-only prose.",
+  bm25_unavailable:
+    "Private BM25 is unavailable. Retrieval continues as dense plus exact/trigram term Hybrid. BM25 snippets are not evidence.",
   graph_updating:
     "The graph is not ready for these documents yet. Retrieval continues on Hybrid.",
   media_limitation:

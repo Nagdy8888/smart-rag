@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { classifyApiError, paidMutationHeaders, resumeHeaders } from "./api";
+import {
+  classifyApiError,
+  paidMutationHeaders,
+  resumeHeaders,
+  startMessageStream,
+} from "./api";
 import { CLIENT_VERSION } from "./client-version";
 
 describe("paidMutationHeaders", () => {
@@ -47,5 +52,59 @@ describe("classifyApiError", () => {
 
   it("maps 404 to deleted conversation", () => {
     expect(classifyApiError(404, {})).toEqual({ kind: "deleted" });
+  });
+});
+
+describe("startMessageStream", () => {
+  it("admits with JSON then resumes GET events for the same run", async () => {
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      if (url.includes("/messages")) {
+        const headers = init?.headers as Record<string, string>;
+        expect(headers.Accept).toBe("application/json");
+        expect(headers["X-Client-Version"]).toBe(CLIENT_VERSION);
+        expect(headers["Idempotency-Key"]).toBe(
+          "33333333-3333-4333-8333-333333333333",
+        );
+        return new Response(
+          JSON.stringify({
+            run_id: "44444444-4444-4444-8444-444444444444",
+            stream_path: "/runs/44444444-4444-4444-8444-444444444444/events",
+            reconnect: false,
+            reservation_id: "55555555-5555-4555-8555-555555555555",
+            route_family: "composite",
+            status: "pending",
+          }),
+          { status: 202, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      expect(url).toContain(
+        "/runs/44444444-4444-4444-8444-444444444444/events?after=0",
+      );
+      return new Response(
+        'event: schema\ndata: {"sse_schema_version":"1"}\n\n',
+        {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        },
+      );
+    };
+    const started = await startMessageStream(
+      { accessToken: "jwt-token" },
+      "66666666-6666-4666-8666-666666666666",
+      "<script>alert(1)</script>",
+      "33333333-3333-4333-8333-333333333333",
+      fetchImpl,
+    );
+    expect(started.failure).toBeNull();
+    expect(started.admission?.run_id).toBe(
+      "44444444-4444-4444-8444-444444444444",
+    );
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.startsWith("POST")).toBe(true);
+    expect(calls[1]?.startsWith("GET")).toBe(true);
   });
 });

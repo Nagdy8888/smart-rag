@@ -1368,66 +1368,118 @@ Post-launch regression sets are not the immutable holdout.
 
 - Browser-direct `@supabase/ssr` `createBrowserClient` password sign-in.
   FastAPI receives `Authorization: Bearer`.
-- Auto Composite chat: `X-Client-Version: 0.1.0`, stable
-  `Idempotency-Key` until terminal, fetch SSE, reconnect
-  `GET /runs/{id}/events?after=` without the version header, cancel POST.
+- Auto Composite chat admits with `Accept: application/json` (202 body
+  includes `run_id`) then `GET /runs/{id}/events`. Handshake
+  `X-Client-Version: 0.1.0` and a stable `Idempotency-Key` until
+  terminal. Resume GET omits the version header. Cancel is POST.
 - Unknown SSE types logged and ignored. Token/entity text via React text
   nodes + `displayText`. Citation `href` requires `isSafeHttpUrl`.
-- Signed limitation copy including `temporal_graph_limitation`. Graph
-  not-ready sentence never mentions restricted/ineligible counts.
+- Signed limitation copy including `temporal_graph_limitation` and
+  `bm25_unavailable`. Graph-not-ready sentence never mentions
+  restricted/ineligible counts.
 - Unmerged packet-7 feedback tags. DELETE conversation acknowledgment
   without source text.
-- Document list from `GET /documents`. Upload finalize remains API-side;
-  graph ready is never inferred from upload. Local `signed_url` stays
-  Phase 10.
+- `POST /documents/uploads` reservation display. Local `signed_url` is
+  null until Phase 10. `GET /ingestion/versions/{id}/status` shows BM25
+  index/lag/pending/failed/dead-letter and graph-handoff counts. Graph
+  ready is never inferred from upload.
 
-SSE catalog payloads do **not** include BM25 index/lag. The console shows
-cache/coverage/route_correction/limitation/tool/citation/usage/heartbeat
-fields that exist on the accepted event types.
+SSE catalog payloads do **not** include BM25 index/lag. Those fields
+come from version status.
+
+### Live local proofs (2026-08-16)
+
+Compose `smart-rag-api` on `:8000` was still the Phase 1 image (`/health/*`
+only). Packet 8 live HTTP used host `uvicorn` from this tree with
+`SUPABASE_URL=http://127.0.0.1:54321` and local Postgres `:54322`.
+Password-grant JWTs are `aal1`; owner/`upload_enabled` callers are
+rejected with `403 MFA required` (packet 2 identity). Live chat therefore
+uses `member` without upload. Upload reserve as that member returns
+`403 forbidden`.
+
+| Check | Result |
+| --- | --- |
+| `GET /api/meta` | 200 `min_client_version=0.1.0` |
+| Bearer `GET /me` | 200 member, `upload_enabled=false` |
+| POST messages without `X-Client-Version` | 426 |
+| Double POST same idempotency key | same `run_id` (one paid run) |
+| XSS `<script>` in message | `text/event-stream`, no `text/html` |
+| SSE until terminal | `schema` plus a terminal event |
+| DELETE conversation | 204; GET conversation/events 404 |
+| `search_conversation_lingering_ids` | all counts 0 |
+| Five Composite admits + concurrent GET events | 5 distinct `run_id`s, all SSE terminals |
+| Five held streams lag/heartbeat | `test_five_held_streams_meet_lag_and_heartbeat_gates` exit 0 (16s hold; live mock completions are shorter than 15s so they do not claim missed heartbeats) |
 
 ### Commands and exit codes
 
 | Command | Exit |
 | --- | --- |
-| `pnpm --filter smart-rag-frontend test` | 0 (20 passed) |
+| `pnpm --filter smart-rag-frontend test` | 0 (23 passed) |
 | `pnpm --filter smart-rag-frontend lint` | 0 |
-| `pnpm --filter smart-rag-frontend exec next typegen` | 0 |
-| `pnpm --filter smart-rag-frontend exec tsc --noEmit` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
 | `pnpm --filter smart-rag-frontend build` | 0 |
 | `pnpm --filter smart-rag-frontend exec playwright --version` | 0 (`Version 1.62.1`) |
+| `uv run python -m pytest tests/contract/test_sse_heartbeat.py::test_five_held_streams_meet_lag_and_heartbeat_gates` | 0 |
+| `uv run python -m pytest tests/contract/test_thin_developer_ui_live.py` | 0 (3 passed) |
+| Playwright `login.spec.ts` | failed: Chromium headless not installed; CI still only asserts `--version` |
 
-### Wrapper gate map
+### Wrapper Deliver / Review / Done one-to-one
 
-| Gate | Evidence | Status |
+| Wrapper clause | Evidence | Status |
 | --- | --- | --- |
-| Handshake / 426 | `classifyApiError` + `paidMutationHeaders` unit tests | proven (client) |
-| Idempotency key reuse | `chat-view.test.ts` + send() ref | proven (client) |
-| Unknown SSE ignore | `applySseFrame` future_metric test | proven (client) |
-| XSS / javascript: href | `safe-text.test.ts` | proven (client) |
-| Route/fusion/tools/reaper/deletion | Packets 1–7 pytest | proven (API) |
-| Five Composite UI streams | Packet 6 API heartbeat tests; no 5-browser run | **unverified through UI** |
-| Live JWT chat + delete lingering-ID | Requires local Auth session in the browser | **unverified** |
-| ParadeDB/LightRAG/Valkey outage via UI | Packets 4–6 API; not re-driven from the console | **unverified through UI** |
-| Stitch / production frontend | Out of scope | not started |
+| Deadlines/ceilings | Packet 1 admission + packet 2 routing tests | proven (API) |
+| Server-derived authorization | Packets 1 and 5; live JWT `/me` | proven |
+| Frozen ParadeDB BM25 recheck/degradation | Phase 4/5 + packet 5 cache; UI shows BM25 from version status | proven (API); UI display wired |
+| Rewrite fidelity / route matrix / one correction | Packet 2 | proven (API) |
+| Resolved-path fusion / ablation / table / verifier | Packet 3 | proven (API) |
+| Memory / reaper / deletion / governance / traces | Packet 7 | proven (API) |
+| Optional tools outside catalog discovery | Packet 4 | proven (API) |
+| Additive API/SSE handshake + resumable SSE | Packet 6; live 426 + GET events | proven |
+| Authorization-safe cache | Packet 5 | proven (API) |
+| Reserve-once / true-up budgets | Packet 1; live double POST same key | proven |
+| Provider vs FastAPI rate ownership / Valkey fail-closed | Packet 5 | proven (API) |
+| Restricted read auditing | Packet 1 | proven (API) |
+| Event-loop / CPU offload / 15s heartbeat | Packet 6 five-held-stream test re-run | proven (ASGI hold); not 15s on sub-second mock completions |
+| Immediate conversation deletion | Packet 7 + live lingering-ID search | proven |
+| Injection / XSS | Packets 5–6 + `safe-text` + live XSS message | proven |
+| Thin UI sign-in/upload/status/stream/citations/feedback | Console + live JWT HTTP contract | proven (HTTP); browser Chromium not installed |
+| Historical/coverage/negation/media/ACL-blindness via UI | Packets 2–3 limitation copy in UI; not re-driven as live labeled eval | mapped, not re-executed as UI cases |
+| Combined +10pp vs Hybrid (QT-EVAL-009) | Packet 7 registry | **unverified** live |
+| ParadeDB/LightRAG/Valkey outage through the browser | Packets 4–6 API | **unverified through UI** |
+| Live OpenAI answer/verifier | Mock mode | **unverified** |
+| Hosted Auth throttling / Phase 10 CDN / Secrets Manager | Later phases | blocker |
+| Stitch / production frontend | Phases 7–8 | not started |
 
 ### Deviations
 
-- No TanStack Query codegen from OpenAPI; types are a hand-maintained
-  subset of `openapi.foundation.json`.
-- Playwright `login.spec.ts` exists but is not in `scripts/check.py`
-  (CI still only asserts `playwright --version`).
-- Packet 8 wrapper checkbox stays **unchecked** until live browser JWT
-  chat, deletion lingering-ID, and five Composite UI streams are proven.
+- Chat client uses JSON 202 then GET EventSource so `run_id` is in the
+  body. The API does not send `X-Run-ID`. Same one-paid-run contract.
+- CORS defaults include Playwright `:3010` so tests do not reuse Compose
+  `:3000`.
+- Compose API image lagged this tree (`/health` only) until rebuild. Live
+  proofs used host uvicorn against local Auth/Postgres.
+- Local password JWTs are `aal1`. Upload-enabled/owner callers need MFA;
+  live member upload reserve is `403 forbidden` by capability, not a
+  `signed_url=null` success.
+- Dockerfile first `uv sync` now copies
+  `hybrid_default_v1.json` so hatchling force-include can build.
 
 ### Rollback
 
 - Revert the frontend App Router console to the Phase 1 scaffold.
-- Remove `NEXT_PUBLIC_API_BASE_URL` from docs/env example.
+- Remove `NEXT_PUBLIC_API_BASE_URL` and `:3010` CORS origins.
+- Restore Dockerfile without the early frozen-profile COPY (API image
+  build will fail hatchling force-include).
 
 ### Phase status
 
-Phase 6 wrapper `status` remains **`pending`**. Do not start Stitch
-(Phase 7) or production UI (Phase 8) from this packet. User acceptance
-is still required for the wrapper `Done when` gate.
+Packet 8 is **complete**. Phase 6 wrapper `status` remains **`pending`**
+until you accept the `Done when` gate. Do not start Stitch (Phase 7) or
+production UI (Phase 8) from this packet.
+
+**Please accept Phase 6** if this evidence is sufficient, or name the
+residual blockers that must close first (QT-EVAL-009 live Combined +10pp,
+browser Chromium JWT, MFA upload, managed Auth, live OpenAI).
+
 
 

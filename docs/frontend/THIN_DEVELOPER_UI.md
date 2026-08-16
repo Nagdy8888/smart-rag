@@ -21,15 +21,20 @@ Related: [SSE.md](../api/SSE.md) ·
 
 Sign-in, conversation list/create/delete, Auto Composite chat with fetch SSE,
 reconnect/cancel, diagnostics from the accepted event catalog, citations,
-unmerged feedback tags, document list, and usage totals.
+unmerged feedback tags, upload reservation, version status including BM25
+index/lag, and usage totals.
 
 ```mermaid
 flowchart TD
   browser["Browser"] --> supabaseAuth["Supabase Auth password"]
   supabaseAuth --> jwt["Bearer access_token"]
   jwt --> fastapi["FastAPI"]
-  fastapi --> sse["POST messages SSE / GET events resume"]
+  fastapi --> admit["POST messages JSON 202"]
+  admit --> sse["GET runs events resume"]
   sse --> ui["Safe text render"]
+  jwt --> upload["POST documents uploads"]
+  jwt --> status["GET ingestion versions status"]
+  status --> bm25["BM25 index lag queues"]
 ```
 
 ## Contracts the UI does not invent
@@ -38,25 +43,31 @@ flowchart TD
 | --- | --- |
 | Handshake | `GET /api/meta`; paid POST sends `X-Client-Version` |
 | Identity | `GET /me` (server role) |
-| Chat admit | `POST /conversations/{id}/messages` with `Idempotency-Key` |
+| Chat admit | `POST /conversations/{id}/messages` with `Accept: application/json` and `Idempotency-Key` |
 | Resume | `GET /runs/{id}/events?after=` without version header |
 | Cancel | `POST /runs/{id}/cancel` |
 | Delete | `DELETE /conversations/{id}` → 204 |
 | Feedback | `POST /runs/{id}/feedback` with exact packet-7 tags |
 | Citations | `GET /runs/{id}/citations` (no snippets) |
+| Upload reserve | `POST /documents/uploads`; local `signed_url` is null |
+| Version status | `GET /ingestion/versions/{id}/status` for Hybrid/BM25/graph-handoff |
 
-Unknown SSE event types are logged in diagnostics and ignored. Token and
-entity text render through React text nodes plus `displayText`; `href` values
-must pass `isSafeHttpUrl`. `dangerouslySetInnerHTML` is forbidden.
+Paid chat uses JSON 202 so `run_id` is in the body, then the same GET EventSource
+path as reconnect. That is one paid reservation. Unknown SSE event types are
+logged in diagnostics and ignored. Token and entity text render through React
+text nodes plus `displayText`; `href` values must pass `isSafeHttpUrl`.
+`dangerouslySetInnerHTML` is forbidden.
 
 ## Diagnostics honesty
 
 SSE payloads are extra=forbid and do **not** include BM25 index/lag bytes.
-The console shows route correction, limitation codes, cache status, coverage
-score, optional tool keys, citation ids, usage tokens, and heartbeat count.
-BM25 projection/index/lag remain API/ops diagnostics from earlier packets.
+Chat diagnostics show route correction, limitation codes, cache status,
+coverage score, optional tool keys, citation ids, usage tokens, and heartbeat
+count.
 
-Graph-not-ready copy is
+BM25 projection/index/lag/pending/failed/dead-letter come from
+`GET /ingestion/versions/{version_id}/status`. Graph ready is never inferred
+from an upload reservation. Graph-not-ready copy is
 “N relevant recent documents are not yet represented in the graph” and never
 includes restricted or ineligible counts.
 
@@ -65,11 +76,12 @@ includes restricted or ineligible counts.
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | FastAPI origin; default `http://127.0.0.1:8000` |
-| `NEXT_PUBLIC_SUPABASE_URL` | Browser Auth project URL |
+| `NEXT_PUBLIC_SUPABASE_URL` | Browser Auth project URL. Packet 8 Playwright forces `http://127.0.0.1:54321` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser anon key only |
 
 Privileged service-role keys, database URLs, and OpenAI keys must never appear
-in `NEXT_PUBLIC_*`.
+in `NEXT_PUBLIC_*`. Playwright uses port `3010` so it does not reuse a Compose
+frontend on `:3000`. FastAPI CORS allow-lists that origin.
 
 ## Verification
 
@@ -80,6 +92,9 @@ pnpm --filter smart-rag-frontend exec tsc --noEmit
 pnpm --filter smart-rag-frontend build
 ```
 
-Playwright `tests/e2e/login.spec.ts` checks the sign-in heading. Live JWT +
-five Composite streams through the browser are recorded separately in packet 8
-evidence and stay unverified until that local run exists.
+Playwright `tests/e2e/login.spec.ts` checks the sign-in heading. Live JWT chat,
+upload `signed_url=null`, lingering-ID search after DELETE, and five Composite
+EventSource connections are `tests/contract/test_thin_developer_ui_live.py`
+against local FastAPI + Auth. Five-run heartbeat/lag remains
+`tests/contract/test_sse_heartbeat.py` because live mock Composite often
+finishes before the 15s heartbeat interval.

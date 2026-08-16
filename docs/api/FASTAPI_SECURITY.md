@@ -81,7 +81,8 @@ now consume FastAPI-owned rate limits after the role gate.
 
 ## CORS, headers, errors, limits
 
-- Exact origins from `CORS_ALLOW_ORIGINS`. Wildcards fail settings validation.
+- Exact origins from `CORS_ALLOW_ORIGINS`. Defaults include local frontend
+  `:3000` and Playwright `:3010`. Wildcards fail settings validation.
   Credentialed responses never send `Access-Control-Allow-Origin: *`.
 - Security headers: `nosniff`, `DENY` framing, `no-store`, empty CSP default-src.
 - Generic JSON errors. Untrusted content is never `text/html`.

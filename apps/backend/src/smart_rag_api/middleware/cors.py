@@ -8,7 +8,12 @@ from fastapi import Request, Response
 from smart_rag_core.settings import BackendSettings
 from starlette.responses import Response as StarletteResponse
 
-_DEFAULT_ORIGINS = ("http://127.0.0.1:3000", "http://localhost:3000")
+_DEFAULT_ORIGINS = (
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3010",
+    "http://localhost:3010",
+)
 _ALLOW_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 _ALLOW_HEADERS = (
     "Authorization, Content-Type, Idempotency-Key, Last-Event-ID, "

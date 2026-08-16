@@ -66,6 +66,53 @@ export type UsageResponse = {
   usage_rows: number;
 };
 
+/** Nested BM25 diagnostics from `GET /ingestion/versions/{id}/status`. */
+export type Bm25Diagnostics = {
+  active_index_version: number | null;
+  index_schema_version: string | null;
+  lag_seconds: number | null;
+  pending: number;
+  processing: number;
+  failed: number;
+  dead_letter: number;
+  retry_attempts: number;
+  verified_at: string | null;
+};
+
+/** LightRAG handoff counts. Upload never implies graph ready. */
+export type GraphHandoffDiagnostics = {
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  dead_letter: number;
+};
+
+/** Version lifecycle plus BM25/graph handoff diagnostics. */
+export type IngestionStatusVersion = {
+  version_id: string;
+  document_id: string;
+  status: string;
+  retrieval_eligible: boolean;
+  document_graph_eligible: boolean;
+  hybrid_verified_at: string | null;
+  bm25_verified_at: string | null;
+  graph_handoff_at: string | null;
+  retry_allowed: boolean;
+  bm25: Bm25Diagnostics;
+  graph_handoff: GraphHandoffDiagnostics;
+};
+
+/** `POST /documents/uploads` local reservation. `signed_url` is null until Phase 10. */
+export type SignedUploadResponse = {
+  reservation_id: string;
+  storage_bucket: string;
+  storage_path: string;
+  expires_at: string;
+  signed_url: string | null;
+  upload_method: string;
+};
+
 /** Catalog event names from `smart_rag_core.sse.catalog`. */
 export const KNOWN_SSE_EVENT_TYPES = [
   "schema",

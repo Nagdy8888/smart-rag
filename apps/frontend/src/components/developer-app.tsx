@@ -10,15 +10,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   cancelRun,
-  createConversation,
-  deleteConversation,
-  fetchMe,
-  fetchMeta,
-  fetchUsageMe,
-  listCitations,
-  listConversations,
-  listDocuments,
-  startMessageStream,
+    createConversation,
+    deleteConversation,
+    fetchMe,
+    fetchMeta,
+    fetchUsageMe,
+    fetchVersionStatus,
+    listCitations,
+    listConversations,
+    listDocuments,
+    reserveUpload,
+    startMessageStream,
   submitFeedback,
   resumeEventStream,
   type ApiAuth,
@@ -26,11 +28,16 @@ import {
 } from "../lib/api";
 import { createBrowserSupabase } from "../lib/auth/browser";
 import {
+  applyAdmission,
   applySseFrame,
   createChatViewState,
   type ChatViewState,
 } from "../lib/chat-view";
 import { publicSupabaseConfig } from "../lib/env";
+import {
+  formatBm25Summary,
+  formatGraphHandoffSummary,
+} from "../lib/ingestion-status";
 import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
 import { displayText, formatProvenance, isSafeHttpUrl } from "../lib/safe-text";
 import { parseSseBuffer } from "../lib/sse";
@@ -99,6 +106,7 @@ export function DeveloperApp() {
   const [failure, setFailure] = useState<ApiFailure | null>(null);
   const [feedbackTag, setFeedbackTag] = useState<FeedbackTag>(FEEDBACK_TAGS[0]);
   const [feedbackComment, setFeedbackComment] = useState("");
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const auth = useMemo<ApiAuth | null>(
     () => (accessToken ? { accessToken } : null),
@@ -128,6 +136,12 @@ export function DeveloperApp() {
     enabled: auth !== null,
   });
 
+  const versionStatusQuery = useQuery({
+    queryKey: ["version-status", accessToken, selectedVersionId],
+    queryFn: () => fetchVersionStatus(auth as ApiAuth, selectedVersionId as string),
+    enabled: auth !== null && selectedVersionId !== null,
+  });
+
   const usageQuery = useQuery({
     queryKey: ["usage", accessToken],
     queryFn: () => fetchUsageMe(auth as ApiAuth),
@@ -146,6 +160,11 @@ export function DeveloperApp() {
       setConversationId(created.conversation_id);
       void queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: () =>
+      reserveUpload(auth as ApiAuth, 1024, newIdempotencyKey()),
   });
 
   const deleteMutation = useMutation({
@@ -212,10 +231,14 @@ export function DeveloperApp() {
       setFailure(started.failure);
       return;
     }
-    const runId = started.response.headers.get("x-run-id");
     let current = next;
-    if (runId) {
-      current = { ...current, runId };
+    if (started.admission !== null) {
+      current = applyAdmission(current, {
+        run_id: started.admission.run_id,
+        reservation_id: started.admission.reservation_id,
+        route_family: started.admission.route_family,
+        reconnect: started.admission.reconnect,
+      });
       setChat(current);
     }
     current = await consumeSse(started.response, current, controller.signal, setChat);
@@ -268,7 +291,9 @@ export function DeveloperApp() {
         <h1>Smart RAG developer console</h1>
         <p className={styles.muted}>
           Thin Phase 6 UI. Browser-direct Supabase Auth, then Bearer FastAPI.
-          Role hiding is not authorization.
+          Role hiding is not authorization. After sign-in: Auto Composite chat,
+          upload reservation (local signed_url is null until Phase 10), BM25
+          version status, citations, and conversation delete.
         </p>
         {publicSupabaseConfig() === null ? (
           <p className={styles.banner} data-kind="error" role="alert">
@@ -384,17 +409,87 @@ export function DeveloperApp() {
 
           <h2>Documents</h2>
           <p className={styles.muted}>
-            Upload finalize stays on the API. Graph ready is never inferred from
-            upload alone. Local signed_url is null until Phase 10 CloudFront.
+            Graph ready is never inferred from upload alone. Local signed_url is
+            null until Phase 10 CloudFront. BM25 index/lag come from version
+            status, not chat SSE.
           </p>
+          <div className={styles.row}>
+            <button
+              type="button"
+              onClick={() => uploadMutation.mutate()}
+              disabled={meQuery.data?.upload_enabled !== true}
+            >
+              Reserve upload
+            </button>
+          </div>
+          {meQuery.data?.upload_enabled !== true ? (
+            <p className={styles.muted}>
+              Upload control hidden as convenience only. Server still denies
+              when upload_enabled is false.
+            </p>
+          ) : null}
+          {uploadMutation.data ? (
+            <p className={styles.muted} role="status">
+              Reservation {displayText(uploadMutation.data.reservation_id)}.
+              signed_url=
+              {uploadMutation.data.signed_url === null
+                ? "null (Phase 10)"
+                : displayText(uploadMutation.data.signed_url)}
+              . Finalize remains API-side.
+            </p>
+          ) : null}
+          {uploadMutation.isError ? (
+            <p className={styles.banner} data-kind="error" role="alert">
+              Upload reserve rejected. Server authorization is authoritative.
+            </p>
+          ) : null}
           <ul className={styles.list}>
             {(documentsQuery.data ?? []).map((doc) => (
               <li key={doc.document_id}>
-                {displayText(doc.title ?? doc.document_id)} —{" "}
-                {displayText(doc.visibility)}
+                <button
+                  type="button"
+                  aria-current={
+                    doc.current_version_id === selectedVersionId ? "true" : undefined
+                  }
+                  disabled={doc.current_version_id === null}
+                  onClick={() => {
+                    if (doc.current_version_id !== null) {
+                      setSelectedVersionId(doc.current_version_id);
+                    }
+                  }}
+                >
+                  {displayText(doc.title ?? doc.document_id)} —{" "}
+                  {displayText(doc.visibility)}
+                </button>
               </li>
             ))}
           </ul>
+          {versionStatusQuery.data ? (
+            <dl>
+              <dt>Version status</dt>
+              <dd>{displayText(versionStatusQuery.data.status)}</dd>
+              <dt>Hybrid verified</dt>
+              <dd>
+                {displayText(versionStatusQuery.data.hybrid_verified_at ?? "not yet")}
+              </dd>
+              <dt>Retrieval eligible</dt>
+              <dd>{versionStatusQuery.data.retrieval_eligible ? "yes" : "no"}</dd>
+              <dt>Graph eligible</dt>
+              <dd>
+                {versionStatusQuery.data.document_graph_eligible ? "yes" : "no"}
+              </dd>
+              <dt>BM25</dt>
+              <dd>{formatBm25Summary(versionStatusQuery.data.bm25)}</dd>
+              <dt>Graph handoff</dt>
+              <dd>
+                {formatGraphHandoffSummary(versionStatusQuery.data.graph_handoff)}
+              </dd>
+            </dl>
+          ) : null}
+          {versionStatusQuery.data &&
+          !versionStatusQuery.data.document_graph_eligible ? (
+            <p className={styles.muted}>{graphNotReadyCopy(1)}</p>
+          ) : null}
         </aside>
 
         <main className={styles.panel}>

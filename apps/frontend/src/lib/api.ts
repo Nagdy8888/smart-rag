@@ -12,8 +12,10 @@ import type {
   DocumentResponse,
   FeedbackTag,
   MetaResponse,
+  SignedUploadResponse,
   SubmitMessageResponse,
   UsageResponse,
+  IngestionStatusVersion,
 } from "./types";
 
 /** Headers shared by paid POST bodies. Resume GET omits the version. */
@@ -270,6 +272,87 @@ export async function listDocuments(
 }
 
 /**
+ * Reserve quarantine upload quota. Local ``signed_url`` is always null.
+ *
+ * @param auth - Access token.
+ * @param declaredBytes - Declared object size.
+ * @param idempotencyKey - Upload reservation key.
+ * @param fetchImpl - Injected fetch.
+ * @returns Reservation payload.
+ */
+export async function reserveUpload(
+  auth: ApiAuth,
+  declaredBytes: number,
+  idempotencyKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SignedUploadResponse> {
+  const response = await fetchImpl(apiUrl("/documents/uploads"), {
+    method: "POST",
+    headers: paidMutationHeaders(auth, idempotencyKey),
+    body: JSON.stringify({
+      declared_bytes: declaredBytes,
+      idempotency_key: idempotencyKey,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("upload_reserve_failed");
+  }
+  return (await response.json()) as SignedUploadResponse;
+}
+
+/**
+ * Fetch Hybrid/BM25/graph-handoff diagnostics for one version.
+ *
+ * Graph ready is never inferred from upload alone.
+ *
+ * @param auth - Access token.
+ * @param versionId - Document version UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Version diagnostics, or null on 404.
+ */
+export async function fetchVersionStatus(
+  auth: ApiAuth,
+  versionId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<IngestionStatusVersion | null> {
+  const response = await fetchImpl(
+    apiUrl(`/ingestion/versions/${versionId}/status`),
+    { headers: resumeHeaders(auth) },
+  );
+  if (response.status === 404) {
+    return null;
+  }
+  const body = (await response.json()) as { version?: IngestionStatusVersion };
+  const version = body.version;
+  if (version === undefined) {
+    return null;
+  }
+  if (version.bm25 === undefined) {
+    version.bm25 = {
+      active_index_version: null,
+      index_schema_version: null,
+      lag_seconds: null,
+      pending: 0,
+      processing: 0,
+      failed: 0,
+      dead_letter: 0,
+      retry_attempts: 0,
+      verified_at: null,
+    };
+  }
+  if (version.graph_handoff === undefined) {
+    version.graph_handoff = {
+      pending: 0,
+      processing: 0,
+      completed: 0,
+      failed: 0,
+      dead_letter: 0,
+    };
+  }
+  return version;
+}
+
+/**
  * Fetch citations for an owned run.
  *
  * @param auth - Access token.
@@ -367,14 +450,17 @@ export type StreamStart = {
 };
 
 /**
- * POST a chat message with SSE Accept. Handshake runs before admit.
+ * POST a chat message with JSON Accept so the 202 body includes `run_id`.
+ * Handshake runs before admit. The EventSource body is `GET /runs/{id}/events`.
+ *
+ * Reconnect uses the same run and never starts a second paid reservation.
  *
  * @param auth - Access token.
  * @param conversationId - Conversation UUID.
  * @param message - Untrusted user text.
  * @param idempotencyKey - Stable UUID reused on retry.
  * @param fetchImpl - Injected fetch.
- * @returns Streaming response or a typed failure.
+ * @returns Streaming GET response plus admission JSON, or a typed failure.
  */
 export async function startMessageStream(
   auth: ApiAuth,
@@ -383,26 +469,37 @@ export async function startMessageStream(
   idempotencyKey: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<StreamStart> {
-  const response = await fetchImpl(
+  const admitHeaders = {
+    ...paidMutationHeaders(auth, idempotencyKey),
+    Accept: "application/json",
+  };
+  const admitResponse = await fetchImpl(
     apiUrl(`/conversations/${conversationId}/messages`),
     {
       method: "POST",
-      headers: {
-        ...paidMutationHeaders(auth, idempotencyKey),
-        Accept: "text/event-stream",
-      },
+      headers: admitHeaders,
       body: JSON.stringify({ message, idempotency_key: idempotencyKey }),
     },
   );
-  if (!response.ok) {
-    const body = await readJsonObject(response);
+  if (!admitResponse.ok) {
+    const body = await readJsonObject(admitResponse);
     return {
-      response,
+      response: admitResponse,
       admission: null,
-      failure: classifyApiError(response.status, body),
+      failure: classifyApiError(admitResponse.status, body),
     };
   }
-  return { response, admission: null, failure: null };
+  const admission = (await admitResponse.json()) as SubmitMessageResponse;
+  const stream = await resumeEventStream(auth, admission.run_id, 0, fetchImpl);
+  if (!stream.ok) {
+    const body = await readJsonObject(stream);
+    return {
+      response: stream,
+      admission,
+      failure: classifyApiError(stream.status, body),
+    };
+  }
+  return { response: stream, admission, failure: null };
 }
 
 /**
@@ -423,7 +520,7 @@ export async function resumeEventStream(
   const url = apiUrl(`/runs/${runId}/events?after=${encodeURIComponent(String(after))}`);
   return fetchImpl(url, {
     headers: {
-      ...resumeHeaders(auth, String(after)),
+      ...resumeHeaders(auth),
       Accept: "text/event-stream",
     },
   });

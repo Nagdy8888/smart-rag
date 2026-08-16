@@ -167,6 +167,9 @@ services:
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-smart-rag}
+      SUPABASE_URL: http://host.docker.internal:54321
+      SUPABASE_DB_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010
       VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
       VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
       PARADEDB_URL: postgresql://${PARADEDB_READER_USER:-paradedb_reader}:${PARADEDB_READER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
@@ -176,6 +179,8 @@ services:
     networks:
       - edge
       - private
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       paradedb:
         condition: service_healthy
