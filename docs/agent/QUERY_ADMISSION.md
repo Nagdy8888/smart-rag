@@ -105,4 +105,5 @@ See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 - [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md)
 - [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md)
 - [SSE.md](../api/SSE.md)
+- [MEMORY_DELETION.md](./MEMORY_DELETION.md)
 - [phase-06-agent-intelligence-evidence.md](../development/phase-06-agent-intelligence-evidence.md)

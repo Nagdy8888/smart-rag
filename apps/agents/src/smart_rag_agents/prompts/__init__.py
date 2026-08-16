@@ -16,6 +16,8 @@ OPTIONAL_CATALOG_PROMPT_VERSION = "optional_catalog_v1"
 OPTIONAL_CATALOG_PROMPT_PATH = (
     Path(__file__).resolve().parent / "optional_catalog_v1.md"
 )
+SUMMARY_PROMPT_VERSION = "summary_v1"
+SUMMARY_PROMPT_PATH = Path(__file__).resolve().parent / "summary_v1.md"
 
 
 def query_profile_prompt_text() -> str:
@@ -81,3 +83,16 @@ def optional_catalog_prompt_text() -> str:
     """
 
     return OPTIONAL_CATALOG_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def summary_prompt_text() -> str:
+    """Return the Packet 7 compact summary prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return SUMMARY_PROMPT_PATH.read_text(encoding="utf-8")

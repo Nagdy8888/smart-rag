@@ -39,6 +39,7 @@ _ALLOWED_OPENAI_CTOR = {
 }
 _ALLOWED_RESPONSES_CREATE = {
     Path("packages/core/src/smart_rag_core/gateways/openai_rerank.py"),
+    Path("packages/core/src/smart_rag_core/gateways/openai_answer.py"),
 }
 _ALLOWED_EMBEDDINGS_CREATE = {
     Path("packages/core/src/smart_rag_core/observability/langsmith_tracing.py"),
@@ -361,3 +362,69 @@ def test_redact_gateway_outputs_accepts_embedding_response() -> None:
     assert payload["vector_count"] == 1
     assert payload["vector_dimensions"] == 2
     assert payload["request_id"] == "req-1"
+
+
+def test_query_run_trace_metadata_is_hashes_and_counts_only() -> None:
+    """Query-run traces never copy canary secrets, emails, or passages."""
+
+    from smart_rag_core.observability.query_run_trace import query_run_trace_metadata
+
+    user_id = uuid4()
+    run_id = uuid4()
+    payload = query_run_trace_metadata(
+        run_id=run_id,
+        user_id=user_id,
+        requested_route="hybrid",
+        effective_route="combined",
+        corrected_route="hybrid",
+        model_versions={"answer": "gpt-4o-mini"},
+        prompt_versions={"answer": "answer_v1"},
+        disclosed_tools=("structured_table",),
+        candidate_counts={"hybrid": 20, "graph": 4},
+        bm25_index="search.chunks_v1",
+        bm25_version="v1",
+        bm25_lag_seconds=3,
+        bm25_recheck_count=20,
+        bm25_fallback="none",
+        latency_ms=1200,
+        input_tokens=100,
+        output_tokens=40,
+        cache_hit=False,
+        cost_usd="0.12",
+    )
+    rendered = json.dumps(payload)
+    assert str(user_id) not in rendered
+    assert payload["user_id_sha256"] == short_content_hash(str(user_id))
+    assert payload["run_id"] == str(run_id)
+    assert payload["disclosed_tool_count"] == 1
+    assert payload["candidate_counts"]["hybrid"] == 20
+    assert not payload_contains_forbidden_text(
+        payload, CANARY_TOKEN, CANARY_EMAIL, CANARY_PASSAGE
+    )
+
+
+def test_langsmith_real_content_is_blocked_until_matrix_verified() -> None:
+    """Unknown/unverified real-company flows cannot export to LangSmith."""
+
+    from smart_rag_core.observability.governance_gate import (
+        ExternalFlowBlockedError,
+        assert_langsmith_export_permitted,
+        assert_vercel_metadata_has_no_private_payload,
+    )
+    from smart_rag_core.security.external_processing import ContentClass
+
+    assert_langsmith_export_permitted(
+        tracing_enabled=True,
+        content_class=ContentClass.SYNTHETIC,
+        provider_settings_verified=False,
+    )
+    with pytest.raises(
+        ExternalFlowBlockedError, match="langsmith_real_content_unverified"
+    ):
+        assert_langsmith_export_permitted(
+            tracing_enabled=True,
+            content_class=ContentClass.REAL_COMPANY,
+            provider_settings_verified=False,
+        )
+    with pytest.raises(ExternalFlowBlockedError, match="vercel_private_payload"):
+        assert_vercel_metadata_has_no_private_payload({"snippet": CANARY_PASSAGE})

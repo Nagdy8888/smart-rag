@@ -8,6 +8,7 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+from smart_rag_core.feedback.tags import FeedbackTag
 from smart_rag_core.tables.plan import TableQueryPlan
 
 
@@ -127,14 +128,16 @@ class CitationResponse(BaseModel):
     citation_index: int
     chunk_id: UUID | None = None
     provenance: dict[str, Any] = Field(default_factory=dict)
+    source_unavailable: bool = False
 
 
 class FeedbackRequest(BaseModel):
-    """Thumbs feedback."""
+    """Thumbs feedback with a required unmerged Phase 6 tag."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     thumbs_up: bool
+    tag: FeedbackTag
     comment: str | None = Field(default=None, max_length=2000)
 
 

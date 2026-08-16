@@ -41,6 +41,8 @@ class QueryGraphDeps:
         live_role_override: Test hook for role-change-after-plan.
         last_bound_runnable: Last next-call bind, for contract tests.
         unbound_model: Original model after bind, for unbind proofs.
+        store_get: Optional LangGraph store reader for compact summaries.
+        store_put: Optional LangGraph store writer for compact summaries.
     """
 
     connection: psycopg.Connection | None = None
@@ -59,3 +61,9 @@ class QueryGraphDeps:
     live_role_override: UserRole | None = None
     last_bound_runnable: object | None = field(default=None)
     unbound_model: object | None = field(default=None)
+    store_get: (
+        Callable[[tuple[str, str, str], str], dict[str, object] | None] | None
+    ) = None
+    store_put: Callable[[tuple[str, str, str], str, dict[str, object]], None] | None = (
+        None
+    )

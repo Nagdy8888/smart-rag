@@ -43,6 +43,9 @@ class BackendSettings(SharedSettings):
         valkey_timeout_seconds: Bounded Valkey connect/command timeout.
         rate_limit_retry_after_seconds: ``Retry-After`` on 429/503 limiter
             responses.
+        langgraph_checkpoint_url: Optional session/direct Postgres DSN for
+            query checkpoints and the LangGraph store. Defaults to
+            ``SUPABASE_DB_URL``. Runtime never auto-migrates.
     """
 
     service_name: ClassVar[Literal["backend"]] = "backend"
@@ -174,6 +177,16 @@ class BackendSettings(SharedSettings):
         description="Retry-After seconds for limiter 429/503 responses.",
         json_schema_extra={"security": "public"},
     )
+    langgraph_checkpoint_url: SecretStr | None = Field(
+        default=None,
+        validation_alias="LANGGRAPH_CHECKPOINT_URL",
+        description=(
+            "Optional Postgres DSN for LangGraph query checkpoints and store. "
+            "Defaults to SUPABASE_DB_URL. Role app_checkpointer, schema "
+            "langgraph. Runtime never auto-migrates."
+        ),
+        json_schema_extra={"security": "secret"},
+    )
 
     @field_validator("cors_allow_origins")
     @classmethod
@@ -216,6 +229,19 @@ class BackendSettings(SharedSettings):
             ):
                 raise ValueError("CORS wildcard origins are forbidden")
         return self
+
+    def resolved_checkpoint_dsn(self) -> str | None:
+        """Return the query checkpointer/store DSN.
+
+        Returns:
+            ``LANGGRAPH_CHECKPOINT_URL`` when set, otherwise
+            ``SUPABASE_DB_URL``, or ``None`` when both are unset.
+        """
+
+        secret = self.langgraph_checkpoint_url or self.supabase_db_url
+        if secret is None:
+            return None
+        return secret.get_secret_value()
 
     def parsed_cors_origins(self) -> tuple[str, ...]:
         """Return exact CORS origins with no wildcard credentials pairing.

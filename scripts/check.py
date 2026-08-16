@@ -198,6 +198,10 @@ class CheckRunner:
                     "Python unit tests",
                     (*python_module, "pytest", *_pytest_args("tests/unit")),
                 ),
+                Command(
+                    "Phase 6 eval registry",
+                    (self._python, "scripts/ci/check_phase6_eval_registry.py"),
+                ),
             ),
             "contract": (
                 Command(

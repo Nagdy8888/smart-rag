@@ -19,6 +19,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
+| [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-16 | eng, security |
+| [evaluation/PHASE6_EVAL_REGISTRY.md](./evaluation/PHASE6_EVAL_REGISTRY.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-08-16 | eng, security |
 | [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-08-16 | eng, frontend |
 | [deployment/STREAMING_TIMEOUTS.md](./deployment/STREAMING_TIMEOUTS.md) | engineering-lead | draft | 2026-08-16 | eng, ops |

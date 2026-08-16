@@ -58,6 +58,9 @@ class SharedSettings(BaseSettings):
             Public, default ``smart-rag``.
         langsmith_endpoint: Optional LangSmith API URL from
             ``LANGSMITH_ENDPOINT``. Internal.
+        subprocessor_matrix_verified: Signed LangSmith/Vercel org-matrix
+            verification from ``SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED``.
+            Public, secure default ``false``.
         mock_fixture_id: Frozen fixture identifier from
             ``MOCK_MODEL_FIXTURE_ID``. Internal, default
             ``phase-1-foundation-v1``.
@@ -130,6 +133,15 @@ class SharedSettings(BaseSettings):
         validation_alias="LANGSMITH_ENDPOINT",
         description="Optional LangSmith API URL; unset uses the hosted default.",
         json_schema_extra={"security": "internal"},
+    )
+    subprocessor_matrix_verified: bool = Field(
+        default=False,
+        validation_alias="SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED",
+        description=(
+            "True only after the signed LangSmith/Vercel org matrix is "
+            "verified. Real company content cannot enable tracing until then."
+        ),
+        json_schema_extra={"security": "public"},
     )
     mock_fixture_id: str = Field(
         default="phase-1-foundation-v1",

@@ -18,10 +18,12 @@ Runtime v1 uses deterministic mapping; discovery is not retained.
 | `answer_v1` | 2026-08-16 | One grounded answer from canonical passages and deterministic table values. |
 | `verifier_v1` | 2026-08-16 | One batched check of at most six atomic links. No second call. |
 | `optional_catalog_v1` | 2026-08-16 | Level 0 catalog capabilities and immutable safety rules. No core retrieve tools. |
+| `summary_v1` | 2026-08-16 | Compact conversation summary for LangGraph store. Preferences only; no source copies. Counted as `usage_kind=summary`. |
 
 Related: [QUERY_PROFILE_EVAL.md](../../../../../docs/evaluation/QUERY_PROFILE_EVAL.md) ·
 [COMBINED_FUSION.md](../../../../../docs/agent/COMBINED_FUSION.md) ·
 [ANSWER_VERIFICATION.md](../../../../../docs/agent/ANSWER_VERIFICATION.md) ·
-[OPTIONAL_TOOLS.md](../../../../../docs/agent/OPTIONAL_TOOLS.md)
+[OPTIONAL_TOOLS.md](../../../../../docs/agent/OPTIONAL_TOOLS.md) ·
+[MEMORY_DELETION.md](../../../../../docs/agent/MEMORY_DELETION.md)
 
 [docs index](../../../../../docs/README.md)

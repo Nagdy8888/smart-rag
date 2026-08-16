@@ -242,6 +242,7 @@ def list_citations_route(
             citation_index=item.citation_index,
             chunk_id=item.chunk_id,
             provenance=item.provenance,
+            source_unavailable=item.source_unavailable,
         )
         for item in records
     ]
@@ -264,7 +265,7 @@ def submit_feedback_route(
     Args:
         request: Active request.
         run_id: Run id.
-        body: Thumbs flag and optional comment.
+        body: Thumbs flag, required tag, and optional comment.
         caller: Authenticated caller.
         service: Injected service.
 
@@ -284,6 +285,7 @@ def submit_feedback_route(
             run_id=run_id,
             thumbs_up=body.thumbs_up,
             comment=body.comment,
+            tag=body.tag,
         )
     except QueryAdmissionError as exc:
         raise_admission_http(exc)

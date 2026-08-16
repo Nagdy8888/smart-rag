@@ -112,6 +112,7 @@ class WorkerLifecycle:
             return
         with ThreadPoolExecutor(max_workers=self._settings.worker_concurrency) as pool:
             in_flight: set[Future[None]] = set()
+            self._enqueue_query_maintenance()
             while not self._stop_event.is_set():
                 in_flight = {future for future in in_flight if not future.done()}
                 self._graph_loop.process_once()
@@ -351,6 +352,8 @@ class WorkerLifecycle:
                 )
                 success = result.get("status") == "indexed"
                 detail = str(result.get("detail", "hybrid_index_failed"))
+            elif job.job_kind in {"query_memory_reaper", "langsmith_trace_deletion"}:
+                success, detail = self._process_query_maintenance(job)
             else:
                 graph_input = _probe_graph_input_from_job(job)
                 result = self._invoke_graph(
@@ -371,7 +374,11 @@ class WorkerLifecycle:
                 )
                 if success:
                     completed = repository.complete(job.id, lease_token)
-                    self._true_up_budget(connection, completed)
+                    if job.job_kind not in {
+                        "query_memory_reaper",
+                        "langsmith_trace_deletion",
+                    }:
+                        self._true_up_budget(connection, completed)
                 else:
                     repository.fail(
                         job.id,
@@ -386,6 +393,77 @@ class WorkerLifecycle:
         finally:
             stop_heartbeat.set()
             heartbeat_thread.join(timeout=5)
+
+    def _enqueue_query_maintenance(self) -> None:
+        """Enqueue daily reaper and LangSmith-deletion jobs without a budget.
+
+        Side Effects:
+            Inserts ``query_memory_reaper`` and ``langsmith_trace_deletion``
+            jobs when missing for the UTC day. Never reserves ingestion budget.
+        """
+
+        postgres_url = self._require_postgres_url()
+        try:
+            from smart_rag_core.memory.reaper import enqueue_query_maintenance_jobs
+
+            with psycopg.connect(postgres_url) as connection:
+                connection.execute("SET ROLE app_worker")
+                enqueue_query_maintenance_jobs(connection)
+                connection.commit()
+        except psycopg.Error:
+            LOGGER.exception("unable to enqueue query maintenance jobs")
+
+    def _process_query_maintenance(self, job: IngestionJobRecord) -> tuple[bool, str]:
+        """Run the dedicated reaper or LangSmith deletion-request worker.
+
+        Args:
+            job: Claimed maintenance job.
+
+        Returns:
+            ``(success, detail)``. Never invokes budget true-up.
+
+        Side Effects:
+            May NULL completed idempotency keys, delete completed events, or
+            record LangSmith deletion HTTP attempts.
+        """
+
+        postgres_url = self._require_postgres_url()
+        with psycopg.connect(postgres_url) as connection:
+            connection.execute("SET ROLE app_worker")
+            if job.job_kind == "query_memory_reaper":
+                from smart_rag_core.memory.reaper import (
+                    enqueue_query_maintenance_jobs,
+                    reap_query_run_retention,
+                )
+
+                enqueue_query_maintenance_jobs(connection)
+                result = reap_query_run_retention(connection)
+                connection.commit()
+                if result.true_up_invoked:
+                    return False, "reaper_invoked_true_up"
+                return True, "query_memory_reaper_ok"
+            from smart_rag_core.observability.langsmith_deletion import (
+                HttpLangSmithDeletionTransport,
+                process_langsmith_deletion_requests,
+            )
+
+            api_key = (
+                self._settings.langsmith_api_key.get_secret_value()
+                if self._settings.langsmith_api_key is not None
+                else None
+            )
+            endpoint = (
+                str(self._settings.langsmith_endpoint)
+                if self._settings.langsmith_endpoint is not None
+                else "https://api.smith.langchain.com"
+            )
+            transport = HttpLangSmithDeletionTransport(
+                api_key=api_key,
+                endpoint=endpoint,
+            )
+            process_langsmith_deletion_requests(connection, transport=transport)
+            connection.commit()
+            return True, "langsmith_trace_deletion_ok"
 
     def _fail_job(self, job_id: UUID, lease_token: str, message: str) -> None:
         """Best-effort persist a transient ingestion job failure.

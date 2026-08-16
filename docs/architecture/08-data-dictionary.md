@@ -118,12 +118,12 @@ erDiagram
 
 | Object | Schema | Authority | Writers | Readers | Retention | Cardinality | Deletion | Idempotency | Phase |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `conversations` | `app` | authority | chat API | creator (+ audit) | 90d undeleted | per user | packet 7 delete/reaper; packet 5 DELETE is 501 | conversation `id` | 2 schema / 6 agent |
+| `conversations` | `app` | authority | chat API | creator (+ audit) | 90d undeleted | per user | immediate `app.delete_conversation` tombstone + cascade | conversation `id` | 2 schema / 6 agent / 6 packet 7 |
 | `messages` | `app` | authority | chat API | creator via `app.load_query_memory` (packet 2); creator (+ audit) SELECT | with conversation | last 12 on query path | cascade | message `id` | 6 packet 2 memory |
-| `runs` | `app` | authority | admit RPC (`app_api` EXECUTE) | creator (+ audit) | 30d payloads | concurrent runs cap 5 | cascade | `(creator_user_id, conversation_id, idempotency_key)` plus global key unique | 6 packet 1 admission |
+| `runs` | `app` | authority | admit RPC (`app_api` EXECUTE) | creator (+ audit) | 30d payloads; completed key NULL after 7d | concurrent runs cap 5 | cascade on conversation delete | `(creator_user_id, conversation_id, idempotency_key)` plus `idempotency_key_hash` unique | 6 packet 1 / 7 reaper |
 | `run_events` | `app` | authority | `app.append_run_event` (`app_api` EXECUTE) | creator SELECT; resume via `app.list_run_events_after` | 30d completed (packet 7 reaper) | monotonic `(run_id, sequence)` | cascade on run; tombstoned conversation denies resume immediately | PK `(run_id, sequence)`; one terminal per run | 6 packet 6 SSE |
-| `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade | `(run_id, citation_index)` | 6 packet 3 provenance jsonb |
-| `user_feedback` | `app` | authority | chat UI | eval pipelines | 12 months | sparse | cascade | feedback `id` | 6 agent |
+| `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade; `source_unavailable` when source deleted | `(run_id, citation_index)` | 6 packet 3 / 7 |
+| `user_feedback` | `app` | authority | chat UI | eval pipelines | 12 months | sparse | cascade on conversation delete | feedback `id`; required unmerged `tag` | 6 packet 7 |
 | `tool_catalog` / `tool_versions` / `tool_permissions` / `tool_usage_events` | `app` | authority (Phase 2 schema) | admin/catalog | progressive disclosure | catalog lifetime | small | deactivate/delete | tool_key unique | 6 packet 4 uses the **in-code** `optional_tools_v1` allow-list as runtime authority; DB rows are expand-ready for later admin UI seed |
 
 ## Usage, audit, checkpoints
@@ -153,7 +153,9 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 | `audit_chain_anchors` | `app` | authority | anchor job | compliance | 7 years | daily anchors | none | anchor_date unique | 6 chain |
 | `restricted_read_events` | `app` | authority | evidence/download RPC | audit | 7 years | sparse | none | event `id` | 2 schema / 3 ACL |
 | `admin_notifications` | `app` | authority | anomaly detectors | admin UI | until ack | bounded | ack only | notification `id` | 2 schema / 6 alerts |
-| `langgraph.checkpoints*` | `langgraph` | authority | checkpointer | agents/worker | 30d undeleted runs | thread keyed | GC job | vendor PKs | 2 placeholder / 3 grants |
+| `langgraph.checkpoints*` | `langgraph` | authority | checkpointer | agents/worker | 30d undeleted runs | thread_id = conversation_id | conversation delete + GC | vendor PKs | 6 packet 7 |
+| `langgraph.store` | `langgraph` | authority | PostgresStore | query runtime | with conversation | compact summary/preferences | conversation delete | `(prefix, key)` | 6 packet 7 |
+| `langsmith_deletion_requests` | `app` | authority | delete RPC / worker | worker | until requested or sla_expired | per deleted conversation | content-free hashed keys | request `id` | 6 packet 7 |
 
 ## Key invariants (schema-enforced)
 
@@ -172,7 +174,7 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - Pending glossary imports never write `search_aliases`; approval projects aliases; rollback deletes that projection.
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
 - `app.runs` also has unique `(creator_user_id, conversation_id, idempotency_key)` where the key is not null. The global `runs_idempotency_key_uq` remains.
-- `app.load_query_memory` is SECURITY DEFINER, `validate_caller_context`, creator-only, fails on deleted conversations, returns at most 12 recent messages, EXECUTE to `app_api` only. No summary store (packet 7). Never joins source documents.
+- `app.load_query_memory` is SECURITY DEFINER, `validate_caller_context`, creator-only, fails on deleted conversations, returns at most 12 recent messages, EXECUTE to `app_api` only. Compact summaries live in `langgraph.store`, never source documents.
 - `app.citations.provenance` jsonb (existing column, expand-only payload) stores fusion algorithm, config hash, hybrid/graph ranks, combined score, requested/effective route, atomic-link id, and inference flag. Packet 3 added no citation table or column. `chunk_id` remains nullable so table-range citations can persist without a passage.
 - `audit_events` rejects UPDATE/DELETE (append-only trigger).
 - `llm_usage` rejects UPDATE/DELETE (append-only trigger). Runtime roles have no table DML; query usage is inserted only through `app.record_query_llm_usage`.

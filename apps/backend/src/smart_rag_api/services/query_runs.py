@@ -147,6 +147,7 @@ class QueryRunService:
                     citation_index=item.citation_index,
                     chunk_id=item.chunk_id,
                     provenance=provenance,
+                    source_unavailable=item.source_unavailable,
                 )
             )
         return tuple(escaped)

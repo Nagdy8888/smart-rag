@@ -536,12 +536,14 @@ class RunCitationRecord:
         citation_index: Display index.
         chunk_id: Canonical chunk when present.
         provenance: JSON object without source HTML.
+        source_unavailable: True when the cited source was deleted.
     """
 
     citation_id: UUID
     citation_index: int
     chunk_id: UUID | None
     provenance: dict[str, object]
+    source_unavailable: bool = False
 
 
 def get_query_run(
@@ -673,7 +675,8 @@ def list_run_citations(
         with connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
-                SELECT citation_id, citation_index, chunk_id, provenance
+                SELECT citation_id, citation_index, chunk_id, provenance,
+                       source_unavailable
                 FROM app.list_run_citations(%s, %s, %s, %s)
                 """,
                 (
@@ -702,6 +705,7 @@ def list_run_citations(
                 citation_index=int(str(row["citation_index"])),
                 chunk_id=chunk_id,
                 provenance=provenance,
+                source_unavailable=bool(row.get("source_unavailable")),
             )
         )
     return tuple(records)

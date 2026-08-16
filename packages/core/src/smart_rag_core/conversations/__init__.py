@@ -164,6 +164,48 @@ def list_conversations(
     return tuple(_conversation_record(row) for row in rows)
 
 
+def delete_conversation(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    conversation_id: UUID,
+) -> None:
+    """Tombstone and purge one conversation in a single Postgres transaction.
+
+    Args:
+        connection: Open ``app_api`` connection. Caller must commit.
+        caller: Server-derived identity. Creator or owner/admin.
+        conversation_id: Conversation primary key.
+
+    Raises:
+        QueryAdmissionError: ``not_found`` for missing, foreign (non-privileged),
+            or unauthorized callers.
+
+    Side Effects:
+        Sets ``conversations.deleted_at``, deletes messages/runs/events/
+        citations/feedback/checkpoints/store rows, appends a content-free
+        audit event, and inserts a durable LangSmith deletion request.
+        Idempotent when already tombstoned.
+    """
+
+    try:
+        with connection.transaction():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT app.delete_conversation(%s, %s, %s, %s)
+                    """,
+                    (
+                        caller.user_id,
+                        caller.rpc_role(),
+                        caller.rpc_authorization_version(),
+                        conversation_id,
+                    ),
+                )
+    except psycopg.Error as exc:
+        _raise_conversation(exc)
+
+
 def get_conversation(
     connection: psycopg.Connection,
     *,

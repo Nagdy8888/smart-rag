@@ -10,7 +10,8 @@ audience: engineering, security
 
 Thin FastAPI transport for authenticated RAG operations. Routers never inject
 repositories. SSE event protocol, EventSource bodies, heartbeats, and resume
-are packet 6. Conversation deletion/reaper is packet 7. UI XSS encoding is
+are packet 6. Conversation deletion and the 7/30-day reaper are packet 7
+([MEMORY_DELETION.md](../agent/MEMORY_DELETION.md)). UI XSS encoding is
 packet 8. CloudFront/WAF/KMS/S3 Object Lock are Phase 10.
 
 Related: [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md) ·
@@ -57,7 +58,7 @@ JWKS-verified `CallerContext` (test bypass only when `APP_ENV=test`).
 | POST | `/documents/uploads/finalize` | member+ upload | finalize RPC | COST_MUTATION |
 | POST/GET | `/conversations` | authenticated | creator insert / list RPC | COST_MUTATION on create |
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
-| DELETE | `/conversations/{id}` | authenticated | **501** | Packet 7 owns deletion |
+| DELETE | `/conversations/{id}` | creator or owner/admin | **204**; foreign/tombstoned **404** | Immediate purge; see [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) |
 | POST | `/conversations/{id}/messages` | creator | handshake then idempotent Auto admit **composite** | JSON Accept → 202 `{run_id, stream_path}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) |
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
 | POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |
@@ -131,7 +132,7 @@ anchors, and S3 Object Lock.
 
 See [SSE.md](./SSE.md). Handshake (`X-Client-Version`) is enforced on
 `POST /conversations/{conversation_id}/messages` before admit. Resume is
-`GET /runs/{run_id}/events`. Conversation deletion/reaper remains packet 7.
+`GET /runs/{run_id}/events`. Conversation deletion is `DELETE /conversations/{id}` (204). Reaper and LangSmith deletion retry: [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md).
 Live Composite LLM streaming remains packet 8. CloudFront/WAF/Caddy IaC
 and a staging 50s CDN stream remain Phase 10; local 90s contract files are
 in [STREAMING_TIMEOUTS.md](../deployment/STREAMING_TIMEOUTS.md).

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 
@@ -35,6 +36,7 @@ __all__ = [
     "QueryGraphState",
     "QueryStateGraph",
     "build_query_graph",
+    "compile_query_graph",
     "enforce_admission",
     "graph",
     "pending_query_state",
@@ -382,5 +384,28 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
     return builder
 
 
+def compile_query_graph(
+    deps: QueryGraphDeps | None = None,
+    *,
+    checkpointer: BaseCheckpointSaver[str] | None = None,
+) -> CompiledQueryGraph:
+    """Compile the query graph for runtime, optionally with a checkpointer.
+
+    Args:
+        deps: Optional retrieve/memory/store bindings.
+        checkpointer: Optional Postgres (or test) checkpointer. ``thread_id``
+            must be ``str(conversation_id)``. Module-level ``graph`` stays
+            checkpointer-free for Studio.
+
+    Returns:
+        Compiled graph. Runtime never calls ``PostgresSaver.setup()``.
+    """
+
+    builder = build_query_graph(deps)
+    return builder.compile(  # pyright: ignore[reportUnknownMemberType]
+        checkpointer=checkpointer
+    )
+
+
 graph: CompiledQueryGraph = build_query_graph().compile()  # pyright: ignore[reportUnknownMemberType]
-"""Compiled query graph for ``langgraph.json`` registration."""
+"""Compiled query graph for ``langgraph.json`` registration. Checkpointer-free."""

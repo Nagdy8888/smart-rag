@@ -113,7 +113,8 @@ fail-open).
 | `JOB_HEARTBEAT_INTERVAL_SECONDS` | integer 10–900; `60` | public | Heartbeat cadence while a job is leased |
 | `JOB_POLL_INTERVAL_SECONDS` | integer 1–60; `5` | public | Idle delay between queue polls |
 | `WORKER_CONCURRENCY` | integer 1–8; `2` | public | Maximum concurrently processed ingestion jobs |
-| `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Checkpointer DSN; defaults to `SUPABASE_DB_URL`. Role `app_checkpointer`, schema `langgraph`. Runtime never auto-migrates. |
+| `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Checkpointer/store DSN; defaults to `SUPABASE_DB_URL`. Role `app_checkpointer`, schema `langgraph`. Runtime never auto-migrates. |
+| `SMART_RAG_PROMPT_ENV` | `dev`, `staging`, or `prod`; `dev` | public | Prompt registry promotion. Unknown ids fail closed. See [prompts/CHANGELOG.md](../../apps/agents/src/smart_rag_agents/prompts/CHANGELOG.md) |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. Cap 4. |
 
 Agent settings currently add only a stable, non-environment service name.

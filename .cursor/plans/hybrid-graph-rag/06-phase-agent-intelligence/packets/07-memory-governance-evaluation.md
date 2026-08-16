@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 7
-status: pending
+status: complete
 title: "Implement Supabase checkpoints/store memory, idempotency/run-event GC, full governance enforcement, trace redaction, prompt versions, usage accounting, feedback, and immediate conversation deletion."
 requirement_ids: [P06-07]
 ---

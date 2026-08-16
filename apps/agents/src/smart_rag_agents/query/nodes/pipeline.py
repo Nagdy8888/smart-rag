@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
+from smart_rag_core.memory.payload import memory_store_namespace
 from smart_rag_core.query_admission.ceilings import (
     assert_call_available,
     assert_deadline_open,
@@ -46,6 +47,7 @@ from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.memory import load_authorized_memory
 from smart_rag_core.query_routing.models import BranchResult, RoutingSurface
 from smart_rag_core.query_routing.preparation import caller_from_runtime, prepare_query
+from smart_rag_core.query_routing.safety import delimit_memory_record
 from smart_rag_core.query_routing.serde import (
     branch_results_from_state,
     memory_from_state,
@@ -123,7 +125,8 @@ def load_memory_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraph
         ``memory_records`` (possibly empty) and ``status=memory_loaded``.
 
     Persistence writes:
-        None. Reads ``app.load_query_memory`` only.
+        None. Reads ``app.load_query_memory`` and optional compact store
+        summaries. Source documents are never joined.
 
     External/model calls:
         None.
@@ -134,7 +137,7 @@ def load_memory_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraph
     Failure/fallback route:
         Without a connection, records empty memory and
         ``memory_unavailable``. Deleted conversation sets
-        ``routing_rejected``. Never copies source documents.
+        ``routing_rejected``. Invalid store payloads are skipped.
 
     Args:
         state: Admitted query graph state.
@@ -170,6 +173,24 @@ def load_memory_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraph
             "memory_records": [],
         }
     dumped = [item.model_dump(mode="json") for item in records]
+    if deps.store_get is not None:
+        namespace = memory_store_namespace(
+            company_id=None,
+            user_id=str(context.user_id),
+            conversation_id=str(context.conversation_id),
+        )
+        stored = deps.store_get(namespace, "summary")
+        summary_text = stored.get("summary") if stored else None
+        if isinstance(summary_text, str) and summary_text:
+            summary_record = delimit_memory_record(
+                message_id=str(
+                    uuid5(NAMESPACE_URL, f"summary:{context.conversation_id}")
+                ),
+                role="system",
+                content=summary_text,
+                created_at="1970-01-01T00:00:00+00:00",
+            )
+            dumped = [summary_record.model_dump(mode="json"), *dumped]
     return {
         **state,
         "status": "memory_loaded",

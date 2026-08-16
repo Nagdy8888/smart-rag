@@ -8,10 +8,10 @@ import psycopg
 from smart_rag_core.conversations import (
     ConversationRecord,
     create_conversation,
+    delete_conversation,
     get_conversation,
     list_conversations,
 )
-from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.security.identity import CallerContext
 
 
@@ -84,12 +84,25 @@ class ConversationService:
                 connection, caller=caller, conversation_id=conversation_id
             )
 
+    def delete(self, caller: CallerContext, *, conversation_id: UUID) -> None:
+        """Tombstone and purge one owned conversation.
 
-def conversation_delete_not_implemented() -> None:
-    """Packet 7 owns deletion. This packet fails closed.
+        Args:
+            caller: Authenticated caller. Creator or owner/admin.
+            conversation_id: Conversation id.
 
-    Raises:
-        QueryAdmissionError: Always ``conversation_deletion_not_implemented``.
-    """
+        Raises:
+            QueryAdmissionError: ``not_found`` when missing, deleted, or
+                foreign for members/viewers.
 
-    raise QueryAdmissionError("conversation_deletion_not_implemented")
+        Side Effects:
+            One Postgres transaction: tombstone, cascade, content-free audit,
+            LangSmith deletion request.
+        """
+
+        with psycopg.connect(self._postgres_url) as connection:
+            connection.execute("SET ROLE app_api")
+            delete_conversation(
+                connection, caller=caller, conversation_id=conversation_id
+            )
+            connection.commit()

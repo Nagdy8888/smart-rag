@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 
@@ -26,7 +26,6 @@ from smart_rag_api.services.auth_rate_limits import RateLimitKind
 from smart_rag_api.services.client_handshake import enforce_client_handshake
 from smart_rag_api.services.conversations import (
     ConversationService,
-    conversation_delete_not_implemented,
 )
 from smart_rag_api.services.http_errors import raise_admission_http
 from smart_rag_api.services.query_runs import QueryRunService
@@ -185,36 +184,43 @@ def get_conversation_route(
     )
 
 
-@router.delete("/{conversation_id}", status_code=status.HTTP_501_NOT_IMPLEMENTED)
+@router.delete(
+    "/{conversation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
 def delete_conversation_route(
+    request: Request,
     conversation_id: UUID,
     caller: CallerContextDep,
-) -> dict[str, str]:
-    """Conversation deletion is packet 7. This packet fails closed.
+    service: Annotated[ConversationService, Depends(get_conversation_service)],
+) -> Response:
+    """Tombstone and purge one owned conversation immediately.
 
     Args:
-        conversation_id: Conversation id (authorization still required).
+        request: Active request for rate limits.
+        conversation_id: Conversation id.
         caller: Authenticated caller.
+        service: Injected conversation service.
 
     Returns:
-        Never a success body.
+        Empty 204 body.
 
     Raises:
-        HTTPException: 501 ``conversation_deletion_not_implemented``.
+        HTTPException: 404 for missing, tombstoned, or foreign conversations.
     """
 
-    del conversation_id, caller
-    try:
-        conversation_delete_not_implemented()
-    except QueryAdmissionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=exc.reason,
-        ) from exc
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="conversation_deletion_not_implemented",
+    enforce_rate_limit(
+        request,
+        bucket_key=f"chat-start:{caller.user_id}",
+        kind=RateLimitKind.COST_MUTATION,
+        max_attempts=20,
     )
+    try:
+        service.delete(caller, conversation_id=conversation_id)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

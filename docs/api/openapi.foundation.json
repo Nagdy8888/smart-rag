@@ -155,6 +155,11 @@
             "additionalProperties": true,
             "title": "Provenance",
             "type": "object"
+          },
+          "source_unavailable": {
+            "default": false,
+            "title": "Source Unavailable",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1049,7 +1054,7 @@
       },
       "FeedbackRequest": {
         "additionalProperties": false,
-        "description": "Thumbs feedback.",
+        "description": "Thumbs feedback with a required unmerged Phase 6 tag.",
         "properties": {
           "comment": {
             "anyOf": [
@@ -1063,13 +1068,30 @@
             ],
             "title": "Comment"
           },
+          "tag": {
+            "enum": [
+              "chunk/cleaning loss",
+              "profile field wrong",
+              "candidate miss",
+              "wrong rerank",
+              "bad refusal/overconfident answer",
+              "missed relationship",
+              "wrong route",
+              "wrong calculation",
+              "bad citation",
+              "insufficient graph"
+            ],
+            "title": "Tag",
+            "type": "string"
+          },
           "thumbs_up": {
             "title": "Thumbs Up",
             "type": "boolean"
           }
         },
         "required": [
-          "thumbs_up"
+          "thumbs_up",
+          "tag"
         ],
         "title": "FeedbackRequest",
         "type": "object"
@@ -5308,7 +5330,7 @@
     },
     "/conversations/{conversation_id}": {
       "delete": {
-        "description": "Conversation deletion is packet 7. This packet fails closed.\n\nArgs:\n    conversation_id: Conversation id (authorization still required).\n    caller: Authenticated caller.\n\nReturns:\n    Never a success body.\n\nRaises:\n    HTTPException: 501 ``conversation_deletion_not_implemented``.",
+        "description": "Tombstone and purge one owned conversation immediately.\n\nArgs:\n    request: Active request for rate limits.\n    conversation_id: Conversation id.\n    caller: Authenticated caller.\n    service: Injected conversation service.\n\nReturns:\n    Empty 204 body.\n\nRaises:\n    HTTPException: 404 for missing, tombstoned, or foreign conversations.",
         "operationId": "delete_conversation_route_conversations__conversation_id__delete",
         "parameters": [
           {
@@ -5419,6 +5441,9 @@
           }
         ],
         "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -5428,20 +5453,6 @@
               }
             },
             "description": "Validation Error"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Delete Conversation Route Conversations  Conversation Id  Delete",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
           }
         },
         "summary": "Delete Conversation Route",
@@ -7988,7 +7999,7 @@
     },
     "/runs/{run_id}/feedback": {
       "post": {
-        "description": "Store thumbs feedback for an owned run.\n\nArgs:\n    request: Active request.\n    run_id: Run id.\n    body: Thumbs flag and optional comment.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Feedback id.",
+        "description": "Store thumbs feedback for an owned run.\n\nArgs:\n    request: Active request.\n    run_id: Run id.\n    body: Thumbs flag, required tag, and optional comment.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Feedback id.",
         "operationId": "submit_feedback_route_runs__run_id__feedback_post",
         "parameters": [
           {

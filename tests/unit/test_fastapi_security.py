@@ -194,6 +194,16 @@ class _FakeConversationService:
             created_at=datetime.now(tz=UTC),
         )
 
+    def delete(self, caller: CallerContext, *, conversation_id: UUID) -> None:
+        """No-op owner delete for HTTP tests.
+
+        Args:
+            caller: Authenticated caller.
+            conversation_id: Conversation id.
+        """
+
+        del caller, conversation_id
+
 
 class _FakeQueryRunService:
     """Admission stand-in that never opens Postgres."""
@@ -318,10 +328,19 @@ def test_api_meta_and_ready_never_claim_query_ready() -> None:
 def test_current_user_and_conversation_delete(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``GET /me`` returns server role; conversation delete is packet 7 501."""
+    """``GET /me`` returns server role; conversation delete is 204."""
 
     monkeypatch.setenv("APP_ENV", "test")
-    with TestClient(create_app()) as raw:
+    monkeypatch.setattr(
+        "smart_rag_api.routers.conversations.enforce_rate_limit",
+        _noop_rate_limit,
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_conversation_service] = lambda: (
+        _FakeConversationService()
+    )
+    with TestClient(application) as raw:
         client = as_openapi_client(raw)
         me = client.get("/me", headers=_identity(_OWNER, "owner"))
         deleted = client.delete(
@@ -331,10 +350,8 @@ def test_current_user_and_conversation_delete(
     assert me.status_code == 200
     body = json_object(me.json())
     assert body["role"] == "owner"
-    assert deleted.status_code == 501
-    assert (
-        json_object(deleted.json())["detail"] == "conversation_deletion_not_implemented"
-    )
+    assert deleted.status_code == 204
+    assert deleted.content == b""
     assert "text/html" not in deleted.headers.get("content-type", "")
 
 

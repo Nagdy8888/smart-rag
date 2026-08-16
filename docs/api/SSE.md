@@ -98,9 +98,9 @@ Exactly one terminal among `completed`, `cancelled`, `error`, `partial`.
   running/completed/cancelled/partial or this process has no live executor
   (replay plus a sanitized terminal if the worker died).
 
-## Retention handoff (packet 7)
+## Retention (packet 7)
 
 Completed idempotency keys default to seven days and completed events to
-30 days through a dedicated reaper. This packet does not reap. Conversation
-deletion (packet 7) must purge keys/events immediately; tombstones already
-deny resume.
+30 days through `app.reap_query_run_retention`. Conversation deletion
+purges keys/events immediately. Tombstones deny resume. See
+[MEMORY_DELETION.md](../agent/MEMORY_DELETION.md).

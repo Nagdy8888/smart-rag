@@ -8,6 +8,7 @@ from uuid import UUID
 
 import psycopg
 from psycopg.rows import dict_row
+from smart_rag_core.feedback.tags import FeedbackTagError, require_feedback_tag
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.security.untrusted import isolate_untrusted_text
@@ -43,6 +44,7 @@ class FeedbackUsageService:
         run_id: UUID,
         thumbs_up: bool,
         comment: str | None,
+        tag: str,
     ) -> UUID:
         """Store thumbs feedback for an owned run.
 
@@ -51,31 +53,59 @@ class FeedbackUsageService:
             run_id: Run id.
             thumbs_up: True for up (rating 5), False for down (rating 1).
             comment: Optional untrusted correction text.
+            tag: Required unmerged Phase 6 feedback tag.
 
         Returns:
             Feedback row id.
+
+        Raises:
+            QueryAdmissionError: ``invalid_tag``, ``not_found``, or database
+                rejection.
         """
 
         rating = 5 if thumbs_up else 1
         stored_comment = isolate_untrusted_text(comment) if comment else None
-        with psycopg.connect(self._postgres_url) as connection:
-            connection.execute("SET ROLE app_api")
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT app.submit_run_feedback(%s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        caller.user_id,
-                        caller.rpc_role(),
-                        caller.rpc_authorization_version(),
-                        run_id,
-                        rating,
-                        stored_comment,
-                    ),
-                )
-                row = cursor.fetchone()
-            connection.commit()
+        try:
+            stored_tag = require_feedback_tag(tag)
+        except FeedbackTagError as exc:
+            raise QueryAdmissionError("invalid_tag") from exc
+        try:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT app.submit_run_feedback(
+                          %s::uuid,
+                          %s::text,
+                          %s::bigint,
+                          %s::uuid,
+                          %s::smallint,
+                          %s::text,
+                          %s::text
+                        )
+                        """,
+                        (
+                            caller.user_id,
+                            caller.rpc_role(),
+                            caller.rpc_authorization_version(),
+                            run_id,
+                            rating,
+                            stored_comment,
+                            stored_tag,
+                        ),
+                    )
+                    row = cursor.fetchone()
+                connection.commit()
+        except psycopg.Error as exc:
+            message = str(exc)
+            if "feedback:invalid_tag" in message:
+                raise QueryAdmissionError("invalid_tag") from exc
+            if "feedback:not_found" in message:
+                raise QueryAdmissionError("not_found") from exc
+            if "feedback:invalid_rating" in message:
+                raise QueryAdmissionError("invalid_rating") from exc
+            raise QueryAdmissionError("database_rejected") from exc
         if row is None:
             raise QueryAdmissionError("database_rejected")
         return UUID(str(row[0]))

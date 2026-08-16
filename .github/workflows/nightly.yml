@@ -23,4 +23,5 @@ jobs:
     uses: ./.github/workflows/job-docs-frontend.yml
   openapi-migrations:
     uses: ./.github/workflows/job-openapi-migrations.yml
-  # Future nightly: Playwright full, retrieval evals, Trivy, backup/restart, live-model opt-in.
+  # Unit job includes scripts/ci/check_phase6_eval_registry.py (holdout sealed).
+  # Future nightly: Playwright full, live retrieval evals, Trivy, backup/restart, live-model opt-in.

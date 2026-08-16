@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 from uuid import UUID
 
+import psycopg
 from fastapi.responses import StreamingResponse
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
@@ -119,7 +120,64 @@ class FixtureQueryRunExecutor:
 
 
 class LangGraphQueryRunExecutor:
-    """Production executor: ``graph.astream`` once per run, status per node."""
+    """Production executor: compiled query graph with optional checkpoints."""
+
+    def __init__(self) -> None:
+        """Create an executor that opens checkpointer/store lazily.
+
+        Side Effects:
+            None at construction. First ``execute`` may open a Postgres pool.
+            ``PostgresSaver.setup()`` and ``PostgresStore.setup()`` are never
+            called.
+        """
+
+        self._compiled = None
+        self._holder = None
+        self._store = None
+
+    def _runtime_graph(self, conversation_id: object):
+        """Compile the query graph with a checkpointer when a DSN is configured.
+
+        Args:
+            conversation_id: Unused; thread id is applied per invoke.
+
+        Returns:
+            Compiled graph. Module-level Studio ``graph`` stays checkpointer-free.
+        """
+
+        del conversation_id
+        if self._compiled is not None:
+            return self._compiled
+        from smart_rag_agents.query.checkpointer import open_query_checkpointer
+        from smart_rag_agents.query.deps import QueryGraphDeps
+        from smart_rag_agents.query.graph import compile_query_graph, graph
+        from smart_rag_agents.query.store import open_query_memory_store
+        from smart_rag_core.settings import load_backend_settings
+
+        settings = load_backend_settings()
+        dsn = settings.resolved_checkpoint_dsn()
+        deps = QueryGraphDeps()
+        if dsn is not None:
+            self._holder = open_query_checkpointer(dsn)
+            memory_store = open_query_memory_store(dsn)
+            self._store = memory_store
+
+            def _bind_put(
+                namespace: tuple[str, str, str],
+                key: str,
+                payload: dict[str, object],
+            ) -> None:
+                memory_store.put_compact(namespace, key, payload)
+
+            deps.store_get = memory_store.get_compact
+            deps.store_put = _bind_put
+            self._compiled = compile_query_graph(
+                deps,
+                checkpointer=self._holder.saver,
+            )
+            return self._compiled
+        self._compiled = graph
+        return self._compiled
 
     async def execute(
         self,
@@ -141,31 +199,60 @@ class LangGraphQueryRunExecutor:
 
         Raises:
             asyncio.CancelledError: When the wrapping task is cancelled.
+            ExternalFlowBlockedError: When tracing would export real company
+                content without a verified subprocessor matrix.
         """
+
+        from smart_rag_core.observability.governance_gate import (
+            assert_langsmith_export_permitted,
+        )
+        from smart_rag_core.observability.query_run_trace import (
+            query_run_trace_metadata,
+        )
+        from smart_rag_core.security.external_processing import ContentClass
+        from smart_rag_core.settings import load_backend_settings
+
+        settings = load_backend_settings()
+        assert_langsmith_export_permitted(
+            tracing_enabled=settings.langsmith_tracing,
+            content_class=(
+                ContentClass.SYNTHETIC
+                if settings.mock_model_mode
+                else ContentClass.REAL_COMPANY
+            ),
+            provider_settings_verified=settings.subprocessor_matrix_verified,
+        )
+        trace_extra = query_run_trace_metadata(
+            run_id=context.run_id,
+            user_id=context.user_id,
+            requested_route=context.route_family.value,
+            effective_route=context.route_family.value,
+            corrected_route=None,
+            model_versions={},
+            prompt_versions={},
+        )
+        del trace_extra
 
         if datetime.now(tz=UTC) >= context.deadline_at:
             yield ("deadline", {"route_family": context.route_family.value})
             yield ("partial", {"reason": "deadline_exhausted"})
             return
 
-        from smart_rag_agents.query.graph import graph, pending_query_state
+        from smart_rag_agents.query.graph import pending_query_state
 
+        compiled = self._runtime_graph(context.conversation_id)
         state = pending_query_state(
             authorized_runtime=context.model_dump(mode="json"),
             user_query=message,
         )
-        stream_name = "astream"
-        stream_method = getattr(graph, stream_name)
-        if not callable(stream_method):
-            raise TypeError("graph_astream_missing")
-        stream_iter = cast(
-            AsyncIterator[object],
-            stream_method(
-                state,
-                {"recursion_limit": context.recursion_limit},
-                stream_mode="updates",
-            ),
-        )
+        config: dict[str, object] = {
+            "recursion_limit": context.recursion_limit,
+            "configurable": {"thread_id": str(context.conversation_id)},
+        }
+        stream_method: Callable[..., AsyncIterator[object]] = compiled.astream  # type: ignore[reportUnknownMemberType]
+        stream_iter = stream_method(state, cast(Any, config), stream_mode="updates")
+        last_remaining_calls = context.model_call_ceiling
+        last_status = "running"
         try:
             async for raw_chunk in stream_iter:
                 if cancel_event.is_set():
@@ -188,6 +275,10 @@ class LangGraphQueryRunExecutor:
                         raw_status = update_map.get("status")
                         if isinstance(raw_status, str) and raw_status:
                             status = raw_status[:64]
+                            last_status = status
+                        remaining = update_map.get("remaining_model_calls")
+                        if isinstance(remaining, int):
+                            last_remaining_calls = remaining
                     yield (
                         "status",
                         {"stage": node_name[:64], "status": status},
@@ -200,6 +291,11 @@ class LangGraphQueryRunExecutor:
                         yield ("partial", {"reason": "deadline_exhausted"})
                         return
             if not cancel_event.is_set():
+                self._maybe_summarize(
+                    context,
+                    remaining_model_calls=last_remaining_calls,
+                    terminal_status=last_status,
+                )
                 yield ("completed", {})
         finally:
             close = getattr(stream_iter, "aclose", None)
@@ -207,6 +303,69 @@ class LangGraphQueryRunExecutor:
                 closed = close()
                 if inspect.isawaitable(closed):
                     await closed
+
+    def _maybe_summarize(
+        self,
+        context: AuthorizedRuntimeContext,
+        *,
+        remaining_model_calls: int,
+        terminal_status: str,
+    ) -> None:
+        """Write a budgeted compact summary when the envelope can afford it.
+
+        Args:
+            context: Authorized run context.
+            remaining_model_calls: Remaining counted calls after the graph.
+            terminal_status: Last node status. Summaries are skipped on
+                admission/routing rejection.
+
+        Side Effects:
+            May consume ``usage_kind=summary`` and write one store item.
+            Records ``summary_deferred`` by skipping the write when the
+            envelope cannot cover the cap.
+        """
+
+        if terminal_status in {"admission_rejected", "routing_rejected"}:
+            return
+        if self._store is None:
+            return
+        from smart_rag_core.memory.summary import maybe_generate_conversation_summary
+        from smart_rag_core.query_routing.preparation import caller_from_runtime
+        from smart_rag_core.settings import load_backend_settings
+
+        settings = load_backend_settings()
+        postgres_url = (
+            settings.supabase_db_url.get_secret_value()
+            if settings.supabase_db_url is not None
+            else None
+        )
+        if postgres_url is None:
+            return
+        store = self._store
+
+        def _put(
+            namespace: tuple[str, str, str],
+            key: str,
+            payload: dict[str, object],
+        ) -> None:
+            store.put_compact(namespace, key, payload)
+
+        with psycopg.connect(postgres_url) as connection:
+            connection.execute("SET ROLE app_api")
+            maybe_generate_conversation_summary(
+                connection,
+                caller=caller_from_runtime(context),
+                run_id=context.run_id,
+                reservation_id=context.reservation_id,
+                expected_version=context.optimistic_version,
+                remaining_model_calls=remaining_model_calls,
+                remaining_usd=context.remaining_usd,
+                conversation_id=context.conversation_id,
+                user_id=str(context.user_id),
+                memory_records=(),
+                store_put=_put,
+            )
+            connection.commit()
 
 
 def raw_status_is_partial(update: dict[str, object]) -> bool:

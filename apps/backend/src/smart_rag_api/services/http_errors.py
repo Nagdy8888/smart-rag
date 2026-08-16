@@ -27,6 +27,8 @@ _ADMISSION_STATUS: dict[str, int] = {
     "run_not_cancellable": status.HTTP_409_CONFLICT,
     "forbidden": status.HTTP_403_FORBIDDEN,
     "invalid_rating": status.HTTP_422_UNPROCESSABLE_ENTITY,
+    "invalid_tag": status.HTTP_422_UNPROCESSABLE_ENTITY,
+    "tag_required": status.HTTP_422_UNPROCESSABLE_ENTITY,
     "invalid_query": status.HTTP_400_BAD_REQUEST,
     "invalid_key": status.HTTP_400_BAD_REQUEST,
     "database_rejected": status.HTTP_503_SERVICE_UNAVAILABLE,
