@@ -1,0 +1,20 @@
+{
+	# Local streaming contract only. Phase 10 owns managed Caddy/CloudFront IaC.
+	# Do not treat this file as proof that Caddy is deployed.
+	servers {
+		timeouts {
+			read_timeout 90s
+			write_timeout 90s
+		}
+	}
+}
+
+:8000 {
+	reverse_proxy 127.0.0.1:8080 {
+		flush_interval -1
+		transport http {
+			read_timeout 90s
+			write_timeout 90s
+		}
+	}
+}

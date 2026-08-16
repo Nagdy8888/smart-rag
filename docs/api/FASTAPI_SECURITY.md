@@ -16,6 +16,8 @@ packet 8. CloudFront/WAF/KMS/S3 Object Lock are Phase 10.
 Related: [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
+[SSE.md](./SSE.md) ·
+[STREAMING_TIMEOUTS.md](../deployment/STREAMING_TIMEOUTS.md) ·
 [AUDIT_CHAIN.md](../security/AUDIT_CHAIN.md) ·
 [openapi.foundation.json](./openapi.foundation.json) ·
 [docs index](../README.md)
@@ -56,9 +58,10 @@ JWKS-verified `CallerContext` (test bypass only when `APP_ENV=test`).
 | POST/GET | `/conversations` | authenticated | creator insert / list RPC | COST_MUTATION on create |
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
 | DELETE | `/conversations/{id}` | authenticated | **501** | Packet 7 owns deletion |
-| POST | `/conversations/{id}/messages` | creator | idempotent Auto admit **composite** | Returns `{run_id, stream_path}`; no SSE body |
+| POST | `/conversations/{id}/messages` | creator | handshake then idempotent Auto admit **composite** | JSON Accept → 202 `{run_id, stream_path}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) |
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
-| POST | `/runs/{run_id}/cancel` | creator | pending/running | Not SSE cancel transport |
+| POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |
+| GET | `/runs/{run_id}/events` | creator only | Bearer resume; no handshake | `after` / `Last-Event-ID`; tombstone → 404 |
 | GET | `/runs/{run_id}/citations` | creator | IDs/provenance escaped | No snippet/passage |
 | POST | `/runs/{run_id}/feedback` | creator | thumbs 1 or 5 | Comment escaped |
 | GET | `/graph/entities/search` | authenticated | ACL SQL, 3s timeout | No vendor prose |
@@ -103,9 +106,9 @@ delete, or current-version mismatch drops the entry, emits
 
 `smart_rag_core.runtime.offload.OffloadExecutor` owns a bounded process pool
 (CPU slices with p95 > 10 ms) and a thread pool (blocking I/O).
-`sample_event_loop_lag` measures loop delay. Packet 6 owns 15s heartbeat
-transport; packet 8 owns five live Composite heartbeat proofs. This packet
-proves lag sampling, offload, and cancellation without live LLM runs.
+`sample_event_loop_lag` measures loop delay. Packet 6 proves 15s persisted
+heartbeats and five held fixture streams (no OpenAI). Packet 8 owns live
+Composite LLM heartbeat proof.
 
 ## Audit export (local)
 
@@ -124,18 +127,24 @@ anchors, and S3 Object Lock.
 - CloudFront signed upload URLs, WAF, origin restriction.
 - KMS chain-head anchors and Object Lock export.
 
-## Packet 6 handoff
+## Packet 6 (implemented)
 
-- `GET /runs/{run_id}/events` EventSource body, SSE schema, resume,
-  15s heartbeat, cancel transport.
-- Handshake enforcement of `min_client_version` / `sse_schema_version`
-  before paid work.
-- Do not invent SSE event names in this packet. `stream_path` is
-  `/runs/{run_id}/events` only.
+See [SSE.md](./SSE.md). Handshake (`X-Client-Version`) is enforced on
+`POST /conversations/{conversation_id}/messages` before admit. Resume is
+`GET /runs/{run_id}/events`. Conversation deletion/reaper remains packet 7.
+Live Composite LLM streaming remains packet 8. CloudFront/WAF/Caddy IaC
+and a staging 50s CDN stream remain Phase 10; local 90s contract files are
+in [STREAMING_TIMEOUTS.md](../deployment/STREAMING_TIMEOUTS.md).
 
 ## Verification
 
 ```
 uv run python scripts/ci/check_openapi.py
 uv run python -m pytest tests/unit/test_fastapi_security.py tests/contract/test_query_admission_api.py tests/contract/test_retrieval_cache.py tests/unit/test_package_imports.py tests/contract/test_import_boundaries.py tests/unit/test_backend_middleware.py -q
+```
+
+Packet 6 SSE:
+
+```
+uv run python -m pytest tests/unit/test_sse_protocol.py tests/contract/test_sse_resume.py tests/contract/test_sse_heartbeat.py tests/contract/test_streaming_timeout_contract.py -q
 ```

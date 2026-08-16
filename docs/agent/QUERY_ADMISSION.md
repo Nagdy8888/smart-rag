@@ -89,10 +89,11 @@ failure returns limiter unavailable and inserts no reservation. FastAPI does
 not throttle hosted Supabase Auth.
 
 `POST /conversations/{id}/messages` admits Auto chat as
-`Phase6RouteFamily.COMPOSITE` and returns `{run_id, stream_path}` where
-`stream_path` is `/runs/{run_id}/events`. Packet 6 owns the EventSource
-body. `GET /health/ready` is dependency-aware and never sets `query_ready`
-in mock mode or when LightRAG is unattached.
+`Phase6RouteFamily.COMPOSITE` after the `X-Client-Version` handshake.
+JSON Accept returns `{run_id, stream_path}` where `stream_path` is
+`/runs/{run_id}/events`. `Accept: text/event-stream` streams immediately.
+See [SSE.md](../api/SSE.md). `GET /health/ready` is dependency-aware and
+never sets `query_ready` in mock mode or when LightRAG is unattached.
 
 See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 
@@ -103,4 +104,5 @@ See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 - [AUDIT_CHAIN.md](../security/AUDIT_CHAIN.md)
 - [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md)
 - [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md)
+- [SSE.md](../api/SSE.md)
 - [phase-06-agent-intelligence-evidence.md](../development/phase-06-agent-intelligence-evidence.md)

@@ -85,13 +85,17 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. |
 | `CORS_ALLOW_ORIGINS` | comma-separated exact origins; `http://127.0.0.1:3000,http://localhost:3000` | public | Wildcards forbidden. Never pair `*` with credentials |
 | `API_VERSION` | `major.minor.patch`; `0.1.0` | public | Published by `GET /api/meta` |
-| `SSE_SCHEMA_VERSION` | safe token; `1` | public | Packet 6 handshake. Packet 5 only publishes it |
-| `MIN_CLIENT_VERSION` | `major.minor.patch`; `0.1.0` | public | Packet 6 handshake. Packet 5 only publishes it |
+| `SSE_SCHEMA_VERSION` | safe token; `1` | public | Published by `GET /api/meta` and the first SSE `schema` event |
+| `MIN_CLIENT_VERSION` | `major.minor.patch`; `0.1.0` | public | Clients send `X-Client-Version` on new paid POST. Missing/below → 426 `client_version_unsupported` before admit. Resume GET does not require the header |
 | `RETRIEVAL_CACHE_RESULT_TTL_SECONDS` | 1–300; `30` | public | ID/rank cache TTL |
 | `RETRIEVAL_CACHE_PROFILE_TTL_SECONDS` | 1–3600; `300` | public | Profile/embedding cache TTL |
 | `REQUEST_MAX_BODY_BYTES` | 1024–16_777_216; `1048576` | public | JSON/body cap; oversized → 413 |
 | `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |
 | `RATE_LIMIT_RETRY_AFTER_SECONDS` | 1–3600; `60` | public | `Retry-After` on limiter 429/503 |
+
+`X-Client-Version` is a request header, not an environment variable. New paid
+`POST /conversations/{conversation_id}/messages` must send a semver-like value
+greater than or equal to `MIN_CLIENT_VERSION`. See [SSE.md](../api/SSE.md).
 
 Phase 6 packet 1 query admission still uses
 `QUERY_ADMISSION_RATE_MAX_ATTEMPTS=20` / 60s as engineering defaults. Packet 5

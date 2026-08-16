@@ -294,6 +294,7 @@ def test_openapi_registers_packet5_paths() -> None:
         "/runs/{run_id}",
         "/runs/{run_id}/cancel",
         "/runs/{run_id}/citations",
+        "/runs/{run_id}/events",
         "/tools",
         "/health/ready",
     ):
@@ -556,6 +557,7 @@ def test_submit_message_returns_composite_stream_path(
             headers={
                 **_identity(_OWNER, "owner"),
                 "Idempotency-Key": str(uuid4()),
+                "X-Client-Version": "0.1.0",
             },
         )
     assert response.status_code == 202

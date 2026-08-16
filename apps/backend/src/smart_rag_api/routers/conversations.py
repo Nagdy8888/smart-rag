@@ -6,12 +6,14 @@ from typing import Annotated
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.responses import JSONResponse, StreamingResponse
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 
 from smart_rag_api.dependencies.identity import CallerContextDep
 from smart_rag_api.dependencies.services import (
     enforce_rate_limit,
     get_postgres_url,
+    get_sse_stream_service,
     get_valkey_limits_client,
 )
 from smart_rag_api.schemas.fastapi_security import (
@@ -21,12 +23,18 @@ from smart_rag_api.schemas.fastapi_security import (
     SubmitMessageResponse,
 )
 from smart_rag_api.services.auth_rate_limits import RateLimitKind
+from smart_rag_api.services.client_handshake import enforce_client_handshake
 from smart_rag_api.services.conversations import (
     ConversationService,
     conversation_delete_not_implemented,
 )
 from smart_rag_api.services.http_errors import raise_admission_http
 from smart_rag_api.services.query_runs import QueryRunService
+from smart_rag_api.services.sse_stream import (
+    SseStreamService,
+    sse_streaming_response,
+    wants_event_stream,
+)
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
 
@@ -211,8 +219,29 @@ def delete_conversation_route(
 
 @router.post(
     "/{conversation_id}/messages",
-    response_model=SubmitMessageResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    response_model=None,
+    responses={
+        202: {"model": SubmitMessageResponse},
+        200: {
+            "description": "SSE event stream",
+            "content": {"text/event-stream": {"schema": {"type": "string"}}},
+        },
+        426: {
+            "description": "Incompatible client version",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string"},
+                            "min_client_version": {"type": "string"},
+                            "sse_schema_version": {"type": "string"},
+                        },
+                    }
+                }
+            },
+        },
+    },
 )
 def submit_message_route(
     request: Request,
@@ -220,11 +249,17 @@ def submit_message_route(
     body: SubmitMessageRequest,
     caller: CallerContextDep,
     service: Annotated[QueryRunService, Depends(get_query_run_service)],
+    sse: Annotated[SseStreamService, Depends(get_sse_stream_service)],
     idempotency_key_header: Annotated[
         str | None, Header(alias="Idempotency-Key")
     ] = None,
-) -> SubmitMessageResponse:
-    """Admit Auto chat as Composite. Returns stream_path without SSE bodies.
+    x_client_version: Annotated[str | None, Header(alias="X-Client-Version")] = None,
+) -> JSONResponse | StreamingResponse:
+    """Admit Auto chat as Composite. Handshake runs before reservation.
+
+    JSON Accept returns 202 ``{run_id, stream_path}``. ``text/event-stream``
+    admits then streams immediately. Duplicate idempotency keys reuse the
+    existing run and never reserve twice.
 
     Args:
         request: Active request.
@@ -232,12 +267,15 @@ def submit_message_route(
         body: Message and optional idempotency key.
         caller: Authenticated caller.
         service: Injected query-run service.
+        sse: Persist-then-flush SSE service.
         idempotency_key_header: Optional ``Idempotency-Key`` header UUID.
+        x_client_version: Required client version for new paid submission.
 
     Returns:
-        ``run_id``, ``stream_path``, reconnect flag.
+        JSON admission result or an SSE stream.
     """
 
+    enforce_client_handshake(request, x_client_version)
     enforce_rate_limit(
         request,
         bucket_key=f"chat-start:{caller.user_id}",
@@ -264,11 +302,24 @@ def submit_message_route(
         )
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
-    return SubmitMessageResponse(
-        run_id=context.run_id,
-        stream_path=stream_path,
-        reconnect=context.reconnect,
-        reservation_id=context.reservation_id,
-        route_family=context.route_family.value,
-        status=context.status,
+    sse.remember_admitted(caller, context, message=body.message)
+    if wants_event_stream(request.headers.get("accept")):
+        return sse_streaming_response(
+            sse.iter_frames(
+                caller,
+                run_id=context.run_id,
+                after=0,
+                context=context,
+            )
+        )
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content=SubmitMessageResponse(
+            run_id=context.run_id,
+            stream_path=stream_path,
+            reconnect=context.reconnect,
+            reservation_id=context.reservation_id,
+            route_family=context.route_family.value,
+            status=context.status,
+        ).model_dump(mode="json"),
     )

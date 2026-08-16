@@ -1,11 +1,12 @@
-"""Thin query-run fetch, cancel, citation, and feedback routes. No SSE bodies."""
+"""Thin query-run fetch, cancel, citation, feedback, and SSE resume routes."""
 
 from __future__ import annotations
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Header, Query, Request, status
+from fastapi.responses import StreamingResponse
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
 
@@ -13,6 +14,7 @@ from smart_rag_api.dependencies.identity import CallerContextDep
 from smart_rag_api.dependencies.services import (
     enforce_rate_limit,
     get_postgres_url,
+    get_sse_stream_service,
     get_valkey_limits_client,
 )
 from smart_rag_api.schemas.fastapi_security import (
@@ -25,6 +27,11 @@ from smart_rag_api.services.auth_rate_limits import RateLimitKind
 from smart_rag_api.services.feedback_usage import FeedbackUsageService
 from smart_rag_api.services.http_errors import raise_admission_http
 from smart_rag_api.services.query_runs import QueryRunService
+from smart_rag_api.services.sse_stream import (
+    SseStreamService,
+    resume_after_sequence,
+    sse_streaming_response,
+)
 
 router = APIRouter(prefix="/runs", tags=["chat"])
 
@@ -122,14 +129,16 @@ def cancel_run_route(
     run_id: UUID,
     caller: CallerContextDep,
     service: Annotated[QueryRunService, Depends(get_query_run_service)],
+    sse: Annotated[SseStreamService, Depends(get_sse_stream_service)],
 ) -> RunResponse:
-    """Cancel one owned run. This is not SSE cancel transport.
+    """Cancel one owned run, stop the live SSE generator, and persist cancelled.
 
     Args:
         request: Active request.
         run_id: Run id.
         caller: Authenticated caller.
-        service: Injected service.
+        service: Injected query-run service.
+        sse: SSE service used to stop the live generator.
 
     Returns:
         Updated run.
@@ -143,9 +152,59 @@ def cancel_run_route(
     )
     try:
         record = service.cancel(caller, run_id=run_id)
+        sse.notify_cancel(caller, run_id=run_id)
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
     return _run_response(record)
+
+
+@router.get(
+    "/{run_id}/events",
+    response_class=StreamingResponse,
+    responses={
+        200: {
+            "description": "SSE event stream",
+            "content": {"text/event-stream": {"schema": {"type": "string"}}},
+        }
+    },
+)
+def stream_run_events_route(
+    request: Request,
+    run_id: UUID,
+    caller: CallerContextDep,
+    sse: Annotated[SseStreamService, Depends(get_sse_stream_service)],
+    after: Annotated[int, Query(ge=0)] = 0,
+    last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
+) -> StreamingResponse:
+    """Replay persisted events after ``after`` / ``Last-Event-ID``. Bearer only.
+
+    Handshake is not required. Foreign, missing, or tombstoned runs are 404.
+    Reconnect never starts a second paid graph.
+
+    Args:
+        request: Active request.
+        run_id: Run id.
+        caller: Authenticated owner.
+        sse: Persist-then-flush service.
+        after: Exclusive sequence cursor. ``0`` means from the start.
+        last_event_id: SSE reconnect header honored when higher than ``after``.
+
+    Returns:
+        ``text/event-stream`` body.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"run-read:{caller.user_id}",
+        kind=RateLimitKind.LOW_RISK_READ,
+        max_attempts=120,
+    )
+    cursor = resume_after_sequence(after, last_event_id)
+    try:
+        sse.assert_readable(caller, run_id=run_id)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    return sse_streaming_response(sse.iter_frames(caller, run_id=run_id, after=cursor))
 
 
 @router.get("/{run_id}/citations", response_model=list[CitationResponse])

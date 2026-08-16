@@ -3010,7 +3010,7 @@
     }
   },
   "info": {
-    "description": "Authenticated RAG API. SSE event transport is packet 6. Readiness is dependency-aware and never query-ready in mock mode.",
+    "description": "Authenticated RAG API with Bearer fetch SSE. Readiness is dependency-aware and never query-ready in mock mode.",
     "title": "Smart RAG API",
     "version": "0.1.0"
   },
@@ -5590,7 +5590,7 @@
     },
     "/conversations/{conversation_id}/messages": {
       "post": {
-        "description": "Admit Auto chat as Composite. Returns stream_path without SSE bodies.\n\nArgs:\n    request: Active request.\n    conversation_id: Conversation the caller must own.\n    body: Message and optional idempotency key.\n    caller: Authenticated caller.\n    service: Injected query-run service.\n    idempotency_key_header: Optional ``Idempotency-Key`` header UUID.\n\nReturns:\n    ``run_id``, ``stream_path``, reconnect flag.",
+        "description": "Admit Auto chat as Composite. Handshake runs before reservation.\n\nJSON Accept returns 202 ``{run_id, stream_path}``. ``text/event-stream``\nadmits then streams immediately. Duplicate idempotency keys reuse the\nexisting run and never reserve twice.\n\nArgs:\n    request: Active request.\n    conversation_id: Conversation the caller must own.\n    body: Message and optional idempotency key.\n    caller: Authenticated caller.\n    service: Injected query-run service.\n    sse: Persist-then-flush SSE service.\n    idempotency_key_header: Optional ``Idempotency-Key`` header UUID.\n    x_client_version: Required client version for new paid submission.\n\nReturns:\n    JSON admission result or an SSE stream.",
         "operationId": "submit_message_route_conversations__conversation_id__messages_post",
         "parameters": [
           {
@@ -5617,6 +5617,22 @@
                 }
               ],
               "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Client-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Client-Version"
             }
           },
           {
@@ -5727,6 +5743,19 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "SSE event stream"
+          },
           "202": {
             "content": {
               "application/json": {
@@ -5735,7 +5764,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Accepted"
           },
           "422": {
             "content": {
@@ -5746,6 +5775,27 @@
               }
             },
             "description": "Validation Error"
+          },
+          "426": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "min_client_version": {
+                      "type": "string"
+                    },
+                    "sse_schema_version": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Incompatible client version"
           }
         },
         "summary": "Submit Message Route",
@@ -7487,7 +7537,7 @@
     },
     "/runs/{run_id}/cancel": {
       "post": {
-        "description": "Cancel one owned run. This is not SSE cancel transport.\n\nArgs:\n    request: Active request.\n    run_id: Run id.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Updated run.",
+        "description": "Cancel one owned run, stop the live SSE generator, and persist cancelled.\n\nArgs:\n    request: Active request.\n    run_id: Run id.\n    caller: Authenticated caller.\n    service: Injected query-run service.\n    sse: SSE service used to stop the live generator.\n\nReturns:\n    Updated run.",
         "operationId": "cancel_run_route_runs__run_id__cancel_post",
         "parameters": [
           {
@@ -7764,6 +7814,173 @@
           }
         },
         "summary": "List Citations Route",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/runs/{run_id}/events": {
+      "get": {
+        "description": "Replay persisted events after ``after`` / ``Last-Event-ID``. Bearer only.\n\nHandshake is not required. Foreign, missing, or tombstoned runs are 404.\nReconnect never starts a second paid graph.\n\nArgs:\n    request: Active request.\n    run_id: Run id.\n    caller: Authenticated owner.\n    sse: Persist-then-flush service.\n    after: Exclusive sequence cursor. ``0`` means from the start.\n    last_event_id: SSE reconnect header honored when higher than ``after``.\n\nReturns:\n    ``text/event-stream`` body.",
+        "operationId": "stream_run_events_route_runs__run_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Last-Event-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "SSE event stream"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Run Events Route",
         "tags": [
           "chat"
         ]

@@ -162,7 +162,7 @@ def test_auto_submit_admits_composite_and_returns_stream_path(
                 "message": "Compare the two invoices",
                 "idempotency_key": str(uuid4()),
             },
-            headers=_identity(),
+            headers={**_identity(), "X-Client-Version": "0.1.0"},
         )
     assert response.status_code == 202
     payload = json_object(response.json())

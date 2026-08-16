@@ -7,8 +7,15 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 from smart_rag_core.runtime.valkey import ValkeyClient
 from smart_rag_core.settings import BackendSettings
+from smart_rag_core.sse.catalog import HEARTBEAT_INTERVAL_SECONDS
+from smart_rag_core.sse.store import PostgresRunEventStore
 
 from smart_rag_api.services.auth_rate_limits import RateLimitKind, check_auth_rate_limit
+from smart_rag_api.services.sse_stream import (
+    QueryRunRegistry,
+    SseStreamService,
+    default_executor_factory,
+)
 
 
 def get_backend_settings(request: Request) -> BackendSettings:
@@ -67,6 +74,40 @@ def get_postgres_url(
     """
 
     return require_postgres_url(settings)
+
+
+def get_sse_stream_service(
+    request: Request,
+    postgres_url: Annotated[str, Depends(get_postgres_url)],
+) -> SseStreamService:
+    """Return the process SSE service. Tests may inject store and executor.
+
+    Args:
+        request: Active request.
+        postgres_url: app_api DSN used when no in-memory store is bound.
+
+    Returns:
+        Stream service sharing the process registry.
+    """
+
+    settings = get_backend_settings(request)
+    registry = getattr(request.app.state, "query_run_registry", None)
+    if not isinstance(registry, QueryRunRegistry):
+        registry = QueryRunRegistry()
+        request.app.state.query_run_registry = registry
+    store = getattr(request.app.state, "run_event_store", None)
+    if store is None:
+        store = PostgresRunEventStore(postgres_url)
+    executor = getattr(request.app.state, "query_run_executor", None)
+    if executor is None:
+        executor = default_executor_factory()
+    return SseStreamService(
+        store=store,
+        registry=registry,
+        executor=executor,
+        sse_schema_version=settings.sse_schema_version,
+        heartbeat_interval_seconds=HEARTBEAT_INTERVAL_SECONDS,
+    )
 
 
 def get_valkey_cache_client(request: Request) -> ValkeyClient | None:

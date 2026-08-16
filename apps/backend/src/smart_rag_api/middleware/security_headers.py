@@ -35,6 +35,8 @@ async def add_security_headers(
     for name, value in SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
     media = response.headers.get("content-type", "")
+    if media.startswith("text/event-stream"):
+        return response
     if media.startswith("text/html"):
         response.headers["content-type"] = "application/json"
     return response

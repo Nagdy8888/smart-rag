@@ -29,6 +29,7 @@ from smart_rag_api.middleware import (
     normalized_request_id,
 )
 from smart_rag_api.services.readiness import build_readiness, readiness_as_dict
+from smart_rag_api.services.sse_stream import QueryRunRegistry
 
 LOGGER = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         audience=settings.supabase_jwt_audience,
         cache_seconds=settings.jwks_cache_seconds,
     )
+    application.state.query_run_registry = QueryRunRegistry()
     adapter = await bind_process_runtime_adapter(
         dsn=settings.lightrag_db_url,
         settings=settings,
@@ -172,7 +174,7 @@ def create_app() -> FastAPI:
         title="Smart RAG API",
         version="0.1.0",
         description=(
-            "Authenticated RAG API. SSE event transport is packet 6. "
+            "Authenticated RAG API with Bearer fetch SSE. "
             "Readiness is dependency-aware and never query-ready in mock mode."
         ),
         lifespan=lifespan,

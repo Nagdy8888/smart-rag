@@ -12,7 +12,7 @@ approval_date: "2026-08-12"
 
 ## Decision
 
-Within a major version, OpenAPI fields and SSE events evolve **additively**. Removals/renames require a major bump and staging version-skew proof (Phase 10). Snapshot: `docs/api/openapi.foundation.json` (health, `/api/meta`, chat/run/document/table/tool/usage routes, plus additive ingestion, glossary, graph inspect/entity search, and entity-rules). Packet 6 may add EventSource paths additively.
+Within a major version, OpenAPI fields and SSE events evolve **additively**. Removals/renames require a major bump and staging version-skew proof (Phase 10). Snapshot: `docs/api/openapi.foundation.json` (health, `/api/meta`, chat/run/document/table/tool/usage routes, plus additive ingestion, glossary, graph inspect/entity search, and entity-rules). Packet 6 added `GET /runs/{run_id}/events` and EventSource on `POST /conversations/{conversation_id}/messages` additively. See [SSE.md](../api/SSE.md).
 
 ## Consequences
 

@@ -11,7 +11,8 @@ from starlette.responses import Response as StarletteResponse
 _DEFAULT_ORIGINS = ("http://127.0.0.1:3000", "http://localhost:3000")
 _ALLOW_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 _ALLOW_HEADERS = (
-    "Authorization, Content-Type, Idempotency-Key, X-Request-ID, "
+    "Authorization, Content-Type, Idempotency-Key, Last-Event-ID, "
+    "X-Client-Version, X-Request-ID, "
     "X-Test-User-Id, X-Test-Role, X-Test-Authorization-Version, X-Test-Email"
 )
 _EXPOSE_HEADERS = "X-Request-ID, Retry-After"

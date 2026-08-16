@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ExceptionHandler
 
+from smart_rag_api.services.client_handshake import ClientVersionUnsupportedError
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -95,6 +97,31 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     return JSONResponse(status_code=500, content={"detail": "internal_error"})
 
 
+async def client_version_unsupported_handler(
+    request: Request,
+    exc: ClientVersionUnsupportedError,
+) -> JSONResponse:
+    """Return HTTP 426 with published handshake versions. No admit occurred.
+
+    Args:
+        request: Active request.
+        exc: Handshake failure.
+
+    Returns:
+        JSON body with ``client_version_unsupported`` and published versions.
+    """
+
+    del request
+    return JSONResponse(
+        status_code=426,
+        content={
+            "detail": "client_version_unsupported",
+            "min_client_version": exc.min_client_version,
+            "sse_schema_version": exc.sse_schema_version,
+        },
+    )
+
+
 def install_error_handlers(application: FastAPI) -> None:
     """Register fail-closed handlers that return JSON, never HTML.
 
@@ -102,6 +129,10 @@ def install_error_handlers(application: FastAPI) -> None:
         application: FastAPI app.
     """
 
+    application.add_exception_handler(
+        ClientVersionUnsupportedError,
+        cast(ExceptionHandler, client_version_unsupported_handler),
+    )
     application.add_exception_handler(
         StarletteHTTPException,
         cast(ExceptionHandler, http_exception_handler),

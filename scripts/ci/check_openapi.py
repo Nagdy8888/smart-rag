@@ -44,6 +44,7 @@ def main() -> int:
         "/runs/{run_id}",
         "/runs/{run_id}/cancel",
         "/runs/{run_id}/citations",
+        "/runs/{run_id}/events",
         "/runs/{run_id}/feedback",
         "/ingestion/crawls",
         "/ingestion/jobs/{job_id}/retry",
