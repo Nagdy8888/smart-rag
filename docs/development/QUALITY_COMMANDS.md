@@ -24,6 +24,7 @@ uv run python scripts/phase09_candidate.py all
 uv run python scripts/ci/check_phase09_packet1.py
 uv run python scripts/ci/check_phase09_packet2.py --mode candidate
 uv run python scripts/ci/check_phase09_packet3.py --mode candidate
+uv run python scripts/ci/check_phase09_packet4.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -131,6 +132,24 @@ uv run python scripts/ci/check_phase09_packet3.py --mode candidate
 docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --no-build --wait paradedb
 uv run python scripts/ci/check_phase09_packet3.py --mode overlay --merge-artifact
 docker compose --env-file .env.compose -f docker-compose.yml up -d --no-build --wait --remove-orphans
+uv run python scripts/phase09_candidate.py health
+```
+
+The Phase 9 Packet 4 gate is local-only and is not a GitHub PR job. It
+fail-closes on zero collection, failures, errors, skipped mandatory local
+tests, Packet 2 corpus-identity drift, Packet 1 image-Id drift, or an empty
+required BM25 re-projection. Candidate compose is `docker-compose.yml` only.
+If overlay host ports are published, the runner detaches with
+`--no-build --wait --remove-orphans` and re-proves unpublished ports.
+BM25 is re-projected through existing `Bm25ProjectionService` inside the
+frozen worker (stdin corpus JSON onto `/tmp`; no image rebuild, no
+SQL-stamped Hybrid/Graph Ready). Load stays on the labeled 8-doc subset.
+Do not claim QT-CAP-001/002/003. Do not kill worker/ParadeDB/Valkey (Packet
+5). Managed pooling/EC2/CDN stay Phase 10 Not Run. Do not set
+`SMART_RAG_HOLDOUT_ACCESS=true`. Do not retry Trivy via docker.sock.
+
+```powershell
+uv run python scripts/ci/check_phase09_packet4.py
 uv run python scripts/phase09_candidate.py health
 ```
 

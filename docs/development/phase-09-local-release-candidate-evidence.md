@@ -614,3 +614,84 @@ Packet 3 checkbox is **checked** because P09-03-A–D are proven or honestly
 classified with sizing-ladder decisions (not fake live Recall or Combined
 gain). Packet 2 stays **unchecked** (Trivy / old-API smoke Blocked). Phase 9
 wrapper `status` remains `pending`. Holdout was not opened.
+
+## Packet 4 — Contention and five-stream load
+
+**Packet:** `Run contention and five-stream load` (`P09-04-A` … `P09-04-E`).
+**Checkbox:** **unchecked**. P09-04-A is **Blocked** (70% pause + live
+foreground p95 not proven; JWT issuer split hides docker EventSource).
+P09-04-B/C/D/E **Passed**. Do not treat Blocked as Passed.
+
+Candidate compose stayed `docker-compose.yml` only. Overlay was **not**
+attached (`was_attached: false`). Packet 1 image Ids were unchanged. Packet 2
+document/version ids were unchanged. Holdout was not opened. Worker/ParadeDB/
+Valkey were not killed (Packet 5).
+
+### BM25 re-projection (no identity rewrite)
+
+Packet 3 overlay recreate emptied ParadeDB. Packet 4 re-projected through
+existing `Bm25ProjectionService.process_upsert_job` inside the frozen worker.
+`sql_stamped_hybrid_or_graph_ready: false`. Skipped `p4-acl_negative-0003`
+(`deletion_pending`). Seven versions re-projected. `parade_total_rows` ~1035.
+
+```mermaid
+flowchart LR
+  subgraph identity [Frozen identity]
+    images[Packet 1 image Ids]
+    corpus[Packet 2 document ids]
+  end
+  subgraph load [Packet 4]
+    reproject[Bm25ProjectionService.process_upsert_job]
+    pytest[Foreground plus ASGI five-stream]
+    pools[pg_stat_activity 30 less than 42]
+    lock[Reserve-once budget lock]
+    jwt[Live EventSource 401]
+  end
+  images --> pytest
+  corpus --> reproject
+  reproject --> pools
+  pytest --> lock
+  jwt --> packet7[Packet 7 jwt_issuer_hostname_split]
+```
+
+### Acceptance
+
+| Check | Class | Evidence |
+| --- | --- | --- |
+| P09-04-A | Blocked | Graph/hybrid pytest 24 Passed. CPU peak **3.06%**; 70% trigger did not fire. Live foreground p95 `null` because docker JWT iss is `http://127.0.0.1:54321/auth/v1` vs frozen API `http://host.docker.internal:54321/auth/v1`. |
+| P09-04-B | Passed | Worst-case 30 &lt; 42. Live pools not exhausted. |
+| P09-04-C | Passed | Reserve-once unique_runs=4, wait_p95_ms ~44.6, deadlock false. |
+| P09-04-D | Passed | ASGI five-stream **14 passed / 0 failed** (heartbeat jitter, lag, offload, resume). Live docker EventSource **Blocked** on JWT (Packet 7). |
+| P09-04-E | Passed | Compose mem_limits remain Packet 1 baseline. OCR/Valkey-OOM/10k **Not Run**. |
+
+### QUALITY_TARGETS (local 8-doc, mock)
+
+- QT-CAP-001/002/003: **Not Run** (8-doc labeled subset; do not claim 10k/1M/25-user).
+- QT-CAP-004: ASGI five concurrent streams **Passed**; live UI five-stream **Blocked** (JWT).
+- QT-CAP-005-P8 = 15 remains the signed graph advertisement.
+- First-token / completion p95 from live docker EventSource: **Not Run** (401).
+
+### Sizing ladder / Packet 7 handoff
+
+- `jwt_issuer_hostname_split`: frozen API issuer uses `host.docker.internal`;
+  local GoTrue issues `127.0.0.1`. Do not rebuild Packet 1 images in Packet 4.
+- 70% maintenance pause controller: not fired on this 8-doc mock load.
+  Packet 7 may author a bounded synthetic CPU/IO probe without claiming the
+  full envelope.
+- Do not infer EC2/CDN/KMS from local NCPU=20 / mem=8131035136.
+
+### Commands and exit codes
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff check` on Packet 4 files | 0 | |
+| `uv run python -m pytest tests/unit/test_phase09_packet4.py -q` | 0 | 12 passed |
+| `uv run python -m pytest tests/contract/test_sse_heartbeat.py tests/unit/test_offload.py -q` | 0 | 14 passed (ASGI five-stream re-run) |
+| `uv run python scripts/ci/check_phase09_packet4.py` | 0 | live load + BM25 reproject; see artifacts |
+
+Artifacts:
+`docs/deployment/phase-09/candidate-packet4-{gate-matrix,workload,contention,streams,pools,resources,bm25}.json`.
+
+Packet 4 checkbox stays **unchecked** because P09-04-A is Blocked. Packet 2
+stays **unchecked**. Phase 9 wrapper `status` remains `pending`. Holdout was
+not opened.

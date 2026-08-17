@@ -2,7 +2,7 @@
 title: Database workload isolation
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-17
 audience: engineering, ops
 phase_packet: Phase 2 Packet 6
 ---
@@ -68,7 +68,11 @@ No replica or graph store bypasses primary canonical authorization.
 
 - Tag every pooled connection with deployable `application_name` (applied).
 - Emit pool wait time, active connections, and `pg_stat_activity` counts per
-  role in Phase 9 load tests (**unverified** here; no load claims).
+  role in Phase 9 load tests. Packet 4 measured these on the labeled 8-version
+  / 16-chunk candidate subset; see
+  [phase-09-local-release-candidate-evidence.md](../development/phase-09-local-release-candidate-evidence.md).
+  The 70% pause controller is still documentation-only; Packet 4 records
+  whether the trigger fired rather than claiming a runtime controller.
 - ParadeDB isolation metrics remain separate (CPU/memory/lag/rebuild duration).
 
 ## Related

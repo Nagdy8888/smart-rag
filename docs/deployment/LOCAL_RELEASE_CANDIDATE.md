@@ -52,6 +52,13 @@ Later packets consume these committed artifacts under
 | `candidate-packet3-bm25.json` | Tokenizer/Arabic/75/300/lag/outage/rebuild classification |
 | `candidate-packet3-graph.json` | Mapping/survival/ETA/seven-day feasibility |
 | `candidate-gold-id-map.json` | Packet 2 retrieve-subset gold UUIDs; not the Phase 4 157-case sidecar |
+| `candidate-packet4-gate-matrix.json` | Packet 4 P09-04-A–E Passed/Failed/Blocked/Not Run matrix |
+| `candidate-packet4-workload.json` | Frozen concurrency, hardware, pools, and telemetry (no secrets) |
+| `candidate-packet4-contention.json` | HNSW/graph/budget-lock/BM25-subset maintenance beside foreground |
+| `candidate-packet4-streams.json` | Five Composite timings, lag, heartbeats, resume |
+| `candidate-packet4-pools.json` | `pg_stat_activity` snapshot versus 30 < 42 |
+| `candidate-packet4-resources.json` | Docker stats peaks; OCR/Valkey-OOM/EC2 Not Run |
+| `candidate-packet4-bm25.json` | Worker re-projection through existing `Bm25ProjectionService` |
 
 A changed git SHA, lockfile, Dockerfile, or image Id invalidates Packet 1
 evidence. Rebuild and reseed; do not reuse a stale digest.
@@ -149,6 +156,13 @@ is already migrated.
    projection; Packet 4 must not assume seed BM25 rows until a worker
    re-projection through existing `Bm25ProjectionService`. Do not claim
    QT-CAP-001/002 from the labeled 8-case subset.
+9. Packet 4 freezes the 8-doc workload, re-projects BM25 from the worker
+   (unpublished ParadeDB; no image rebuild), and runs foreground
+   Hybrid/Combined/table/inspection traffic beside BM25/HNSW/graph
+   maintenance plus five Composite streams. Overlay
+   `docker-compose.packet8.yml` is detached when host ports are published.
+   Managed pooling/EC2/CDN stay Phase 10 Not Run. Packet 5 owns
+   kill/deny/fill/restart.
 
 ```mermaid
 flowchart TD

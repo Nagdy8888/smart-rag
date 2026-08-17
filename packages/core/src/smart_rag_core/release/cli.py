@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
+from smart_rag_core.release.bm25_reproject import run_reproject_cli
 from smart_rag_core.release.constants import ARTIFACT_DIR
 from smart_rag_core.release.health import query_pg_search_version
 from smart_rag_core.release.identity import (
@@ -16,6 +18,7 @@ from smart_rag_core.release.migrations import (
     collect_migration_inventory,
     load_applied_versions,
 )
+from smart_rag_core.release.packet4 import probe_event_loop_lag
 from smart_rag_core.release.seed import seed_candidate_corpus
 from smart_rag_core.settings.base import get_process_environ
 
@@ -94,6 +97,44 @@ def cmd_seed(output_dir: Path, *, supabase_url: str, parade_url: str) -> int:
     return 0
 
 
+def cmd_reproject_bm25(
+    output: Path,
+    *,
+    supabase_url: str,
+    parade_url: str,
+    corpus_json: str,
+) -> int:
+    """Re-project Packet 2 BM25 rows through the existing driver.
+
+    Args:
+        output: Destination JSON path (worker tmpfs).
+        supabase_url: Postgres URL.
+        parade_url: ParadeDB writer URL.
+        corpus_json: Corpus manifest JSON.
+
+    Returns:
+        ``0`` when identity held and required versions projected.
+    """
+
+    return run_reproject_cli(
+        supabase_url=supabase_url,
+        parade_url=parade_url,
+        corpus_json=corpus_json,
+        output=output,
+    )
+
+
+def cmd_event_loop_lag() -> int:
+    """Print one event-loop lag sample as JSON.
+
+    Returns:
+        Always ``0``.
+    """
+
+    print(probe_event_loop_lag())
+    return 0
+
+
 def cmd_migrations(repo_root: Path, output: Path, *, supabase_url: str | None) -> int:
     """Write the migration inventory, failing on applied drift.
 
@@ -125,7 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
     """
 
     parser = argparse.ArgumentParser(
-        description="Phase 9 Packet 1 candidate freeze and seed"
+        description="Phase 9 candidate freeze, seed, and Packet 4 BM25 re-project"
     )
     sub = parser.add_subparsers(dest="command", required=True)
     freeze = sub.add_parser("freeze", help="Write identity freeze JSON")
@@ -137,6 +178,17 @@ def build_parser() -> argparse.ArgumentParser:
     migrations = sub.add_parser("migrations", help="Write migration inventory")
     migrations.add_argument("--output", type=Path, default=None)
     migrations.add_argument("--supabase-url", default=None)
+    reproject = sub.add_parser(
+        "reproject-bm25",
+        help="Re-project Packet 2 BM25 rows from corpus JSON on stdin",
+    )
+    reproject.add_argument("--output-dir", type=Path, default=None)
+    reproject.add_argument("--supabase-url", default=None)
+    reproject.add_argument("--parade-url", default=None)
+    sub.add_parser(
+        "event-loop-lag",
+        help="Sample event-loop lag as JSON (API/worker exec)",
+    )
     return parser
 
 
@@ -172,6 +224,28 @@ def main(argv: list[str] | None = None) -> int:
         output = args.output or artifact_dir / "candidate-migrations.json"
         supabase_url = args.supabase_url or get_process_environ("SUPABASE_DB_URL")
         return cmd_migrations(repo_root, output, supabase_url=supabase_url)
+    if args.command == "reproject-bm25":
+        output_dir = args.output_dir or artifact_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+        supabase_url = (
+            args.supabase_url
+            or get_process_environ("SUPABASE_DB_URL")
+            or DEFAULT_SUPABASE_DB_URL
+        )
+        parade_url = args.parade_url or get_process_environ("PARADEDB_URL")
+        if not parade_url:
+            parser.error("PARADEDB_URL or --parade-url is required for reproject-bm25")
+        corpus_json = sys.stdin.read()
+        if not corpus_json.strip():
+            parser.error("reproject-bm25 requires corpus JSON on stdin")
+        return cmd_reproject_bm25(
+            output_dir / "candidate-packet4-bm25.json",
+            supabase_url=supabase_url,
+            parade_url=parade_url,
+            corpus_json=corpus_json,
+        )
+    if args.command == "event-loop-lag":
+        return cmd_event_loop_lag()
     parser.error(f"unknown command {args.command}")
     return 2
 

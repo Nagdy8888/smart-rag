@@ -1,0 +1,60 @@
+{
+  "above_seventy_percent_ceiling": false,
+  "active_minus_this_backend": 12,
+  "budget_ceiling": 42,
+  "by_role_application_state": [
+    {
+      "application_name": "PostgREST 16.1",
+      "count": 1,
+      "state": "idle",
+      "usename": "authenticator"
+    },
+    {
+      "application_name": "",
+      "count": 1,
+      "state": "active",
+      "usename": "postgres"
+    },
+    {
+      "application_name": "",
+      "count": 1,
+      "state": "idle",
+      "usename": "postgres"
+    },
+    {
+      "application_name": "cluster_node_realtime@127.0.0.1",
+      "count": 2,
+      "state": "idle",
+      "usename": "supabase_admin"
+    },
+    {
+      "application_name": "pg_cron scheduler",
+      "count": 1,
+      "state": "",
+      "usename": "supabase_admin"
+    },
+    {
+      "application_name": "pg_net 0.14.0",
+      "count": 1,
+      "state": "",
+      "usename": "supabase_admin"
+    },
+    {
+      "application_name": "supabase_mt_realtime",
+      "count": 5,
+      "state": "idle",
+      "usename": "supabase_admin"
+    },
+    {
+      "application_name": "",
+      "count": 1,
+      "state": "idle",
+      "usename": "supabase_storage_admin"
+    }
+  ],
+  "exhausted": false,
+  "passed": true,
+  "schema_version": "phase09-candidate-packet4-pools-v1",
+  "selected_tier_hard_limit": 60,
+  "worst_case_caps_sum": 30
+}

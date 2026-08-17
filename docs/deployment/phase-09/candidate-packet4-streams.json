@@ -1,0 +1,10 @@
+{
+  "asgi_heartbeat_gate": "tests/contract/test_sse_heartbeat.py five held streams",
+  "cpu_slice_budget_ms": 10,
+  "live": {
+    "detail": "conversation_create_401",
+    "passed": false
+  },
+  "mock_model_mode": true,
+  "schema_version": "phase09-candidate-packet4-streams-v1"
+}

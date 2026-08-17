@@ -1,0 +1,96 @@
+{
+  "bm25_subset": {
+    "outcome": {
+      "copy_returncode": 0,
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "identity_drift": false,
+      "image_rebuilt": false,
+      "parade_total_rows": 1051,
+      "passed": true,
+      "sample_is_eight_doc_subset": true,
+      "schema_version": "phase09-candidate-packet4-bm25-v1",
+      "sql_stamped_hybrid_or_graph_ready": false,
+      "unpublished_paradedb": true,
+      "versions": [
+        {
+          "case_id": "p4-acl_negative-0003",
+          "detail": "skip_deleted_or_pre_hybrid_status",
+          "document_id": "a5418f3e-5bb3-4089-b603-8bb04a1e423c",
+          "driver": "skipped",
+          "job_id": null,
+          "parade_row_count": 0,
+          "passed": true,
+          "skipped": true,
+          "status_after": "deletion_pending",
+          "status_before": "deletion_pending",
+          "version_id": "96286c5e-c2a4-4e37-9686-30515af04554"
+        },
+        {
+          "case_id": "p4-alias-0003",
+          "detail": "",
+          "document_id": "1b0d09c0-e050-474a-a77f-9158792891f5",
+          "driver": "Bm25ProjectionService.process_upsert_job",
+          "job_id": "3e5bbc4b-98e7-4f77-845a-0dbc81428d37",
+          "parade_row_count": 2,
+          "passed": true,
+          "skipped": false,
+          "status_after": "graph_ineligible",
+          "status_before": "graph_ineligible",
+          "version_id": "f24d149d-97f8-4ef3-acd3-cb8f91fd6f06"
+        },
+        {
+          "case_id": "p4-arabic_mixed-0003",
+          "detail": "",
+          "document_id": "769f3b6c-668b-40d2-ac3f-5377a64f831a",
+          "driver": "Bm25ProjectionService.process_upsert_job",
+          "job_id": "b8aabef0-2081-49ed-9c35-3a0c15df52c0",
+          "parade_row_count": 2,
+          "passed": true,
+          "skipped": false,
+          "status_after": "graph_ineligible",
+          "status_before": "graph_ineligible",
+          "version_id": "3174ccf2-a263-4730-a384-2e98dd0103a5"
+        }
+      ],
+      "worker_returncode": 0
+    },
+    "returncode": 0
+  },
+  "budget": {
+    "deadlock_or_timeout": false,
+    "errors": [],
+    "lock_timeout_app_api": "2s",
+    "overspend": false,
+    "passed": true,
+    "qt_cap_004": 5,
+    "shared_row": "company_settings plus profile FOR UPDATE at admit only",
+    "unique_runs": 4,
+    "wait_ms": [
+      15.99999999962165,
+      30.999999999039574,
+      30.999999999039574,
+      47.00000000048021
+    ],
+    "wait_p95_ms": 44.60000000026412,
+    "workers": 4
+  },
+  "graph": {
+    "held": true,
+    "lock_already_held": false,
+    "passed": true,
+    "released": true,
+    "second_session_excluded": true,
+    "workspace_key": "company_default"
+  },
+  "hnsw": {
+    "detail": "REINDEX on seeded chunks, not the 1M envelope",
+    "elapsed_ms": 281.00000000085856,
+    "index": "app.document_chunks_embedding_hnsw_idx",
+    "passed": true,
+    "sample_is_eight_doc_subset": true
+  },
+  "runtime_pause_controller": "No in-process 70% pause controller was observed. Architecture docs define the trigger; Packet 4 measures whether it fires.",
+  "sample_is_eight_doc_subset": true,
+  "schema_version": "phase09-candidate-packet4-contention-v1",
+  "threads_alive": false
+}

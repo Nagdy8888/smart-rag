@@ -1,0 +1,380 @@
+{
+  "acceptance": [
+    {
+      "check": "P09-04-A",
+      "classification": "Blocked",
+      "detail": "Foreground pytest Passed. 70% trigger fired=False; live p95 unavailable (JWT iss Blocked). 8-doc subset CPU peak 3.06%."
+    },
+    {
+      "check": "P09-04-B",
+      "classification": "Passed",
+      "detail": "Worst-case 30<42 plus live pg_stat_activity. exhausted=False"
+    },
+    {
+      "check": "P09-04-C",
+      "classification": "Passed",
+      "detail": "Reserve-once admit contention. unique_runs=4 deadlock=False"
+    },
+    {
+      "check": "P09-04-D",
+      "classification": "Passed",
+      "detail": "ASGI five-stream 14/0/0/0 Passed. Live docker EventSource Blocked on JWT iss (Packet 7)."
+    },
+    {
+      "check": "P09-04-E",
+      "classification": "Passed",
+      "detail": "Compose mem_limits remain the Packet 1 baseline. cpu_peak_percent=3.06; OCR/Valkey-OOM/10k envelope Not Run"
+    }
+  ],
+  "candidate_image_ids": {
+    "api": "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
+    "crawl-proxy": "sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604",
+    "frontend": "sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+    "parser-sandbox": "sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec",
+    "worker": "sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990"
+  },
+  "compose_file": "docker-compose.yml",
+  "frozen_packet1_head_note": "46dcb34",
+  "handoffs": [
+    {
+      "acceptance": "P09-04-E",
+      "classification": "Not Run",
+      "item_id": "qt_cap_full_envelope",
+      "managed_only": false,
+      "next_action": "Do not advertise 10k/1M from this candidate.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "Packet 2 seed is 8 versions / 16 chunks. Packet 4 load stays on that subset and does not claim QT-CAP-001/002.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-04-A",
+      "classification": "Not Run",
+      "item_id": "qt_cap_003_twenty_five_users",
+      "managed_only": false,
+      "next_action": "Do not claim QT-CAP-003 from the five-stream gate.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "Load uses at most five simultaneous runs, not 25 concurrent users.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-04-B",
+      "classification": "Not Run",
+      "item_id": "managed_pooling_ec2_cdn",
+      "managed_only": true,
+      "next_action": "Phase 10 extends connection/stream gates under staging topology.",
+      "owner": "Phase 10",
+      "reason": "Managed Supabase pooling, real EC2, and CloudFront/CDN streaming are managed topology gates.",
+      "sizing_ladder": "Do not infer managed success from local NCPU/mem."
+    },
+    {
+      "acceptance": "P09-04-E",
+      "classification": "Not Run",
+      "item_id": "valkey_oom_acl_outage",
+      "managed_only": false,
+      "next_action": "Packet 5 proves reclaim and degraded Valkey behavior.",
+      "owner": "Phase 9 Packet 5",
+      "reason": "Packet 5 owns kill/deny/fill/restart of worker/ParadeDB/Valkey. Packet 4 saturates/measures only.",
+      "sizing_ladder": "Do not fill Valkey to OOM in Packet 4."
+    },
+    {
+      "acceptance": "P09-04-E",
+      "classification": "Not Run",
+      "item_id": "ocr_pages_per_hour",
+      "managed_only": false,
+      "next_action": "Measure QT-ING-002 on an OCR fixture, not this 8-doc subset.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "Candidate corpus is markdown text, not OCR pages.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    }
+  ],
+  "head_consumed": "46dcb34b12a969a0752396043e7b1b9637c96f58",
+  "holdout_opened": false,
+  "local_candidate_not_full_envelope": true,
+  "managed_claims": [],
+  "mock_model_mode": true,
+  "overlay": {
+    "detached": false,
+    "health": {
+      "command": "scripts/phase09_candidate.py health",
+      "returncode": 0
+    },
+    "health_after_load": {
+      "command": "scripts/phase09_candidate.py health",
+      "returncode": 0
+    },
+    "overlay_file_is_candidate": false,
+    "published_services": [],
+    "was_attached": false
+  },
+  "overlay_file_is_candidate": false,
+  "requirement_id": "P09-04",
+  "sample_is_eight_doc_subset": true,
+  "schema_version": "phase09-candidate-packet4-v1",
+  "seventy_percent": {
+    "cpu_peak_percent": 3.06,
+    "foreground_gate_ms": 40000.0,
+    "foreground_p95_held": false,
+    "foreground_p95_ms": null,
+    "passed": false,
+    "runtime_pause_controller": "No in-process 70% pause controller was observed. Architecture docs define the trigger; Packet 4 measures whether it fires.",
+    "sample_is_eight_doc_subset": true,
+    "sizing_ladder": "On this 8-doc subset, 70% CPU/IO pause is measured rather than forced with unbounded load. If foreground p95 holds, P09-04-A can pass without the trigger firing. Implement/prove the pause controller before raising the advertised envelope.",
+    "trigger_70_percent_fired": false
+  },
+  "suites": [
+    {
+      "acceptance": "P09-04-A",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "foreground_maintenance_graph_bm25",
+      "tests": 24,
+      "title": "Graph writer concurrency-one and Hybrid retrieval contracts"
+    },
+    {
+      "acceptance": "P09-04-B",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "connection_caps_timeouts",
+      "tests": 3,
+      "title": "Worst-case pool math under 70% and role statement/lock timeouts"
+    },
+    {
+      "acceptance": "P09-04-C",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "budget_lock_reserve_once",
+      "tests": 24,
+      "title": "Reserve-once admit contention, crash true-up, and concurrency cap"
+    },
+    {
+      "acceptance": "P09-04-D",
+      "classification": "Passed",
+      "detail": "re-run 2026-08-17: 14 passed, 0 failed (ASGI heartbeat/offload/resume)",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "five_stream_lag_heartbeat_offload",
+      "tests": 14,
+      "title": "Five held streams, 15s heartbeat, CPU offload, resume, deadlines"
+    },
+    {
+      "acceptance": "P09-04-E",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "bounded_resource_contracts",
+      "tests": 6,
+      "title": "Offload pools, connection budget, and graph lock stay bounded"
+    }
+  ],
+  "targets": [
+    {
+      "acceptance": "P09-04-A",
+      "classification": "Not Run",
+      "detail": "Not claimed from the 8-doc local candidate",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "25",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10.",
+      "target_id": "QT-CAP-003",
+      "title": "25 concurrently active users",
+      "unit": "users"
+    },
+    {
+      "acceptance": "P09-04-D",
+      "classification": "Failed",
+      "detail": "five Composite Auto-chat runs",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "5",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10.",
+      "target_id": "QT-CAP-004",
+      "title": "5 simultaneous query runs",
+      "unit": "concurrent runs"
+    },
+    {
+      "acceptance": "P09-04-D",
+      "classification": "Not Run",
+      "detail": "Auto chat admits Composite only; no dedicated stream",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "5000",
+      "sizing_ladder": null,
+      "target_id": "QT-LAT-002",
+      "title": "Hybrid first token p95 \u22645s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-04-D",
+      "classification": "Not Run",
+      "detail": "Auto chat admits Composite only; no dedicated stream",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "20000",
+      "sizing_ladder": null,
+      "target_id": "QT-LAT-003",
+      "title": "Hybrid completion p95 \u226420s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-04-A",
+      "classification": "Not Run",
+      "detail": "Auto chat admits Composite only; no dedicated stream",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "10000",
+      "sizing_ladder": null,
+      "target_id": "QT-LAT-004",
+      "title": "Combined first token p95 \u226410s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-04-A",
+      "classification": "Not Run",
+      "detail": "Auto chat admits Composite only; no dedicated stream",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "35000",
+      "sizing_ladder": null,
+      "target_id": "QT-LAT-005",
+      "title": "Combined completion p95 \u226435s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-04-A",
+      "classification": "Not Run",
+      "detail": "Auto chat admits Composite; markdown corpus has no Parquet table route",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "5000",
+      "sizing_ladder": null,
+      "target_id": "QT-LAT-006",
+      "title": "Structured-table result p95 \u22645s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-04-A",
+      "classification": "Not Run",
+      "detail": "POST /graph/inspect on Packet 2 exact-code document",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "5000",
+      "sizing_ladder": null,
+      "target_id": "QT-LAT-009",
+      "title": "Graph inspection p95 \u22645s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-04-D",
+      "classification": "Not Run",
+      "detail": "mock Composite first token_delta; not live OpenAI",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "12000",
+      "sizing_ladder": null,
+      "target_id": "QT-LAT-010",
+      "title": "Composite first token p95 \u226412s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-04-D",
+      "classification": "Not Run",
+      "detail": "mock Composite completion; not live OpenAI",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "40000",
+      "sizing_ladder": null,
+      "target_id": "QT-LAT-011",
+      "title": "Composite completion p95 \u226440s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-04-D",
+      "classification": "Passed",
+      "detail": "FAMILY_* ceilings covered by streaming timeout pytest",
+      "live_model_required": false,
+      "measured": "25",
+      "mock_model_mode": true,
+      "sample_size": null,
+      "signed_value": "25",
+      "sizing_ladder": null,
+      "target_id": "QT-DL-001",
+      "title": "Hybrid hard deadline 25s",
+      "unit": "seconds"
+    },
+    {
+      "acceptance": "P09-04-D",
+      "classification": "Passed",
+      "detail": "FAMILY_* ceilings covered by streaming timeout pytest",
+      "live_model_required": false,
+      "measured": "50",
+      "mock_model_mode": true,
+      "sample_size": null,
+      "signed_value": "50",
+      "sizing_ladder": null,
+      "target_id": "QT-DL-004",
+      "title": "Composite hard deadline 50s",
+      "unit": "seconds"
+    },
+    {
+      "acceptance": "P09-04-E",
+      "classification": "Not Run",
+      "detail": "Not claimed from the 8-doc local candidate",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "sample_size": 0,
+      "signed_value": "10000",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10.",
+      "target_id": "QT-CAP-001",
+      "title": "10,000 Hybrid document versions",
+      "unit": "document versions"
+    }
+  ]
+}

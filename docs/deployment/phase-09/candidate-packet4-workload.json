@@ -1,0 +1,94 @@
+{
+  "candidate_image_ids": {
+    "api": "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
+    "crawl-proxy": "sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604",
+    "frontend": "sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+    "parser-sandbox": "sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec",
+    "worker": "sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990"
+  },
+  "compose_file": "docker-compose.yml",
+  "concurrency": {
+    "cpu_slice_budget_ms": 10.0,
+    "heartbeat_interval_seconds": 15,
+    "heartbeat_jitter_seconds": 2.0,
+    "p95_event_loop_lag_seconds": 0.05,
+    "qt_cap_003_users_not_claimed": 25,
+    "qt_cap_004_simultaneous_runs": 5
+  },
+  "frozen_docker_mem_bytes": 8131035136,
+  "frozen_docker_ncpu": 20,
+  "hardware": {
+    "container_limits": {
+      "api": "unbounded_in_compose",
+      "clamav": "2g",
+      "crawl-proxy": "128m",
+      "frontend": "unbounded_in_compose",
+      "paradedb": "2g",
+      "valkey-cache": "320m",
+      "valkey-limits": "128m",
+      "worker": "unbounded_in_compose"
+    },
+    "docker_mem_bytes": 8131035136,
+    "docker_ncpu": 20,
+    "local_candidate_not_full_envelope": true,
+    "reduced_graph_version_envelope": 15,
+    "seeded_chunks": 16,
+    "seeded_document_versions": 8,
+    "seeded_graph_eligible_versions": 2
+  },
+  "holdout_opened": false,
+  "local_candidate_not_full_envelope": true,
+  "maintenance": {
+    "bm25_rebuild": "8-doc subset via Bm25ProjectionService",
+    "graph": "pg_try_advisory_lock concurrency-one",
+    "hnsw": "REINDEX app.document_chunks_embedding_hnsw_idx",
+    "pause_trigger": "70% CPU/IO or Hybrid p95 breach"
+  },
+  "managed_claims": [],
+  "mock_model_mode": true,
+  "overlay_file_is_candidate": false,
+  "pools": {
+    "budget_ceiling": 42,
+    "role_timeouts": {
+      "app_api": {
+        "lock_timeout": "2s",
+        "statement_timeout": "15s"
+      },
+      "app_checkpointer": {
+        "lock_timeout": "3s",
+        "statement_timeout": "30s"
+      },
+      "app_lightrag": {
+        "lock_timeout": "5s",
+        "statement_timeout": "120s"
+      },
+      "app_worker": {
+        "lock_timeout": "5s",
+        "statement_timeout": "60s"
+      }
+    },
+    "selected_tier_hard_limit": 60,
+    "worst_case_caps": {
+      "api_checkpointer_session": 4,
+      "api_lightrag_session": 4,
+      "api_txn": 10,
+      "operations": 2,
+      "worker_lightrag_session": 4,
+      "worker_txn": 6
+    },
+    "worst_case_sum": 30,
+    "worst_case_under_ceiling": true
+  },
+  "requirement_id": "P09-04",
+  "sample_is_eight_doc_subset": true,
+  "schema_version": "phase09-candidate-packet4-workload-v1",
+  "seeded_chunks": 16,
+  "seeded_document_versions": 8,
+  "telemetry": {
+    "budget_lock_wait": true,
+    "docker_stats": true,
+    "event_loop_lag": true,
+    "pg_stat_activity": true,
+    "sse_first_token_completion": true
+  }
+}
