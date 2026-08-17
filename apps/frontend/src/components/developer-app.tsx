@@ -7,7 +7,23 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState, Fragment } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  Fragment,
+  type ReactNode,
+} from "react";
+import { Button } from "./ui/button";
+import { CitationChip } from "./ui/citation-chip";
+import { Input } from "./ui/input";
+import { LimitationCallout } from "./ui/limitation-callout";
+import { LiveRegion } from "./ui/live-region";
+import { StatusBanner } from "./ui/status-banner";
+import { StatusPill } from "./ui/status-pill";
+import { Textarea } from "./ui/textarea";
 import {
   cancelRun,
     createConversation,
@@ -86,6 +102,38 @@ async function consumeSse(
 }
 
 /**
+ * Collapse diagnostics on viewports below 801px; keep them open on desktop.
+ *
+ * @param children - Diagnostic definition list and related copy.
+ * @returns Details element whose `open` tracks the desktop media query.
+ */
+function DiagnosticsDetails({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 801px)");
+    const sync = () => {
+      setOpen(media.matches);
+    };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+  return (
+    <details
+      className={styles.diagnostics}
+      open={open}
+      data-testid="diagnostics"
+      onToggle={(event) => {
+        setOpen(event.currentTarget.open);
+      }}
+    >
+      <summary>Diagnostics</summary>
+      {children}
+    </details>
+  );
+}
+
+/**
  * Render live `GET /health/ready` so ParadeDB/Valkey/LightRAG outages are
  * visible in the browser without treating unconfigured as healthy.
  *
@@ -105,10 +153,10 @@ function ReadinessPanel({ ready }: { ready: ReadinessResponse | null | undefined
     return (
       <section className={styles.panel} aria-label="API readiness">
         <h2>API readiness</h2>
-        <p className={styles.banner} data-kind="error" role="status">
+        <StatusBanner kind="error" role="status">
           FastAPI GET /health/ready is unreachable. Outage copy below is still
           the signed UI language when those events exist.
-        </p>
+        </StatusBanner>
       </section>
     );
   }
@@ -153,8 +201,8 @@ function SignedOutageCopy() {
         ParadeDB loss uses bm25_unavailable. LightRAG loss uses graph_outage.
         Valkey mutations fail closed; approved reads may degrade.
       </p>
-      <p role="status">{limitationCopy("bm25_unavailable")}</p>
-      <p role="status">{limitationCopy("graph_outage")}</p>
+      <LimitationCallout>{limitationCopy("bm25_unavailable")}</LimitationCallout>
+      <LimitationCallout>{limitationCopy("graph_outage")}</LimitationCallout>
     </section>
   );
 }
@@ -376,20 +424,21 @@ export function DeveloperApp() {
       <div className={styles.shell}>
         <h1>Smart RAG developer console</h1>
         <p className={styles.muted}>
-          Thin Phase 6 UI. Browser-direct Supabase Auth, then Bearer FastAPI.
-          Role hiding is not authorization. After sign-in: Auto Composite chat,
-          upload reservation (local signed_url is null until Phase 10), BM25
+          Thin Phase 6 UI hosted in the production shell. Browser-direct
+          Supabase Auth, then Bearer FastAPI. Role hiding is not
+          authorization. After sign-in: Auto Composite chat, upload
+          reservation (local signed_url is null until Phase 10), BM25
           version status, citations, and conversation delete.
         </p>
         {publicSupabaseConfig() === null ? (
-          <p className={styles.banner} data-kind="error" role="alert">
+          <StatusBanner kind="error" role="alert">
             Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
-          </p>
+          </StatusBanner>
         ) : null}
         {authError ? (
-          <p className={styles.banner} data-kind="error" role="alert">
+          <StatusBanner kind="error" role="alert">
             {displayText(authError)}
-          </p>
+          </StatusBanner>
         ) : null}
         <ReadinessPanel ready={readyQuery.data} />
         <SignedOutageCopy />
@@ -400,27 +449,25 @@ export function DeveloperApp() {
             void signIn();
           }}
         >
-          <label>
-            Email
-            <input
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Password
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </label>
-          <button type="submit">Sign in</button>
+          <Input
+            label="Email"
+            type="email"
+            autoComplete="username"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+          <Input
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+          <Button type="submit" variant="primary">
+            Sign in
+          </Button>
         </form>
       </div>
     );
@@ -431,14 +478,14 @@ export function DeveloperApp() {
       <div className={styles.shell}>
         <header className={styles.row}>
           <h1>Smart RAG developer console</h1>
-          <button type="button" onClick={() => void signOut()}>
+          <Button type="button" onClick={() => void signOut()}>
             Sign out
-          </button>
+          </Button>
         </header>
-        <p className={styles.banner} data-kind="error" role="alert">
+        <StatusBanner kind="error" role="alert">
           MFA required. Owner, admin, and upload_enabled callers need a verified
           TOTP session (aal2). Password JWTs stay aal1 until challenge/verify.
-        </p>
+        </StatusBanner>
         <ReadinessPanel ready={readyQuery.data} />
         <SignedOutageCopy />
       </div>
@@ -454,55 +501,55 @@ export function DeveloperApp() {
           {displayText(meQuery.data?.user_id ?? "")}. Server role is
           authoritative.
         </p>
-        <button type="button" onClick={() => void signOut()}>
+        <Button type="button" onClick={() => void signOut()}>
           Sign out
-        </button>
+        </Button>
       </header>
 
       {failure?.kind === "upgrade" ? (
-        <p className={styles.banner} role="alert">
+        <StatusBanner kind="error" role="alert">
           Client upgrade required. Minimum {failure.minClientVersion}, SSE schema{" "}
           {failure.sseSchemaVersion}.
-        </p>
+        </StatusBanner>
       ) : null}
       {failure?.kind === "auth" ? (
-        <p className={styles.banner} data-kind="error" role="alert">
+        <StatusBanner kind="error" role="alert">
           Session rejected ({failure.detail}). Sign in again. UI state is not
           authorization.
-        </p>
+        </StatusBanner>
       ) : null}
       {failure?.kind === "mfa" ? (
-        <p className={styles.banner} data-kind="error" role="alert">
+        <StatusBanner kind="error" role="alert">
           MFA required. Verify TOTP so the JWT is aal2, then retry the upload.
-        </p>
+        </StatusBanner>
       ) : null}
       {failure?.kind === "fail_closed" ? (
-        <p className={styles.banner} data-kind="error" role="alert">
+        <StatusBanner kind="error" role="alert">
           Limiter fail-closed ({displayText(failure.detail)}). Approved reads
           may degrade; cost mutations are denied.
-        </p>
+        </StatusBanner>
       ) : null}
       {failure?.kind === "deleted" || deleteMutation.isSuccess ? (
-        <p className={styles.banner} role="status">
+        <StatusBanner kind="info" role="status">
           Conversation deleted. Reads, resume, and citations are denied. No
           source text is shown.
-        </p>
+        </StatusBanner>
       ) : null}
 
       <div className={styles.grid}>
         <aside className={styles.panel}>
           <h2>Conversations</h2>
           <div className={styles.row}>
-            <button type="button" onClick={() => createMutation.mutate()}>
+            <Button type="button" onClick={() => createMutation.mutate()}>
               New conversation
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => deleteMutation.mutate()}
               disabled={conversationId === null}
             >
               Delete conversation
-            </button>
+            </Button>
           </div>
           <ul className={styles.list}>
             {(conversationsQuery.data ?? []).map((item) => (
@@ -532,13 +579,13 @@ export function DeveloperApp() {
             status, not chat SSE.
           </p>
           <div className={styles.row}>
-            <button
+            <Button
               type="button"
               onClick={() => uploadMutation.mutate()}
               disabled={meQuery.data?.upload_enabled !== true}
             >
               Reserve upload
-            </button>
+            </Button>
           </div>
           {meQuery.data?.upload_enabled !== true ? (
             <p className={styles.muted}>
@@ -557,12 +604,12 @@ export function DeveloperApp() {
             </p>
           ) : null}
           {uploadMutation.isError ? (
-            <p className={styles.banner} data-kind="error" role="alert">
+            <StatusBanner kind="error" role="alert">
               {uploadMutation.error instanceof Error &&
               uploadMutation.error.message === "mfa_required"
                 ? "MFA required. Verify TOTP so the JWT is aal2, then retry the upload."
                 : "Upload reserve rejected. Server authorization is authoritative."}
-            </p>
+            </StatusBanner>
           ) : null}
           <ul className={styles.list}>
             {(documentsQuery.data ?? []).map((doc) => (
@@ -580,7 +627,7 @@ export function DeveloperApp() {
                   }}
                 >
                   {displayText(doc.title ?? doc.document_id)} —{" "}
-                  {displayText(doc.visibility)}
+                  <StatusPill status={doc.visibility} />
                 </button>
               </li>
             ))}
@@ -613,73 +660,72 @@ export function DeveloperApp() {
           ) : null}
         </aside>
 
-        <main className={styles.panel}>
+        <section className={styles.panel} aria-label="Auto chat">
           <h2>Auto chat (Composite)</h2>
           <p className={styles.muted}>
             Manual route selection is diagnostics-only and does not change
             admission. Handshake uses X-Client-Version {metaQuery.data?.min_client_version}.
           </p>
-          <label>
-            Message
-            <textarea
-              rows={4}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-            />
-          </label>
+          <Textarea
+            label="Message"
+            rows={4}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          />
           <div className={styles.row}>
-            <button type="button" onClick={() => void send()}>
+            <Button type="button" variant="primary" onClick={() => void send()}>
               Send
-            </button>
-            <button type="button" onClick={() => void reconnect()}>
+            </Button>
+            <Button type="button" onClick={() => void reconnect()}>
               Reconnect
-            </button>
-            <button type="button" onClick={() => void cancel()}>
+            </Button>
+            <Button type="button" onClick={() => void cancel()}>
               Cancel
-            </button>
+            </Button>
           </div>
-          <div className={styles.answer} aria-live="polite">
+          <LiveRegion aria-label="Answer tokens">
             {displayText(chat.answerText) || "No tokens yet."}
-          </div>
+          </LiveRegion>
 
-          <h2>Diagnostics</h2>
-          <dl>
-            <dt>Requested route</dt>
-            <dd>{displayText(chat.diagnostics.requestedRoute ?? chat.routeFamily ?? "—")}</dd>
-            <dt>Effective route</dt>
-            <dd>{displayText(chat.diagnostics.effectiveRoute ?? "—")}</dd>
-            <dt>Corrected route</dt>
-            <dd>{displayText(chat.diagnostics.correctedRoute ?? "none")}</dd>
-            <dt>Cache</dt>
-            <dd>{displayText(chat.diagnostics.cacheStatus ?? "—")}</dd>
-            <dt>Coverage</dt>
-            <dd>
-              {chat.diagnostics.coverageScore === null
-                ? "—"
-                : String(chat.diagnostics.coverageScore)}
-            </dd>
-            <dt>Tools</dt>
-            <dd>{chat.diagnostics.toolKeys.map(displayText).join(", ") || "none"}</dd>
-            <dt>Stage</dt>
-            <dd>
-              {displayText(chat.stage ?? "—")} / {displayText(chat.status ?? "—")}
-            </dd>
-            <dt>Terminal</dt>
-            <dd>{displayText(chat.terminal ?? "running")}</dd>
-            <dt>Heartbeats</dt>
-            <dd>{String(chat.diagnostics.heartbeatCount)}</dd>
-            <dt>Unknown events</dt>
-            <dd>{chat.diagnostics.unknownEvents.join(", ") || "none (ignored)"}</dd>
-            <dt>Usage</dt>
-            <dd>
-              {String(chat.diagnostics.promptTokens)}/{String(chat.diagnostics.completionTokens)}{" "}
-              tokens. Company total {String(usageQuery.data?.cost_usd ?? "—")} USD.
-            </dd>
-          </dl>
+          <DiagnosticsDetails>
+            <dl>
+              <dt>Requested route</dt>
+              <dd>{displayText(chat.diagnostics.requestedRoute ?? chat.routeFamily ?? "—")}</dd>
+              <dt>Effective route</dt>
+              <dd>{displayText(chat.diagnostics.effectiveRoute ?? "—")}</dd>
+              <dt>Corrected route</dt>
+              <dd>{displayText(chat.diagnostics.correctedRoute ?? "none")}</dd>
+              <dt>Cache</dt>
+              <dd>{displayText(chat.diagnostics.cacheStatus ?? "—")}</dd>
+              <dt>Coverage</dt>
+              <dd>
+                {chat.diagnostics.coverageScore === null
+                  ? "—"
+                  : String(chat.diagnostics.coverageScore)}
+              </dd>
+              <dt>Tools</dt>
+              <dd>{chat.diagnostics.toolKeys.map(displayText).join(", ") || "none"}</dd>
+              <dt>Stage</dt>
+              <dd>
+                {displayText(chat.stage ?? "—")} / {displayText(chat.status ?? "—")}
+              </dd>
+              <dt>Terminal</dt>
+              <dd>{displayText(chat.terminal ?? "running")}</dd>
+              <dt>Heartbeats</dt>
+              <dd>{String(chat.diagnostics.heartbeatCount)}</dd>
+              <dt>Unknown events</dt>
+              <dd>{chat.diagnostics.unknownEvents.join(", ") || "none (ignored)"}</dd>
+              <dt>Usage</dt>
+              <dd>
+                {String(chat.diagnostics.promptTokens)}/{String(chat.diagnostics.completionTokens)}{" "}
+                tokens. Company total {String(usageQuery.data?.cost_usd ?? "—")} USD.
+              </dd>
+            </dl>
+          </DiagnosticsDetails>
           {chat.diagnostics.limitationCodes.map((code) => (
-            <p key={code} className={styles.banner} role="status">
+            <LimitationCallout key={code}>
               {limitationCopy(code)}
-            </p>
+            </LimitationCallout>
           ))}
           <ReadinessPanel ready={readyQuery.data} />
           <SignedOutageCopy />
@@ -694,17 +740,16 @@ export function DeveloperApp() {
               const url = typeof urlRaw === "string" && isSafeHttpUrl(urlRaw) ? urlRaw : null;
               return (
                 <li key={citation.citation_id}>
-                  [{citation.citation_index}] {displayText(citation.citation_id)}{" "}
+                  <CitationChip
+                    index={citation.citation_index}
+                    citationId={citation.citation_id}
+                    unavailable={citation.source_unavailable}
+                    href={url}
+                  />{" "}
                   {formatProvenance(citation.provenance)}
-                  {citation.source_unavailable ? ` — ${limitationCopy("source_unavailable")}` : ""}
-                  {url ? (
-                    <>
-                      {" "}
-                      <a href={url} rel="noreferrer">
-                        Open source
-                      </a>
-                    </>
-                  ) : null}
+                  {citation.source_unavailable
+                    ? ` — ${limitationCopy("source_unavailable")}`
+                    : ""}
                 </li>
               );
             })}
@@ -724,17 +769,15 @@ export function DeveloperApp() {
               ))}
             </select>
           </label>
-          <label>
-            Comment
-            <input
-              value={feedbackComment}
-              onChange={(event) => setFeedbackComment(event.target.value)}
-            />
-          </label>
-          <button type="button" onClick={() => void sendFeedback()}>
+          <Input
+            label="Comment"
+            value={feedbackComment}
+            onChange={(event) => setFeedbackComment(event.target.value)}
+          />
+          <Button type="button" onClick={() => void sendFeedback()}>
             Submit thumbs-up feedback
-          </button>
-        </main>
+          </Button>
+        </section>
       </div>
     </div>
   );

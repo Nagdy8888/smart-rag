@@ -17,6 +17,7 @@ diagnostics, or mock quotas as API contracts.
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
+[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
 [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
 [docs index](../README.md)
 

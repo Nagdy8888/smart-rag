@@ -1,17 +1,63 @@
+@import "tailwindcss";
+
+/*
+ * Canonical tokens: docs/frontend/STITCH_BRIEF.md (not DESIGN.md YAML,
+ * not lavender #faf8ff, not #004ac6, not teal #0F766E canvas/accent,
+ * not 10px radius-md, not blur). CSS variables here plus
+ * src/lib/design-tokens.ts are the implementation source of truth.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-text: #0F172A;
+  --color-text-muted: #475569;
+  --color-border: #CBD5E1;
+  --color-accent: #2563EB;
+  --color-accent-fg: #FFFFFF;
+  --color-danger: #B91C1C;
+  --color-warning: #A16207;
+  --color-success: #166534;
+  --color-focus: #2563EB;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --space: 4px;
+  --shadow-1: 0 1px 2px rgb(15 23 42 / 0.08);
+  --shadow-2: 0 8px 24px rgb(15 23 42 / 0.08);
+  --font-sans: "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", monospace;
+  --line-height-ar: 1.75;
+  --line-height-en: 1.5;
+  --nav-width: 280px;
+  --row-height: 48px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  --color-page: var(--color-bg);
+  --color-card: var(--color-surface);
+  --color-ink: var(--color-text);
+  --color-muted: var(--color-text-muted);
+  --color-line: var(--color-border);
+  --color-brand: var(--color-accent);
+  --color-brand-fg: var(--color-accent-fg);
+  --color-danger-text: var(--color-danger);
+  --color-warning-text: var(--color-warning);
+  --color-success-text: var(--color-success);
+  --color-focus-ring: var(--color-focus);
+  --radius-chip: var(--radius-sm);
+  --radius-control: var(--radius-md);
+  --radius-card: var(--radius-lg);
+  --shadow-elevation-1: var(--shadow-1);
+  --shadow-elevation-2: var(--shadow-2);
+  --font-console: var(--font-sans);
+  --font-code: var(--font-mono);
+  --spacing: var(--space);
+  --width-nav: var(--nav-width);
 }
 
 html {
   height: 100%;
+  color-scheme: light;
 }
 
 html,
@@ -24,26 +70,38 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  line-height: var(--line-height-en);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 * {
   box-sizing: border-box;
-  padding: 0;
-  margin: 0;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+[dir="auto"] {
+  unicode-bidi: isolate;
+}
+
+[dir="ltr"].code-isolate {
+  unicode-bidi: isolate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

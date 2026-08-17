@@ -22,6 +22,7 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) ·
 [STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
+[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
 [phase-07 evidence](../development/phase-07-stitch-specification-evidence.md) ·
 [docs index](../README.md)
 

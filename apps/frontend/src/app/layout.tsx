@@ -1,33 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { AppProviders } from "../components/providers";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Smart RAG developer console",
+  title: "Smart RAG console",
   description:
-    "Thin authenticated developer UI for Hybrid/Graph RAG. Not the production frontend.",
+    "Production console shell hosting the Phase 6 developer console until later Phase 8 packets replace that surface.",
 };
 
 /**
- * Render the shared HTML shell for developer-console routes.
+ * Render the shared HTML shell for console routes.
  *
  * @param children - App Router content for the active route.
- * @returns The root document structure with local font variables.
+ * @returns The root document with English LTR chrome and the system font stack.
+ * @remarks
+ * Google Fonts and CDN typefaces are forbidden by the CSP/token contract.
+ * Fonts are the STITCH_BRIEF system stack in `globals.css`.
  */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" dir="ltr">
       <body>
         <AppProviders>{children}</AppProviders>
       </body>

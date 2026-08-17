@@ -2,16 +2,20 @@
 title: Thin authenticated developer UI
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-17
 audience: engineering, frontend
 ---
 
 # Thin developer UI (Phase 6 packet 8)
 
-Authenticated Next.js console for local RAG testing. This is **not** Stitch
-and **not** the production frontend (Phases 7–8).
+Authenticated Next.js console for local RAG testing. Phase 8 packet 1 hosts
+this surface inside the production `AppShell`; it is still not a Stitch
+frame route. Tokens and primitives:
+[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).
 
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
+[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
+[STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [SSE.md](../api/SSE.md) ·
 [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md) ·
 [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) ·

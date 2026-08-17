@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 1
-status: pending
+status: complete
 title: "Integrate the approved design system into the existing Next.js workspace without replacing real Phase 6 contracts with mocks. Convert the approved `DESIGN.md` tokens and frame-00 primitives into build-time Tailwind/theme and reusable typed components; preserve the high-density light shell, 280px desktop navigation, responsive diagnostic treatment, 48px enterprise rows, status/citation patterns, typography, and tonal elevation without shipping runtime Tailwind CDN or generated inline scripts."
 requirement_ids: [P08-01]
 ---

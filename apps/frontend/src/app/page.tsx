@@ -1,14 +1,19 @@
 /**
- * Thin developer console home. Auth, chat, citations, and deletion live here.
- * Stitch and production UX are out of scope.
+ * Console home. Packet 1 wraps the Phase 6 developer UI in AppShell.
+ * Auth, chat, citations, and deletion still live in `DeveloperApp`.
  */
 import { DeveloperApp } from "../components/developer-app";
+import { AppShell } from "../components/ui/app-shell";
 
 /**
- * Render the Phase 6 developer UI.
+ * Render the production shell around the existing developer console.
  *
- * @returns Developer console tree.
+ * @returns AppShell wrapping DeveloperApp. No new routes.
  */
 export default function Home() {
-  return <DeveloperApp />;
+  return (
+    <AppShell>
+      <DeveloperApp />
+    </AppShell>
+  );
 }
