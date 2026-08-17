@@ -18,6 +18,7 @@ deterministically by packets 1–3.
 Related: [ANSWER_VERIFICATION.md](./ANSWER_VERIFICATION.md) ·
 [QUERY_ROUTING.md](./QUERY_ROUTING.md) ·
 [QUERY_BUDGETS.md](./QUERY_BUDGETS.md) ·
+[ADMINISTRATION.md](../frontend/ADMINISTRATION.md) ·
 [phase-06 evidence](../development/phase-06-agent-intelligence-evidence.md) ·
 [docs index](../README.md)
 

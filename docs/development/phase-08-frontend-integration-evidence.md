@@ -11,7 +11,8 @@ audience: engineering, reviewers, client-approver
 Canonical packet evidence for
 [Phase 8](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md).
 Do not check a packet from file presence alone. Phase status remains
-`pending`.
+`pending`. Journey coverage for packet 6 lives in
+[PHASE8_JOURNEY_MATRIX.md](../frontend/PHASE8_JOURNEY_MATRIX.md).
 
 ## Packet 1 — Integrate the approved design system without replacing Phase 6 contracts
 
@@ -64,9 +65,9 @@ exposes only `/` and `/_not-found`.
 
 ### Visual / component / accessibility results
 
-- Playwright 1280Ã—800: `app-shell-nav` computed width **280px**; skip link
-  `href="#main"`; Console â†’ `/`.
-- Playwright 390Ã—844: nav stacks above `#main` (nav `y` < main `y`, width
+- Playwright 1280×800: `app-shell-nav` computed width **280px**; skip link
+  `href="#main"`; Console → `/`.
+- Playwright 390×844: nav stacks above `#main` (nav `y` < main `y`, width
   > 300px).
 - Playwright `prefers-reduced-motion: reduce`: authored `transition-duration: 1s`
   computes to `1e-05s` (0.01ms).
@@ -145,7 +146,7 @@ and jsdom 30 require Node 22+). Tailwind / `@tailwindcss/postcss` **4.3.3**.
 
 ### Negative findings
 
-- XSS filename and `</script>Ø´Ø±ÙƒØ©` remain text nodes.
+- XSS filename and `</script>شركة` remain text nodes.
 - Omitting a nav item does not imply 403
   (`CLIENT_NAV_IS_NOT_AUTHORIZATION`, `hiddenNavImpliesForbidden`).
 - No Tailwind CDN, no Google Fonts loader, no blur utilities.
@@ -585,3 +586,142 @@ Revert the P08-05 frontend a11y/CSP/error files, restore previous
 `next.config.ts` CSP, and delete
 `docs/frontend/A11Y_SECURITY_IMPLEMENTATION.md` plus this evidence
 section. Leave packets 1--4 surfaces in place. Phase 8 stays `pending`.
+
+## Packet 6 — Run complete frontend verification journeys
+
+### Requirement (quoted)
+
+> Run complete Playwright journeys for roles, routing/limitation families, reconnect, API/deploy versioning, fallbacks, table provenance, curation, and graph evidence. Add stable visual/interaction regression coverage keyed to each delivered frame surface, plus explicit journeys for delivered gallery states and required Stitch gaps including MFA recovery, API skew, BM25 degradation, rate limits, Graph Pending/ACL blindness, RTL citations, and restricted evidence audit.
+
+Stitch is a **template, not a layout**. Visual/interaction regression is keyed
+to shipped contract surfaces, not Stitch frame numbers. Matrix:
+[PHASE8_JOURNEY_MATRIX.md](../frontend/PHASE8_JOURNEY_MATRIX.md).
+
+### Concrete acceptance checks
+
+- Every wrapper final-gate journey has a real contract test or is listed
+  **unverified-live**.
+- Authorization negatives, ACL silence, citations without snippets, table
+  `source_ranges`, limitation honesty, and reconnect/idempotency hold in
+  unit/component tests with injected fetch.
+- No mock data in production UI; no test-auth bypass; prohibited-pattern
+  scan passes.
+- Exact commands and exit codes recorded.
+
+### Bounded repairs
+
+- `listCitations` now keeps ids/coordinates and drops `snippet` / `passage` /
+  `text` / `html` / `content` / `body` fields (including nested provenance).
+  404 private-run citations return `[]` without parsing a title or passage.
+- Evidence encoding: `×`, `→`, and `شركة` restored in packet 1 notes.
+
+No backend redesign. No production test-auth bypass. No `X-Test-*` headers.
+
+### Commands and results (2026-08-17)
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend exec next typegen` | 0 |
+| `pnpm --filter smart-rag-frontend exec tsc --noEmit` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (27 files, 149 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 (routes `/`, `/documents`, `/graph`, `/tables`, `/team`, `/tools`, `/curation`, `/usage`, `/profile`, Auth, `/unavailable/[gap]`; no `frame_*` / gallery / admin) |
+| `pnpm exec playwright test` (cwd `apps/frontend`) | 0 (25 passed, 4 skipped) |
+| `uv run python -m pytest tests/unit/test_phase08_journey_matrix.py -q` | 0 |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (118 markdown files, 0 lint issues; links + Mermaid render) |
+
+`uv run python scripts/check.py --tier frontend` was not run as one process.
+The frontend-tier commands above are the same vector `check.py` uses
+(lint, typegen, tsc, vitest, build, playwright), invoked separately.
+
+Playwright skips (live FastAPI/Auth down; same assertions exist in Vitest):
+
+- `browser readiness panel matches live GET /health/ready`
+- `authenticated Auto chrome when a session exists`
+- `stubbed document 404 shows Not found without a title`
+- `stubbed company usage 403 stays forbidden copy when signed in`
+
+### Negative findings
+
+- Auto POST body has no route field (GAP-07-01)
+- ACL blindness copy ignores `count` 99 and titles
+- Citations omit snippet/passage fields
+- Table `source_ranges` render; client total is null; no Export without disclosure
+- Cancel POST omits `X-Client-Version`
+- Resume 404 is `deleted` without a second paid POST
+- GAP-07-07/08 Unavailable pages have no recovery-code or bootstrap inputs
+- GAP-07-12 Usage has no fake audit table or passages
+- Login CSP has `default-src 'self'` and no Tailwind CDN
+- Prohibited-pattern scan still forbids `dangerouslySetInnerHTML`, `innerHTML`,
+  hash placeholders, blur, CDN fonts, `Math.random`, `X-Test-` headers
+
+### Unverified-live
+
+- Local GoTrue sign-in / MFA verify / aal2 upload (no test-auth bypass)
+- Live FastAPI `/health/ready` panel match
+- Authenticated Playwright Auto chrome, document 404, company-usage 403
+- `tests/contract/test_thin_developer_ui_live.py` (FastAPI+Auth HTTP, not Next chrome)
+- Abandoned / expired / oversize quarantine as distinct public JSON enums
+  (version status prints the server `status` string; those labels are not
+  invented)
+- Live WCAG lab measurement of every computed style
+- Hosted Auth throttling (GAP-07-20 / Phase 10)
+
+Existing live HTTP proof to keep citing:
+`tests/contract/test_thin_developer_ui_live.py` talks to FastAPI+Auth, not
+Next chrome.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `apps/frontend/src/lib/api.ts` | Strip citation snippet/passage fields |
+| `apps/frontend/src/lib/api.test.ts` | 426, cancel, delete, resume 404, citations, quota 402, session_revoked |
+| `apps/frontend/src/lib/chat-view.test.ts` | Heartbeat, cancel, BM25/ACL/pending/summary codes |
+| `apps/frontend/src/lib/ingestion-status.test.ts` | Graph Pending vs failed; no invented quarantine enums |
+| `apps/frontend/src/lib/graph-client.test.ts` | Graph Pending vs ACL blindness; count ignored |
+| `apps/frontend/src/components/chat-app.test.tsx` | MFA, revoked, SSE families, cancel, reconnect 404, delete |
+| `apps/frontend/src/components/core-rag-surfaces.test.tsx` | Graph Pending vs ACL, tables `source_ranges`, library status |
+| `apps/frontend/src/components/administration-surfaces.test.tsx` | GAP-07-08, GAP-07-12 member, curation approve |
+| `apps/frontend/src/components/auth/auth-screens.test.tsx` | GAP-07-08 no bootstrap form |
+| `apps/frontend/src/components/accessibility-security.test.tsx` | ACME `mark` parent `dir="auto"` |
+| `apps/frontend/tests/e2e/phase08-journeys.spec.ts` | Unauth routes, gaps, handshake stub, CSP, document 404 → login |
+| `docs/frontend/PHASE8_JOURNEY_MATRIX.md` | Created |
+| `tests/unit/test_phase08_journey_matrix.py` | Lock limitation codes and GAP ids |
+| `docs/README.md` | Index row |
+| Reciprocal links | CORE_RAG, ADMINISTRATION, AUTH, A11Y → matrix |
+
+### Rollback
+
+Revert the P08-06 test/docs files and the `listCitations` sanitizer. Leave
+packets 1--5 surfaces in place. Phase 8 stays `pending`.
+
+## Phase 8 exit record (pending user acceptance)
+
+Wrapper `status` remains **pending**. Packet 6 may be checked after this
+evidence. Do not start Phase 9 until the user accepts this exit record.
+
+### Done-when
+
+| Done-when item | Status |
+| --- | --- |
+| Production Next.js build, strict types, lint, component tests, accessibility checks | **proven** (commands above) |
+| Matches `STITCH_REVIEW.md`: no Stitch template routes | **proven** (build routes; prohibited-pattern scan) |
+| Honest GAP Unavailable pages for missing HTTP (GAP-07-07/08), not Stitch placeholders | **proven** (Playwright + component). Wrapper text that forbids “Unavailable-gap pages” is read as forbidding Stitch-number placeholders, not these contract gap fills |
+| No prohibited generated-HTML pattern | **proven** |
+| `@supabase/ssr` Auth: sign-in/up, Google disabled, reset/callback, invitation accept, MFA enroll/challenge, lost-factor GAP-07-07, owner bootstrap GAP-07-08, revoked sessions, upload MFA; no client authz shortcut | **proven** in Vitest; **unverified-live** against local GoTrue |
+| Handshake blocks unsupported clients before paid work | **proven** (9.0.0 stub + 426 POST) |
+| Typed SSE clients tolerate unknown additive events | **proven** |
+| Idempotent submit, sequenced reconnect, heartbeat, cancel, route correction, deadline/partial, BM25 degrade, LightRAG `graph_outage`, figure/media, temporal, ACL, summary, negation, citations without snippets, inference GAP-07-02 copy, table provenance, diagnostics, feedback chrome, generic errors | **proven** in unit/component |
+| Document upload/quota/crawl/quarantine/scan/parse/BM25/Hybrid-Graph/backlog/retry/version/anomaly/deletion journeys | **proven** for mapped contracts; **unverified-live** Storage JWT upload; abandoned/expired/oversize are not distinct public enums |
+| Graph explorer, tables, tools, curation, team, usage/budget/rate, restricted audit GAP-07-12, profile, company settings enforce roles | **proven** in component tests; **unverified-live** FastAPI mutations |
+| Responsive LTR/RTL, ACME logical highlight, keyboard/skip/reduced-motion, WCAG AA tokens, CSP, strict escaping, XSS fixtures | **proven** |
+| Playwright unauth + public stubs for roles chrome, MFA recovery, API skew, BM25 copy, Graph/ACL (component), RTL fixtures, restricted audit (component) | **proven**; authenticated Playwright **unverified-live** |
+| No mock data, test-auth bypass, `dangerouslySetInnerHTML`, or unescaped retrieved markup | **proven** |
+
+### Phase 9 handoff blockers
+
+- User acceptance of this Phase 8 exit record
+- Optional: run `test_thin_developer_ui_live.py` and authenticated Playwright
+  when local FastAPI + GoTrue are up
+- Do not start Phase 9 local release-candidate load/eval until accepted

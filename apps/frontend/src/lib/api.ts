@@ -1031,6 +1031,51 @@ export async function analyzeTable(
   };
 }
 
+const CITATION_SNIPPET_KEYS = /^(snippet|passage|text|html|content|body)$/i;
+
+/**
+ * Keep citation ids and coordinate provenance. Drop passage/snippet fields.
+ *
+ * @param item - One JSON citation object.
+ * @returns Typed citation, or null when `citation_id` is missing.
+ */
+function parseCitationItem(item: unknown): CitationResponse | null {
+  if (item === null || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+  const row = item as Record<string, unknown>;
+  const citationId = row.citation_id;
+  if (typeof citationId !== "string" || citationId.trim() === "") {
+    return null;
+  }
+  const provenanceRaw = row.provenance;
+  const provenance: Record<string, unknown> = {};
+  if (
+    provenanceRaw !== null &&
+    typeof provenanceRaw === "object" &&
+    !Array.isArray(provenanceRaw)
+  ) {
+    for (const [key, value] of Object.entries(
+      provenanceRaw as Record<string, unknown>,
+    )) {
+      if (CITATION_SNIPPET_KEYS.test(key)) {
+        continue;
+      }
+      provenance[key] = value;
+    }
+  }
+  return {
+    citation_id: citationId,
+    citation_index: Number(row.citation_index ?? 0),
+    chunk_id:
+      row.chunk_id === null || row.chunk_id === undefined
+        ? null
+        : String(row.chunk_id),
+    provenance,
+    source_unavailable: Boolean(row.source_unavailable),
+  };
+}
+
 /**
  * Fetch citations for an owned run.
  *
@@ -1047,11 +1092,16 @@ export async function listCitations(
   const response = await fetchImpl(apiUrl(`/runs/${runId}/citations`), {
     headers: resumeHeaders(auth),
   });
+  if (response.status === 404) {
+    return [];
+  }
   const parsed: unknown = await response.json();
   if (!Array.isArray(parsed)) {
     return [];
   }
-  return parsed as CitationResponse[];
+  return parsed
+    .map(parseCitationItem)
+    .filter((item): item is CitationResponse => item !== null);
 }
 
 /**

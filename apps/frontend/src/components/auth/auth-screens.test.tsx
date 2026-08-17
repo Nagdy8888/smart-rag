@@ -132,3 +132,15 @@ describe("Unavailable GAP-07-07", () => {
     expect(screen.queryByRole("button", { name: /recover|submit/i })).toBeNull();
   });
 });
+
+describe("Unavailable GAP-07-08", () => {
+  it("has no owner-bootstrap form", () => {
+    renderAuth(<UnavailableGap gap="GAP-07-08" />);
+    expect(screen.getByRole("heading", { name: "Unavailable" })).toBeInTheDocument();
+    expect(screen.getAllByText(/GAP-07-08/).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText(/company/i)).toBeNull();
+    expect(screen.queryByLabelText(/owner/i)).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /bootstrap|create company/i })).toBeNull();
+  });
+});

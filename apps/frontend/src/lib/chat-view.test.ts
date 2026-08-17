@@ -146,4 +146,45 @@ describe("chat view", () => {
     expect(state.diagnostics.unknownEvents).toEqual(["future_metric"]);
     expect(state.terminal).toBeNull();
   });
+
+  it("counts heartbeats and records cancelled as the terminal", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(state, parseSseBlock("event: heartbeat\nid: 1\ndata: {}"));
+    state = applySseFrame(state, parseSseBlock("event: heartbeat\nid: 2\ndata: {}"));
+    state = applySseFrame(
+      state,
+      parseSseBlock("event: cancelled\nid: 3\ndata: {}"),
+    );
+    expect(state.diagnostics.heartbeatCount).toBe(2);
+    expect(state.terminal).toBe("cancelled");
+  });
+
+  it("records BM25, LightRAG, ACL, pending, and summary limitation codes", () => {
+    let state = createChatViewState("k");
+    const codes = [
+      "bm25_unavailable",
+      "graph_outage",
+      "graph_pending",
+      "graph_acl_blindness",
+      "coverage_gap",
+      "global_steering_only",
+    ];
+    codes.forEach((code, index) => {
+      state = applySseFrame(
+        state,
+        parseSseBlock(
+          `event: limitation\nid: ${String(index + 1)}\ndata: {"code":"${code}"}`,
+        ),
+      );
+    });
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: citation_preview\nid: 20\ndata: {"citation_ids":["cite-1"],"snippet":"SECRET"}',
+      ),
+    );
+    expect(state.diagnostics.limitationCodes).toEqual(codes);
+    expect(state.diagnostics.citationIds).toEqual(["cite-1"]);
+    expect(JSON.stringify(state.diagnostics)).not.toContain("SECRET");
+  });
 });

@@ -69,6 +69,7 @@ describe("logical highlight fixture", () => {
     expect(mark?.textContent).toBe("ACME");
     expect(mark?.querySelector("*")).toBeNull();
     expect(screen.getByText("ACME")).toBeInTheDocument();
+    expect(mark?.parentElement).toHaveAttribute("dir", "auto");
   });
 });
 

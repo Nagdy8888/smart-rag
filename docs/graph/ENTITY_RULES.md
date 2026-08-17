@@ -20,6 +20,7 @@ Related: [MAPPING.md](./MAPPING.md) ·
 [FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
 [PHASE6_HANDOFF.md](./PHASE6_HANDOFF.md) ·
 [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) ·
+[ADMINISTRATION.md](../frontend/ADMINISTRATION.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [docs index](../README.md)
 

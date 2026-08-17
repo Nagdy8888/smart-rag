@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 6
-status: pending
+status: complete
 title: "Run complete Playwright journeys for roles, routing/limitation families, reconnect, API/deploy versioning, fallbacks, table provenance, curation, and graph evidence. Add stable visual/interaction regression coverage keyed to each delivered frame surface, plus explicit journeys for delivered gallery states and required Stitch gaps including MFA recovery, API skew, BM25 degradation, rate limits, Graph Pending/ACL blindness, RTL citations, and restricted evidence audit."
 requirement_ids: [P08-06]
 ---

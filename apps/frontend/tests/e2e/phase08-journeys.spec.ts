@@ -1,0 +1,113 @@
+import { expect, test } from "@playwright/test";
+import { handshakeBelowMinCopy } from "../../src/lib/handshake";
+import { MFA_RECOVERY_UNAVAILABLE, OWNER_BOOTSTRAP_UNAVAILABLE } from "../../src/lib/auth/copy";
+
+const PUBLIC_AUTH_PATHS = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/mfa/enroll",
+  "/mfa/challenge",
+  "/unavailable/GAP-07-07",
+  "/unavailable/GAP-07-08",
+] as const;
+
+const PROTECTED_PATHS = [
+  "/",
+  "/documents",
+  "/documents/33333333-3333-4333-8333-333333333333",
+  "/graph",
+  "/tables",
+  "/team",
+  "/tools",
+  "/curation",
+  "/usage",
+  "/profile",
+  "/invitations/accept",
+] as const;
+
+test("unauthenticated shipped routes redirect to login except public auth pages", async ({
+  page,
+}) => {
+  for (const path of PROTECTED_PATHS) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/login/);
+  }
+  for (const path of PUBLIC_AUTH_PATHS) {
+    await page.goto(path);
+    await expect(page).toHaveURL(new RegExp(`${path.replaceAll("/", "\\/")}`));
+  }
+});
+
+test("login chrome has skip link, Sign in, and contract nav without Stitch frames", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await expect(page.getByRole("link", { name: "Skip to main content" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "Documents" })).toHaveAttribute(
+    "href",
+    "/documents",
+  );
+  await expect(page.getByRole("link", { name: "Curation" })).toHaveAttribute(
+    "href",
+    "/curation",
+  );
+  await expect(page.getByText("Stitch")).toHaveCount(0);
+  await expect(page.getByText("frame_04")).toHaveCount(0);
+});
+
+test("GAP-07-07 and GAP-07-08 unavailable pages have no mocked recovery or bootstrap", async ({
+  page,
+}) => {
+  await page.goto("/unavailable/GAP-07-07");
+  await expect(page.getByRole("heading", { name: "Unavailable" })).toBeVisible();
+  await expect(page.getByText(MFA_RECOVERY_UNAVAILABLE)).toBeVisible();
+  await expect(page.getByLabel(/recovery/i)).toHaveCount(0);
+  await expect(page.locator("input")).toHaveCount(0);
+
+  await page.goto("/unavailable/GAP-07-08");
+  await expect(page.getByText(OWNER_BOOTSTRAP_UNAVAILABLE)).toBeVisible();
+  await expect(page.getByLabel(/company/i)).toHaveCount(0);
+  await expect(page.locator("input")).toHaveCount(0);
+});
+
+test("handshake 9.0.0 public stub blocks paid-work copy on login", async ({ page }) => {
+  await page.route("**/api/meta", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        api_version: "1",
+        sse_schema_version: "1",
+        min_client_version: "9.0.0",
+      }),
+    });
+  });
+  await page.goto("/login");
+  await expect(page.getByText(handshakeBelowMinCopy())).toBeVisible();
+});
+
+test("unauthenticated document 404 still redirects to login", async ({ page }) => {
+  await page.route("http://127.0.0.1:8000/documents/**", async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ title: "SECRET TITLE", detail: "not_found" }),
+    });
+  });
+  await page.goto("/documents/33333333-3333-4333-8333-333333333333");
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByText("SECRET TITLE")).toHaveCount(0);
+});
+
+test("login response includes CSP without Tailwind CDN", async ({ page }) => {
+  const response = await page.goto("/login");
+  expect(response).not.toBeNull();
+  const csp = response?.headers()["content-security-policy"] ?? "";
+  expect(csp).toContain("default-src 'self'");
+  expect(csp).toContain("object-src 'none'");
+  expect(csp).not.toContain("cdn.tailwindcss.com");
+  expect(csp).not.toContain("fonts.googleapis.com");
+});

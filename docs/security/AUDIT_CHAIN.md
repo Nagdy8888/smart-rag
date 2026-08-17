@@ -82,4 +82,5 @@ uv run pytest tests/contract/test_audit_chain.py -q
 ```
 
 Related: [PROTECTED_MIGRATION_CREDENTIALS.md](./PROTECTED_MIGRATION_CREDENTIALS.md) ·
-[05-database-connections.md](../architecture/05-database-connections.md)
+[05-database-connections.md](../architecture/05-database-connections.md) ·
+[ADMINISTRATION.md](../frontend/ADMINISTRATION.md)

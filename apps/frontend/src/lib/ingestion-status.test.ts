@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatBm25Summary, formatGraphHandoffSummary } from "./ingestion-status";
+import {
+  formatBm25Summary,
+  formatGraphHandoffSummary,
+  ingestionStatusLabel,
+  ingestionStatusTone,
+} from "./ingestion-status";
 
 describe("formatBm25Summary", () => {
   it("renders index lag and queue counts without claiming readiness", () => {
@@ -33,5 +38,20 @@ describe("formatGraphHandoffSummary", () => {
     expect(text).toBe(
       "pending=4 processing=0 completed=0 failed=0 dead_letter=0",
     );
+  });
+});
+
+describe("ingestionStatusLabel", () => {
+  it("labels Graph Pending distinctly from failed and does not invent quarantine HTTP", () => {
+    expect(ingestionStatusLabel("graph_pending")).toBe("Graph Pending");
+    expect(ingestionStatusLabel("deletion_pending")).toBe("Deletion pending");
+    expect(ingestionStatusLabel("scanning")).toBe("Scanning");
+    expect(ingestionStatusLabel("parsing")).toBe("Parsing");
+    expect(ingestionStatusLabel("failed")).toBe("Failed");
+    expect(ingestionStatusTone("graph_pending")).toBe("warning");
+    expect(ingestionStatusTone("failed")).toBe("danger");
+    expect(ingestionStatusLabel("abandoned")).toBe("abandoned");
+    expect(ingestionStatusLabel("expired")).toBe("expired");
+    expect(ingestionStatusLabel("oversize")).toBe("oversize");
   });
 });

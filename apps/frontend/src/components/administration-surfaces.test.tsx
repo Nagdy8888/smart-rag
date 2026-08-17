@@ -11,6 +11,8 @@ import {
   COMPANY_SETTINGS_UNAVAILABLE,
   NO_MEMBER_DIRECTORY_COPY,
   PROFILE_EDITOR_UNAVAILABLE,
+  RATE_LIMIT_COPY,
+  TEAM_OWNER_BOOTSTRAP_UNAVAILABLE,
 } from "../lib/admin-copy";
 import { SessionProvider } from "../lib/auth/session-provider";
 import { CurationApp } from "./curation-app";
@@ -28,6 +30,7 @@ const fetchUsageMe = vi.fn();
 const fetchUsageCompany = vi.fn();
 const fetchReady = vi.fn();
 const fetchMeta = vi.fn();
+const approveEntityRule = vi.fn();
 const listEntityRules = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -83,6 +86,7 @@ vi.mock("../lib/api", async () => {
     fetchUsageMe: (...args: unknown[]) => fetchUsageMe(...args),
     fetchUsageCompany: (...args: unknown[]) => fetchUsageCompany(...args),
     listEntityRules: (...args: unknown[]) => listEntityRules(...args),
+    approveEntityRule: (...args: unknown[]) => approveEntityRule(...args),
   };
 });
 
@@ -136,6 +140,10 @@ beforeEach(() => {
     },
   ]);
   listEntityRules.mockResolvedValue({ rules: [] });
+  approveEntityRule.mockResolvedValue({
+    rule_id: "rule-1",
+    row_version: 2,
+  });
   createInvitation.mockResolvedValue({
     invitation_id: "inv-1",
     email: "<img src=x onerror=alert(1)>@evil.test",
@@ -185,6 +193,8 @@ describe("TeamApp", () => {
     expect(screen.queryByRole("button", { name: "Create invitation" })).toBeNull();
     expect(createInvitation).toBeDefined();
     expect(offboardUser).toBeDefined();
+    expect(screen.getByText(TEAM_OWNER_BOOTSTRAP_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /unavailable GAP-07-08/i })).toBeNull();
   });
 
   it("renders raw_token once and hostile email as text", async () => {
@@ -266,5 +276,63 @@ describe("CurationApp", () => {
     expect(await screen.findByText(/Curation mutations are hidden/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import glossary" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  });
+
+  it("approves an entity rule with row_version only for an owner", async () => {
+    listEntityRules.mockResolvedValue({
+      rules: [
+        {
+          id: "rule-1",
+          entity_type: "ORG",
+          canonical_name: "<script>x</script>",
+          aliases: [],
+          do_not_merge: [],
+          status: "proposed",
+          source: "admin",
+          row_version: 4,
+        },
+      ],
+    });
+    renderSurface(<CurationApp />);
+    const approve = await screen.findByRole("button", { name: "Approve" });
+    fireEvent.click(approve);
+    expect(await screen.findByText(/row_version=2/)).toBeInTheDocument();
+    expect(approveEntityRule).toHaveBeenCalledWith(
+      { accessToken: "jwt-token" },
+      "rule-1",
+      4,
+    );
+    expect(screen.getByText("<script>x</script>")).toBeInTheDocument();
+    expect(document.querySelector("script")).toBeNull();
+  });
+});
+
+describe("UsageApp member 403 and rate degradation", () => {
+  it("hides company meters for a member and still shows GAP-07-12 without passages", async () => {
+    fetchMe.mockResolvedValue({
+      user_id: "u-member",
+      role: "member",
+      authorization_version: 1,
+      upload_enabled: true,
+      mfa_enrolled: true,
+    });
+    fetchUsageCompany.mockRejectedValue(new Error("forbidden"));
+    fetchReady.mockResolvedValue({
+      status: "degraded",
+      query_ready: true,
+      detail: "ok",
+      rate_limit_degraded: true,
+      dependencies: [],
+    });
+    renderSurface(<UsageApp />);
+    expect(await screen.findByTestId("usage-meters")).toBeInTheDocument();
+    expect(screen.queryByTestId("company-usage-meters")).toBeNull();
+    expect(screen.getByTestId("audit-unavailable")).toHaveTextContent(
+      AUDIT_HISTORY_UNAVAILABLE,
+    );
+    expect(screen.getByText(/Rate limiter is degraded/)).toBeInTheDocument();
+    expect(screen.getByText(RATE_LIMIT_COPY, { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText("SECRET_PASSAGE")).toBeNull();
+    expect(document.querySelector("input[type='range']")).toBeNull();
   });
 });

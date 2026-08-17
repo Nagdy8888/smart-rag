@@ -18,6 +18,7 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
 [ADMINISTRATION.md](./ADMINISTRATION.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
+[PHASE8_JOURNEY_MATRIX.md](./PHASE8_JOURNEY_MATRIX.md) ·
 [SSE.md](../api/SSE.md) ·
 [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md) ·
 [phase-08 evidence](../development/phase-08-frontend-integration-evidence.md) ·

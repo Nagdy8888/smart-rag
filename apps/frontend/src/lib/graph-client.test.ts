@@ -3,6 +3,8 @@ import {
   GRAPH_INSPECT_MAX_DEPTH,
   buildGraphInspectRequest,
   clampGraphInspectDepth,
+  graphLimitationDisplay,
+  isGraphPendingLimitation,
 } from "./graph-client";
 
 describe("clampGraphInspectDepth", () => {
@@ -21,5 +23,18 @@ describe("buildGraphInspectRequest", () => {
     expect(body.entity_keys).toHaveLength(12);
     expect(body.depth).toBe(3);
     expect(body.document_id).toBe("doc-1");
+  });
+});
+
+describe("graphLimitationDisplay", () => {
+  it("keeps Graph Pending distinct from ACL blindness without unauthorized counts", () => {
+    expect(isGraphPendingLimitation("graph_pending")).toBe(true);
+    expect(isGraphPendingLimitation("graph_acl_blindness")).toBe(false);
+    expect(
+      graphLimitationDisplay({ code: "graph_acl_blindness", count: 44 }),
+    ).not.toContain("44");
+    expect(
+      graphLimitationDisplay({ code: "graph_pending", count: 2 }),
+    ).toContain("not ready");
   });
 });

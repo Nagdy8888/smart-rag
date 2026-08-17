@@ -17,6 +17,7 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
+[PHASE8_JOURNEY_MATRIX.md](./PHASE8_JOURNEY_MATRIX.md) ·
 [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md) ·
 [phase-08 evidence](../development/phase-08-frontend-integration-evidence.md) ·
 [docs index](../README.md)

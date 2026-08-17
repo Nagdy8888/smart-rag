@@ -62,3 +62,4 @@ Monthly query spend uses
 
 - [QUERY_ADMISSION.md](./QUERY_ADMISSION.md)
 - [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
+- [ADMINISTRATION.md](../frontend/ADMINISTRATION.md)

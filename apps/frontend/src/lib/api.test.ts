@@ -14,6 +14,7 @@ import {
   finalizeUpload,
   importGlossary,
   inspectGraph,
+  listCitations,
   listTools,
   offboardUser,
   paidMutationHeaders,
@@ -22,6 +23,9 @@ import {
   shouldResumeExistingRun,
   startMessageStream,
   startOrResumeMessageStream,
+  cancelRun,
+  deleteConversation,
+  fetchMe,
 } from "./api";
 import { clientComputedTableTotal } from "./table-plan";
 import { CLIENT_VERSION } from "./client-version";
@@ -477,6 +481,7 @@ describe("analyzeTable extra fields", () => {
     );
     expect(body).not.toContain("select 1");
     expect(result.rows).toHaveLength(2);
+    expect(result.source_ranges).toEqual(["A1:B2"]);
     expect(clientComputedTableTotal()).toBeNull();
   });
 });
@@ -774,5 +779,190 @@ describe("reserveUpload MFA", () => {
         fetchImpl,
       ),
     ).rejects.toThrow("mfa_required");
+  });
+
+  it("does not return a reservation on 402 quota or budget exhaustion", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "budget_exhausted", signed_url: "https://secret" }), {
+        status: 402,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      reserveUpload(
+        { accessToken: "jwt-token" },
+        1024,
+        "idem-upload-2",
+        fetchImpl,
+      ),
+    ).rejects.toThrow("upload_reserve_failed");
+  });
+});
+
+describe("fetchMe session revocation", () => {
+  it("throws session_revoked on 401 session_revoked", async () => {
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      const headers = init?.headers as Record<string, string>;
+      expect(headers["X-Test-Role"]).toBeUndefined();
+      return new Response(JSON.stringify({ detail: "session_revoked" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    await expect(fetchMe({ accessToken: "jwt-token" }, fetchImpl)).rejects.toThrow(
+      "session_revoked",
+    );
+  });
+});
+
+describe("paid POST handshake 426", () => {
+  it("classifies upgrade and does not open the SSE GET", async () => {
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      return new Response(
+        JSON.stringify({
+          min_client_version: "9.0.0",
+          sse_schema_version: "1",
+        }),
+        { status: 426, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const started = await startMessageStream(
+      { accessToken: "jwt-token" },
+      "conv-1",
+      "hello",
+      "33333333-3333-4333-8333-333333333333",
+      fetchImpl,
+    );
+    expect(started.failure).toEqual({
+      kind: "upgrade",
+      minClientVersion: "9.0.0",
+      sseSchemaVersion: "1",
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.startsWith("POST")).toBe(true);
+    expect(calls.some((call) => call.includes("/events"))).toBe(false);
+  });
+});
+
+describe("private-run resume 404", () => {
+  it("classifies a foreign or missing run as deleted without a second POST", async () => {
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      const headers = init?.headers as Record<string, string>;
+      expect(headers["X-Client-Version"]).toBeUndefined();
+      return new Response(JSON.stringify({ detail: "not_found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    const started = await startOrResumeMessageStream(
+      { accessToken: "jwt-token" },
+      "conv-1",
+      "retry",
+      {
+        runId: "run-foreign",
+        terminal: null,
+        lastSequence: 3,
+        idempotencyKey: "33333333-3333-4333-8333-333333333333",
+      },
+      fetchImpl,
+    );
+    expect(started.resumed).toBe(true);
+    expect(started.failure).toEqual({ kind: "deleted" });
+    expect(calls).toEqual([
+      "GET http://127.0.0.1:8000/runs/run-foreign/events?after=3",
+    ]);
+    expect(calls.some((call) => call.startsWith("POST"))).toBe(false);
+  });
+});
+
+describe("cancelRun", () => {
+  it("posts cancel with resume headers and no X-Client-Version", async () => {
+    const fetchImpl: typeof fetch = async (input, init) => {
+      expect(String(input)).toBe("http://127.0.0.1:8000/runs/run-1/cancel");
+      expect(init?.method).toBe("POST");
+      const headers = init?.headers as Record<string, string>;
+      expect(headers.Authorization).toBe("Bearer jwt-token");
+      expect(headers["X-Client-Version"]).toBeUndefined();
+      expect(headers["X-Test-Role"]).toBeUndefined();
+      return new Response(null, { status: 204 });
+    };
+    await expect(
+      cancelRun({ accessToken: "jwt-token" }, "run-1", fetchImpl),
+    ).resolves.toBe(true);
+  });
+});
+
+describe("deleteConversation", () => {
+  it("DELETEs the conversation and treats 204 as success", async () => {
+    const fetchImpl: typeof fetch = async (input, init) => {
+      expect(String(input)).toBe(
+        "http://127.0.0.1:8000/conversations/conv-1",
+      );
+      expect(init?.method).toBe("DELETE");
+      const headers = init?.headers as Record<string, string>;
+      expect(headers["X-Client-Version"]).toBeUndefined();
+      return new Response(null, { status: 204 });
+    };
+    await expect(
+      deleteConversation({ accessToken: "jwt-token" }, "conv-1", fetchImpl),
+    ).resolves.toBe(true);
+  });
+});
+
+describe("listCitations without snippets", () => {
+  it("keeps ids and drops passage snippet fields", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            citation_id: "cite-1",
+            citation_index: 1,
+            chunk_id: "chunk-1",
+            snippet: "SECRET PASSAGE",
+            passage: "SECRET PASSAGE",
+            provenance: {
+              page_number: 3,
+              snippet: "SECRET PASSAGE",
+              url: "https://example.com/doc",
+            },
+            source_unavailable: false,
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const citations = await listCitations(
+      { accessToken: "jwt-token" },
+      "run-1",
+      fetchImpl,
+    );
+    expect(citations).toEqual([
+      {
+        citation_id: "cite-1",
+        citation_index: 1,
+        chunk_id: "chunk-1",
+        provenance: { page_number: 3, url: "https://example.com/doc" },
+        source_unavailable: false,
+      },
+    ]);
+    expect(JSON.stringify(citations)).not.toContain("SECRET");
+    expect(JSON.stringify(citations)).not.toContain("snippet");
+  });
+
+  it("returns an empty list for a 404 private run", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ snippet: "SECRET" }), { status: 404 });
+    const citations = await listCitations(
+      { accessToken: "jwt-token" },
+      "run-missing",
+      fetchImpl,
+    );
+    expect(citations).toEqual([]);
   });
 });

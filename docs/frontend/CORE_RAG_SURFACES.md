@@ -20,6 +20,7 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
 [ADMINISTRATION.md](./ADMINISTRATION.md) ·
+[PHASE8_JOURNEY_MATRIX.md](./PHASE8_JOURNEY_MATRIX.md) ·
 [SSE.md](../api/SSE.md) ·
 [phase-08 evidence](../development/phase-08-frontend-integration-evidence.md) ·
 [docs index](../README.md)
