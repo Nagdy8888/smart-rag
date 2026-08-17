@@ -16,12 +16,15 @@ def test_review_selects_component_fallback_within_timebox() -> None:
     assert "Opened | 2026-08-17" in text or "Opened | 2026-08-17" in text.replace(
         "| ", "| "
     )
-    assert "1 of 2" in text
+    assert "2 of 2" in text
     assert "0 of 2" not in text
+    assert "1 of 2" not in text
     assert "component-system fallback" in text
     assert "native HTML" in text
     assert "**No** runtime Tailwind CDN" in text
-    assert "visual references" in text
+    assert "template, not a layout" in text
+    assert "do not add it" in text
+    assert "Stitch frames added as routes | **none**" in text
     assert "Stitch HTML accepted as production | **no**" in text
     assert "Do not copy Stitch" in text
     assert "GAP-07-07" in text

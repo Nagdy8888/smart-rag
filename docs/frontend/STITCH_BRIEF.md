@@ -25,9 +25,9 @@ loading, empty, error, permission, quarantine, quota, compatibility,
 limitation, fallback, partial-readiness, budget, and degraded state.
 [STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md) is the accessibility
 and security review.
-[STITCH_REVIEW.md](./STITCH_REVIEW.md) records round-1 visual-reference
-acceptance of the delivered Stitch frames and the component-system
-implementation fallback (do not port HTML).
+[STITCH_REVIEW.md](./STITCH_REVIEW.md) records that the delivered Stitch
+export is a **template, not product layout**. Do not add Stitch frames as
+routes. Implementation is the component-system fallback (do not port HTML).
 
 ## Localization decision
 
@@ -302,6 +302,8 @@ comment; random cost; complete corpus summary without coverage_score.
 ## Phase 8 consumption
 
 Implement in `apps/frontend` with Next.js App Router 16.3, React 19,
-`@supabase/ssr` 0.7.0, TanStack Query 5.85. If Stitch export is unusable,
-Phase 8 uses accessible native HTML plus build-time Tailwind tokens (not CDN)
-matching the token table in this brief.
+`@supabase/ssr` 0.7.0, TanStack Query 5.85. The Stitch export is a template,
+not a layout: do not add its frames as pages. Phase 8 uses accessible native
+HTML plus build-time Tailwind tokens (not CDN) matching the token table in
+this brief, and only surfaces with typed contracts in
+[API_UI_MAPPING.md](./API_UI_MAPPING.md).

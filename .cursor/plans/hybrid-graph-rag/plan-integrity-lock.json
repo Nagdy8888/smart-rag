@@ -24,8 +24,8 @@
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/04-map-ui-to-real-contracts.md": "20acbd402eeed315806c2ecb6b1cba98b156bca63f023da980761a7d5684a35b",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/05-review-accessibility-and-security.md": "5388e4ed6ecccf1e8a10d20501b8b373250226631fb7c6f82b2e5b2062965614",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/06-record-approval-or-fallback.md": "d75f570528bd5140481fb891a678cfa35a6b778eed2f683f5aaabd264cfeef59",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md": "50e3d53349110e348f30eac303f8ac99caaa6400ebb9c4c714d7b6cf458a9446",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-shared-contracts.md": "94e3c7fc0d372cface64771447a0a068609cac643d34e4d956162dd284be1fd6",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md": "7bfacc78f58f17bf4347749ae21cbb70692883f1dcf7ed2866a44c18b70b7fb4",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-shared-contracts.md": "3a6a5f75b84e8b4fd1a8885e2f5cf5b2856e7b1cf856769fa7edab9a047566b5",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/01-integrate-approved-design-system.md": "6b968bfe3cfa340a8f167e4e37a217ffc25a3df7bffa7dc6d418fd97ec8c1467",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/02-implement-auth-and-streaming.md": "b442377cca9a56166a6cc9eeb2d2e5e3902ada15f454e0f8b10df527a2f96405",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/03-implement-core-rag-surfaces.md": "b5cfc0173a8c089fed0419f3019802a16b6a66385129ff55e6e68576122a179d",
@@ -83,6 +83,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-08-16T22:31:48.850134+00:00",
+  "generated_at": "2026-08-17T10:55:19.254255+00:00",
   "schema_version": 1
 }

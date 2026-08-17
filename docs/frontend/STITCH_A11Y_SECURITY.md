@@ -11,8 +11,8 @@ packet: P07-05
 
 Review of [STITCH_BRIEF.md](./STITCH_BRIEF.md), [STITCH_STATES.md](./STITCH_STATES.md),
 and [API_UI_MAPPING.md](./API_UI_MAPPING.md). Delivered Stitch HTML is
-not an accessibility waiver. Missing RTL/mixed frames remain a
-design-evidence gap.
+not an accessibility waiver. Do not add a Stitch RTL page; mixed-direction
+content rules in this file still apply.
 
 Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
@@ -98,7 +98,7 @@ Phase 6 thin UI already forbids raw HTML. Phase 8 keeps that contract.
 
 | ID | Finding | Disposition |
 | --- | --- | --- |
-| A11Y-01 | Delivered Stitch HTML has almost no `aria-*`, no skip link, no RTL/mixed frames; gallery uses blur | Not a waiver; Phase 8 implements this file, not the HTML |
+| A11Y-01 | Delivered Stitch HTML is a template, not layout; almost no `aria-*` | Not a waiver; do not add those frames; Phase 8 implements this file |
 | A11Y-04 | Sign-in uses `loader.innerHTML` | Forbidden in production; React text nodes only |
 | A11Y-02 | Warning color `#A16207` as small text may be tight AA | Use as icon + `#0F172A` sentence |
 | A11Y-03 | Graph canvas keyboard path is underspecified in Stitch | Phase 8: search field + list of nodes first, canvas optional |

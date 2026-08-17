@@ -320,6 +320,27 @@ to accent `#2563EB`, canvas `#F8FAFC`, radius 8px, no blur.
 | `uv run python -m pytest tests/unit/test_phase07_stitch_review.py tests/unit/test_phase07_stitch_brief.py tests/unit/test_phase07_stitch_a11y.py tests/unit/test_phase07_api_ui_mapping.py tests/unit/test_phase07_stitch_states.py -q` | 0 (16 passed) |
 | `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
 
+### Round 2 (2026-08-17) — template, not layout
+
+User: the Stitch export is a template, not a layout; if a frame is not
+necessary, do not add it. Stitch frames are **not** product routes.
+Missing Stitch numbers are **not** pages to fill. Screen list is the
+mapping plus Auth-direct contracts that already exist.
+
+| File | Action |
+| --- | --- |
+| `docs/frontend/STITCH_REVIEW.md` | Round 2: 2 of 2; template; add none |
+| `docs/frontend/STITCH_BRIEF.md` | Phase 8 consumption: do not add frames |
+| `docs/frontend/STITCH_A11Y_SECURITY.md` | A11Y-01: do not add template frames |
+| `tests/unit/test_phase07_stitch_review.py` | Expect 2 of 2 and template-not-layout |
+| `.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md` | Wrapper: template not layout |
+| `.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-shared-contracts.md` | Do not add Stitch routes |
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_phase07_stitch_review.py tests/unit/test_phase07_stitch_brief.py tests/unit/test_phase07_stitch_a11y.py tests/unit/test_phase07_api_ui_mapping.py tests/unit/test_phase07_stitch_states.py -q` | 0 (16 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
 ## Phase 7 exit record
 
 ### Done when
@@ -330,11 +351,11 @@ to accent `#2563EB`, canvas `#F8FAFC`, radius 8px, no blur.
 | Brief has copy-ready prompts, LTR/RTL frames, localization, mixed fixtures, hierarchy, components, copy, a11y | `STITCH_BRIEF.md` + packet 2 tests |
 | Every loading/empty/error/limitation state | `STITCH_STATES.md` (part of brief) |
 | API/UI map to real Phase 2/6 contracts + gaps | `API_UI_MAPPING.md` + inventory JSON + unit tests |
-| Five days / two rounds: approve Stitch **or** fallback | Round 1 2026-08-17: visual references accepted; HTML not ported; implementation fallback; 1 of 2 |
+| Five days / two rounds: approve Stitch **or** fallback | Round 2 2026-08-17: template not layout; no Stitch routes; implementation fallback; 2 of 2 |
 
 ### Unverified / blockers for Phase 8
 
-- User acceptance of this round-1 handoff (wrapper status stays pending until accepted).
+- User acceptance of this round-2 handoff (wrapper status stays pending until accepted).
 - Owning-phase HTTP: GAP-07-07, 08, 09, 10, 11, 12, 13, 14, 19.
 - Hosted Auth throttling (GAP-07-20 / Phase 10).
 - CloudFront `signed_url` (Phase 10).
@@ -342,13 +363,13 @@ to accent `#2563EB`, canvas `#F8FAFC`, radius 8px, no blur.
 
 ### Deviations
 
-None to security/data/cost. Round 1 accepts gitignored Stitch frames as
-visual references and keeps the component-system implementation fallback
-because the HTML uses CDN Tailwind, almost no ARIA, mock diagnostics,
-and prohibited blur.
+None to security/data/cost. Round 2 (user): Stitch is a template, not
+product layout. Phase 8 must not add Stitch frames as routes. Implementation
+remains the component-system fallback. Phase 8 wrapper packet titles that
+still name frames are superseded by `STITCH_REVIEW.md`.
 
 ### Phase 8 handoff
 
-Implement production UI from the five frontend docs above plus the
-gitignored visual export. Do not restart Stitch. Do not port `code.html`.
-Do not mock GAP rows. Keep Auto as default chat. Accent `#2563EB`.
+Implement production UI from the mapping and brief tokens only. Do not
+restart Stitch. Do not port `code.html`. Do not add Stitch frames or
+Unavailable-gap pages. Keep Auto as default chat. Accent `#2563EB`.
