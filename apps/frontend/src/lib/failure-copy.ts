@@ -11,6 +11,9 @@ import { MFA_REQUIRED_BANNER, SESSION_REVOKED_BANNER } from "./auth/copy";
 import { handshakeBelowMinCopy } from "./handshake";
 import { displayText } from "./safe-text";
 
+/** Unknown 5xx and unclassified failures. Never exception text. */
+export const GENERIC_PRODUCTION_ERROR = "Something went wrong.";
+
 /**
  * Map a classified API failure to English chrome.
  *
@@ -41,6 +44,8 @@ export function apiFailureBanner(failure: ApiFailure): string {
       return `Limiter fail-closed (${displayText(failure.detail)}). Approved reads may degrade; cost mutations are denied.`;
     case "deleted":
       return "Conversation deleted. Reads, resume, and citations are denied. No source text is shown.";
+    case "server":
+      return GENERIC_PRODUCTION_ERROR;
     default: {
       const _exhaustive: never = failure;
       return String(_exhaustive);
@@ -71,6 +76,6 @@ export function mutationFailureBanner(error: Error): string {
     case "stale_row_version":
       return STALE_ROW_VERSION_COPY;
     default:
-      return displayText(error.message);
+      return GENERIC_PRODUCTION_ERROR;
   }
 }

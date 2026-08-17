@@ -29,8 +29,10 @@ import { totpQrImageSrc } from "../../lib/auth/totp-qr";
 import { useSession } from "../../lib/auth/session-provider";
 import { publicSupabaseConfig } from "../../lib/env";
 import { evaluatePaidHandshake, handshakeBelowMinCopy } from "../../lib/handshake";
+import { mutationFailureBanner } from "../../lib/failure-copy";
 import { publicQueryKeys } from "../../lib/query-keys";
 import { ReadinessPanel, SignedOutageCopy } from "../readiness-panel";
+import { ReviewedContentFixtures } from "../ui/reviewed-content-fixtures";
 import styles from "../developer-app.module.css";
 
 /**
@@ -171,6 +173,7 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
       </StatusBanner>
       <ReadinessPanel ready={readyQuery.data} />
       <SignedOutageCopy />
+      <ReviewedContentFixtures />
       <form className={styles.panel} onSubmit={(event) => void onSubmit(event)}>
         <Input
           label="Email"
@@ -642,7 +645,11 @@ export function InvitationAcceptForm() {
         const accepted = await acceptInvitation({ accessToken }, token);
         setInvitationId(accepted.invitation_id);
       } catch (error) {
-        setFailed(error instanceof Error ? error.message : "invitation_rejected");
+        setFailed(
+          error instanceof Error
+            ? mutationFailureBanner(error)
+            : mutationFailureBanner(new Error("invitation_rejected")),
+        );
       }
     },
     [accessToken, token],
@@ -670,7 +677,7 @@ export function InvitationAcceptForm() {
       )}
       {failed ? (
         <StatusBanner kind="error" role="alert">
-          <UserText value={failed} />
+          {failed}
         </StatusBanner>
       ) : null}
       {invitationId ? (

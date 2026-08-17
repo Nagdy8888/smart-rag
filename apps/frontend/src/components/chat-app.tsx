@@ -7,14 +7,18 @@
 
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { HandshakeBanner } from "./auth/auth-screens";
 import { ReadinessPanel, SignedOutageCopy } from "./readiness-panel";
 import { Button } from "./ui/button";
 import { CitationChip } from "./ui/citation-chip";
+import { Drawer } from "./ui/drawer";
 import { Input } from "./ui/input";
 import { LimitationCallout } from "./ui/limitation-callout";
 import { LiveRegion } from "./ui/live-region";
+import { LogicalHighlight } from "./ui/logical-highlight";
+import { ReviewedContentFixtures } from "./ui/reviewed-content-fixtures";
+import { RovingList } from "./ui/roving-list";
 import { StatusBanner } from "./ui/status-banner";
 import { Textarea } from "./ui/textarea";
 import { UserText } from "./ui/user-text";
@@ -48,7 +52,7 @@ import {
 } from "../lib/chat-view";
 import { COMPOSER_MAX_CHARS, composerDraftIsSendable } from "../lib/composer";
 import { evaluatePaidHandshake, mayStartPaidPost } from "../lib/handshake";
-import { apiFailureBanner } from "../lib/failure-copy";
+import { apiFailureBanner, GENERIC_PRODUCTION_ERROR } from "../lib/failure-copy";
 import {
   isGraphOnlyInspectionRoute,
   limitationCopy,
@@ -56,8 +60,13 @@ import {
 } from "../lib/limitations";
 import { publicQueryKeys, sessionQueryKeys } from "../lib/query-keys";
 import { displayText, formatProvenance } from "../lib/safe-text";
+import {
+  CITATION_LOGICAL_END,
+  CITATION_LOGICAL_FIXTURE_TEXT,
+  CITATION_LOGICAL_START,
+} from "../lib/highlight-logical-range";
 import { consumeSse } from "../lib/sse-consume";
-import { FEEDBACK_TAGS, type CitationResponse, type FeedbackTag } from "../lib/types";
+import { FEEDBACK_TAGS, type CitationResponse, type ConversationResponse, type FeedbackTag } from "../lib/types";
 import styles from "./developer-app.module.css";
 
 function newIdempotencyKey(): string {
@@ -73,21 +82,21 @@ function newIdempotencyKey(): string {
 export function CitationDrawer({
   citation,
   onClose,
+  returnFocusRef,
 }: {
   citation: CitationResponse | null;
   onClose: () => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   if (citation === null) {
     return null;
   }
   return (
-    <aside className={styles.drawer} aria-label="Source drawer">
-      <div className={styles.row}>
-        <h3>Citation {String(citation.citation_index)}</h3>
-        <Button type="button" onClick={onClose}>
-          Close
-        </Button>
-      </div>
+    <Drawer
+      title={`Citation ${String(citation.citation_index)}`}
+      onClose={onClose}
+      returnFocusRef={returnFocusRef}
+    >
       <dl>
         <dt>citation_id</dt>
         <dd>
@@ -108,7 +117,17 @@ export function CitationDrawer({
         </LimitationCallout>
       ) : null}
       <p className={styles.muted}>{SOURCE_PREVIEW_UNAVAILABLE}</p>
-    </aside>
+      <section aria-label="Reviewed logical highlight fixture">
+        <p className={styles.muted}>
+          Citations API has no offset fields. Reviewed logical-offset fixture:
+        </p>
+        <LogicalHighlight
+          text={CITATION_LOGICAL_FIXTURE_TEXT}
+          start={CITATION_LOGICAL_START}
+          end={CITATION_LOGICAL_END}
+        />
+      </section>
+    </Drawer>
   );
 }
 
@@ -133,6 +152,7 @@ export function ChatApp() {
   const [thumbsUp, setThumbsUp] = useState(true);
   const [selectedCitation, setSelectedCitation] =
     useState<CitationResponse | null>(null);
+  const citationTriggerRef = useRef<HTMLElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const auth = useMemo<ApiAuth | null>(
     () => (accessToken ? { accessToken } : null),
@@ -326,7 +346,7 @@ export function ChatApp() {
       return MFA_REQUIRED_BANNER;
     }
     if (chat.terminal === "error") {
-      return displayText(chat.status ?? "error");
+      return GENERIC_PRODUCTION_ERROR;
     }
     return "";
   })();
@@ -352,6 +372,7 @@ export function ChatApp() {
         </p>
         <ReadinessPanel ready={readyQuery.data} />
         <SignedOutageCopy />
+        <ReviewedContentFixtures />
       </div>
     );
   }
@@ -460,26 +481,27 @@ export function ChatApp() {
           !conversationsQuery.isPending ? (
             <p className={styles.muted}>No conversations yet</p>
           ) : null}
-          <ul className={styles.list}>
-            {(conversationsQuery.data ?? []).map((item) => (
-              <li key={item.conversation_id}>
-                <button
-                  type="button"
-                  aria-current={
-                    item.conversation_id === conversationId ? "true" : undefined
-                  }
-                  onClick={() => {
-                    setConversationId(item.conversation_id);
-                    idempotencyRef.current = newIdempotencyKey();
-                    setChat(createChatViewState(idempotencyRef.current));
-                    setFailure(null);
-                  }}
-                >
-                  <UserText value={item.title ?? item.conversation_id} />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <RovingList
+            aria-label="Conversations"
+            className={styles.list}
+            selectedId={conversationId}
+            items={(conversationsQuery.data ?? []).map(
+              (item: ConversationResponse) => ({
+                id: item.conversation_id,
+                item,
+              }),
+            )}
+            onSelect={(item) => {
+              setConversationId(item.conversation_id);
+              idempotencyRef.current = newIdempotencyKey();
+              setChat(createChatViewState(idempotencyRef.current));
+              setFailure(null);
+            }}
+          >
+            {(item) => (
+              <UserText value={item.title ?? item.conversation_id} />
+            )}
+          </RovingList>
         </aside>
 
         <section className={styles.panel} aria-label="Auto chat">
@@ -559,7 +581,9 @@ export function ChatApp() {
               </dd>
               <dt>Tools</dt>
               <dd>
-                {chat.diagnostics.toolKeys.map(displayText).join(", ") || "none"}
+                <UserText
+                  value={chat.diagnostics.toolKeys.map(displayText).join(", ") || "none"}
+                />
               </dd>
               <dt>Heartbeats</dt>
               <dd>{String(chat.diagnostics.heartbeatCount)}</dd>
@@ -615,7 +639,10 @@ export function ChatApp() {
                   citationId={citation.citation_id}
                   unavailable={citation.source_unavailable}
                   href={citationChipHref(citation.provenance.url)}
-                  onSelect={() => setSelectedCitation(citation)}
+                  onSelect={(trigger) => {
+                    citationTriggerRef.current = trigger;
+                    setSelectedCitation(citation);
+                  }}
                 />
               </li>
             ))}
@@ -623,7 +650,10 @@ export function ChatApp() {
           <CitationDrawer
             citation={selectedCitation}
             onClose={() => setSelectedCitation(null)}
+            returnFocusRef={citationTriggerRef}
           />
+
+          <ReviewedContentFixtures />
 
           <h2>Feedback</h2>
           <div className={styles.row}>

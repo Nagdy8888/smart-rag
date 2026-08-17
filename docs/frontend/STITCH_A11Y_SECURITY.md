@@ -17,6 +17,7 @@ content rules in this file still apply.
 Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md) ·
+[A11Y_SECURITY_IMPLEMENTATION.md](./A11Y_SECURITY_IMPLEMENTATION.md) ·
 [docs index](../README.md)
 
 ## Keyboard, focus, live regions
@@ -113,3 +114,12 @@ cells, and answers must not execute. Narrow 390px, 200% zoom, long mixed
 strings, keyboard-only drawers, `prefers-reduced-motion`. Forged admin POST,
 unauthorized source href, diagnostic leakage, raw errors, test-auth in
 production UI: all denied or absent.
+
+## Phase 8 implementation
+
+Packet P08-05 implements this review in
+[A11Y_SECURITY_IMPLEMENTATION.md](./A11Y_SECURITY_IMPLEMENTATION.md).
+Logical offsets, CSP (production without `'unsafe-eval'`), error focus,
+drawer restore, roving lists, generic 5xx copy, and RTL/mobile gap fills
+are recorded there. Missing Stitch RTL/mobile frames remain a gap fill,
+not a waiver.

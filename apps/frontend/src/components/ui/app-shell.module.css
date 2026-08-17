@@ -44,6 +44,17 @@
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-1);
   padding: calc(var(--space) * 4);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.navMenu summary {
+  cursor: pointer;
+  min-height: var(--row-height);
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .brand {
@@ -101,5 +112,11 @@
     flex: 0 0 var(--nav-width);
     border-bottom: none;
     border-inline-end: 1px solid var(--color-border);
+    max-height: none;
+    overflow: visible;
+  }
+
+  .navMenu summary {
+    display: none;
   }
 }

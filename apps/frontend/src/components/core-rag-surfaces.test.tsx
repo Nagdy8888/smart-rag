@@ -126,6 +126,8 @@ describe("CitationDrawer", () => {
     render(<CitationDrawer citation={citation} onClose={() => undefined} />);
     expect(screen.getByText(XSS_FILENAME, { exact: false })).toBeInTheDocument();
     expect(screen.getByText(XSS_ENTITY, { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("ACME")).toBeInTheDocument();
+    expect(document.querySelector("mark")?.textContent).toBe("ACME");
     expect(screen.queryByRole("link", { name: /https:\/\// })).toBeNull();
     expect(document.querySelector("script")).toBeNull();
   });

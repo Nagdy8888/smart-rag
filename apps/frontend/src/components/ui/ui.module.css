@@ -60,7 +60,7 @@
 }
 
 .pillWarning {
-  color: var(--color-warning);
+  color: var(--color-text);
   border-color: var(--color-warning);
 }
 
@@ -84,8 +84,17 @@
 }
 
 .bannerWarning {
-  color: var(--color-warning);
+  color: var(--color-text);
   border-color: var(--color-warning);
+}
+
+.warningGlyph {
+  display: inline-block;
+  margin-inline-end: calc(var(--space) * 2);
+  color: var(--color-warning);
+  font-weight: 700;
+  font-size: 1.125rem;
+  line-height: 1;
 }
 
 .bannerSuccess {
@@ -103,6 +112,7 @@
 }
 
 .calloutWarning {
+  color: var(--color-text);
   border-color: var(--color-warning);
 }
 
@@ -260,10 +270,92 @@
 
 .userText {
   unicode-bidi: isolate;
+  line-height: var(--line-height-ar);
+  overflow-wrap: anywhere;
 }
 
 .codeText {
   unicode-bidi: isolate;
   font-family: var(--font-mono);
   overflow-wrap: anywhere;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.logicalMark {
+  background: transparent;
+  color: var(--color-text);
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-decoration-color: var(--color-accent);
+}
+
+.drawer {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space) * 3);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+}
+
+.drawerHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space) * 2);
+  min-height: var(--row-height);
+}
+
+.rovingList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.rovingList > li,
+.rovingList button {
+  min-height: var(--row-height);
+}
+
+.rovingList button {
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 0 calc(var(--space) * 2);
+}
+
+.fixturePanel {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space) * 3);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+
+.fixturePanel h2 {
+  font-size: 1rem;
+}
+
+.fixtureNote {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.diacriticLine {
+  line-height: var(--line-height-ar);
+}
+
+.longUrl {
+  display: inline-block;
+  max-width: 100%;
 }

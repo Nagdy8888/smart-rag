@@ -18,6 +18,9 @@ export type LimitationCalloutProps = {
  *
  * @param props - Signed copy. Do not invent bypass language.
  * @returns Status region. No fetch side effects.
+ * @remarks
+ * A11Y-02: warning body uses `#0F172A` plus an icon, not warning-colored
+ * small text alone.
  */
 export function LimitationCallout({
   children,
@@ -33,6 +36,11 @@ export function LimitationCallout({
   const body = typeof children === "string" ? displayText(children) : children;
   return (
     <p className={combined} role="status">
+      {tone === "warning" ? (
+        <span className={styles.warningGlyph} aria-hidden="true">
+          !
+        </span>
+      ) : null}
       {body}
     </p>
   );

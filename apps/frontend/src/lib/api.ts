@@ -173,6 +173,11 @@ export type DeletedFailure = {
   kind: "deleted";
 };
 
+export type ServerFailure = {
+  kind: "server";
+  status: number;
+};
+
 export type ApiFailure =
   | HandshakeFailure
   | AuthFailure
@@ -180,20 +185,38 @@ export type ApiFailure =
   | FailClosedFailure
   | BudgetFailure
   | RateFailure
-  | DeletedFailure;
+  | DeletedFailure
+  | ServerFailure;
+
+/**
+ * Return whether a FastAPI `detail` looks like a short code, not a trace.
+ *
+ * @param value - Candidate detail.
+ * @returns True for `snake_case` / `MFA required` codes at most 64 chars.
+ */
+export function isSafeDetailCode(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === "MFA required") {
+    return true;
+  }
+  return /^[a-z][a-z0-9_]{0,63}$/i.test(trimmed);
+}
 
 /**
  * Read a sanitized `detail` string from a FastAPI JSON body.
  *
  * @param body - Parsed object.
- * @param fallback - Used when `detail` is missing or not a string.
+ * @param fallback - Used when `detail` is missing, not a string, or a trace.
  * @returns Code-like detail. Never exception text from unknown shapes.
  */
 export function sanitizedDetail(
   body: Record<string, unknown>,
   fallback: string,
 ): string {
-  return typeof body.detail === "string" ? body.detail : fallback;
+  if (typeof body.detail !== "string") {
+    return fallback;
+  }
+  return isSafeDetailCode(body.detail) ? body.detail : fallback;
 }
 
 /**
@@ -273,7 +296,26 @@ export function classifyApiError(
   if (status === 404) {
     return { kind: "deleted" };
   }
+  if (status >= 500) {
+    return { kind: "server", status };
+  }
   return null;
+}
+
+/**
+ * Map a non-OK response to a typed failure, using generic copy for unknowns.
+ *
+ * @param status - HTTP status.
+ * @param body - JSON-ish object.
+ * @param headers - Optional headers for `Retry-After`.
+ * @returns Never null when the caller already knows the response failed.
+ */
+export function classifiedOrGenericFailure(
+  status: number,
+  body: Record<string, unknown>,
+  headers?: Headers | Record<string, string>,
+): ApiFailure {
+  return classifyApiError(status, body, headers) ?? { kind: "server", status };
 }
 
 /**
@@ -324,12 +366,15 @@ export function throwClassifiedAdminError(
     if (detail === "forbidden" || detail === "authorization_rejected") {
       throw new Error("forbidden");
     }
-    throw new Error(detail);
+    throw new Error("request_rejected");
+  }
+  if (classified?.kind === "server") {
+    throw new Error("request_rejected");
   }
   if (status === 409) {
     throw new Error(sanitizedDetail(body, "stale_row_version"));
   }
-  throw new Error(sanitizedDetail(body, "request_rejected"));
+  throw new Error("request_rejected");
 }
 
 async function readJsonObject(response: Response): Promise<Record<string, unknown>> {
@@ -1696,7 +1741,11 @@ export async function startMessageStream(
     return {
       response: admitResponse,
       admission: null,
-      failure: classifyApiError(admitResponse.status, body, admitResponse.headers),
+      failure: classifiedOrGenericFailure(
+        admitResponse.status,
+        body,
+        admitResponse.headers,
+      ),
       resumed: false,
     };
   }
@@ -1707,7 +1756,7 @@ export async function startMessageStream(
     return {
       response: stream,
       admission,
-      failure: classifyApiError(stream.status, body, stream.headers),
+      failure: classifiedOrGenericFailure(stream.status, body, stream.headers),
       resumed: false,
     };
   }
@@ -1747,7 +1796,7 @@ export async function startOrResumeMessageStream(
       return {
         response: stream,
         admission: null,
-        failure: classifyApiError(stream.status, body, stream.headers),
+        failure: classifiedOrGenericFailure(stream.status, body, stream.headers),
         resumed: true,
       };
     }

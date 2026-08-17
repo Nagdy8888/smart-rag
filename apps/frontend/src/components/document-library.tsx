@@ -6,6 +6,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { HandshakeBanner } from "./auth/auth-screens";
@@ -13,6 +14,7 @@ import { Button } from "./ui/button";
 import { FileDropZone } from "./ui/file-drop-zone";
 import { Input } from "./ui/input";
 import { LimitationCallout } from "./ui/limitation-callout";
+import { RovingList } from "./ui/roving-list";
 import { StatusBanner } from "./ui/status-banner";
 import { StatusPill } from "./ui/status-pill";
 import { UserText } from "./ui/user-text";
@@ -67,6 +69,7 @@ function newIdempotencyKey(): string {
  */
 export function DocumentLibrary() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const session = useSession();
   const accessToken = session.accessToken;
   const auth = useMemo<ApiAuth | null>(
@@ -323,19 +326,32 @@ export function DocumentLibrary() {
         {(documentsQuery.data ?? []).length === 0 ? (
           <p className={styles.muted}>No documents you can see</p>
         ) : null}
-        <div className={styles.cards}>
-          {(documentsQuery.data ?? []).map((doc) => (
-            <article key={doc.document_id} className={styles.card}>
-              <h3>
-                <Link href={`/documents/${doc.document_id}`}>
-                  <UserText value={doc.title ?? doc.document_id} />
-                </Link>
-              </h3>
+        <RovingList
+          aria-label="Documents"
+          className={styles.list}
+          items={(documentsQuery.data ?? []).map((doc) => ({
+            id: doc.document_id,
+            item: doc,
+          }))}
+          onSelect={(doc) => {
+            void router.push(`/documents/${doc.document_id}`);
+          }}
+        >
+          {(doc) => (
+            <>
+              <UserText value={doc.title ?? doc.document_id} />
+              {" — "}
               <StatusPill status={doc.visibility} />
-              <p className={styles.muted}>
+            </>
+          )}
+        </RovingList>
+        <ul className={styles.list} aria-label="Version status shortcuts">
+          {(documentsQuery.data ?? []).map((doc) => (
+            <li key={`status-${doc.document_id}`}>
+              <span className={styles.muted}>
                 current_version_id{" "}
                 <UserText value={doc.current_version_id ?? "none"} />
-              </p>
+              </span>
               {doc.current_version_id ? (
                 <Button
                   type="button"
@@ -344,9 +360,9 @@ export function DocumentLibrary() {
                   Load status
                 </Button>
               ) : null}
-            </article>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
       {version ? (

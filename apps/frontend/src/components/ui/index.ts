@@ -18,6 +18,10 @@ export { StatusBanner } from "./status-banner";
 export { StatusPill } from "./status-pill";
 export { Textarea } from "./textarea";
 export { CodeText, UserText } from "./user-text";
+export { Drawer } from "./drawer";
+export { LogicalHighlight } from "./logical-highlight";
+export { RovingList } from "./roving-list";
+export { ReviewedContentFixtures } from "./reviewed-content-fixtures";
 
 export type { AppShellProps } from "./app-shell";
 export type { BadgeProps } from "./badge";
@@ -34,3 +38,6 @@ export type { StatusBannerKind, StatusBannerProps } from "./status-banner";
 export type { StatusPillProps, StatusTone } from "./status-pill";
 export type { TextareaProps } from "./textarea";
 export type { CodeTextProps, UserTextProps } from "./user-text";
+export type { DrawerProps } from "./drawer";
+export type { LogicalHighlightProps } from "./logical-highlight";
+export type { RovingListItem, RovingListProps } from "./roving-list";

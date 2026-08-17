@@ -147,4 +147,29 @@ describe("prohibited production patterns", () => {
     }
     expect(hits).toEqual([]);
   });
+
+  it("keeps production CSP without CDN hosts and without always-on unsafe-eval", () => {
+    const config = readFileSync(path.join(frontendRoot, "next.config.ts"), "utf8");
+    expect(config).toContain("X-Content-Type-Options");
+    expect(config).toContain("nosniff");
+    expect(config).toContain("X-Frame-Options");
+    expect(config).toContain("DENY");
+    expect(config).toContain("Referrer-Policy");
+    expect(config).toContain("no-referrer");
+    expect(config).toContain("Content-Security-Policy");
+    expect(config).toContain("font-src 'self'");
+    expect(config).toContain("img-src 'self' data:");
+    expect(config).toContain("Permissions-Policy");
+    expect(config).toContain("X-DNS-Prefetch-Control");
+    expect(config).not.toMatch(/cdn\.tailwindcss\.com/);
+    expect(config).not.toMatch(/fonts\.googleapis\.com/);
+    expect(config).toContain("NODE_ENV === \"development\"");
+    expect(config).toContain("'unsafe-eval'");
+    expect(config).toContain(": \"'self' 'unsafe-inline'\"");
+  });
+
+  it("does not send X-Test headers from api.ts", () => {
+    const api = readFileSync(path.join(srcRoot, "lib/api.ts"), "utf8");
+    expect(api).not.toMatch(/["']X-Test-/);
+  });
 });

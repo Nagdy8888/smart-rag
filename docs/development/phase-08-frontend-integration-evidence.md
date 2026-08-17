@@ -474,3 +474,114 @@ Revert the new App Router folders and administration clients, restore
 Chat/Documents/Graph/Tables-only nav, and delete
 `docs/frontend/ADMINISTRATION.md` plus this evidence section. Leave
 packets 1--3 primitives, Auth, and core RAG surfaces in place.
+
+## Packet 5 — Apply accessibility, RTL, CSP, and generic production errors
+
+### Requirement (quoted)
+
+> Apply strict escaping, CSP/security headers, WCAG AA behavior, Arabic RTL/bidirectional text, keyboard navigation, responsive layouts, and generic production errors. Treat the lack of RTL/mobile-specific Stitch frames as missing design evidence, not a waiver: add reviewed Arabic/mixed-direction fixtures, logical citation highlighting, responsive breakpoints, focus/live-region behavior, reduced-motion behavior, and security tests while rejecting every prohibited generated-HTML pattern above.
+
+### Concrete acceptance checks
+
+- XSS fixtures render as inert text and CSP/security-header tests pass.
+- Desktop/mobile LTR/RTL tasks are complete at required breakpoints and zoom, with correct logical citation interaction.
+- Keyboard, focus, live-region, reduced-motion, and WCAG AA checks pass across auth, chat, documents, graph, tables, and administration.
+- Errors are generic in production while retaining safe recovery and correlation behavior.
+- No runtime Tailwind CDN, inline handler/script, `innerHTML`, mock/random auth, placeholder link, third-party avatar, static live diagnostic, CSP-violating dependency, demo data, dead link, unsafe markup, or test bypass remains.
+
+### RTL / mobile gap fills (missing Stitch frames are not a waiver)
+
+The delivered export still has no RTL or mobile frames. Packet 5 ships
+reviewed fixtures rather than inventing Stitch routes:
+
+| Gap | Fill |
+| --- | --- |
+| Mixed message | `راجع INV-SR-8801 في https://example.com/q?id=12 — القسم 3.` in `ReviewedContentFixtures` |
+| Logical highlight | `الشركة ACME وقعت العقد.` codepoint offsets 7–11 (`ACME`) via `highlightLogicalRange` |
+| Diacritics | `إِنَّ` at line-height 1.75 |
+| Long URL | wrap inside `dir="ltr"` isolate |
+| XSS / `javascript:` / `\u202E` | `UserText` / `CodeText` only |
+| 390px nav overflow | `<details>` Menu (no hash placeholder) plus scrollable nav |
+| 200% zoom | Playwright viewport 640×400 on `/login` stub composer, banners, chips |
+
+Citations HTTP has no offset fields (GAP-07-09). The helper and drawer
+demo use the reviewed fixture; no invented API offset fields.
+
+### CSP / headers
+
+Production `script-src` is `'self' 'unsafe-inline'`. `'unsafe-eval'` is
+development-only. Next.js 16.3 documents that React uses `eval` for
+debug info in development and that production React/Next do not require
+`'unsafe-eval'` by default. `'unsafe-inline'` remains because this app
+does not emit CSP nonces. Added `Permissions-Policy` and
+`X-DNS-Prefetch-Control: off`. No CDN hosts. `api.ts` does not send
+`X-Test-*`.
+
+### Generic production errors
+
+Unknown 5xx and unclassified mutation `Error.message` values map to
+**Something went wrong.** Login still shows only **Sign in failed**.
+Traceback-shaped FastAPI `detail` is discarded. Reconnect/retry remain.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `apps/frontend/next.config.ts` | Dev-only `'unsafe-eval'`; Permissions-Policy; DNS prefetch off |
+| `apps/frontend/src/lib/highlight-logical-range.ts` | Codepoint highlight helper + ACME fixture |
+| `apps/frontend/src/lib/contrast.ts` | WCAG relative-luminance helper |
+| `apps/frontend/src/lib/failure-copy.ts` | Generic 5xx copy |
+| `apps/frontend/src/lib/api.ts` | `server` failure kind; safe detail codes |
+| `apps/frontend/src/components/ui/*` | Error focus, drawer trap, roving list, fixtures, warning icon |
+| `apps/frontend/src/components/chat-app.tsx` | Drawer restore, conversation listbox, generic terminal error |
+| `apps/frontend/src/components/document-library.tsx` | Document listbox |
+| `apps/frontend/src/components/auth/auth-screens.tsx` | Fixtures on login; invitation errors generic |
+| `apps/frontend/tests/e2e/a11y-security.spec.ts` | Skip-link Tab, zoom, Menu, no Auth traces |
+| `docs/frontend/A11Y_SECURITY_IMPLEMENTATION.md` | Created |
+| `docs/frontend/STITCH_A11Y_SECURITY.md` | Phase 8 pointer |
+| `docs/README.md` | Index row |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend exec next typegen` | 0 |
+| `pnpm --filter smart-rag-frontend exec tsc --noEmit` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (27 files, 123 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 (no Stitch/frame/admin gallery routes) |
+| `pnpm exec playwright test` (cwd `apps/frontend`) | 0 (19 passed, 4 skipped) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (117 markdown files, 0 lint issues; links + Mermaid render) |
+
+Playwright skips: live FastAPI `/health/ready` when 127.0.0.1:8000 is down;
+authenticated Auto chrome, document 404, and company-usage 403 when no
+Auth session exists.
+
+### Negative findings
+
+- XSS filename/entity, `javascript:alert(1)`, and `\u202E` remain text nodes
+- ACME highlight is codepoint offsets 7–11, not UTF-16 visual order
+- Escape closes the source drawer and restores the citation chip
+- Unknown 500 traceback details never appear in banners
+- Production CSP source omits always-on `'unsafe-eval'`
+- No `X-Test-` header literals in `api.ts`
+- Prohibited-pattern scan still forbids CDN, `innerHTML`, hash placeholders, blur, Google Fonts, avatars, `Math.random`, test-auth bypass
+
+### Unverified
+
+- Live WCAG lab measurement of every computed style beyond token hex pairs
+- Authenticated Playwright chat composer at 200% zoom (unsigned login hosts the stub composer/chip fixtures)
+- Self-hosted Arabic font files (system stack only)
+- Packet 6 full role/routing Playwright journeys
+
+### Open gaps for P08-06
+
+- Complete Playwright journeys for roles, reconnect, API skew, table provenance, curation, graph evidence, and limitation families
+- Do not start packet 6 until this evidence is accepted
+
+### Rollback
+
+Revert the P08-05 frontend a11y/CSP/error files, restore previous
+`next.config.ts` CSP, and delete
+`docs/frontend/A11Y_SECURITY_IMPLEMENTATION.md` plus this evidence
+section. Leave packets 1--4 surfaces in place. Phase 8 stays `pending`.

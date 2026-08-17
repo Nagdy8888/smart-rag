@@ -109,6 +109,26 @@ describe("classifyApiError", () => {
     });
   });
 
+  it("maps unknown 5xx to a generic server failure", () => {
+    expect(
+      classifyApiError(500, {
+        detail: "Traceback (most recent call last): boom",
+      }),
+    ).toEqual({ kind: "server", status: 500 });
+  });
+
+  it("does not treat a traceback string as a safe detail code", () => {
+    expect(
+      classifyApiError(401, {
+        detail: "Traceback (most recent call last): AuthApiError",
+      }),
+    ).toEqual({
+      kind: "auth",
+      status: 401,
+      detail: "unauthorized",
+    });
+  });
+
   it("maps 429 concurrency_limit", () => {
     expect(classifyApiError(429, { detail: "concurrency_limit" })).toEqual({
       kind: "rate",

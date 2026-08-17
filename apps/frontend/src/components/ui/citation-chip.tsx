@@ -15,8 +15,11 @@ export type CitationChipProps = {
   unavailable?: boolean;
   /** Optional safe http(s) href. Callers must pass `isSafeHttpUrl` first. */
   href?: string | null;
-  /** Optional select handler when the chip is a button. */
-  onSelect?: () => void;
+  /**
+   * Select handler when the chip is a button. Receives the chip element
+   * so a drawer can restore focus.
+   */
+  onSelect?: (trigger: HTMLButtonElement) => void;
 };
 
 /**
@@ -26,7 +29,7 @@ export type CitationChipProps = {
  * @returns Anchor when `href` is set, otherwise a button or span.
  * @remarks
  * Security: `href` is not validated here. Do not pass `javascript:` URLs.
- * Opening a source drawer is a later packet; this chip does not fetch.
+ * GAP-07-09 keeps production `href` null.
  */
 export function CitationChip({
   index,
@@ -62,7 +65,12 @@ export function CitationChip({
     );
   }
   return (
-    <button type="button" className={className} onClick={onSelect} aria-label={name}>
+    <button
+      type="button"
+      className={className}
+      onClick={(event) => onSelect?.(event.currentTarget)}
+      aria-label={name}
+    >
       {body}
     </button>
   );
