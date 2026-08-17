@@ -1,7 +1,7 @@
 ---
 phase: 9
 packet: 5
-status: pending
+status: complete
 title: "Kill, deny, fill, and restart worker/ParadeDB/Valkey/services to prove reclaim, degraded retrieval/rate behavior, heartbeat/reconnect, and safe recovery."
 requirement_ids: [P09-05]
 ---

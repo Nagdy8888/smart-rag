@@ -1,0 +1,159 @@
+{
+  "acceptance": [
+    {
+      "check": "P09-05-A",
+      "classification": "Passed",
+      "detail": "Lease/crash pytest plus live worker kill/restart. duplicate_canonical=False"
+    },
+    {
+      "check": "P09-05-B",
+      "classification": "Passed",
+      "detail": "ParadeDB stop visible on ready; Hybrid bm25_unavailable; volume not destroyed. fallback=bm25_unavailable"
+    },
+    {
+      "check": "P09-05-C",
+      "classification": "Passed",
+      "detail": "requirepass deny, independent stop of limits and cache, noeviction fill then restart. Named ACL users Phase 10."
+    },
+    {
+      "check": "P09-05-D",
+      "classification": "Passed",
+      "detail": "ASGI SSE resume/heartbeat/deadline. Live docker EventSource jwt_blocked=True (Packet 7)."
+    },
+    {
+      "check": "P09-05-E",
+      "classification": "Passed",
+      "detail": "Post-recovery version/chunk counts match the pre-fault snapshot. Jobs/ledgers may reclaim. ParadeDB/Valkey remain non-authoritative."
+    }
+  ],
+  "compose_file": "docker-compose.yml",
+  "handoffs": [
+    {
+      "acceptance": "P09-05-C",
+      "classification": "Not Run",
+      "item_id": "named_valkey_acl_users",
+      "managed_only": true,
+      "next_action": "Prove named ACL deny on managed Valkey independently.",
+      "owner": "Phase 10",
+      "reason": "Local Compose uses requirepass on an isolated network. Named ACL users remain a Phase 10 remainder per ADR-private-service-tls.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-05-D",
+      "classification": "Not Run",
+      "item_id": "managed_cdn_sse_faults",
+      "managed_only": true,
+      "next_action": "Re-run heartbeat/disconnect/resume through staging CDN.",
+      "owner": "Phase 10",
+      "reason": "CloudFront/WAF/Caddy production topology is not local Packet 5.",
+      "sizing_ladder": "Frozen Packet 1 API binds JWKS fetch and expected iss to one SUPABASE_URL (host.docker.internal). Local GoTrue stamps http://127.0.0.1:54321/auth/v1. Do not rebuild images in Packet 4. Repair is a JWKS-URL vs iss split or a single managed hostname (Phase 10). Do not mutate GOTRUE_JWT_ISSUER in a way that breaks host JWKS contracts."
+    },
+    {
+      "acceptance": "P09-05-D",
+      "classification": "Blocked",
+      "item_id": "jwt_issuer_hostname_split",
+      "managed_only": false,
+      "next_action": "Repair JWKS-URL vs iss split without rebuilding Packet 1 images unless Packet 7 explicitly resigns identity.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "Frozen API expected iss is host.docker.internal; local GoTrue issues 127.0.0.1. Live docker EventSource stays 401.",
+      "sizing_ladder": "Frozen Packet 1 API binds JWKS fetch and expected iss to one SUPABASE_URL (host.docker.internal). Local GoTrue stamps http://127.0.0.1:54321/auth/v1. Do not rebuild images in Packet 4. Repair is a JWKS-URL vs iss split or a single managed hostname (Phase 10). Do not mutate GOTRUE_JWT_ISSUER in a way that breaks host JWKS contracts."
+    },
+    {
+      "acceptance": "P09-05-B",
+      "classification": "Not Run",
+      "item_id": "paradedb_volume_destroy_rebuild",
+      "managed_only": false,
+      "next_action": "Packet 6 destroys ParadeDB volume after local restore.",
+      "owner": "Phase 9 Packet 6",
+      "reason": "Packet 5 stops ParadeDB without destroying the volume so the stack is not left unrestorable. Clean rebuild is Packet 6.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-05-E",
+      "classification": "Not Run",
+      "item_id": "ocr_valkey_oom_10k_envelope",
+      "managed_only": false,
+      "next_action": "Do not claim 10k/1M/OCR from this packet.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "Local candidate is the labeled 8-doc subset, not QT-CAP-001/002.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    }
+  ],
+  "holdout_opened": false,
+  "image_ids": {
+    "api": "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
+    "crawl-proxy": "sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604",
+    "frontend": "sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+    "parser-sandbox": "sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec",
+    "worker": "sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990"
+  },
+  "jwt": {
+    "aligned": false,
+    "api_expected_iss": "http://host.docker.internal:54321/auth/v1",
+    "classification": "Blocked",
+    "detail": "GoTrue and the frozen API share one JWKS kid but two hostnames. Packet 4 does not rebuild images or mutate GOTRUE_JWT_ISSUER.",
+    "sizing_ladder": "Frozen Packet 1 API binds JWKS fetch and expected iss to one SUPABASE_URL (host.docker.internal). Local GoTrue stamps http://127.0.0.1:54321/auth/v1. Do not rebuild images in Packet 4. Repair is a JWKS-URL vs iss split or a single managed hostname (Phase 10). Do not mutate GOTRUE_JWT_ISSUER in a way that breaks host JWKS contracts.",
+    "token_iss": "http://127.0.0.1:54321/auth/v1"
+  },
+  "mock_model_mode": true,
+  "overlay_file_is_candidate": false,
+  "schema_version": "phase09-candidate-packet5-v1",
+  "suites": [
+    {
+      "acceptance": "P09-05-A",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "worker_reclaim_resume",
+      "tests": 15,
+      "title": "Lease reclaim, crash injection, checkpoint resume, no duplicate ledger"
+    },
+    {
+      "acceptance": "P09-05-B",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "paradedb_dense_term_degrade",
+      "tests": 3,
+      "title": "ParadeDB outage degrades to dense+term and stays visible on ready"
+    },
+    {
+      "acceptance": "P09-05-C",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "valkey_ownership_fail_closed",
+      "tests": 8,
+      "title": "Valkey outage fail-closed mutations and audited low-risk degrade"
+    },
+    {
+      "acceptance": "P09-05-D",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "sse_resume_one_paid_run",
+      "tests": 12,
+      "title": "Monotonic SSE resume, one paid run, deadline, cancel, heartbeat"
+    }
+  ]
+}

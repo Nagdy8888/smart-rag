@@ -1,0 +1,171 @@
+{
+  "compose_file": "docker-compose.yml",
+  "deny": {
+    "cache": {
+      "action": "wrong_password_ping",
+      "denied": true,
+      "named_acl_users": false,
+      "returncode": 0,
+      "service": "valkey-cache"
+    },
+    "denied": true,
+    "limits": {
+      "action": "wrong_password_ping",
+      "denied": true,
+      "named_acl_users": false,
+      "returncode": 0,
+      "service": "valkey-limits"
+    },
+    "named_acl_users": false
+  },
+  "fill": {
+    "action": "fill_noeviction",
+    "flush": {
+      "action": "flushdb",
+      "passed": true,
+      "returncode": 0,
+      "service": "valkey-limits"
+    },
+    "keys_accepted": 62,
+    "last_returncode": 0,
+    "passed": true,
+    "policy": "noeviction",
+    "recovered": true,
+    "rejected": true,
+    "service": "valkey-limits"
+  },
+  "holdout_opened": false,
+  "hybrid_degrade": {
+    "constructor": "paradedb_none_bm25_none",
+    "driver": "HybridRetriever.retrieve",
+    "fallback_reason": "bm25_unavailable",
+    "mock_model_mode": true,
+    "overlay_required": false,
+    "paradedb_reachable": false,
+    "passed": true,
+    "query_omitted": true,
+    "ranked_count": 100,
+    "sample_is_eight_doc_subset": true,
+    "schema_version": "phase09-candidate-packet5-hybrid-degrade-v1",
+    "unpublished_paradedb": true,
+    "worker_returncode": 0
+  },
+  "image_rebuilt": false,
+  "inject_degrade_returncode": 0,
+  "overlay_file_is_candidate": false,
+  "parade_rows_after": {
+    "bm25_chunks": 1051,
+    "returncode": 0,
+    "unpublished": true
+  },
+  "parade_rows_before": {
+    "bm25_chunks": 1051,
+    "returncode": 0,
+    "unpublished": true
+  },
+  "paradedb_down": {
+    "expected": "down",
+    "name": "paradedb",
+    "passed": true,
+    "query_ready": false,
+    "status": "down"
+  },
+  "paradedb_up": {
+    "expected": "ok",
+    "name": "paradedb",
+    "passed": true,
+    "query_ready": false,
+    "status": "ok"
+  },
+  "ready_sample": {
+    "dependencies": {
+      "database": "ok",
+      "lightrag": "unconfigured",
+      "model_gateway": "mock",
+      "paradedb": "ok",
+      "valkey_cache": "ok",
+      "valkey_limits": "ok"
+    },
+    "ok": true,
+    "query_ready": false,
+    "status": "degraded",
+    "status_code": 200
+  },
+  "restore": {
+    "image_rebuilt": false,
+    "overlay_attached": false,
+    "returncode": 0,
+    "services": [
+      "paradedb",
+      "valkey-limits",
+      "valkey-cache",
+      "worker",
+      "api"
+    ]
+  },
+  "schema_version": "phase09-candidate-packet5-fault-v1",
+  "start_paradedb": {
+    "action": "start",
+    "image_rebuilt": false,
+    "returncode": 0,
+    "service": "paradedb"
+  },
+  "start_valkey_cache": {
+    "action": "start",
+    "image_rebuilt": false,
+    "returncode": 0,
+    "service": "valkey-cache"
+  },
+  "start_valkey_limits": {
+    "action": "start",
+    "image_rebuilt": false,
+    "returncode": 0,
+    "service": "valkey-limits"
+  },
+  "stop_paradedb": {
+    "action": "stop",
+    "returncode": 0,
+    "service": "paradedb",
+    "volume_destroyed": false
+  },
+  "stop_valkey_cache": {
+    "action": "stop",
+    "returncode": 0,
+    "service": "valkey-cache",
+    "volume_destroyed": false
+  },
+  "stop_valkey_limits": {
+    "action": "stop",
+    "returncode": 0,
+    "service": "valkey-limits",
+    "volume_destroyed": false
+  },
+  "valkey_cache_down": {
+    "expected": "down",
+    "name": "valkey_cache",
+    "passed": true,
+    "query_ready": false,
+    "status": "down"
+  },
+  "valkey_limits_down": {
+    "expected": "down",
+    "name": "valkey_limits",
+    "passed": true,
+    "query_ready": false,
+    "status": "down"
+  },
+  "version_mismatch": {
+    "mismatch_mentions_version": true,
+    "mismatch_returncode": 1,
+    "ok_returncode": 0,
+    "passed": true,
+    "unpublished": true
+  },
+  "volume_destroyed": false,
+  "worker": {
+    "image_rebuilt": false,
+    "kill_returncode": 0,
+    "passed": true,
+    "start_returncode": 0
+  }
+}

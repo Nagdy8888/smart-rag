@@ -695,3 +695,66 @@ Artifacts:
 Packet 4 checkbox stays **unchecked** because P09-04-A is Blocked. Packet 2
 stays **unchecked**. Phase 9 wrapper `status` remains `pending`. Holdout was
 not opened.
+
+## Packet 5 — Failure, degradation, and recovery
+
+**Packet:** `Kill, deny, fill, and restart worker/ParadeDB/Valkey/services to prove reclaim, degraded retrieval/rate behavior, heartbeat/reconnect, and safe recovery.` (`P09-05-A` … `P09-05-E`).
+**Checkbox:** **checked**. P09-05-A–E **Passed**. Named Valkey ACL users and
+managed CDN SSE remain Phase 10 **Not Run**. Live docker EventSource stays
+JWT-blocked for Packet 7. ParadeDB volume destroy stays Packet 6.
+
+Candidate compose stayed `docker-compose.yml` only. Overlay was **not**
+attached. Packet 1 image Ids were unchanged. Packet 2 labeled document ids
+were unchanged. Holdout was not opened. ParadeDB volume was **not**
+destroyed. Worker/ParadeDB/Valkey were restored; `phase09_candidate.py health`
+exit 0 after the drill.
+
+```mermaid
+flowchart LR
+  baseline[Canonical snapshot]
+  worker[Kill and restart worker]
+  parade[Stop ParadeDB]
+  degrade[Hybrid bm25_unavailable]
+  valkey[Deny fill stop limits and cache]
+  restore[Restore services]
+  baseline --> worker --> parade --> degrade --> valkey --> restore
+  parade --> readyDown["GET /health/ready paradedb=down"]
+  restore --> health[Candidate health]
+```
+
+### Acceptance
+
+| Check | Class | Evidence |
+| --- | --- | --- |
+| P09-05-A | Passed | Lease/crash/checkpoint pytest 15/0/0/0. Live worker kill/restart. Versions/chunks did not increase. |
+| P09-05-B | Passed | Ready showed `paradedb=down`. Worker Hybrid `fallback_reason=bm25_unavailable` with ParadeDB unreachable. Normalization version mismatch fail-closed. `bm25_chunks` 1051 before and after restart. Volume not destroyed. |
+| P09-05-C | Passed | Auth rate-limit pytest 8/0/0/0. Wrong requirepass denied on limits and cache. Each instance stop visible on ready. Limits noeviction fill accepted 62 x 1MiB keys then rejected; restart + FLUSHDB recovered. Named ACL users Phase 10. |
+| P09-05-D | Passed | ASGI resume/heartbeat/deadline 12/0/0/0. Five-stream lag remains Packet 4. Live docker EventSource JWT Blocked (Packet 7). CDN Not Run (Phase 10). |
+| P09-05-E | Passed | Pre/post snapshot versions 248 / chunks 604 matched. Identity held. Health after restore exit 0. ParadeDB/Valkey remained non-authoritative. |
+
+The 248/604 counts are the whole local database at Packet 5 time, not a claim
+that the labeled corpus grew. Packet 2 `p4-exact_code-0003` document id
+stayed `3367635d-7b03-4be7-945c-dd207c848e02`. Ingestion job counts may
+change during reclaim.
+
+### Sizing ladder / later handoff
+
+- `jwt_issuer_hostname_split` remains Packet 7.
+- Named Valkey ACL users and managed-host/CDN faults remain Phase 10.
+- ParadeDB volume destroy + clean BM25 rebuild remains Packet 6.
+- Do not claim QT-CAP-001/002/OCR from this packet.
+
+### Commands and exit codes
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff check` on Packet 5 files | 0 | |
+| `uv run python -m pytest tests/unit/test_phase09_packet5.py -q` | 0 | 13 passed |
+| `uv run python scripts/ci/check_phase09_packet5.py` | 0 | pytest 15+3+8+12; live kill/deny/fill/restore |
+| `uv run python scripts/phase09_candidate.py health` | 0 | after restore |
+
+Artifacts:
+`docs/deployment/phase-09/candidate-packet5-{gate-matrix,fault-matrix,reconcile}.json`.
+
+Packet 4 stays **unchecked** (P09-04-A Blocked). Packet 2 stays **unchecked**.
+Phase 9 wrapper `status` remains `pending`. Holdout was not opened.

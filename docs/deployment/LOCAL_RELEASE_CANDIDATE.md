@@ -59,6 +59,9 @@ Later packets consume these committed artifacts under
 | `candidate-packet4-pools.json` | `pg_stat_activity` snapshot versus 30 < 42 |
 | `candidate-packet4-resources.json` | Docker stats peaks; OCR/Valkey-OOM/EC2 Not Run |
 | `candidate-packet4-bm25.json` | Worker re-projection through existing `Bm25ProjectionService` |
+| `candidate-packet5-gate-matrix.json` | Packet 5 P09-05-A–E Passed/Failed/Blocked/Not Run matrix |
+| `candidate-packet5-fault-matrix.json` | Kill/deny/fill/restart commands and timelines (no secrets) |
+| `candidate-packet5-reconcile.json` | Pre/post canonical counts and health after restore |
 
 A changed git SHA, lockfile, Dockerfile, or image Id invalidates Packet 1
 evidence. Rebuild and reseed; do not reuse a stale digest.
@@ -163,6 +166,11 @@ is already migrated.
    `docker-compose.packet8.yml` is detached when host ports are published.
    Managed pooling/EC2/CDN stay Phase 10 Not Run. Packet 5 owns
    kill/deny/fill/restart.
+10. Packet 5 records a canonical snapshot, kills/restarts the worker, stops
+    ParadeDB (volume kept) to prove dense+term degrade, independently
+    stops/denies/fills each Valkey instance, then restores candidate
+    health. Overlay is not candidate identity. Named ACL users and CDN
+    SSE remain Phase 10. Do not destroy ParadeDB volumes here (Packet 6).
 
 ```mermaid
 flowchart TD

@@ -25,6 +25,7 @@ uv run python scripts/ci/check_phase09_packet1.py
 uv run python scripts/ci/check_phase09_packet2.py --mode candidate
 uv run python scripts/ci/check_phase09_packet3.py --mode candidate
 uv run python scripts/ci/check_phase09_packet4.py
+uv run python scripts/ci/check_phase09_packet5.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -150,6 +151,21 @@ Do not claim QT-CAP-001/002/003. Do not kill worker/ParadeDB/Valkey (Packet
 
 ```powershell
 uv run python scripts/ci/check_phase09_packet4.py
+uv run python scripts/phase09_candidate.py health
+```
+
+The Phase 9 Packet 5 gate is local-only and is not a GitHub PR job. It
+fail-closes on zero collection, failures, errors, skipped mandatory local
+tests, Packet 2 corpus-identity drift, or Packet 1 image-Id drift. Candidate
+compose is `docker-compose.yml` only. It kills, denies, fills, and restarts
+worker/ParadeDB/Valkey, then restores them. It does not destroy the ParadeDB
+volume (Packet 6), rebuild images, or set `SMART_RAG_HOLDOUT_ACCESS=true`.
+Named Valkey ACL users and managed CDN SSE faults stay Phase 10. Live docker
+EventSource remains JWT-blocked for Packet 7; ASGI resume/heartbeat is the
+local proof.
+
+```powershell
+uv run python scripts/ci/check_phase09_packet5.py
 uv run python scripts/phase09_candidate.py health
 ```
 

@@ -63,8 +63,10 @@ Phase 9 Packet 1 candidate freeze/seed
 (`scripts/phase09_candidate.py`, `scripts/ci/check_phase09_packet1.py`),
 Packet 2 local CI/security gates (`scripts/ci/check_phase09_packet2.py`),
 Packet 3 quality/latency/BM25/graph measurement
-(`scripts/ci/check_phase09_packet3.py`), and Packet 4
-foreground-plus-maintenance load (`scripts/ci/check_phase09_packet4.py`)
+(`scripts/ci/check_phase09_packet3.py`), Packet 4
+foreground-plus-maintenance load (`scripts/ci/check_phase09_packet4.py`),
+and Packet 5 worker/ParadeDB/Valkey fault recovery
+(`scripts/ci/check_phase09_packet5.py`)
 are local gates. They are not added to the GitHub PR job graph. See
 [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
 
