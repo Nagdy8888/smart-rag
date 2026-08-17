@@ -1,0 +1,79 @@
+{
+  "ceilings": {
+    "bm25_scan_cap": 300,
+    "bm25_survivor_cap": 75,
+    "duplicate_lightrag_keyword_extraction": false,
+    "families": [
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 25,
+        "deadline_target": 25,
+        "family": "hybrid",
+        "model_call_ceiling": 7,
+        "model_call_passed": true,
+        "model_call_target": 7,
+        "tool_ceiling": 4
+      },
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 45,
+        "deadline_target": 45,
+        "family": "combined",
+        "model_call_ceiling": 8,
+        "model_call_passed": true,
+        "model_call_target": 8,
+        "tool_ceiling": 4
+      },
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 30,
+        "deadline_target": 30,
+        "family": "structured_table",
+        "model_call_ceiling": 6,
+        "model_call_passed": true,
+        "model_call_target": 6,
+        "tool_ceiling": 4
+      },
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 50,
+        "deadline_target": 50,
+        "family": "composite",
+        "model_call_ceiling": 9,
+        "model_call_passed": true,
+        "model_call_target": 9,
+        "tool_ceiling": 5
+      },
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 10,
+        "deadline_target": 10,
+        "family": "graph_inspection",
+        "model_call_ceiling": 3,
+        "model_call_passed": true,
+        "model_call_target": 3,
+        "tool_ceiling": 4
+      }
+    ],
+    "recursion_limit": 24,
+    "recursion_target": 24
+  },
+  "hardware": {
+    "docker_mem_bytes": 8131035136,
+    "docker_ncpu": 20,
+    "local_candidate_not_full_envelope": true,
+    "reduced_graph_version_envelope": 15,
+    "seeded_chunks": 16,
+    "seeded_document_versions": 8,
+    "seeded_graph_eligible_versions": 2
+  },
+  "mock_model_mode": true,
+  "profile_model_calls": 0,
+  "rerank_call_count": 0,
+  "rerank_call_count_note": "Identity/mock rerank. Live OpenAI Responses rerank was not run.",
+  "schema_version": "phase09-candidate-packet3-ledger-v1",
+  "tool_executions": 0,
+  "usd_currency": "USD",
+  "usd_note": "MOCK_MODEL_MODE=true. Mock gateway estimated_cost_usd is 0. Calls are still counted. This is not live OpenAI spend.",
+  "usd_total": 0.0
+}

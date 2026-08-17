@@ -449,3 +449,168 @@ because P09-02-A (Trivy) and P09-02-D (old-API smoke) are local Blocked, not
 Phase 10 managed-only handoffs. Phase 9 wrapper `status` remains `pending`.
 Holdout was not opened (`HoldoutAccess.denied()`). `SMART_RAG_HOLDOUT_ACCESS`
 was not set to `true`.
+
+## Packet 3 — Measure quality, latency, BM25, cost, and graph throughput
+
+Requirement ID: **P09-03**.
+
+### Requirement (quoted)
+
+> Measure Hybrid/Combined/table/inspection quality, BM25
+> projection/query/recheck/rebuild behavior, p50/p95/deadlines, model
+> calls/cost, graph survival, writer throughput, and onboarding ETA.
+
+### Concrete acceptance checks
+
+- **P09-03-A:** Zero ACL leaks; citation correctness ≥98%;
+  completeness/faithfulness ≥90%; routing ≥90%; Hybrid Recall@10 ≥85%;
+  exact Recall@5 ≥98%; alias Recall@10 ≥95%; Combined gain ≥10 points
+  within cost/latency. Evidence: immutable report. Failure: requalify/no-go.
+- **P09-03-B:** Route percentiles/deadlines and call/tool ceilings pass or
+  limits are reduced/re-signed. Evidence: raw samples/ledger. Failure:
+  sizing route.
+- **P09-03-C:** BM25 exact numeric/query/recheck/lag/outage/rebuild gates
+  pass. Evidence: BM25 report. Failure: blocker/envelope decision.
+- **P09-03-D:** Graph mapping, per-language survival, concurrency-one
+  throughput, ETA, cost, and seven-day maintenance are proven. Evidence:
+  graph report. Failure: reduce graph envelope/quarantine.
+
+```mermaid
+flowchart TD
+  identity["Packet 2 corpus and Packet 1 image Ids"] --> candidate["Candidate pytest plus profile coverage sidecar lag graph"]
+  candidate --> overlayAttach["Attach packet8 ParadeDB :54329 no-build"]
+  overlayAttach --> overlayRun["Overlay typed BM25 and ranked-ID live"]
+  overlayRun --> overlayDetach["Detach candidate compose"]
+  overlayDetach --> health["Re-prove unpublished ports"]
+  health --> matrix["Passed Failed Blocked Not Run vs QUALITY_TARGETS"]
+```
+
+### Identities and method
+
+HEAD consumed: Packet 2 `f71c04e`. Images were **not** rebuilt. Data identity
+is the Packet 2 reseed (`p4-exact_code-0003` document
+`3367635d-7b03-4be7-945c-dd207c848e02`), not Packet 1 ids. Hardware from
+`candidate-sizing-baseline.json`: Docker NCPU **20**, mem **8131035136**
+bytes. Seed is a labeled **8-version / 16-chunk / 2 graph-eligible** subset,
+not QT-CAP-001/002. Profile: `APP_ENV=local`, `MOCK_MODEL_MODE=true`.
+Holdout stayed sealed. Candidate compose is `docker-compose.yml` only.
+
+The Phase 4 runtime sidecar
+`tests/fixtures/evaluation/phase4/runtime/gold_id_map.json` is Packet 1
+identity and was **not** used for scoring. Packet 3 wrote
+`docs/deployment/phase-09/candidate-gold-id-map.json` from live
+`app.document_chunks` for the seven retrieve cases (graph-mapping omitted
+because ranked-ID retrieve excludes that class). ACL-negative chunks are
+tombstoned after the Packet 1 `deletion_pending` drive; mapping includes
+deleted rows so leak checks still have real UUIDs.
+
+Mock Recall@K is recorded and labeled `qt_eval_006_live=false`. Combined
+fixture ablation is **66.7 pp** and is **not** live QT-EVAL-009
+(`qt_eval_009_status()==unverified`). LightRAG keyword extraction was not
+duplicated (`query_keyword_extract=0`). Phase 5 freeze markdown was not
+rewritten.
+
+### Inspected paths (before edit)
+
+| Path | Result |
+| --- | --- |
+| `scripts/eval_phase4_ranked_ids.py` | Existing `--live` / `--split open`; added repeatable `--case-id` |
+| `scripts/eval_query_profile.py`, coverage, freeze, graph freeze CLIs | Inspected; freeze writers not invoked |
+| `tests/contract/test_paradedb_bm25.py` | Compose exec; no overlay |
+| `tests/contract/test_hybrid_retrieval.py::test_bm25_typed_query_and_injection` | Overlay host `:54329` |
+| `docs/QUALITY_TARGETS.md` | Signed QT-EVAL/LAT/DL/MC/BM25/GR/CAP rows |
+| `docs/evaluation/PHASE4_RANKED_IDS.md`, `PHASE5_GRAPH_EVAL.md` | Consumed; not rewritten |
+
+### Files changed (allowed outputs only)
+
+| File | Action |
+| --- | --- |
+| `packages/core/src/smart_rag_core/release/packet3.py` | Fail-closed matrix, sidecar, lag, graph snapshot |
+| `packages/core/src/smart_rag_core/release/constants.py` | Packet 3 schema versions |
+| `scripts/ci/check_phase09_packet3.py` | Candidate/overlay/all runner; zero collection fails |
+| `scripts/eval_phase4_ranked_ids.py` | `--case-id` fail-closed filter |
+| `tests/unit/test_phase09_packet3.py` | Mapping, mock≠live, ACL not averaged |
+| `docs/deployment/phase-09/candidate-packet3-*.json` | Quality, latency, ledger, BM25, graph, matrix |
+| `docs/deployment/phase-09/candidate-gold-id-map.json` | Packet 2 retrieve gold UUIDs |
+
+### P09-03-A through P09-03-D matrix
+
+| Check | Classification | Evidence | Notes |
+| --- | --- | --- | --- |
+| P09-03-A ACL leaks | **Passed** | `acl_leak_count=0` on 7-case live retrieve plus citation/coverage units 65/0/0/0 | Not averaged |
+| P09-03-A locator / citation correctness | **Passed** | Locator correctness **1.0** (n=7); QT-EVAL-002 threshold 0.98 | Retrieve locators, not answer-assembler completeness |
+| P09-03-A completeness / faithfulness | **Not Run** | QT-EVAL-003/004 live_model_required | Verifier fixtures only |
+| P09-03-A routing ≥90% | **Passed** | Routing matrix 59/0/0/0; query-profile development 216 and qualification 77 both `passed=true`; model_calls=0 | Holdout sealed |
+| P09-03-A Hybrid Recall@10 / exact@5 / alias@10 | **Not Run** | Mock Recall@10 **0.25**, exact@5 **1.0**, alias@10 **0.0**; `embeddings=mock`; `qt_eval_006_live=false` | Overlay recreate emptied BM25; live OpenAI eval is Packet 7 |
+| P09-03-A Combined +10pp | **Not Run** | Fixture ablation 66.7 pp; `combined_gain_live_status=unverified` | Not live Combined gain; no duplicate keyword extraction |
+| P09-03-A QT-CAP-001 10k versions | **Not Run** | Seed 8 versions | `local_candidate_not_full_envelope=true` |
+| P09-03-B first-evidence p95 | **Passed** | **560.8 ms** vs QT-LAT-001 2000 ms; n=7 | Ranked-ID CLI emits p95 only; p50 not invented. Empty BM25 after overlay. Packet 4 may invalidate under load |
+| P09-03-B first-token / completion p95 | **Not Run** | Stream samples absent | Packet 4 |
+| P09-03-B deadlines / model-call ceilings | **Passed** | `FAMILY_*` match QT-DL-001–005 and QT-MC-001–005; ceiling suite 13/0/0/0 | Recursion limit 24 |
+| P09-03-C tokenizer / Arabic / 75 / 300 / outage / recheck | **Passed** | Candidate BM25 suite 86/0/0/0; overlay typed/injection/delete/reconcile 4/0/0/0 | Compose exec kept ParadeDB unpublished for candidate |
+| P09-03-C seed lag vs 5 min | **Passed** | Outbox p50 **35.7 s**, p95 **98.9 s**, 42 completed / 66 jobs | Seed, not 1M chunks |
+| P09-03-C 1M rebuild | **Not Run** | 16 chunks | Packet 6/7 |
+| P09-03-D mapping / survival / resolver ACL | **Passed** | Graph suite 80/0/0/0; fixture language gates en 1.0 / ar+mixed 0.85 | Live LightRAG extraction P/R unverified |
+| P09-03-D concurrency-one throughput / ETA | **Not Run** | `eta_confidence=insufficient-sample`; `documents_per_hour=null`; mapping_verified_count=0 | Do not invent docs/hour |
+| P09-03-D 2k Graph Ready in 7 days | **Blocked** | Sequential 600s cap 1008; Packet 8 envelope **15** | Bulk onboarding blocked; not Phase 10 managed |
+
+### Quality snapshot (mock vs live)
+
+| Metric | Value | Live signed gate |
+| --- | --- | --- |
+| ACL leaks | 0 | Passed |
+| Locator correctness | 1.0 | Passed as QT-EVAL-002 locators |
+| Refusal correct rate | 1.0 (1 media case) | Fixture/retrieve |
+| Hybrid Recall@10 | 0.25 (miss: alias, arabic_mixed, latest_as_of) | **Not** live QT-EVAL-006 |
+| Exact Recall@5 | 1.0 | **Not** live QT-EVAL-007 |
+| Alias Recall@10 | 0.0 | **Not** live QT-EVAL-008 |
+| Table executed | 0 / 1 (no Parquet dir) | QT-LAT-006 Not Run |
+| Coverage qualification | 77 cases, false_supported=0, not retuned | Holdout sealed |
+| Combined fixture gain | 66.7 pp | Not live QT-EVAL-009 |
+| USD | 0.0 | Mock gateway; calls counted |
+
+### Overlay attach / detach
+
+1. Candidate gate ran on unpublished ParadeDB (compose exec).
+2. Overlay attach `docker-compose.packet8.yml` `--no-build --wait paradedb`
+   **recreated** ParadeDB (seed BM25 rows dropped).
+3. Overlay pytest 4/0/0/0 and ranked-ID `--live` returncode 0.
+4. Detach `docker-compose.yml` `--no-build --wait --remove-orphans` recreated
+   ParadeDB again (still empty).
+5. `phase09_candidate.py health`: `overlay_used: false`; `paradedb` publishers
+   empty; `pg_search` passed.
+
+### Sizing ladder
+
+- Repair live-model Recall/Combined under a signed budget; do not average ACL
+  or citation failures.
+- Keep QT-CAP-005-P8 = 15; seven-day 2k rebuild stays Blocked.
+- Do not infer EC2/CDN/KMS proof from local NCPU/mem.
+- Packet 4 must re-project BM25 through existing
+  `Bm25ProjectionService.process_upsert_job` without changing Packet 2
+  document/version ids and without SQL-stamping Hybrid Ready.
+
+### Packet 4 handoff
+
+Packet 4 owns five-stream SSE load, first-token/completion p95, connection
+caps, and budget-lock contention. Do not claim QT-CAP-001/002 from this
+corpus. Do not treat overlay-empty ParadeDB as a Hybrid BM25 baseline.
+Managed topology remains Phase 10.
+
+### Commands and exit codes
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff format` / `ruff check` on Packet 3 files | 0 | |
+| `uv run python -m pytest tests/unit/test_phase09_packet3.py tests/unit/test_phase4_ranked_ids.py -q` | 0 | 27 passed |
+| `uv run python scripts/phase09_candidate.py health` (before) | 0 | overlay_used false; paradedb unpublished |
+| `uv run python scripts/ci/check_phase09_packet3.py --mode candidate` | 0 | 59+65+18+13+86+80, 0 skip; sidecar mapped |
+| Overlay attach `--no-build --wait paradedb` | 0 | Container recreated |
+| Packet 3 overlay `--merge-artifact` | 0 | 4 tests; ranked-ID live returncode 0; mock `qt_eval_006_live=false` |
+| Overlay detach `--no-build --remove-orphans` | 0 | ParadeDB recreated empty |
+| `phase09_candidate.py health` (after) | 0 | overlay_used false; private publishers empty |
+
+Packet 3 checkbox is **checked** because P09-03-A–D are proven or honestly
+classified with sizing-ladder decisions (not fake live Recall or Combined
+gain). Packet 2 stays **unchecked** (Trivy / old-API smoke Blocked). Phase 9
+wrapper `status` remains `pending`. Holdout was not opened.

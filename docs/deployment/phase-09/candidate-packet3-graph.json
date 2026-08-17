@@ -1,0 +1,136 @@
+{
+  "bulk_onboarding_blocked": true,
+  "concurrency_one_writer": true,
+  "duplicate_lightrag_keyword_extraction": false,
+  "hardware": {
+    "docker_mem_bytes": 8131035136,
+    "docker_ncpu": 20,
+    "local_candidate_not_full_envelope": true,
+    "reduced_graph_version_envelope": 15,
+    "seeded_chunks": 16,
+    "seeded_document_versions": 8,
+    "seeded_graph_eligible_versions": 2
+  },
+  "phase5_freeze_rewritten": false,
+  "qt_cap_005_p8": 15,
+  "schema_version": "phase09-candidate-packet3-graph-v1",
+  "seven_day_2k_feasibility": false,
+  "snapshot": {
+    "attempted_cost_usd": "0",
+    "bulk_onboarding_blocked": true,
+    "bulk_window_active": false,
+    "coverage_gates_passed": true,
+    "coverage_reason": "",
+    "deadline_cap_documents": 1008,
+    "documents_per_hour": null,
+    "duplicate_lightrag_keyword_extraction": false,
+    "envelope_uncertainty": "No live mapping-verified documents/hour or full-rebuild cost. Sequential jobs at the 600s deadline cannot finish 2000 documents inside 7 days (cap 1008). Source-chunk rebuild of 200000 is unmeasured. Advertised envelope is qualification-scale labeled graph_mapping volume; bulk onboarding is blocked.",
+    "eta_confidence": "insufficient-sample",
+    "eta_seconds": null,
+    "language_metrics": [
+      {
+        "denominator": 20,
+        "gate_floor": 0.9,
+        "language": "en",
+        "numerator": 20,
+        "object_type": "entity",
+        "passed": true,
+        "ratio": 1.0,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      },
+      {
+        "denominator": 20,
+        "gate_floor": 0.9,
+        "language": "en",
+        "numerator": 20,
+        "object_type": "relation",
+        "passed": true,
+        "ratio": 1.0,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      },
+      {
+        "denominator": 20,
+        "gate_floor": 0.9,
+        "language": "en",
+        "numerator": 20,
+        "object_type": "path_edge",
+        "passed": true,
+        "ratio": 1.0,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      },
+      {
+        "denominator": 20,
+        "gate_floor": 0.85,
+        "language": "ar",
+        "numerator": 17,
+        "object_type": "entity",
+        "passed": true,
+        "ratio": 0.85,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      },
+      {
+        "denominator": 20,
+        "gate_floor": 0.85,
+        "language": "ar",
+        "numerator": 17,
+        "object_type": "relation",
+        "passed": true,
+        "ratio": 0.85,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      },
+      {
+        "denominator": 20,
+        "gate_floor": 0.85,
+        "language": "ar",
+        "numerator": 17,
+        "object_type": "path_edge",
+        "passed": true,
+        "ratio": 0.85,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      },
+      {
+        "denominator": 20,
+        "gate_floor": 0.85,
+        "language": "mixed",
+        "numerator": 17,
+        "object_type": "entity",
+        "passed": true,
+        "ratio": 0.85,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      },
+      {
+        "denominator": 20,
+        "gate_floor": 0.85,
+        "language": "mixed",
+        "numerator": 17,
+        "object_type": "relation",
+        "passed": true,
+        "ratio": 0.85,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      },
+      {
+        "denominator": 20,
+        "gate_floor": 0.85,
+        "language": "mixed",
+        "numerator": 17,
+        "object_type": "path_edge",
+        "passed": true,
+        "ratio": 0.85,
+        "source": "unit CoverageSlice gate contract (test_language_gate_not_hidden_by_english_aggregate); live LightRAG extraction P/R unverified"
+      }
+    ],
+    "maintenance_reserve_usd": 800.0,
+    "mapping_verified_count": 0,
+    "measured_full_rebuild_cost_usd": null,
+    "oldest_pending_age_seconds": null,
+    "pending_index_count": 0,
+    "pending_maintenance_count": 0,
+    "qt_cap_005_p8": 15,
+    "qt_gr_002_classification": "Blocked",
+    "query_keyword_extract": 0,
+    "settled_cost_usd": "0",
+    "seven_day_rebuild_of_2k": false,
+    "supported_documents": 15,
+    "usd_note": "Mock-model seed; USD may be 0. This is not live extraction cost."
+  }
+}

@@ -45,6 +45,13 @@ Later packets consume these committed artifacts under
 | `candidate-sizing-baseline.json` | Local Docker CPU/RAM and seeded counts mapped onto QT-CAP envelopes |
 | `candidate-seed-counts.json` | Version/chunk/graph-eligible counts plus blockers |
 | `candidate-command-log.json` | Host orchestrator commands and exit codes |
+| `candidate-packet3-gate-matrix.json` | Packet 3 Passed/Failed/Blocked/Not Run matrix |
+| `candidate-packet3-quality.json` | Per-class routing/recall/citation/refusal/Combined labels |
+| `candidate-packet3-latency.json` | First-evidence p95 and signed deadline/call ceilings |
+| `candidate-packet3-cost-ledger.json` | Mock call/token/USD ledger (USD may be 0) |
+| `candidate-packet3-bm25.json` | Tokenizer/Arabic/75/300/lag/outage/rebuild classification |
+| `candidate-packet3-graph.json` | Mapping/survival/ETA/seven-day feasibility |
+| `candidate-gold-id-map.json` | Packet 2 retrieve-subset gold UUIDs; not the Phase 4 157-case sidecar |
 
 A changed git SHA, lockfile, Dockerfile, or image Id invalidates Packet 1
 evidence. Rebuild and reseed; do not reuse a stale digest.
@@ -134,6 +141,14 @@ is already migrated.
    rewritten `candidate-corpus-manifest.json` document/version ids. Image Ids
    stay the Packet 1 freeze. Old-API/new-schema smoke is Blocked until a
    prior API digest exists. Do not retry Trivy via docker.sock.
+8. Packet 3 measures quality/latency/BM25/graph against signed
+   [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) on this corpus. Live-model
+   Recall@K and Combined +10pp stay Not Run under `MOCK_MODEL_MODE=true`.
+   Overlay ParadeDB `:54329` is attached only for host typed-query tests and
+   ranked-ID `--live`, then detached. Overlay recreate empties the BM25
+   projection; Packet 4 must not assume seed BM25 rows until a worker
+   re-projection through existing `Bm25ProjectionService`. Do not claim
+   QT-CAP-001/002 from the labeled 8-case subset.
 
 ```mermaid
 flowchart TD

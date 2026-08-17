@@ -84,7 +84,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         argv: Optional argument vector excluding the program name.
 
     Returns:
-        Parsed namespace.
+        Parsed namespace. ``case_ids`` is a list of strings or ``None``.
     """
 
     parser = argparse.ArgumentParser(
@@ -115,6 +115,16 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--live",
         action="store_true",
         help="Run HybridRetriever against local Supabase and Packet 8 ParadeDB",
+    )
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        default=None,
+        dest="case_ids",
+        help=(
+            "Restrict scoring to these open-split case ids. Repeatable. "
+            "Unknown or holdout ids fail closed."
+        ),
     )
     parser.add_argument(
         "--parquet-dir",
@@ -439,6 +449,25 @@ def main(argv: list[str] | None = None) -> int:
     settings = SharedSettings()
     embeddings = _embeddings_kind(settings)
     cases = load_eval_cases(split, limit=args.limit)
+    requested_ids = tuple(args.case_ids) if args.case_ids else ()
+    if requested_ids:
+        wanted = frozenset(requested_ids)
+        cases = [case for case in cases if case.case_id in wanted]
+        missing = sorted(wanted.difference(case.case_id for case in cases))
+        if missing or not cases:
+            _print_json(
+                {
+                    **_closed_payload(
+                        split=split,
+                        case_count=len(cases),
+                        embeddings=embeddings,
+                        sidecar_unmapped=True,
+                    ),
+                    "missing_case_ids": missing,
+                    "requested_case_ids": list(requested_ids),
+                }
+            )
+            return 2
     if not args.sidecar.is_file():
         _print_json(
             _closed_payload(

@@ -1,0 +1,30 @@
+{
+  "arabic_normalization": "arabic_norm_v1",
+  "hardware": {
+    "docker_mem_bytes": 8131035136,
+    "docker_ncpu": 20,
+    "local_candidate_not_full_envelope": true,
+    "reduced_graph_version_envelope": 15,
+    "seeded_chunks": 16,
+    "seeded_document_versions": 8,
+    "seeded_graph_eligible_versions": 2
+  },
+  "lag": {
+    "completed_count": 42,
+    "job_count": 66,
+    "lag_p50_seconds": 35.695676,
+    "lag_p95_seconds": 98.86994799999997,
+    "qt_bm25_002_live": false,
+    "qt_bm25_003_passed": true,
+    "qt_bm25_003_seconds": 300.0,
+    "sample_is_seed_not_million_chunks": true
+  },
+  "outage_degrades_to_dense_term": true,
+  "rebuild_1m_chunks": "Not Run",
+  "sample_is_seed_not_million_chunks": true,
+  "scan_cap": 300,
+  "schema_version": "phase09-candidate-packet3-bm25-v1",
+  "survivor_cap": 75,
+  "typed_query": "Passed",
+  "unicode_tokenizer": "pdb.unicode_words"
+}

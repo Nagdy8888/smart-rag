@@ -1,0 +1,82 @@
+{
+  "ceilings": {
+    "bm25_scan_cap": 300,
+    "bm25_survivor_cap": 75,
+    "duplicate_lightrag_keyword_extraction": false,
+    "families": [
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 25,
+        "deadline_target": 25,
+        "family": "hybrid",
+        "model_call_ceiling": 7,
+        "model_call_passed": true,
+        "model_call_target": 7,
+        "tool_ceiling": 4
+      },
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 45,
+        "deadline_target": 45,
+        "family": "combined",
+        "model_call_ceiling": 8,
+        "model_call_passed": true,
+        "model_call_target": 8,
+        "tool_ceiling": 4
+      },
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 30,
+        "deadline_target": 30,
+        "family": "structured_table",
+        "model_call_ceiling": 6,
+        "model_call_passed": true,
+        "model_call_target": 6,
+        "tool_ceiling": 4
+      },
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 50,
+        "deadline_target": 50,
+        "family": "composite",
+        "model_call_ceiling": 9,
+        "model_call_passed": true,
+        "model_call_target": 9,
+        "tool_ceiling": 5
+      },
+      {
+        "deadline_passed": true,
+        "deadline_seconds": 10,
+        "deadline_target": 10,
+        "family": "graph_inspection",
+        "model_call_ceiling": 3,
+        "model_call_passed": true,
+        "model_call_target": 3,
+        "tool_ceiling": 4
+      }
+    ],
+    "recursion_limit": 24,
+    "recursion_target": 24
+  },
+  "completion_p50_ms": null,
+  "completion_p95_ms": null,
+  "deadline_exhaustion_route": "verified partial or insufficient evidence",
+  "first_evidence_p50_ms": null,
+  "first_evidence_p95_ms": 560.8249749998322,
+  "first_token_p50_ms": null,
+  "first_token_p95_ms": null,
+  "hardware": {
+    "docker_mem_bytes": 8131035136,
+    "docker_ncpu": 20,
+    "local_candidate_not_full_envelope": true,
+    "reduced_graph_version_envelope": 15,
+    "seeded_chunks": 16,
+    "seeded_document_versions": 8,
+    "seeded_graph_eligible_versions": 2
+  },
+  "mock_model_mode": true,
+  "note": "first_evidence_p95_ms comes from the existing ranked-ID CLI. That CLI does not emit p50; p50 is not invented from p95. first-token/completion stream percentiles are Packet 4. Deadlines compared via ceiling constants.",
+  "qt_lat_001_ms": 2000.0,
+  "sample_size": 7,
+  "schema_version": "phase09-candidate-packet3-latency-v1"
+}

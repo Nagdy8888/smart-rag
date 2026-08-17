@@ -613,6 +613,43 @@ def test_cli_fail_closed_json_on_unmapped_sidecar(
     assert payload["embeddings"] in {"mock", "openai"}
 
 
+def test_cli_unknown_case_id_fail_closed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Unknown --case-id values fail closed and never load holdout labels."""
+
+    import importlib.util
+
+    case = _case(QueryClass.EXACT_CODE)
+    sidecar = _sidecar((_record(case, chunk_id=uuid4()),))
+    path = tmp_path / "gold_id_map.json"
+    path.write_text(
+        json.dumps(sidecar.model_dump(mode="json"), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    spec = importlib.util.spec_from_file_location("eval_phase4_ranked_ids", EVAL_SCRIPT)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    code = module.main(
+        [
+            "--sidecar",
+            str(path),
+            "--split",
+            "development",
+            "--case-id",
+            "holdout-never-loaded",
+        ]
+    )
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert code == 2
+    assert payload["holdout_opened"] is False
+    assert payload["recall_at_10"] is None
+    assert "holdout-never-loaded" in payload["missing_case_ids"]
+
+
 def test_load_eval_cases_is_phase4_open_split_only() -> None:
     """Eval case loader uses select_phase4_retrieve_cases, not sealed labels."""
 

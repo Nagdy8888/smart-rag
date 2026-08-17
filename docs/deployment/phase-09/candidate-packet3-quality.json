@@ -1,0 +1,938 @@
+{
+  "combined_gain_fixture_pp": 66.66666666666667,
+  "combined_gain_live_status": "unverified",
+  "coverage_qualification": {
+    "case_count": 77,
+    "class_metrics": {
+      "acl_negative": {
+        "false_supported": 0,
+        "n": 4,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "alias": {
+        "false_supported": 0,
+        "n": 4,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "arabic_mixed": {
+        "false_supported": 0,
+        "n": 4,
+        "unnecessary_refusal": 4,
+        "weighted_loss": 1.0
+      },
+      "broad_synthesis": {
+        "false_supported": 0,
+        "n": 2,
+        "unnecessary_refusal": 2,
+        "weighted_loss": 1.0
+      },
+      "document_summary": {
+        "false_supported": 0,
+        "n": 2,
+        "unnecessary_refusal": 1,
+        "weighted_loss": 0.5
+      },
+      "exact_code": {
+        "false_supported": 0,
+        "n": 5,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "graph_mapping": {
+        "false_supported": 0,
+        "n": 4,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "insufficient_refusal": {
+        "false_supported": 0,
+        "n": 4,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "latest_as_of": {
+        "false_supported": 0,
+        "n": 2,
+        "unnecessary_refusal": 2,
+        "weighted_loss": 1.0
+      },
+      "media_limitation": {
+        "false_supported": 0,
+        "n": 1,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "mixed_locale_temporal": {
+        "false_supported": 0,
+        "n": 2,
+        "unnecessary_refusal": 2,
+        "weighted_loss": 1.0
+      },
+      "multi_hop": {
+        "false_supported": 0,
+        "n": 6,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "multi_part": {
+        "false_supported": 0,
+        "n": 4,
+        "unnecessary_refusal": 4,
+        "weighted_loss": 1.0
+      },
+      "negation": {
+        "false_supported": 0,
+        "n": 2,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "profile_fidelity": {
+        "false_supported": 0,
+        "n": 4,
+        "unnecessary_refusal": 4,
+        "weighted_loss": 1.0
+      },
+      "prompt_injection": {
+        "false_supported": 0,
+        "n": 6,
+        "unnecessary_refusal": 6,
+        "weighted_loss": 1.0
+      },
+      "relationship": {
+        "false_supported": 0,
+        "n": 6,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "selective_metadata_filter": {
+        "false_supported": 0,
+        "n": 2,
+        "unnecessary_refusal": 2,
+        "weighted_loss": 1.0
+      },
+      "semantic_factual": {
+        "false_supported": 0,
+        "n": 7,
+        "unnecessary_refusal": 7,
+        "weighted_loss": 1.0
+      },
+      "tabular_aggregation": {
+        "false_supported": 0,
+        "n": 4,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      },
+      "typo": {
+        "false_supported": 0,
+        "n": 2,
+        "unnecessary_refusal": 0,
+        "weighted_loss": 0.0
+      }
+    },
+    "false_supported": 0,
+    "holdout_opened": false,
+    "passed": true,
+    "retuned": false,
+    "split": "qualification",
+    "weighted_loss": 0.44155844155844154
+  },
+  "duplicate_lightrag_keyword_extraction": false,
+  "hardware": {
+    "docker_mem_bytes": 8131035136,
+    "docker_ncpu": 20,
+    "local_candidate_not_full_envelope": true,
+    "reduced_graph_version_envelope": 15,
+    "seeded_chunks": 16,
+    "seeded_document_versions": 8,
+    "seeded_graph_eligible_versions": 2
+  },
+  "holdout_opened": false,
+  "mock_model_mode": true,
+  "qt_eval_006_live": false,
+  "query_profile": {
+    "development": {
+      "case_count": 216,
+      "extra": [
+        {
+          "name": "negation_accuracy",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 1.0
+        },
+        {
+          "name": "document_scope_accuracy",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 1.0
+        },
+        {
+          "name": "media_dependence_f1",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 1.0
+        },
+        {
+          "name": "historical_relationship_f1",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 0.608696
+        },
+        {
+          "name": "variant_list_f1",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 1.0
+        },
+        {
+          "name": "code_f1",
+          "passed": true,
+          "threshold": 0.98,
+          "value": 1.0
+        },
+        {
+          "name": "date_f1",
+          "passed": true,
+          "threshold": 0.98,
+          "value": 1.0
+        }
+      ],
+      "model_calls": 0,
+      "passed": true,
+      "scores": [
+        {
+          "name": "language_configuration_accuracy",
+          "passed": true,
+          "threshold": 0.95,
+          "value": 1.0
+        },
+        {
+          "name": "temporal_macro_f1",
+          "passed": true,
+          "threshold": 0.9,
+          "value": 1.0
+        },
+        {
+          "name": "code_date_f1",
+          "passed": true,
+          "threshold": 0.98,
+          "value": 1.0
+        },
+        {
+          "name": "entity_alias_macro_f1",
+          "passed": true,
+          "threshold": 0.9,
+          "value": 1.0
+        },
+        {
+          "name": "metadata_filter_precision",
+          "passed": true,
+          "threshold": 0.95,
+          "value": 1.0
+        },
+        {
+          "name": "metadata_filter_recall",
+          "passed": true,
+          "threshold": 0.95,
+          "value": 1.0
+        },
+        {
+          "name": "query_type_relationship_table_decomposition_macro_f1",
+          "passed": true,
+          "threshold": 0.9,
+          "value": 1.0
+        }
+      ],
+      "split": "development"
+    },
+    "holdout_opened": false,
+    "qualification": {
+      "case_count": 77,
+      "extra": [
+        {
+          "name": "negation_accuracy",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 1.0
+        },
+        {
+          "name": "document_scope_accuracy",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 1.0
+        },
+        {
+          "name": "media_dependence_f1",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 1.0
+        },
+        {
+          "name": "historical_relationship_f1",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 0.8
+        },
+        {
+          "name": "variant_list_f1",
+          "passed": true,
+          "threshold": 0.0,
+          "value": 1.0
+        },
+        {
+          "name": "code_f1",
+          "passed": true,
+          "threshold": 0.98,
+          "value": 1.0
+        },
+        {
+          "name": "date_f1",
+          "passed": true,
+          "threshold": 0.98,
+          "value": 1.0
+        }
+      ],
+      "model_calls": 0,
+      "passed": true,
+      "scores": [
+        {
+          "name": "language_configuration_accuracy",
+          "passed": true,
+          "threshold": 0.95,
+          "value": 1.0
+        },
+        {
+          "name": "temporal_macro_f1",
+          "passed": true,
+          "threshold": 0.9,
+          "value": 1.0
+        },
+        {
+          "name": "code_date_f1",
+          "passed": true,
+          "threshold": 0.98,
+          "value": 1.0
+        },
+        {
+          "name": "entity_alias_macro_f1",
+          "passed": true,
+          "threshold": 0.9,
+          "value": 1.0
+        },
+        {
+          "name": "metadata_filter_precision",
+          "passed": true,
+          "threshold": 0.95,
+          "value": 1.0
+        },
+        {
+          "name": "metadata_filter_recall",
+          "passed": true,
+          "threshold": 0.95,
+          "value": 1.0
+        },
+        {
+          "name": "query_type_relationship_table_decomposition_macro_f1",
+          "passed": true,
+          "threshold": 0.9,
+          "value": 1.0
+        }
+      ],
+      "split": "qualification"
+    }
+  },
+  "ranked_ids": {
+    "acl_leak_count": 0,
+    "alias_recall_at_10": 0.0,
+    "case_count": 7,
+    "cost": null,
+    "embeddings": "mock",
+    "exact_code_recall_at_5": 1.0,
+    "first_evidence_p95_ms": 560.8249749998322,
+    "follow_up": null,
+    "hardware": {
+      "cpu_count": 20,
+      "machine": "AMD64",
+      "processor": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+      "python": "3.11.15",
+      "release": "10",
+      "system": "Windows"
+    },
+    "holdout_opened": false,
+    "live_retrieve": true,
+    "locator_correctness": 1.0,
+    "qt_eval_002_threshold": 0.98,
+    "qt_eval_006_live": false,
+    "qt_eval_006_threshold": 0.85,
+    "qt_eval_007_threshold": 0.98,
+    "qt_eval_008_threshold": 0.95,
+    "qt_lat_001_ms": 2000.0,
+    "recall_at_10": 0.25,
+    "recall_case_count": 4,
+    "recall_miss_case_ids": [
+      "p4-alias-0003",
+      "p4-arabic_mixed-0003",
+      "p4-latest_as_of-0003"
+    ],
+    "refusal_case_count": 1,
+    "refusal_correct_rate": 1.0,
+    "returncode": 0,
+    "sidecar_unmapped": false,
+    "split": "open",
+    "table_case_count": 1,
+    "table_executed_count": 0
+  },
+  "schema_version": "phase09-candidate-packet3-quality-v1",
+  "seeded_retrieve_case_ids": [
+    "p4-acl_negative-0003",
+    "p4-alias-0003",
+    "p4-arabic_mixed-0003",
+    "p4-exact_code-0003",
+    "p4-latest_as_of-0003",
+    "p4-media_limitation-0002",
+    "p4-tabular_aggregation-0003"
+  ],
+  "sidecar": {
+    "case_count": 7,
+    "holdout_opened": false,
+    "packet2_identity": true,
+    "path": "docs/deployment/phase-09/candidate-gold-id-map.json",
+    "sidecar_sha256": "441c9a4494bbde29f7265c46d8559783366e0138030a3c2564f54b85217b4dad",
+    "sidecar_unmapped": false
+  },
+  "targets": [
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Passed",
+      "detail": "Zero ACL leaks on ranked-ID fixtures and Packet 2 identity suite. Live 7-case subset scored when overlay retrieve ran.",
+      "live_model_required": false,
+      "measured": 0,
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": 7,
+      "signed_value": "0",
+      "target_id": "QT-EVAL-001",
+      "title": "Zero ACL leaks",
+      "unit": "count"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Passed",
+      "detail": "Locator correctness from ranked-ID evidence units, not answer-assembler completeness. Verifier unit suite classification=Passed.",
+      "live_model_required": false,
+      "measured": 1.0,
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": 7,
+      "signed_value": "0.98",
+      "target_id": "QT-EVAL-002",
+      "title": "Citation correctness \u226598%",
+      "unit": "%"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Not Run",
+      "detail": "Answer completeness/faithfulness needs live answers. Verifier fixtures passed as contract proof only.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": null,
+      "signed_value": "0.90",
+      "target_id": "QT-EVAL-003",
+      "title": "Citation completeness \u226590%",
+      "unit": "%"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Not Run",
+      "detail": "Answer completeness/faithfulness needs live answers. Verifier fixtures passed as contract proof only.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": null,
+      "signed_value": "0.90",
+      "target_id": "QT-EVAL-004",
+      "title": "Answer faithfulness \u226590%",
+      "unit": "%"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Passed",
+      "detail": "Routing matrix plus open-split profile gates. Holdout sealed.",
+      "live_model_required": false,
+      "measured": "routing_matrix_and_profile",
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": null,
+      "signed_value": "0.90",
+      "target_id": "QT-EVAL-005",
+      "title": "Routing accuracy \u226590%",
+      "unit": "%"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Not Run",
+      "detail": "Mock embeddings. qt_eval_006_live must stay false. Signed live Recall@K is Not Run under MOCK_MODEL_MODE.",
+      "live_model_required": true,
+      "measured": 0.25,
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": 7,
+      "signed_value": "0.85",
+      "target_id": "QT-EVAL-006",
+      "title": "Hybrid Recall@10 \u226585%",
+      "unit": "%"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Not Run",
+      "detail": "Mock embeddings. qt_eval_006_live must stay false. Signed live Recall@K is Not Run under MOCK_MODEL_MODE.",
+      "live_model_required": true,
+      "measured": 1.0,
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": 7,
+      "signed_value": "0.98",
+      "target_id": "QT-EVAL-007",
+      "title": "Exact-identifier/code Recall@5 \u226598%",
+      "unit": "%"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Not Run",
+      "detail": "Mock embeddings. qt_eval_006_live must stay false. Signed live Recall@K is Not Run under MOCK_MODEL_MODE.",
+      "live_model_required": true,
+      "measured": 0.0,
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": 7,
+      "signed_value": "0.95",
+      "target_id": "QT-EVAL-008",
+      "title": "Approved-alias Recall@10 \u226595%",
+      "unit": "%"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Not Run",
+      "detail": "phase6_registry status=unverified. Fixture ablation is not live Combined gain.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": false,
+      "sample_size": 3,
+      "signed_value": "10",
+      "target_id": "QT-EVAL-009",
+      "title": "Combined +10pp over Hybrid",
+      "unit": "percentage points"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Retrieve first_evidence_ms p95 on the Packet 2 subset. Not first answer token.",
+      "live_model_required": false,
+      "measured": 560.8249749998322,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": 7,
+      "signed_value": "2000",
+      "target_id": "QT-LAT-001",
+      "title": "Hybrid first evidence p95 \u22642s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "5000",
+      "target_id": "QT-LAT-002",
+      "title": "Hybrid first token p95 \u22645s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "20000",
+      "target_id": "QT-LAT-003",
+      "title": "Hybrid completion p95 \u226420s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "10000",
+      "target_id": "QT-LAT-004",
+      "title": "Combined first token p95 \u226410s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "35000",
+      "target_id": "QT-LAT-005",
+      "title": "Combined completion p95 \u226435s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "5000",
+      "target_id": "QT-LAT-006",
+      "title": "Structured-table result p95 \u22645s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "8000",
+      "target_id": "QT-LAT-007",
+      "title": "Structured-table first token p95 \u22648s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "20000",
+      "target_id": "QT-LAT-008",
+      "title": "Structured-table completion p95 \u226420s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "5000",
+      "target_id": "QT-LAT-009",
+      "title": "Graph inspection p95 \u22645s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "12000",
+      "target_id": "QT-LAT-010",
+      "title": "Composite first token p95 \u226412s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Not Run",
+      "detail": "Stream first-token/completion p95 is Packet 4. Not inferred.",
+      "live_model_required": true,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "40000",
+      "target_id": "QT-LAT-011",
+      "title": "Composite completion p95 \u226440s",
+      "unit": "ms"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "25",
+      "target_id": "QT-DL-001",
+      "title": "Hybrid hard deadline 25s",
+      "unit": "seconds"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "45",
+      "target_id": "QT-DL-002",
+      "title": "Combined hard deadline 45s",
+      "unit": "seconds"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "30",
+      "target_id": "QT-DL-003",
+      "title": "StructuredTable hard deadline 30s",
+      "unit": "seconds"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "50",
+      "target_id": "QT-DL-004",
+      "title": "Composite hard deadline 50s",
+      "unit": "seconds"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "10",
+      "target_id": "QT-DL-005",
+      "title": "Graph inspection hard deadline 10s",
+      "unit": "seconds"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "7",
+      "target_id": "QT-MC-001",
+      "title": "Hybrid max 7 model calls",
+      "unit": "calls/query"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "8",
+      "target_id": "QT-MC-002",
+      "title": "Combined max 8 model calls",
+      "unit": "calls/query"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "6",
+      "target_id": "QT-MC-003",
+      "title": "StructuredTable max 6 model calls",
+      "unit": "calls/query"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "9",
+      "target_id": "QT-MC-004",
+      "title": "Composite max 9 model calls",
+      "unit": "calls/query"
+    },
+    {
+      "acceptance": "P09-03-B",
+      "classification": "Passed",
+      "detail": "Server-owned FAMILY_* ceilings match QUALITY_TARGETS.",
+      "live_model_required": false,
+      "measured": "ceiling_constants",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "3",
+      "target_id": "QT-MC-005",
+      "title": "Inspection max 3 model calls",
+      "unit": "calls/query"
+    },
+    {
+      "acceptance": "P09-03-C",
+      "classification": "Passed",
+      "detail": "Unicode BM25 contract plus byte-identical arabic_norm_v1.",
+      "live_model_required": false,
+      "measured": "paradedb_exec_and_arabic_parity",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "pass",
+      "target_id": "QT-BM25-001",
+      "title": "Pinned Unicode tokenizer and Arabic normalization",
+      "unit": "qualification pass/fail"
+    },
+    {
+      "acceptance": "P09-03-C",
+      "classification": "Not Run",
+      "detail": "See Packet 3 handoffs and sizing ladder.",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "measured suite",
+      "target_id": "QT-BM25-002",
+      "title": "1,000,000-chunk index/RAM/p95/rebuild suite",
+      "unit": "measured suite"
+    },
+    {
+      "acceptance": "P09-03-C",
+      "classification": "Passed",
+      "detail": "Seed outbox lag, not the 1,000,000-chunk envelope.",
+      "live_model_required": false,
+      "measured": 98.86994799999997,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": 66,
+      "signed_value": "300",
+      "target_id": "QT-BM25-003",
+      "title": "Normal ingestion p95 BM25 lag <5 minutes",
+      "unit": "seconds"
+    },
+    {
+      "acceptance": "P09-03-C",
+      "classification": "Passed",
+      "detail": "Batched Supabase recheck tests. ACL safety is immediate.",
+      "live_model_required": false,
+      "measured": "recheck_drops_stale_unauthorized",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "true",
+      "target_id": "QT-BM25-004",
+      "title": "Deletion/ACL safety via Supabase recheck",
+      "unit": "boolean"
+    },
+    {
+      "acceptance": "P09-03-D",
+      "classification": "Not Run",
+      "detail": "Durable GraphMetricsService eta_confidence=insufficient-sample. Do not invent documents/hour.",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": 0,
+      "signed_value": "measured",
+      "target_id": "QT-GR-001",
+      "title": "Concurrency-one Graph Ready versions/hour plus cost",
+      "unit": "versions/hour + cost"
+    },
+    {
+      "acceptance": "P09-03-D",
+      "classification": "Blocked",
+      "detail": "See Packet 3 handoffs and sizing ladder.",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "7",
+      "target_id": "QT-GR-002",
+      "title": "2,000-document Graph Ready within 7 days",
+      "unit": "days"
+    },
+    {
+      "acceptance": "P09-03-D",
+      "classification": "Passed",
+      "detail": "Canonical resolver ACL/deletion fixtures. Live SLA unverified.",
+      "live_model_required": false,
+      "measured": "resolver_acl_fixtures",
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "true",
+      "target_id": "QT-GR-003",
+      "title": "Graph deletion/ACL immediate at resolver",
+      "unit": "boolean"
+    },
+    {
+      "acceptance": "P09-03-A",
+      "classification": "Not Run",
+      "detail": "See Packet 3 handoffs and sizing ladder.",
+      "live_model_required": false,
+      "measured": null,
+      "mock_model_mode": true,
+      "qt_eval_006_live": null,
+      "sample_size": null,
+      "signed_value": "10000",
+      "target_id": "QT-CAP-001",
+      "title": "10,000 Hybrid document versions",
+      "unit": "document versions"
+    }
+  ]
+}

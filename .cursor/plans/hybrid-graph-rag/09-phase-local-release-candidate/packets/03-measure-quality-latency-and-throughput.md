@@ -1,7 +1,7 @@
 ---
 phase: 9
 packet: 3
-status: pending
+status: complete
 title: "Measure Hybrid/Combined/table/inspection quality, BM25 projection/query/recheck/rebuild behavior, p50/p95/deadlines, model calls/cost, graph survival, writer throughput, and onboarding ETA."
 requirement_ids: [P09-03]
 ---

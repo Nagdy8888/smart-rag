@@ -23,6 +23,7 @@ uv run python scripts/ci/check_phase2_integration.py
 uv run python scripts/phase09_candidate.py all
 uv run python scripts/ci/check_phase09_packet1.py
 uv run python scripts/ci/check_phase09_packet2.py --mode candidate
+uv run python scripts/ci/check_phase09_packet3.py --mode candidate
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -107,6 +108,29 @@ Remove-Item Env:SMART_RAG_REQUIRE_CLAMAV
 Remove-Item Env:SMART_RAG_REQUIRE_CRAWL_PROXY
 docker compose --env-file .env.compose -f docker-compose.yml up -d --no-build --wait --remove-orphans
 uv run python scripts/phase09_candidate.py ports-static
+uv run python scripts/phase09_candidate.py health
+```
+
+The Phase 9 Packet 3 gate is local-only and is not a GitHub PR job. It
+fail-closes on zero collection, failures, errors, skipped mandatory local
+tests, Packet 2 corpus-identity drift, unmapped gold UUIDs, or mock embeddings
+labeled `qt_eval_006_live=true`. `--mode candidate` uses unpublished ParadeDB
+via compose exec plus in-memory profile/coverage scoring. `--mode overlay`
+requires `docker-compose.packet8.yml` already attached for host BM25 typed
+query/injection/delete/reconcile and `eval_phase4_ranked_ids.py --live` on
+the Packet 2 7-case sidecar (`docs/deployment/phase-09/candidate-gold-id-map.json`).
+Detach the overlay afterward and re-prove unpublished ports. Overlay merge
+must use `--merge-artifact`. Do not set `SMART_RAG_HOLDOUT_ACCESS=true`. Do
+not label mock Recall@K as live QT-EVAL-006. Do not rewrite Phase 4/5 freeze
+markdown from this gate. Overlay recreate empties ParadeDB; Packet 4 must
+re-project through existing `Bm25ProjectionService` without changing Packet 2
+document ids.
+
+```powershell
+uv run python scripts/ci/check_phase09_packet3.py --mode candidate
+docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --no-build --wait paradedb
+uv run python scripts/ci/check_phase09_packet3.py --mode overlay --merge-artifact
+docker compose --env-file .env.compose -f docker-compose.yml up -d --no-build --wait --remove-orphans
 uv run python scripts/phase09_candidate.py health
 ```
 

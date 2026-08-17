@@ -115,6 +115,14 @@
     {
       "command": "sizing",
       "exit_code": 0
+    },
+    {
+      "command": "health",
+      "exit_code": 0
+    },
+    {
+      "command": "health",
+      "exit_code": 0
     }
   ]
 }
