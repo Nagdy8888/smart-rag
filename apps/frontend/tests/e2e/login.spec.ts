@@ -1,7 +1,8 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { limitationCopy } from "../../src/lib/limitations";
 import { handshakeBelowMinCopy } from "../../src/lib/handshake";
 import { CALLBACK_FAILED, MFA_REQUIRED_BANNER } from "../../src/lib/auth/copy";
+import { fetchLocalReady } from "./live-auth";
 
 test("unauthenticated console shows sign-in", async ({ page }) => {
   await page.goto("/");
@@ -23,28 +24,6 @@ test("unauthenticated console shows sign-in", async ({ page }) => {
     page.getByRole("button", { name: "Continue with Google (when enabled)" }),
   ).toBeDisabled();
 });
-
-/**
- * Fetch live FastAPI readiness from the Playwright request context.
- *
- * @param request - Playwright API request fixture.
- * @returns JSON body, or null when FastAPI is down.
- */
-async function fetchLocalReady(
-  request: APIRequestContext,
-): Promise<Record<string, unknown> | null> {
-  try {
-    const response = await request.get("http://127.0.0.1:8000/health/ready", {
-      timeout: 3000,
-    });
-    if (!response.ok()) {
-      return null;
-    }
-    return (await response.json()) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
 
 test("browser readiness panel matches live GET /health/ready", async ({
   page,

@@ -78,8 +78,12 @@ flowchart TD
 | Forged role headers | `src/lib/client-authorization.test.ts` | does not treat a forged client role as request authorization | vitest-unit | proven |
 | session_revoked | `src/components/chat-app.test.tsx` | shows session_revoked banner and signs out | vitest-component | proven |
 | session_revoked HTTP | `src/lib/api.test.ts` | throws session_revoked on 401 session_revoked | vitest-unit | proven |
-| Live Auth/MFA/JWT | `tests/contract/test_thin_developer_ui_live.py` | test_upload_enabled_aal1_is_mfa_required | python-contract-live | unverified-live |
-| Live sign-in | `tests/e2e/login.spec.ts` | browser readiness panel matches live GET /health/ready | playwright-live | unverified-live |
+| Live Auth/MFA/JWT | `tests/contract/test_thin_developer_ui_live.py` | test_upload_enabled_aal1_is_mfa_required | python-contract-live | proven |
+| Live TOTP aal2 + Storage JWT PUT | `tests/contract/test_thin_developer_ui_live.py` | test_mfa_aal2_upload_reserve_signed_url_is_null | python-contract-live | proven |
+| Live sign-in / ready panel | `tests/e2e/login.spec.ts` | browser readiness panel matches live GET /health/ready | playwright-live | proven |
+| Live Auto chrome | `tests/e2e/core-rag-surfaces.spec.ts` | authenticated Auto chrome when a session exists | playwright-live | proven |
+| Live document 404 chrome | `tests/e2e/core-rag-surfaces.spec.ts` | stubbed document 404 shows Not found without a title | playwright-live | proven |
+| Live usage 403 chrome | `tests/e2e/administration-surfaces.spec.ts` | stubbed company usage 403 stays forbidden copy when signed in | playwright-live | proven |
 
 ## Handshake, SSE, reconnect, cancel, delete
 
@@ -99,7 +103,7 @@ flowchart TD
 | Reconnect 404 chrome | `src/components/chat-app.test.tsx` | reconnect 404 shows deleted copy without source text | vitest-component | proven |
 | Conversation DELETE | `src/lib/api.test.ts` | DELETEs the conversation and treats 204 as success | vitest-unit | proven |
 | Conversation delete chrome | `src/components/chat-app.test.tsx` | Delete conversation issues DELETE and shows deleted copy | vitest-component | proven |
-| Live JWT chat/idempotency/delete | `tests/contract/test_thin_developer_ui_live.py` | test_thin_ui_live_jwt_chat_idempotency_delete_upload | python-contract-live | unverified-live |
+| Live JWT chat/idempotency/delete | `tests/contract/test_thin_developer_ui_live.py` | test_thin_ui_live_jwt_chat_idempotency_delete_upload | python-contract-live | proven |
 
 ## Routing and limitation families
 
@@ -118,7 +122,7 @@ is no client route field.
 | LightRAG `graph_outage` | `src/lib/limitations.test.ts` | uses signed historical-graph language | vitest-unit | proven |
 | Table / comparison `source_ranges` | `src/components/core-rag-surfaces.test.tsx` | renders deterministic source_ranges and no client total or export | vitest-component | proven |
 | Citations without snippets GAP-07-09 | `src/lib/api.test.ts` | keeps ids and drops passage snippet fields | vitest-unit | proven |
-| Live five composite streams | `tests/contract/test_thin_developer_ui_live.py` | test_thin_ui_live_five_composite_streams | python-contract-live | unverified-live |
+| Live five composite streams | `tests/contract/test_thin_developer_ui_live.py` | test_thin_ui_live_five_composite_streams | python-contract-live | proven |
 
 ## Documents, graph, tables, administration
 
@@ -141,7 +145,7 @@ is no client route field.
 | Usage GAP-07-12 Unavailable | `src/components/administration-surfaces.test.tsx` | hides company meters for a member and still shows GAP-07-12 without passages | vitest-component | proven |
 | Budget sliders absent GAP-07-11 | `src/components/administration-surfaces.test.tsx` | shows token meters and no budget slider or fake audit events | vitest-component | proven |
 | Abandoned/expired/oversize HTTP | `src/lib/ingestion-status.test.ts` | labels Graph Pending distinctly from failed and does not invent quarantine HTTP | vitest-unit | proven |
-| Live upload signed_url null | `tests/contract/test_thin_developer_ui_live.py` | test_mfa_aal2_upload_reserve_signed_url_is_null | python-contract-live | unverified-live |
+| Live upload signed_url null + user JWT PUT | `tests/contract/test_thin_developer_ui_live.py` | test_mfa_aal2_upload_reserve_signed_url_is_null | python-contract-live | proven |
 
 Abandoned, expired, and oversize quarantine are not distinct public JSON
 enums on `GET /ingestion/versions/{id}/status`. The UI prints the server
@@ -163,14 +167,14 @@ enums on `GET /ingestion/versions/{id}/status`. The UI prints the server
 | Prohibited patterns | `src/lib/prohibited-patterns.test.ts` | rejects CDN, innerHTML, dead hashes, blur, fonts, avatars, and random auth | vitest-unit | proven |
 | No `X-Test-` in api.ts | `src/lib/prohibited-patterns.test.ts` | does not send X-Test headers from api.ts | vitest-unit | proven |
 
-## Live FastAPI/Auth still unverified in this packet
+## Remaining unverified-live items
 
-These exist as real tests but require the local stack. They are **unverified-live**
-when `GET http://127.0.0.1:8000/health/ready` is down. Vitest covers the same
-contracts with injected fetch.
+These were **not** claimed as proven in the 2026-08-17 live run. The word
+**unverified-live** stays for CI skips when FastAPI is down. Re-run log:
+[phase-08-later-live-verification.md](../development/phase-08-later-live-verification.md).
 
-- `tests/e2e/login.spec.ts` — browser readiness panel matches live GET /health/ready
-- `tests/e2e/core-rag-surfaces.spec.ts` — authenticated Auto chrome when a session exists
-- `tests/e2e/core-rag-surfaces.spec.ts` — stubbed document 404 shows Not found without a title
-- `tests/e2e/administration-surfaces.spec.ts` — stubbed company usage 403 stays forbidden copy when signed in
-- `tests/contract/test_thin_developer_ui_live.py` — handshake, JWT chat, idempotency, delete, upload MFA, five composite streams
+- P08-LV-01 Compose ParadeDB/Valkey stop-visible-on-ready
+- P08-LV-02 Abandoned / expired / oversize as distinct public JSON enums
+- P08-LV-03 Live WCAG lab measurement of computed styles
+- P08-LV-04 Hosted Auth throttling (GAP-07-20 / Phase 10)
+- P08-LV-05 Signed-in Next chrome against live graph/tables/tools/curation mutations

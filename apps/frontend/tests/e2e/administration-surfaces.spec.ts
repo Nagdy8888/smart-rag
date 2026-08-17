@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { signInLiveMember } from "./live-auth";
 
 test("login chrome includes administration nav links", async ({ page }) => {
   await page.goto("/login");
@@ -35,12 +36,9 @@ test("unauthenticated administration routes redirect to login", async ({
 
 test("stubbed company usage 403 stays forbidden copy when signed in", async ({
   page,
+  request,
 }) => {
-  await page.goto("/usage");
-  if (page.url().includes("/login")) {
-    test.skip(true, "no live Auth session; unauthenticated redirect is covered");
-    return;
-  }
+  await signInLiveMember(page, request);
   await page.route("http://127.0.0.1:8000/usage/company", async (route) => {
     await route.fulfill({
       status: 403,
@@ -48,7 +46,7 @@ test("stubbed company usage 403 stays forbidden copy when signed in", async ({
       body: JSON.stringify({ detail: "forbidden" }),
     });
   });
-  await page.reload();
+  await page.goto("/usage");
   await expect(page.getByTestId("budget-editor-unavailable")).toBeVisible();
   await expect(page.locator("input[type='range']")).toHaveCount(0);
   await expect(page.getByTestId("audit-unavailable")).toBeVisible();

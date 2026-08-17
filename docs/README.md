@@ -34,6 +34,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [frontend/STITCH_REVIEW.md](./frontend/STITCH_REVIEW.md) | engineering-lead | draft | 2026-08-17 | frontend, reviewers |
 | [development/phase-07-stitch-specification-evidence.md](./development/phase-07-stitch-specification-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
 | [development/phase-08-frontend-integration-evidence.md](./development/phase-08-frontend-integration-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
+| [development/phase-08-later-live-verification.md](./development/phase-08-later-live-verification.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
 | [evaluation/PHASE6_EVAL_REGISTRY.md](./evaluation/PHASE6_EVAL_REGISTRY.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-08-16 | eng, security |
 | [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-08-16 | eng, frontend |

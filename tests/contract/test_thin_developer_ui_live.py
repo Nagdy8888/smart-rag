@@ -632,7 +632,12 @@ def test_upload_enabled_aal1_is_mfa_required(live_stack: dict[str, str]) -> None
 def test_mfa_aal2_upload_reserve_signed_url_is_null(
     live_stack: dict[str, str],
 ) -> None:
-    """Verified TOTP (aal2) plus upload_enabled reserves with signed_url null."""
+    """Verified TOTP (aal2) plus upload_enabled reserves with signed_url null.
+
+    After reserve, the same user JWT can POST the object to Storage. That is
+    the local ``supabase_storage_jwt`` path; FastAPI still returns
+    ``signed_url=None``.
+    """
 
     created = _create_password_user(live_stack)
     _upsert_profile(created["user_id"], upload_enabled=False, mfa_enrolled=False)
@@ -661,7 +666,24 @@ def test_mfa_aal2_upload_reserve_signed_url_is_null(
         assert reserved.status_code == 200, reserved.text
         body = _json_object(reserved.json())
         assert body.get("signed_url") is None
+        assert body.get("upload_method") == "supabase_storage_jwt"
         assert body.get("reservation_id")
+        bucket = str(body.get("storage_bucket", ""))
+        prefix = str(body.get("storage_path", "")).rstrip("/")
+        if bucket == "" or prefix == "":
+            pytest.fail("aal2 reserve omitted storage_bucket or storage_path")
+        object_name = f"{prefix}/phase8-live.bin"
+        uploaded = client.post(
+            f"{created['auth_url'].rstrip('/')}/storage/v1/object/{bucket}/{object_name}",
+            headers={
+                "Authorization": f"Bearer {aal2_token}",
+                "apikey": created["anon_key"],
+                "Content-Type": "text/plain",
+                "x-upsert": "false",
+            },
+            content=b"phase8-storage-jwt",
+        )
+        assert uploaded.status_code in {200, 201}, uploaded.text
 
 
 def test_live_compose_outage_visible_on_ready(live_stack: dict[str, str]) -> None:

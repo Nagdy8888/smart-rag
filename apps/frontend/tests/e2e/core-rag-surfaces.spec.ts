@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { limitationCopy } from "../../src/lib/limitations";
 import { DOCUMENT_NOT_FOUND_COPY } from "../../src/lib/citation-drawer";
+import { signInLiveMember } from "./live-auth";
 
 test("login chrome includes Chat Documents Graph Tables nav", async ({ page }) => {
   await page.goto("/login");
@@ -48,23 +49,22 @@ test("login still shows BM25 and graph outage copy", async ({ page }) => {
   await expect(page.getByText(limitationCopy("graph_outage"))).toBeVisible();
 });
 
-test("authenticated Auto chrome when a session exists", async ({ page }) => {
+test("authenticated Auto chrome when a session exists", async ({
+  page,
+  request,
+}) => {
+  await signInLiveMember(page, request);
   await page.goto("/");
-  if (page.url().includes("/login")) {
-    test.skip(true, "no live Auth session; public chrome is covered above");
-    return;
-  }
   await expect(page.getByRole("heading", { name: "Auto chat" })).toBeVisible();
   await expect(page.getByTestId("auto-label")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
 
-test("stubbed document 404 shows Not found without a title", async ({ page }) => {
-  await page.goto("/documents/33333333-3333-4333-8333-333333333333");
-  if (page.url().includes("/login")) {
-    test.skip(true, "unauthenticated; 404 copy is covered by component tests");
-    return;
-  }
+test("stubbed document 404 shows Not found without a title", async ({
+  page,
+  request,
+}) => {
+  await signInLiveMember(page, request);
   await page.route("http://127.0.0.1:8000/documents/**", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({
@@ -76,7 +76,7 @@ test("stubbed document 404 shows Not found without a title", async ({ page }) =>
     }
     await route.continue();
   });
-  await page.reload();
+  await page.goto("/documents/33333333-3333-4333-8333-333333333333");
   await expect(page.getByText(DOCUMENT_NOT_FOUND_COPY)).toBeVisible();
   await expect(page.getByText("SECRET TITLE")).toHaveCount(0);
 });

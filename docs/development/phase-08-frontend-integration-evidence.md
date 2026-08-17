@@ -626,7 +626,7 @@ No backend redesign. No production test-auth bypass. No `X-Test-*` headers.
 | `pnpm --filter smart-rag-frontend exec tsc --noEmit` | 0 |
 | `pnpm --filter smart-rag-frontend test` | 0 (27 files, 149 passed) |
 | `pnpm --filter smart-rag-frontend build` | 0 (routes `/`, `/documents`, `/graph`, `/tables`, `/team`, `/tools`, `/curation`, `/usage`, `/profile`, Auth, `/unavailable/[gap]`; no `frame_*` / gallery / admin) |
-| `pnpm exec playwright test` (cwd `apps/frontend`) | 0 (25 passed, 4 skipped) |
+| `pnpm exec playwright test` (cwd `apps/frontend`) | 0 (29 passed, 0 skipped) |
 | `uv run python -m pytest tests/unit/test_phase08_journey_matrix.py -q` | 0 |
 | `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (118 markdown files, 0 lint issues; links + Mermaid render) |
 
@@ -636,10 +636,42 @@ The frontend-tier commands above are the same vector `check.py` uses
 
 Playwright skips (live FastAPI/Auth down; same assertions exist in Vitest):
 
-- `browser readiness panel matches live GET /health/ready`
-- `authenticated Auto chrome when a session exists`
-- `stubbed document 404 shows Not found without a title`
-- `stubbed company usage 403 stays forbidden copy when signed in`
+- none in the 2026-08-17 live re-run (29 passed, 0 skipped)
+
+### Live stack re-run (2026-08-17)
+
+Docker Desktop was stuck on an unresponsive WSL VM (`wsl.exe -l -v` timed
+out; `vmmemWSL` would not die without elevation). After an elevated
+`WSLService` restart, local GoTrue came up on `127.0.0.1:54321`. Compose
+`frontend` image build failed once because the Docker context was copied
+before `tests/e2e/live-auth.ts` existed; live HTTP used **host uvicorn**
+against local Auth/Postgres (same overlay as Phase 6 packet 8), not the
+Compose API image. `GET /health/ready` reported `database=ok`,
+`paradedb=unconfigured`, `valkey_limits=unconfigured`, `model_gateway=mock`.
+
+Auth was restarted (`pnpm exec supabase stop` then `start`, no `db reset`)
+so `[auth.mfa.totp]` enroll/verify applied. TOTP enroll had been 422 before
+that restart.
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/contract/test_thin_developer_ui_live.py -q -rs` | 0 (5 passed, 1 skipped: compose ParadeDB/Valkey stop; host API is `unconfigured`) |
+| `pnpm exec playwright test` (cwd `apps/frontend`) | 0 (29 passed, 0 skipped) |
+
+Proven in that run:
+
+- `GET /api/meta` public handshake
+- Password JWT chat, 426 without `X-Client-Version`, idempotent POST, SSE terminal, conversation DELETE, lingering ids 0
+- Five concurrent Composite streams
+- `upload_enabled` aal1 → `403 MFA required` on `/me` and reserve
+- Verified TOTP aal2 + `upload_enabled` reserve: `signed_url` is null,
+  `upload_method=supabase_storage_jwt`, user JWT POST to Storage returns 200/201
+- Playwright live `/health/ready` panel match
+- Playwright sign-in via GoTrue admin-created user (no `X-Test-*`): Auto chrome,
+  document 404 “Not found” without title leak, usage 403 with no budget sliders
+
+Playwright live sign-in helper: `apps/frontend/tests/e2e/live-auth.ts` reads
+pinned `supabase status -o json` (never prints keys) and fills `/login`.
 
 ### Negative findings
 
@@ -657,19 +689,14 @@ Playwright skips (live FastAPI/Auth down; same assertions exist in Vitest):
 
 ### Unverified-live
 
-- Local GoTrue sign-in / MFA verify / aal2 upload (no test-auth bypass)
-- Live FastAPI `/health/ready` panel match
-- Authenticated Playwright Auto chrome, document 404, company-usage 403
-- `tests/contract/test_thin_developer_ui_live.py` (FastAPI+Auth HTTP, not Next chrome)
-- Abandoned / expired / oversize quarantine as distinct public JSON enums
-  (version status prints the server `status` string; those labels are not
-  invented)
-- Live WCAG lab measurement of every computed style
-- Hosted Auth throttling (GAP-07-20 / Phase 10)
+Later re-run checklist (commands, pass criteria, results log):
+[phase-08-later-live-verification.md](./phase-08-later-live-verification.md).
 
-Existing live HTTP proof to keep citing:
-`tests/contract/test_thin_developer_ui_live.py` talks to FastAPI+Auth, not
-Next chrome.
+- P08-LV-01 Compose ParadeDB/Valkey stop-visible-on-ready
+- P08-LV-02 Abandoned / expired / oversize as distinct public JSON enums
+- P08-LV-03 Live WCAG lab measurement of computed styles
+- P08-LV-04 Hosted Auth throttling (GAP-07-20 / Phase 10)
+- P08-LV-05 Signed-in Next chrome against live graph/tables/tools/curation mutations
 
 ### Files changed
 
@@ -686,7 +713,13 @@ Next chrome.
 | `apps/frontend/src/components/auth/auth-screens.test.tsx` | GAP-07-08 no bootstrap form |
 | `apps/frontend/src/components/accessibility-security.test.tsx` | ACME `mark` parent `dir="auto"` |
 | `apps/frontend/tests/e2e/phase08-journeys.spec.ts` | Unauth routes, gaps, handshake stub, CSP, document 404 → login |
-| `docs/frontend/PHASE8_JOURNEY_MATRIX.md` | Created |
+| `apps/frontend/tests/e2e/live-auth.ts` | Live GoTrue admin user + `/login` sign-in helper |
+| `apps/frontend/tests/e2e/login.spec.ts` | Shared `fetchLocalReady` |
+| `apps/frontend/tests/e2e/core-rag-surfaces.spec.ts` | Live session Auto chrome and document 404 |
+| `apps/frontend/tests/e2e/administration-surfaces.spec.ts` | Live session usage 403 |
+| `tests/contract/test_thin_developer_ui_live.py` | aal2 reserve then user-JWT Storage POST |
+| `docs/frontend/PHASE8_JOURNEY_MATRIX.md` | Created; live rows flipped after 2026-08-17 run |
+| `docs/development/phase-08-later-live-verification.md` | Later-verification IDs P08-LV-01–05 |
 | `tests/unit/test_phase08_journey_matrix.py` | Lock limitation codes and GAP ids |
 | `docs/README.md` | Index row |
 | Reciprocal links | CORE_RAG, ADMINISTRATION, AUTH, A11Y → matrix |
@@ -709,19 +742,17 @@ evidence. Do not start Phase 9 until the user accepts this exit record.
 | Matches `STITCH_REVIEW.md`: no Stitch template routes | **proven** (build routes; prohibited-pattern scan) |
 | Honest GAP Unavailable pages for missing HTTP (GAP-07-07/08), not Stitch placeholders | **proven** (Playwright + component). Wrapper text that forbids “Unavailable-gap pages” is read as forbidding Stitch-number placeholders, not these contract gap fills |
 | No prohibited generated-HTML pattern | **proven** |
-| `@supabase/ssr` Auth: sign-in/up, Google disabled, reset/callback, invitation accept, MFA enroll/challenge, lost-factor GAP-07-07, owner bootstrap GAP-07-08, revoked sessions, upload MFA; no client authz shortcut | **proven** in Vitest; **unverified-live** against local GoTrue |
-| Handshake blocks unsupported clients before paid work | **proven** (9.0.0 stub + 426 POST) |
+| `@supabase/ssr` Auth: sign-in/up, Google disabled, reset/callback, invitation accept, MFA enroll/challenge, lost-factor GAP-07-07, owner bootstrap GAP-07-08, revoked sessions, upload MFA; no client authz shortcut | **proven** in Vitest and live GoTrue (password sign-in Playwright; aal1 MFA required; TOTP aal2 reserve) |
+| Handshake blocks unsupported clients before paid work | **proven** (9.0.0 stub + live 426 POST) |
 | Typed SSE clients tolerate unknown additive events | **proven** |
 | Idempotent submit, sequenced reconnect, heartbeat, cancel, route correction, deadline/partial, BM25 degrade, LightRAG `graph_outage`, figure/media, temporal, ACL, summary, negation, citations without snippets, inference GAP-07-02 copy, table provenance, diagnostics, feedback chrome, generic errors | **proven** in unit/component |
-| Document upload/quota/crawl/quarantine/scan/parse/BM25/Hybrid-Graph/backlog/retry/version/anomaly/deletion journeys | **proven** for mapped contracts; **unverified-live** Storage JWT upload; abandoned/expired/oversize are not distinct public enums |
-| Graph explorer, tables, tools, curation, team, usage/budget/rate, restricted audit GAP-07-12, profile, company settings enforce roles | **proven** in component tests; **unverified-live** FastAPI mutations |
+| Document upload/quota/crawl/quarantine/scan/parse/BM25/Hybrid-Graph/backlog/retry/version/anomaly/deletion journeys | **proven** for mapped contracts; **proven** local Storage JWT PUT after aal2 reserve (`signed_url` still null); abandoned/expired/oversize are not distinct public enums |
+| Graph explorer, tables, tools, curation, team, usage/budget/rate, restricted audit GAP-07-12, profile, company settings enforce roles | **proven** in component tests; usage 403 Playwright live; remaining FastAPI mutations **unverified-live** from Next chrome |
 | Responsive LTR/RTL, ACME logical highlight, keyboard/skip/reduced-motion, WCAG AA tokens, CSP, strict escaping, XSS fixtures | **proven** |
-| Playwright unauth + public stubs for roles chrome, MFA recovery, API skew, BM25 copy, Graph/ACL (component), RTL fixtures, restricted audit (component) | **proven**; authenticated Playwright **unverified-live** |
+| Playwright unauth + public stubs for roles chrome, MFA recovery, API skew, BM25 copy, Graph/ACL (component), RTL fixtures, restricted audit (component) | **proven**; authenticated Playwright Auto / document 404 / usage 403 **proven** live |
 | No mock data, test-auth bypass, `dangerouslySetInnerHTML`, or unescaped retrieved markup | **proven** |
 
 ### Phase 9 handoff blockers
 
 - User acceptance of this Phase 8 exit record
-- Optional: run `test_thin_developer_ui_live.py` and authenticated Playwright
-  when local FastAPI + GoTrue are up
 - Do not start Phase 9 local release-candidate load/eval until accepted
