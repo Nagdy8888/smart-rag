@@ -25,8 +25,9 @@ loading, empty, error, permission, quarantine, quota, compatibility,
 limitation, fallback, partial-readiness, budget, and degraded state.
 [STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md) is the accessibility
 and security review.
-[STITCH_REVIEW.md](./STITCH_REVIEW.md) records the component-system
-fallback (no approved Stitch export).
+[STITCH_REVIEW.md](./STITCH_REVIEW.md) records round-1 visual-reference
+acceptance of the delivered Stitch frames and the component-system
+implementation fallback (do not port HTML).
 
 ## Localization decision
 
@@ -47,43 +48,53 @@ Direction rules:
 | Codes, IDs, URLs, emails, sheet ranges, ISO dates | `dir="ltr"` | isolate inside RTL paragraphs |
 | Citation highlight offsets | logical Unicode offsets on canonical text, never visual-order | N/A |
 
-Optional future Arabic chrome is blocked on a real locale contract. Missing
-RTL **content** frames are a design gap, not a waiver: Stitch must still
-generate mixed-direction chat, citation, and highlight examples.
+Optional future Arabic chrome is blocked on a real locale contract. The
+delivered Stitch bundle has **no** RTL or mixed-direction frames; that
+remains a design-evidence gap, not a waiver. Phase 8 still implements the
+fixtures in this brief.
 
 ## Canonical design tokens
 
-No `DESIGN.md` exists. These values are the single approved set. Stitch
-frames and the Phase 8 fallback must use them. **Blur is rejected** (no
-frosted glass, no `backdrop-filter` as a required look).
+Round 1 (2026-08-17) reconciles three conflicting sources. **One set
+wins.** **Blur is rejected** (no frosted glass, no `backdrop-filter`).
+
+| Source | What it said | Disposition |
+| --- | --- | --- |
+| This brief (pre-export) | Teal `#0F766E`, radius 8px, canvas `#F8FAFC` | Teal replaced by delivered primary |
+| `smart_rag/DESIGN.md` YAML | Canvas `#faf8ff`, primary `#004ac6` | YAML lavender canvas rejected |
+| `DESIGN.md` prose | Canvas `#F8FAFC`, primary `#2563EB`, radius 10px, no blur | Canvas + primary kept; 10px rejected |
+| Frame HTML `tailwind.config` | Same YAML colors; `rounded-lg` = 8px | 8px kept |
+| Chat frame body | `bg-[#F8FAFC]` | Confirms canvas |
+| `frame_04_chat_state_gallery` | `.glass-panel` `backdrop-filter: blur(12px)` | **Rejected** |
 
 | Token | Value | Notes |
 | --- | --- | --- |
-| `--color-bg` | `#F8FAFC` | page |
+| `--color-bg` | `#F8FAFC` | page (chat frame + DESIGN prose) |
 | `--color-surface` | `#FFFFFF` | cards |
-| `--color-text` | `#0F172A` | AA on bg/surface |
+| `--color-text` | `#0F172A` | AA; YAML `on-surface` `#131B2E` is equivalent |
 | `--color-text-muted` | `#475569` | secondary; still AA on white |
 | `--color-border` | `#CBD5E1` | 1px |
-| `--color-accent` | `#0F766E` | teal; AA with white text |
+| `--color-accent` | `#2563EB` | delivered primary-container / DESIGN prose |
 | `--color-accent-fg` | `#FFFFFF` | |
-| `--color-danger` | `#B91C1C` | errors; not for BM25 degrade |
+| `--color-danger` | `#B91C1C` | YAML error `#ba1a1a` rounded to AA body text |
 | `--color-warning` | `#A16207` | quota/degraded; non-alarming |
 | `--color-success` | `#166534` | ready/complete |
-| `--color-focus` | `#0F766E` | 2px solid ring, offset 2px |
+| `--color-focus` | `#2563EB` | 2px solid ring, offset 2px |
 | `--radius-sm` | `6px` | chips |
-| `--radius-md` | `8px` | inputs, buttons |
+| `--radius-md` | `8px` | inputs, buttons (`rounded-lg` in frames) |
 | `--radius-lg` | `12px` | cards, drawers |
 | `--space` | `4px` grid | 8/12/16/24/32 |
 | `--shadow-1` | `0 1px 2px rgb(15 23 42 / 0.08)` | |
 | `--shadow-2` | `0 8px 24px rgb(15 23 42 / 0.08)` | drawers; no blur overlay |
-| `--font-sans` | `"Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif` | CSP-compatible, self-host in Phase 8 |
+| `--font-sans` | `"Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif` | CSP-compatible; optional self-hosted Inter later |
 | `--font-mono` | `ui-monospace, "Cascadia Code", monospace` | IDs/codes |
 | `--line-height-ar` | `1.75` | diacritics |
 | `--line-height-en` | `1.5` | chrome |
 | Motion | honor `prefers-reduced-motion` | no required animation |
 
-Prohibited: runtime Tailwind CDN, inline event-handler scripts, random mock
-metrics, external placeholder avatars, graph-only answer chrome, purple glass.
+Prohibited: runtime Tailwind CDN, Google Fonts CDN, Material Symbols CDN,
+inline event-handler scripts, random mock metrics, external placeholder
+avatars, graph-only answer chrome, purple glass, gallery blur.
 
 ## Information hierarchy
 
@@ -147,7 +158,7 @@ Do not use blur, glassmorphism, stock photography, or random avatars.
 Do not render retrieved HTML. All filenames, entities, answers, and table cells are plain text.
 UI role hiding is convenience only; never imply the browser enforces authorization.
 If a control has no backend contract, show an honest Unavailable state with a gap id, never mock data.
-Tokens: background #F8FAFC, surface #FFFFFF, text #0F172A, accent #0F766E, danger #B91C1C, warning #A16207, radius 8px, no blur.
+Tokens: background #F8FAFC, surface #FFFFFF, text #0F172A, accent #2563EB, danger #B91C1C, warning #A16207, radius 8px, no blur.
 WCAG AA contrast, visible 2px focus ring, keyboard-only operable, skip link.
 Desktop 1280px and mobile 390px. Mixed-direction fixtures required on chat and citations.
 ```
@@ -268,7 +279,7 @@ platform bidi.
 ## Signed limitation copy (non-alarming)
 
 Use [limitations.ts](../../apps/frontend/src/lib/limitations.ts) sentences.
-BM25 unavailable is warning (teal/amber), not danger-red. Graph-only must
+BM25 unavailable is warning (amber), not danger-red. Graph-only must
 never appear as "Answer with graph". Historical relationships stay on Hybrid.
 
 ## Accessibility baseline (expanded in STITCH_A11Y_SECURITY)

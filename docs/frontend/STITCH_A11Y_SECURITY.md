@@ -10,8 +10,9 @@ packet: P07-05
 # Accessibility, bidirectional, and security review (Phase 7)
 
 Review of [STITCH_BRIEF.md](./STITCH_BRIEF.md), [STITCH_STATES.md](./STITCH_STATES.md),
-and [API_UI_MAPPING.md](./API_UI_MAPPING.md). Missing generated Stitch frames
-are a design-evidence gap, not an accessibility waiver.
+and [API_UI_MAPPING.md](./API_UI_MAPPING.md). Delivered Stitch HTML is
+not an accessibility waiver. Missing RTL/mixed frames remain a
+design-evidence gap.
 
 Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
@@ -24,7 +25,7 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 | --- | --- | --- |
 | Skip link | First focusable control to `#main` | specified |
 | Tab order | Chrome LTR, then isolated content widgets | specified |
-| Focus visible | 2px `#0F766E` ring, 2px offset | specified |
+| Focus visible | 2px `#2563EB` ring, 2px offset | specified |
 | Error focus | move focus to `StatusBanner` on 426/402/MFA/error | specified |
 | Drawers | Escape closes; focus trap; restore trigger | specified |
 | Lists | arrow keys in conversation/document lists | specified |
@@ -43,7 +44,7 @@ upload, graph search, read BM25 degrade, read ACL blindness.
 ## Contrast (WCAG AA)
 
 Token pairs in the brief: `#0F172A` on `#F8FAFC`/`#FFFFFF`; `#FFFFFF` on
-`#0F766E`; `#B91C1C` and `#A16207` used as text on white only when they meet
+`#2563EB`; `#B91C1C` and `#A16207` used as text on white only when they meet
 4.5:1 (warning `#A16207` on white is AA for large text; body warning uses
 the sentence plus an icon, not warning-colored small text alone). Muted
 `#475569` on white is AA. Do not place muted text on `#CBD5E1`.
@@ -97,7 +98,8 @@ Phase 6 thin UI already forbids raw HTML. Phase 8 keeps that contract.
 
 | ID | Finding | Disposition |
 | --- | --- | --- |
-| A11Y-01 | No generated mobile/RTL Stitch export to screenshot-review | Not a waiver; fallback primitives must still meet this file |
+| A11Y-01 | Delivered Stitch HTML has almost no `aria-*`, no skip link, no RTL/mixed frames; gallery uses blur | Not a waiver; Phase 8 implements this file, not the HTML |
+| A11Y-04 | Sign-in uses `loader.innerHTML` | Forbidden in production; React text nodes only |
 | A11Y-02 | Warning color `#A16207` as small text may be tight AA | Use as icon + `#0F172A` sentence |
 | A11Y-03 | Graph canvas keyboard path is underspecified in Stitch | Phase 8: search field + list of nodes first, canvas optional |
 | SEC-01 | Source drawer has no HTTP | Unavailable GAP-07-09 |

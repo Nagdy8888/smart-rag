@@ -14,6 +14,7 @@ contracts for Stitch specification. This document does not invent endpoints,
 fields, or success paths. Unresolved gaps stay named.
 
 Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
+[STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [api-ui-inventory.json](./api-ui-inventory.json) ·
 [openapi.foundation.json](../api/openapi.foundation.json) ·

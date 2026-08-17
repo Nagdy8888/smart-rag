@@ -289,14 +289,36 @@ Delete the a11y review document and test.
 | `uv run python -m pytest tests/unit/test_phase07_stitch_review.py tests/unit/test_phase07_api_ui_mapping.py tests/unit/test_phase07_stitch_brief.py tests/unit/test_phase07_stitch_states.py tests/unit/test_phase07_stitch_a11y.py -q` | 0 (16 passed) |
 | `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
 
-### Decision
+### Decision (superseded by round 1)
 
-Component-system fallback selected on 2026-08-17. Zero Stitch revision
-rounds. No approved frames. Phase 8 implements native HTML + brief tokens.
+Component-system fallback selected on 2026-08-17 with zero rounds because
+no implementable export was in the repo. The user then delivered the
+bundle the same day. Round 1 below supersedes the “no frames” clause
+while keeping the implementation fallback.
 
 ### Rollback
 
 Delete `STITCH_REVIEW.md`. Do not un-check packets 1–5.
+
+### Round 1 (2026-08-17) — delivered Stitch export
+
+The user pointed at `docs/stitch_smart_rag_enterprise_console/` (gitignored).
+Eleven frames plus `smart_rag/DESIGN.md` were reviewed. HTML is **not**
+production. Frames are visual/interaction references. Tokens reconciled
+to accent `#2563EB`, canvas `#F8FAFC`, radius 8px, no blur.
+
+| File | Action |
+| --- | --- |
+| `docs/frontend/STITCH_REVIEW.md` | Round 1: 1 of 2; visual yes; HTML no; fallback yes |
+| `docs/frontend/STITCH_BRIEF.md` | Token reconciliation |
+| `docs/frontend/STITCH_A11Y_SECURITY.md` | A11Y-01/04 + accent token |
+| `tests/unit/test_phase07_stitch_review.py` | Expect 1 of 2, not 0 of 2 |
+| `tests/unit/test_phase07_stitch_brief.py` | Expect `#2563EB` |
+
+| Command | Exit |
+| --- | --- |
+| `uv run python -m pytest tests/unit/test_phase07_stitch_review.py tests/unit/test_phase07_stitch_brief.py tests/unit/test_phase07_stitch_a11y.py tests/unit/test_phase07_api_ui_mapping.py tests/unit/test_phase07_stitch_states.py -q` | 0 (16 passed) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
 
 ## Phase 7 exit record
 
@@ -308,11 +330,11 @@ Delete `STITCH_REVIEW.md`. Do not un-check packets 1–5.
 | Brief has copy-ready prompts, LTR/RTL frames, localization, mixed fixtures, hierarchy, components, copy, a11y | `STITCH_BRIEF.md` + packet 2 tests |
 | Every loading/empty/error/limitation state | `STITCH_STATES.md` (part of brief) |
 | API/UI map to real Phase 2/6 contracts + gaps | `API_UI_MAPPING.md` + inventory JSON + unit tests |
-| Five days / two rounds: approve Stitch **or** fallback | `STITCH_REVIEW.md` fallback on 2026-08-17, 0 rounds |
+| Five days / two rounds: approve Stitch **or** fallback | Round 1 2026-08-17: visual references accepted; HTML not ported; implementation fallback; 1 of 2 |
 
 ### Unverified / blockers for Phase 8
 
-- User acceptance of this fallback (wrapper status stays pending until accepted).
+- User acceptance of this round-1 handoff (wrapper status stays pending until accepted).
 - Owning-phase HTTP: GAP-07-07, 08, 09, 10, 11, 12, 13, 14, 19.
 - Hosted Auth throttling (GAP-07-20 / Phase 10).
 - CloudFront `signed_url` (Phase 10).
@@ -320,11 +342,13 @@ Delete `STITCH_REVIEW.md`. Do not un-check packets 1–5.
 
 ### Deviations
 
-None to security/data/cost. Design generation skipped in favor of the
-planned fallback because no implementable Stitch export existed in the
-bounded window.
+None to security/data/cost. Round 1 accepts gitignored Stitch frames as
+visual references and keeps the component-system implementation fallback
+because the HTML uses CDN Tailwind, almost no ARIA, mock diagnostics,
+and prohibited blur.
 
 ### Phase 8 handoff
 
-Implement production UI from the five frontend docs above. Do not restart
-Stitch. Do not mock GAP rows. Keep Auto as default chat.
+Implement production UI from the five frontend docs above plus the
+gitignored visual export. Do not restart Stitch. Do not port `code.html`.
+Do not mock GAP rows. Keep Auto as default chat. Accent `#2563EB`.

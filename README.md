@@ -53,6 +53,7 @@ Full index (owner / status / last-reviewed): [docs/README.md](docs/README.md)
 
 Phase 1 foundation was accepted on 2026-08-12. Phases 2–5 have local evidence.
 Phase 6 packets 1–8 are implemented; wrapper acceptance is still pending.
-Phase 7 packets 1–6 are specified (Stitch brief, API/UI map, component-system
-fallback) and await user acceptance of the fallback handoff. See
+Phase 7 packets 1–6 are specified (Stitch brief, API/UI map, round-1 visual
+references plus component-system implementation fallback) and await user
+acceptance of the handoff. See
 [docs/README.md](docs/README.md).
