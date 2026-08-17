@@ -346,7 +346,13 @@ def test_proxy_bypass_denied_without_fetch_route() -> None:
 
 
 def test_worker_compose_has_no_public_egress_network() -> None:
-    """Worker service remains on internal-only private network."""
+    """Worker stays off crawl egress and does not publish host ports.
+
+    Packet 1 candidate identity attaches the worker to ``edge`` so it can
+    reach local Supabase at ``host.docker.internal``. Compose ``private`` is
+    ``internal: true`` and cannot route to the Docker host gateway. ``egress``
+    remains forbidden; worker host ports remain unpublished.
+    """
 
     import yaml
 
@@ -354,8 +360,11 @@ def test_worker_compose_has_no_public_egress_network() -> None:
         (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     )
     worker = compose["services"]["worker"]
-    assert "edge" not in worker["networks"]
-    assert "egress" not in worker["networks"]
+    networks = worker["networks"]
+    assert "private" in networks
+    assert "edge" in networks
+    assert "egress" not in networks
+    assert "ports" not in worker
 
 
 def test_crawl_proxy_gateway_requires_peer_ip() -> None:

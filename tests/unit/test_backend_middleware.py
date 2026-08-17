@@ -91,8 +91,10 @@ def test_security_headers_are_present_on_live() -> None:
     from fastapi.testclient import TestClient
     from smart_rag_api.main import create_app
 
-    with TestClient(create_app()) as client:
-        response = client.get("/health/live")
+    from tests.unit.typed_openapi import as_openapi_client
+
+    with TestClient(create_app()) as raw:
+        response = as_openapi_client(raw).get("/health/live")
     assert response.status_code == 200
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"

@@ -60,8 +60,10 @@ execution evidence.
 **Future (not fake-green):** Supabase reset/RLS, LightRAG, retrieval evals, load, restore — Phases 2–10.
 
 Phase 9 Packet 1 candidate freeze/seed
-(`scripts/phase09_candidate.py`, `scripts/ci/check_phase09_packet1.py`) is a
-local gate. It is not added to the GitHub PR job graph. See
+(`scripts/phase09_candidate.py`, `scripts/ci/check_phase09_packet1.py`) and
+Packet 2 local CI/security gates
+(`scripts/ci/check_phase09_packet2.py`) are local gates. They are not added
+to the GitHub PR job graph. See
 [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
 
 Actions are pinned by commit SHA. The caller workflows use

@@ -202,9 +202,9 @@ def test_deletion_pending_is_driven_on_graph_ineligible() -> None:
     graph-ineligible version instead of the Graph Ready row.
     """
 
-    source = (
-        REPO_ROOT / "packages/core/src/smart_rag_core/release/seed.py"
-    ).read_text(encoding="utf-8")
+    source = (REPO_ROOT / "packages/core/src/smart_rag_core/release/seed.py").read_text(
+        encoding="utf-8"
+    )
     assert 'result.status == "graph_ineligible"' in source
     assert "graph_ready_done = True\n                deletion_version" not in source
 

@@ -619,6 +619,57 @@ def cmd_migrations() -> int:
     return 0
 
 
+def _copy_worker_seed_artifact(name: str) -> int:
+    """Copy one seed JSON artifact from worker tmpfs via exec.
+
+    Docker ``compose cp`` cannot see the worker ``/tmp`` tmpfs on this host.
+    ``exec`` reads the same mount the seed process wrote.
+
+    Args:
+        name: Filename under ``/tmp/phase09``. Must be one of the three seed
+            artifacts; the path is not taken from operator input.
+
+    Returns:
+        Process exit code.
+
+    Side Effects:
+        Writes ``docs/deployment/phase-09/<name>`` after JSON validation.
+    """
+
+    allowed = {
+        "candidate-corpus-manifest.json",
+        "candidate-readiness-export.json",
+        "candidate-seed-counts.json",
+    }
+    if name not in allowed:
+        raise CandidateReleaseError(f"refusing to copy unexpected seed artifact {name}")
+    completed = run_compose(
+        REPO_ROOT,
+        [
+            "exec",
+            "-T",
+            "worker",
+            "python",
+            "-c",
+            (
+                "from pathlib import Path; "
+                f"print(Path('/tmp/phase09/{name}').read_text(encoding='utf-8'), end='')"
+            ),
+        ],
+        timeout_seconds=60,
+    )
+    if completed.returncode != 0:
+        sys.stderr.write(completed.stderr or completed.stdout)
+        return completed.returncode
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        sys.stderr.write(f"worker seed artifact {name} is not valid JSON\n")
+        return 1
+    dump_canonical_json(as_json_object(payload), ARTIFACTS / name)
+    return 0
+
+
 def cmd_seed() -> int:
     """Seed through the worker container so ParadeDB stays unpublished."""
 
@@ -638,23 +689,18 @@ def cmd_seed() -> int:
         ],
         timeout_seconds=1800,
     )
+    if seed.returncode != 0:
+        sys.stderr.write(seed.stderr or seed.stdout)
+        return seed.returncode
     copy_code = 0
     for name in (
         "candidate-corpus-manifest.json",
         "candidate-readiness-export.json",
         "candidate-seed-counts.json",
     ):
-        copied = run_compose(
-            REPO_ROOT,
-            ["cp", f"worker:/tmp/phase09/{name}", str(ARTIFACTS / name)],
-            timeout_seconds=60,
-        )
-        if copied.returncode != 0:
-            sys.stderr.write(copied.stderr or copied.stdout)
-            copy_code = copied.returncode
-    if seed.returncode != 0:
-        sys.stderr.write(seed.stderr or seed.stdout)
-        return seed.returncode
+        copied = _copy_worker_seed_artifact(name)
+        if copied != 0:
+            copy_code = copied
     return copy_code
 
 

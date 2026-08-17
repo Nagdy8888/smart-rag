@@ -29,11 +29,19 @@ from smart_rag_core.query_admission.service import true_up_query_reservation
 
 from tests.contract.integration_support import resolve_supabase_db_url, try_connect
 from tests.contract.test_query_run_admission import (
-    _admit,
-    _authorization_version,
-    _caller,
-    _insert_conversation,
-    _insert_user_profile,
+    admit as _admit,
+)
+from tests.contract.test_query_run_admission import (
+    authorization_version as _authorization_version,
+)
+from tests.contract.test_query_run_admission import (
+    caller_context as _caller,
+)
+from tests.contract.test_query_run_admission import (
+    insert_conversation as _insert_conversation,
+)
+from tests.contract.test_query_run_admission import (
+    insert_user_profile as _insert_user_profile,
 )
 
 _NOW = datetime(2026, 8, 16, 12, 0, tzinfo=UTC)

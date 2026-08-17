@@ -125,6 +125,15 @@ is already migrated.
    `candidate-sizing-baseline.json` without claiming managed proof.
 6. Packet 6 re-runs full SBOM/Trivy; Packet 1 stores compact summaries and
    gitignored dumps under `.tmp-phase09/`.
+7. Packet 2 runs local hard CI/security gates against these Ids. It does not
+   rebuild images. `scripts/ci/check_phase09_packet2.py --mode candidate`
+   fail-closes extras beyond Phase 2 integration. Overlay malware/proxy/BM25
+   tests use `--mode overlay` only while `docker-compose.packet8.yml` is
+   attached, then the overlay is removed. Packet 2 ran schema determinism
+   (two matching resets) and reseeded; later packets must consume the
+   rewritten `candidate-corpus-manifest.json` document/version ids. Image Ids
+   stay the Packet 1 freeze. Old-API/new-schema smoke is Blocked until a
+   prior API digest exists. Do not retry Trivy via docker.sock.
 
 ```mermaid
 flowchart TD

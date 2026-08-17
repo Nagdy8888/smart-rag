@@ -22,6 +22,7 @@ uv run python scripts/ci/check_migrations.py
 uv run python scripts/ci/check_phase2_integration.py
 uv run python scripts/phase09_candidate.py all
 uv run python scripts/ci/check_phase09_packet1.py
+uv run python scripts/ci/check_phase09_packet2.py --mode candidate
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -38,7 +39,8 @@ The schema determinism gate is intentionally destructive and local-only. With
 the pinned Supabase stack running, it resets the local database exactly twice,
 runs the authoritative schema contract after each reset, and compares roles,
 extensions, tables, columns, constraints, private-schema exposure, and generated
-types:
+types. Type generation uses `--db-url` against host `127.0.0.1:54322`. The gate
+wipes any Phase 9 seed; reseed immediately on candidate compose only.
 
 ```powershell
 uv run python scripts/ci/check_schema_determinism.py
@@ -72,6 +74,40 @@ Blocked in `docs/deployment/phase-09/candidate-scan-summary.json`.
 ```powershell
 uv run python scripts/phase09_candidate.py all
 uv run python scripts/ci/check_phase09_packet1.py
+```
+
+The Phase 9 Packet 2 gate is also local-only and is not a GitHub PR job. It
+fail-closes on zero collection, failures, errors, or skipped mandatory local
+tests. `--mode candidate` uses unpublished ParadeDB via `docker compose exec`.
+`--mode overlay` requires `docker-compose.packet8.yml` already attached for
+ClamAV, crawl-proxy, and host-side BM25 tests; detach the overlay afterward
+and re-prove unpublished ports. Overlay merge must use `--merge-artifact` so
+candidate suite rows are not clobbered. Do not set
+`SMART_RAG_HOLDOUT_ACCESS=true`. `check_schema_determinism.py` wipes Packet 1
+seed; reseed immediately with `phase09_candidate.py seed` on candidate compose
+only (worker `exec` copies artifacts; `compose cp` cannot see worker `/tmp`
+tmpfs). Old-API/new-schema authenticated smoke has no existing repository
+script; Packet 2 records it Blocked rather than inventing a pass. Managed
+JWKS/CDN/KMS/OIDC/restore/assessment stay Phase 10 handoffs. Do not retry
+Trivy via docker.sock.
+
+```powershell
+uv run python scripts/ci/check_phase09_packet2.py --mode candidate
+uv run python scripts/ci/check_phase2_integration.py
+uv run python scripts/ci/check_openapi.py
+uv run python scripts/ci/check_migrations.py
+uv run python scripts/ci/check_schema_determinism.py
+uv run python scripts/phase09_candidate.py seed
+uv run python scripts/phase09_candidate.py sizing
+docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --no-build --wait clamav paradedb crawl-proxy
+$env:SMART_RAG_REQUIRE_CLAMAV = "1"
+$env:SMART_RAG_REQUIRE_CRAWL_PROXY = "1"
+uv run python scripts/ci/check_phase09_packet2.py --mode overlay --merge-artifact
+Remove-Item Env:SMART_RAG_REQUIRE_CLAMAV
+Remove-Item Env:SMART_RAG_REQUIRE_CRAWL_PROXY
+docker compose --env-file .env.compose -f docker-compose.yml up -d --no-build --wait --remove-orphans
+uv run python scripts/phase09_candidate.py ports-static
+uv run python scripts/phase09_candidate.py health
 ```
 
 Tiers hard-fail (no `|| true`). Zero collected tests fail the unit/contract tiers.

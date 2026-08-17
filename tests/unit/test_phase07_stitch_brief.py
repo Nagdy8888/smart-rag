@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-BRIEF_PATH = Path(__file__).resolve().parents[2] / "docs" / "frontend" / "STITCH_BRIEF.md"
+BRIEF_PATH = (
+    Path(__file__).resolve().parents[2] / "docs" / "frontend" / "STITCH_BRIEF.md"
+)
 
 
 def test_brief_records_english_chrome_and_arabic_content() -> None:

@@ -12,6 +12,7 @@ SIZING_SCHEMA_VERSION = "phase09-candidate-sizing-v1"
 SCAN_SCHEMA_VERSION = "phase09-candidate-scan-v1"
 HEALTH_SCHEMA_VERSION = "phase09-candidate-health-v1"
 MIGRATION_SCHEMA_VERSION = "phase09-candidate-migrations-v1"
+PACKET2_MATRIX_SCHEMA_VERSION = "phase09-candidate-packet2-v1"
 
 ARTIFACT_DIR = "docs/deployment/phase-09"
 CANDIDATE_COMPOSE_FILE = "docker-compose.yml"

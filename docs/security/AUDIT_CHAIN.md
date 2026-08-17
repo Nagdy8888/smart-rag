@@ -2,7 +2,7 @@
 title: Audit hash chain
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-17
 audience: engineering, security
 phase_packet: Phase 2 Packet 6
 ---
@@ -53,7 +53,7 @@ fields, redacted payload, `previous_hash`, and `created_at`.
 | `app.append_audit_event(...)` | `SECURITY DEFINER`; `EXECUTE` for `app_api`, `app_audit_writer` | Fixed `search_path`; PUBLIC revoked |
 | `app.authorize_restricted_read(...)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` only | Revalidates typed context, ACL, restricted visibility, and current version; atomically appends purpose/resource/session metadata |
 | `app.record_run_restricted_evidence(...)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` only | Same content-minimized chain for evidence included in a completed run; stores actor, version, run, citation, purpose; no passage text |
-| `app.verify_audit_chain(limit_n)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` | Returns first broken `id` or `NULL` |
+| `app.verify_audit_chain(limit_n)` | `SECURITY DEFINER`; `EXECUTE` for `app_api` | Returns first broken `id` or `NULL`. Scans the **oldest** `n` events (`ORDER BY chain_seq ASC LIMIT n`), not the newest. Operators and tests must pass `n >= count(*)` to cover later tampers. Default `n` is 1000. |
 | `app.redact_audit_payload(jsonb)` | internal helper | PUBLIC revoked |
 
 Restricted evidence, preview, and download admission creates both an

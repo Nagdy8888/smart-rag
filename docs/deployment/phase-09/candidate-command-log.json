@@ -95,6 +95,26 @@
     {
       "command": "scan",
       "exit_code": 0
+    },
+    {
+      "command": "ports-static",
+      "exit_code": 0
+    },
+    {
+      "command": "health",
+      "exit_code": 0
+    },
+    {
+      "command": "seed",
+      "exit_code": 1
+    },
+    {
+      "command": "sizing",
+      "exit_code": 0
+    },
+    {
+      "command": "sizing",
+      "exit_code": 0
     }
   ]
 }

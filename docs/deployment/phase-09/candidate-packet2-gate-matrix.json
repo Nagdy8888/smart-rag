@@ -1,0 +1,180 @@
+{
+  "candidate_image_ids": {
+    "api": "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
+    "crawl-proxy": "sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604",
+    "frontend": "sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+    "parser-sandbox": "sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec",
+    "worker": "sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990"
+  },
+  "commands": [],
+  "compose_file": "docker-compose.yml",
+  "handoffs": [
+    {
+      "acceptance": "P09-02-B",
+      "classification": "Not Run",
+      "item_id": "managed_jwks_rollover",
+      "managed_only": true,
+      "next_action": "Prove standby\u2192active\u2192retired rollover on isolated managed Supabase",
+      "owner": "Phase 10",
+      "reason": "tests/contract/test_jwks_rollover.py is the optional managed JWKS postcondition probe, not local asymmetric fixtures"
+    },
+    {
+      "acceptance": "P09-02-B",
+      "classification": "Not Run",
+      "item_id": "managed_pgvector",
+      "managed_only": true,
+      "next_action": "Run the managed pgvector capability contract against staging",
+      "owner": "Phase 10",
+      "reason": "test_managed_pgvector_capabilities_when_configured requires SUPABASE_MANAGED_DB_URL"
+    },
+    {
+      "acceptance": "P09-02-D",
+      "classification": "Not Run",
+      "item_id": "real_cdn_sse",
+      "managed_only": true,
+      "next_action": "Prove heartbeat, disconnect, and resume through staging CDN",
+      "owner": "Phase 10",
+      "reason": "Real CloudFront/WAF streaming is a managed topology gate"
+    },
+    {
+      "acceptance": "P09-02-E",
+      "classification": "Not Run",
+      "item_id": "kms_s3_audit_anchor",
+      "managed_only": true,
+      "next_action": "Prove KMS-anchored export on staging; local HMAC adapter remains Packet 2/Phase 6",
+      "owner": "Phase 10",
+      "reason": "Managed immutable audit-chain anchors require KMS/S3 Object Lock"
+    },
+    {
+      "acceptance": "P09-02-D",
+      "classification": "Not Run",
+      "item_id": "oidc_protected_migrations",
+      "managed_only": true,
+      "next_action": "Run the protected expand-migration path on staging",
+      "owner": "Phase 10",
+      "reason": "GitHub OIDC/SSM/Secrets Manager protected migrations are managed-only"
+    },
+    {
+      "acceptance": "P09-02-A",
+      "classification": "Not Run",
+      "item_id": "managed_restore",
+      "managed_only": true,
+      "next_action": "Packet 6 owns local restore; Phase 10 owns managed restore",
+      "owner": "Phase 10",
+      "reason": "Managed Supabase/Storage restore is not a local Packet 2 gate"
+    },
+    {
+      "acceptance": "P09-02-A",
+      "classification": "Not Run",
+      "item_id": "external_assessment",
+      "managed_only": true,
+      "next_action": "Attach the dated assessment or delta review in Phase 10",
+      "owner": "Phase 10",
+      "reason": "External security assessment is not locally executable"
+    },
+    {
+      "acceptance": "P09-02-D",
+      "classification": "Blocked",
+      "item_id": "old_api_new_schema_smoke",
+      "managed_only": false,
+      "next_action": "Author a bounded authenticated read/chat/upload smoke that starts a prior expand-compatible API digest against the current schema. Do not fake this with the single Packet 1 candidate image.",
+      "owner": "Phase 9 Packet 2/7",
+      "reason": "No repository test or script runs an older API image against the post-expansion local schema. Expand/contract static checks and minimum-client/SSE tests exist; the drain smoke does not."
+    },
+    {
+      "acceptance": "P09-02-A",
+      "classification": "Blocked",
+      "item_id": "trivy_sbom",
+      "managed_only": false,
+      "next_action": "Packet 6 re-runs full SBOM/Trivy after Docker Desktop/WSL recovery",
+      "owner": "Phase 9 Packet 6",
+      "reason": "Packet 1 Trivy via docker.sock hung Docker Desktop on 2026-08-17. Packet 2 must not retry that path."
+    },
+    {
+      "acceptance": "P09-02-D",
+      "classification": "Passed",
+      "item_id": "schema_determinism_reset_reapply",
+      "managed_only": false,
+      "next_action": "Packet 3 consumes the rewritten candidate-corpus-manifest.json document/version ids. Image Ids stay the Packet 1 freeze.",
+      "owner": "Phase 9 Packet 2",
+      "reason": "Two local supabase db reset --yes passes matched schema SHA-256 0921806d9fb378393c2dd313bbaf52953d1636af96f311a59ad4f63f57fee76d and types SHA-256 8aafd3c2871be7199707d36429ec57b782b77f91b2f4526eed5df6bc383a42c8. Packet 1 seed was wiped. Candidate compose reseeded without rebuilding images. Worker seed artifacts are copied via exec because compose cp cannot see worker /tmp tmpfs."
+    }
+  ],
+  "holdout_opened": false,
+  "mode": "overlay",
+  "overlay_file_is_candidate": false,
+  "requirement_id": "P09-02",
+  "schema_version": "phase09-candidate-packet2-v1",
+  "suites": [
+    {
+      "acceptance": "P09-02-B",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "identity_acl_graph_cache",
+      "tests": 48,
+      "title": "Identity, ACL, graph isolation, retrieval cache, conversation deletion, and hybrid authorization negatives"
+    },
+    {
+      "acceptance": "P09-02-C",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "replay_idempotency_gc",
+      "tests": 46,
+      "title": "Replay, job leases, BM25 reconcile, hybrid enqueue, query GC, SSE idempotency"
+    },
+    {
+      "acceptance": "P09-02-D",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "sse_openapi_reconnect",
+      "tests": 12,
+      "title": "Additive SSE heartbeat, local Caddy timeouts, and sequenced reconnect"
+    },
+    {
+      "acceptance": "P09-02-E",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": false,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "parser_governance_egress_redaction",
+      "tests": 18,
+      "title": "Parser sandbox, crawl SSRF, governance docs, structured table, DuckDB sandbox"
+    },
+    {
+      "acceptance": "P09-02-E",
+      "classification": "Passed",
+      "detail": "",
+      "errors": 0,
+      "fail_on_skip": true,
+      "failures": 0,
+      "overlay_required": true,
+      "returncode": 0,
+      "skipped": 0,
+      "suite_id": "overlay_malware_proxy_bm25",
+      "tests": 8,
+      "title": "ClamAV, crawl-proxy overlay, typed BM25 injection, BM25 delete/reconcile live"
+    }
+  ]
+}

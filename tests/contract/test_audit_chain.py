@@ -29,6 +29,32 @@ def db_connection() -> Iterator[psycopg.Connection]:
     connection.close()
 
 
+def _verify_full_audit_chain(cursor: psycopg.Cursor) -> uuid.UUID | None:
+    """Verify the entire local hash chain.
+
+    ``app.verify_audit_chain(n)`` scans the oldest ``n`` events, not the
+    newest. Candidate seed data exceeds 100 rows, so a hard-coded ``100``
+    misses later tampers. Tests pass ``count(*)`` so the window covers the
+    fixture events.
+
+    Args:
+        cursor: Open database cursor.
+
+    Returns:
+        First broken event id, or ``None`` when the scanned chain is intact.
+    """
+
+    cursor.execute("SELECT count(*) FROM app.audit_events")
+    count_row = cursor.fetchone()
+    assert count_row is not None
+    chain_len = max(int(count_row[0]), 1)
+    cursor.execute("SELECT app.verify_audit_chain(%s)", (chain_len,))
+    verification = cursor.fetchone()
+    assert verification is not None
+    broken = verification[0]
+    return broken if broken is None else uuid.UUID(str(broken))
+
+
 def test_redact_audit_payload_strips_sensitive_keys() -> None:
     """Python redaction helper matches Packet 6 sensitive-key policy."""
 
@@ -180,10 +206,7 @@ def test_append_chain_redaction_and_immutability(
         assert second_prev == first_hash
         assert second_payload["token"] == marker
 
-        cursor.execute("SELECT app.verify_audit_chain(100)")
-        verification = cursor.fetchone()
-        assert verification is not None
-        assert verification[0] is None
+        assert _verify_full_audit_chain(cursor) is None
 
         cursor.execute("SET ROLE app_audit_writer")
         with pytest.raises(
@@ -216,11 +239,7 @@ def test_append_chain_redaction_and_immutability(
             (second_id,),
         )
         cursor.execute("ALTER TABLE app.audit_events ENABLE TRIGGER USER")
-        cursor.execute("SELECT app.verify_audit_chain(100)")
-        broken_row = cursor.fetchone()
-        assert broken_row is not None
-        broken_at = broken_row[0]
-        assert broken_at == second_id
+        assert _verify_full_audit_chain(cursor) == second_id
 
 
 def test_verify_detects_reordered_previous_hash(
@@ -290,9 +309,5 @@ def test_verify_detects_reordered_previous_hash(
         )
         cursor.execute("ALTER TABLE app.audit_events ENABLE TRIGGER USER")
 
-        cursor.execute("SELECT app.verify_audit_chain(100)")
-        broken_row = cursor.fetchone()
-        assert broken_row is not None
-        broken_at = broken_row[0]
-        assert broken_at == second_id
+        assert _verify_full_audit_chain(cursor) == second_id
         assert first_hash

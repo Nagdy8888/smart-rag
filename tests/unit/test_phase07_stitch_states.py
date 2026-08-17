@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-STATES_PATH = Path(__file__).resolve().parents[2] / "docs" / "frontend" / "STITCH_STATES.md"
-BRIEF_PATH = Path(__file__).resolve().parents[2] / "docs" / "frontend" / "STITCH_BRIEF.md"
+STATES_PATH = (
+    Path(__file__).resolve().parents[2] / "docs" / "frontend" / "STITCH_STATES.md"
+)
+BRIEF_PATH = (
+    Path(__file__).resolve().parents[2] / "docs" / "frontend" / "STITCH_BRIEF.md"
+)
 
 
 def test_state_matrix_covers_required_families() -> None:

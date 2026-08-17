@@ -9,7 +9,7 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import cast
 from uuid import UUID, uuid4
 
 import httpx
@@ -63,7 +63,7 @@ def _event_names(buffer: str) -> list[str]:
     return names
 
 
-def _json_object(value: object) -> dict[str, Any]:
+def _json_object(value: object) -> dict[str, object]:
     """Narrow decoded JSON to a string-keyed object.
 
     Args:
@@ -78,10 +78,10 @@ def _json_object(value: object) -> dict[str, Any]:
 
     if not isinstance(value, dict):
         raise AssertionError("expected JSON object")
-    return value
+    return cast(dict[str, object], value)
 
 
-def _access_token_from_auth_json(body: dict[str, Any]) -> str:
+def _access_token_from_auth_json(body: dict[str, object]) -> str:
     """Extract an access token from a GoTrue JSON object.
 
     Args:
@@ -96,7 +96,8 @@ def _access_token_from_auth_json(body: dict[str, Any]) -> str:
         return token
     nested = body.get("data")
     if isinstance(nested, dict):
-        return str(nested.get("access_token", ""))
+        nested_body = _json_object(cast(object, nested))
+        return str(nested_body.get("access_token", ""))
     return ""
 
 
@@ -117,7 +118,8 @@ def _jwt_aal(token: str) -> str:
     payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
     if not isinstance(payload, dict):
         return "aal1"
-    return str(payload.get("aal", "aal1"))
+    claims = _json_object(cast(object, payload))
+    return str(claims.get("aal", "aal1"))
 
 
 def _upsert_profile(
@@ -247,7 +249,8 @@ def _enroll_and_verify_totp(
         totp = enroll_body.get("totp")
         if not isinstance(totp, dict):
             pytest.skip("GoTrue enroll omitted totp.secret")
-        secret = str(totp.get("secret", ""))
+        totp_body = _json_object(cast(object, totp))
+        secret = str(totp_body.get("secret", ""))
         factor_id = str(enroll_body.get("id", ""))
         if secret == "" or factor_id == "":
             pytest.skip("GoTrue enroll omitted factor id or secret")
@@ -317,11 +320,13 @@ def _ready_dependencies(api: str) -> dict[str, str]:
     if not isinstance(raw, list):
         return {}
     out: dict[str, str] = {}
-    for item in raw:
-        if isinstance(item, dict):
-            name = str(item.get("name", ""))
-            if name:
-                out[name] = str(item.get("status", ""))
+    for raw_item in cast(list[object], raw):
+        if not isinstance(raw_item, dict):
+            continue
+        row = _json_object(cast(object, raw_item))
+        name = str(row.get("name", ""))
+        if name:
+            out[name] = str(row.get("status", ""))
     return out
 
 

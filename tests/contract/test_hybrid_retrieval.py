@@ -348,10 +348,18 @@ def test_cold_term_channel_is_empty(
     db_connection: psycopg.Connection,
     seed: HybridRetrievalSeed,
 ) -> None:
-    """Unseeded codes cannot be claimed from an empty term channel."""
+    """Unseeded codes cannot be claimed from an empty term channel.
+
+    ``SKU-P4-*`` collides with the Phase 9 open-split corpus via trigram.
+    A nonce outside dataset identifier rules keeps the cold-channel proof
+    valid on a seeded candidate database.
+    """
 
     retriever = TermRetriever(db_connection)
-    result = retriever.retrieve(caller=seed.member, query_text="SKU-P4-ZZZ")
+    result = retriever.retrieve(
+        caller=seed.member,
+        query_text=f"ZXQCOLD{uuid4().hex}",
+    )
     assert result.empty_channel is True
     assert result.candidates == ()
 

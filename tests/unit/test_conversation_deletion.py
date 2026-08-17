@@ -154,8 +154,7 @@ def test_usage_response_has_no_source_text_fields() -> None:
     from smart_rag_api.schemas.fastapi_security import UsageResponse
 
     dumped = UsageResponse.model_json_schema()
-    properties = dumped.get("properties", {})
-    assert isinstance(properties, dict)
+    properties = json_object(dumped.get("properties", {}))
     forbidden = {"prompt", "query", "passage", "snippet", "html", "source", "message"}
     assert forbidden.isdisjoint(properties)
     assert set(properties) <= {

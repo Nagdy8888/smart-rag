@@ -52,6 +52,7 @@ class JsonResponse(Protocol):
 
     status_code: int
     text: str
+    content: bytes
     headers: Mapping[str, str]
 
     def json(self) -> object:

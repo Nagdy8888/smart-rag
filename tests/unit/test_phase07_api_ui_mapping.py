@@ -88,9 +88,7 @@ def test_visible_controls_map_to_contracts_or_gaps() -> None:
     """Packet 4: each Stitch screen family has mapped controls or GAP ids."""
 
     mapping = MAPPING_PATH.read_text(encoding="utf-8")
-    brief = (ROOT / "docs" / "frontend" / "STITCH_BRIEF.md").read_text(
-        encoding="utf-8"
-    )
+    brief = (ROOT / "docs" / "frontend" / "STITCH_BRIEF.md").read_text(encoding="utf-8")
     assert "## Visible control mapping (P07-04)" in mapping
     for marker in (
         "### A. Sign in",

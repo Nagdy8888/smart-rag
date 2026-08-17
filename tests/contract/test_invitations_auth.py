@@ -156,18 +156,43 @@ def test_expired_invitation_rejected(db_connection: psycopg.Connection) -> None:
 
 
 def test_bootstrap_owner_race_safe_once(db_connection: psycopg.Connection) -> None:
-    """First bootstrap succeeds; second call returns false."""
+    """First bootstrap succeeds only when no owner exists; a second call is false.
+
+    The Phase 9 candidate seed already has an owner referenced by
+    ``glossary_imports`` and documents, so deleting owners is not possible
+    without destroying seed foreign keys. When an owner already exists this
+    test proves bootstrap cannot create a second owner. The empty-database
+    first-success path still runs after a local reset.
+    """
 
     owner = uuid.uuid4()
     with db_connection.cursor() as cursor:
         _insert_auth_user(cursor, owner, f"owner-{owner}@example.com")
-        cursor.execute("DELETE FROM app.profiles WHERE role = 'owner'::app.user_role")
+        cursor.execute(
+            "SELECT count(*) FROM app.profiles WHERE role = 'owner'::app.user_role"
+        )
+        existing = cursor.fetchone()
+        assert existing is not None
+        owner_count = int(existing[0])
         cursor.execute("SET ROLE app_api")
+        if owner_count == 0:
+            cursor.execute("SELECT app.bootstrap_owner(%s)", (owner,))
+            first_bootstrap = cursor.fetchone()
+            assert first_bootstrap is not None
+            assert first_bootstrap[0] is True
+            cursor.execute("SELECT app.bootstrap_owner(%s)", (uuid.uuid4(),))
+            second_bootstrap = cursor.fetchone()
+            assert second_bootstrap is not None
+            assert second_bootstrap[0] is False
+            return
         cursor.execute("SELECT app.bootstrap_owner(%s)", (owner,))
-        first_bootstrap = cursor.fetchone()
-        assert first_bootstrap is not None
-        assert first_bootstrap[0] is True
-        cursor.execute("SELECT app.bootstrap_owner(%s)", (uuid.uuid4(),))
-        second_bootstrap = cursor.fetchone()
-        assert second_bootstrap is not None
-        assert second_bootstrap[0] is False
+        blocked = cursor.fetchone()
+        assert blocked is not None
+        assert blocked[0] is False
+        cursor.execute("RESET ROLE")
+        cursor.execute(
+            "SELECT count(*) FROM app.profiles WHERE role = 'owner'::app.user_role"
+        )
+        after = cursor.fetchone()
+        assert after is not None
+        assert int(after[0]) == owner_count

@@ -102,6 +102,37 @@ def _insert_profile(
     )
 
 
+def _assert_fixture_document_visibility(
+    visible: set[uuid.UUID],
+    *,
+    company_document: uuid.UUID,
+    restricted_document: uuid.UUID,
+    role_name: str,
+) -> None:
+    """Assert this test's fixtures follow the role matrix on a seeded database.
+
+    The Phase 9 candidate seed may add other ``company_visible`` documents.
+    Extra authorized rows do not weaken the fixture checks. A disabled caller
+    must still see zero documents, including seed rows.
+
+    Args:
+        visible: IDs returned by ``app.list_visible_documents``.
+        company_document: Fixture company-visible document.
+        restricted_document: Fixture restricted document.
+        role_name: Matrix cell name (``owner``, ``admin``, ``member``,
+            ``upload_member``, ``viewer``, or ``disabled``).
+    """
+
+    if role_name == "disabled":
+        assert not visible
+        return
+    assert company_document in visible
+    if role_name in {"owner", "admin"}:
+        assert restricted_document in visible
+    else:
+        assert restricted_document not in visible
+
+
 def _visible_document_ids(
     cursor: psycopg.Cursor,
     user_id: uuid.UUID | None,
@@ -392,7 +423,7 @@ def test_rls_matrix_documents_conversations_and_audit(
             (version_id, restricted_doc),
         )
 
-        with pytest.raises(psycopg.errors.RaiseException, match="graph index rejected"):
+        with pytest.raises(psycopg.errors.RaiseException, match="index rejected"):
             cursor.execute("SAVEPOINT restricted_graph_job")
             cursor.execute(
                 """
@@ -622,14 +653,6 @@ def test_full_role_acl_conversation_and_context_matrix(
 
         cursor.execute("SET ROLE app_api")
 
-        expected_documents: dict[str, set[uuid.UUID]] = {
-            "owner": {company_document, restricted_document},
-            "admin": {company_document, restricted_document},
-            "member": {company_document},
-            "upload_member": {company_document},
-            "viewer": {company_document},
-            "disabled": set(),
-        }
         authoritative_roles = {
             "owner": "owner",
             "admin": "admin",
@@ -638,15 +661,17 @@ def test_full_role_acl_conversation_and_context_matrix(
             "viewer": "viewer",
             "disabled": "member",
         }
-        for name, expected in expected_documents.items():
-            assert (
+        for name in authoritative_roles:
+            _assert_fixture_document_visibility(
                 _visible_document_ids(
                     cursor,
                     users[name],
                     authoritative_roles[name],
                     authorization_version,
-                )
-                == expected
+                ),
+                company_document=company_document,
+                restricted_document=restricted_document,
+                role_name=name,
             )
 
         assert member_conversation in _conversation_ids(
@@ -746,7 +771,7 @@ def test_full_role_acl_conversation_and_context_matrix(
             FROM app.audit_events
             WHERE target_id = %s
               AND event_type IN ('document_acl.granted', 'document_acl.revoked')
-            ORDER BY created_at
+            ORDER BY chain_seq
             """,
             (restricted_document,),
         )

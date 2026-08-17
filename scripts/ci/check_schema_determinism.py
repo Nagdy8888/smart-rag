@@ -149,8 +149,10 @@ def _generate_types(pnpm: str) -> str:
         Line-ending-normalized generated TypeScript.
 
     Side Effects:
-        Runs the pinned Supabase CLI against the local database without writing
-        the generated file.
+        Runs the pinned Supabase CLI against the host-published local Postgres
+        URL (``127.0.0.1:54322``) without writing the generated file. ``--local``
+        is avoided because prior phases observed it targeting container port
+        ``5432``.
     """
 
     source = _run(
@@ -161,7 +163,8 @@ def _generate_types(pnpm: str) -> str:
             "gen",
             "types",
             "typescript",
-            "--local",
+            "--db-url",
+            LOCAL_DB_URL,
             "--schema",
             TYPE_SCHEMAS,
         ],

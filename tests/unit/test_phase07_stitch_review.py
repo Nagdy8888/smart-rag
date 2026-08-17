@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-REVIEW = (
-    Path(__file__).resolve().parents[2] / "docs" / "frontend" / "STITCH_REVIEW.md"
-)
+REVIEW = Path(__file__).resolve().parents[2] / "docs" / "frontend" / "STITCH_REVIEW.md"
 
 
 def test_review_selects_component_fallback_within_timebox() -> None:

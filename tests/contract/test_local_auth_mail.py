@@ -151,6 +151,10 @@ def test_auth_oauth_and_local_smtp_configuration_is_explicit() -> None:
         "http://localhost:3000",
         "http://127.0.0.1:3000/auth/callback",
         "http://localhost:3000/auth/callback",
+        "http://127.0.0.1:3010",
+        "http://localhost:3010",
+        "http://127.0.0.1:3010/auth/callback",
+        "http://localhost:3010/auth/callback",
     ]
     assert all("*" not in str(url) for url in cast(list[object], redirects))
     assert auth["site_url"] == "http://127.0.0.1:3000"

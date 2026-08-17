@@ -216,6 +216,14 @@ def _admit(
     return result, key
 
 
+# Public aliases for cross-module contract reuse (Pyright reportPrivateUsage).
+admit = _admit
+authorization_version = _authorization_version
+caller_context = _caller
+insert_conversation = _insert_conversation
+insert_user_profile = _insert_user_profile
+
+
 def _admit_error(
     connection: psycopg.Connection,
     match: str,
