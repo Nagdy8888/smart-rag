@@ -26,3 +26,36 @@ paths = [
 regexes = [
   '''^\s*".+\.md": "[0-9a-f]{64}",?\s*$''',
 ]
+
+[[allowlists]]
+description = "Published local Supabase demo anon JWT for Playwright against GoTrue"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)apps/frontend/playwright\.config\.ts$''',
+]
+regexes = [
+  '''eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24i''',
+]
+
+[[allowlists]]
+description = "Inert LangSmith leak canary, not a live provider key"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)tests/unit/test_langsmith_tracing\.py$''',
+]
+regexes = [
+  '''sk-canarysecretFORBID''',
+]
+
+[[allowlists]]
+description = "Synthetic glossary inventory codes that trip generic-api-key"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)tests/unit/test_glossary_validation\.py$''',
+]
+regexes = [
+  '''idempotency_key="glossary-''',
+]

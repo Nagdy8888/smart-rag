@@ -44,9 +44,9 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-08-16 | eng, reviewers |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-08-14 | eng |
+| [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-08-17 | eng |
 | [architecture/03-components.md](./architecture/03-components.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [architecture/04-deployment.md](./architecture/04-deployment.md) | engineering-lead | draft | 2026-08-12 | eng, ops |
+| [architecture/04-deployment.md](./architecture/04-deployment.md) | engineering-lead | draft | 2026-08-17 | eng, ops |
 | [architecture/05-database-connections.md](./architecture/05-database-connections.md) | engineering-lead | proven | 2026-08-13 | eng, ops |
 | [architecture/06-database-workload-isolation.md](./architecture/06-database-workload-isolation.md) | engineering-lead | proven | 2026-08-13 | eng, ops |
 | [architecture/08-data-dictionary.md](./architecture/08-data-dictionary.md) | engineering-lead | draft | 2026-08-16 | eng |
@@ -78,7 +78,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
 | [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/WORKSPACE_BOUNDARIES.md](./development/WORKSPACE_BOUNDARIES.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [development/QUALITY_COMMANDS.md](./development/QUALITY_COMMANDS.md) | engineering-lead | draft | 2026-08-16 | eng |
+| [development/QUALITY_COMMANDS.md](./development/QUALITY_COMMANDS.md) | engineering-lead | draft | 2026-08-17 | eng |
 | [development/PYRIGHT_BASELINE.md](./development/PYRIGHT_BASELINE.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [development/CI_TIERS.md](./development/CI_TIERS.md) | engineering-lead | draft | 2026-08-16 | eng |
 | [development/DEPENDENCY_UPDATES.md](./development/DEPENDENCY_UPDATES.md) | engineering-lead | draft | 2026-08-15 | eng |

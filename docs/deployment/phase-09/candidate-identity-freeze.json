@@ -6,7 +6,7 @@
   "embedding_dimensions": 1024,
   "embedding_model": "text-embedding-3-large",
   "frozen_retrieval_profile_id": "hybrid_default_v1",
-  "git_commit_sha": "7c31763ed47d9d2a81f53877d9b5ced4865e6d09",
+  "git_commit_sha": "7438b54abe70a57652f85c90f678d5ad2f58192a",
   "git_dirty": true,
   "graph_pipeline_version": "graph_pipeline_v1",
   "lightrag_handoff_version": "lightrag_v1",

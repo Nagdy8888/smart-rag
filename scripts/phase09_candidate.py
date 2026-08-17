@@ -366,6 +366,10 @@ def cmd_scan() -> int:
     )
     if any(row.status == "failed" for row in summaries):
         return 1
+    if gitleaks_status == "failed":
+        return 1
+    if pip_status == "failed" or pnpm_status == "failed":
+        return 1
     return 0
 
 
@@ -389,6 +393,7 @@ def _run_gitleaks() -> Literal["passed", "failed", "blocked", "not_run"]:
             GITLEAKS_IMAGE,
             "detect",
             "--source=/repo",
+            "--config=/repo/.gitleaks.toml",
             "--no-banner",
             "--redact",
         ],
@@ -493,8 +498,15 @@ def cmd_up() -> int:
 
     completed = run_compose(
         REPO_ROOT,
-        ["up", "-d", "--wait", "--remove-orphans"],
-        timeout_seconds=600,
+        [
+            "up",
+            "-d",
+            "--wait",
+            "--no-build",
+            "--force-recreate",
+            "--remove-orphans",
+        ],
+        timeout_seconds=900,
     )
     if completed.returncode != 0:
         sys.stderr.write(completed.stderr or completed.stdout)

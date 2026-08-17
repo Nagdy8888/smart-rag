@@ -82,8 +82,8 @@ flowchart TD
 | `docs/development/CI_TIERS.md` | Local-only gate note |
 | `docs/architecture/04-deployment.md` | Reciprocal link |
 | `docs/README.md` | Index rows |
-| `.cursor/plans/.../09-phase-local-release-candidate.md` | Packet 1 checkbox only after Passed |
-| `.cursor/plans/.../packets/01-build-exact-candidate-images.md` | `status: complete` only after Passed |
+| `.cursor/plans/.../09-phase-local-release-candidate.md` | Packet 1 checkbox `[x]` after live Passed |
+| `.cursor/plans/.../packets/01-build-exact-candidate-images.md` | `status: complete` after live Passed |
 
 ### Identities frozen
 
@@ -91,7 +91,7 @@ Source: `docs/deployment/phase-09/candidate-identity-freeze.json`. No secrets.
 
 | Field | Value |
 | --- | --- |
-| git | `7c31763ed47d9d2a81f53877d9b5ced4865e6d09` (`git_dirty`: true) |
+| git | `7438b54abe70a57652f85c90f678d5ad2f58192a` (`git_dirty`: true) |
 | `uv.lock` sha256 | `d05ce6ea28378999c7a95118bd482f89399f61ffb20e11b0f70228dc7674cfbc` |
 | `pnpm-lock.yaml` sha256 | `ba5c198c44a586dfcd128e19cc2db713d08e255dae2e95165d06e48051f0bcc7` |
 | frozen retrieval profile | `hybrid_default_v1` |
@@ -109,53 +109,68 @@ Source: `docs/deployment/phase-09/candidate-identity-freeze.json`. No secrets.
 
 Built from repository Dockerfiles via `docker-compose.yml` plus profile
 `parser-build`. User `10001:10001`. Local `repo_digest` is
-`name@sha256:<image_id>` (no registry push).
+`name@sha256:<image_id>` (no registry push). API/worker images bake tiktoken
+`cl100k_base` encodings because the worker has no public DNS on Compose
+`private`.
 
 | Service | Image | Id |
 | --- | --- | --- |
-| api | `smart-rag-api` | `sha256:a1484eb1c3184ca2f02dd9ca474ec491f0d2466c20a22fcb5199091dfb709708` |
-| worker | `smart-rag-worker` | `sha256:ef958f14c5d3d5dab17316657338fd5bf8b137e39c856af2ed45f722c6ae2413` |
+| api | `smart-rag-api` | `sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632` |
+| worker | `smart-rag-worker` | `sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990` |
 | frontend | `smart-rag-frontend` | `sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e` |
 | crawl-proxy | `smart-rag-crawl-proxy` | `sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604` |
 | parser-sandbox | `smart-rag-parser-sandbox:local` | `sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec` |
 
-A later rebuild that changes any Id invalidates this freeze.
+A later rebuild that changes any Id invalidates this freeze. Later packets
+consume these Ids, not git SHA (`git_dirty` was true while Packet 1 completed).
 
 ### Classifications
 
-Packet 1 wrapper checkbox stays **unchecked**. Live seed/health did not pass.
-Unit negatives passed independently of Docker.
+Packet 1 live health, migrations, corpus, readiness, and sizing **Passed**.
+Trivy via docker.sock remains **Blocked** (not retried). Gitleaks **Passed**
+after allowlisting published local demo JWT / inert test canaries. pip-audit
+and pnpm audit **Passed**. Phase 9 wrapper stays `pending`.
 
 | Check | Classification | Notes |
 | --- | --- | --- |
-| P09-01-A digest/health | Blocked | Images built and frozen. Runtime health and unpublished-port proof blocked after Docker Desktop/WSL became unresponsive. Trivy compact status is Blocked (real attempt hung the engine). pip-audit and pnpm audit Passed. |
-| P09-01-B migrations | Blocked | 51 repository files hashed. Applied `schema_migrations` unavailable (`connection timeout expired` to local Supabase). No drift claimed or disproved. |
-| P09-01-C corpus | Passed (unit) / Blocked (seed) | Holdout/production rejection unit-tested. Worker seed not run; no `candidate-corpus-manifest.json`. Planned seed is 8 labeled open-split cases (one per required class), not 10k versions. |
-| P09-01-D readiness | Passed (unit) / Blocked (live) | Fake/duplicate rejection unit-tested. No job/state export. No SQL stamps were used. |
-| P09-01-E sizing | Passed (unit) / Blocked (live) | Model forbids managed claims; Compose `mem_limit` recorded. Docker `NCPU`/`MemTotal` null; seeded counts 0. Local candidate is not the QT-CAP envelope. |
+| P09-01-A digest/health | Passed | Candidate compose without overlay. API/frontend live. `pg_search` 0.25.2. Valkey AUTH. Private publishers empty. `MOCK_MODEL_MODE=true`. Overlay `false`. |
+| P09-01-B migrations | Passed | 51 repository files hashed. Applied `schema_migrations` match; `drift: false`. |
+| P09-01-C corpus | Passed | 8 open-split cases, `holdout_opened: false`. One each exact_code, alias, arabic_mixed, latest_as_of, tabular_aggregation, media_limitation, acl_negative (restricted), graph_mapping. |
+| P09-01-D readiness | Passed | All required public states observed. Hybrid Ready used `Bm25ProjectionService.process_upsert_job`. Graph Ready used `GraphMappingService.map_after_vendor_success`. No SQL stamps. Restricted LightRAG rejected live. |
+| P09-01-E sizing | Passed | 8 versions, 16 chunks, 2 graph-eligible. Docker NCPU 20 / MemTotal 8131035136. No managed claims. Local subset, not QT-CAP envelope. |
 | Digest mismatch negative | Passed | `tests/unit/test_phase09_candidate.py` |
 | Holdout/unapproved/production negative | Passed | Same |
-| Restricted LightRAG negative | Passed | Same |
+| Restricted LightRAG negative | Passed | Unit plus live restricted rejection during seed |
 | Fake/duplicate readiness negative | Passed | Same |
-| Public ParadeDB/Valkey/LightRAG port negative | Passed | Unit plus static candidate Compose (no host ports on private services) |
-| Identity freeze fields | Passed | Collected from this repo |
-| Trivy Critical | Blocked | Attempted via `aquasec/trivy` docker.sock; hung Docker Desktop HTTP 500. Not invented as a pass. Packet 6 re-runs full SBOM/Trivy. |
-| Gitleaks | Blocked | Docker engine unresponsive; not invoked after the hang. |
+| Public ParadeDB/Valkey/LightRAG port negative | Passed | Unit, static Compose, and live `compose ps` after overlay removal |
+| Identity freeze fields | Passed | `APP_ENV=local`, ParadeDB digest `dca046b8…883bb` |
+| Trivy Critical | Blocked | docker.sock Trivy hung Docker Desktop on 2026-08-17. Not retried. Packet 6 re-runs full SBOM/Trivy. |
+| Gitleaks | Passed | Pinned image; allowlists cover local demo JWT, LangSmith canary, glossary idempotency keys |
+| pip-audit / pnpm audit | Passed | Compact scan summary |
 | Managed EC2/Supabase | Not Run | Phase 10 handoff; not claimed |
 
 ### Corpus seed counts
 
-Live seed **did not run**. Expected worker seed (when Docker recovers): one
-open-split case each for exact_code, alias, arabic_mixed, latest_as_of,
-tabular_aggregation, media_limitation, acl_negative (restricted /
-graph-ineligible), graph_mapping (company_visible / graph-eligible). Holdout
-closed. Production paths rejected.
+Frozen manifest is the labeled 8-row subset. Holdout closed. Production paths
+rejected. Seed ran from **host Python** against a temporary Packet 8 ParadeDB
+`:54329` overlay because unpublished ParadeDB is unreachable from Windows
+localhost and the then-running worker image lacked the `graph_eligible`
+insert-order fix. Overlay was removed; candidate health re-proved unpublished
+ports. Worker/API were then rebuilt so later worker-exec seed uses the same
+code. A first failed seed (deletion constraint) left extra unlabeled versions
+in local Supabase; later packets must use `candidate-corpus-manifest.json` ids,
+not “all documents”.
 
-| Split / visibility / state | Live count |
+| Split / visibility / state | Frozen manifest |
 | --- | --- |
-| development + qualification | 0 seeded |
-| company_visible / restricted | 0 seeded |
-| Hybrid Ready / Graph Ready / others | 0 seeded |
+| development | 7 cases |
+| qualification | 1 (`p4-media_limitation-0002`) |
+| company_visible | 7 |
+| restricted | 1 (`p4-acl_negative-0003`, graph-ineligible) |
+| Hybrid Ready events (BM25 verified) | 8 |
+| Graph Ready | 1 (`p4-exact_code-0003`, maps verified) |
+| graph_pending left unlabeled | 1 (`p4-graph_mapping-0003`) |
+| seeded_document_versions / chunks / graph-eligible | 8 / 16 / 2 |
 
 ### Readiness states proven vs not
 
@@ -164,45 +179,59 @@ graph_ready, graph_ineligible, deletion_pending, failed.
 
 | State | Live proof |
 | --- | --- |
-| All required public states | **Not proven** (seed blocked) |
+| uploading | `app.reserve_upload_quota` |
+| uploaded | `app.finalize_quarantine_upload` |
+| scanning | `app.transition_document_version_status` |
+| parsing | `app.transition_document_version_status` |
+| failed | `app.transition_document_version_status` |
+| hybrid_ready | `Bm25ProjectionService.process_upsert_job` (`bm25_verified`) |
+| graph_ineligible | `app.finalize_hybrid_ready` |
+| graph_pending | `app.finalize_hybrid_ready/enqueue_graph_pending_handoff` |
+| graph_ready | `GraphMappingService.map_after_vendor_success` (`maps_verified`) |
+| deletion_pending | `app.exclude_version_from_retrieval` on a graph-ineligible version |
 | Fake/duplicate Hybrid/Graph Ready | **Rejected in unit tests** |
-| Restricted LightRAG index | **Rejected in unit tests** |
+| Restricted LightRAG index | **Rejected in unit tests and live seed** |
 
 ### Artifact paths
 
 | Path | Role |
 | --- | --- |
 | `docs/deployment/phase-09/candidate-identity-freeze.json` | Identity freeze |
-| `docs/deployment/phase-09/candidate-image-manifest.json` | Image Ids |
-| `docs/deployment/phase-09/candidate-scan-summary.json` | Compact scans (Trivy Blocked) |
-| `docs/deployment/phase-09/candidate-health.json` | Health Blocked (`compose ps` failed) |
-| `docs/deployment/phase-09/candidate-migrations.json` | File inventory; applied versions empty |
-| `docs/deployment/phase-09/candidate-corpus-manifest.json` | **Missing** — seed blocked |
-| `docs/deployment/phase-09/candidate-readiness-export.json` | **Missing** — seed blocked |
-| `docs/deployment/phase-09/candidate-sizing-baseline.json` | Local envelope map; Docker resources null; counts 0 |
-| `docs/deployment/phase-09/candidate-seed-counts.json` | **Missing** — seed blocked |
-| `docs/deployment/phase-09/candidate-command-log.json` | Commands / exit codes |
-| `.tmp-phase09/` | Gitignored full Trivy dumps (none written after hang) |
+| `docs/deployment/phase-09/candidate-image-manifest.json` | Image Ids above |
+| `docs/deployment/phase-09/candidate-scan-summary.json` | Trivy Blocked; Gitleaks/pip-audit/pnpm Passed |
+| `docs/deployment/phase-09/candidate-health.json` | All live checks passed; overlay false |
+| `docs/deployment/phase-09/candidate-migrations.json` | File inventory; applied versions; drift false |
+| `docs/deployment/phase-09/candidate-corpus-manifest.json` | 8 open-split rows |
+| `docs/deployment/phase-09/candidate-readiness-export.json` | Required states; `missing_states: []` |
+| `docs/deployment/phase-09/candidate-sizing-baseline.json` | Local envelope map; counts 8/16/2 |
+| `docs/deployment/phase-09/candidate-seed-counts.json` | Blockers empty |
+| `docs/deployment/phase-09/candidate-command-log.json` | Host orchestrator commands and exit codes |
+| `.tmp-phase09/` | Gitignored scanner dumps |
 
-Later packets must consume the freeze files above. Do not run Packet 2 until
-health, migrations-applied, corpus, and readiness artifacts exist for these
-image Ids.
+Later packets must consume these image Ids and corpus/version ids.
 
 ### Failures and repairs
 
 1. Trivy via `docker run -v /var/run/docker.sock aquasec/trivy:latest image`
    hung Docker Desktop (`HTTP 500` on `_ping`). Orchestrator was killed.
-2. Host disk filled (`ENOSPC`). Docker updater
-   `Docker Desktop Updater-233772 (236836).exe` (245 MiB) was deleted from
-   Temp. About 2.4 GiB free remained afterward.
-3. `com.docker.service` required UAC to restart. WSL `vmmemWSL` PID 18776
-   stayed **StopPending**; `taskkill /F` did not clear it. `wsl --shutdown`
-   timed out. Local ports 8000/3000/54321/54322 were closed.
-4. Repair for Packet 1 completion: reboot Windows, confirm `docker info`
-   reports NCPU ≥ 1, keep ≥ 5 GiB free, then
-   `uv run python scripts/phase09_candidate.py up` through `seed` **without**
-   rebuilding unless `docker inspect` cannot find the frozen Ids. Do **not**
-   retry docker.sock Trivy until Packet 6.
+2. Host disk filled (`ENOSPC`). Docker updater leftover was deleted from Temp.
+3. `vmmemWSL` stayed **StopPending** until Docker recovered. Packet 1 did
+   **not** retry docker.sock Trivy.
+4. Worker health failed: tiktoken tried to download encodings with no DNS on
+   `private`. Repair: prefetch encodings in API/worker Dockerfiles.
+5. Worker could not reach host Supabase: `private` is `internal: true`.
+   Repair: worker also joins `edge` (still no published ports), matching API.
+6. `documents_graph_eligible_requires_company_visible`: `graph_eligible` cannot
+   be true before `current_version_id`. Repair: set eligibility after the
+   current-version pointer.
+7. `document_versions_graph_eligible_requires_open`: deletion cannot keep
+   `graph_eligible`. Repair: drive `deletion_pending` on a graph-ineligible
+   version.
+8. Worker rootfs is read-only; host code was not `docker cp`'d in. Repair:
+   rebuild API/worker after the seed-path fixes.
+9. Gitleaks reported 4 fixture findings (local demo JWT, leak canary,
+   glossary idempotency keys). Repair: path-scoped `.gitleaks.toml` allowlists.
+   Compact scan now fails closed on Gitleaks/pip-audit/pnpm `failed`.
 
 ### Managed blockers / Phase 10 handoff
 
@@ -210,26 +239,24 @@ image Ids.
 - Packet 1 does not prove instance-equivalent sizing or restore drills
   (Packets 4 and 6).
 - Canonical evidence remains local Supabase; ParadeDB is derived.
+- Full SBOM/Trivy remains Packet 6.
 
 ### Commands and exit codes
 
 | Command | Exit code | Notes |
 | --- | --- | --- |
 | `uv run python scripts/phase09_candidate.py ports-static` | 0 | Candidate Compose has no private host ports |
-| `uv run python scripts/phase09_candidate.py freeze` | 0 | Identity freeze written |
-| `uv run python scripts/phase09_candidate.py supabase` | 0 | Was up before the hang |
-| `uv run python scripts/phase09_candidate.py build` | 0 | Five images, user 10001 |
-| `uv run python scripts/phase09_candidate.py scan` (during hang) | 0 then engine 500 | First Trivy attempt |
-| `uv run python scripts/phase09_candidate.py up` | 1 | Engine unresponsive |
-| `uv run python scripts/phase09_candidate.py scan` (after hang) | 0 | Trivy/Gitleaks Blocked; pip-audit/pnpm Passed |
-| `uv run python scripts/phase09_candidate.py migrations` | 1 | Supabase connection timeout; file inventory written |
-| `uv run python scripts/phase09_candidate.py health` | 1 | `docker compose ps` failed |
-| `uv run python scripts/phase09_candidate.py sizing` | 0 | Counts 0; Docker resources null; no managed claims |
-| `uv run python -m pytest tests/unit/test_phase09_candidate.py -q` | 0 | 15 passed |
-| `uv run python -m pytest tests/contract/test_phase09_candidate.py -q` | 0 | Live checks skipped; image/identity artifacts asserted |
-| `uv run python scripts/ci/check_phase09_packet1.py` | 0 | 23 tests, 0 failures, 6 skipped |
-| `uv run python scripts/check_docs.py` | 0 | After this evidence update, re-run |
-| `pnpm exec markdownlint-cli2` on Packet 1 docs | 0 | Before this evidence expansion |
+| `uv run python scripts/phase09_candidate.py freeze` | 0 | Identity freeze written; `git_dirty` true |
+| `uv run python scripts/phase09_candidate.py supabase` | 0 | Local CLI stack |
+| `docker compose -f docker-compose.yml build api worker` | 0 | Tiktoken bake + seed-path core |
+| `uv run python scripts/phase09_candidate.py up` | 0 | `--no-build --force-recreate --remove-orphans`; no overlay |
+| `uv run python scripts/phase09_candidate.py health` | 0 | Private ports unpublished |
+| `uv run python scripts/phase09_candidate.py migrations` | 0 | drift false |
+| Host `smart_rag_core.release.cli seed` (overlay then removed) | 0 | 8 labeled cases; all required states |
+| `uv run python scripts/phase09_candidate.py sizing` | 0 | Counts 8/16/2; NCPU 20 |
+| `uv run python scripts/phase09_candidate.py scan` | 0 | Trivy Blocked (not retried); Gitleaks/pip/pnpm Passed |
+| `uv run python -m pytest tests/unit/test_phase09_candidate.py tests/contract/test_phase09_candidate.py -q` | 0 | 24 passed, 0 skipped |
+| `uv run python scripts/ci/check_phase09_packet1.py` | 0 | tests=24 failures=0 errors=0 skipped=0 |
 
-Packet file `status` remains `pending`. Phase 9 wrapper `status` remains
-`pending`. Holdout was not opened.
+Packet file `status` is `complete`. Phase 9 wrapper `status` remains
+`pending`. Holdout was not opened (`HoldoutAccess.denied()`).

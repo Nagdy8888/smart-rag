@@ -1,0 +1,236 @@
+{
+  "events": [
+    {
+      "bm25_verified": false,
+      "document_id": "bc77f3e0-425a-459a-b425-99f7122ed69e",
+      "driver": "app.reserve_upload_quota",
+      "job_id": null,
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "uploading",
+      "version_id": "f0ec40d5-4a6a-4dc4-b25c-6ee54eef2025"
+    },
+    {
+      "bm25_verified": false,
+      "document_id": "3b397103-9fc6-4678-8378-d10118c01832",
+      "driver": "app.finalize_quarantine_upload",
+      "job_id": null,
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "uploaded",
+      "version_id": "926fd5b4-d652-47e0-b1dd-57c218a8e43b"
+    },
+    {
+      "bm25_verified": false,
+      "document_id": "0badaf29-c253-4c7c-b291-b83c1f958999",
+      "driver": "app.transition_document_version_status",
+      "job_id": null,
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "scanning",
+      "version_id": "ac5ac2bb-9f02-427d-aaa2-543b876ae624"
+    },
+    {
+      "bm25_verified": false,
+      "document_id": "e9eaf34e-df4a-41d3-866a-0c414dc908ae",
+      "driver": "app.transition_document_version_status",
+      "job_id": null,
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "parsing",
+      "version_id": "244d6c4a-2471-4d79-a16c-da5d4fa52c62"
+    },
+    {
+      "bm25_verified": false,
+      "document_id": "4c205d65-c2be-4927-9462-62a0e6a65a1f",
+      "driver": "app.transition_document_version_status",
+      "job_id": null,
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "failed",
+      "version_id": "585cd5fc-bd3d-4a15-b37f-13cfe96fc4e0"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "5520f40c-0846-4185-b082-55fd43a72930",
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "job_id": "5e5bea31-c407-41da-8e52-2463b2707f29",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "hybrid_ready",
+      "version_id": "8678b68c-22de-439f-9bf0-85451a989259"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "5520f40c-0846-4185-b082-55fd43a72930",
+      "driver": "app.finalize_hybrid_ready",
+      "job_id": "5e5bea31-c407-41da-8e52-2463b2707f29",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "graph_ineligible",
+      "version_id": "8678b68c-22de-439f-9bf0-85451a989259"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "08505043-bc1f-42ce-9bee-02958e3743e1",
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "job_id": "af859515-7e4a-48d3-bf0f-8a4f0a2cad87",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "hybrid_ready",
+      "version_id": "e98d25eb-f399-4554-a01c-1cfbd8b537a7"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "08505043-bc1f-42ce-9bee-02958e3743e1",
+      "driver": "app.finalize_hybrid_ready",
+      "job_id": "af859515-7e4a-48d3-bf0f-8a4f0a2cad87",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "graph_ineligible",
+      "version_id": "e98d25eb-f399-4554-a01c-1cfbd8b537a7"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "f83788bd-a98d-439c-b13b-b31822397619",
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "job_id": "2ca5e7aa-0c75-4c24-a3d6-722913db8aa3",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "hybrid_ready",
+      "version_id": "ae84866f-d687-47d7-bafb-6e1bb768899a"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "f83788bd-a98d-439c-b13b-b31822397619",
+      "driver": "app.finalize_hybrid_ready",
+      "job_id": "2ca5e7aa-0c75-4c24-a3d6-722913db8aa3",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "graph_ineligible",
+      "version_id": "ae84866f-d687-47d7-bafb-6e1bb768899a"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "bb7e6d26-a724-4493-812f-dfa627840594",
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "job_id": "8802d625-e6cf-45dd-8973-4fe0ba36cac8",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "hybrid_ready",
+      "version_id": "4a9d4afe-f569-4c57-a11c-723b48846669"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "bb7e6d26-a724-4493-812f-dfa627840594",
+      "driver": "app.finalize_hybrid_ready/enqueue_graph_pending_handoff",
+      "job_id": "8802d625-e6cf-45dd-8973-4fe0ba36cac8",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "graph_pending",
+      "version_id": "4a9d4afe-f569-4c57-a11c-723b48846669"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "bb7e6d26-a724-4493-812f-dfa627840594",
+      "driver": "GraphMappingService.map_after_vendor_success",
+      "job_id": null,
+      "maps_verified": true,
+      "observed_at": "2026-08-17T18:34:00Z",
+      "state": "graph_ready",
+      "version_id": "4a9d4afe-f569-4c57-a11c-723b48846669"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "68deeedb-cce0-4674-b09e-cc763b6fd1e3",
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "job_id": "a398ca97-bc9a-4526-b159-8885ae9957f9",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "hybrid_ready",
+      "version_id": "8147ecd8-2f14-45ca-9098-31b18583fa0b"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "68deeedb-cce0-4674-b09e-cc763b6fd1e3",
+      "driver": "app.finalize_hybrid_ready/enqueue_graph_pending_handoff",
+      "job_id": "a398ca97-bc9a-4526-b159-8885ae9957f9",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "graph_pending",
+      "version_id": "8147ecd8-2f14-45ca-9098-31b18583fa0b"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "166ebcc5-c999-4b15-a58d-f8edd8ab7831",
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "job_id": "68d894fc-f4f5-4085-9419-0764f0d8edad",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "hybrid_ready",
+      "version_id": "ac6177e0-c432-4de4-b8f8-9e414940c71f"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "166ebcc5-c999-4b15-a58d-f8edd8ab7831",
+      "driver": "app.finalize_hybrid_ready",
+      "job_id": "68d894fc-f4f5-4085-9419-0764f0d8edad",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "graph_ineligible",
+      "version_id": "ac6177e0-c432-4de4-b8f8-9e414940c71f"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "51bcc544-2cc1-4280-8b4c-b3905413bd40",
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "job_id": "b68108d9-69f3-4550-be02-8bf673972bd1",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "hybrid_ready",
+      "version_id": "6df02952-5892-4b70-aa50-91ce1caf8e87"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "51bcc544-2cc1-4280-8b4c-b3905413bd40",
+      "driver": "app.finalize_hybrid_ready",
+      "job_id": "b68108d9-69f3-4550-be02-8bf673972bd1",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "graph_ineligible",
+      "version_id": "6df02952-5892-4b70-aa50-91ce1caf8e87"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "541e5b7f-203e-4687-9a3e-446a03fed8ce",
+      "driver": "Bm25ProjectionService.process_upsert_job",
+      "job_id": "e3e04547-e636-4d9b-bdee-c824e03b6574",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "hybrid_ready",
+      "version_id": "bcbac9c6-4d8e-4b33-ba8c-c19cf12ba2d7"
+    },
+    {
+      "bm25_verified": true,
+      "document_id": "541e5b7f-203e-4687-9a3e-446a03fed8ce",
+      "driver": "app.finalize_hybrid_ready",
+      "job_id": "e3e04547-e636-4d9b-bdee-c824e03b6574",
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "graph_ineligible",
+      "version_id": "bcbac9c6-4d8e-4b33-ba8c-c19cf12ba2d7"
+    },
+    {
+      "bm25_verified": false,
+      "document_id": null,
+      "driver": "app.exclude_version_from_retrieval",
+      "job_id": null,
+      "maps_verified": false,
+      "observed_at": "2026-08-17T18:34:01Z",
+      "state": "deletion_pending",
+      "version_id": "8678b68c-22de-439f-9bf0-85451a989259"
+    }
+  ],
+  "missing_states": [],
+  "schema_version": "phase09-candidate-readiness-v1"
+}

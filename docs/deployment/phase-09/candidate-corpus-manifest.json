@@ -1,0 +1,94 @@
+{
+  "holdout_opened": false,
+  "rows": [
+    {
+      "case_id": "p4-acl_negative-0003",
+      "content_sha256": "2b7d3df3cf7e6294e2c69829af3f23c4b150a1842ad0ee17728f9a96626328cb",
+      "document_id": "5520f40c-0846-4185-b082-55fd43a72930",
+      "query_class": "acl_negative",
+      "source_family_id": "p4-fam-acl_negative-g02",
+      "split": "development",
+      "status": "graph_ineligible",
+      "version_id": "8678b68c-22de-439f-9bf0-85451a989259",
+      "visibility": "restricted"
+    },
+    {
+      "case_id": "p4-alias-0003",
+      "content_sha256": "6910dd5ae78c1e2957ba9522c11d1325d0011fa43ba361e51735389f13518c83",
+      "document_id": "08505043-bc1f-42ce-9bee-02958e3743e1",
+      "query_class": "alias",
+      "source_family_id": "p4-fam-alias-g02",
+      "split": "development",
+      "status": "graph_ineligible",
+      "version_id": "e98d25eb-f399-4554-a01c-1cfbd8b537a7",
+      "visibility": "company_visible"
+    },
+    {
+      "case_id": "p4-arabic_mixed-0003",
+      "content_sha256": "84c101325481f790dd7b3f3f6d27a66b8469e42061f0002a9489cb97aee17c8a",
+      "document_id": "f83788bd-a98d-439c-b13b-b31822397619",
+      "query_class": "arabic_mixed",
+      "source_family_id": "p4-fam-arabic_mixed-g02",
+      "split": "development",
+      "status": "graph_ineligible",
+      "version_id": "ae84866f-d687-47d7-bafb-6e1bb768899a",
+      "visibility": "company_visible"
+    },
+    {
+      "case_id": "p4-exact_code-0003",
+      "content_sha256": "d27087829e2d3ad44465ff66188116c67bd9ca2dc6d81d227c8dbdd5a94cddf3",
+      "document_id": "bb7e6d26-a724-4493-812f-dfa627840594",
+      "query_class": "exact_code",
+      "source_family_id": "p4-fam-exact_code-g02",
+      "split": "development",
+      "status": "graph_pending",
+      "version_id": "4a9d4afe-f569-4c57-a11c-723b48846669",
+      "visibility": "company_visible"
+    },
+    {
+      "case_id": "p4-graph_mapping-0003",
+      "content_sha256": "fe36a37921e24ce5eadb52eaddacc37e1166cfad7243fe3fe06dfe98c2d60864",
+      "document_id": "68deeedb-cce0-4674-b09e-cc763b6fd1e3",
+      "query_class": "graph_mapping",
+      "source_family_id": "p4-fam-graph_mapping-g02",
+      "split": "development",
+      "status": "graph_pending",
+      "version_id": "8147ecd8-2f14-45ca-9098-31b18583fa0b",
+      "visibility": "company_visible"
+    },
+    {
+      "case_id": "p4-latest_as_of-0003",
+      "content_sha256": "50d2c8f4906fa7c727f4a2534b7e7785ff54dc03d81823dd6812c52e5987cc39",
+      "document_id": "166ebcc5-c999-4b15-a58d-f8edd8ab7831",
+      "query_class": "latest_as_of",
+      "source_family_id": "p4-fam-latest_as_of-g02",
+      "split": "development",
+      "status": "graph_ineligible",
+      "version_id": "ac6177e0-c432-4de4-b8f8-9e414940c71f",
+      "visibility": "company_visible"
+    },
+    {
+      "case_id": "p4-media_limitation-0002",
+      "content_sha256": "ca3112eef2e3821af466602199e70927c8160253ccd221a67f3bf48f537629ec",
+      "document_id": "51bcc544-2cc1-4280-8b4c-b3905413bd40",
+      "query_class": "media_limitation",
+      "source_family_id": "p4-fam-media_limitation-0002",
+      "split": "qualification",
+      "status": "graph_ineligible",
+      "version_id": "6df02952-5892-4b70-aa50-91ce1caf8e87",
+      "visibility": "company_visible"
+    },
+    {
+      "case_id": "p4-tabular_aggregation-0003",
+      "content_sha256": "1d5fd94623c178bdc752473335616db84b8cea004a7c928b5e82f7cbc64b34e2",
+      "document_id": "541e5b7f-203e-4687-9a3e-446a03fed8ce",
+      "query_class": "tabular_aggregation",
+      "source_family_id": "p4-fam-tabular_aggregation-g02",
+      "split": "development",
+      "status": "graph_ineligible",
+      "version_id": "bcbac9c6-4d8e-4b33-ba8c-c19cf12ba2d7",
+      "visibility": "company_visible"
+    }
+  ],
+  "schema_version": "phase09-candidate-corpus-v1"
+}

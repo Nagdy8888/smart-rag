@@ -1,12 +1,12 @@
 {
-  "api_live": "not_run",
-  "detail": "docker compose ps failed for candidate stack",
-  "frontend_live": "not_run",
-  "mock_model_mode": "unverified",
+  "api_live": "passed",
+  "detail": "{\"publishers\": {\"api\": [8000, 8000], \"clamav\": [], \"crawl-proxy\": [], \"frontend\": [3000, 3000], \"paradedb\": [], \"valkey-cache\": [], \"valkey-limits\": [], \"worker\": []}}",
+  "frontend_live": "passed",
+  "mock_model_mode": "true",
   "overlay_used": false,
-  "pg_search": "not_run",
-  "private_ports": "blocked",
+  "pg_search": "passed",
+  "private_ports": "passed",
   "schema_version": "phase09-candidate-health-v1",
-  "valkey_cache_auth": "not_run",
-  "valkey_limits_auth": "not_run"
+  "valkey_cache_auth": "passed",
+  "valkey_limits_auth": "passed"
 }

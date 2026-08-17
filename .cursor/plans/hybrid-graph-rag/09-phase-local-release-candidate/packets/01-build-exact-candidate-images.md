@@ -1,7 +1,7 @@
 ---
 phase: 9
 packet: 1
-status: pending
+status: complete
 title: "Build the exact candidate images and seed only the approved local evaluation corpus through all readiness states."
 requirement_ids: [P09-01]
 ---

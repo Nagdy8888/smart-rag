@@ -2,7 +2,8 @@ FROM python:3.11-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a2
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    TIKTOKEN_CACHE_DIR=/app/.tiktoken
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.23 /uv /usr/local/bin/uv
 
@@ -27,8 +28,11 @@ COPY packages/core/src packages/core/src
 COPY apps/agents/src apps/agents/src
 COPY apps/backend/src apps/backend/src
 
+# Prefetch tiktoken encodings so API import does not require runtime DNS.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --package smart-rag-backend --no-dev \
+    && mkdir -p /app/.tiktoken \
+    && /app/.venv/bin/python -c "import tiktoken; tiktoken.get_encoding('cl100k_base'); tiktoken.encoding_for_model('gpt-4o-mini')" \
     && chown -R appuser:appuser /app
 
 USER 10001:10001

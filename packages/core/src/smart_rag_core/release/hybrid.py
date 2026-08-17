@@ -120,20 +120,53 @@ def persist_parse_to_bm25_outbox(
     with supabase.cursor() as cursor:
         cursor.execute(
             """
-            INSERT INTO app.documents (id, title, visibility, graph_eligible)
-            VALUES (%s, %s, %s::app.document_visibility, %s)
+            INSERT INTO app.documents (id, title, visibility)
+            VALUES (%s, %s, %s::app.document_visibility)
             """,
-            (document_id, title, visibility, graph_eligible),
+            (document_id, title, visibility),
         )
         cursor.execute(
             """
             INSERT INTO app.document_versions (
-              id, document_id, version_number, status, graph_eligible
+              id, document_id, version_number, status
             )
-            VALUES (%s, %s, 1, 'parsing', %s)
+            VALUES (%s, %s, 1, 'parsing')
             """,
-            (version_id, document_id, graph_eligible),
+            (version_id, document_id),
         )
+        cursor.execute(
+            """
+            UPDATE app.document_versions
+            SET is_current = true, updated_at = timezone('utc', now())
+            WHERE id = %s
+            """,
+            (version_id,),
+        )
+        cursor.execute(
+            """
+            UPDATE app.documents
+            SET current_version_id = %s, updated_at = timezone('utc', now())
+            WHERE id = %s
+            """,
+            (version_id, document_id),
+        )
+        if graph_eligible:
+            cursor.execute(
+                """
+                UPDATE app.document_versions
+                SET graph_eligible = true, updated_at = timezone('utc', now())
+                WHERE id = %s
+                """,
+                (version_id,),
+            )
+            cursor.execute(
+                """
+                UPDATE app.documents
+                SET graph_eligible = true, updated_at = timezone('utc', now())
+                WHERE id = %s
+                """,
+                (document_id,),
+            )
     supabase.execute("SET ROLE app_worker")
     chunking = chunk_parse_result(
         parse_result,

@@ -195,6 +195,20 @@ def test_approved_open_splits_cover_required_classes_without_holdout() -> None:
     assert manifest.holdout_opened is False
 
 
+def test_deletion_pending_is_driven_on_graph_ineligible() -> None:
+    """``exclude_version_from_retrieval`` cannot keep graph_eligible with deleted_at.
+
+    The candidate seed therefore drives ``deletion_pending`` on a
+    graph-ineligible version instead of the Graph Ready row.
+    """
+
+    source = (
+        REPO_ROOT / "packages/core/src/smart_rag_core/release/seed.py"
+    ).read_text(encoding="utf-8")
+    assert 'result.status == "graph_ineligible"' in source
+    assert "graph_ready_done = True\n                deletion_version" not in source
+
+
 def test_restricted_lightrag_input_is_rejected() -> None:
     """Restricted or ineligible documents must never be LightRAG-indexed."""
 

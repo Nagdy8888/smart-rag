@@ -56,6 +56,17 @@ ParadeDB, Valkey limits, Valkey cache, and crawl-proxy have **no** host
 Compose service, no ports `9621`/`9624`). The API and frontend remain the
 only developer host endpoints (`8000` / `3000`).
 
+The worker joins both `private` and `edge` and uses
+`extra_hosts: host.docker.internal:host-gateway`. Compose `private` is
+`internal: true`, so a worker on `private` alone cannot reach host Supabase
+at `host.docker.internal:54322`. The worker still publishes **no** host
+ports. API already used the same dual-network pattern.
+
+API and worker images prefetch `cl100k_base` / `gpt-4o-mini` tiktoken
+encodings at build time (`TIKTOKEN_CACHE_DIR=/app/.tiktoken`). The worker
+has no public DNS on `private`; a runtime download of those encodings fails
+closed.
+
 Seed Hybrid Ready from inside the worker container so ParadeDB is reached on
 the private network:
 
@@ -64,8 +75,16 @@ uv run python scripts/phase09_candidate.py seed
 ```
 
 That execs `python -m smart_rag_core.release.cli seed --output-dir /tmp/phase09`
-in the worker and copies JSON artifacts out. Do not publish ParadeDB to make
-host pytest easier; that would change candidate identity.
+in the worker and copies JSON artifacts out. Do not leave
+`docker-compose.packet8.yml` attached after a host-side seed drill: overlay
+ParadeDB `:54329` is not candidate identity. Recreate private services from
+`docker-compose.yml` only, then re-prove unpublished ports.
+
+`graph_eligible` is set only after `documents.current_version_id` exists
+(`documents_graph_eligible_requires_company_visible`).
+`deletion_pending` is driven on a `graph_ineligible` version because
+`app.exclude_version_from_retrieval` cannot keep `graph_eligible = true`
+once `deleted_at` is set (`document_versions_graph_eligible_requires_open`).
 
 ## Seed command and corpus
 

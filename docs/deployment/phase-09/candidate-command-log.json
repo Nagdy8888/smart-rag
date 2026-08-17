@@ -43,6 +43,58 @@
     {
       "command": "health",
       "exit_code": 1
+    },
+    {
+      "command": "freeze",
+      "exit_code": 0
+    },
+    {
+      "command": "health",
+      "exit_code": 0
+    },
+    {
+      "command": "migrations",
+      "exit_code": 0
+    },
+    {
+      "command": "seed",
+      "exit_code": 1
+    },
+    {
+      "command": "seed",
+      "exit_code": 1
+    },
+    {
+      "command": "seed",
+      "exit_code": 1
+    },
+    {
+      "command": "seed",
+      "exit_code": 1
+    },
+    {
+      "command": "up",
+      "exit_code": 0
+    },
+    {
+      "command": "freeze",
+      "exit_code": 0
+    },
+    {
+      "command": "health",
+      "exit_code": 0
+    },
+    {
+      "command": "migrations",
+      "exit_code": 0
+    },
+    {
+      "command": "sizing",
+      "exit_code": 0
+    },
+    {
+      "command": "scan",
+      "exit_code": 0
     }
   ]
 }

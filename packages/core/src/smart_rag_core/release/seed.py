@@ -285,13 +285,10 @@ def seed_candidate_corpus(
                 reject_duplicate_readiness(events, ready)
                 events.append(ready)
                 graph_ready_done = True
-                deletion_version = result.version_id
 
-        if deletion_version is None and result.status in {
-            "hybrid_ready",
-            "graph_ineligible",
-            "graph_pending",
-        }:
+        # exclude_version_from_retrieval sets deleted_at and cannot keep
+        # graph_eligible=true (document_versions_graph_eligible_requires_open).
+        if deletion_version is None and result.status == "graph_ineligible":
             deletion_version = result.version_id
 
         rows.append(

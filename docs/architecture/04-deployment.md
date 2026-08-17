@@ -2,7 +2,7 @@
 title: C4 — Deployment views
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-17
 audience: engineering, operations
 ---
 
@@ -14,7 +14,7 @@ audience: engineering, operations
 | --- | --- | --- |
 | Next.js | host 3000 | scaffold |
 | FastAPI | host 8000 | live + unconfigured ready |
-| Worker | private | no queue claim yet |
+| Worker | private + edge, no host port | local candidate; `host.docker.internal` for Supabase |
 | ParadeDB | private only | pg_search health |
 | Valkey limits/cache | private only | auth + distinct policies |
 | Crawl proxy | private only | deny-by-default |

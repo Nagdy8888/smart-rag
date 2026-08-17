@@ -48,7 +48,7 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
-1. [ ] [Build the exact candidate images and seed only the approved local evaluation corpus through all readiness states.](./09-phase-local-release-candidate/packets/01-build-exact-candidate-images.md)
+1. [x] [Build the exact candidate images and seed only the approved local evaluation corpus through all readiness states.](./09-phase-local-release-candidate/packets/01-build-exact-candidate-images.md)
 2. [ ] [Run all applicable hard CI, expand/contract migration compatibility, identity/RLS/BM25/cache/read-audit, graph isolation, injection, parsing, deletion, idempotency/GC, API/SSE compatibility, and redaction gates with no skipped required tests.](./09-phase-local-release-candidate/packets/02-run-applicable-hard-ci-and-security-gates.md)
 3. [ ] [Measure Hybrid/Combined/table/inspection quality, BM25 projection/query/recheck/rebuild behavior, p50/p95/deadlines, model calls/cost, graph survival, writer throughput, and onboarding ETA.](./09-phase-local-release-candidate/packets/03-measure-quality-latency-and-throughput.md)
 4. [ ] [Run foreground-plus-maintenance Supabase/HNSW/ParadeDB/graph load, connection caps, budget-lock contention, CPU offload, and five-stream event-loop tests.](./09-phase-local-release-candidate/packets/04-run-contention-and-five-stream-load.md)

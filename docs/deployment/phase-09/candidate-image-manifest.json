@@ -2,18 +2,18 @@
   "compose_file": "docker-compose.yml",
   "images": [
     {
-      "created": "2026-08-17T15:47:01.054327358Z",
-      "image_id": "sha256:a1484eb1c3184ca2f02dd9ca474ec491f0d2466c20a22fcb5199091dfb709708",
+      "created": "2026-08-17T18:39:25.752439259Z",
+      "image_id": "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
       "image_name": "smart-rag-api",
-      "repo_digest": "smart-rag-api@sha256:a1484eb1c3184ca2f02dd9ca474ec491f0d2466c20a22fcb5199091dfb709708",
+      "repo_digest": "smart-rag-api@sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
       "service": "api",
       "user": "10001:10001"
     },
     {
-      "created": "2026-08-17T15:47:01.22013157Z",
-      "image_id": "sha256:ef958f14c5d3d5dab17316657338fd5bf8b137e39c856af2ed45f722c6ae2413",
+      "created": "2026-08-17T18:39:28.538857885Z",
+      "image_id": "sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990",
       "image_name": "smart-rag-worker",
-      "repo_digest": "smart-rag-worker@sha256:ef958f14c5d3d5dab17316657338fd5bf8b137e39c856af2ed45f722c6ae2413",
+      "repo_digest": "smart-rag-worker@sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990",
       "service": "worker",
       "user": "10001:10001"
     },

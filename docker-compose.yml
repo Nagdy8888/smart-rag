@@ -232,6 +232,9 @@ services:
       CLAMAV_PORT: "3310"
     networks:
       - private
+      - edge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       paradedb:
         condition: service_healthy
