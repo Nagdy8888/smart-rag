@@ -1,14 +1,13 @@
 /**
- * Console home. Packet 2 keeps Phase 6 DeveloperApp chat/upload on `/`
- * after Auth. Sign-in is `/login`.
+ * Auto chat at `/`. Replaces the Phase 6 DeveloperApp monolith.
  */
-import { DeveloperApp } from "../components/developer-app";
+import { ChatApp } from "../components/chat-app";
 
 /**
- * Render the authenticated developer console.
+ * Render the authenticated Auto chat surface.
  *
- * @returns DeveloperApp. AppShell comes from the root layout.
+ * @returns ChatApp. AppShell comes from the root layout.
  */
 export default function Home() {
-  return <DeveloperApp />;
+  return <ChatApp />;
 }

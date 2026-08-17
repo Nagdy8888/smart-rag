@@ -6,6 +6,9 @@
 
 import type { Bm25Diagnostics, GraphHandoffDiagnostics } from "./types";
 
+/** Pill tone mapped from a lifecycle enum. */
+export type IngestionStatusTone = "neutral" | "success" | "warning" | "danger";
+
 /**
  * Format BM25 index, lag, and queue counts as plain text.
  *
@@ -45,4 +48,52 @@ export function formatGraphHandoffSummary(
     `failed=${String(handoff.failed)}`,
     `dead_letter=${String(handoff.dead_letter)}`,
   ].join(" ");
+}
+
+/**
+ * Map a lifecycle status to a pill tone. Graph Pending is warning, not danger.
+ *
+ * @param status - Server enum.
+ * @returns Tone. Failed is danger; pending/lag is warning; ready is success.
+ */
+export function ingestionStatusTone(status: string): IngestionStatusTone {
+  if (status === "failed") {
+    return "danger";
+  }
+  if (
+    status === "graph_pending" ||
+    status === "deletion_pending" ||
+    status === "uploading" ||
+    status === "uploaded" ||
+    status === "scanning" ||
+    status === "parsing"
+  ) {
+    return "warning";
+  }
+  if (status === "hybrid_ready" || status === "graph_ready") {
+    return "success";
+  }
+  return "neutral";
+}
+
+/**
+ * Human label for a lifecycle enum. Does not invent statuses.
+ *
+ * @param status - Server value.
+ * @returns Display label.
+ */
+export function ingestionStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    uploading: "Uploading",
+    uploaded: "Uploaded",
+    scanning: "Scanning",
+    parsing: "Parsing",
+    hybrid_ready: "Hybrid Ready",
+    graph_pending: "Graph Pending",
+    graph_ready: "Graph Ready",
+    graph_ineligible: "Graph Ineligible",
+    deletion_pending: "Deletion pending",
+    failed: "Failed",
+  };
+  return labels[status] ?? status;
 }

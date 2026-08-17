@@ -42,9 +42,25 @@ export function isSafeHttpUrl(value: string): boolean {
  */
 export function formatProvenance(provenance: Record<string, unknown>): string {
   const parts: string[] = [];
-  for (const key of ["page", "section", "sheet", "slide", "url"] as const) {
+  const keys = [
+    "page",
+    "page_number",
+    "section",
+    "section_path",
+    "sheet",
+    "sheet_name",
+    "slide",
+    "range_ref",
+    "url",
+    "source_url",
+  ] as const;
+  for (const key of keys) {
     const raw = provenance[key];
     if (raw === undefined || raw === null) {
+      continue;
+    }
+    if (Array.isArray(raw)) {
+      parts.push(`${key}=${displayText(raw.map(String).join("/"))}`);
       continue;
     }
     parts.push(`${key}=${displayText(String(raw))}`);

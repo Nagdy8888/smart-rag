@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   acceptInvitation,
+  analyzeTable,
   classifyApiError,
+  enqueueWebsiteCrawl,
+  fetchDocument,
   fetchReady,
+  finalizeUpload,
+  inspectGraph,
   paidMutationHeaders,
+  reserveUpload,
   resumeHeaders,
   shouldResumeExistingRun,
   startMessageStream,
   startOrResumeMessageStream,
 } from "./api";
+import { clientComputedTableTotal } from "./table-plan";
 import { CLIENT_VERSION } from "./client-version";
 
 describe("paidMutationHeaders", () => {
@@ -259,6 +266,200 @@ describe("acceptInvitation", () => {
   });
 });
 
+describe("submitMessageBody Auto contract", () => {
+  it("posts message and idempotency_key only, with no route field", async () => {
+    let body = "";
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes("/messages")) {
+        body = String(init?.body ?? "");
+        const headers = init?.headers as Record<string, string>;
+        expect(headers["X-Test-User-Id"]).toBeUndefined();
+        expect(headers["X-Test-Role"]).toBeUndefined();
+        return new Response(
+          JSON.stringify({
+            run_id: "run-auto",
+            stream_path: "/runs/run-auto/events",
+            reconnect: false,
+            reservation_id: "res-auto",
+            route_family: "composite",
+            status: "pending",
+          }),
+          { status: 202, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response("event: schema\ndata: {}\n\n", {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    };
+    await startMessageStream(
+      { accessToken: "jwt-token" },
+      "conv-1",
+      "hello",
+      "33333333-3333-4333-8333-333333333333",
+      fetchImpl,
+    );
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    expect(parsed).toEqual({
+      message: "hello",
+      idempotency_key: "33333333-3333-4333-8333-333333333333",
+    });
+    expect(parsed.route).toBeUndefined();
+    expect(parsed.route_family).toBeUndefined();
+  });
+});
+
+describe("finalizeUpload", () => {
+  it("posts required finalize fields", async () => {
+    let body = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = String(init?.body ?? "");
+      const headers = init?.headers as Record<string, string>;
+      expect(headers["X-Test-Role"]).toBeUndefined();
+      return new Response(
+        JSON.stringify({
+          reservation_id: "res-1",
+          document_id: "doc-1",
+          version_id: "ver-1",
+          job_id: "job-1",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const result = await finalizeUpload(
+      { accessToken: "jwt-token" },
+      {
+        reservation_id: "res-1",
+        object_name: "user/res/file.pdf",
+        content_hash: "a".repeat(64),
+        actual_bytes: 12,
+        declared_category: "allowed",
+        attestation_policy_version: "2026-08-13",
+        idempotency_key: "idem-finalize-1",
+      },
+      fetchImpl,
+    );
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    expect(parsed.reservation_id).toBe("res-1");
+    expect(parsed.object_name).toBe("user/res/file.pdf");
+    expect(parsed.content_hash).toHaveLength(64);
+    expect(parsed.actual_bytes).toBe(12);
+    expect(parsed.declared_category).toBe("allowed");
+    expect(parsed.attestation_policy_version).toBe("2026-08-13");
+    expect(parsed.idempotency_key).toBe("idem-finalize-1");
+    expect(result.document_id).toBe("doc-1");
+  });
+});
+
+describe("enqueueWebsiteCrawl", () => {
+  it("still posts for a member helper call (server 403 is authoritative)", async () => {
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      const headers = init?.headers as Record<string, string>;
+      expect(headers["X-Test-Role"]).toBeUndefined();
+      return new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    await expect(
+      enqueueWebsiteCrawl(
+        { accessToken: "jwt-token" },
+        {
+          start_url: "https://example.com",
+          approved_domain: "example.com",
+          idempotency_key: "crawl-key-1",
+        },
+        fetchImpl,
+      ),
+    ).rejects.toThrow("forbidden");
+  });
+});
+
+describe("fetchDocument", () => {
+  it("returns notFound on 404 without reading a title", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ title: "SECRET TITLE", detail: "not_found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    const result = await fetchDocument(
+      { accessToken: "jwt-token" },
+      "33333333-3333-4333-8333-333333333333",
+      fetchImpl,
+    );
+    expect(result).toEqual({ ok: false, notFound: true });
+    expect(JSON.stringify(result)).not.toContain("SECRET");
+  });
+});
+
+describe("inspectGraph client clamp", () => {
+  it("sends depth 3 when the caller asked for 99", async () => {
+    let body = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = String(init?.body ?? "");
+      return new Response(
+        JSON.stringify({
+          nodes: [{ object_id: "e1", object_type: "entity", chunk_id: "c", document_id: "d", version_id: "v", support: 1, hop: 1, title: "SECRET" }],
+          locators: [],
+          limitations: [{ code: "graph_acl_blindness", count: 7 }],
+          row_count: 1,
+          depth: 3,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const result = await inspectGraph(
+      { accessToken: "jwt-token" },
+      { entity_keys: ["e1"], depth: 99 },
+      fetchImpl,
+    );
+    expect(JSON.parse(body).depth).toBe(3);
+    expect(result.nodes[0]).not.toHaveProperty("title");
+    expect(JSON.stringify(result.nodes[0])).not.toContain("SECRET");
+    expect(result.limitations[0]?.count).toBe(7);
+  });
+});
+
+describe("analyzeTable extra fields", () => {
+  it("omits sql from the analyze POST body", async () => {
+    let body = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = String(init?.body ?? "");
+      return new Response(
+        JSON.stringify({
+          table_id: "t",
+          version_id: "v",
+          document_id: "d",
+          rows: [{ amount: 1 }, { amount: 2 }],
+          source_ranges: ["A1:B2"],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const result = await analyzeTable(
+      { accessToken: "jwt-token" },
+      {
+        table_id: "11111111-1111-4111-8111-111111111111",
+        version_id: "22222222-2222-4222-8222-222222222222",
+        predicates: [{ column: "amount", operator: "gt", value: 0 }],
+        sql: "select 1",
+      } as never,
+      fetchImpl,
+    );
+    expect(body).not.toContain("select 1");
+    expect(result.rows).toHaveLength(2);
+    expect(clientComputedTableTotal()).toBeNull();
+  });
+});
+
+describe("GAP-07-14 no delete-document HTTP helper", () => {
+  it("does not export a deleteDocument client", async () => {
+    const api = await import("./api");
+    expect("deleteDocument" in api).toBe(false);
+  });
+});
+
 describe("fetchReady", () => {
   it("maps GET /health/ready including paradedb", async () => {
     const fetchImpl: typeof fetch = async () =>
@@ -281,5 +482,23 @@ describe("fetchReady", () => {
       { name: "paradedb", status: "down" },
       { name: "lightrag", status: "unconfigured" },
     ]);
+  });
+});
+
+describe("reserveUpload MFA", () => {
+  it("throws mfa_required on 403 MFA required", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "MFA required" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      reserveUpload(
+        { accessToken: "jwt-token" },
+        1024,
+        "idem-upload-1",
+        fetchImpl,
+      ),
+    ).rejects.toThrow("mfa_required");
   });
 });

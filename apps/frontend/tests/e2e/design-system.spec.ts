@@ -12,7 +12,7 @@ test("desktop navigation is 280px and skip link targets main", async ({
   const skip = page.getByRole("link", { name: "Skip to main content" });
   await expect(skip).toHaveAttribute("href", "#main");
   await expect(page.locator("#main")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Console" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Chat" })).toHaveAttribute(
     "href",
     "/",
   );

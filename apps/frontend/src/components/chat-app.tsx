@@ -1,32 +1,23 @@
 /**
- * Thin authenticated developer console. Not Stitch or production RAG chrome.
- *
- * Server authorization is authoritative. Hidden controls are convenience only.
- * Sign-in lives on `/login`. This surface stays on `/` after Auth.
+ * Auto chat surface at `/`. Handshake, SSE, citations, feedback, usage.
+ * Upload and graph live on other routes. GAP-07-01: no route POST field.
  */
 
 "use client";
 
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HandshakeBanner } from "./auth/auth-screens";
+import { ReadinessPanel, SignedOutageCopy } from "./readiness-panel";
 import { Button } from "./ui/button";
 import { CitationChip } from "./ui/citation-chip";
 import { Input } from "./ui/input";
 import { LimitationCallout } from "./ui/limitation-callout";
 import { LiveRegion } from "./ui/live-region";
 import { StatusBanner } from "./ui/status-banner";
-import { StatusPill } from "./ui/status-pill";
 import { Textarea } from "./ui/textarea";
-import { HandshakeBanner } from "./auth/auth-screens";
-import { ReadinessPanel, SignedOutageCopy } from "./readiness-panel";
+import { UserText } from "./ui/user-text";
 import {
   cancelRun,
   createConversation,
@@ -35,35 +26,38 @@ import {
   fetchMeta,
   fetchReady,
   fetchUsageMe,
-  fetchVersionStatus,
   listCitations,
   listConversations,
-  listDocuments,
-  reserveUpload,
   startOrResumeMessageStream,
   submitFeedback,
   resumeEventStream,
   type ApiAuth,
   type ApiFailure,
 } from "../lib/api";
-import { MFA_REQUIRED_BANNER, MFA_UPLOAD_DENIED, SESSION_REVOKED_BANNER } from "../lib/auth/copy";
+import { MFA_REQUIRED_BANNER, SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { useSession } from "../lib/auth/session-provider";
+import {
+  INFERENCE_LINKS_UNAVAILABLE,
+  SOURCE_PREVIEW_UNAVAILABLE,
+  citationChipHref,
+} from "../lib/citation-drawer";
 import {
   applyAdmission,
   createChatViewState,
   type ChatViewState,
 } from "../lib/chat-view";
+import { COMPOSER_MAX_CHARS, composerDraftIsSendable } from "../lib/composer";
 import { evaluatePaidHandshake, mayStartPaidPost } from "../lib/handshake";
-import {
-  formatBm25Summary,
-  formatGraphHandoffSummary,
-} from "../lib/ingestion-status";
-import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
-import { publicQueryKeys, sessionQueryKeys } from "../lib/query-keys";
 import { apiFailureBanner } from "../lib/failure-copy";
-import { displayText, formatProvenance, isSafeHttpUrl } from "../lib/safe-text";
+import {
+  isGraphOnlyInspectionRoute,
+  limitationCopy,
+  limitationTone,
+} from "../lib/limitations";
+import { publicQueryKeys, sessionQueryKeys } from "../lib/query-keys";
+import { displayText, formatProvenance } from "../lib/safe-text";
 import { consumeSse } from "../lib/sse-consume";
-import { FEEDBACK_TAGS, type FeedbackTag } from "../lib/types";
+import { FEEDBACK_TAGS, type CitationResponse, type FeedbackTag } from "../lib/types";
 import styles from "./developer-app.module.css";
 
 function newIdempotencyKey(): string {
@@ -71,44 +65,59 @@ function newIdempotencyKey(): string {
 }
 
 /**
- * Collapse diagnostics on viewports below 801px; keep them open on desktop.
+ * Render citation ids and provenance in a drawer. No privileged href.
  *
- * @param children - Diagnostic definition list and related copy.
- * @returns Details element whose `open` tracks the desktop media query.
+ * @param props - Selected citation or null.
+ * @returns Drawer region.
  */
-function DiagnosticsDetails({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(true);
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 801px)");
-    const sync = () => {
-      setOpen(media.matches);
-    };
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
+export function CitationDrawer({
+  citation,
+  onClose,
+}: {
+  citation: CitationResponse | null;
+  onClose: () => void;
+}) {
+  if (citation === null) {
+    return null;
+  }
   return (
-    <details
-      className={styles.diagnostics}
-      open={open}
-      data-testid="diagnostics"
-      onToggle={(event) => {
-        setOpen(event.currentTarget.open);
-      }}
-    >
-      <summary>Diagnostics</summary>
-      {children}
-    </details>
+    <aside className={styles.drawer} aria-label="Source drawer">
+      <div className={styles.row}>
+        <h3>Citation {String(citation.citation_index)}</h3>
+        <Button type="button" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+      <dl>
+        <dt>citation_id</dt>
+        <dd>
+          <UserText value={citation.citation_id} />
+        </dd>
+        <dt>chunk_id</dt>
+        <dd>
+          <UserText value={citation.chunk_id ?? "none"} />
+        </dd>
+        <dt>provenance</dt>
+        <dd>
+          <UserText value={formatProvenance(citation.provenance) || "none"} />
+        </dd>
+      </dl>
+      {citation.source_unavailable ? (
+        <LimitationCallout tone="warning">
+          {limitationCopy("source_unavailable")}
+        </LimitationCallout>
+      ) : null}
+      <p className={styles.muted}>{SOURCE_PREVIEW_UNAVAILABLE}</p>
+    </aside>
   );
 }
 
 /**
- * Render the thin developer UI for upload status, chat, citations,
- * feedback, and conversation deletion. Auth screens live on `/login`.
+ * Auto chat: conversations, composer, transcript, diagnostics, feedback.
  *
- * @returns Developer console.
+ * @returns Chat surface.
  */
-export function DeveloperApp() {
+export function ChatApp() {
   const queryClient = useQueryClient();
   const session = useSession();
   const accessToken = session.accessToken;
@@ -121,7 +130,9 @@ export function DeveloperApp() {
   const [failure, setFailure] = useState<ApiFailure | null>(null);
   const [feedbackTag, setFeedbackTag] = useState<FeedbackTag>(FEEDBACK_TAGS[0]);
   const [feedbackComment, setFeedbackComment] = useState("");
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [thumbsUp, setThumbsUp] = useState(true);
+  const [selectedCitation, setSelectedCitation] =
+    useState<CitationResponse | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const auth = useMemo<ApiAuth | null>(
     () => (accessToken ? { accessToken } : null),
@@ -157,18 +168,6 @@ export function DeveloperApp() {
     enabled: auth !== null,
   });
 
-  const documentsQuery = useQuery({
-    queryKey: keys.documents,
-    queryFn: () => listDocuments(auth as ApiAuth),
-    enabled: auth !== null,
-  });
-
-  const versionStatusQuery = useQuery({
-    queryKey: keys.versionStatus(selectedVersionId),
-    queryFn: () => fetchVersionStatus(auth as ApiAuth, selectedVersionId as string),
-    enabled: auth !== null && selectedVersionId !== null,
-  });
-
   const usageQuery = useQuery({
     queryKey: keys.usage,
     queryFn: () => fetchUsageMe(auth as ApiAuth),
@@ -182,19 +181,10 @@ export function DeveloperApp() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => createConversation(auth as ApiAuth, "Developer thread"),
+    mutationFn: () => createConversation(auth as ApiAuth, "Chat"),
     onSuccess: (created) => {
       setConversationId(created.conversation_id);
       void queryClient.invalidateQueries({ queryKey: ["conversations"] });
-    },
-  });
-
-  const uploadMutation = useMutation({
-    mutationFn: () => {
-      if (!handshake.allowPaidPost) {
-        throw new Error("handshake_blocked");
-      }
-      return reserveUpload(auth as ApiAuth, 1024, newIdempotencyKey());
     },
   });
 
@@ -216,7 +206,7 @@ export function DeveloperApp() {
   });
 
   const send = useCallback(async () => {
-    if (auth === null || conversationId === null || draft.trim() === "") {
+    if (auth === null || conversationId === null || !composerDraftIsSendable(draft)) {
       return;
     }
     if (!mayStartPaidPost(handshake, chat)) {
@@ -262,7 +252,10 @@ export function DeveloperApp() {
     setChat(current);
     if (current.terminal !== null) {
       idempotencyRef.current = newIdempotencyKey();
-      setChat((prev) => ({ ...prev, idempotencyKey: idempotencyRef.current as string }));
+      setChat((prev) => ({
+        ...prev,
+        idempotencyKey: idempotencyRef.current as string,
+      }));
     }
   }, [auth, chat, conversationId, draft, handshake]);
 
@@ -296,11 +289,11 @@ export function DeveloperApp() {
     await submitFeedback(
       auth,
       chat.runId,
-      true,
+      thumbsUp,
       feedbackTag,
       feedbackComment || null,
     );
-  }, [auth, chat.runId, feedbackComment, feedbackTag]);
+  }, [auth, chat.runId, feedbackComment, feedbackTag, thumbsUp]);
 
   const mfaRequired =
     meQuery.isError &&
@@ -318,10 +311,30 @@ export function DeveloperApp() {
     }
   }, [session, sessionRevoked]);
 
+  const paradeDbDown =
+    readyQuery.data?.dependencies.some(
+      (item) => item.name === "paradedb" && item.status === "down",
+    ) === true;
+  const bm25Limitation =
+    chat.diagnostics.limitationCodes.includes("bm25_unavailable");
+
+  const assertiveCopy = (() => {
+    if (failure?.kind === "upgrade" || failure?.kind === "budget") {
+      return apiFailureBanner(failure);
+    }
+    if (mfaRequired) {
+      return MFA_REQUIRED_BANNER;
+    }
+    if (chat.terminal === "error") {
+      return displayText(chat.status ?? "error");
+    }
+    return "";
+  })();
+
   if (!session.ready) {
     return (
       <div className={styles.shell}>
-        <h1>Smart RAG developer console</h1>
+        <h1>Auto chat</h1>
         <p className={styles.muted}>Restoring session.</p>
       </div>
     );
@@ -330,7 +343,7 @@ export function DeveloperApp() {
   if (accessToken === null) {
     return (
       <div className={styles.shell}>
-        <h1>Smart RAG developer console</h1>
+        <h1>Auto chat</h1>
         <StatusBanner kind="info" role="status">
           Sign in to continue. Optimistic cookie checks are not authorization.
         </StatusBanner>
@@ -347,7 +360,7 @@ export function DeveloperApp() {
     return (
       <div className={styles.shell}>
         <header className={styles.row}>
-          <h1>Smart RAG developer console</h1>
+          <h1>Auto chat</h1>
           <Button type="button" onClick={() => void session.signOut()}>
             Sign out
           </Button>
@@ -355,21 +368,23 @@ export function DeveloperApp() {
         <StatusBanner kind="error" role="alert">
           {MFA_REQUIRED_BANNER}
         </StatusBanner>
+        <LiveRegion politeness="assertive" aria-label="Blocking errors">
+          {MFA_REQUIRED_BANNER}
+        </LiveRegion>
         <p className={styles.muted}>
           <Link href="/mfa/challenge">MFA challenge</Link>
           {" · "}
           <Link href="/mfa/enroll">Enroll TOTP</Link>
         </p>
         <ReadinessPanel ready={readyQuery.data} />
-        <SignedOutageCopy />
       </div>
     );
   }
 
-  if (sessionRevoked || failure?.kind === "auth" && failure.detail === "session_revoked") {
+  if (sessionRevoked || (failure?.kind === "auth" && failure.detail === "session_revoked")) {
     return (
       <div className={styles.shell}>
-        <h1>Smart RAG developer console</h1>
+        <h1>Auto chat</h1>
         <StatusBanner kind="error" role="alert">
           {SESSION_REVOKED_BANNER}
         </StatusBanner>
@@ -380,29 +395,26 @@ export function DeveloperApp() {
     );
   }
 
-  const paidBlocked = !handshake.allowPaidPost;
-  const sendDisabled = !mayStartPaidPost(handshake, chat);
+  const sendDisabled =
+    !mayStartPaidPost(handshake, chat) ||
+    !composerDraftIsSendable(draft) ||
+    conversationId === null;
 
   return (
     <div className={styles.shell}>
       <header className={styles.row}>
-        <h1>Smart RAG developer console</h1>
+        <h1>Auto chat</h1>
+        <p className={styles.muted} data-testid="auto-label">
+          Auto (server-routed). This label does not change the POST body.
+        </p>
         <p className={styles.muted}>
-          Signed in as {displayText(meQuery.data?.role ?? "unknown")}{" "}
-          {displayText(meQuery.data?.user_id ?? "")}. Server role is
-          authoritative.
+          Signed in as <UserText value={meQuery.data?.role ?? "unknown"} />{" "}
+          <UserText value={meQuery.data?.user_id ?? ""} />
         </p>
         <Button type="button" onClick={() => void session.signOut()}>
           Sign out
         </Button>
       </header>
-      <p className={styles.muted}>
-        <Link href="/mfa/enroll">Enroll MFA</Link>
-        {" · "}
-        <Link href="/mfa/challenge">MFA challenge</Link>
-        {" · "}
-        <Link href="/invitations/accept">Accept invitation</Link>
-      </p>
 
       <HandshakeBanner />
 
@@ -414,6 +426,11 @@ export function DeveloperApp() {
           {apiFailureBanner(failure)}
         </StatusBanner>
       ) : null}
+
+      <LiveRegion politeness="assertive" aria-label="Blocking errors">
+        {assertiveCopy || ""}
+      </LiveRegion>
+
       {deleteMutation.isSuccess && failure?.kind !== "deleted" ? (
         <StatusBanner kind="info" role="status">
           Conversation deleted. Reads, resume, and citations are denied. No
@@ -436,6 +453,13 @@ export function DeveloperApp() {
               Delete conversation
             </Button>
           </div>
+          {conversationsQuery.isPending ? (
+            <p className={styles.muted}>Loading conversations</p>
+          ) : null}
+          {(conversationsQuery.data ?? []).length === 0 &&
+          !conversationsQuery.isPending ? (
+            <p className={styles.muted}>No conversations yet</p>
+          ) : null}
           <ul className={styles.list}>
             {(conversationsQuery.data ?? []).map((item) => (
               <li key={item.conversation_id}>
@@ -451,112 +475,26 @@ export function DeveloperApp() {
                     setFailure(null);
                   }}
                 >
-                  {displayText(item.title ?? item.conversation_id)}
+                  <UserText value={item.title ?? item.conversation_id} />
                 </button>
               </li>
             ))}
           </ul>
-
-          <h2>Documents</h2>
-          <p className={styles.muted}>
-            Graph ready is never inferred from upload alone. Local signed_url is
-            null until Phase 10 CloudFront. BM25 index/lag come from version
-            status, not chat SSE.
-          </p>
-          <div className={styles.row}>
-            <Button
-              type="button"
-              onClick={() => uploadMutation.mutate()}
-              disabled={meQuery.data?.upload_enabled !== true || paidBlocked}
-            >
-              Reserve upload
-            </Button>
-          </div>
-          {meQuery.data?.upload_enabled !== true ? (
-            <p className={styles.muted}>
-              Upload control hidden as convenience only. Server still denies
-              when upload_enabled is false.
-            </p>
-          ) : null}
-          {uploadMutation.data ? (
-            <p className={styles.muted} role="status">
-              Reservation {displayText(uploadMutation.data.reservation_id)}.
-              signed_url=
-              {uploadMutation.data.signed_url === null
-                ? "null (Phase 10)"
-                : displayText(uploadMutation.data.signed_url)}
-              . Finalize remains API-side.
-            </p>
-          ) : null}
-          {uploadMutation.isError ? (
-            <StatusBanner kind="error" role="alert">
-              {uploadMutation.error instanceof Error &&
-              uploadMutation.error.message === "mfa_required"
-                ? MFA_UPLOAD_DENIED
-                : "Upload reserve rejected. Server authorization is authoritative."}
-            </StatusBanner>
-          ) : null}
-          <ul className={styles.list}>
-            {(documentsQuery.data ?? []).map((doc) => (
-              <li key={doc.document_id}>
-                <button
-                  type="button"
-                  aria-current={
-                    doc.current_version_id === selectedVersionId ? "true" : undefined
-                  }
-                  disabled={doc.current_version_id === null}
-                  onClick={() => {
-                    if (doc.current_version_id !== null) {
-                      setSelectedVersionId(doc.current_version_id);
-                    }
-                  }}
-                >
-                  {displayText(doc.title ?? doc.document_id)} —{" "}
-                  <StatusPill status={doc.visibility} />
-                </button>
-              </li>
-            ))}
-          </ul>
-          {versionStatusQuery.data ? (
-            <dl>
-              <dt>Version status</dt>
-              <dd>{displayText(versionStatusQuery.data.status)}</dd>
-              <dt>Hybrid verified</dt>
-              <dd>
-                {displayText(versionStatusQuery.data.hybrid_verified_at ?? "not yet")}
-              </dd>
-              <dt>Retrieval eligible</dt>
-              <dd>{versionStatusQuery.data.retrieval_eligible ? "yes" : "no"}</dd>
-              <dt>Graph eligible</dt>
-              <dd>
-                {versionStatusQuery.data.document_graph_eligible ? "yes" : "no"}
-              </dd>
-              <dt>BM25</dt>
-              <dd>{formatBm25Summary(versionStatusQuery.data.bm25)}</dd>
-              <dt>Graph handoff</dt>
-              <dd>
-                {formatGraphHandoffSummary(versionStatusQuery.data.graph_handoff)}
-              </dd>
-            </dl>
-          ) : null}
-          {versionStatusQuery.data &&
-          !versionStatusQuery.data.document_graph_eligible ? (
-            <p className={styles.muted}>{graphNotReadyCopy(1)}</p>
-          ) : null}
         </aside>
 
         <section className={styles.panel} aria-label="Auto chat">
-          <h2>Auto chat (Composite)</h2>
           <p className={styles.muted}>
-            Manual route selection is diagnostics-only and does not change
-            admission. Handshake uses X-Client-Version {metaQuery.data?.min_client_version}.
+            SubmitMessageRequest is message plus optional idempotency_key only.
+            Hybrid/Combined/Table/Inspect send controls are not present
+            (GAP-07-01).
           </p>
           <Textarea
             label="Message"
             rows={4}
+            maxLength={COMPOSER_MAX_CHARS}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            disabled={sendDisabled}
+            disabled={!mayStartPaidPost(handshake, chat)}
           />
           <div className={styles.row}>
             <Button
@@ -574,20 +512,45 @@ export function DeveloperApp() {
               Cancel
             </Button>
           </div>
-          <LiveRegion aria-label="Answer tokens">
-            {displayText(chat.answerText) || "No tokens yet."}
+          <LiveRegion aria-label="Answer tokens" politeness="polite">
+            <UserText value={chat.answerText || "No tokens yet."} />
           </LiveRegion>
+          {isGraphOnlyInspectionRoute(
+            chat.diagnostics.effectiveRoute ?? chat.routeFamily,
+          ) ? (
+            <LimitationCallout tone="warning">
+              Graph-only inspection is not an answering mode. Final answers use
+              Hybrid evidence.
+            </LimitationCallout>
+          ) : null}
 
-          <DiagnosticsDetails>
+          <details className={styles.diagnostics} data-testid="advanced-diagnostics">
+            <summary>Advanced (requested vs effective route)</summary>
             <dl>
               <dt>Requested route</dt>
-              <dd>{displayText(chat.diagnostics.requestedRoute ?? chat.routeFamily ?? "—")}</dd>
+              <dd>
+                <UserText
+                  value={
+                    chat.diagnostics.requestedRoute ?? chat.routeFamily ?? "—"
+                  }
+                />
+              </dd>
               <dt>Effective route</dt>
-              <dd>{displayText(chat.diagnostics.effectiveRoute ?? "—")}</dd>
+              <dd>
+                <UserText value={chat.diagnostics.effectiveRoute ?? "—"} />
+              </dd>
               <dt>Corrected route</dt>
-              <dd>{displayText(chat.diagnostics.correctedRoute ?? "none")}</dd>
+              <dd>
+                <UserText value={chat.diagnostics.correctedRoute ?? "none"} />
+              </dd>
+              <dt>Correction reason</dt>
+              <dd>
+                <UserText value={chat.diagnostics.correctionReason ?? "—"} />
+              </dd>
               <dt>Cache</dt>
-              <dd>{displayText(chat.diagnostics.cacheStatus ?? "—")}</dd>
+              <dd>
+                <UserText value={chat.diagnostics.cacheStatus ?? "—"} />
+              </dd>
               <dt>Coverage</dt>
               <dd>
                 {chat.diagnostics.coverageScore === null
@@ -595,63 +558,97 @@ export function DeveloperApp() {
                   : String(chat.diagnostics.coverageScore)}
               </dd>
               <dt>Tools</dt>
-              <dd>{chat.diagnostics.toolKeys.map(displayText).join(", ") || "none"}</dd>
-              <dt>Stage</dt>
               <dd>
-                {displayText(chat.stage ?? "—")} / {displayText(chat.status ?? "—")}
+                {chat.diagnostics.toolKeys.map(displayText).join(", ") || "none"}
               </dd>
-              <dt>Terminal</dt>
-              <dd>{displayText(chat.terminal ?? "running")}</dd>
               <dt>Heartbeats</dt>
               <dd>{String(chat.diagnostics.heartbeatCount)}</dd>
               <dt>Unknown events</dt>
-              <dd>{chat.diagnostics.unknownEvents.join(", ") || "none (ignored)"}</dd>
-              <dt>Usage</dt>
               <dd>
-                {String(chat.diagnostics.promptTokens)}/{String(chat.diagnostics.completionTokens)}{" "}
-                tokens. Company total {String(usageQuery.data?.cost_usd ?? "—")} USD.
+                {chat.diagnostics.unknownEvents.join(", ") || "none (ignored)"}
+              </dd>
+              <dt>Stage</dt>
+              <dd>
+                <UserText value={chat.stage ?? "—"} /> /{" "}
+                <UserText value={chat.status ?? "—"} />
+              </dd>
+              <dt>Terminal</dt>
+              <dd>
+                <UserText value={chat.terminal ?? "running"} />
               </dd>
             </dl>
-          </DiagnosticsDetails>
+            <p className={styles.muted}>{INFERENCE_LINKS_UNAVAILABLE}</p>
+          </details>
+
           {chat.diagnostics.limitationCodes.map((code) => (
-            <LimitationCallout key={code}>
+            <LimitationCallout key={code} tone={limitationTone(code)}>
               {limitationCopy(code)}
             </LimitationCallout>
           ))}
+          {paradeDbDown ? (
+            <LimitationCallout tone="warning">
+              {limitationCopy("bm25_unavailable")}
+            </LimitationCallout>
+          ) : null}
+          {paradeDbDown && bm25Limitation ? (
+            <p className={styles.muted}>
+              Ready ParadeDB is down and the run reported bm25_unavailable. BM25
+              is not claimed healthy.
+            </p>
+          ) : null}
+
           <ReadinessPanel ready={readyQuery.data} />
           <SignedOutageCopy />
-          {chat.diagnostics.limitationCodes.includes("graph_updating") ? (
-            <p className={styles.muted}>{graphNotReadyCopy(0)}</p>
-          ) : null}
+
+          <p className={styles.muted} data-testid="usage-strip">
+            Usage {String(chat.diagnostics.promptTokens)}/
+            {String(chat.diagnostics.completionTokens)} tokens. Company total{" "}
+            {String(usageQuery.data?.cost_usd ?? "—")} USD.
+          </p>
 
           <h2>Citations</h2>
           <ul className={styles.list}>
-            {(citationsQuery.data ?? []).map((citation) => {
-              const urlRaw = citation.provenance.url;
-              const url = typeof urlRaw === "string" && isSafeHttpUrl(urlRaw) ? urlRaw : null;
-              return (
-                <li key={citation.citation_id}>
-                  <CitationChip
-                    index={citation.citation_index}
-                    citationId={citation.citation_id}
-                    unavailable={citation.source_unavailable}
-                    href={url}
-                  />{" "}
-                  {formatProvenance(citation.provenance)}
-                  {citation.source_unavailable
-                    ? ` — ${limitationCopy("source_unavailable")}`
-                    : ""}
-                </li>
-              );
-            })}
+            {(citationsQuery.data ?? []).map((citation) => (
+              <li key={citation.citation_id}>
+                <CitationChip
+                  index={citation.citation_index}
+                  citationId={citation.citation_id}
+                  unavailable={citation.source_unavailable}
+                  href={citationChipHref(citation.provenance.url)}
+                  onSelect={() => setSelectedCitation(citation)}
+                />
+              </li>
+            ))}
           </ul>
+          <CitationDrawer
+            citation={selectedCitation}
+            onClose={() => setSelectedCitation(null)}
+          />
 
           <h2>Feedback</h2>
+          <div className={styles.row}>
+            <Button
+              type="button"
+              variant={thumbsUp ? "primary" : "secondary"}
+              onClick={() => setThumbsUp(true)}
+            >
+              Thumbs up
+            </Button>
+            <Button
+              type="button"
+              variant={!thumbsUp ? "primary" : "secondary"}
+              onClick={() => setThumbsUp(false)}
+            >
+              Thumbs down
+            </Button>
+          </div>
           <label>
             Tag
             <select
               value={feedbackTag}
-              onChange={(event) => setFeedbackTag(event.target.value as FeedbackTag)}
+              onChange={(event) =>
+                setFeedbackTag(event.target.value as FeedbackTag)
+              }
             >
               {FEEDBACK_TAGS.map((tag) => (
                 <option key={tag} value={tag}>
@@ -666,7 +663,7 @@ export function DeveloperApp() {
             onChange={(event) => setFeedbackComment(event.target.value)}
           />
           <Button type="button" onClick={() => void sendFeedback()}>
-            Submit thumbs-up feedback
+            Submit feedback
           </Button>
         </section>
       </div>

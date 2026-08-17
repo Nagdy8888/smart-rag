@@ -26,5 +26,9 @@ export function sessionQueryKeys(accessToken: string | null) {
     versionStatus: (versionId: string | null) =>
       ["version-status", accessToken, versionId] as const,
     citations: (runId: string | null) => ["citations", accessToken, runId] as const,
+    document: (documentId: string | null) =>
+      ["document", accessToken, documentId] as const,
+    tables: ["tables", accessToken] as const,
+    graphSearch: (query: string) => ["graph-search", accessToken, query] as const,
   };
 }

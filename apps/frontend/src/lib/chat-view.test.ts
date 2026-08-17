@@ -76,6 +76,58 @@ describe("chat view", () => {
     expect(state.lastSequence).toBe(5);
   });
 
+  it("records route correction, deadline, and limitation codes from the catalog", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: route_correction\nid: 1\ndata: {"from_route":"hybrid","to_route":"combined","reason":"relationship"}',
+      ),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: limitation\nid: 2\ndata: {"code":"insufficient_evidence"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: limitation\nid: 3\ndata: {"code":"coverage_gap"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: limitation\nid: 4\ndata: {"code":"negation_unresolved"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: limitation\nid: 5\ndata: {"code":"media_limitation"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: limitation\nid: 6\ndata: {"code":"temporal_graph_limitation"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: limitation\nid: 7\ndata: {"code":"bm25_unavailable"}'),
+    );
+    state = applySseFrame(state, parseSseBlock("event: deadline\nid: 8\ndata: {}"));
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: partial\nid: 9\ndata: {"reason":"deadline"}'),
+    );
+    expect(state.diagnostics.requestedRoute).toBe("hybrid");
+    expect(state.diagnostics.correctedRoute).toBe("combined");
+    expect(state.diagnostics.effectiveRoute).toBe("combined");
+    expect(state.diagnostics.limitationCodes).toEqual([
+      "insufficient_evidence",
+      "coverage_gap",
+      "negation_unresolved",
+      "media_limitation",
+      "temporal_graph_limitation",
+      "bm25_unavailable",
+    ]);
+    expect(state.stage).toBe("deadline");
+    expect(state.terminal).toBe("partial");
+  });
+
   it("keeps the answer when an unknown additive event is injected", () => {
     let state = createChatViewState("k");
     state = applySseFrame(

@@ -1,10 +1,31 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import "@testing-library/jest-dom/vitest";
 import { CLIENT_NAV_IS_NOT_AUTHORIZATION } from "../../lib/client-authorization";
 import { AppShell } from "./app-shell";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+}));
+
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...rest
+  }: {
+    href: string;
+    children: ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 
 afterEach(() => {
   cleanup();
@@ -20,7 +41,19 @@ describe("AppShell", () => {
     const skip = screen.getByRole("link", { name: "Skip to main content" });
     expect(skip).toHaveAttribute("href", "#main");
     expect(screen.getByRole("navigation", { name: "Console" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Console" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Documents" })).toHaveAttribute(
+      "href",
+      "/documents",
+    );
+    expect(screen.getByRole("link", { name: "Graph" })).toHaveAttribute(
+      "href",
+      "/graph",
+    );
+    expect(screen.getByRole("link", { name: "Tables" })).toHaveAttribute(
+      "href",
+      "/tables",
+    );
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
     expect(screen.getByTestId("app-shell-nav")).toBeInTheDocument();
     expect(CLIENT_NAV_IS_NOT_AUTHORIZATION).toBe(true);

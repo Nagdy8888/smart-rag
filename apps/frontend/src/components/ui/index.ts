@@ -3,6 +3,7 @@
  */
 
 export { AppShell } from "./app-shell";
+export { AppNav, navItemIsCurrent } from "./app-nav";
 export { Badge } from "./badge";
 export { Button } from "./button";
 export { CitationChip } from "./citation-chip";

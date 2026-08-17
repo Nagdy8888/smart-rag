@@ -279,3 +279,106 @@ when FastAPI is not on `127.0.0.1:8000`.
 Revert `apps/frontend/src/proxy.ts`, Auth routes, session provider, handshake
 helpers, and `docs/frontend/AUTH_AND_STREAMING.md`. Restore DeveloperApp
 inline password `useState` sign-in on `/`. Leave packet 1 primitives in place.
+
+## Packet 3 — Implement core RAG surfaces
+
+### Requirement (quoted)
+
+> Implement chat/test limitation diagnostics, citations/inferences, quota-aware document upload/status/quarantine, graph-blindness states, tables, and feedback. Preserve frame 04's Auto-first shell, route controls, pipeline/inference/scope/citation patterns and state-gallery families; frame 05's deterministic-versus-generated table separation; frames 06/07/09's document, attestation, quarantine, and chunk-review patterns; and frame 10's three-pane graph/evidence layout. Add every required BM25, deadline, temporal, figure/media, negation, summary, quota, version, backlog, fallback, Graph Pending, and authorized ACL-blindness state absent from Stitch.
+
+### Concrete acceptance checks
+
+- Frame behavior is traceable and every required missing state has an approved primitive-based implementation.
+- `Auto` is default; diagnostics distinguish requested/effective/corrected routes, dense+term BM25 degradation, Hybrid fallback, limitations, and partial readiness.
+- Citations open authorized canonical sources; inference links cite atomic support; table results retain exact deterministic provenance.
+- `Graph Pending` differs from authorized ACL blindness, and unauthorized actors receive no count, title, entity, relation, or source leakage.
+- Upload/quarantine/quota/readiness/backlog/retry/version/anomaly/deletion journeys use real server state.
+
+### Frame / gap traceability
+
+Stitch is a template, not a layout. No `frame_04` / `05` / `06` / `07` / `09` / `10` routes.
+
+| Surface | Disposition |
+| --- | --- |
+| Chat Auto | Native `/`. `SubmitMessageRequest` is `{ message, idempotency_key? }` only (GAP-07-01) |
+| Advanced panel | Closed `<details>` of catalog events. No Hybrid/Combined/Table/Inspect send |
+| Inference chains | GAP-07-02: not in SSE catalog; citation chips only |
+| Source drawer | Ids + provenance text. No privileged href (GAP-07-09) |
+| Documents | `/documents` library, reserve, Storage JWT, SHA-256 finalize, crawl convenience |
+| Document detail | `/documents/[documentId]`. 404 is "Not found" with no title. No audit/PII/preview tabs |
+| Delete document | Unavailable GAP-07-14. `deletion_pending` pill only |
+| Graph | `/graph` search + inspect, hop cap 3, list-first. ACL copy ignores count |
+| Tables | `/tables` typed plan. No SQL. No client total. No export without chat disclosure |
+| Admin/tools/usage | Packet 4. Not started |
+
+### Contract versions
+
+- Next.js 16.3.0 App Router; `@supabase/ssr` 0.7.0 Storage JWT upload
+- FastAPI OpenAPI `docs/api/openapi.foundation.json` finalize, crawls, graph inspect/search, tables analyze
+- SSE catalog in `smart_rag_core.sse.catalog`
+- Attestation policy version `2026-08-13`
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `apps/frontend/src/lib/api.ts` | finalize, crawl, retry, document GET, graph, tables |
+| `apps/frontend/src/lib/limitations.ts` | GraphLimitationCode copy |
+| `apps/frontend/src/components/chat-app.tsx` | Auto chat at `/` |
+| `apps/frontend/src/components/document-library.tsx` | Library + upload + crawl |
+| `apps/frontend/src/components/document-detail.tsx` | Detail + 404 |
+| `apps/frontend/src/components/graph-explorer.tsx` | Search + inspect |
+| `apps/frontend/src/components/tables-app.tsx` | Plan builder |
+| `apps/frontend/src/components/ui/app-nav.tsx` | Chat/Documents/Graph/Tables `Link` |
+| `apps/frontend/src/app/documents` `/graph` `/tables` | Native routes |
+| `docs/frontend/CORE_RAG_SURFACES.md` | Canonical packet 3 doc |
+
+`DeveloperApp` was removed. Upload moved off `/`.
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend exec next typegen` | 0 |
+| `pnpm --filter smart-rag-frontend exec tsc --noEmit` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (21 files, 86 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 (routes `/`, `/documents`, `/documents/[documentId]`, `/graph`, `/tables`, plus Auth; no `/chat`) |
+| `pnpm exec playwright test` (cwd `apps/frontend`) | 0 (13 passed, 3 skipped) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+Playwright skips: live FastAPI `/health/ready` when 127.0.0.1:8000 is down;
+authenticated Auto chrome and authenticated document 404 when no Auth session
+exists. Component tests cover Auto POST body, handshake-gated Send, 404
+"Not found" with no title, and public chrome for documents/graph/tables.
+
+### Negative findings
+
+- Auto POST body has no route field
+- ACL blindness copy has no unauthorized title or count
+- Graph inspect depth clamps to 3
+- Table client omits SQL-like extra fields and does not sum rows
+- Document 404 does not parse a title
+- No `deleteDocument` helper (GAP-07-14)
+- Citation chip href is always null (GAP-07-09)
+- XSS fixtures remain text nodes
+- Handshake still blocks Send
+- Upload MFA maps to `mfa_required`
+- Crawl helper still posts and 403s; UI hides for non-admin
+
+### Unverified
+
+- Live Storage JWT upload against local Supabase RLS (finalize client is mocked in unit tests)
+- Live FastAPI graph/table/document journeys
+- Authenticated Playwright Auto chrome when no Auth session exists
+
+### Open gaps for P08-04
+
+- Team, tools, glossary, entity rules, usage/company, profile editor
+- Do not start until this packet's evidence is accepted
+
+### Rollback
+
+Revert the new App Router folders, restore `DeveloperApp` on `/`, restore
+single-item Console nav, and delete `docs/frontend/CORE_RAG_SURFACES.md`
+plus this evidence section. Leave packet 1--2 Auth/primitives in place.

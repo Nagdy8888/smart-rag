@@ -18,6 +18,7 @@ states. Every row maps to a real server signal in
 Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [limitations.ts](../../apps/frontend/src/lib/limitations.ts) ·
+[CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
 [docs index](../README.md)
 
 Copy uses signed sentences. Production never shows exception text. BM25

@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Smart RAG console",
   description:
-    "Production console shell hosting Auth and the Phase 6 developer console until later Phase 8 packets replace chat surfaces.",
+    "Production Auto chat, documents, graph explorer, and structured tables.",
 };
 
 /**

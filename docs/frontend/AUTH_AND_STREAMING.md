@@ -15,6 +15,7 @@ Auth/FastAPI contracts exist, not because Stitch numbered them.
 
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
+[CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [SSE.md](../api/SSE.md) ·
 [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md) ·
@@ -38,10 +39,10 @@ convenience. FastAPI still authorizes every Bearer call.
 | `/invitations/accept` | `POST /invitations/accept` `{ token }` | Email from JWT, not the form |
 | `/unavailable/GAP-07-07` | none | Honest Unavailable; no recovery HTTP |
 | `/unavailable/GAP-07-08` | none | Honest Unavailable; no bootstrap HTTP |
-| `/` | Phase 6 DeveloperApp | Chat/upload after Auth. Packet 3 redesigns it |
+| `/` | Auto chat | Packet 3. No route POST field. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) |
 
-Team admin create/offboard is packet 4. Chat/docs/graph/tables/tools remain
-the Phase 6 console on `/` until packet 3.
+Team admin create/offboard is packet 4. Documents, graph, and tables are
+packet 3 native routes. Tools remain packet 4.
 
 ## SSR cookie flow
 

@@ -10,14 +10,13 @@ audience: engineering, frontend
 
 Authenticated Next.js console for local RAG testing. Phase 8 packet 1 hosts
 this surface inside the production `AppShell`; packet 2 moves sign-in to
-`/login` with SSR Auth. Chat/upload on `/` after Auth is still not a Stitch
-frame route. Auth/streaming:
-[AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md). Tokens and primitives:
-[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).
+`/login` with SSR Auth. Chat/upload on `/` after Auth was replaced in packet 3 by native Auto chat
+at `/` plus `/documents`. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md).
 
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
+[CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
 [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [SSE.md](../api/SSE.md) ·
 [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md) ·

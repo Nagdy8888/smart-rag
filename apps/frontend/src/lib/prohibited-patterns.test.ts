@@ -96,8 +96,18 @@ describe("prohibited production patterns", () => {
     expect(names).not.toContain("gallery");
     expect(names).not.toContain("chat");
     expect(names).not.toContain("docs");
-    expect(names).not.toContain("graph");
     expect(names).not.toContain("admin");
+    expect(names).toEqual(
+      expect.arrayContaining(["documents", "graph", "tables"]),
+    );
+  });
+
+  it("does not ship a DELETE /documents client or privileged Storage href helper", () => {
+    const api = readFileSync(path.join(srcRoot, "lib/api.ts"), "utf8");
+    expect(api).not.toMatch(/DELETE[`'"\s]*\/documents\//);
+    expect(api).not.toContain("deleteDocument");
+    const drawer = readFileSync(path.join(srcRoot, "lib/citation-drawer.ts"), "utf8");
+    expect(drawer).toContain("return null");
   });
 
   it("allows Auth-direct App Router folders", () => {

@@ -22,6 +22,20 @@ const LIMITATION_COPY: Record<string, string> = {
     "Negation scope is unresolved. The run asks for clarification or refuses.",
   source_unavailable:
     "A cited source was deleted after the run. History is not rewritten; the citation is marked unavailable.",
+  graph_partial_readiness:
+    "Some authorized documents are not yet in the graph. Retrieval continues on Hybrid.",
+  graph_acl_blindness: "Some sources you cannot access are omitted.",
+  graph_survival_below_threshold:
+    "Graph support is below the survival threshold. Combined is relabeled to Hybrid.",
+  graph_filtered_dirty:
+    "Dirty graph changes are filtered. Retrieval continues on authorized Hybrid evidence.",
+  global_steering_only:
+    "Graph output is steering only. Final answers use Hybrid evidence.",
+  graph_empty: "No authorized graph objects are available for this inspect.",
+  graph_deadline: "Graph inspection stopped at the deadline. Results are partial.",
+  graph_cancelled: "Graph inspection was cancelled.",
+  graph_pending:
+    "The graph is not ready for these documents yet. Hybrid remains usable. Graph-only is not an answering mode.",
 };
 
 /**
@@ -49,4 +63,30 @@ export function limitationCopy(code: string): string {
 export function graphNotReadyCopy(authorizedNotReadyCount: number): string {
   const count = Math.max(0, Math.floor(authorizedNotReadyCount));
   return `${count} relevant recent documents are not yet represented in the graph`;
+}
+
+/**
+ * Return the callout tone for a limitation code.
+ *
+ * BM25 degrade and Graph Pending stay warning, not danger.
+ *
+ * @param _code - Limitation code.
+ * @returns Always `warning`. Never danger for BM25 or Graph Pending.
+ */
+export function limitationTone(_code: string): "warning" {
+  void _code;
+  return "warning";
+}
+
+/**
+ * Return whether graph-only inspection is being presented as an answering
+ * success. Graph-only is never a success answering mode.
+ *
+ * @param routeFamily - Server `route_family`.
+ * @returns True when the UI must label inspection, not an answer.
+ */
+export function isGraphOnlyInspectionRoute(
+  routeFamily: string | null,
+): boolean {
+  return routeFamily === "graph_inspection";
 }

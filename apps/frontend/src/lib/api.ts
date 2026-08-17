@@ -11,14 +11,29 @@ import type {
   CurrentUserResponse,
   AcceptInvitationResponse,
   DocumentResponse,
+  DocumentIngestionStatusResponse,
+  EnqueueWebsiteCrawlRequest,
+  EnqueueWebsiteCrawlResponse,
   FeedbackTag,
+  FinalizeUploadHttpRequest,
+  FinalizeUploadHttpResponse,
+  GraphEntityResponse,
+  GraphInspectRequest,
+  GraphInspectResponse,
+  IngestionJobSummary,
+  IngestionStatusVersion,
   MetaResponse,
+  RetryIngestionJobResponse,
   SignedUploadResponse,
   SubmitMessageResponse,
+  TableAnalyzeResponse,
+  TableManifestResponse,
+  TableQueryPlan,
   UsageResponse,
-  IngestionStatusVersion,
   ReadinessResponse,
 } from "./types";
+import { buildGraphInspectRequest, clampGraphSearchLimit } from "./graph-client";
+import { tableAnalyzeBody } from "./table-plan";
 
 /** Headers shared by paid POST bodies. Resume GET omits the version. */
 export type ApiAuth = {
@@ -45,6 +60,21 @@ export function paidMutationHeaders(
     headers["Idempotency-Key"] = idempotencyKey;
   }
   return headers;
+}
+
+/**
+ * JSON body for `POST /conversations/{id}/messages`. Auto only.
+ * There is no client route field (GAP-07-01).
+ *
+ * @param message - Untrusted user text.
+ * @param idempotencyKey - Stable UUID.
+ * @returns `{ message, idempotency_key }` only.
+ */
+export function submitMessageBody(
+  message: string,
+  idempotencyKey: string,
+): { message: string; idempotency_key: string } {
+  return { message, idempotency_key: idempotencyKey };
 }
 
 /**
@@ -463,13 +493,13 @@ export async function reserveUpload(
  * @param auth - Access token.
  * @param versionId - Document version UUID.
  * @param fetchImpl - Injected fetch.
- * @returns Version diagnostics, or null on 404.
+ * @returns Envelope, or null on 404. 404 bodies are not parsed for titles.
  */
 export async function fetchVersionStatus(
   auth: ApiAuth,
   versionId: string,
   fetchImpl: typeof fetch = fetch,
-): Promise<IngestionStatusVersion | null> {
+): Promise<DocumentIngestionStatusResponse | null> {
   const response = await fetchImpl(
     apiUrl(`/ingestion/versions/${versionId}/status`),
     { headers: resumeHeaders(auth) },
@@ -477,7 +507,10 @@ export async function fetchVersionStatus(
   if (response.status === 404) {
     return null;
   }
-  const body = (await response.json()) as { version?: IngestionStatusVersion };
+  const body = (await response.json()) as {
+    version?: IngestionStatusVersion;
+    recent_jobs?: IngestionJobSummary[];
+  };
   const version = body.version;
   if (version === undefined) {
     return null;
@@ -504,7 +537,373 @@ export async function fetchVersionStatus(
       dead_letter: 0,
     };
   }
-  return version;
+  return {
+    version,
+    recent_jobs: Array.isArray(body.recent_jobs) ? body.recent_jobs : [],
+  };
+}
+
+export type DocumentFetchResult =
+  | { ok: true; document: DocumentResponse }
+  | { ok: false; notFound: true };
+
+/**
+ * GET `/documents/{document_id}`. 404 must not leak a title.
+ *
+ * @param auth - Access token.
+ * @param documentId - Document UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Document or `{ notFound: true }` without parsing error titles.
+ */
+export async function fetchDocument(
+  auth: ApiAuth,
+  documentId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<DocumentFetchResult> {
+  const response = await fetchImpl(apiUrl(`/documents/${documentId}`), {
+    headers: resumeHeaders(auth),
+  });
+  if (response.status === 404) {
+    await response.arrayBuffer().catch(() => undefined);
+    return { ok: false, notFound: true };
+  }
+  if (!response.ok) {
+    await response.arrayBuffer().catch(() => undefined);
+    return { ok: false, notFound: true };
+  }
+  const body = await readJsonObject(response);
+  return {
+    ok: true,
+    document: {
+      document_id: String(body.document_id ?? ""),
+      title: typeof body.title === "string" ? body.title : null,
+      visibility: String(body.visibility ?? ""),
+      current_version_id:
+        typeof body.current_version_id === "string"
+          ? body.current_version_id
+          : null,
+      visibility_generation: Number(body.visibility_generation ?? 0),
+    },
+  };
+}
+
+/**
+ * Finalize a reserved quarantine upload after Storage write + SHA-256.
+ *
+ * @param auth - Access token.
+ * @param body - Required finalize fields.
+ * @param fetchImpl - Injected fetch.
+ * @returns Identifiers, or a classified failure.
+ */
+export async function finalizeUpload(
+  auth: ApiAuth,
+  body: FinalizeUploadHttpRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<FinalizeUploadHttpResponse> {
+  const payload: FinalizeUploadHttpRequest = {
+    reservation_id: body.reservation_id,
+    object_name: body.object_name,
+    content_hash: body.content_hash,
+    actual_bytes: body.actual_bytes,
+    declared_category: body.declared_category,
+    attestation_policy_version: body.attestation_policy_version,
+    idempotency_key: body.idempotency_key,
+  };
+  if (body.media_type) {
+    payload.media_type = body.media_type;
+  }
+  if (body.document_title) {
+    payload.document_title = body.document_title;
+  }
+  const response = await fetchImpl(apiUrl("/documents/uploads/finalize"), {
+    method: "POST",
+    headers: paidMutationHeaders(auth, body.idempotency_key),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorBody = await readJsonObject(response);
+    const classified = classifyApiError(response.status, errorBody);
+    if (classified?.kind === "mfa") {
+      throw new Error("mfa_required");
+    }
+    throw new Error(sanitizedDetail(errorBody, "upload_finalize_rejected"));
+  }
+  const parsed = await readJsonObject(response);
+  return {
+    reservation_id: String(parsed.reservation_id ?? ""),
+    document_id: String(parsed.document_id ?? ""),
+    version_id: String(parsed.version_id ?? ""),
+    job_id: String(parsed.job_id ?? ""),
+  };
+}
+
+/**
+ * Enqueue an approved website crawl. Owner/admin on the server; members 403.
+ *
+ * @param auth - Access token.
+ * @param body - Crawl request.
+ * @param fetchImpl - Injected fetch.
+ * @returns Created ids.
+ */
+export async function enqueueWebsiteCrawl(
+  auth: ApiAuth,
+  body: EnqueueWebsiteCrawlRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EnqueueWebsiteCrawlResponse> {
+  const payload: EnqueueWebsiteCrawlRequest = {
+    start_url: body.start_url,
+    approved_domain: body.approved_domain,
+    idempotency_key: body.idempotency_key,
+    max_depth: body.max_depth ?? 2,
+    max_pages: body.max_pages ?? 50,
+    content_class: body.content_class ?? "synthetic",
+    graph_eligible: body.graph_eligible ?? false,
+  };
+  if (body.document_title) {
+    payload.document_title = body.document_title;
+  }
+  if (body.attestation_policy_version) {
+    payload.attestation_policy_version = body.attestation_policy_version;
+  }
+  const response = await fetchImpl(apiUrl("/ingestion/crawls"), {
+    method: "POST",
+    headers: paidMutationHeaders(auth, body.idempotency_key),
+    body: JSON.stringify(payload),
+  });
+  const parsed = await readJsonObject(response);
+  if (!response.ok) {
+    const classified = classifyApiError(response.status, parsed);
+    if (classified?.kind === "auth") {
+      throw new Error("forbidden");
+    }
+    throw new Error(sanitizedDetail(parsed, "crawl_enqueue_rejected"));
+  }
+  return {
+    document_id: String(parsed.document_id ?? ""),
+    version_id: String(parsed.version_id ?? ""),
+    source_id: String(parsed.source_id ?? ""),
+    approval_id: String(parsed.approval_id ?? ""),
+    job_id: String(parsed.job_id ?? ""),
+  };
+}
+
+/**
+ * Retry a failed ingestion job. Owner/admin when `retry_allowed`.
+ *
+ * @param auth - Access token.
+ * @param jobId - Job UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Retry result.
+ */
+export async function retryIngestionJob(
+  auth: ApiAuth,
+  jobId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RetryIngestionJobResponse> {
+  const response = await fetchImpl(apiUrl(`/ingestion/jobs/${jobId}/retry`), {
+    method: "POST",
+    headers: paidMutationHeaders(auth),
+  });
+  const parsed = await readJsonObject(response);
+  if (!response.ok) {
+    throw new Error(sanitizedDetail(parsed, "retry_not_allowed"));
+  }
+  return {
+    job_id: String(parsed.job_id ?? ""),
+    status: String(parsed.status ?? ""),
+    detail: String(parsed.detail ?? ""),
+  };
+}
+
+/**
+ * Search authorized graph entities. Limit is clamped to 25.
+ *
+ * @param auth - Access token.
+ * @param query - Bounded search string.
+ * @param limit - Requested limit.
+ * @param fetchImpl - Injected fetch.
+ * @returns Hits without vendor prose.
+ */
+export async function searchGraphEntities(
+  auth: ApiAuth,
+  query: string,
+  limit: number = 25,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GraphEntityResponse[]> {
+  const capped = clampGraphSearchLimit(limit);
+  const url = apiUrl(
+    `/graph/entities/search?q=${encodeURIComponent(query)}&limit=${String(capped)}`,
+  );
+  const response = await fetchImpl(url, { headers: resumeHeaders(auth) });
+  const parsed: unknown = await response.json();
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  return parsed.map((item) => {
+    const row = item as Record<string, unknown>;
+    return {
+      object_id: String(row.object_id ?? ""),
+      object_type: String(row.object_type ?? ""),
+      chunk_id: String(row.chunk_id ?? ""),
+      document_id: String(row.document_id ?? ""),
+      version_id: String(row.version_id ?? ""),
+      support: Number(row.support ?? 0),
+    };
+  });
+}
+
+/**
+ * Inspect authorized graph objects. Depth is clamped to 1–3 on this client.
+ *
+ * Extra title fields on nodes are ignored.
+ *
+ * @param auth - Access token.
+ * @param request - Seed keys and/or document id.
+ * @param fetchImpl - Injected fetch.
+ * @returns Inspect payload.
+ */
+export async function inspectGraph(
+  auth: ApiAuth,
+  request: GraphInspectRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GraphInspectResponse> {
+  const body = buildGraphInspectRequest(
+    request.entity_keys,
+    request.document_id ?? null,
+    request.depth,
+  );
+  const payload: {
+    entity_keys: string[];
+    depth: number;
+    document_id?: string;
+  } = {
+    entity_keys: body.entity_keys,
+    depth: body.depth,
+  };
+  if (body.document_id) {
+    payload.document_id = body.document_id;
+  }
+  const response = await fetchImpl(apiUrl("/graph/inspect"), {
+    method: "POST",
+    headers: paidMutationHeaders(auth),
+    body: JSON.stringify(payload),
+  });
+  const parsed = await readJsonObject(response);
+  if (!response.ok) {
+    throw new Error(sanitizedDetail(parsed, "inspect_rejected"));
+  }
+  const nodesRaw = Array.isArray(parsed.nodes) ? parsed.nodes : [];
+  const locatorsRaw = Array.isArray(parsed.locators) ? parsed.locators : [];
+  const limitationsRaw = Array.isArray(parsed.limitations)
+    ? parsed.limitations
+    : [];
+  return {
+    nodes: nodesRaw.map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        object_type: String(row.object_type ?? ""),
+        object_id: String(row.object_id ?? ""),
+        chunk_id: String(row.chunk_id ?? ""),
+        document_id: String(row.document_id ?? ""),
+        version_id: String(row.version_id ?? ""),
+        support: Number(row.support ?? 0),
+        hop: Number(row.hop ?? 0),
+      };
+    }),
+    locators: locatorsRaw.map((item) => {
+      const row = item as Record<string, unknown>;
+      const section = row.section_path;
+      return {
+        chunk_id: String(row.chunk_id ?? ""),
+        document_id: String(row.document_id ?? ""),
+        version_id: String(row.version_id ?? ""),
+        page_number: typeof row.page_number === "number" ? row.page_number : null,
+        section_path: Array.isArray(section) ? section.map(String) : [],
+        sheet_name: typeof row.sheet_name === "string" ? row.sheet_name : null,
+        range_ref: typeof row.range_ref === "string" ? row.range_ref : null,
+        source_url: typeof row.source_url === "string" ? row.source_url : null,
+      };
+    }),
+    limitations: limitationsRaw.map((item) => {
+      const row = item as Record<string, unknown>;
+      return {
+        code: String(row.code ?? ""),
+        count: typeof row.count === "number" ? row.count : null,
+      };
+    }),
+    row_count: Number(parsed.row_count ?? 0),
+    depth: Number(parsed.depth ?? body.depth),
+  };
+}
+
+/**
+ * List authorized table manifests. No storage paths.
+ *
+ * @param auth - Access token.
+ * @param fetchImpl - Injected fetch.
+ * @returns Manifests.
+ */
+export async function listTables(
+  auth: ApiAuth,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TableManifestResponse[]> {
+  const response = await fetchImpl(apiUrl("/tables"), {
+    headers: resumeHeaders(auth),
+  });
+  const parsed: unknown = await response.json();
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  return parsed.map((item) => {
+    const row = item as Record<string, unknown>;
+    return {
+      table_id: String(row.table_id ?? ""),
+      document_id: String(row.document_id ?? ""),
+      version_id: String(row.version_id ?? ""),
+      table_name: String(row.table_name ?? ""),
+      sheet_name: typeof row.sheet_name === "string" ? row.sheet_name : null,
+      row_count: typeof row.row_count === "number" ? row.row_count : null,
+      column_count: typeof row.column_count === "number" ? row.column_count : null,
+    };
+  });
+}
+
+/**
+ * Execute one extra-forbid TableQueryPlan. Extra SQL-like fields are omitted.
+ *
+ * @param auth - Access token.
+ * @param plan - Declarative plan.
+ * @param fetchImpl - Injected fetch.
+ * @returns Deterministic rows and source_ranges.
+ */
+export async function analyzeTable(
+  auth: ApiAuth,
+  plan: TableQueryPlan,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TableAnalyzeResponse> {
+  const response = await fetchImpl(apiUrl("/tables/analyze"), {
+    method: "POST",
+    headers: paidMutationHeaders(auth),
+    body: JSON.stringify(tableAnalyzeBody(plan)),
+  });
+  const parsed = await readJsonObject(response);
+  if (!response.ok) {
+    throw new Error(sanitizedDetail(parsed, "table_plan_rejected"));
+  }
+  const rowsRaw = Array.isArray(parsed.rows) ? parsed.rows : [];
+  const rangesRaw = Array.isArray(parsed.source_ranges)
+    ? parsed.source_ranges
+    : [];
+  return {
+    table_id: String(parsed.table_id ?? ""),
+    version_id: String(parsed.version_id ?? ""),
+    document_id: String(parsed.document_id ?? ""),
+    rows: rowsRaw.filter(
+      (row): row is Record<string, unknown> =>
+        row !== null && typeof row === "object" && !Array.isArray(row),
+    ),
+    source_ranges: rangesRaw.map(String),
+  };
 }
 
 /**
@@ -690,7 +1089,7 @@ export async function startMessageStream(
     {
       method: "POST",
       headers: admitHeaders,
-      body: JSON.stringify({ message, idempotency_key: idempotencyKey }),
+      body: JSON.stringify(submitMessageBody(message, idempotencyKey)),
     },
   );
   if (!admitResponse.ok) {
