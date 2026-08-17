@@ -382,3 +382,95 @@ exists. Component tests cover Auto POST body, handshake-gated Send, 404
 Revert the new App Router folders, restore `DeveloperApp` on `/`, restore
 single-item Console nav, and delete `docs/frontend/CORE_RAG_SURFACES.md`
 plus this evidence section. Leave packet 1--2 Auth/primitives in place.
+
+## Packet 4 — Implement administration surfaces
+
+### Requirement (quoted)
+
+> Implement team, tools, alias/entity curation, usage, budgets, restricted read/download audit, profile, and company settings with server-enforced permissions. Preserve frame 14's usage/budget information hierarchy and degradation/critical-reserve patterns. Because the remaining administration surfaces have no delivered frame, derive them from `API_UI_MAPPING.md`, reuse approved primitives and shell patterns, and list the design gap in exit evidence.
+
+### Concrete acceptance checks
+
+- Server denial protects every mutation and restricted read even if controls are forged or revealed.
+- Frame 14 hierarchy and degradation/critical-reserve patterns match the accepted reference (tokens + usage meters; no budget sliders).
+- Tool/curation changes display version, permission, enable state, and auditable outcomes.
+- Audit history exposes only authorized metadata and records restricted access consistently — GAP-07-12 has no HTTP, so Unavailable, do not mock events.
+- Every absent administration frame has an approved, mapped, primitive-based solution in evidence.
+
+### Frame / gap traceability
+
+Stitch is a template, not a layout. No `frame_02` / `08` / `11` / `12` / `13` / `14` routes. No `app/admin` folder.
+
+| Surface | Disposition |
+| --- | --- |
+| Team | Native `/team`. Invite `{ email, role, upload_enabled }`. Offboard by `user_id`. No member directory HTTP |
+| Invitation accept | Existing `/invitations/accept`. Linked from team |
+| Owner bootstrap | Unavailable GAP-07-08. No bootstrap HTTP |
+| Tools | Native `/tools`. `GET /tools` for any member. Enable/permissions owner/admin convenience; server 403 |
+| Curation | Native `/curation`. Glossary import/approve/rollback + entity rules with `row_version` |
+| Usage | Native `/usage`. `GET /usage/me` for all; `GET /usage/company` owner/admin. Totals only |
+| Frame 14 budget sliders / critical reserve | Unavailable GAP-07-11. 402 `budget_exhausted` copy + token meters. No `/budgets` |
+| Audit list/export | Unavailable GAP-07-12. No fake events or passages |
+| Profile | Native `/profile`. Five `GET /me` fields. GAP-07-19 no name/locale editor |
+| Company settings | Unavailable GAP-07-13 on profile. No save control |
+
+Missing-frame decision: frame 14's information hierarchy is recreated as caller/company token meters plus honest 402/rate banners. Budget-policy editors are not shipped.
+
+### Role matrix and forged-request results
+
+- Viewer/member convenience hides invite, offboard, and enable. `createInvitation` / `offboardUser` / `enableTool` still post Bearer only.
+- Forged client `role=owner` does not add `X-Role`, `X-Test-Role`, or `X-Test-User-Id`.
+- 403 `forbidden`, 403 `MFA required`, 402 `budget_exhausted`, and 429 `rate_limited` are classified.
+- Company usage 403 for member.
+- Unauthorized tool names are omitted from the catalog fixture; the client does not invent redacted titles.
+- Entity-rule approve posts `{ row_version }`. Glossary extra SQL-like fields are not posted.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `apps/frontend/src/lib/api.ts` | Invitation, offboard, tools, glossary, entity-rule, company usage clients |
+| `apps/frontend/src/lib/admin-bodies.ts` | Extra-forbid builders |
+| `apps/frontend/src/lib/admin-copy.ts` | Gap copy |
+| `apps/frontend/src/lib/roles.ts` | Invite/offboard/enable convenience helpers |
+| `apps/frontend/src/components/team-app.tsx` `/tools-app.tsx` `/curation-app.tsx` `/usage-app.tsx` `/profile-app.tsx` | Native surfaces |
+| `apps/frontend/src/app/team` `/tools` `/curation` `/usage` `/profile` | App Router pages |
+| `apps/frontend/src/components/ui/app-nav.tsx` | Team, Tools, Curation, Usage, Profile `Link`s |
+| `docs/frontend/ADMINISTRATION.md` | Canonical packet 4 doc |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend exec next typegen` | 0 |
+| `pnpm --filter smart-rag-frontend exec tsc --noEmit` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (23 files, 106 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 (routes `/team`, `/tools`, `/curation`, `/usage`, `/profile`; no `/admin`) |
+| `pnpm exec playwright test` (cwd `apps/frontend`) | 0 (15 passed, 4 skipped) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+### Negative findings
+
+- No budget slider, no fake audit table, no company-settings save
+- `raw_token` is text once; hostile invitation email remains a text node
+- Viewer/member helpers hide mutations; server 403 remains
+- Prohibited-pattern scan still forbids `admin`, `frame_*`, `gallery`, `design-system`, `chat`, `docs`
+
+### Unverified
+
+- Live FastAPI invitation/offboard/tool/glossary/entity-rule journeys
+- Authenticated Playwright company-usage 403 when no Auth session exists
+- AAL2 offboard against local GoTrue
+
+### Open gaps for P08-05
+
+- Accessibility, RTL, CSP/security headers, and generic production errors are **not** in this packet
+- Do not start packet 5 until this evidence is accepted
+
+### Rollback
+
+Revert the new App Router folders and administration clients, restore
+Chat/Documents/Graph/Tables-only nav, and delete
+`docs/frontend/ADMINISTRATION.md` plus this evidence section. Leave
+packets 1--3 primitives, Auth, and core RAG surfaces in place.

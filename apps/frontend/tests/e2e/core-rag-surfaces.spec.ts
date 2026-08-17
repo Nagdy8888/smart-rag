@@ -17,6 +17,14 @@ test("login chrome includes Chat Documents Graph Tables nav", async ({ page }) =
     "href",
     "/tables",
   );
+  await expect(page.getByRole("link", { name: "Team" })).toHaveAttribute(
+    "href",
+    "/team",
+  );
+  await expect(page.getByRole("link", { name: "Profile" })).toHaveAttribute(
+    "href",
+    "/profile",
+  );
 });
 
 test("unauthenticated documents graph tables redirect to login", async ({ page }) => {

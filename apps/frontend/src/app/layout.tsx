@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Smart RAG console",
   description:
-    "Production Auto chat, documents, graph explorer, and structured tables.",
+    "Production Auto chat, documents, graph, tables, team, tools, curation, usage, and profile.",
 };
 
 /**

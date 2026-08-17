@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 4
-status: pending
+status: complete
 title: "Implement team, tools, alias/entity curation, usage, budgets, restricted read/download audit, profile, and company settings with server-enforced permissions. Preserve frame 14's usage/budget information hierarchy and degradation/critical-reserve patterns. Because the remaining administration surfaces have no delivered frame, derive them from `API_UI_MAPPING.md`, reuse approved primitives and shell patterns, and list the design gap in exit evidence."
 requirement_ids: [P08-04]
 ---

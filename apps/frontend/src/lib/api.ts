@@ -10,28 +10,52 @@ import type {
   ConversationResponse,
   CurrentUserResponse,
   AcceptInvitationResponse,
+  CreateInvitationRequest,
+  CreateInvitationResponse,
   DocumentResponse,
   DocumentIngestionStatusResponse,
   EnqueueWebsiteCrawlRequest,
   EnqueueWebsiteCrawlResponse,
+  EntityRuleListItem,
+  EntityRuleListResponse,
+  EntityRuleMutationResponse,
+  EntityRuleSource,
+  EntityRuleStatus,
+  EntityRuleUpsertRequest,
   FeedbackTag,
   FinalizeUploadHttpRequest,
   FinalizeUploadHttpResponse,
+  GlossaryImportResponse,
   GraphEntityResponse,
   GraphInspectRequest,
   GraphInspectResponse,
+  ImportGlossaryRequest,
   IngestionJobSummary,
   IngestionStatusVersion,
   MetaResponse,
+  OffboardResponse,
   RetryIngestionJobResponse,
   SignedUploadResponse,
   SubmitMessageResponse,
   TableAnalyzeResponse,
   TableManifestResponse,
   TableQueryPlan,
+  ToolCardResponse,
+  ToolMutationResponse,
+  ToolPermissionRequest,
+  ToolSeedRequest,
   UsageResponse,
   ReadinessResponse,
 } from "./types";
+import {
+  buildEntityRuleConcurrencyBody,
+  buildEntityRuleUpsertBody,
+  buildGlossaryImportBody,
+  buildInvitationCreateBody,
+  buildToolEnableBody,
+  buildToolPermissionBody,
+  buildToolSeedBody,
+} from "./admin-bodies";
 import { buildGraphInspectRequest, clampGraphSearchLimit } from "./graph-client";
 import { tableAnalyzeBody } from "./table-plan";
 
@@ -250,6 +274,62 @@ export function classifyApiError(
     return { kind: "deleted" };
   }
   return null;
+}
+
+/**
+ * JSON headers for AUTH_ADJACENT administration POSTs.
+ *
+ * Handshake `X-Client-Version` is reserved for paid chat/upload. These
+ * mutations send Bearer only. Production never sends `X-Test-*`.
+ *
+ * @param auth - Access token.
+ * @returns Header map.
+ */
+export function adminMutationHeaders(auth: ApiAuth): Record<string, string> {
+  return {
+    ...resumeHeaders(auth),
+    "Content-Type": "application/json",
+  };
+}
+
+/**
+ * Map a non-OK administration response to a thrown Error code.
+ *
+ * 404 is not treated as conversation deletion. 403 MFA required stays
+ * distinct from forbidden.
+ *
+ * @param status - HTTP status.
+ * @param body - JSON-ish object.
+ * @param headers - Optional headers for 429 Retry-After classification.
+ * @throws Error with `mfa_required`, `forbidden`, `budget_exhausted`,
+ *   `rate_limited`, `stale_row_version`, or a sanitized detail.
+ */
+export function throwClassifiedAdminError(
+  status: number,
+  body: Record<string, unknown>,
+  headers?: Headers | Record<string, string>,
+): never {
+  const classified = classifyApiError(status, body, headers);
+  if (classified?.kind === "mfa") {
+    throw new Error("mfa_required");
+  }
+  if (classified?.kind === "budget") {
+    throw new Error("budget_exhausted");
+  }
+  if (classified?.kind === "rate") {
+    throw new Error("rate_limited");
+  }
+  if (classified?.kind === "auth") {
+    const detail = classified.detail;
+    if (detail === "forbidden" || detail === "authorization_rejected") {
+      throw new Error("forbidden");
+    }
+    throw new Error(detail);
+  }
+  if (status === 409) {
+    throw new Error(sanitizedDetail(body, "stale_row_version"));
+  }
+  throw new Error(sanitizedDetail(body, "request_rejected"));
 }
 
 async function readJsonObject(response: Response): Promise<Record<string, unknown>> {
@@ -981,11 +1061,30 @@ export async function cancelRun(
 }
 
 /**
+ * Parse usage totals. Prompt text fields are omitted even if present.
+ *
+ * @param body - JSON object.
+ * @returns Totals only.
+ */
+function parseUsageResponse(body: Record<string, unknown>): UsageResponse {
+  const cost = body.cost_usd;
+  return {
+    scope: String(body.scope ?? ""),
+    cost_usd:
+      typeof cost === "number" || typeof cost === "string" ? cost : String(cost ?? "0"),
+    prompt_tokens: Number(body.prompt_tokens ?? 0),
+    completion_tokens: Number(body.completion_tokens ?? 0),
+    usage_rows: Number(body.usage_rows ?? 0),
+  };
+}
+
+/**
  * Fetch caller usage totals without prompt text.
  *
  * @param auth - Access token.
  * @param fetchImpl - Injected fetch.
  * @returns Usage summary.
+ * @throws Error when FastAPI rejects the call.
  */
 export async function fetchUsageMe(
   auth: ApiAuth,
@@ -994,7 +1093,33 @@ export async function fetchUsageMe(
   const response = await fetchImpl(apiUrl("/usage/me"), {
     headers: resumeHeaders(auth),
   });
-  return (await response.json()) as UsageResponse;
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseUsageResponse(body);
+}
+
+/**
+ * Fetch company usage totals. Owner/admin on the server; members 403.
+ *
+ * @param auth - Access token.
+ * @param fetchImpl - Injected fetch.
+ * @returns Company totals. No prompt text.
+ * @throws Error `forbidden` for member/viewer 403.
+ */
+export async function fetchUsageCompany(
+  auth: ApiAuth,
+  fetchImpl: typeof fetch = fetch,
+): Promise<UsageResponse> {
+  const response = await fetchImpl(apiUrl("/usage/company"), {
+    headers: resumeHeaders(auth),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseUsageResponse(body);
 }
 
 /**
@@ -1032,6 +1157,480 @@ export async function acceptInvitation(
     throw new Error(sanitizedDetail(body, "invitation_rejected"));
   }
   return { invitation_id: String(body.invitation_id ?? "") };
+}
+
+/**
+ * Create a 24-hour invitation. Owner/admin on the server.
+ *
+ * Body is `{ email, role, upload_enabled }` only. `raw_token` is returned
+ * once. Production never sends `X-Test-*` or a role header.
+ *
+ * @param auth - Access token.
+ * @param input - Invitee email, role, and upload flag.
+ * @param fetchImpl - Injected fetch.
+ * @returns Invitation identifiers including the one-time token.
+ * @throws Error `forbidden`, `mfa_required`, `budget_exhausted`, or `rate_limited`.
+ */
+export async function createInvitation(
+  auth: ApiAuth,
+  input: CreateInvitationRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CreateInvitationResponse> {
+  const payload = buildInvitationCreateBody(input);
+  const response = await fetchImpl(apiUrl("/admin/invitations"), {
+    method: "POST",
+    headers: adminMutationHeaders(auth),
+    body: JSON.stringify(payload),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return {
+    invitation_id: String(body.invitation_id ?? ""),
+    email: String(body.email ?? ""),
+    role: String(body.role ?? ""),
+    upload_enabled: Boolean(body.upload_enabled),
+    expires_at: String(body.expires_at ?? ""),
+    raw_token: String(body.raw_token ?? ""),
+  };
+}
+
+/**
+ * Offboard one subject. Owner/admin AAL2 on the server.
+ *
+ * @param auth - Access token. No role header.
+ * @param userId - Subject user UUID from `GET /me` (no member directory).
+ * @param fetchImpl - Injected fetch.
+ * @returns Completed identifiers.
+ * @throws Error `forbidden` or `mfa_required` on 403.
+ */
+export async function offboardUser(
+  auth: ApiAuth,
+  userId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<OffboardResponse> {
+  const response = await fetchImpl(apiUrl(`/admin/users/${userId}/offboard`), {
+    method: "POST",
+    headers: adminMutationHeaders(auth),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return {
+    request_id: String(body.request_id ?? ""),
+    subject_user_id: String(body.subject_user_id ?? ""),
+    completed_at: String(body.completed_at ?? ""),
+  };
+}
+
+/**
+ * Parse one tool card. Unknown extra fields are ignored.
+ *
+ * @param row - JSON object.
+ * @returns Card, or null when `tool_key` is empty.
+ */
+function parseToolCard(row: Record<string, unknown>): ToolCardResponse | null {
+  const toolKey = String(row.tool_key ?? "");
+  if (toolKey === "") {
+    return null;
+  }
+  return {
+    tool_key: toolKey,
+    version_label: String(row.version_label ?? ""),
+    short_name: String(row.short_name ?? ""),
+    purpose: String(row.purpose ?? ""),
+    required_role: String(row.required_role ?? ""),
+    risk_class: String(row.risk_class ?? ""),
+    active: Boolean(row.active),
+  };
+}
+
+/**
+ * List tools the live role may see. Unauthorized names are omitted.
+ *
+ * This client does not invent redacted titles for omitted tools.
+ *
+ * @param auth - Access token.
+ * @param query - Optional substring filter.
+ * @param fetchImpl - Injected fetch.
+ * @returns Permission-filtered cards.
+ */
+export async function listTools(
+  auth: ApiAuth,
+  query?: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ToolCardResponse[]> {
+  const suffix =
+    query && query.trim() !== ""
+      ? `?q=${encodeURIComponent(query.trim().slice(0, 64))}`
+      : "";
+  const response = await fetchImpl(apiUrl(`/tools${suffix}`), {
+    headers: resumeHeaders(auth),
+  });
+  const parsed: unknown = await response.json();
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  return parsed
+    .filter(
+      (item): item is Record<string, unknown> =>
+        item !== null && typeof item === "object" && !Array.isArray(item),
+    )
+    .map(parseToolCard)
+    .filter((card): card is ToolCardResponse => card !== null);
+}
+
+/**
+ * Seed an allow-listed tool. Owner/admin on the server.
+ *
+ * @param auth - Access token.
+ * @param input - Seed payload.
+ * @param fetchImpl - Injected fetch.
+ * @returns Catalog row id.
+ */
+export async function seedTool(
+  auth: ApiAuth,
+  input: ToolSeedRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ToolMutationResponse> {
+  const payload = buildToolSeedBody(input);
+  const response = await fetchImpl(apiUrl("/admin/tools"), {
+    method: "POST",
+    headers: adminMutationHeaders(auth),
+    body: JSON.stringify(payload),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return { id: String(body.id ?? "") };
+}
+
+/**
+ * Enable or disable a catalog tool. Owner/admin on the server.
+ *
+ * The helper still exists for viewer/member callers; FastAPI returns 403.
+ *
+ * @param auth - Access token. Bearer only; no role header.
+ * @param toolKey - Catalog key.
+ * @param active - Desired flag.
+ * @param fetchImpl - Injected fetch.
+ * @returns Catalog row id.
+ */
+export async function enableTool(
+  auth: ApiAuth,
+  toolKey: string,
+  active: boolean,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ToolMutationResponse> {
+  const response = await fetchImpl(apiUrl(`/admin/tools/${toolKey}/enable`), {
+    method: "POST",
+    headers: adminMutationHeaders(auth),
+    body: JSON.stringify(buildToolEnableBody(active)),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return { id: String(body.id ?? "") };
+}
+
+/**
+ * Set a role permission seed. Executor still rechecks live role.
+ *
+ * @param auth - Access token.
+ * @param toolKey - Catalog key.
+ * @param input - Target role and permission.
+ * @param fetchImpl - Injected fetch.
+ * @returns Permission row id.
+ */
+export async function setToolPermission(
+  auth: ApiAuth,
+  toolKey: string,
+  input: ToolPermissionRequest,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ToolMutationResponse> {
+  const payload = buildToolPermissionBody(input);
+  const response = await fetchImpl(
+    apiUrl(`/admin/tools/${toolKey}/permissions`),
+    {
+      method: "POST",
+      headers: adminMutationHeaders(auth),
+      body: JSON.stringify(payload),
+    },
+  );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return { id: String(body.id ?? "") };
+}
+
+/**
+ * Import a pending glossary batch. Extra SQL-like fields are omitted.
+ *
+ * @param auth - Access token.
+ * @param input - Source, version, idempotency key, and entries.
+ * @param fetchImpl - Injected fetch.
+ * @returns Import identifiers.
+ */
+export async function importGlossary(
+  auth: ApiAuth,
+  input: ImportGlossaryRequest & Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GlossaryImportResponse> {
+  const payload = buildGlossaryImportBody(input);
+  const response = await fetchImpl(apiUrl("/admin/glossary/imports"), {
+    method: "POST",
+    headers: adminMutationHeaders(auth),
+    body: JSON.stringify(payload),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return {
+    import_id: String(body.import_id ?? ""),
+    status: String(body.status ?? ""),
+    entry_count: Number(body.entry_count ?? 0),
+    alias_count: Number(body.alias_count ?? 0),
+  };
+}
+
+/**
+ * Approve a pending glossary import.
+ *
+ * @param auth - Access token.
+ * @param importId - Import UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Updated identifiers.
+ */
+export async function approveGlossaryImport(
+  auth: ApiAuth,
+  importId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GlossaryImportResponse> {
+  const response = await fetchImpl(
+    apiUrl(`/admin/glossary/imports/${importId}/approve`),
+    {
+      method: "POST",
+      headers: adminMutationHeaders(auth),
+    },
+  );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return {
+    import_id: String(body.import_id ?? ""),
+    status: String(body.status ?? ""),
+    entry_count: Number(body.entry_count ?? 0),
+    alias_count: Number(body.alias_count ?? 0),
+  };
+}
+
+/**
+ * Roll back an approved glossary import.
+ *
+ * @param auth - Access token.
+ * @param importId - Import UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Updated identifiers.
+ */
+export async function rollbackGlossaryImport(
+  auth: ApiAuth,
+  importId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GlossaryImportResponse> {
+  const response = await fetchImpl(
+    apiUrl(`/admin/glossary/imports/${importId}/rollback`),
+    {
+      method: "POST",
+      headers: adminMutationHeaders(auth),
+    },
+  );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return {
+    import_id: String(body.import_id ?? ""),
+    status: String(body.status ?? ""),
+    entry_count: Number(body.entry_count ?? 0),
+    alias_count: Number(body.alias_count ?? 0),
+  };
+}
+
+/**
+ * Parse one entity-rule list row.
+ *
+ * @param row - JSON object.
+ * @returns List item.
+ */
+function parseEntityRuleItem(row: Record<string, unknown>): EntityRuleListItem {
+  const aliases = Array.isArray(row.aliases) ? row.aliases.map(String) : [];
+  const doNotMerge = Array.isArray(row.do_not_merge)
+    ? row.do_not_merge.map(String)
+    : [];
+  const languages = Array.isArray(row.languages) ? row.languages.map(String) : [];
+  return {
+    id: String(row.id ?? ""),
+    entity_type: String(row.entity_type ?? ""),
+    canonical_name: typeof row.canonical_name === "string" ? row.canonical_name : null,
+    display_label: typeof row.display_label === "string" ? row.display_label : null,
+    aliases,
+    do_not_merge: doNotMerge,
+    languages,
+    alias_scope: String(row.alias_scope ?? ""),
+    relation_label_policy: String(row.relation_label_policy ?? ""),
+    status: String(row.status ?? "suggested") as EntityRuleStatus,
+    active: Boolean(row.active),
+    row_version: Number(row.row_version ?? 1),
+    source: String(row.source ?? "admin") as EntityRuleSource,
+    reason: String(row.reason ?? ""),
+    confidence: typeof row.confidence === "number" ? row.confidence : null,
+    created_at: typeof row.created_at === "string" ? row.created_at : null,
+    updated_at: typeof row.updated_at === "string" ? row.updated_at : null,
+  };
+}
+
+/**
+ * List entity rules. Owner/admin on the server; members 403.
+ *
+ * @param auth - Access token.
+ * @param fetchImpl - Injected fetch.
+ * @returns `{ rules }`.
+ */
+export async function listEntityRules(
+  auth: ApiAuth,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EntityRuleListResponse> {
+  const response = await fetchImpl(apiUrl("/admin/graph/entity-rules"), {
+    headers: resumeHeaders(auth),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  const rulesRaw = Array.isArray(body.rules) ? body.rules : [];
+  return {
+    rules: rulesRaw
+      .filter(
+        (item): item is Record<string, unknown> =>
+          item !== null && typeof item === "object" && !Array.isArray(item),
+      )
+      .map(parseEntityRuleItem),
+  };
+}
+
+/**
+ * Parse an entity-rule mutation response.
+ *
+ * @param body - JSON object.
+ * @returns Mutation identifiers. Alias text is omitted.
+ */
+function parseEntityRuleMutation(
+  body: Record<string, unknown>,
+): EntityRuleMutationResponse {
+  return {
+    rule_id: String(body.rule_id ?? ""),
+    status: String(body.status ?? "suggested") as EntityRuleStatus,
+    row_version: Number(body.row_version ?? 1),
+    entity_rules_generation: Number(body.entity_rules_generation ?? 0),
+    rebuild_job_id:
+      typeof body.rebuild_job_id === "string" ? body.rebuild_job_id : null,
+    repair_job_id: typeof body.repair_job_id === "string" ? body.repair_job_id : null,
+    invalidated: Boolean(body.invalidated),
+  };
+}
+
+/**
+ * Create or replace an entity rule. Extra fields are omitted.
+ *
+ * @param auth - Access token.
+ * @param input - Upsert payload.
+ * @param fetchImpl - Injected fetch.
+ * @returns Mutation identifiers.
+ */
+export async function upsertEntityRule(
+  auth: ApiAuth,
+  input: EntityRuleUpsertRequest & Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EntityRuleMutationResponse> {
+  const payload = buildEntityRuleUpsertBody(input);
+  const response = await fetchImpl(apiUrl("/admin/graph/entity-rules"), {
+    method: "POST",
+    headers: adminMutationHeaders(auth),
+    body: JSON.stringify(payload),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseEntityRuleMutation(body);
+}
+
+/**
+ * Approve a suggested entity rule. Body is `{ row_version }` only.
+ *
+ * @param auth - Access token.
+ * @param ruleId - Rule UUID.
+ * @param rowVersion - Optimistic concurrency token.
+ * @param fetchImpl - Injected fetch.
+ * @returns Mutation identifiers.
+ * @throws Error `stale_row_version` on 409.
+ */
+export async function approveEntityRule(
+  auth: ApiAuth,
+  ruleId: string,
+  rowVersion: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EntityRuleMutationResponse> {
+  const response = await fetchImpl(
+    apiUrl(`/admin/graph/entity-rules/${ruleId}/approve`),
+    {
+      method: "POST",
+      headers: adminMutationHeaders(auth),
+      body: JSON.stringify(buildEntityRuleConcurrencyBody(rowVersion)),
+    },
+  );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseEntityRuleMutation(body);
+}
+
+/**
+ * Revoke an entity rule. Body is `{ row_version }` only.
+ *
+ * @param auth - Access token.
+ * @param ruleId - Rule UUID.
+ * @param rowVersion - Optimistic concurrency token.
+ * @param fetchImpl - Injected fetch.
+ * @returns Mutation identifiers.
+ */
+export async function revokeEntityRule(
+  auth: ApiAuth,
+  ruleId: string,
+  rowVersion: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EntityRuleMutationResponse> {
+  const response = await fetchImpl(
+    apiUrl(`/admin/graph/entity-rules/${ruleId}/revoke`),
+    {
+      method: "POST",
+      headers: adminMutationHeaders(auth),
+      body: JSON.stringify(buildEntityRuleConcurrencyBody(rowVersion)),
+    },
+  );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseEntityRuleMutation(body);
 }
 
 export type StreamStart = {

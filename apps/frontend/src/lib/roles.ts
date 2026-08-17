@@ -39,3 +39,54 @@ export function showUploadConvenience(
 export function showCrawlConvenience(role: string | undefined): boolean {
   return isOwnerOrAdmin(role);
 }
+
+/**
+ * Return whether invite, offboard, tool enable/permissions, and curation
+ * forms should render.
+ *
+ * @param role - `GET /me` role.
+ * @returns Convenience flag. Viewer/member helpers still 403 if called.
+ */
+export function showAdminMutationConvenience(role: string | undefined): boolean {
+  return isOwnerOrAdmin(role);
+}
+
+/**
+ * Return whether invite create chrome should render.
+ *
+ * @param role - `GET /me` role.
+ * @returns Convenience flag only.
+ */
+export function showInviteConvenience(role: string | undefined): boolean {
+  return showAdminMutationConvenience(role);
+}
+
+/**
+ * Return whether offboard chrome should render.
+ *
+ * @param role - `GET /me` role.
+ * @returns Convenience flag only.
+ */
+export function showOffboardConvenience(role: string | undefined): boolean {
+  return showAdminMutationConvenience(role);
+}
+
+/**
+ * Return whether tool enable/permission chrome should render.
+ *
+ * @param role - `GET /me` role.
+ * @returns Convenience flag only.
+ */
+export function showToolEnableConvenience(role: string | undefined): boolean {
+  return showAdminMutationConvenience(role);
+}
+
+/**
+ * Return whether company usage should be fetched and shown.
+ *
+ * @param role - `GET /me` role.
+ * @returns Convenience flag. Members still 403 if they call the helper.
+ */
+export function showCompanyUsageConvenience(role: string | undefined): boolean {
+  return showAdminMutationConvenience(role);
+}

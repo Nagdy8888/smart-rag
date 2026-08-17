@@ -25,6 +25,7 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
+[ADMINISTRATION.md](./ADMINISTRATION.md) ·
 [phase-07 evidence](../development/phase-07-stitch-specification-evidence.md) ·
 [docs index](../README.md)
 

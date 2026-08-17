@@ -54,6 +54,26 @@ describe("AppShell", () => {
       "href",
       "/tables",
     );
+    expect(screen.getByRole("link", { name: "Team" })).toHaveAttribute(
+      "href",
+      "/team",
+    );
+    expect(screen.getByRole("link", { name: "Tools" })).toHaveAttribute(
+      "href",
+      "/tools",
+    );
+    expect(screen.getByRole("link", { name: "Curation" })).toHaveAttribute(
+      "href",
+      "/curation",
+    );
+    expect(screen.getByRole("link", { name: "Usage" })).toHaveAttribute(
+      "href",
+      "/usage",
+    );
+    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
+      "href",
+      "/profile",
+    );
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
     expect(screen.getByTestId("app-shell-nav")).toBeInTheDocument();
     expect(CLIENT_NAV_IS_NOT_AUTHORIZATION).toBe(true);

@@ -14,6 +14,11 @@ const NAV_ITEMS = [
   { href: "/documents", label: "Documents" },
   { href: "/graph", label: "Graph" },
   { href: "/tables", label: "Tables" },
+  { href: "/team", label: "Team" },
+  { href: "/tools", label: "Tools" },
+  { href: "/curation", label: "Curation" },
+  { href: "/usage", label: "Usage" },
+  { href: "/profile", label: "Profile" },
 ] as const;
 
 /**
@@ -31,7 +36,7 @@ export function navItemIsCurrent(pathname: string, href: string): boolean {
 }
 
 /**
- * Render production Chat/Documents/Graph/Tables links.
+ * Render production Chat through Profile links.
  *
  * @returns List of Next.js `Link` items.
  * @remarks

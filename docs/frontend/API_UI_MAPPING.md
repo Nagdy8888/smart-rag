@@ -18,6 +18,7 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
+[ADMINISTRATION.md](./ADMINISTRATION.md) ·
 [api-ui-inventory.json](./api-ui-inventory.json) ·
 [openapi.foundation.json](../api/openapi.foundation.json) ·
 [SSE.md](../api/SSE.md) ·

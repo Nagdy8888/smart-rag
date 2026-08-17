@@ -2,6 +2,10 @@
  * Sanitized FastAPI failure banners. Codes only; never stack traces.
  */
 
+import {
+  FORBIDDEN_MUTATION_COPY,
+  STALE_ROW_VERSION_COPY,
+} from "./admin-copy";
 import type { ApiFailure } from "./api";
 import { MFA_REQUIRED_BANNER, SESSION_REVOKED_BANNER } from "./auth/copy";
 import { handshakeBelowMinCopy } from "./handshake";
@@ -41,5 +45,32 @@ export function apiFailureBanner(failure: ApiFailure): string {
       const _exhaustive: never = failure;
       return String(_exhaustive);
     }
+  }
+}
+
+/**
+ * Map a thrown administration helper error to English chrome.
+ *
+ * @param error - `Error` from create/offboard/enable/curation/usage helpers.
+ * @returns Banner body. Codes only; never stack traces.
+ */
+export function mutationFailureBanner(error: Error): string {
+  switch (error.message) {
+    case "mfa_required":
+      return MFA_REQUIRED_BANNER;
+    case "forbidden":
+      return FORBIDDEN_MUTATION_COPY;
+    case "budget_exhausted":
+      return apiFailureBanner({ kind: "budget", detail: "budget_exhausted" });
+    case "rate_limited":
+      return apiFailureBanner({
+        kind: "rate",
+        detail: "rate_limited",
+        retryAfter: null,
+      });
+    case "stale_row_version":
+      return STALE_ROW_VERSION_COPY;
+    default:
+      return displayText(error.message);
   }
 }

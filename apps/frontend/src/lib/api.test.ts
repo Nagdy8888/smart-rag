@@ -1,13 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   acceptInvitation,
+  adminMutationHeaders,
   analyzeTable,
+  approveEntityRule,
   classifyApiError,
+  createInvitation,
+  enableTool,
   enqueueWebsiteCrawl,
   fetchDocument,
   fetchReady,
+  fetchUsageCompany,
   finalizeUpload,
+  importGlossary,
   inspectGraph,
+  listTools,
+  offboardUser,
   paidMutationHeaders,
   reserveUpload,
   resumeHeaders,
@@ -457,6 +465,252 @@ describe("GAP-07-14 no delete-document HTTP helper", () => {
   it("does not export a deleteDocument client", async () => {
     const api = await import("./api");
     expect("deleteDocument" in api).toBe(false);
+  });
+});
+
+describe("administration clients", () => {
+  function expectBearerOnly(headers: Record<string, string>): void {
+    expect(headers.Authorization).toBe("Bearer jwt-token");
+    expect(headers["X-Test-Role"]).toBeUndefined();
+    expect(headers["X-Test-User-Id"]).toBeUndefined();
+    expect(headers["X-Role"]).toBeUndefined();
+    expect(Object.keys(headers).some((key) => /role/i.test(key))).toBe(false);
+  }
+
+  it("sends Bearer only on adminMutationHeaders even with a forged owner role", () => {
+    const forgedRole = "owner";
+    void forgedRole;
+    const headers = adminMutationHeaders({ accessToken: "jwt-token" });
+    expectBearerOnly(headers);
+    expect(headers["X-Client-Version"]).toBeUndefined();
+  });
+
+  it("createInvitation posts extra-forbid body and classifies 403 forbidden", async () => {
+    let body = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = String(init?.body ?? "");
+      expectBearerOnly(init?.headers as Record<string, string>);
+      return new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    await expect(
+      createInvitation(
+        { accessToken: "jwt-token" },
+        {
+          email: "a@b.test",
+          role: "member",
+          upload_enabled: true,
+          sql: "drop table profiles",
+        } as never,
+        fetchImpl,
+      ),
+    ).rejects.toThrow("forbidden");
+    expect(JSON.parse(body)).toEqual({
+      email: "a@b.test",
+      role: "member",
+      upload_enabled: true,
+    });
+    expect(body).not.toContain("drop table");
+  });
+
+  it("createInvitation classifies MFA required, 402, and 429", async () => {
+    const cases: Array<{
+      status: number;
+      detail: string;
+      thrown: string;
+      headers?: Record<string, string>;
+    }> = [
+      { status: 403, detail: "MFA required", thrown: "mfa_required" },
+      { status: 402, detail: "budget_exhausted", thrown: "budget_exhausted" },
+      {
+        status: 429,
+        detail: "rate_limited",
+        thrown: "rate_limited",
+        headers: { "Retry-After": "12" },
+      },
+    ];
+    for (const item of cases) {
+      const fetchImpl: typeof fetch = async () =>
+        new Response(JSON.stringify({ detail: item.detail }), {
+          status: item.status,
+          headers: {
+            "Content-Type": "application/json",
+            ...(item.headers ?? {}),
+          },
+        });
+      await expect(
+        createInvitation(
+          { accessToken: "jwt-token" },
+          { email: "a@b.test", role: "member", upload_enabled: false },
+          fetchImpl,
+        ),
+      ).rejects.toThrow(item.thrown);
+    }
+  });
+
+  it("offboardUser still posts with Bearer only for a member helper call", async () => {
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      expectBearerOnly(init?.headers as Record<string, string>);
+      expect(String(_input)).toContain(
+        "/admin/users/33333333-3333-4333-8333-333333333333/offboard",
+      );
+      return new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    await expect(
+      offboardUser(
+        { accessToken: "jwt-token" },
+        "33333333-3333-4333-8333-333333333333",
+        fetchImpl,
+      ),
+    ).rejects.toThrow("forbidden");
+  });
+
+  it("enableTool still posts { active } with Bearer only", async () => {
+    let body = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = String(init?.body ?? "");
+      expectBearerOnly(init?.headers as Record<string, string>);
+      return new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    await expect(
+      enableTool({ accessToken: "jwt-token" }, "export_csv", false, fetchImpl),
+    ).rejects.toThrow("forbidden");
+    expect(JSON.parse(body)).toEqual({ active: false });
+  });
+
+  it("fetchUsageCompany 403s for a member", async () => {
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      expectBearerOnly(init?.headers as Record<string, string>);
+      return new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    await expect(
+      fetchUsageCompany({ accessToken: "jwt-token" }, fetchImpl),
+    ).rejects.toThrow("forbidden");
+  });
+
+  it("omits unauthorized tool names from the catalog fixture", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            tool_key: "export_csv",
+            version_label: "1",
+            short_name: "CSV export",
+            purpose: "Export rows",
+            required_role: "member",
+            risk_class: "low",
+            active: true,
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const cards = await listTools({ accessToken: "jwt-token" }, undefined, fetchImpl);
+    expect(cards.map((card) => card.tool_key)).toEqual(["export_csv"]);
+    expect(JSON.stringify(cards)).not.toContain("admin_secret_tool");
+    expect(JSON.stringify(cards)).not.toContain("REDACTED");
+  });
+
+  it("approveEntityRule posts { row_version } only", async () => {
+    let body = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = String(init?.body ?? "");
+      expectBearerOnly(init?.headers as Record<string, string>);
+      return new Response(
+        JSON.stringify({
+          rule_id: "rule-1",
+          status: "approved",
+          row_version: 4,
+          entity_rules_generation: 2,
+          rebuild_job_id: null,
+          repair_job_id: null,
+          invalidated: true,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const result = await approveEntityRule(
+      { accessToken: "jwt-token" },
+      "rule-1",
+      3,
+      fetchImpl,
+    );
+    expect(JSON.parse(body)).toEqual({ row_version: 3 });
+    expect(result.status).toBe("approved");
+  });
+
+  it("importGlossary omits SQL-like extra fields", async () => {
+    let body = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = String(init?.body ?? "");
+      return new Response(
+        JSON.stringify({
+          import_id: "imp-1",
+          status: "pending_approval",
+          entry_count: 1,
+          alias_count: 0,
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    await importGlossary(
+      { accessToken: "jwt-token" },
+      {
+        source_name: "sme",
+        source_version: "1",
+        idempotency_key: "idem-gloss-1",
+        sql: "select * from app.search_aliases",
+        entries: [
+          {
+            entry_key: "INV.1",
+            canonical_term: "Invoice",
+            language: "en",
+            entry_type: "canonical_term",
+            effective_scope: "company",
+            sql: "delete from aliases",
+          },
+        ],
+      } as never,
+      fetchImpl,
+    );
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty("sql");
+    expect(body).not.toContain("select *");
+    expect(body).not.toContain("delete from");
+    expect(parsed.source_name).toBe("sme");
+    expect(Array.isArray(parsed.entries)).toBe(true);
+  });
+
+  it("createInvitation returns raw_token once on 201", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          invitation_id: "inv-1",
+          email: "<img src=x onerror=alert(1)>@evil.test",
+          role: "member",
+          upload_enabled: false,
+          expires_at: "2026-08-18T00:00:00Z",
+          raw_token: "once-secret",
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    const created = await createInvitation(
+      { accessToken: "jwt-token" },
+      { email: "a@b.test", role: "member", upload_enabled: false },
+      fetchImpl,
+    );
+    expect(created.raw_token).toBe("once-secret");
+    expect(created.email).toContain("<img");
   });
 });
 

@@ -16,6 +16,7 @@ Auth/FastAPI contracts exist, not because Stitch numbered them.
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
+[ADMINISTRATION.md](./ADMINISTRATION.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [SSE.md](../api/SSE.md) ·
 [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md) ·
@@ -41,8 +42,9 @@ convenience. FastAPI still authorizes every Bearer call.
 | `/unavailable/GAP-07-08` | none | Honest Unavailable; no bootstrap HTTP |
 | `/` | Auto chat | Packet 3. No route POST field. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) |
 
-Team admin create/offboard is packet 4. Documents, graph, and tables are
-packet 3 native routes. Tools remain packet 4.
+Team admin create/offboard, tools, curation, usage, and profile are
+packet 4 native routes. See [ADMINISTRATION.md](./ADMINISTRATION.md).
+Documents, graph, and tables are packet 3 native routes.
 
 ## SSR cookie flow
 

@@ -30,5 +30,8 @@ export function sessionQueryKeys(accessToken: string | null) {
       ["document", accessToken, documentId] as const,
     tables: ["tables", accessToken] as const,
     graphSearch: (query: string) => ["graph-search", accessToken, query] as const,
+    tools: ["tools", accessToken] as const,
+    entityRules: ["entity-rules", accessToken] as const,
+    usageCompany: ["usage-company", accessToken] as const,
   };
 }

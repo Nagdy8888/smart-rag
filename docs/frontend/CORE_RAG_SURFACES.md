@@ -19,6 +19,7 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
+[ADMINISTRATION.md](./ADMINISTRATION.md) ·
 [SSE.md](../api/SSE.md) ·
 [phase-08 evidence](../development/phase-08-frontend-integration-evidence.md) ·
 [docs index](../README.md)
@@ -33,9 +34,10 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 | `/graph` | Entity search + inspect, list-first, hop cap 3 |
 | `/tables` | Manifests + typed `TableQueryPlan` builder |
 
-Chat stays at `/`. There is no `app/chat` folder. There is no `/tools`,
-`/admin`, or `/usage` in this packet. Nav uses Next.js `Link`.
-`aria-current` follows the pathname. Nav is not authorization.
+Chat stays at `/`. There is no `app/chat` folder. There is no `app/admin`
+folder. Team, tools, curation, usage, and profile are packet 4 native
+routes in [ADMINISTRATION.md](./ADMINISTRATION.md). Nav uses Next.js
+`Link`. `aria-current` follows the pathname. Nav is not authorization.
 
 ## Flows
 

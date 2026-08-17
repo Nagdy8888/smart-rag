@@ -169,3 +169,23 @@
   grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
   gap: calc(var(--space) * 3);
 }
+
+.meterList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+
+.meterRow {
+  display: grid;
+  grid-template-columns: 10rem 1fr auto;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+  min-height: var(--row-height);
+}
+
+.meterTrack {
+  height: 0.5rem;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+}
