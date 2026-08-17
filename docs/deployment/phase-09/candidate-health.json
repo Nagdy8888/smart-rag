@@ -1,0 +1,12 @@
+{
+  "api_live": "not_run",
+  "detail": "docker compose ps failed for candidate stack",
+  "frontend_live": "not_run",
+  "mock_model_mode": "unverified",
+  "overlay_used": false,
+  "pg_search": "not_run",
+  "private_ports": "blocked",
+  "schema_version": "phase09-candidate-health-v1",
+  "valkey_cache_auth": "not_run",
+  "valkey_limits_auth": "not_run"
+}

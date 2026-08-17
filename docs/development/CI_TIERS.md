@@ -2,7 +2,7 @@
 title: CI tiers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-17
 audience: engineering
 ---
 
@@ -58,6 +58,11 @@ As of 2026-08-16 the local full-repo Pyright count is **0** errors, so
 execution evidence.
 
 **Future (not fake-green):** Supabase reset/RLS, LightRAG, retrieval evals, load, restore — Phases 2–10.
+
+Phase 9 Packet 1 candidate freeze/seed
+(`scripts/phase09_candidate.py`, `scripts/ci/check_phase09_packet1.py`) is a
+local gate. It is not added to the GitHub PR job graph. See
+[LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
 
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and

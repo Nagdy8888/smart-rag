@@ -1,0 +1,24 @@
+{
+  "container_limits": {
+    "api": "unbounded_in_compose",
+    "clamav": "2g",
+    "crawl-proxy": "128m",
+    "frontend": "unbounded_in_compose",
+    "paradedb": "2g",
+    "valkey-cache": "320m",
+    "valkey-limits": "128m",
+    "worker": "unbounded_in_compose"
+  },
+  "docker_mem_bytes": null,
+  "docker_ncpu": null,
+  "local_candidate_not_full_envelope": true,
+  "managed_claims": [],
+  "reduced_graph_version_envelope": 15,
+  "schema_version": "phase09-candidate-sizing-v1",
+  "seeded_chunks": 0,
+  "seeded_document_versions": 0,
+  "seeded_graph_eligible_versions": 0,
+  "signed_chunk_envelope": 1000000,
+  "signed_graph_version_envelope": 2000,
+  "signed_hybrid_version_envelope": 10000
+}

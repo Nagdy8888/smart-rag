@@ -1,0 +1,47 @@
+{
+  "compose_file": "docker-compose.yml",
+  "images": [
+    {
+      "created": "2026-08-17T15:47:01.054327358Z",
+      "image_id": "sha256:a1484eb1c3184ca2f02dd9ca474ec491f0d2466c20a22fcb5199091dfb709708",
+      "image_name": "smart-rag-api",
+      "repo_digest": "smart-rag-api@sha256:a1484eb1c3184ca2f02dd9ca474ec491f0d2466c20a22fcb5199091dfb709708",
+      "service": "api",
+      "user": "10001:10001"
+    },
+    {
+      "created": "2026-08-17T15:47:01.22013157Z",
+      "image_id": "sha256:ef958f14c5d3d5dab17316657338fd5bf8b137e39c856af2ed45f722c6ae2413",
+      "image_name": "smart-rag-worker",
+      "repo_digest": "smart-rag-worker@sha256:ef958f14c5d3d5dab17316657338fd5bf8b137e39c856af2ed45f722c6ae2413",
+      "service": "worker",
+      "user": "10001:10001"
+    },
+    {
+      "created": "2026-08-17T15:46:05.491201877Z",
+      "image_id": "sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+      "image_name": "smart-rag-frontend",
+      "repo_digest": "smart-rag-frontend@sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+      "service": "frontend",
+      "user": "10001:10001"
+    },
+    {
+      "created": "2026-08-16T20:31:09.290576541Z",
+      "image_id": "sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604",
+      "image_name": "smart-rag-crawl-proxy",
+      "repo_digest": "smart-rag-crawl-proxy@sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604",
+      "service": "crawl-proxy",
+      "user": "10001:10001"
+    },
+    {
+      "created": "2026-08-17T15:49:58.686613076Z",
+      "image_id": "sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec",
+      "image_name": "smart-rag-parser-sandbox:local",
+      "repo_digest": "smart-rag-parser-sandbox@sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec",
+      "service": "parser-sandbox",
+      "user": "10001:10001"
+    }
+  ],
+  "overlay_file": null,
+  "schema_version": "phase09-candidate-images-v1"
+}

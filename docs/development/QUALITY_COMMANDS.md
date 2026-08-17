@@ -2,7 +2,7 @@
 title: Quality commands
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-17
 audience: engineering
 ---
 
@@ -20,6 +20,8 @@ uv run python scripts/check.py --tier fast
 uv run python scripts/ci/check_openapi.py
 uv run python scripts/ci/check_migrations.py
 uv run python scripts/ci/check_phase2_integration.py
+uv run python scripts/phase09_candidate.py all
+uv run python scripts/ci/check_phase09_packet1.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -52,6 +54,24 @@ separate, not silently skipped as local proof:
 
 ```powershell
 uv run python scripts/ci/check_phase2_integration.py
+```
+
+The Phase 9 Packet 1 candidate gate freezes digest-bound images, unpublished
+private ports, and the approved open-split corpus. It is local-only and is
+not a GitHub PR job. Zero collected Packet 1 tests fail the gate. Live
+Compose/Supabase artifact checks skip unless
+`SMART_RAG_REQUIRE_PHASE09_CANDIDATE=1`. See
+[LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
+
+Do not retry Packet 1 Trivy via `docker run aquasec/trivy` mounting
+`docker.sock` on this Windows host until Packet 6: the 2026-08-17 attempt
+hung Docker Desktop (HTTP 500), left WSL `vmmemWSL` StopPending, and filled
+the disk with a Docker Desktop updater download. Compact scan status is
+Blocked in `docs/deployment/phase-09/candidate-scan-summary.json`.
+
+```powershell
+uv run python scripts/phase09_candidate.py all
+uv run python scripts/ci/check_phase09_packet1.py
 ```
 
 Tiers hard-fail (no `|| true`). Zero collected tests fail the unit/contract tiers.
@@ -90,4 +110,4 @@ docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb30
 pre-buffering that Python bindings do not expose. Packet 8 keeps
 `pyarrow==19.0.1`. See [ADR-cve-pin-patch-2026-08.md](../adr/ADR-cve-pin-patch-2026-08.md).
 
-[docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md)
+[docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md)

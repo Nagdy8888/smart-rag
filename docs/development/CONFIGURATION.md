@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-17
 audience: developers, operators
 ---
 
@@ -36,6 +36,7 @@ Validation errors list field paths and categories but omit source values.
 | `SMART_RAG_REQUIRE_CLAMAV` | `1` fails closed | public | Contract tests fail instead of skip when ClamAV is down |
 | `SMART_RAG_REQUIRE_CRAWL_PROXY` | `1` fails closed | public | Live proxy overlay tests fail instead of skip |
 | `SMART_RAG_REQUIRE_JOB_INTEGRATION` | `1` fails closed | public | Postgres job/checkpointer tests fail instead of skip |
+| `SMART_RAG_REQUIRE_PHASE09_CANDIDATE` | `1` fails closed | public | Phase 9 Packet 1 live Compose/Supabase/artifact contract tests fail instead of skip |
 | `SMART_RAG_HOLDOUT_ACCESS` | boolean; `false` | public | Default denies sealed holdout labels. Packet 8 freeze refuses to run when true. Enable only for an independently SME-sealed holdout or dataset seal verify |
 | `SMART_RAG_HOLDOUT_ACCESS_PURPOSE` | `packet8_immutable_holdout` or `dataset_seal_verify` | internal | Required when holdout access is enabled |
 | `SMART_RAG_HOLDOUT_ACCESS_ACTOR` | safe identifier | internal | Auditable actor required when holdout access is enabled |

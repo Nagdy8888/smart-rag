@@ -1,0 +1,63 @@
+{
+  "gitleaks_status": "blocked",
+  "images": [
+    {
+      "critical": 0,
+      "detail": "Packet 1 attempted Trivy via aquasec/trivy docker.sock on 2026-08-17; the scan hung Docker Desktop (HTTP 500), WSL became unresponsive, and the host disk filled (Docker updater ENOSPC). Packet 1 records Blocked and does not retry docker.sock Trivy. Packet 6 re-runs full SBOM/Trivy.",
+      "high": 0,
+      "image_name": "smart-rag-api",
+      "low": 0,
+      "medium": 0,
+      "status": "blocked",
+      "tool": "trivy",
+      "unknown": 0
+    },
+    {
+      "critical": 0,
+      "detail": "Packet 1 attempted Trivy via aquasec/trivy docker.sock on 2026-08-17; the scan hung Docker Desktop (HTTP 500), WSL became unresponsive, and the host disk filled (Docker updater ENOSPC). Packet 1 records Blocked and does not retry docker.sock Trivy. Packet 6 re-runs full SBOM/Trivy.",
+      "high": 0,
+      "image_name": "smart-rag-worker",
+      "low": 0,
+      "medium": 0,
+      "status": "blocked",
+      "tool": "trivy",
+      "unknown": 0
+    },
+    {
+      "critical": 0,
+      "detail": "Packet 1 attempted Trivy via aquasec/trivy docker.sock on 2026-08-17; the scan hung Docker Desktop (HTTP 500), WSL became unresponsive, and the host disk filled (Docker updater ENOSPC). Packet 1 records Blocked and does not retry docker.sock Trivy. Packet 6 re-runs full SBOM/Trivy.",
+      "high": 0,
+      "image_name": "smart-rag-frontend",
+      "low": 0,
+      "medium": 0,
+      "status": "blocked",
+      "tool": "trivy",
+      "unknown": 0
+    },
+    {
+      "critical": 0,
+      "detail": "Packet 1 attempted Trivy via aquasec/trivy docker.sock on 2026-08-17; the scan hung Docker Desktop (HTTP 500), WSL became unresponsive, and the host disk filled (Docker updater ENOSPC). Packet 1 records Blocked and does not retry docker.sock Trivy. Packet 6 re-runs full SBOM/Trivy.",
+      "high": 0,
+      "image_name": "smart-rag-crawl-proxy",
+      "low": 0,
+      "medium": 0,
+      "status": "blocked",
+      "tool": "trivy",
+      "unknown": 0
+    },
+    {
+      "critical": 0,
+      "detail": "Packet 1 attempted Trivy via aquasec/trivy docker.sock on 2026-08-17; the scan hung Docker Desktop (HTTP 500), WSL became unresponsive, and the host disk filled (Docker updater ENOSPC). Packet 1 records Blocked and does not retry docker.sock Trivy. Packet 6 re-runs full SBOM/Trivy.",
+      "high": 0,
+      "image_name": "smart-rag-parser-sandbox:local",
+      "low": 0,
+      "medium": 0,
+      "status": "blocked",
+      "tool": "trivy",
+      "unknown": 0
+    }
+  ],
+  "pip_audit_status": "passed",
+  "pnpm_audit_status": "passed",
+  "schema_version": "phase09-candidate-scan-v1"
+}

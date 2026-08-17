@@ -1,0 +1,48 @@
+{
+  "commands": [
+    {
+      "command": "ports-static",
+      "exit_code": 0
+    },
+    {
+      "command": "freeze",
+      "exit_code": 0
+    },
+    {
+      "command": "supabase",
+      "exit_code": 0
+    },
+    {
+      "command": "build",
+      "exit_code": 0
+    },
+    {
+      "command": "scan",
+      "exit_code": 0
+    },
+    {
+      "command": "up",
+      "exit_code": 1
+    },
+    {
+      "command": "scan",
+      "exit_code": 0
+    },
+    {
+      "command": "migrations",
+      "exit_code": 1
+    },
+    {
+      "command": "health",
+      "exit_code": 1
+    },
+    {
+      "command": "sizing",
+      "exit_code": 0
+    },
+    {
+      "command": "health",
+      "exit_code": 1
+    }
+  ]
+}

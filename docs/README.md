@@ -39,6 +39,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-08-16 | eng, security |
 | [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-08-16 | eng, frontend |
 | [deployment/STREAMING_TIMEOUTS.md](./deployment/STREAMING_TIMEOUTS.md) | engineering-lead | draft | 2026-08-16 | eng, ops |
+| [deployment/LOCAL_RELEASE_CANDIDATE.md](./deployment/LOCAL_RELEASE_CANDIDATE.md) | engineering-lead | draft | 2026-08-17 | eng, ops, reviewers |
+| [development/phase-09-local-release-candidate-evidence.md](./development/phase-09-local-release-candidate-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
 | [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-08-16 | eng, reviewers |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
