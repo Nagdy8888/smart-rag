@@ -12,6 +12,11 @@ export type MetaResponse = {
   min_client_version: string;
 };
 
+/** `POST /invitations/accept` response. Email is not a request field. */
+export type AcceptInvitationResponse = {
+  invitation_id: string;
+};
+
 /** `GET /me` server-derived identity. */
 export type CurrentUserResponse = {
   user_id: string;

@@ -9,12 +9,15 @@ audience: engineering, frontend
 # Thin developer UI (Phase 6 packet 8)
 
 Authenticated Next.js console for local RAG testing. Phase 8 packet 1 hosts
-this surface inside the production `AppShell`; it is still not a Stitch
-frame route. Tokens and primitives:
+this surface inside the production `AppShell`; packet 2 moves sign-in to
+`/login` with SSR Auth. Chat/upload on `/` after Auth is still not a Stitch
+frame route. Auth/streaming:
+[AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md). Tokens and primitives:
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).
 
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
+[AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [SSE.md](../api/SSE.md) ·
 [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md) ·
@@ -115,8 +118,9 @@ pnpm --filter smart-rag-frontend exec playwright install chromium
 pnpm --filter smart-rag-frontend exec playwright test tests/e2e/login.spec.ts
 ```
 
-Playwright `tests/e2e/login.spec.ts` checks the sign-in heading, signed outage
-copy, and (when FastAPI is up) that the readiness panel matches
+Playwright `tests/e2e/login.spec.ts` checks the `/login` heading, signup/forgot
+links, callback failure copy, MFA-required banner, handshake stub, signed
+outage copy, and (when FastAPI is up) that the readiness panel matches
 `GET /health/ready`. The frontend quality tier installs Chromium and runs
 those tests; it no longer stops at `playwright --version`. Live JWT chat,
 aal2 upload `signed_url=null`, lingering-ID search after DELETE, five Composite

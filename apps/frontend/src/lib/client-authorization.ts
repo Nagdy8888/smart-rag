@@ -36,3 +36,12 @@ export function hiddenNavImpliesForbidden(path: string): false {
 export function clientControlIsAuthorizationBoundary(): false {
   return false;
 }
+
+/**
+ * Return whether a forged client `role=owner` claim authorizes FastAPI.
+ *
+ * @returns Always `false`. Requests use Bearer only; no role header.
+ */
+export function forgedClientRoleIsAuthorization(): false {
+  return false;
+}

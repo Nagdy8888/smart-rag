@@ -23,6 +23,7 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
+[AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [phase-07 evidence](../development/phase-07-stitch-specification-evidence.md) ·
 [docs index](../README.md)
 
@@ -115,7 +116,7 @@ Phase 8 implements `apps/frontend` with:
 | --- | --- |
 | Framework | Next.js App Router 16.3, React 19, TypeScript strict (already pinned) |
 | Server state | TanStack Query 5.85.5 |
-| Auth | `@supabase/ssr` 0.7.0 browser client; Bearer to FastAPI |
+| Auth | `@supabase/ssr` 0.7.0 SSR cookies + browser client; Bearer to FastAPI. See [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) |
 | Visual intent | brief tokens + native hierarchy; **not** Stitch frame layout |
 | Styling | CSS variables from the brief token table; optional **build-time** Tailwind. **No** runtime Tailwind CDN |
 | Components | native `button`, `dialog`, `textarea`, `table`, `details`; no required animation |

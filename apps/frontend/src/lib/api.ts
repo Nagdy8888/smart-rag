@@ -9,6 +9,7 @@ import type {
   CitationResponse,
   ConversationResponse,
   CurrentUserResponse,
+  AcceptInvitationResponse,
   DocumentResponse,
   FeedbackTag,
   MetaResponse,
@@ -103,6 +104,17 @@ export type FailClosedFailure = {
   detail: string;
 };
 
+export type BudgetFailure = {
+  kind: "budget";
+  detail: string;
+};
+
+export type RateFailure = {
+  kind: "rate";
+  detail: string;
+  retryAfter: string | null;
+};
+
 export type DeletedFailure = {
   kind: "deleted";
 };
@@ -112,18 +124,54 @@ export type ApiFailure =
   | AuthFailure
   | MfaFailure
   | FailClosedFailure
+  | BudgetFailure
+  | RateFailure
   | DeletedFailure;
+
+/**
+ * Read a sanitized `detail` string from a FastAPI JSON body.
+ *
+ * @param body - Parsed object.
+ * @param fallback - Used when `detail` is missing or not a string.
+ * @returns Code-like detail. Never exception text from unknown shapes.
+ */
+export function sanitizedDetail(
+  body: Record<string, unknown>,
+  fallback: string,
+): string {
+  return typeof body.detail === "string" ? body.detail : fallback;
+}
+
+/**
+ * Read `Retry-After` from a Fetch Headers map or a plain record.
+ *
+ * @param headers - Optional response headers.
+ * @returns Header value, or null.
+ */
+export function retryAfterHeader(
+  headers?: Headers | Record<string, string>,
+): string | null {
+  if (headers === undefined) {
+    return null;
+  }
+  if (headers instanceof Headers) {
+    return headers.get("Retry-After");
+  }
+  return headers["Retry-After"] ?? headers["retry-after"] ?? null;
+}
 
 /**
  * Parse a FastAPI error body into a typed UI failure.
  *
  * @param status - HTTP status.
  * @param body - JSON-ish object.
+ * @param headers - Optional headers for `Retry-After` on 429.
  * @returns Typed failure when the status is an expected gate.
  */
 export function classifyApiError(
   status: number,
   body: Record<string, unknown>,
+  headers?: Headers | Record<string, string>,
 ): ApiFailure | null {
   if (status === 426) {
     const min =
@@ -142,13 +190,31 @@ export function classifyApiError(
     return { kind: "mfa", detail: "MFA required" };
   }
   if (status === 401 || status === 403) {
-    const detail = typeof body.detail === "string" ? body.detail : "unauthorized";
-    return { kind: "auth", status, detail };
+    return {
+      kind: "auth",
+      status,
+      detail: sanitizedDetail(body, "unauthorized"),
+    };
+  }
+  if (status === 402) {
+    return {
+      kind: "budget",
+      detail: sanitizedDetail(body, "budget_exhausted"),
+    };
+  }
+  if (status === 429) {
+    return {
+      kind: "rate",
+      detail: sanitizedDetail(body, "rate_limited"),
+      retryAfter: retryAfterHeader(headers),
+    };
   }
   if (status === 503) {
-    const detail =
-      typeof body.detail === "string" ? body.detail : "limiter_unavailable";
-    return { kind: "fail_closed", status, detail };
+    return {
+      kind: "fail_closed",
+      status,
+      detail: sanitizedDetail(body, "limiter_unavailable"),
+    };
   }
   if (status === 404) {
     return { kind: "deleted" };
@@ -224,10 +290,17 @@ export async function fetchMeta(
 ): Promise<MetaResponse> {
   const response = await fetchImpl(apiUrl("/api/meta"));
   const body = await readJsonObject(response);
+  if (!response.ok) {
+    throw new Error("meta_unreachable");
+  }
+  const minClientVersion = String(body.min_client_version ?? "");
+  if (minClientVersion.trim() === "") {
+    throw new Error("meta_unreachable");
+  }
   return {
     api_version: String(body.api_version ?? ""),
     sse_schema_version: String(body.sse_schema_version ?? ""),
-    min_client_version: String(body.min_client_version ?? ""),
+    min_client_version: minClientVersion,
   };
 }
 
@@ -250,6 +323,9 @@ export async function fetchMe(
     const classified = classifyApiError(response.status, body);
     if (classified?.kind === "mfa") {
       throw new Error("mfa_required");
+    }
+    if (classified?.kind === "auth" && classified.detail === "session_revoked") {
+      throw new Error("session_revoked");
     }
     throw new Error("me_failed");
   }
@@ -522,11 +598,68 @@ export async function fetchUsageMe(
   return (await response.json()) as UsageResponse;
 }
 
+/**
+ * Accept a single-use invitation. Body is `{ token }` only. Email comes from
+ * the verified JWT on the server, not this payload.
+ *
+ * @param auth - Access token.
+ * @param token - Raw invitation secret.
+ * @param fetchImpl - Injected fetch.
+ * @returns Accepted invitation id.
+ * @throws Error when FastAPI rejects the call. MFA maps to `mfa_required`.
+ */
+export async function acceptInvitation(
+  auth: ApiAuth,
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<AcceptInvitationResponse> {
+  const response = await fetchImpl(apiUrl("/invitations/accept"), {
+    method: "POST",
+    headers: {
+      ...resumeHeaders(auth),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token }),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    const classified = classifyApiError(response.status, body, response.headers);
+    if (classified?.kind === "mfa") {
+      throw new Error("mfa_required");
+    }
+    if (classified?.kind === "auth" && classified.detail === "session_revoked") {
+      throw new Error("session_revoked");
+    }
+    throw new Error(sanitizedDetail(body, "invitation_rejected"));
+  }
+  return { invitation_id: String(body.invitation_id ?? "") };
+}
+
 export type StreamStart = {
   response: Response;
   admission: SubmitMessageResponse | null;
   failure: ApiFailure | null;
+  /** True when the client skipped POST and used GET resume for an existing run. */
+  resumed: boolean;
 };
+
+/** Minimal run snapshot used to prefer resume over a second paid POST. */
+export type PaidRunPointer = {
+  runId: string | null;
+  terminal: string | null;
+  lastSequence: number;
+  idempotencyKey: string;
+};
+
+/**
+ * Return whether the client must resume GET instead of posting again.
+ *
+ * @param state - Current chat run.
+ * @returns True when `runId` is set and the run is not terminal.
+ */
+export function shouldResumeExistingRun(state: PaidRunPointer): boolean {
+  return state.runId !== null && state.terminal === null;
+}
 
 /**
  * POST a chat message with JSON Accept so the 202 body includes `run_id`.
@@ -565,7 +698,8 @@ export async function startMessageStream(
     return {
       response: admitResponse,
       admission: null,
-      failure: classifyApiError(admitResponse.status, body),
+      failure: classifyApiError(admitResponse.status, body, admitResponse.headers),
+      resumed: false,
     };
   }
   const admission = (await admitResponse.json()) as SubmitMessageResponse;
@@ -575,10 +709,64 @@ export async function startMessageStream(
     return {
       response: stream,
       admission,
-      failure: classifyApiError(stream.status, body),
+      failure: classifyApiError(stream.status, body, stream.headers),
+      resumed: false,
     };
   }
-  return { response: stream, admission, failure: null };
+  return { response: stream, admission, failure: null, resumed: false };
+}
+
+/**
+ * Resume an in-flight run when `runId` is already known; otherwise admit.
+ *
+ * Reusing the stored run never sends a second paid POST from this client.
+ * If this helper does POST (no `runId` yet), the server still reuses the
+ * idempotency key.
+ *
+ * @param auth - Access token.
+ * @param conversationId - Conversation UUID.
+ * @param message - Untrusted user text. Ignored on resume.
+ * @param state - Current run pointer.
+ * @param fetchImpl - Injected fetch.
+ * @returns Stream start. `resumed` is true when POST was skipped.
+ */
+export async function startOrResumeMessageStream(
+  auth: ApiAuth,
+  conversationId: string,
+  message: string,
+  state: PaidRunPointer,
+  fetchImpl: typeof fetch = fetch,
+): Promise<StreamStart> {
+  if (shouldResumeExistingRun(state) && state.runId !== null) {
+    const stream = await resumeEventStream(
+      auth,
+      state.runId,
+      state.lastSequence,
+      fetchImpl,
+    );
+    if (!stream.ok) {
+      const body = await readJsonObject(stream);
+      return {
+        response: stream,
+        admission: null,
+        failure: classifyApiError(stream.status, body, stream.headers),
+        resumed: true,
+      };
+    }
+    return {
+      response: stream,
+      admission: null,
+      failure: null,
+      resumed: true,
+    };
+  }
+  return startMessageStream(
+    auth,
+    conversationId,
+    message,
+    state.idempotencyKey,
+    fetchImpl,
+  );
 }
 
 /**

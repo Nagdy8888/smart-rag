@@ -99,4 +99,32 @@ describe("prohibited production patterns", () => {
     expect(names).not.toContain("graph");
     expect(names).not.toContain("admin");
   });
+
+  it("allows Auth-direct App Router folders", () => {
+    const appDir = path.join(srcRoot, "app");
+    const names = readdirSync(appDir);
+    expect(names).toEqual(
+      expect.arrayContaining(["login", "signup", "auth", "mfa", "invitations"]),
+    );
+  });
+
+  it("does not embed service-role or privileged keys in frontend source", () => {
+    const hits: string[] = [];
+    for (const file of files) {
+      const text = readFileSync(file, "utf8");
+      const rel = path.relative(frontendRoot, file).replaceAll("\\", "/");
+      const needles: Array<[RegExp, string]> = [
+        [/NEXT_PUBLIC_[A-Z0-9_]*SERVICE_ROLE/, "NEXT_PUBLIC service role"],
+        [/process\.env\.[A-Z0-9_]*SERVICE_ROLE/, "process.env service role"],
+        [/supabaseServiceRole/i, "service role identifier"],
+        [/test-auth-bypass/i, "test-auth bypass"],
+      ];
+      for (const [pattern, label] of needles) {
+        if (pattern.test(text)) {
+          hits.push(`${rel}: ${label}`);
+        }
+      }
+    }
+    expect(hits).toEqual([]);
+  });
 });

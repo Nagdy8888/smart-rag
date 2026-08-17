@@ -17,6 +17,7 @@ route and no design-system gallery page.
 Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
+[AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [phase-08 evidence](../development/phase-08-frontend-integration-evidence.md) ·
 [docs index](../README.md)
 

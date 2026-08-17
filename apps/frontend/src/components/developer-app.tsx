@@ -1,11 +1,13 @@
 /**
- * Thin authenticated developer console. Not Stitch or production UI.
+ * Thin authenticated developer console. Not Stitch or production RAG chrome.
  *
  * Server authorization is authoritative. Hidden controls are convenience only.
+ * Sign-in lives on `/login`. This surface stays on `/` after Auth.
  */
 
 "use client";
 
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
@@ -13,7 +15,6 @@ import {
   useMemo,
   useRef,
   useState,
-  Fragment,
   type ReactNode,
 } from "react";
 import { Button } from "./ui/button";
@@ -24,81 +25,49 @@ import { LiveRegion } from "./ui/live-region";
 import { StatusBanner } from "./ui/status-banner";
 import { StatusPill } from "./ui/status-pill";
 import { Textarea } from "./ui/textarea";
+import { HandshakeBanner } from "./auth/auth-screens";
+import { ReadinessPanel, SignedOutageCopy } from "./readiness-panel";
 import {
   cancelRun,
-    createConversation,
-    deleteConversation,
-    fetchMe,
-    fetchMeta,
-    fetchReady,
-    fetchUsageMe,
-    fetchVersionStatus,
-    listCitations,
-    listConversations,
-    listDocuments,
-    reserveUpload,
-    startMessageStream,
+  createConversation,
+  deleteConversation,
+  fetchMe,
+  fetchMeta,
+  fetchReady,
+  fetchUsageMe,
+  fetchVersionStatus,
+  listCitations,
+  listConversations,
+  listDocuments,
+  reserveUpload,
+  startOrResumeMessageStream,
   submitFeedback,
   resumeEventStream,
   type ApiAuth,
   type ApiFailure,
 } from "../lib/api";
-import { createBrowserSupabase } from "../lib/auth/browser";
+import { MFA_REQUIRED_BANNER, MFA_UPLOAD_DENIED, SESSION_REVOKED_BANNER } from "../lib/auth/copy";
+import { useSession } from "../lib/auth/session-provider";
 import {
   applyAdmission,
-  applySseFrame,
   createChatViewState,
   type ChatViewState,
 } from "../lib/chat-view";
-import { publicSupabaseConfig } from "../lib/env";
+import { evaluatePaidHandshake, mayStartPaidPost } from "../lib/handshake";
 import {
   formatBm25Summary,
   formatGraphHandoffSummary,
 } from "../lib/ingestion-status";
 import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
+import { publicQueryKeys, sessionQueryKeys } from "../lib/query-keys";
+import { apiFailureBanner } from "../lib/failure-copy";
 import { displayText, formatProvenance, isSafeHttpUrl } from "../lib/safe-text";
-import { parseSseBuffer } from "../lib/sse";
-import { FEEDBACK_TAGS, type FeedbackTag, type ReadinessResponse } from "../lib/types";
+import { consumeSse } from "../lib/sse-consume";
+import { FEEDBACK_TAGS, type FeedbackTag } from "../lib/types";
 import styles from "./developer-app.module.css";
 
 function newIdempotencyKey(): string {
   return crypto.randomUUID();
-}
-
-async function consumeSse(
-  response: Response,
-  initial: ChatViewState,
-  signal: AbortSignal,
-  onState: (state: ChatViewState) => void,
-): Promise<ChatViewState> {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    return initial;
-  }
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let current = initial;
-  try {
-    while (!signal.aborted) {
-      const chunk = await reader.read();
-      if (chunk.done) {
-        break;
-      }
-      buffer += decoder.decode(chunk.value, { stream: true });
-      const parsed = parseSseBuffer(buffer);
-      buffer = parsed.rest;
-      for (const frame of parsed.frames) {
-        current = applySseFrame(current, frame);
-        onState(current);
-        if (current.terminal !== null) {
-          return current;
-        }
-      }
-    }
-  } finally {
-    await reader.cancel().catch(() => undefined);
-  }
-  return current;
 }
 
 /**
@@ -134,92 +103,15 @@ function DiagnosticsDetails({ children }: { children: ReactNode }) {
 }
 
 /**
- * Render live `GET /health/ready` so ParadeDB/Valkey/LightRAG outages are
- * visible in the browser without treating unconfigured as healthy.
- *
- * @param ready - Readiness payload, or null when FastAPI is unreachable.
- * @returns Readiness panel.
- */
-function ReadinessPanel({ ready }: { ready: ReadinessResponse | null | undefined }) {
-  if (ready === undefined) {
-    return (
-      <section className={styles.panel} aria-label="API readiness">
-        <h2>API readiness</h2>
-        <p className={styles.muted}>Checking GET /health/ready.</p>
-      </section>
-    );
-  }
-  if (ready === null) {
-    return (
-      <section className={styles.panel} aria-label="API readiness">
-        <h2>API readiness</h2>
-        <StatusBanner kind="error" role="status">
-          FastAPI GET /health/ready is unreachable. Outage copy below is still
-          the signed UI language when those events exist.
-        </StatusBanner>
-      </section>
-    );
-  }
-  return (
-    <section
-      className={styles.panel}
-      aria-label="API readiness"
-      data-testid="api-readiness"
-    >
-      <h2>API readiness</h2>
-      <p className={styles.muted}>{displayText(ready.detail)}</p>
-      <dl>
-        <dt>query_ready</dt>
-        <dd data-testid="query-ready">{String(ready.query_ready)}</dd>
-        <dt>status</dt>
-        <dd>{displayText(ready.status)}</dd>
-        <dt>rate_limit_degraded</dt>
-        <dd>{String(ready.rate_limit_degraded)}</dd>
-        {ready.dependencies.map((item) => (
-          <Fragment key={item.name}>
-            <dt>{displayText(item.name)}</dt>
-            <dd data-testid={`dep-${item.name}`}>{displayText(item.status)}</dd>
-          </Fragment>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
-/**
- * Signed retrieval-outage sentences. Chat SSE still owns live codes; this
- * catalog is always visible so a killed ParadeDB/LightRAG path cannot hide
- * behind missing UI copy.
- *
- * @returns Outage-copy panel.
- */
-function SignedOutageCopy() {
-  return (
-    <section className={styles.panel} aria-label="Signed outage copy">
-      <h2>Signed outage copy</h2>
-      <p className={styles.muted}>
-        ParadeDB loss uses bm25_unavailable. LightRAG loss uses graph_outage.
-        Valkey mutations fail closed; approved reads may degrade.
-      </p>
-      <LimitationCallout>{limitationCopy("bm25_unavailable")}</LimitationCallout>
-      <LimitationCallout>{limitationCopy("graph_outage")}</LimitationCallout>
-    </section>
-  );
-}
-
-/**
- * Render the thin developer UI for sign-in, upload status, chat, citations,
- * feedback, and conversation deletion.
+ * Render the thin developer UI for upload status, chat, citations,
+ * feedback, and conversation deletion. Auth screens live on `/login`.
  *
  * @returns Developer console.
  */
 export function DeveloperApp() {
   const queryClient = useQueryClient();
-  const supabase = useMemo(() => createBrowserSupabase(), []);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const session = useSession();
+  const accessToken = session.accessToken;
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [chat, setChat] = useState<ChatViewState>(() =>
@@ -235,50 +127,56 @@ export function DeveloperApp() {
     () => (accessToken ? { accessToken } : null),
     [accessToken],
   );
+  const keys = sessionQueryKeys(accessToken);
 
   const metaQuery = useQuery({
-    queryKey: ["meta"],
+    queryKey: publicQueryKeys.meta,
     queryFn: () => fetchMeta(),
   });
 
+  const handshake = evaluatePaidHandshake(
+    metaQuery.data ?? null,
+    metaQuery.isPending ? "loading" : metaQuery.isError ? "error" : "ok",
+  );
+
   const readyQuery = useQuery({
-    queryKey: ["health-ready"],
+    queryKey: publicQueryKeys.ready,
     queryFn: () => fetchReady(),
     refetchInterval: 5000,
   });
 
   const meQuery = useQuery({
-    queryKey: ["me", accessToken],
+    queryKey: keys.me,
     queryFn: () => fetchMe(auth as ApiAuth),
     enabled: auth !== null,
   });
 
   const conversationsQuery = useQuery({
-    queryKey: ["conversations", accessToken],
+    queryKey: keys.conversations,
     queryFn: () => listConversations(auth as ApiAuth),
     enabled: auth !== null,
   });
 
   const documentsQuery = useQuery({
-    queryKey: ["documents", accessToken],
+    queryKey: keys.documents,
     queryFn: () => listDocuments(auth as ApiAuth),
     enabled: auth !== null,
   });
 
   const versionStatusQuery = useQuery({
-    queryKey: ["version-status", accessToken, selectedVersionId],
+    queryKey: keys.versionStatus(selectedVersionId),
     queryFn: () => fetchVersionStatus(auth as ApiAuth, selectedVersionId as string),
     enabled: auth !== null && selectedVersionId !== null,
   });
 
   const usageQuery = useQuery({
-    queryKey: ["usage", accessToken],
+    queryKey: keys.usage,
     queryFn: () => fetchUsageMe(auth as ApiAuth),
     enabled: auth !== null,
   });
 
   const citationsQuery = useQuery({
-    queryKey: ["citations", accessToken, chat.runId],
+    queryKey: keys.citations(chat.runId),
     queryFn: () => listCitations(auth as ApiAuth, chat.runId as string),
     enabled: auth !== null && chat.runId !== null && chat.terminal !== null,
   });
@@ -292,8 +190,12 @@ export function DeveloperApp() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: () =>
-      reserveUpload(auth as ApiAuth, 1024, newIdempotencyKey()),
+    mutationFn: () => {
+      if (!handshake.allowPaidPost) {
+        throw new Error("handshake_blocked");
+      }
+      return reserveUpload(auth as ApiAuth, 1024, newIdempotencyKey());
+    },
   });
 
   const deleteMutation = useMutation({
@@ -313,54 +215,40 @@ export function DeveloperApp() {
     },
   });
 
-  const signIn = useCallback(async () => {
-    setAuthError(null);
-    if (supabase === null) {
-      setAuthError("supabase_unconfigured");
-      return;
-    }
-    const result = await supabase.auth.signInWithPassword({ email, password });
-    if (result.error) {
-      setAuthError(result.error.message);
-      return;
-    }
-    const token = result.data.session?.access_token;
-    if (!token) {
-      setAuthError("session_missing");
-      return;
-    }
-    setAccessToken(token);
-  }, [email, password, supabase]);
-
-  const signOut = useCallback(async () => {
-    await supabase?.auth.signOut();
-    setAccessToken(null);
-  }, [supabase]);
-
   const send = useCallback(async () => {
     if (auth === null || conversationId === null || draft.trim() === "") {
+      return;
+    }
+    if (!mayStartPaidPost(handshake, chat)) {
       return;
     }
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-    if (idempotencyRef.current === null) {
-      idempotencyRef.current = newIdempotencyKey();
+    let current = chat;
+    if (chat.runId === null || chat.terminal !== null) {
+      if (idempotencyRef.current === null) {
+        idempotencyRef.current = newIdempotencyKey();
+      }
+      current = createChatViewState(idempotencyRef.current);
+      setChat(current);
+      setFailure(null);
     }
-    const next = createChatViewState(idempotencyRef.current);
-    setChat(next);
-    setFailure(null);
-    const started = await startMessageStream(
+    const started = await startOrResumeMessageStream(
       auth,
       conversationId,
       draft,
-      next.idempotencyKey,
+      {
+        runId: current.runId,
+        terminal: current.terminal,
+        lastSequence: current.lastSequence,
+        idempotencyKey: current.idempotencyKey,
+      },
     );
     if (started.failure) {
       setFailure(started.failure);
       return;
     }
-    let current = next;
     if (started.admission !== null) {
       current = applyAdmission(current, {
         run_id: started.admission.run_id,
@@ -376,7 +264,7 @@ export function DeveloperApp() {
       idempotencyRef.current = newIdempotencyKey();
       setChat((prev) => ({ ...prev, idempotencyKey: idempotencyRef.current as string }));
     }
-  }, [auth, conversationId, draft]);
+  }, [auth, chat, conversationId, draft, handshake]);
 
   const reconnect = useCallback(async () => {
     if (auth === null || chat.runId === null) {
@@ -419,56 +307,38 @@ export function DeveloperApp() {
     meQuery.error instanceof Error &&
     meQuery.error.message === "mfa_required";
 
+  const sessionRevoked =
+    meQuery.isError &&
+    meQuery.error instanceof Error &&
+    meQuery.error.message === "session_revoked";
+
+  useEffect(() => {
+    if (sessionRevoked) {
+      void session.signOut();
+    }
+  }, [session, sessionRevoked]);
+
+  if (!session.ready) {
+    return (
+      <div className={styles.shell}>
+        <h1>Smart RAG developer console</h1>
+        <p className={styles.muted}>Restoring session.</p>
+      </div>
+    );
+  }
+
   if (accessToken === null) {
     return (
       <div className={styles.shell}>
         <h1>Smart RAG developer console</h1>
+        <StatusBanner kind="info" role="status">
+          Sign in to continue. Optimistic cookie checks are not authorization.
+        </StatusBanner>
         <p className={styles.muted}>
-          Thin Phase 6 UI hosted in the production shell. Browser-direct
-          Supabase Auth, then Bearer FastAPI. Role hiding is not
-          authorization. After sign-in: Auto Composite chat, upload
-          reservation (local signed_url is null until Phase 10), BM25
-          version status, citations, and conversation delete.
+          <Link href="/login">Sign in</Link>
         </p>
-        {publicSupabaseConfig() === null ? (
-          <StatusBanner kind="error" role="alert">
-            Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
-          </StatusBanner>
-        ) : null}
-        {authError ? (
-          <StatusBanner kind="error" role="alert">
-            {displayText(authError)}
-          </StatusBanner>
-        ) : null}
         <ReadinessPanel ready={readyQuery.data} />
         <SignedOutageCopy />
-        <form
-          className={styles.panel}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void signIn();
-          }}
-        >
-          <Input
-            label="Email"
-            type="email"
-            autoComplete="username"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-          <Input
-            label="Password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-          <Button type="submit" variant="primary">
-            Sign in
-          </Button>
-        </form>
       </div>
     );
   }
@@ -478,19 +348,40 @@ export function DeveloperApp() {
       <div className={styles.shell}>
         <header className={styles.row}>
           <h1>Smart RAG developer console</h1>
-          <Button type="button" onClick={() => void signOut()}>
+          <Button type="button" onClick={() => void session.signOut()}>
             Sign out
           </Button>
         </header>
         <StatusBanner kind="error" role="alert">
-          MFA required. Owner, admin, and upload_enabled callers need a verified
-          TOTP session (aal2). Password JWTs stay aal1 until challenge/verify.
+          {MFA_REQUIRED_BANNER}
         </StatusBanner>
+        <p className={styles.muted}>
+          <Link href="/mfa/challenge">MFA challenge</Link>
+          {" · "}
+          <Link href="/mfa/enroll">Enroll TOTP</Link>
+        </p>
         <ReadinessPanel ready={readyQuery.data} />
         <SignedOutageCopy />
       </div>
     );
   }
+
+  if (sessionRevoked || failure?.kind === "auth" && failure.detail === "session_revoked") {
+    return (
+      <div className={styles.shell}>
+        <h1>Smart RAG developer console</h1>
+        <StatusBanner kind="error" role="alert">
+          {SESSION_REVOKED_BANNER}
+        </StatusBanner>
+        <p className={styles.muted}>
+          <Link href="/login">Sign in</Link>
+        </p>
+      </div>
+    );
+  }
+
+  const paidBlocked = !handshake.allowPaidPost;
+  const sendDisabled = !mayStartPaidPost(handshake, chat);
 
   return (
     <div className={styles.shell}>
@@ -501,35 +392,29 @@ export function DeveloperApp() {
           {displayText(meQuery.data?.user_id ?? "")}. Server role is
           authoritative.
         </p>
-        <Button type="button" onClick={() => void signOut()}>
+        <Button type="button" onClick={() => void session.signOut()}>
           Sign out
         </Button>
       </header>
+      <p className={styles.muted}>
+        <Link href="/mfa/enroll">Enroll MFA</Link>
+        {" · "}
+        <Link href="/mfa/challenge">MFA challenge</Link>
+        {" · "}
+        <Link href="/invitations/accept">Accept invitation</Link>
+      </p>
 
-      {failure?.kind === "upgrade" ? (
-        <StatusBanner kind="error" role="alert">
-          Client upgrade required. Minimum {failure.minClientVersion}, SSE schema{" "}
-          {failure.sseSchemaVersion}.
+      <HandshakeBanner />
+
+      {failure ? (
+        <StatusBanner
+          kind={failure.kind === "deleted" ? "info" : "error"}
+          role={failure.kind === "deleted" ? "status" : "alert"}
+        >
+          {apiFailureBanner(failure)}
         </StatusBanner>
       ) : null}
-      {failure?.kind === "auth" ? (
-        <StatusBanner kind="error" role="alert">
-          Session rejected ({failure.detail}). Sign in again. UI state is not
-          authorization.
-        </StatusBanner>
-      ) : null}
-      {failure?.kind === "mfa" ? (
-        <StatusBanner kind="error" role="alert">
-          MFA required. Verify TOTP so the JWT is aal2, then retry the upload.
-        </StatusBanner>
-      ) : null}
-      {failure?.kind === "fail_closed" ? (
-        <StatusBanner kind="error" role="alert">
-          Limiter fail-closed ({displayText(failure.detail)}). Approved reads
-          may degrade; cost mutations are denied.
-        </StatusBanner>
-      ) : null}
-      {failure?.kind === "deleted" || deleteMutation.isSuccess ? (
+      {deleteMutation.isSuccess && failure?.kind !== "deleted" ? (
         <StatusBanner kind="info" role="status">
           Conversation deleted. Reads, resume, and citations are denied. No
           source text is shown.
@@ -582,7 +467,7 @@ export function DeveloperApp() {
             <Button
               type="button"
               onClick={() => uploadMutation.mutate()}
-              disabled={meQuery.data?.upload_enabled !== true}
+              disabled={meQuery.data?.upload_enabled !== true || paidBlocked}
             >
               Reserve upload
             </Button>
@@ -607,7 +492,7 @@ export function DeveloperApp() {
             <StatusBanner kind="error" role="alert">
               {uploadMutation.error instanceof Error &&
               uploadMutation.error.message === "mfa_required"
-                ? "MFA required. Verify TOTP so the JWT is aal2, then retry the upload."
+                ? MFA_UPLOAD_DENIED
                 : "Upload reserve rejected. Server authorization is authoritative."}
             </StatusBanner>
           ) : null}
@@ -671,9 +556,15 @@ export function DeveloperApp() {
             rows={4}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            disabled={sendDisabled}
           />
           <div className={styles.row}>
-            <Button type="button" variant="primary" onClick={() => void send()}>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void send()}
+              disabled={sendDisabled}
+            >
               Send
             </Button>
             <Button type="button" onClick={() => void reconnect()}>

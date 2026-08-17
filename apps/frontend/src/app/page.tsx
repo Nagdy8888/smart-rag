@@ -1,19 +1,14 @@
 /**
- * Console home. Packet 1 wraps the Phase 6 developer UI in AppShell.
- * Auth, chat, citations, and deletion still live in `DeveloperApp`.
+ * Console home. Packet 2 keeps Phase 6 DeveloperApp chat/upload on `/`
+ * after Auth. Sign-in is `/login`.
  */
 import { DeveloperApp } from "../components/developer-app";
-import { AppShell } from "../components/ui/app-shell";
 
 /**
- * Render the production shell around the existing developer console.
+ * Render the authenticated developer console.
  *
- * @returns AppShell wrapping DeveloperApp. No new routes.
+ * @returns DeveloperApp. AppShell comes from the root layout.
  */
 export default function Home() {
-  return (
-    <AppShell>
-      <DeveloperApp />
-    </AppShell>
-  );
+  return <DeveloperApp />;
 }

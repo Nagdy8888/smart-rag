@@ -64,9 +64,9 @@ exposes only `/` and `/_not-found`.
 
 ### Visual / component / accessibility results
 
-- Playwright 1280×800: `app-shell-nav` computed width **280px**; skip link
-  `href="#main"`; Console → `/`.
-- Playwright 390×844: nav stacks above `#main` (nav `y` < main `y`, width
+- Playwright 1280Ã—800: `app-shell-nav` computed width **280px**; skip link
+  `href="#main"`; Console â†’ `/`.
+- Playwright 390Ã—844: nav stacks above `#main` (nav `y` < main `y`, width
   > 300px).
 - Playwright `prefers-reduced-motion: reduce`: authored `transition-duration: 1s`
   computes to `1e-05s` (0.01ms).
@@ -145,7 +145,7 @@ and jsdom 30 require Node 22+). Tailwind / `@tailwindcss/postcss` **4.3.3**.
 
 ### Negative findings
 
-- XSS filename and `</script>شركة` remain text nodes.
+- XSS filename and `</script>Ø´Ø±ÙƒØ©` remain text nodes.
 - Omitting a nav item does not imply 403
   (`CLIENT_NAV_IS_NOT_AUTHORIZATION`, `hiddenNavImpliesForbidden`).
 - No Tailwind CDN, no Google Fonts loader, no blur utilities.
@@ -175,3 +175,107 @@ Revert the frontend token/primitive/shell files, restore Geist in
 `layout.tsx`, drop Tailwind/PostCSS/testing-library pins from
 `apps/frontend/package.json` and the lockfile, and delete
 `docs/frontend/DESIGN_SYSTEM.md` plus this evidence section.
+
+## Packet 2 — Implement SSR Auth, handshake, typed clients, and streaming UX
+
+### Requirement (quoted)
+
+> Implement SSR Auth, audited MFA recovery/permission states, API-version handshake, typed API clients, query state, safe Bearer POST streaming, reconnect, and idempotency UX. Match frame 01's transactional sign-in and frame 03's gated owner setup where approved; fill the absent sign-up, reset/callback, MFA enrollment/challenge/lost-factor recovery, invitation/team entry, upload-MFA denial, and incompatible-client surfaces from real contracts rather than design mocks.
+
+### Concrete acceptance checks
+
+- All required Auth/MFA/recovery/invitation/session/upload-permission journeys use real contracts and auditable server behavior.
+- Minimum-client rejection occurs before paid work; unknown additive SSE events do not break an active answer.
+- Retries/reconnects reuse one run, apply monotonic sequences, and never duplicate paid submission.
+- Frame 01/03 traceability and all absent-surface gap decisions are evidenced.
+
+### Frame 01/03 and gap traceability
+
+Stitch is a template, not a layout. No `frame_01` or `frame_03` routes.
+
+| Surface | Disposition |
+| --- | --- |
+| Sign in | Native `/login` (`signInWithPassword`). Generic "Sign in failed". GAP-07-20: copy does not claim FastAPI throttles the form |
+| Sign up | Native `/signup`. Invitation still required for FastAPI membership |
+| Forgot / reset / callback | `/forgot-password`, `/auth/reset`, `/auth/callback` PKCE |
+| Google | Disabled button GAP-07-04. `maybeSignInWithGoogle(false)` never calls OAuth |
+| MFA enroll/challenge | Auth-direct TOTP. FastAPI 403 `MFA required` banner |
+| MFA recovery | Unavailable GAP-07-07. `mfa_recovery.py` has no router. No recovery-code input |
+| Owner bootstrap | Unavailable GAP-07-08. Invitation accept is in scope |
+| Invitation accept | Authenticated `POST /invitations/accept` `{ token }` only |
+| Chat/docs/graph | Still Phase 6 DeveloperApp on `/` after Auth |
+
+### Contract versions
+
+- Next.js 16.3.0 `src/proxy.ts` (not `middleware.ts`)
+- `@supabase/ssr` 0.7.0 `createServerClient` / `createBrowserClient` / `exchangeCodeForSession`
+- `@supabase/supabase-js` 2.57.4 MFA `enroll({ factorType: "totp" })`
+- TanStack Query 5.85.5 session-aware keys
+- FastAPI OpenAPI `docs/api/openapi.foundation.json` invitation accept and `/api/meta`
+
+### Handshake-before-spend
+
+`evaluatePaidHandshake` compares `CLIENT_VERSION` `0.1.0` to `GET /api/meta`
+`min_client_version`. Below min or unreachable meta: composer Send disabled;
+`startMessageStream` is not called. Resume GET omits `X-Client-Version`.
+Newer `sse_schema_version` continues. Server 426 remains classified.
+
+### Streaming / idempotency
+
+`startOrResumeMessageStream` skips POST when `runId` is set and `terminal`
+is null. Duplicate/older SSE sequences are ignored. Unknown events log and
+continue. 402/429/503 classified as budget/rate/fail_closed.
+
+### Files changed
+
+| File | Action |
+| --- | --- |
+| `apps/frontend/src/proxy.ts` | Next 16 cookie refresh + optimistic redirects |
+| `apps/frontend/src/lib/auth/*` | Server client, session provider, Google/MFA-recovery guards |
+| `apps/frontend/src/lib/handshake.ts` | Min-client compare; fail closed; schema-newer continue |
+| `apps/frontend/src/lib/api.ts` | 402/429 classify; `acceptInvitation`; resume-over-POST |
+| `apps/frontend/src/lib/chat-view.ts` | Ignore duplicate/older SSE sequences |
+| `apps/frontend/src/app/login` and Auth routes | Native Auth-direct surfaces |
+| `apps/frontend/src/components/developer-app.tsx` | Session restore; handshake-gated Send |
+| `docs/frontend/AUTH_AND_STREAMING.md` | Canonical Auth/streaming doc |
+
+### Commands and results
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend exec next typegen` | 0 |
+| `pnpm --filter smart-rag-frontend exec tsc --noEmit` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (15 files, 59 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 (Proxy plus `/`, `/login`, `/signup`, `/forgot-password`, `/auth/callback`, `/auth/reset`, `/mfa/*`, `/invitations/accept`, `/unavailable/[gap]`) |
+| `pnpm exec playwright test` (cwd `apps/frontend`) | 0 (9 passed, 1 skipped) |
+| `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
+
+Playwright skip: `browser readiness panel matches live GET /health/ready`
+when FastAPI is not on `127.0.0.1:8000`.
+
+### Negative findings
+
+- Forged `role=owner` does not add a role header; Bearer only
+- Hidden MFA recovery control is not an HTTP call (`mfaRecoveryRequestUrl()` is null)
+- Google disabled does not call `signInWithOAuth`
+- Callback without `code` shows "Sign-in could not be completed"
+- XSS email remains a text value
+- No `NEXT_PUBLIC_*SERVICE_ROLE*` in frontend source
+
+### Unverified
+
+- Live GoTrue sign-in/MFA verify against local Auth (Playwright does not use a test-auth bypass)
+- Hosted Auth throttling (GAP-07-20 / Phase 10)
+- Packet 3 chat redesign and packet 4 team admin
+
+### Open gaps for P08-03
+
+- Chat/test limitation diagnostics, citations, document library, graph, tables, feedback chrome beyond the Phase 6 DeveloperApp
+- Do not start until this packet's evidence is accepted
+
+### Rollback
+
+Revert `apps/frontend/src/proxy.ts`, Auth routes, session provider, handshake
+helpers, and `docs/frontend/AUTH_AND_STREAMING.md`. Restore DeveloperApp
+inline password `useState` sign-in on `/`. Leave packet 1 primitives in place.

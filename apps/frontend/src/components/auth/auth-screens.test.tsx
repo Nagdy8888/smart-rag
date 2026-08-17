@@ -1,0 +1,134 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ReactElement } from "react";
+import "@testing-library/jest-dom/vitest";
+import { XSS_FILENAME } from "../../lib/hostile-text-fixtures";
+import { SIGN_IN_FAILED } from "../../lib/auth/copy";
+import { SessionProvider } from "../../lib/auth/session-provider";
+import {
+  GoogleOAuthButton,
+  SignInForm,
+  SignUpForm,
+  UnavailableGap,
+} from "./auth-screens";
+
+afterEach(() => {
+  cleanup();
+});
+
+const signInWithPassword = vi.fn();
+const signInWithOAuth = vi.fn();
+const signUp = vi.fn();
+const getSession = vi.fn(async () => ({ data: { session: null } }));
+const onAuthStateChange = vi.fn(() => ({
+  data: { subscription: { unsubscribe: vi.fn() } },
+}));
+
+vi.mock("../../lib/auth/browser", () => ({
+  createBrowserSupabase: () => ({
+    auth: {
+      signInWithPassword,
+      signInWithOAuth,
+      signUp,
+      getSession,
+      onAuthStateChange,
+      signOut: vi.fn(),
+    },
+  }),
+}));
+
+vi.mock("../../lib/env", () => ({
+  publicSupabaseConfig: () => ({
+    url: "http://127.0.0.1:54321",
+    anonKey: "anon",
+  }),
+  apiBaseUrl: () => "http://127.0.0.1:8000",
+}));
+
+vi.mock("../../lib/api", async () => {
+  const actual = await vi.importActual<typeof import("../../lib/api")>("../../lib/api");
+  return {
+    ...actual,
+    fetchMeta: vi.fn(async () => ({
+      api_version: "1",
+      sse_schema_version: "1",
+      min_client_version: "0.1.0",
+    })),
+    fetchReady: vi.fn(async () => null),
+  };
+});
+
+/**
+ * Wrap Auth screens with Query and session providers.
+ *
+ * @param ui - Screen under test.
+ * @returns Render result.
+ */
+function renderAuth(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <SessionProvider>{ui}</SessionProvider>
+    </QueryClientProvider>,
+  );
+}
+
+describe("SignInForm", () => {
+  it("shows a generic Sign in failed banner without provider traces", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      error: { message: "AuthApiError: Invalid login credentials from GoTrue" },
+      data: { session: null },
+    });
+    const user = userEvent.setup();
+    renderAuth(<SignInForm />);
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
+    await user.type(screen.getByLabelText("Password"), "secret");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(SIGN_IN_FAILED);
+    expect(
+      screen.queryByText(/GoTrue|AuthApiError|Invalid login credentials/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("SignUpForm", () => {
+  it("renders XSS in the email field as text", async () => {
+    renderAuth(<SignUpForm />);
+    const email = screen.getByLabelText("Email");
+    fireEvent.change(email, { target: { value: XSS_FILENAME } });
+    expect(email).toHaveValue(XSS_FILENAME);
+    expect(screen.getByDisplayValue(XSS_FILENAME)).toBeInTheDocument();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(document.querySelector("script")).toBeNull();
+  });
+});
+
+describe("GoogleOAuthButton", () => {
+  it("stays disabled and does not call OAuth", async () => {
+    const user = userEvent.setup();
+    renderAuth(<GoogleOAuthButton />);
+    const button = screen.getByRole("button", {
+      name: "Continue with Google (when enabled)",
+    });
+    expect(button).toBeDisabled();
+    await user.click(button);
+    expect(signInWithOAuth).not.toHaveBeenCalled();
+  });
+});
+
+describe("Unavailable GAP-07-07", () => {
+  it("has no recovery-code input that submits", () => {
+    renderAuth(<UnavailableGap gap="GAP-07-07" />);
+    expect(screen.getByRole("heading", { name: "Unavailable" })).toBeInTheDocument();
+    expect(screen.getAllByText(/GAP-07-07/).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText(/recovery/i)).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /recover|submit/i })).toBeNull();
+  });
+});

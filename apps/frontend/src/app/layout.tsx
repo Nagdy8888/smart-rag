@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { AppProviders } from "../components/providers";
+import { AppShell } from "../components/ui/app-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Smart RAG console",
   description:
-    "Production console shell hosting the Phase 6 developer console until later Phase 8 packets replace that surface.",
+    "Production console shell hosting Auth and the Phase 6 developer console until later Phase 8 packets replace chat surfaces.",
 };
 
 /**
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" dir="ltr">
       <body>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <AppShell>{children}</AppShell>
+        </AppProviders>
       </body>
     </html>
   );

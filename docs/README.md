@@ -22,6 +22,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-16 | eng, security |
 | [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-08-17 | eng, frontend |
 | [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-08-17 | frontend, reviewers |
+| [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-08-17 | eng, frontend, security |
 | [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-08-17 | eng, frontend |
 | [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-17 | design, frontend |
 | [frontend/STITCH_STATES.md](./frontend/STITCH_STATES.md) | engineering-lead | draft | 2026-08-17 | design, frontend |

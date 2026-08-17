@@ -141,6 +141,9 @@ function stringList(value: unknown): string[] {
 export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewState {
   const payload = parseSsePayload(frame.data);
   const sequence = sequenceFromFrame(frame, payload);
+  if (sequence !== null && sequence <= state.lastSequence) {
+    return state;
+  }
   const lastSequence =
     sequence !== null && sequence > state.lastSequence ? sequence : state.lastSequence;
 

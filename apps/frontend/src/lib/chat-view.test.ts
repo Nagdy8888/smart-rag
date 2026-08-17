@@ -57,4 +57,41 @@ describe("chat view", () => {
     expect(state.terminal).toBe("completed");
     expect(state.lastSequence).toBe(9);
   });
+
+  it("ignores duplicate and older sequences", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 5\ndata: {"delta":"ok"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 5\ndata: {"delta":"dup"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 3\ndata: {"delta":"old"}'),
+    );
+    expect(state.answerText).toBe("ok");
+    expect(state.lastSequence).toBe(5);
+  });
+
+  it("keeps the answer when an unknown additive event is injected", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"Hi"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock("event: future_metric\nid: 2\ndata: {\"n\":1}"),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 3\ndata: {"delta":"!"}'),
+    );
+    expect(state.answerText).toBe("Hi!");
+    expect(state.diagnostics.unknownEvents).toEqual(["future_metric"]);
+    expect(state.terminal).toBeNull();
+  });
 });
