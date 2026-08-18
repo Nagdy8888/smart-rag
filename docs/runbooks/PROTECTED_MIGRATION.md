@@ -111,4 +111,5 @@ fall back to long-lived GitHub AWS keys or `service_role` in Vercel.
 - [PROTECTED_MIGRATION_CREDENTIALS.md](../security/PROTECTED_MIGRATION_CREDENTIALS.md)
 - [ADR-expand-contract-migrations.md](../adr/ADR-expand-contract-migrations.md)
 - [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md)
+- [instance-rebuild.md](./instance-rebuild.md)
 - [phase-10 evidence](../development/phase-10-managed-staging-evidence.md)

@@ -1,0 +1,66 @@
+{
+  "acceptance": [
+    {
+      "check": "P10-06-A",
+      "classification": "Blocked",
+      "detail": "Local disposable dump/restore supporting Passed with restore_returncode=1; live_database_overwritten=false. Required buckets present. Live managed PITR is Blocked: No isolated managed Supabase PITR plus four-bucket Storage restore. Local Phase 9 dump/restore is supporting only and is not a complete managed restore Pass."
+    },
+    {
+      "check": "P10-06-B",
+      "classification": "Blocked",
+      "detail": "Reconciliation runbook plus restore_incomplete policy Passed. Live orphan counts were not invented. Live managed reconciliation is Blocked: No live managed reconciliation. Orphan counts were not invented. Policy requires restore_incomplete exclusion and orphan quarantine before any BM25 rebuild."
+    },
+    {
+      "check": "P10-06-C",
+      "classification": "Passed",
+      "detail": "Phase 9 empty ParadeDB re-projection Passed (paradedb_used_as_canonical=false, volume_destroyed=true, rows=28). Live EC2 empty rebuild is Blocked: No timed empty ParadeDB rebuild on EC2. Phase 9 volume destroy plus authorized re-projection is derived-projection evidence only."
+    },
+    {
+      "check": "P10-06-D",
+      "classification": "Blocked",
+      "detail": "Instance-rebuild runbook Passed. Targets RTO\u22644h RPO\u226424h; no invented measurements. Live timed EC2 rebuild is Blocked: No timed EC2 instance rebuild. RTO \u22644h and RPO \u226424h remain targets, not measurements."
+    },
+    {
+      "check": "P10-06-E",
+      "classification": "Blocked",
+      "detail": "Old-API/new-schema smoke Passed (prior digest sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7; freeze sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec). Expand/contract contraction absent. Forward-fix runbook present. Live drain/deploy-order/failed SSM is Blocked: No live CloudFront/Vercel deploy-order matrix and no live Caddy drain or failed SSM deploy. Compose api-blue/api-green exists; a live switch is not claimed."
+    }
+  ],
+  "envelope": {
+    "QT-CAP-001-P9": 8,
+    "QT-CAP-002-P9": 16,
+    "QT-CAP-005-P8": 15
+  },
+  "holdout_opened": false,
+  "live_drain": "Blocked",
+  "live_ec2_rebuild": "Blocked",
+  "live_instance_rebuild": "Blocked",
+  "live_managed_pitr": "Blocked",
+  "live_reconciliation": "Blocked",
+  "packet": "P10-06",
+  "packet1_checkbox": "unchecked",
+  "packet2_checkbox": "unchecked",
+  "packet3_checkbox": "unchecked",
+  "packet4_checkbox": "unchecked",
+  "packet5_checkbox": "unchecked",
+  "packet6_checkbox": "unchecked",
+  "phase9_image_ids": {
+    "api": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
+    "crawl-proxy": "sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3",
+    "frontend": "sha256:e47efc373a151c7c79039009fd04f459f997127beafb00747cd91c4a9b96a5c1",
+    "parser-sandbox": "sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a",
+    "worker": "sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e"
+  },
+  "policy": "Passed",
+  "policy_sha256": "7982903977fcde457daf3e51b5b1413e79d921dd4fec63e38764dcd89c2a882e",
+  "restore_incomplete_subset": {
+    "files": [
+      "tests/unit/test_phase10_packet6.py::test_restore_incomplete_excludes_hybrid_and_graph",
+      "tests/unit/test_phase10_packet6.py::test_object_orphan_quarantines_and_alerts"
+    ],
+    "skipped": 0,
+    "tests": 2
+  },
+  "schema_version": "phase10-packet6-matrix-v1",
+  "wrapper_status": "pending"
+}

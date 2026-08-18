@@ -111,6 +111,17 @@ stay Blocked. HMAC claimed as KMS is Failed. It is not added to
 See [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) and
 [alert-routing.md](../runbooks/alert-routing.md).
 
+Phase 10 Packet 6 restore/rebuild/instance/skew
+(`scripts/ci/check_phase10_packet6.py`) is a local gate. Phase 9 derived
+BM25 rebuild and old-API/new-schema smoke can Pass as support. Live
+managed PITR, reconciliation, timed EC2 rebuild, and Caddy/Vercel drain
+stay Blocked. Local dump is not PITR. It is not added to `pr-fast.yml`.
+Packets 1–5 remaining unchecked is not a Packet 6 failure. See
+[MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md),
+[storage-db-reconciliation.md](../runbooks/storage-db-reconciliation.md),
+[bm25-rebuild.md](../runbooks/bm25-rebuild.md), and
+[instance-rebuild.md](../runbooks/instance-rebuild.md).
+
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and
 artifact upload. A local workflow definition is not remote execution

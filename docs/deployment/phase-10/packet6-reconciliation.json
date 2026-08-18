@@ -1,0 +1,23 @@
+{
+  "live_orphan_counts": null,
+  "live_reason": "No live managed reconciliation. Orphan counts were not invented. Policy requires restore_incomplete exclusion and orphan quarantine before any BM25 rebuild.",
+  "live_reconciliation": "Blocked",
+  "orphan_action": "quarantine_append_only_audit_alert",
+  "policy": "Passed",
+  "rebuild_before_reconcile": false,
+  "restore_incomplete_action": "mark_and_exclude_hybrid_graph",
+  "restore_incomplete_subset": {
+    "files": [
+      "tests/unit/test_phase10_packet6.py::test_restore_incomplete_excludes_hybrid_and_graph",
+      "tests/unit/test_phase10_packet6.py::test_object_orphan_quarantines_and_alerts"
+    ],
+    "skipped": 0,
+    "tests": 2
+  },
+  "runbook": "docs/runbooks/storage-db-reconciliation.md",
+  "schema_version": "phase10-packet6-reconciliation-v1",
+  "tests": [
+    "tests/unit/test_phase10_packet6.py::test_restore_incomplete_excludes_hybrid_and_graph",
+    "tests/unit/test_phase10_packet6.py::test_object_orphan_quarantines_and_alerts"
+  ]
+}

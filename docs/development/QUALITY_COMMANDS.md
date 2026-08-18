@@ -34,6 +34,7 @@ uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
 uv run python scripts/ci/check_phase10_packet5.py
+uv run python scripts/ci/check_phase10_packet6.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -292,6 +293,14 @@ Pro pooling, and EC2 measurements stay Blocked. HMAC is not KMS. It is
 local-only and is not a GitHub PR job. Packets 1–4 remaining unchecked
 is not a Packet 5 failure.
 
+The Phase 10 Packet 6 gate reviews Storage/database reconciliation,
+derived BM25 rebuild lineage, instance-rebuild targets, old-API/new-schema
+smoke, and expand/contract. Live managed PITR, live reconciliation, timed
+EC2 rebuild, and live Caddy/Vercel drain stay Blocked. Local dump is not
+PITR. ParadeDB snapshots are not canonical. Rebuild before reconcile is
+Failed. It is local-only and is not a GitHub PR job. Packets 1–5 remaining
+unchecked is not a Packet 6 failure.
+
 ```powershell
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
@@ -299,6 +308,7 @@ uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
 uv run python scripts/ci/check_phase10_packet5.py
+uv run python scripts/ci/check_phase10_packet6.py
 ```
 
 [docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)

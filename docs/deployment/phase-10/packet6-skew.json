@@ -1,0 +1,15 @@
+{
+  "compose_api_blue_green": true,
+  "contraction_absent": true,
+  "forward_fix": "Passed",
+  "freeze_api_id": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
+  "live_blue_green_drain": "Blocked",
+  "live_failed_ssm_deploy": "Blocked",
+  "live_reason": "No live CloudFront/Vercel deploy-order matrix and no live Caddy drain or failed SSM deploy. Compose api-blue/api-green exists; a live switch is not claimed.",
+  "live_vercel_api_orders": "Blocked",
+  "old_api_new_schema": "Passed",
+  "overall": "Blocked",
+  "prior_digest": "sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7",
+  "restored_freeze": true,
+  "schema_version": "phase10-packet6-skew-v1"
+}

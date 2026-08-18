@@ -128,6 +128,9 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [runbooks/SUPABASE_JWKS_ROLLOVER.md](./runbooks/SUPABASE_JWKS_ROLLOVER.md) | engineering-lead | draft | 2026-08-18 | ops, security |
 | [runbooks/origin-secret-rotation.md](./runbooks/origin-secret-rotation.md) | engineering-lead | draft | 2026-08-18 | eng, ops, security |
 | [runbooks/alert-routing.md](./runbooks/alert-routing.md) | engineering-lead | draft | 2026-08-18 | eng, ops, security |
+| [runbooks/storage-db-reconciliation.md](./runbooks/storage-db-reconciliation.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
+| [runbooks/bm25-rebuild.md](./runbooks/bm25-rebuild.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
+| [runbooks/instance-rebuild.md](./runbooks/instance-rebuild.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [security/OPENAI_DATA_GOVERNANCE.md](./security/OPENAI_DATA_GOVERNANCE.md) | product-owner | accepted | 2026-08-13 | client, security |
 | [security/SUBPROCESSOR_GOVERNANCE.md](./security/SUBPROCESSOR_GOVERNANCE.md) | product-owner | accepted | 2026-08-13 | client, security |
 | [api/openapi.foundation.json](./api/openapi.foundation.json) | engineering-lead | draft | 2026-08-16 | eng |

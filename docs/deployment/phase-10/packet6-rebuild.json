@@ -1,0 +1,12 @@
+{
+  "derived_projection": "Passed",
+  "live_ec2_empty_rebuild": "Blocked",
+  "live_reason": "No timed empty ParadeDB rebuild on EC2. Phase 9 volume destroy plus authorized re-projection is derived-projection evidence only.",
+  "parade_total_rows": 28,
+  "paradedb_used_as_canonical": false,
+  "rebuild_scope": "authorized_current",
+  "runbook": "docs/runbooks/bm25-rebuild.md",
+  "schema_version": "phase10-packet6-rebuild-v1",
+  "supporting_artifact": "docs/deployment/phase-09/candidate-packet6-rebuild.json",
+  "volume_destroyed": true
+}

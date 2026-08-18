@@ -144,6 +144,24 @@ QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. Do not claim 10k/1M.
 The Packet 5 checkbox stays **unchecked** while live KMS/SNS/SES/resources
 are Blocked. Packets 1–4 remaining unchecked is not a Packet 5 failure.
 
+## Packet 6 restore, reconciliation, rebuild, instance, skew
+
+Runbooks under [storage-db-reconciliation.md](../runbooks/storage-db-reconciliation.md),
+[bm25-rebuild.md](../runbooks/bm25-rebuild.md), and
+[instance-rebuild.md](../runbooks/instance-rebuild.md). Local Phase 9
+dump/restore is supporting only (`restore_returncode: 1` is warnings;
+`live_database_overwritten: false`). It is **not** managed PITR. Live
+isolated Supabase PITR plus the four durable buckets, live reconciliation,
+timed EC2 instance rebuild, CloudFront/Vercel deploy orders, and live Caddy
+drain are **Blocked**. Phase 9 empty ParadeDB re-projection can Pass as
+derived-projection evidence; a ParadeDB snapshot is never canonical.
+Rebuild only after reconciliation. RTO ≤4h and RPO ≤24h remain **targets,
+not measurements**. Envelope stays QT-CAP-001-P9=8 / QT-CAP-002-P9=16 /
+QT-CAP-005-P8=15.
+
+The Packet 6 checkbox stays **unchecked** while P10-06-A/B/D/E are Blocked.
+Packets 1–5 remaining unchecked is not a Packet 6 failure.
+
 ## Verification
 
 ```powershell
@@ -153,4 +171,5 @@ uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
 uv run python scripts/ci/check_phase10_packet5.py
+uv run python scripts/ci/check_phase10_packet6.py
 ```

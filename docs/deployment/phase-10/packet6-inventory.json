@@ -1,0 +1,25 @@
+{
+  "claimed_as_managed_pitr": false,
+  "disposable_passed": true,
+  "dump_passed": true,
+  "live_database_overwritten": false,
+  "live_managed_pitr": "Blocked",
+  "live_reason": "No isolated managed Supabase PITR plus four-bucket Storage restore. Local Phase 9 dump/restore is supporting only and is not a complete managed restore Pass.",
+  "missing_buckets": [],
+  "present_buckets": [
+    "documents-originals",
+    "documents-quarantine",
+    "table-artifacts",
+    "web-snapshots"
+  ],
+  "production_restore": false,
+  "required_buckets": [
+    "documents-quarantine",
+    "documents-originals",
+    "web-snapshots",
+    "table-artifacts"
+  ],
+  "restore_returncode": 1,
+  "schema_version": "phase10-packet6-inventory-v1",
+  "supporting_artifact": "docs/deployment/phase-09/candidate-packet6-restore.json"
+}

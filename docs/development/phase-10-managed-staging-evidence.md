@@ -730,5 +730,146 @@ absent from topology. Packet 3 telemetry no longer requires
 requires `true` plus SNS. Packets 1–4 remaining unchecked did not fail
 Packet 5 classify. Terraform was not applied. AWS login was not run.
 
+## Packet 6 — Restore, reconciliation, BM25/instance rebuild, skew, rollback
+
+Requirement ID: **P10-06**.
+
+### Requirement (quoted)
+
+> Perform and record database-plus-Storage restore/reconciliation followed
+> by clean BM25 projection rebuild, instance rebuild, old-slot/new-schema
+> and frontend/API deploy-skew behavior, failed deployment, forward-fix
+> migration boundary, and application rollback.
+
+### Concrete acceptance checks
+
+- **P10-06-A:** Complete managed restore at recorded point. Evidence:
+  inventory. Failure: blocker.
+- **P10-06-B:** Reconciliation marks/quarantines/excludes/alerts before
+  rebuild. Evidence: adversarial report. Failure: stop.
+- **P10-06-C:** Authoritative-only empty BM25 rebuild reaches parity/time
+  with no canonical snapshot. Evidence: lineage. Failure: blocker/sizing.
+- **P10-06-D:** Instance rebuild meets approved RTO/RPO. Evidence: timed
+  report. Failure: revise/stop.
+- **P10-06-E:** Old-slot/schema, both deploy orders, failure, drain,
+  rollback, forward-fix pass without contraction. Evidence: matrix.
+  Failure: requalify.
+
+```mermaid
+flowchart TD
+  restore["Managed PITR plus four buckets"] --> recon["Reconcile missing hash orphan"]
+  recon --> bm25["Empty ParadeDB from reconciled Supabase"]
+  bm25 --> instance["Recreate EC2 start empty ParadeDB"]
+  instance --> skew["Old slot drain deploy orders rollback"]
+  restore -.->|Blocked no live PITR| hold["Keep checkbox unchecked"]
+  recon -.->|Blocked no live orphans| hold
+  instance -.->|Blocked no timed rebuild| hold
+  skew -.->|Blocked no live drain| hold
+```
+
+### Inspected paths (before edit)
+
+| Path | Result |
+| --- | --- |
+| `docs/deployment/phase-09/candidate-packet6-restore.json` | Supporting only. `restore_returncode: 1`, `live_database_overwritten: false`. Not managed PITR |
+| `docs/deployment/phase-09/candidate-packet6-rebuild.json` | `paradedb_used_as_canonical: false`, volume destroyed, authorized re-projection passed |
+| `docs/deployment/phase-09/candidate-old-api-new-schema-smoke.json` | Passed. Prior digest `sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7`. Freeze restored |
+| `scripts/ci/check_migrations.py` | No contraction DDL. Packet 2 `find_migration_violations` reused |
+| `docs/runbooks/PROTECTED_MIGRATION.md` | Schema rollback is a reviewed forward fix |
+| `infra/ec2/docker-compose.staging.yml` | `api-blue` / `api-green` present |
+| Terraform apply / AWS login / production restore | Not run |
+
+### Files changed (allowed outputs only)
+
+| File | Action |
+| --- | --- |
+| `packages/core/src/smart_rag_core/release/phase10_packet6.py` | Created — restore/rebuild/skew classifier |
+| `packages/core/src/smart_rag_core/release/phase10_constants.py` | Packet 6 artifact/runbook identifiers |
+| `scripts/ci/check_phase10_packet6.py` | Created — zero-collection fail-closed gate |
+| `tests/unit/test_phase10_packet6.py` | Created — negatives always run |
+| `tests/contract/test_phase10_packet6.py` | Created — committed runbooks and Phase 9 JSON |
+| `docs/runbooks/storage-db-reconciliation.md` | Created |
+| `docs/runbooks/bm25-rebuild.md` | Created |
+| `docs/runbooks/instance-rebuild.md` | Created — includes Caddy drain section |
+| `docs/deployment/phase-10/packet6-*.json` | Created by the Packet 6 gate (no secrets) |
+| `docs/runbooks/README.md`, `docs/README.md`, `MANAGED_STAGING.md`, `QUALITY_COMMANDS.md`, `CI_TIERS.md` | Indexed Packet 6 gates and runbooks |
+| `.cursor/plans/.../10-phase-managed-staging.md` | Wrapper remains pending; Packet 6 checkbox unchecked |
+
+No `*.tf` files were added. Packets 1–5 IaC hashes were not refreshed.
+`STREAMING_TIMEOUTS.md` was not touched and still contains `does **not** claim`.
+
+### Identities frozen
+
+No secrets. No invented PITR recovery points, orphan counts, EC2 rebuild
+durations, or Caddy switch results.
+
+| Field | Value |
+| --- | --- |
+| Envelope | keep QT-CAP-001-P9=8, QT-CAP-002-P9=16, QT-CAP-005-P8=15 |
+| RTO target | 4 hours (not a measurement) |
+| RPO target | 24 hours (not a measurement) |
+| Freeze API | `sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec` |
+| Old-API prior digest | `sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7` |
+| Packet 6 policy sha256 | `7982903977fcde457daf3e51b5b1413e79d921dd4fec63e38764dcd89c2a882e` |
+| Required buckets | documents-quarantine, documents-originals, web-snapshots, table-artifacts |
+
+### Classifications
+
+Packet 6 **does not** mark the wrapper complete. P10-06-A/B/D/E are
+**Blocked**, so the Packet 6 checkbox stays unchecked. Packets 1–5 stay
+unchecked and are not required for Packet 6 classify.
+
+| Check | Classification | Notes |
+| --- | --- | --- |
+| P10-06-A managed restore | Blocked | Local dump/restore supporting Passed (`restore_returncode=1` warnings). Not managed PITR. Live DB not overwritten. Four buckets present in Phase 9 inventory |
+| P10-06-B reconciliation | Blocked | Runbook plus restore_incomplete/orphan policy Passed. Live orphan counts not invented. Rebuild-before-reconcile is Failed as a negative |
+| P10-06-C BM25 rebuild | Passed | Phase 9 empty volume plus authorized re-projection. Live EC2 empty rebuild Blocked in the same row. Snapshot-as-canonical Failed as a negative |
+| P10-06-D instance rebuild | Blocked | Runbook Passed. RTO≤4h RPO≤24h are targets, not measurements |
+| P10-06-E skew/drain/rollback | Blocked | Old-API smoke Passed; contraction absent; forward-fix documented. Live Vercel/API orders, Caddy drain, failed SSM Blocked |
+
+### Commands and exit codes
+
+```powershell
+uv run ruff format packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_packet6.py scripts/ci/check_phase10_packet6.py tests/unit/test_phase10_packet6.py tests/contract/test_phase10_packet6.py
+uv run ruff check packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_packet6.py scripts/ci/check_phase10_packet6.py tests/unit/test_phase10_packet6.py tests/contract/test_phase10_packet6.py
+uv run python -m pytest tests/unit/test_phase10_packet6.py tests/contract/test_phase10_packet6.py tests/unit/test_phase10_packet1.py tests/contract/test_phase10_packet5.py tests/unit/test_phase10_packet4.py -q
+uv run python scripts/ci/check_phase10_packet6.py
+```
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff format` on Packet 6 Python | 0 | Files formatted then left unchanged |
+| `uv run ruff check` on Packet 6 Python | 0 | All checks passed |
+| `uv run python -m pyright` on Packet 6 Python | 0 | 0 errors |
+| `uv run python -m pytest` Packet 1/4/5/6 as listed | 0 | 36 passed, 0 skipped |
+| `uv run python scripts/ci/check_phase10_packet6.py` | 0 | tests=14 failures=0 errors=0 skipped=0; restore_incomplete subset tests=2 skipped=0; policy Passed; live PITR/EC2/drain Blocked; A/B/D/E Blocked; C Passed |
+
+Artifacts: `docs/deployment/phase-10/packet6-{gate-matrix,inventory,reconciliation,rebuild,instance,skew,negatives}.json`.
+
+Packet 6 checkbox stays **unchecked** because live PITR, reconciliation,
+timed instance rebuild, and drain are Blocked. Packet file `status` stays
+`pending`. Phase 10 wrapper `status` remains `pending`. Holdout was not
+opened. Packets 1–5 stay unchecked. Not added to `pr-fast.yml`.
+
+### Unverified / Blocked
+
+- Isolated managed Supabase PITR plus four-bucket Storage restore.
+- Live managed missing-object / hash-mismatch / orphan reconciliation
+  counts.
+- Timed empty ParadeDB rebuild on EC2.
+- Timed EC2 instance recreate from IaC with health proof.
+- Live CloudFront/Vercel deploy-order matrix, Caddy drain, failed SSM
+  inactive-slot deploy.
+- Packet 7 release suite and external assessment.
+
+### Deviations
+
+None versus Packet 6 scope. Local Phase 9 dump/restore was not treated as
+managed PITR. Production was not restored. The live local database was not
+overwritten. ParadeDB was not treated as canonical. RTO/RPO hours were not
+invented. Packets 1–5 remaining unchecked did not fail Packet 6 classify.
+Terraform was not applied. AWS login was not run.
+
+
 
 

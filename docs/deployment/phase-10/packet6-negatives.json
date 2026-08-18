@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "case": "paradedb_snapshot_canonical",
+      "exercise": "tests/unit/test_phase10_packet6.py",
+      "expected": "Failed"
+    },
+    {
+      "case": "rebuild_before_reconcile",
+      "exercise": "tests/unit/test_phase10_packet6.py",
+      "expected": "Phase10Packet6GateError"
+    },
+    {
+      "case": "missing_required_bucket",
+      "exercise": "tests/unit/test_phase10_packet6.py",
+      "expected": "Phase10Packet6GateError"
+    },
+    {
+      "case": "live_database_overwritten",
+      "exercise": "tests/unit/test_phase10_packet6.py",
+      "expected": "Phase10Packet6GateError"
+    },
+    {
+      "case": "destructive_drop_table_contraction",
+      "exercise": "tests/unit/test_phase10_packet6.py",
+      "expected": "Failed"
+    },
+    {
+      "case": "local_dump_claimed_as_managed_pitr",
+      "exercise": "tests/unit/test_phase10_packet6.py",
+      "expected": "Phase10Packet6GateError"
+    },
+    {
+      "case": "invented_rto_rpo_measurements",
+      "exercise": "tests/unit/test_phase10_packet6.py",
+      "expected": "Phase10Packet6GateError"
+    }
+  ],
+  "schema_version": "phase10-packet6-negatives-v1"
+}

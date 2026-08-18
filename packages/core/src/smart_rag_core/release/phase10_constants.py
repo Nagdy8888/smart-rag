@@ -1,12 +1,14 @@
-"""Stable identifiers for Phase 10 Packets 1-5.
+"""Stable identifiers for Phase 10 Packets 1-6.
 
 Packet 1 consumes the accepted Phase 9 promotion freeze. Packet 2 adds GitHub
 OIDC, named SSM documents, and Secrets Manager placeholders. Packet 3 asserts
 origin/egress/timeout/telemetry policy. Packet 4 classifies JWKS, origin
 rotation, CDN SSE, ParadeDB degrade, and Valkey fail-closed. Packet 5 asserts
 KMS/S3 Object Lock IaC, alarm routing, SES/OAuth/Storage support, pooling,
-and the signed reduced envelope. None of these packets imply live AWS apply,
-KMS PutObject, SNS delivery, SES send, or managed pool pressure.
+and the signed reduced envelope. Packet 6 classifies managed restore,
+reconciliation, derived BM25 rebuild, instance rebuild, and skew/rollback.
+None of these packets imply live AWS apply, managed PITR, EC2 rebuild, or
+CloudFront/Vercel drain.
 """
 
 from __future__ import annotations
@@ -53,6 +55,13 @@ PACKET5_INTEGRATIONS_NAME = "packet5-integrations.json"
 PACKET5_POOL_NAME = "packet5-pool.json"
 PACKET5_ENVELOPE_NAME = "packet5-envelope.json"
 PACKET5_NEGATIVES_NAME = "packet5-negatives.json"
+PACKET6_MATRIX_NAME = "packet6-gate-matrix.json"
+PACKET6_INVENTORY_NAME = "packet6-inventory.json"
+PACKET6_RECONCILE_NAME = "packet6-reconciliation.json"
+PACKET6_REBUILD_NAME = "packet6-rebuild.json"
+PACKET6_INSTANCE_NAME = "packet6-instance.json"
+PACKET6_SKEW_NAME = "packet6-skew.json"
+PACKET6_NEGATIVES_NAME = "packet6-negatives.json"
 GITHUB_WORKFLOWS_DIR = ".github/workflows"
 SSM_DOCUMENTS_DIR = "infra/ec2/ssm-documents"
 MIGRATIONS_DIR = "supabase/migrations"
@@ -93,6 +102,13 @@ PACKET5_INTEGRATIONS_SCHEMA_VERSION = "phase10-packet5-integrations-v1"
 PACKET5_POOL_SCHEMA_VERSION = "phase10-packet5-pool-v1"
 PACKET5_ENVELOPE_SCHEMA_VERSION = "phase10-packet5-envelope-v1"
 PACKET5_NEGATIVES_SCHEMA_VERSION = "phase10-packet5-negatives-v1"
+PACKET6_MATRIX_SCHEMA_VERSION = "phase10-packet6-matrix-v1"
+PACKET6_INVENTORY_SCHEMA_VERSION = "phase10-packet6-inventory-v1"
+PACKET6_RECONCILE_SCHEMA_VERSION = "phase10-packet6-reconciliation-v1"
+PACKET6_REBUILD_SCHEMA_VERSION = "phase10-packet6-rebuild-v1"
+PACKET6_INSTANCE_SCHEMA_VERSION = "phase10-packet6-instance-v1"
+PACKET6_SKEW_SCHEMA_VERSION = "phase10-packet6-skew-v1"
+PACKET6_NEGATIVES_SCHEMA_VERSION = "phase10-packet6-negatives-v1"
 
 AWS_PROVIDER_CONSTRAINT = "~> 5.100"
 INTENDED_AWS_REGION = "us-east-1"
@@ -235,6 +251,10 @@ PACKET5_RELATIVE = (
     ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
     "05-exercise-anchors-alerts-and-managed-load.md"
 )
+PACKET6_RELATIVE = (
+    ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
+    "06-prove-restore-rebuild-skew-and-rollback.md"
+)
 ALERT_ROUTING_RUNBOOK = "docs/runbooks/alert-routing.md"
 AUDIT_EXPORT_MODULE = "packages/core/src/smart_rag_core/security/audit_export.py"
 KMS_S3_AUDIT_TF = "infra/ec2/kms_s3_audit.tf"
@@ -317,6 +337,71 @@ CDN_SSE_MIN_DURATION_SECONDS = 50
 CDN_SSE_VIA_CLOUDFRONT = "cloudfront"
 PHASE09_PACKET5_FAULT = "docs/deployment/phase-09/candidate-packet5-fault-matrix.json"
 PHASE09_PACKET6_REBUILD = "docs/deployment/phase-09/candidate-packet6-rebuild.json"
+PHASE09_PACKET6_RESTORE = "docs/deployment/phase-09/candidate-packet6-restore.json"
+STORAGE_RECONCILE_RUNBOOK = "docs/runbooks/storage-db-reconciliation.md"
+BM25_REBUILD_RUNBOOK = "docs/runbooks/bm25-rebuild.md"
+INSTANCE_REBUILD_RUNBOOK = "docs/runbooks/instance-rebuild.md"
+PROTECTED_MIGRATION_RUNBOOK = "docs/runbooks/PROTECTED_MIGRATION.md"
+RTO_TARGET_HOURS = 4
+RPO_TARGET_HOURS = 24
+OLD_API_PRIOR_DIGEST = (
+    "sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7"
+)
+REQUIRED_STORAGE_BUCKETS: tuple[str, ...] = (
+    "documents-quarantine",
+    "documents-originals",
+    "web-snapshots",
+    "table-artifacts",
+)
+RECONCILE_RUNBOOK_REQUIRED_TOKENS: tuple[str, ...] = (
+    "missing object",
+    "hash mismatch",
+    "restore_incomplete",
+    "hybrid",
+    "graph",
+    "orphan",
+    "quarantine",
+    "append-only audit",
+    "alert",
+    "rebuild only after reconciliation",
+    "```mermaid",
+)
+BM25_REBUILD_RUNBOOK_REQUIRED_TOKENS: tuple[str, ...] = (
+    "reconciled authorized current",
+    "paradedb snapshot never canonical",
+    "empty paradedb",
+    "supabase",
+    "parity",
+    "```mermaid",
+)
+INSTANCE_REBUILD_RUNBOOK_REQUIRED_TOKENS: tuple[str, ...] = (
+    "recreate from iac",
+    "phase 9 freeze",
+    "empty paradedb",
+    "rebuild projection from supabase",
+    "host data is not canonical",
+    "rto",
+    "4 hour",
+    "rpo",
+    "24 hour",
+    "targets, not measurements",
+    "drain",
+    "active_api_upstream",
+    "failed health check leaves the old slot active",
+    "```mermaid",
+)
+REBUILD_BEFORE_RECONCILE_PHRASES: tuple[str, ...] = (
+    "rebuild before reconcil",
+    "rebuild then reconcil",
+    "rebuild first, then reconcil",
+)
+PACKET6_RESTORE_INCOMPLETE_TEST_FILES: tuple[str, ...] = (
+    (
+        "tests/unit/test_phase10_packet6.py"
+        "::test_restore_incomplete_excludes_hybrid_and_graph"
+    ),
+    "tests/unit/test_phase10_packet6.py::test_object_orphan_quarantines_and_alerts",
+)
 PACKET4_JWKS_TEST_FILES: tuple[str, ...] = ("tests/unit/test_jwks_local_issuers.py",)
 PACKET4_PARADEDB_TEST_FILES: tuple[str, ...] = (
     "tests/unit/test_hybrid_run.py::test_bm25_degradation_continues_dense_and_term",
