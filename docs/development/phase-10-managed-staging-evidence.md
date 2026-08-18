@@ -183,7 +183,9 @@ ADR for instance type:
   `52.206.156.176` tcp 22/80/443/5432/6379/8000/8080/8443 all `open=false`.
   Artifact:
   [packet1-live-network-scan.json](../deployment/phase-10/packet1-live-network-scan.json).
-  P10-01-C stays **Blocked** because compose is not running.
+  P10-01-C stays **Blocked** because compose is not running. Repeat scan
+  2026-08-18T20:55Z with profile `Nagdy-iam` plus SSM `ss -lnt` still
+  `qualifies_for_p10_01_c: false`. Host listen is only `127.0.0.1:44923`.
 - Origin hostname in CloudFront remains the placeholder until DNS/EIP origin
   is wired. Direct origin health is unverified.
 
@@ -1071,11 +1073,13 @@ was not applied. AWS login was not run. Production was not promoted.
 
 ### Unverified / Blocked
 
-- Isolated managed staging project, CloudFront, live AWS apply.
-- Complete production-equivalent suite against that topology.
+- Isolated **Pro / us-east-1 / PITR** Supabase (live reuse is Free / eu-central-1).
+- Compose running on an instance that can hold mem_limits (not t3.micro).
+- Complete production-equivalent suite against running topology.
 - Independent third-party pentest/external security review and Critical/High retest.
-- Live OIDC assume, JWKS dashboard rollover, origin rotation, 50s CDN SSE,
-  KMS PutObject, SNS ack, SES send, PITR restore, EC2 rebuild, Caddy drain.
+- Live OIDC AssumeRoleWithWebIdentity, SSM migrate execution, JWKS dashboard
+  rollover, origin rotation, 50s CDN SSE, KMS PutObject, SNS ack, SES send,
+  PITR restore, EC2 rebuild, Caddy drain.
 
 ### Deviations
 
@@ -1086,6 +1090,29 @@ Checkboxes were not checked. 10k/1M was not advertised.
 ### Request for user acceptance
 
 Request for user acceptance: Phase 10 remains status pending with all seven packet checkboxes unchecked. The honest recommendation is no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production.
+
+## Phase 10 live closeout (2026-08-18, profile `Nagdy-iam`)
+
+User asked to finish remaining packets and keep going. Subagents mapped
+Packets 2–7 gaps. Live inventory (no secret values):
+[phase10-live-aws-inventory.json](../deployment/phase-10/phase10-live-aws-inventory.json).
+
+Caller `arn:aws:iam::665602132723:user/Muna`. Terraform was not re-applied
+from CI. Compose was not started. No pentest was invented. No packet
+checkbox was checked. Wrapper stays `pending`. Phase 11 stays **no-go**.
+
+| Packet | Policy | Live after inventory | Checkbox |
+| --- | --- | --- | --- |
+| 1 | A/D/E Passed on freeze files | B runtime IMDS/SSM observed (t3.micro drift). C Blocked: compose not running; EIP all-closed does not qualify | unchecked |
+| 2 | A/B/D/E Passed | OIDC provider/roles/SSM documents exist. AssumeRoleWithWebIdentity and SSM migrate **not** executed. Secret rotation Lambda absent | unchecked |
+| 3 | C/D IaC 90s/WAF Passed | CloudFront `E2W9UNLLZ6I383` origin timeouts **90/90**, WAF attached, origin still `origin.staging.example.invalid`. Direct CDN matrix / running private-port scan / alarm delivery Blocked | unchecked |
+| 4 | A/D/E app tests Passed | Live JWKS rollover, origin rotation, 50s CDN SSE Blocked (`STREAMING_TIMEOUTS.md` still does **not** claim a proven 50s CDN stream) | unchecked |
+| 5 | D local envelope Passed | Audit bucket Object Lock GOVERNANCE 7y + KMS encryption exist. PutObject/SNS ack/SES send/m6i load Blocked | unchecked |
+| 6 | C local rebuild policy Passed | Free-plan **no PITR**. Instance rebuild/drain not run | unchecked |
+| 7 | B/E Passed | A/C/D Blocked. Independent assessment `not_run`. Promotion **no-go** | unchecked |
+
+Envelope remains QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15.
+Holdout stays closed. `MOCK_MODEL_MODE=true`. HS256 stays forbidden.
 
 
 

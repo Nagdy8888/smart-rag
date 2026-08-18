@@ -3,7 +3,7 @@
   "deny_passed": true,
   "double_admission": false,
   "fill_recovered": true,
-  "live_ec2_kill": "Blocked",
+  "live_ec2_kill": "Not Run",
   "live_reason": "No EC2 Valkey kill. Application fail-closed tests are not a managed host outage.",
   "named_acl_users": false,
   "schema_version": "phase10-packet4-valkey-v1",

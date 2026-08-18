@@ -3,27 +3,27 @@
     {
       "check": "P10-05-A",
       "classification": "Blocked",
-      "detail": "KMS/Object Lock IaC Passed. Application tamper tests Passed. HMAC-as-KMS rejected. Live Object-Lock GetObject is Blocked: No live Object-Lock GetObject of a KMS-signed chain head. Terraform is not applied and AWS session is expired or missing."
+      "detail": "KMS/Object Lock IaC Passed. Application tamper tests Passed. HMAC-as-KMS rejected. Live Object-Lock GetObject is Not Run: No live Object-Lock GetObject of a KMS-signed chain head. Terraform is not applied and AWS session is expired or missing."
     },
     {
       "check": "P10-05-B",
       "classification": "Blocked",
-      "detail": "IaC plus runbook alarm matrix Passed. Live SNS/ack/escalation is Blocked: IaC and runbook routing exist. Live SNS publish, acknowledgement, and escalation were not run."
+      "detail": "IaC plus runbook alarm matrix Passed. Live SNS/ack/escalation is Not Run: IaC and runbook routing exist. Live SNS publish, acknowledgement, and escalation were not run."
     },
     {
       "check": "P10-05-C",
       "classification": "Blocked",
-      "detail": "SES sandbox IaC Passed. Managed Storage CORS is not claimed Passed. Live SES send is Blocked: SES sandbox IaC exists. No live SES send and no production recipient."
+      "detail": "SES sandbox IaC Passed. Managed Storage CORS is not claimed Passed. Live SES send is Not Run: SES sandbox IaC exists. No live SES send and no production recipient."
     },
     {
       "check": "P10-05-D",
       "classification": "Passed",
-      "detail": "Application 70% pause Passed; local connection budget 30<42 Passed. Replica-without-recheck absent. Live managed pool pressure is Blocked: Managed Pro pooling and database pressure were not measured. Local 30<42 math and 70% pause tests are not managed pool proof."
+      "detail": "Application 70% pause Passed; local connection budget 30<42 Passed. Replica-without-recheck absent. Live managed pool pressure is Not Run: Managed Pro pooling and database pressure were not measured. Local 30<42 math and 70% pause tests are not managed pool proof."
     },
     {
       "check": "P10-05-E",
       "classification": "Blocked",
-      "detail": "Keep QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. 10k/1M claim rejected. Live managed resources are Blocked: No live EC2/ParadeDB/Valkey/OCR measurements. Keep the signed reduced envelope; do not advertise 10k/1M."
+      "detail": "Keep QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. 10k/1M claim rejected. Live managed resources are Not Run: No live EC2/ParadeDB/Valkey/OCR measurements. Keep the signed reduced envelope; do not advertise 10k/1M."
     }
   ],
   "budget_subset": {
@@ -36,11 +36,11 @@
   "holdout_opened": false,
   "iac_policy": "Passed",
   "iac_sha256": "2f25475b21dfe67cfee19fa8c50d200384608280e622e263cba6294cef06e6e5",
-  "live_kms_object_lock": "Blocked",
-  "live_managed_pool": "Blocked",
-  "live_managed_resources": "Blocked",
-  "live_ses_send": "Blocked",
-  "live_sns_ack": "Blocked",
+  "live_kms_object_lock": "Not Run",
+  "live_managed_pool": "Not Run",
+  "live_managed_resources": "Not Run",
+  "live_ses_send": "Not Run",
+  "live_sns_ack": "Not Run",
   "packet": "P10-05",
   "packet1_checkbox": "unchecked",
   "packet2_checkbox": "unchecked",

@@ -3,7 +3,7 @@
   "disposable_passed": true,
   "dump_passed": true,
   "live_database_overwritten": false,
-  "live_managed_pitr": "Blocked",
+  "live_managed_pitr": "Not Run",
   "live_reason": "No isolated managed Supabase PITR plus four-bucket Storage restore. Local Phase 9 dump/restore is supporting only and is not a complete managed restore Pass.",
   "missing_buckets": [],
   "present_buckets": [

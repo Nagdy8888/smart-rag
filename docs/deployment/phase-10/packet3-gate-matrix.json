@@ -3,12 +3,12 @@
     {
       "check": "P10-03-A",
       "classification": "Blocked",
-      "detail": "Committed Caddy 403 / CloudFront custom header / prefix-list origin policy Passed. Live CDN request matrix is Blocked: No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent."
+      "detail": "Committed Caddy 403 / CloudFront custom header / prefix-list origin policy Passed. Live CDN request matrix is Not Run: No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent."
     },
     {
       "check": "P10-03-B",
       "classification": "Blocked",
-      "detail": "Committed unpublished private-port and metadata-deny policy Passed. Live scan is Blocked: No EC2 host or scan artifact. Live private-port and metadata scans were not run."
+      "detail": "Committed unpublished private-port and metadata-deny policy Passed. Live scan is Not Run: No EC2 host or scan artifact. Live private-port and metadata scans were not run."
     },
     {
       "check": "P10-03-C",
@@ -18,12 +18,12 @@
     {
       "check": "P10-03-D",
       "classification": "Passed",
-      "detail": "CloudFront origin_read/keepalive 90s/90s, Caddy 90s, flush_interval -1, CachingDisabled, WAF CLOUDFRONT, and Caddy header/body/connection caps Passed. origin_read_timeout 60 is rejected. Live CDN runtime drift is Blocked."
+      "detail": "CloudFront origin_read/keepalive 90s/90s, Caddy 90s, flush_interval -1, CachingDisabled, WAF CLOUDFRONT, and Caddy header/body/connection caps Passed. origin_read_timeout 60 is rejected. Live CDN runtime drift is Not Run."
     },
     {
       "check": "P10-03-E",
       "classification": "Blocked",
-      "detail": "WAF visibility_config metric names and CloudWatch egress/origin denial filters Passed. Live synthetic alarm is Blocked: CloudWatch log group and metric filters exist in IaC. Live denial alarm delivery was not proven."
+      "detail": "WAF visibility_config metric names and CloudWatch egress/origin denial filters Passed. Live synthetic alarm is Not Run: CloudWatch log group and metric filters exist in IaC. Live denial alarm delivery was not proven."
     }
   ],
   "crawl_subset": {
@@ -37,9 +37,9 @@
   "holdout_opened": false,
   "iac_policy": "Passed",
   "iac_sha256": "931d12eaef39adaf0b9b547983a745d9a05c14f86d2a92d2c6f3b3446097daff",
-  "live_cdn_requests": "Blocked",
-  "live_denial_alert": "Blocked",
-  "live_port_scan": "Blocked",
+  "live_cdn_requests": "Not Run",
+  "live_denial_alert": "Not Run",
+  "live_port_scan": "Not Run",
   "packet": "P10-03",
   "packet1_checkbox": "unchecked",
   "packet2_checkbox": "unchecked",

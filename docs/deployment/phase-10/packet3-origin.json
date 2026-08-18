@@ -1,35 +1,35 @@
 {
   "live_reason": "No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent.",
-  "live_requests": "Blocked",
+  "live_requests": "Not Run",
   "policy": "Passed",
   "request_matrix": [
     {
       "case": "valid_cdn",
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent.",
       "http_status": null
     },
     {
       "case": "direct_origin_missing_header",
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent.",
       "http_status": null
     },
     {
       "case": "direct_origin_wrong_secret",
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent.",
       "http_status": null
     },
     {
       "case": "direct_ip",
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent.",
       "http_status": null
     },
     {
       "case": "direct_hostname",
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent.",
       "http_status": null
     }

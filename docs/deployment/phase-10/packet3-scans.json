@@ -1,8 +1,8 @@
 {
-  "live_alert": "Blocked",
+  "live_alert": "Not Run",
   "live_alert_reason": "CloudWatch log group and metric filters exist in IaC. Live denial alarm delivery was not proven.",
   "live_reason": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
-  "live_scan": "Blocked",
+  "live_scan": "Not Run",
   "log_group": "/smart-rag/staging/egress-denials",
   "metrics": {
     "direct_origin_denials": "DirectOriginDenials",
@@ -13,70 +13,70 @@
   "schema_version": "phase10-packet3-scans-v1",
   "targets": [
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "caddy origin beyond CloudFront prefix list",
       "target": "tcp/443"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "ssh",
       "target": "tcp/22"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "paradedb",
       "target": "tcp/5432"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "valkey",
       "target": "tcp/6379"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "crawl-proxy/provider-egress host publish",
       "target": "tcp/8080"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "lightrag",
       "target": "tcp/9621"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "lightrag",
       "target": "tcp/9624"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "packet8 paradedb overlay",
       "target": "tcp/54329"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "management",
       "target": "udp/161"
     },
     {
-      "classification": "Blocked",
+      "classification": "Not Run",
       "detail": "No EC2 host or scan artifact. Live private-port and metadata scans were not run.",
       "observed": null,
       "role": "instance metadata",

@@ -4,12 +4,12 @@
     {
       "field": "live_apply",
       "packet": "P10-01",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_oidc_assume",
       "packet": "P10-02",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_secret_rotation",
@@ -19,27 +19,27 @@
     {
       "field": "live_ssm_migrate",
       "packet": "P10-02",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_cdn_requests",
       "packet": "P10-03",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_denial_alert",
       "packet": "P10-03",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_port_scan",
       "packet": "P10-03",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_cdn_sse",
       "packet": "P10-04",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_managed_jwks",
@@ -49,67 +49,67 @@
     {
       "field": "live_origin_rotation",
       "packet": "P10-04",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_paradedb_kill",
       "packet": "P10-04",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_valkey_kill",
       "packet": "P10-04",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_kms_object_lock",
       "packet": "P10-05",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_managed_pool",
       "packet": "P10-05",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_managed_resources",
       "packet": "P10-05",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_ses_send",
       "packet": "P10-05",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_sns_ack",
       "packet": "P10-05",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_drain",
       "packet": "P10-06",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_ec2_rebuild",
       "packet": "P10-06",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_instance_rebuild",
       "packet": "P10-06",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_managed_pitr",
       "packet": "P10-06",
-      "state": "Blocked"
+      "state": "Not Run"
     },
     {
       "field": "live_reconciliation",
       "packet": "P10-06",
-      "state": "Blocked"
+      "state": "Not Run"
     }
   ],
   "p10_07_a": "Blocked",

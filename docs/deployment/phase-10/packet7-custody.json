@@ -28,12 +28,12 @@
       "passed": true
     }
   ],
-  "live_oidc_assume": "Blocked",
-  "live_reason": "Terraform/OpenTofu are not installed; live apply is Blocked. aws sts get-caller-identity failed (session missing or expired)",
+  "live_oidc_assume": "Not Run",
+  "live_reason": "Credentials exist but Packet 1 must not apply Terraform from CI",
   "oidc_no_long_lived_github_secrets": true,
   "paradedb_digest_pinned": true,
   "policy": "Passed",
-  "policy_sha256": "9a9d3c644755b4e59db7513fe0869885a6a4d61147aeda2c222061d5ec766724",
+  "policy_sha256": "252d7202bdfd2f32a2c70d96602758615a170e6406ab97df92a18a141d4e7929",
   "private_ports": true,
   "schema_version": "phase10-packet7-custody-v1",
   "vercel_public_env_only": true

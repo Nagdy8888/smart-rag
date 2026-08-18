@@ -2,7 +2,7 @@
   "freeze_api_id": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
   "host_data_canonical": false,
   "live_reason": "No timed EC2 instance rebuild. RTO \u22644h and RPO \u226424h remain targets, not measurements.",
-  "live_timed_rebuild": "Blocked",
+  "live_timed_rebuild": "Not Run",
   "measurement_kind": "target_not_measurement",
   "rpo_measured_hours": null,
   "rpo_target_hours": 24,

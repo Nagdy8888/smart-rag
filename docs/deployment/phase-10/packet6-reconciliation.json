@@ -1,7 +1,7 @@
 {
   "live_orphan_counts": null,
   "live_reason": "No live managed reconciliation. Orphan counts were not invented. Policy requires restore_incomplete exclusion and orphan quarantine before any BM25 rebuild.",
-  "live_reconciliation": "Blocked",
+  "live_reconciliation": "Not Run",
   "orphan_action": "quarantine_append_only_audit_alert",
   "policy": "Passed",
   "rebuild_before_reconcile": false,

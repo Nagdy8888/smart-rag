@@ -8,7 +8,7 @@
     {
       "check": "P10-07-B",
       "classification": "Passed",
-      "detail": "Committed custody/IaC Passed: OIDC with no long-lived GitHub secrets, private ports, digest-pinned ParadeDB, expand/contract find_migration_violations, Vercel public env only. Live OIDC assume remains Blocked (Terraform/OpenTofu are not installed; live apply is Blocked. aws sts get-caller-identity failed (session missing or expired)). Fake origin 200/403 is Failed."
+      "detail": "Committed custody/IaC Passed: OIDC with no long-lived GitHub secrets, private ports, digest-pinned ParadeDB, expand/contract find_migration_violations, Vercel public env only. Live OIDC assume remains Not Run (Credentials exist but Packet 1 must not apply Terraform from CI). Fake origin 200/403 is Failed."
     },
     {
       "check": "P10-07-C",
@@ -33,7 +33,7 @@
   },
   "holdout_opened": false,
   "independent_assessment": "not_run",
-  "live_oidc_assume": "Blocked",
+  "live_oidc_assume": "Not Run",
   "packet": "P10-07",
   "packet1_checkbox": "unchecked",
   "packet2_checkbox": "unchecked",
@@ -59,7 +59,7 @@
     "worker": "sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e"
   },
   "policy": "Passed",
-  "policy_sha256": "9a9d3c644755b4e59db7513fe0869885a6a4d61147aeda2c222061d5ec766724",
+  "policy_sha256": "252d7202bdfd2f32a2c70d96602758615a170e6406ab97df92a18a141d4e7929",
   "recommendation": "no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close",
   "schema_version": "phase10-packet7-matrix-v1",
   "user_acceptance_request": "Request for user acceptance: Phase 10 remains status pending with all seven packet checkboxes unchecked. The honest recommendation is no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production.",

@@ -1,0 +1,89 @@
+{
+  "schema_version": "phase10-live-aws-inventory-v1",
+  "recorded_at": "2026-08-18T20:55:00Z",
+  "aws_profile": "Nagdy-iam",
+  "aws_account": "665602132723",
+  "aws_region": "us-east-1",
+  "caller_arn": "arn:aws:iam::665602132723:user/Muna",
+  "secrets_read": false,
+  "terraform_applied_from_ci": false,
+  "ec2": {
+    "instance_id": "i-0abe79350a3880e87",
+    "state": "running",
+    "instance_type": "t3.micro",
+    "intended_instance_type": "m6i.xlarge",
+    "public_ip": "52.206.156.176",
+    "private_ip": "10.40.0.201",
+    "imds_http_tokens": "required",
+    "imds_hop_limit": 1,
+    "ssm_ping": "Online",
+    "sshd": "inactive",
+    "host_listen": ["127.0.0.1:44923"],
+    "mem_total_mib": 916,
+    "compose_files_present": true,
+    "compose_started": false,
+    "compose_start_blocked_reason": "t3.micro 916Mi vs Compose mem_limits >1Gi"
+  },
+  "cloudfront": {
+    "id": "E2W9UNLLZ6I383",
+    "domain": "dzm8yijuajwge.cloudfront.net",
+    "status": "Deployed",
+    "origin_domain": "origin.staging.example.invalid",
+    "origin_read_timeout_seconds": 90,
+    "origin_keepalive_timeout_seconds": 90,
+    "origin_protocol": "https-only",
+    "waf_web_acl_id": "bc02673b-cb26-4467-934c-c81043ccfd43"
+  },
+  "origin_security_group": {
+    "id": "sg-02398d702405818e6",
+    "ingress_443": "prefix-list pl-3b927c52 only",
+    "ssh_ingress": false
+  },
+  "oidc": {
+    "provider": "arn:aws:iam::665602132723:oidc-provider/token.actions.githubusercontent.com",
+    "roles": [
+      "smart-rag-staging-ec2",
+      "smart-rag-staging-oidc-migrate",
+      "smart-rag-staging-oidc-deploy",
+      "smart-rag-production-oidc-migrate"
+    ],
+    "live_assume_role_with_web_identity": false
+  },
+  "secretsmanager": {
+    "names_only": ["smart-rag/staging/db", "smart-rag/production/db"],
+    "rotation_enabled": false,
+    "values_read": false
+  },
+  "ssm_documents": [
+    "SmartRagStagingMigrate",
+    "SmartRagStagingDeploy",
+    "SmartRagProductionMigrate"
+  ],
+  "live_ssm_migrate_run": false,
+  "s3_audit": {
+    "bucket": "smart-rag-staging-audit-anchors",
+    "object_lock": "GOVERNANCE",
+    "retention_years": 7,
+    "versioning": "Enabled",
+    "sse": "aws:kms",
+    "live_put_get_proven": false
+  },
+  "sns_topics": ["arn:aws:sns:us-east-1:665602132723:smart-rag-staging-ops"],
+  "budget": {
+    "name": "smart-rag-staging-monthly",
+    "amount_usd": "50.0",
+    "time_unit": "MONTHLY"
+  },
+  "ses": {
+    "identity": "staging-alerts@example.invalid",
+    "verification": "Pending"
+  },
+  "ecr_repositories": [
+    "smart-rag-api",
+    "smart-rag-worker",
+    "smart-rag-crawl-proxy",
+    "smart-rag-parser-sandbox"
+  ],
+  "images_pushed": false,
+  "phase11_recommendation": "no-go"
+}

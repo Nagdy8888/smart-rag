@@ -16,8 +16,11 @@ the Pro/us-east-1/PITR freeze
 Live AWS/Vercel apply: Terraform apply created the staging VPC, CloudFront,
 WAF, SES identity, OIDC, KMS/S3 Object Lock, and EC2. Live inventory:
 [packet1-live-aws.json](./phase-10/packet1-live-aws.json).
-Compose/Caddy files were copied to `/opt/smart-rag` via SSM; the stack was
-**not** started (`t3.micro` has 916Mi RAM). An internet EIP probe closed
+Live inventory (profile `Nagdy-iam`, no secrets):
+[phase10-live-aws-inventory.json](./phase-10/phase10-live-aws-inventory.json).
+Compose/Caddy files are on `/opt/smart-rag`; the stack was **not** started
+(`t3.micro` has 916Mi RAM). CloudFront origin timeouts are live 90/90 with
+placeholder origin hostname. An internet EIP probe closed
 22/80/443/5432/6379/8000/8080/8443 but does **not** qualify as P10-01-C
 because ParadeDB/Valkey are not running
 ([packet1-live-network-scan.json](./phase-10/packet1-live-network-scan.json)).

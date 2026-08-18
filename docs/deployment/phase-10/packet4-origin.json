@@ -2,7 +2,7 @@
   "caddy_current_and_previous": true,
   "cloudfront_custom_header": true,
   "live_reason": "No CloudFront distribution or EC2 origin. Live dual origin-secret rotation was not executed.",
-  "live_rotation": "Blocked",
+  "live_rotation": "Not Run",
   "overlap_minutes_max": 15,
   "policy": "Passed",
   "rollback_documented": true,

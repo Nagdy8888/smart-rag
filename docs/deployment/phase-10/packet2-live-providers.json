@@ -1,13 +1,13 @@
 {
-  "apply_reason": "Terraform/OpenTofu are not installed; live apply is Blocked. aws sts get-caller-identity failed (session missing or expired)",
+  "apply_reason": "Credentials exist but Packet 1 must not apply Terraform from CI",
   "aws_cli_installed": true,
-  "oidc_assume": "Blocked",
+  "oidc_assume": "Not Run",
   "schema_version": "phase10-packet2-live-v1",
   "secret_rotation": "Blocked",
   "secret_rotation_reason": "hashicorp/aws 5.100 aws_secretsmanager_secret_rotation requires a Lambda for non-RDS secrets; this packet does not invent one",
-  "ssm_migrate": "Blocked",
-  "sts_detail": "aws sts get-caller-identity failed (session missing or expired)",
-  "sts_ok": false,
-  "terraform_installed": false,
+  "ssm_migrate": "Not Run",
+  "sts_detail": "sts succeeded; Packet 1 still does not apply Terraform",
+  "sts_ok": true,
+  "terraform_installed": true,
   "tofu_installed": false
 }

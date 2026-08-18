@@ -8,22 +8,22 @@
     {
       "check": "P10-04-B",
       "classification": "Blocked",
-      "detail": "Committed Caddy CURRENT+PREVIOUS, CloudFront custom_header, overlap<=15 minutes, and rollback runbook Passed. Live origin rotation is Blocked: No CloudFront distribution or EC2 origin. Live dual origin-secret rotation was not executed."
+      "detail": "Committed Caddy CURRENT+PREVIOUS, CloudFront custom_header, overlap<=15 minutes, and rollback runbook Passed. Live origin rotation is Not Run: No CloudFront distribution or EC2 origin. Live dual origin-secret rotation was not executed."
     },
     {
       "check": "P10-04-C",
       "classification": "Blocked",
-      "detail": "90-second CloudFront/Caddy settings Passed. Live 50-second CDN SSE is Blocked: No CloudFront 50-second SSE timeline. Local EventSource is not CDN. Supporting application SSE tests are not a CloudFront timeline."
+      "detail": "90-second CloudFront/Caddy settings Passed. Live 50-second CDN SSE is Not Run: No CloudFront 50-second SSE timeline. Local EventSource is not CDN. Supporting application SSE tests are not a CloudFront timeline."
     },
     {
       "check": "P10-04-D",
       "classification": "Passed",
-      "detail": "Application Hybrid dense+term degrade and Phase 9 rebuild parity (ParadeDB not canonical) Passed. Live EC2 ParadeDB kill is Blocked: No EC2 ParadeDB kill or version-mismatch drill. Local compose degrade is not a managed host kill."
+      "detail": "Application Hybrid dense+term degrade and Phase 9 rebuild parity (ParadeDB not canonical) Passed. Live EC2 ParadeDB kill is Not Run: No EC2 ParadeDB kill or version-mismatch drill. Local compose degrade is not a managed host kill."
     },
     {
       "check": "P10-04-E",
       "classification": "Passed",
-      "detail": "Application Valkey fail-closed ownership and no double admission Passed. Named ACL users are Not Run. Live EC2 Valkey kill is Blocked: No EC2 Valkey kill. Application fail-closed tests are not a managed host outage."
+      "detail": "Application Valkey fail-closed ownership and no double admission Passed. Named ACL users are Not Run. Live EC2 Valkey kill is Not Run: No EC2 Valkey kill. Application fail-closed tests are not a managed host outage."
     }
   ],
   "holdout_opened": false,
@@ -34,11 +34,11 @@
     "skipped": 0,
     "tests": 11
   },
-  "live_cdn_sse": "Blocked",
+  "live_cdn_sse": "Not Run",
   "live_managed_jwks": "Not Run",
-  "live_origin_rotation": "Blocked",
-  "live_paradedb_kill": "Blocked",
-  "live_valkey_kill": "Blocked",
+  "live_origin_rotation": "Not Run",
+  "live_paradedb_kill": "Not Run",
+  "live_valkey_kill": "Not Run",
   "origin_policy": "Passed",
   "origin_policy_sha256": "d072fb135af7007c016f9ab654c9392e5e6ce38a3dce41f7f1ed74a3a60673cf",
   "packet": "P10-04",

@@ -9,7 +9,7 @@
   "budget_tests": [
     "tests/contract/test_connection_budgets.py::test_worst_case_connection_budget_under_seventy_percent"
   ],
-  "live_managed_pool": "Blocked",
+  "live_managed_pool": "Not Run",
   "live_reason": "Managed Pro pooling and database pressure were not measured. Local 30<42 math and 70% pause tests are not managed pool proof.",
   "local_budget_30_lt_42": true,
   "pause_subset": {

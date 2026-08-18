@@ -1,7 +1,7 @@
 {
   "application_degrade": "Passed",
   "fallback_reason": "bm25_unavailable",
-  "live_ec2_kill": "Blocked",
+  "live_ec2_kill": "Not Run",
   "live_reason": "No EC2 ParadeDB kill or version-mismatch drill. Local compose degrade is not a managed host kill.",
   "paradedb_subset": {
     "files": [

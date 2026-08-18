@@ -1,13 +1,16 @@
 {
   "schema_version": "phase10-live-network-scan-v1",
   "qualifies_for_p10_01_c": false,
-  "qualifies_reason": "Compose/Caddy/ParadeDB/Valkey are not running on the instance. An internet TCP probe of the EIP cannot prove private services have no host ports when started.",
-  "scanned_at": "2026-08-18T20:12:00Z",
-  "method": "System.Net.Sockets.TcpClient BeginConnect with 2000ms timeout from a workstation outside the VPC",
+  "qualifies_reason": "Compose/Caddy/ParadeDB/Valkey are still not running. Host listen is only 127.0.0.1:44923 (SSM). An internet TCP probe cannot prove private-service bind policy for a running stack.",
+  "scanned_at": "2026-08-18T20:55:00Z",
+  "method": "System.Net.Sockets.TcpClient BeginConnect with 2000ms timeout from a workstation outside the VPC, plus SSM ss -lnt on the instance",
   "target_eip": "52.206.156.176",
   "instance_id": "i-0abe79350a3880e87",
-  "compose_copied_via_ssm": false,
-  "aws_session": "expired_at_scan_time",
+  "compose_copied_via_ssm": true,
+  "compose_started": false,
+  "aws_session": "Nagdy-iam",
+  "ssm_listen": ["127.0.0.1:44923"],
+  "sshd": "inactive",
   "results": [
     {"port": 22, "open": false},
     {"port": 80, "open": false},
@@ -19,8 +22,8 @@
     {"port": 8443, "open": false}
   ],
   "notes": [
-    "Origin security group allows tcp/443 only from CloudFront prefix list pl-3b927c52; workstation 443 closed is expected even if Caddy later listens.",
-    "No SSH ingress in IaC; port 22 closed is consistent.",
-    "P10-01-C stays Blocked until SSM copies compose, services start, and a scan is repeated against the running topology."
+    "Origin SG allows tcp/443 only from CloudFront prefix list pl-3b927c52.",
+    "sshd disabled via SSM. Public 22 remains closed.",
+    "P10-01-C stays Blocked until the digest-pinned stack runs on a host that can hold Compose mem_limits and the scan is repeated."
   ]
 }

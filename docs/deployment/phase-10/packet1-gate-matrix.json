@@ -8,7 +8,7 @@
     {
       "check": "P10-01-B",
       "classification": "Blocked",
-      "detail": "IaC policy Passed. Runtime EC2/IMDS/SSH assertions are Blocked: AWS session is missing or expired; live apply is Blocked. Do not run aws login from this packet."
+      "detail": "IaC policy Passed. Runtime EC2/IMDS/SSH assertions are Not Run: Credentials exist but Packet 1 must not apply Terraform from CI"
     },
     {
       "check": "P10-01-C",
@@ -18,7 +18,7 @@
     {
       "check": "P10-01-D",
       "classification": "Passed",
-      "detail": "Committed Vercel allow-list is API URL, Supabase URL, and publishable key only. Live Vercel/SES environment apply is Blocked."
+      "detail": "Committed Vercel allow-list is API URL, Supabase URL, and publishable key only. Live Vercel/SES environment apply is Not Run."
     },
     {
       "check": "P10-01-E",
@@ -29,7 +29,7 @@
   "holdout_opened": false,
   "iac_policy": "Passed",
   "iac_sha256": "661ab394964e33e219308f7b01532dc9e6f9655132632d2361aaf022b7bd6649",
-  "live_apply": "Blocked",
+  "live_apply": "Not Run",
   "packet": "P10-01",
   "packet1_checkbox": "unchecked",
   "phase9_image_ids": {

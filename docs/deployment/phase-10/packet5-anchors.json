@@ -5,7 +5,7 @@
     "phase_10_blocker": true,
     "s3_object_lock": false
   },
-  "live_put_object": "Blocked",
+  "live_put_object": "Not Run",
   "live_reason": "No live Object-Lock GetObject of a KMS-signed chain head. Terraform is not applied and AWS session is expired or missing.",
   "policy": "Passed",
   "schema_version": "phase10-packet5-anchors-v1",

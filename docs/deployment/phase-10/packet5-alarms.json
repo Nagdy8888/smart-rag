@@ -1,7 +1,7 @@
 {
   "budget_unbounded": false,
   "budget_usd": 50,
-  "live_delivery": "Blocked",
+  "live_delivery": "Not Run",
   "live_reason": "IaC and runbook routing exist. Live SNS publish, acknowledgement, and escalation were not run.",
   "matrix": [
     {

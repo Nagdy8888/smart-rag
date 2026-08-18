@@ -3,7 +3,7 @@
     {
       "check": "P10-02-A",
       "classification": "Passed",
-      "detail": "Committed GitHub OIDC trust/permissions allow-deny tests Passed for Nagdy8888/Demo_Project_3. Live AssumeRoleWithWebIdentity is Blocked: Terraform/OpenTofu are not installed; live apply is Blocked. aws sts get-caller-identity failed (session missing or expired)"
+      "detail": "Committed GitHub OIDC trust/permissions allow-deny tests Passed for Nagdy8888/Demo_Project_3. Live AssumeRoleWithWebIdentity is Not Run: Credentials exist but Packet 1 must not apply Terraform from CI"
     },
     {
       "check": "P10-02-B",
@@ -13,7 +13,7 @@
     {
       "check": "P10-02-C",
       "classification": "Blocked",
-      "detail": "Immutable migration hash f967d4814d272c9d8f62d9f01501ab64963f02076fe4a2dd5ef99f8a9366ed87 over 52 files. Expand/contract policy Passed. Protected environment wiring Passed. Live SSM migrate is Blocked."
+      "detail": "Immutable migration hash f967d4814d272c9d8f62d9f01501ab64963f02076fe4a2dd5ef99f8a9366ed87 over 52 files. Expand/contract policy Passed. Protected environment wiring Passed. Live SSM migrate is Not Run."
     },
     {
       "check": "P10-02-D",
@@ -27,9 +27,9 @@
     }
   ],
   "holdout_opened": false,
-  "live_oidc_assume": "Blocked",
+  "live_oidc_assume": "Not Run",
   "live_secret_rotation": "Blocked",
-  "live_ssm_migrate": "Blocked",
+  "live_ssm_migrate": "Not Run",
   "migration_sha256": "f967d4814d272c9d8f62d9f01501ab64963f02076fe4a2dd5ef99f8a9366ed87",
   "oidc_policy": "Passed",
   "oidc_sha256": "79f626810cc222cbd3af437cda52bb0743c140abd02dd5d551237af6e716ad6d",
