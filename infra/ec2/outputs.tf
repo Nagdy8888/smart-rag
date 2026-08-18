@@ -47,5 +47,35 @@ output "ses_configuration_set" {
 
 output "instance_role_name" {
   value       = aws_iam_role.staging_instance.name
-  description = "EC2 instance role. OIDC deploy roles are Packet 2."
+  description = "EC2 instance role. Fetches staging secrets for one-shot SSM jobs."
+}
+
+output "github_oidc_provider_arn" {
+  value       = aws_iam_openid_connect_provider.github.arn
+  description = "GitHub OIDC provider ARN after apply. Live assume is not proven here."
+}
+
+output "staging_oidc_migrate_role_arn" {
+  value       = aws_iam_role.staging_oidc_migrate.arn
+  description = "Staging migrate OIDC role. Store as GitHub environment var, not a secret."
+}
+
+output "staging_oidc_deploy_role_arn" {
+  value       = aws_iam_role.staging_oidc_deploy.arn
+  description = "Staging deploy OIDC role. Store as GitHub environment var, not a secret."
+}
+
+output "production_oidc_migrate_role_arn" {
+  value       = aws_iam_role.production_oidc_migrate.arn
+  description = "Production migrate OIDC role. Live production assume remains Blocked."
+}
+
+output "staging_migrate_document_name" {
+  value       = aws_ssm_document.staging_migrate.name
+  description = "Named SSM migrate document the staging OIDC role may invoke."
+}
+
+output "secret_rotation_max_days" {
+  value       = local.secret_rotation_max_days
+  description = "Custody maximum days between rotations. Live rotation Lambda is absent."
 }

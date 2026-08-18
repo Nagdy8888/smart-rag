@@ -1,4 +1,4 @@
-# Least-privilege instance role for Packet 1. GitHub OIDC deploy roles are Packet 2.
+# Least-privilege instance role. GitHub OIDC roles live in oidc.tf (Packet 2).
 
 data "aws_iam_policy_document" "ec2_assume" {
   statement {
@@ -31,6 +31,18 @@ data "aws_iam_policy_document" "staging_secrets" {
     actions = ["secretsmanager:GetSecretValue"]
     resources = [
       "arn:aws:secretsmanager:${var.aws_region}:*:secret:${var.staging_secret_prefix}*"
+    ]
+  }
+
+  statement {
+    sid    = "DenyProductionSecrets"
+    effect = "Deny"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:PutSecretValue",
+    ]
+    resources = [
+      "arn:aws:secretsmanager:${var.aws_region}:*:secret:${var.production_secret_prefix}*"
     ]
   }
 }

@@ -1,0 +1,56 @@
+name: Staging deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_image_id:
+        description: Immutable API image id to record. Must match the Phase 9 freeze unless a later packet updates it.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Protected staging deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Configure AWS credentials via GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          audience: sts.amazonaws.com
+          aws-region: us-east-1
+          role-to-assume: ${{ vars.STAGING_OIDC_DEPLOY_ROLE_ARN }}
+          role-session-name: staging-deploy
+
+      - name: Send named SmartRagStagingDeploy command
+        env:
+          STAGING_INSTANCE_ID: ${{ vars.STAGING_INSTANCE_ID }}
+          IMAGE_API: ${{ inputs.api_image_id }}
+          OPERATOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STAGING_INSTANCE_ID}" ]; then
+            echo "Blocked: STAGING_INSTANCE_ID GitHub environment variable is unset"
+            exit 1
+          fi
+          aws ssm send-command \
+            --instance-ids "${STAGING_INSTANCE_ID}" \
+            --document-name "SmartRagStagingDeploy" \
+            --comment "protected staging deploy" \
+            --parameters "Operator=${OPERATOR},ImageApi=${IMAGE_API}" \
+            --output json

@@ -59,3 +59,21 @@ variable "staging_secret_prefix" {
   description = "Secrets Manager name prefix the instance role may read."
   default     = "smart-rag/staging/"
 }
+
+variable "production_secret_prefix" {
+  type        = string
+  description = "Production Secrets Manager prefix. Staging roles must not read it."
+  default     = "smart-rag/production/"
+}
+
+variable "github_repository" {
+  type        = string
+  description = "GitHub owner/name trusted by OIDC. Wrong repos cannot assume."
+  default     = "Nagdy8888/Demo_Project_3"
+}
+
+variable "production_project_name" {
+  type        = string
+  description = "Name prefix for production OIDC/SSM resources."
+  default     = "smart-rag-production"
+}

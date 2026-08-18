@@ -1,0 +1,32 @@
+{
+  "findings": [
+    {
+      "check": "oidc_trust",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "oidc_permissions",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "secret_custody",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "ssm_documents",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "workflows",
+      "detail": "ok",
+      "passed": true
+    }
+  ],
+  "oidc_sha256": "67cd8ba7e5188f355b2b6681df228ff71e9d8fdbcd7c31d2914f6e8e018b043f",
+  "passed": true,
+  "schema_version": "phase10-packet2-iac-v1"
+}

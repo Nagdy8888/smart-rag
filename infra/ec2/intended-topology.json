@@ -66,5 +66,20 @@
   },
   "synthetic_corpus_manifest": "docs/deployment/phase-09/candidate-corpus-manifest.json",
   "region_freeze_note": "Packet 1 intended freeze, not a prior client-signed region",
-  "live_provisioned": false
+  "live_provisioned": false,
+  "github_repository": "Nagdy8888/Demo_Project_3",
+  "github_oidc_issuer": "https://token.actions.githubusercontent.com",
+  "github_oidc_audience": "sts.amazonaws.com",
+  "staging_oidc_sub": "repo:Nagdy8888/Demo_Project_3:environment:staging",
+  "production_oidc_sub": "repo:Nagdy8888/Demo_Project_3:environment:production",
+  "staging_migrate_document": "SmartRagStagingMigrate",
+  "staging_deploy_document": "SmartRagStagingDeploy",
+  "production_migrate_document": "SmartRagProductionMigrate",
+  "staging_secret_prefix": "smart-rag/staging/",
+  "production_secret_prefix": "smart-rag/production/",
+  "secret_rotation_max_days": 90,
+  "secret_rotation_lambda_present": false,
+  "live_oidc_assume": "Blocked",
+  "live_ssm_migrate": "Blocked",
+  "live_secret_rotation": "Blocked"
 }

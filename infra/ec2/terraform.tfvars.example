@@ -13,3 +13,7 @@ ses_from_email   = "staging-alerts@example.invalid"
 # origin_header_value
 # origin_header_name_previous
 # origin_header_value_previous
+
+# Packet 2 OIDC defaults are in variables.tf. Do not put role ARNs that
+# embed account ids into git if they are treated as confidential; GitHub
+# Environment vars hold the applied ARNs after live apply.

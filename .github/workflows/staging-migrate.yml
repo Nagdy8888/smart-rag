@@ -1,0 +1,66 @@
+name: Staging migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration_hash:
+        description: Reviewed immutable migration SHA-256. Must match the checked-out tree.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: staging-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Protected staging expand migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup Python with uv
+        uses: ./.github/actions/setup-python-uv
+
+      - name: Review expand/contract policy
+        run: uv run python scripts/ci/check_migrations.py
+
+      - name: Configure AWS credentials via GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          audience: sts.amazonaws.com
+          aws-region: us-east-1
+          role-to-assume: ${{ vars.STAGING_OIDC_MIGRATE_ROLE_ARN }}
+          role-session-name: staging-migrate
+
+      - name: Send named SmartRagStagingMigrate command
+        env:
+          STAGING_INSTANCE_ID: ${{ vars.STAGING_INSTANCE_ID }}
+          REQUESTED_HASH: ${{ inputs.migration_hash }}
+          OPERATOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STAGING_INSTANCE_ID}" ]; then
+            echo "Blocked: STAGING_INSTANCE_ID GitHub environment variable is unset"
+            exit 1
+          fi
+          if [ -z "${REQUESTED_HASH}" ]; then
+            echo "Blocked: migration hash input is empty"
+            exit 1
+          fi
+          aws ssm send-command \
+            --instance-ids "${STAGING_INSTANCE_ID}" \
+            --document-name "SmartRagStagingMigrate" \
+            --comment "protected expand migrate" \
+            --parameters "MigrationHash=${REQUESTED_HASH},Operator=${OPERATOR}" \
+            --output json

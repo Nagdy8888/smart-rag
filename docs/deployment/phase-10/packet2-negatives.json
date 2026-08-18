@@ -1,0 +1,35 @@
+{
+  "cases": [
+    {
+      "case": "wrong_repo",
+      "exercise": "tests/unit/test_phase10_packet2.py",
+      "expected": "Phase10OidcError"
+    },
+    {
+      "case": "missing_environment",
+      "exercise": "tests/unit/test_phase10_packet2.py",
+      "expected": "Phase10OidcError"
+    },
+    {
+      "case": "aws_access_key_in_workflow",
+      "exercise": "tests/unit/test_phase10_packet2.py",
+      "expected": "Phase10OidcError"
+    },
+    {
+      "case": "drop_table_migration",
+      "exercise": "tests/unit/test_phase10_packet2.py",
+      "expected": "find_migration_violations"
+    },
+    {
+      "case": "production_secret_arn_on_staging_role",
+      "exercise": "tests/unit/test_phase10_packet2.py",
+      "expected": "Phase10OidcError"
+    },
+    {
+      "case": "vercel_service_role",
+      "exercise": "tests/unit/test_phase10_packet2.py",
+      "expected": "Phase10TopologyError"
+    }
+  ],
+  "schema_version": "phase10-packet2-negatives-v1"
+}

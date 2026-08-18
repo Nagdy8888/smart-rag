@@ -79,6 +79,13 @@ is also a local gate. It parses committed Terraform/Compose/Caddy/inventory
 in Python. It is not added to the GitHub PR job graph and does not apply
 cloud resources. See [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
 
+Phase 10 Packet 2 OIDC/protected-migration policy
+(`scripts/ci/check_phase10_packet2.py`) is a local gate. It parses committed
+OIDC roles, named SSM documents, protected workflows, and secret prefixes.
+It reuses `scripts/ci/check_migrations.py`. It is not added to `pr-fast.yml`.
+Live OIDC assume and SSM migrate stay Blocked. See
+[PROTECTED_MIGRATION_CREDENTIALS.md](../security/PROTECTED_MIGRATION_CREDENTIALS.md).
+
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and
 artifact upload. A local workflow definition is not remote execution

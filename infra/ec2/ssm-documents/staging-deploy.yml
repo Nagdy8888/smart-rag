@@ -1,0 +1,38 @@
+---
+schemaVersion: "2.2"
+description: >-
+  One-shot staging deploy of digest-pinned Compose services. Does not fetch
+  database secrets. Unsets process environment on EXIT. Records operator and
+  result.
+parameters:
+  Operator:
+    type: String
+    description: GitHub actor. Not a credential.
+  ImageApi:
+    type: String
+    description: Immutable API image id. Not a secret.
+mainSteps:
+  - action: aws:runShellScript
+    name: StagingDeploy
+    inputs:
+      timeoutSeconds: 1200
+      runCommand:
+        - |
+          set -eu
+          RESULT="failed"
+          unset_env() {
+            unset DATABASE_URL PGPASSWORD SUPABASE_SERVICE_ROLE_KEY
+            echo "operator={{Operator}} image_api={{ImageApi}} result=${RESULT}"
+          }
+          trap unset_env EXIT
+          set +x
+          if [ ! -f /opt/smart-rag/docker-compose.staging.yml ]; then
+            echo "blocked: staging compose is missing on the instance"
+            RESULT="blocked_compose"
+            exit 1
+          fi
+          cd /opt/smart-rag
+          docker compose -f docker-compose.staging.yml pull
+          docker compose -f docker-compose.staging.yml up -d
+          RESULT="ok"
+          echo "deploy completed without database secrets in the GitHub role"

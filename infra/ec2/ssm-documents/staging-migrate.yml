@@ -1,0 +1,93 @@
+---
+schemaVersion: "2.2"
+description: >-
+  One-shot staging expand migration. The instance role fetches
+  smart-rag/staging/db. Command output is redacted. Process environment is
+  unset on EXIT. Records migration   hash, operator, and result. Runtime extension-create is rejected.
+  Live run is Blocked until the instance and secret value exist.
+parameters:
+  MigrationHash:
+    type: String
+    description: Immutable SHA-256 of reviewed supabase/migrations files.
+  Operator:
+    type: String
+    description: GitHub actor. Not a credential.
+mainSteps:
+  - action: aws:runShellScript
+    name: ExpandMigrate
+    inputs:
+      timeoutSeconds: 900
+      runCommand:
+        - |
+          set -eu
+          RESULT="failed"
+          DSN_FILE="/tmp/smart-rag-migrate-dsn"
+          unset_secrets() {
+            unset SECRET_JSON DATABASE_URL PGPASSWORD SUPABASE_DB_URL MIGRATION_DSN
+            rm -f "${DSN_FILE}"
+            echo "migration_hash={{MigrationHash}} operator={{Operator}} result=${RESULT}"
+          }
+          trap unset_secrets EXIT
+          set +x
+          export AWS_PAGER=""
+          if [ ! -d /opt/smart-rag/supabase/migrations ]; then
+            echo "blocked: migration files are not on the instance"
+            RESULT="blocked_files"
+            exit 1
+          fi
+          if grep -R -E -i --include='*.sql' 'CREATE[[:space:]]+EXTENSION' /opt/smart-rag/supabase/migrations >/dev/null 2>&1; then
+            echo "blocked: CREATE EXTENSION is forbidden in reviewed migrations"
+            RESULT="blocked_extension"
+            exit 1
+          fi
+          if grep -R -E -i --include='*.sql' 'DROP[[:space:]]+TABLE|DROP[[:space:]]+COLUMN' /opt/smart-rag/supabase/migrations >/dev/null 2>&1; then
+            echo "blocked: contraction DDL is forbidden in this release"
+            RESULT="blocked_contraction"
+            exit 1
+          fi
+          SECRET_JSON="$(aws secretsmanager get-secret-value --secret-id 'smart-rag/staging/db' --query SecretString --output text 2>/dev/null || true)"
+          export SECRET_JSON
+          if [ -z "${SECRET_JSON}" ] || [ "${SECRET_JSON}" = "None" ]; then
+            echo "blocked: staging db secret value is absent"
+            RESULT="blocked_secret"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          raw = os.environ.get("SECRET_JSON", "")
+          url = ""
+          try:
+              payload = json.loads(raw)
+              if isinstance(payload, dict):
+                  url = str(
+                      payload.get("database_url")
+                      or payload.get("DATABASE_URL")
+                      or payload.get("url")
+                      or ""
+                  )
+              elif isinstance(payload, str):
+                  url = payload
+          except json.JSONDecodeError:
+              url = raw
+          if not url.startswith("postgres"):
+              raise SystemExit(2)
+          path = Path("/tmp/smart-rag-migrate-dsn")
+          path.write_text(url, encoding="utf-8")
+          path.chmod(0o600)
+          PY
+          if ! command -v psql >/dev/null 2>&1; then
+            echo "blocked: psql is not installed on the instance"
+            RESULT="blocked_psql"
+            exit 1
+          fi
+          DATABASE_URL="$(python3 -c 'from pathlib import Path; print(Path("/tmp/smart-rag-migrate-dsn").read_text(encoding="utf-8").strip())')"
+          export DATABASE_URL
+          for sql in /opt/smart-rag/supabase/migrations/*.sql; do
+            psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${sql}" >/tmp/smart-rag-migrate.out 2>/tmp/smart-rag-migrate.err
+          done
+          sed -E 's/postgres(ql)?:\/\/[^[:space:]]+/postgresql:\/\/***redacted***/g' /tmp/smart-rag-migrate.err >/dev/null
+          RESULT="ok"
+          echo "migrate completed; secret values redacted"

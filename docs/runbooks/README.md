@@ -2,7 +2,7 @@
 title: Runbook backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-18
 audience: operations
 ---
 
@@ -12,7 +12,9 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 
 | Runbook | Owner phase | Prerequisites | Status | Verification | Escalation |
 | --- | --- | --- | --- | --- | --- |
-| Protected migrations / credential rotation | 2/10 | migrations exist | planned | migrate drill | eng-lead |
+| Runbook | Owner phase | Prerequisites | Status | Verification | Escalation |
+| --- | --- | --- | --- | --- |
+| Protected migrations / credential rotation | 2/10 | migrations exist | draft | migrate drill / Packet 2 policy | eng-lead |
 | JWKS / signing-key rollover | 2/10 | Auth asymmetric keys | planned | rollover drill | security |
 | ClamAV engine/signature update | 3 | scanner image | planned | signature freshness test | eng-lead |
 | Valkey outage/recovery | 6/9 | Valkey services | planned | degraded-path test | eng-lead |
@@ -31,4 +33,5 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 
 [lightrag-schema-bootstrap.md](./lightrag-schema-bootstrap.md) ·
 [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](./GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) ·
+[PROTECTED_MIGRATION.md](./PROTECTED_MIGRATION.md) ·
 [docs index](../README.md)

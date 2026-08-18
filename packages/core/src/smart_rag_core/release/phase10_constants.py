@@ -1,8 +1,8 @@
-"""Stable identifiers for Phase 10 Packet 1 managed-staging topology.
+"""Stable identifiers for Phase 10 Packet 1 topology and Packet 2 OIDC custody.
 
-Packet 1 consumes the accepted Phase 9 promotion freeze. It does not claim
-10k Hybrid versions or 1M chunks. Live AWS/Supabase/Vercel/SES apply is a
-separate classification and is not implied by these constants.
+Packet 1 consumes the accepted Phase 9 promotion freeze. Packet 2 adds GitHub
+OIDC, named SSM documents, and Secrets Manager placeholders. Neither packet
+implies live AWS assume, SSM migrate, or secret rotation.
 """
 
 from __future__ import annotations
@@ -23,6 +23,18 @@ PACKET1_INVENTORY_NAME = "packet1-inventory.json"
 PACKET1_IAC_NAME = "packet1-iac-policy.json"
 PACKET1_LIVE_NAME = "packet1-live-providers.json"
 PACKET1_NEGATIVES_NAME = "packet1-negatives.json"
+PACKET2_MATRIX_NAME = "packet2-gate-matrix.json"
+PACKET2_INVENTORY_NAME = "packet2-inventory.json"
+PACKET2_IAC_NAME = "packet2-iac-policy.json"
+PACKET2_LIVE_NAME = "packet2-live-providers.json"
+PACKET2_NEGATIVES_NAME = "packet2-negatives.json"
+PACKET2_MIGRATION_HASH_NAME = "packet2-migration-hash.json"
+GITHUB_WORKFLOWS_DIR = ".github/workflows"
+SSM_DOCUMENTS_DIR = "infra/ec2/ssm-documents"
+MIGRATIONS_DIR = "supabase/migrations"
+PHASE09_OLD_API_SMOKE = (
+    "docs/deployment/phase-09/candidate-old-api-new-schema-smoke.json"
+)
 
 TOPOLOGY_SCHEMA_VERSION = "phase10-intended-topology-v1"
 VERCEL_ENV_SCHEMA_VERSION = "phase10-vercel-public-env-v1"
@@ -31,6 +43,12 @@ PACKET1_INVENTORY_SCHEMA_VERSION = "phase10-packet1-inventory-v1"
 PACKET1_IAC_SCHEMA_VERSION = "phase10-packet1-iac-v1"
 PACKET1_LIVE_SCHEMA_VERSION = "phase10-packet1-live-v1"
 PACKET1_NEGATIVES_SCHEMA_VERSION = "phase10-packet1-negatives-v1"
+PACKET2_MATRIX_SCHEMA_VERSION = "phase10-packet2-matrix-v1"
+PACKET2_INVENTORY_SCHEMA_VERSION = "phase10-packet2-inventory-v1"
+PACKET2_IAC_SCHEMA_VERSION = "phase10-packet2-iac-v1"
+PACKET2_LIVE_SCHEMA_VERSION = "phase10-packet2-live-v1"
+PACKET2_NEGATIVES_SCHEMA_VERSION = "phase10-packet2-negatives-v1"
+PACKET2_MIGRATION_HASH_SCHEMA_VERSION = "phase10-packet2-migration-hash-v1"
 
 AWS_PROVIDER_CONSTRAINT = "~> 5.100"
 INTENDED_AWS_REGION = "us-east-1"
@@ -156,4 +174,36 @@ WRAPPER_RELATIVE = ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging.md"
 PACKET1_RELATIVE = (
     ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
     "01-provision-isolated-managed-staging.md"
+)
+PACKET2_RELATIVE = (
+    ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
+    "02-implement-protected-migrations-and-secrets.md"
+)
+
+GITHUB_REPOSITORY = "Nagdy8888/Demo_Project_3"
+GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
+GITHUB_OIDC_AUDIENCE = "sts.amazonaws.com"
+STAGING_OIDC_SUB = f"repo:{GITHUB_REPOSITORY}:environment:staging"
+PRODUCTION_OIDC_SUB = f"repo:{GITHUB_REPOSITORY}:environment:production"
+STAGING_MIGRATE_WORKFLOW = "staging-migrate.yml"
+STAGING_DEPLOY_WORKFLOW = "staging-deploy.yml"
+PRODUCTION_MIGRATE_WORKFLOW = "production-migrate.yml"
+STAGING_MIGRATE_DOCUMENT = "SmartRagStagingMigrate"
+STAGING_DEPLOY_DOCUMENT = "SmartRagStagingDeploy"
+PRODUCTION_MIGRATE_DOCUMENT = "SmartRagProductionMigrate"
+STAGING_SECRET_PREFIX = "smart-rag/staging/"  # noqa: S105 - name prefix, not a value
+PRODUCTION_SECRET_PREFIX = "smart-rag/production/"  # noqa: S105 - name prefix, not a value
+SECRET_ROTATION_MAX_DAYS = 90
+CHECKOUT_ACTION_PIN = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+CONFIGURE_AWS_CREDENTIALS_SHA = "7474bc4690e29a8392af63c5b98e7449536d5c3a"
+CONFIGURE_AWS_CREDENTIALS_RELEASE = "v4.3.1"
+CONFIGURE_AWS_CREDENTIALS_PIN = (
+    f"aws-actions/configure-aws-credentials@{CONFIGURE_AWS_CREDENTIALS_SHA}"
+)
+LONG_LIVED_WORKFLOW_FRAGMENTS: tuple[str, ...] = (
+    "AWS_ACCESS_KEY",
+    "AWS_SECRET_ACCESS_KEY",
+    "aws-access-key-id",
+    "aws-secret-access-key",
+    "secrets.AWS_",
 )

@@ -1,0 +1,9 @@
+{
+  "github_repository": "Nagdy8888/Demo_Project_3",
+  "live_provisioned": false,
+  "production_secret_prefix": "smart-rag/production/",
+  "schema_version": "phase10-packet2-inventory-v1",
+  "secret_rotation_lambda_present": false,
+  "secret_rotation_max_days": 90,
+  "staging_secret_prefix": "smart-rag/staging/"
+}

@@ -57,7 +57,8 @@ resource "aws_instance" "staging" {
   }
 
   tags = {
-    Name = "${var.project_name}-origin"
+    Name        = "${var.project_name}-origin"
+    Environment = "staging"
   }
 }
 

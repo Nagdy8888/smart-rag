@@ -38,6 +38,7 @@ bound for origin timeouts. The AWS CloudFront API allows OriginReadTimeout
 ```powershell
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
+uv run python scripts/ci/check_phase10_packet2.py
 ```
 
 ## Apply later (when accounts and a valid session exist)
@@ -46,7 +47,10 @@ uv run python scripts/ci/check_phase10_packet1.py
 2. Set sensitive origin header name/value current and previous (no commit).
 3. Install Terraform or OpenTofu. Do not download them from Packet 1 CI.
 4. `terraform init` then `terraform plan` in `infra/ec2`.
-5. Apply only after Packet 1 review sign-off. Packet 2 adds GitHub OIDC.
+5. Apply only after Packet 1 review sign-off. Packet 2 adds GitHub OIDC,
+   named SSM documents, and Secrets Manager placeholders without values.
+   Live OIDC assume is still Blocked until GitHub Environments and a valid
+   session exist.
 
 Live health, prefix-list reachability, and private-port network scans remain
 **Blocked** until a real scan artifact exists.

@@ -30,6 +30,7 @@ uv run python scripts/ci/check_phase09_packet6.py
 uv run python scripts/ci/check_phase09_packet7.py
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
+uv run python scripts/ci/check_phase10_packet2.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -256,9 +257,18 @@ when Terraform/OpenTofu or the AWS session is missing. Do not run
 `aws login` or `terraform apply` from this gate. See
 [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
 
+The Phase 10 Packet 2 gate reviews GitHub OIDC trust, named SSM documents,
+protected workflows, secret-prefix custody, and the immutable migration
+hash. It reuses `scripts/ci/check_migrations.py`. Live OIDC assume, SSM
+migrate, and Secrets Manager rotation stay Blocked. It is local-only and is
+not a GitHub PR job. Zero collected Packet 2 tests fail the gate. Do not
+run `aws sts assume-role-with-web-identity` or `ssm send-command` from this
+gate.
+
 ```powershell
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
+uv run python scripts/ci/check_phase10_packet2.py
 ```
 
 [docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)
