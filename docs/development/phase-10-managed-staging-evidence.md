@@ -149,6 +149,11 @@ Live actuals (no secrets):
   on this project is **unproven**.
 - Remaining repo migrations after Phase 2 are applied to this hosted
   project (not local). Intended freeze constants were **not** rewritten.
+- `query_memory_store_reaper_v1` is now recorded on hosted
+  `schema_migrations`. Duplicate earlier `apply_migration` races left
+  duplicate name rows; objects largely exist. LangSmith claim/record
+  RPCs `app.claim_langsmith_deletion_requests` and
+  `app.record_langsmith_deletion_attempt` are present.
 - `vercel-public-env.json` `live_values` stays `{}` (contract forbids
   committing live keys).
 
@@ -165,7 +170,13 @@ ADR for instance type:
 - Origin SG HTTPS 443 from CloudFront prefix list `pl-3b927c52` only. No SSH.
 - CloudFront `dzm8yijuajwge.cloudfront.net`. WAF associated.
 - SES identity created for `staging-alerts@example.invalid` (unverified).
-- Compose files are **not** on the host yet. Private-port scan **not** run.
+- Compose files are **not** on the host yet. AWS STS/`aws login` grant
+  expired (`CreateOAuth2Token` INVALID_REQUEST), so SSM copy is Blocked.
+- EIP probe from a workstation (not a P10-01-C qualifying scan):
+  `52.206.156.176` tcp 22/80/443/5432/6379/8000/8080/8443 all `open=false`.
+  Artifact:
+  [packet1-live-network-scan.json](../deployment/phase-10/packet1-live-network-scan.json).
+  P10-01-C stays **Blocked** because compose is not running.
 - Origin hostname in CloudFront remains the placeholder until DNS/EIP origin
   is wired. Direct origin health is unverified.
 
@@ -173,11 +184,27 @@ ADR for instance type:
 
 - Live managed Supabase **Pro** project, PITR, us-east-1, proven JWKS, Pro pooling.
 - Live SES mailbox verification and SMTP delivery.
-- Live Caddy/Compose health, SSM file copy, ParadeDB/Valkey running.
-- Live private-port and metadata network scan.
+- Live Caddy/Compose health, SSM file copy, ParadeDB/Valkey running
+  (requires a fresh `aws login --profile Nagdy`).
+- Qualifying P10-01-C network scan against **running** private services
+  (EIP probe exists but `qualifies_for_p10_01_c: false`).
 - Live Vercel project env.
 - Packets 3–7 live CDN/scan/KMS PutObject/PITR/pentest. Packet 2 live OIDC
   assume/SSM migrate remains Blocked.
+
+### Packet 1 continuation (hosted RPCs + EIP probe)
+
+Remaining LangSmith RPCs applied on hosted `qsjivtwtmlmtksufqjik` via
+Supabase MCP `apply_migration` name `query_memory_store_reaper_v1`.
+No parallel migration agents. Packet file `status` stays `pending`.
+Wrapper checkbox 1 stays unchecked.
+
+| Command / probe | Exit | Result |
+| --- | --- | --- |
+| Hosted `execute_sql` for `claim_langsmith_deletion_requests` / `record_langsmith_deletion_attempt` | 0 | Both functions present |
+| Hosted `documents` / `storage.objects` counts | 0 | 0 / 0; `auth.users` still 1 on reused project |
+| `aws sts get-caller-identity --profile Nagdy` | 254 | OAuth grant expired; SSM Blocked |
+| TcpClient EIP probe 2s timeout | 0 | All listed ports `open=false`; does not qualify P10-01-C |
 
 ### Deviations
 

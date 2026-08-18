@@ -1,0 +1,26 @@
+{
+  "schema_version": "phase10-live-network-scan-v1",
+  "qualifies_for_p10_01_c": false,
+  "qualifies_reason": "Compose/Caddy/ParadeDB/Valkey are not running on the instance. An internet TCP probe of the EIP cannot prove private services have no host ports when started.",
+  "scanned_at": "2026-08-18T20:12:00Z",
+  "method": "System.Net.Sockets.TcpClient BeginConnect with 2000ms timeout from a workstation outside the VPC",
+  "target_eip": "52.206.156.176",
+  "instance_id": "i-0abe79350a3880e87",
+  "compose_copied_via_ssm": false,
+  "aws_session": "expired_at_scan_time",
+  "results": [
+    {"port": 22, "open": false},
+    {"port": 80, "open": false},
+    {"port": 443, "open": false},
+    {"port": 5432, "open": false},
+    {"port": 6379, "open": false},
+    {"port": 8000, "open": false},
+    {"port": 8080, "open": false},
+    {"port": 8443, "open": false}
+  ],
+  "notes": [
+    "Origin security group allows tcp/443 only from CloudFront prefix list pl-3b927c52; workstation 443 closed is expected even if Caddy later listens.",
+    "No SSH ingress in IaC; port 22 closed is consistent.",
+    "P10-01-C stays Blocked until SSM copies compose, services start, and a scan is repeated against the running topology."
+  ]
+}

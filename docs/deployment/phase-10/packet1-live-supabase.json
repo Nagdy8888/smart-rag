@@ -38,7 +38,10 @@
       "app.revoked_sessions",
       "app.mfa_recovery_requests"
     ],
-    "migrations_status": "in_progress_after_phase2"
+    "migrations_status": "repo_objects_present_schema_migrations_has_duplicate_names",
+    "query_memory_store_reaper_v1_recorded": true,
+    "langsmith_claim_rpcs_present": true,
+    "schema_migrations_duplicate_names": true
   },
   "p10_01_a_live": "Does not match intended freeze; classify live region/plan/PITR drift honestly",
   "vercel_live_values_committed": false,

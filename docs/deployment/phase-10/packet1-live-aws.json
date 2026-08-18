@@ -37,6 +37,8 @@
   "ses_verified": false,
   "compose_copied_via_ssm": false,
   "network_scan_present": false,
+  "eip_probe_artifact": "docs/deployment/phase-10/packet1-live-network-scan.json",
+  "eip_probe_qualifies_for_p10_01_c": false,
   "vercel_live_applied": false,
   "secrets_committed": false
 }

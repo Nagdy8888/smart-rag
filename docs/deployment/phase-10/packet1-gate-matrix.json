@@ -8,7 +8,7 @@
     {
       "check": "P10-01-B",
       "classification": "Blocked",
-      "detail": "IaC policy Passed. Runtime EC2/IMDS/SSH assertions are Blocked: Terraform/OpenTofu are not installed; live apply is Blocked. aws sts get-caller-identity failed (session missing or expired)"
+      "detail": "IaC policy Passed. Runtime EC2/IMDS/SSH assertions are Blocked: AWS session is missing or expired; live apply is Blocked. Do not run aws login from this packet."
     },
     {
       "check": "P10-01-C",
