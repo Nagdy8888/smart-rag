@@ -47,7 +47,7 @@ Operator procedure: [PROTECTED_MIGRATION.md](../runbooks/PROTECTED_MIGRATION.md)
 
 **Honest status:** IaC and workflow policy tests **Passed**. Live OIDC assume, SSM migrate, Secrets Manager values, and 90-day rotation are **Blocked**. hashicorp/aws 5.100 requires a rotation Lambda for `aws_secretsmanager_secret_rotation` on non-RDS secrets; this packet does not invent one. Do not treat live migrate as proven.
 
-KMS/S3 Object Lock anchoring remains a later Phase 10 packet.
+Independent assessment scope (not a report): [phase-10-external-assessment-scope.md](./phase-10-external-assessment-scope.md). Status remains **not run**.
 
 ## Related
 

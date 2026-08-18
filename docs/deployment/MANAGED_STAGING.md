@@ -162,6 +162,35 @@ QT-CAP-005-P8=15.
 The Packet 6 checkbox stays **unchecked** while P10-06-A/B/D/E are Blocked.
 Packets 1–5 remaining unchecked is not a Packet 6 failure.
 
+## Packet 7 release suite and external assessment
+
+Packet 7 consumes committed
+[packet 1–6 gate matrices](./phase-10/packet1-gate-matrix.json)
+and does **not** re-run those pytest suites. Local policy artifacts exist,
+but a complete production-equivalent suite is **Blocked** while live apply,
+CDN 50-second SSE, origin rotation, KMS PutObject, SNS ack, SES send, PITR
+restore, EC2 rebuild, and Caddy drain remain Blocked.
+
+Committed custody/IaC can Pass: GitHub OIDC without long-lived secrets,
+private ports, digest-pinned ParadeDB, expand/contract
+`find_migration_violations`, and Vercel public env only. Live OIDC assume
+stays **Blocked** in the same row. Invented origin HTTP 200/403 is Failed.
+
+Independent assessment:
+[phase-10-external-assessment-scope.md](../security/phase-10-external-assessment-scope.md)
+is **scope only**, status **not run**. There is no third-party pentest
+report. Trivy is image scan, not Packet 7-C. Do not claim Critical=0 from
+an assessment that did not happen.
+
+Promotion inputs:
+[phase10-phase11-promotion-manifest.json](./phase-10/phase10-phase11-promotion-manifest.json).
+Recommendation is **no-go for Phase 11**. Envelope stays
+QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. Do not advertise
+10k/1M. Do not apply Terraform from this clone. Holdout stays closed.
+
+The Packet 7 checkbox stays **unchecked**. All seven Phase 10 checkboxes
+stay unchecked. Wrapper stays `pending`.
+
 ## Verification
 
 ```powershell
@@ -172,4 +201,5 @@ uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
 uv run python scripts/ci/check_phase10_packet5.py
 uv run python scripts/ci/check_phase10_packet6.py
+uv run python scripts/ci/check_phase10_packet7.py
 ```

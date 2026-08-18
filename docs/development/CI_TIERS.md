@@ -122,6 +122,15 @@ Packets 1–5 remaining unchecked is not a Packet 6 failure. See
 [bm25-rebuild.md](../runbooks/bm25-rebuild.md), and
 [instance-rebuild.md](../runbooks/instance-rebuild.md).
 
+Phase 10 Packet 7 release-suite/assessment
+(`scripts/ci/check_phase10_packet7.py`) is a local gate. It loads committed
+Packets 1–6 JSON and does not re-run those pytest suites. Independent
+assessment stays not run; Trivy is not Packet 7-C. Promotion remains
+no-go/pending. It is not added to `pr-fast.yml`. Checking a Phase 10
+checkbox or setting the wrapper complete is Failed. See
+[MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) and
+[phase-10-external-assessment-scope.md](../security/phase-10-external-assessment-scope.md).
+
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and
 artifact upload. A local workflow definition is not remote execution

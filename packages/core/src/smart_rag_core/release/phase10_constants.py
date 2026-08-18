@@ -1,4 +1,4 @@
-"""Stable identifiers for Phase 10 Packets 1-6.
+"""Stable identifiers for Phase 10 Packets 1-7.
 
 Packet 1 consumes the accepted Phase 9 promotion freeze. Packet 2 adds GitHub
 OIDC, named SSM documents, and Secrets Manager placeholders. Packet 3 asserts
@@ -7,8 +7,10 @@ rotation, CDN SSE, ParadeDB degrade, and Valkey fail-closed. Packet 5 asserts
 KMS/S3 Object Lock IaC, alarm routing, SES/OAuth/Storage support, pooling,
 and the signed reduced envelope. Packet 6 classifies managed restore,
 reconciliation, derived BM25 rebuild, instance rebuild, and skew/rollback.
-None of these packets imply live AWS apply, managed PITR, EC2 rebuild, or
-CloudFront/Vercel drain.
+Packet 7 aggregates Packets 1-6 matrices, records custody/IaC, documents
+independent-assessment scope as not run, and writes a no-go Phase 11
+manifest. None of these packets imply live AWS apply, managed PITR, EC2
+rebuild, CloudFront/Vercel drain, or a completed pentest.
 """
 
 from __future__ import annotations
@@ -62,6 +64,17 @@ PACKET6_REBUILD_NAME = "packet6-rebuild.json"
 PACKET6_INSTANCE_NAME = "packet6-instance.json"
 PACKET6_SKEW_NAME = "packet6-skew.json"
 PACKET6_NEGATIVES_NAME = "packet6-negatives.json"
+PACKET7_MATRIX_NAME = "packet7-gate-matrix.json"
+PACKET7_SUITE_NAME = "packet7-suite.json"
+PACKET7_CUSTODY_NAME = "packet7-custody.json"
+PACKET7_ASSESSMENT_NAME = "packet7-assessment.json"
+PACKET7_TRACEABILITY_NAME = "packet7-traceability.json"
+PACKET7_NEGATIVES_NAME = "packet7-negatives.json"
+PHASE10_PHASE11_PROMOTION_MANIFEST = (
+    "docs/deployment/phase-10/phase10-phase11-promotion-manifest.json"
+)
+EXTERNAL_ASSESSMENT_SCOPE = "docs/security/phase-10-external-assessment-scope.md"
+PHASE10_EVIDENCE = "docs/development/phase-10-managed-staging-evidence.md"
 GITHUB_WORKFLOWS_DIR = ".github/workflows"
 SSM_DOCUMENTS_DIR = "infra/ec2/ssm-documents"
 MIGRATIONS_DIR = "supabase/migrations"
@@ -109,6 +122,13 @@ PACKET6_REBUILD_SCHEMA_VERSION = "phase10-packet6-rebuild-v1"
 PACKET6_INSTANCE_SCHEMA_VERSION = "phase10-packet6-instance-v1"
 PACKET6_SKEW_SCHEMA_VERSION = "phase10-packet6-skew-v1"
 PACKET6_NEGATIVES_SCHEMA_VERSION = "phase10-packet6-negatives-v1"
+PACKET7_MATRIX_SCHEMA_VERSION = "phase10-packet7-matrix-v1"
+PACKET7_SUITE_SCHEMA_VERSION = "phase10-packet7-suite-v1"
+PACKET7_CUSTODY_SCHEMA_VERSION = "phase10-packet7-custody-v1"
+PACKET7_ASSESSMENT_SCHEMA_VERSION = "phase10-packet7-assessment-v1"
+PACKET7_TRACEABILITY_SCHEMA_VERSION = "phase10-packet7-traceability-v1"
+PACKET7_NEGATIVES_SCHEMA_VERSION = "phase10-packet7-negatives-v1"
+PACKET7_PROMOTION_SCHEMA_VERSION = "phase10-phase11-promotion-manifest-v1"
 
 AWS_PROVIDER_CONSTRAINT = "~> 5.100"
 INTENDED_AWS_REGION = "us-east-1"
@@ -254,6 +274,10 @@ PACKET5_RELATIVE = (
 PACKET6_RELATIVE = (
     ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
     "06-prove-restore-rebuild-skew-and-rollback.md"
+)
+PACKET7_RELATIVE = (
+    ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
+    "07-run-release-suite-and-external-assessment.md"
 )
 ALERT_ROUTING_RUNBOOK = "docs/runbooks/alert-routing.md"
 AUDIT_EXPORT_MODULE = "packages/core/src/smart_rag_core/security/audit_export.py"
@@ -507,3 +531,89 @@ LONG_LIVED_WORKFLOW_FRAGMENTS: tuple[str, ...] = (
     "aws-secret-access-key",
     "secrets.AWS_",
 )
+
+USER_ACCEPTANCE_REQUEST = (
+    "Request for user acceptance: Phase 10 remains status pending with all "
+    "seven packet checkboxes unchecked. The honest recommendation is no-go "
+    "for Phase 11 until live AWS/managed staging proof and an independent "
+    "external security assessment close. Please accept this pending/no-go "
+    "state; do not promote production."
+)
+PHASE11_NO_GO_RECOMMENDATION = (
+    "no-go for Phase 11 until live AWS/managed staging proof and an "
+    "independent external security assessment close"
+)
+PHASE11_ROLLBACK = (
+    "Keep the Phase 9 freeze identities. Do not advertise 10k/1M. Do not "
+    "apply Terraform from this clone. Do not open holdout. Do not promote "
+    "production."
+)
+ASSESSMENT_SCOPE_REQUIRED_TOKENS: tuple[str, ...] = (
+    "auth/jwks",
+    "rls/acl",
+    "identity",
+    "private bm25",
+    "signed url",
+    "quarantine",
+    "ssrf",
+    "egress",
+    "injection",
+    "origin bypass",
+    "rate ownership",
+    "storage",
+    "synthetic",
+    "no long-lived",
+    "retest",
+    "critical",
+    "high",
+    "medium",
+    "dated adr",
+    "owner",
+    "not run",
+    "trivy is image scan, not packet 7-c",
+    "does not claim critical=0",
+)
+FAKE_ASSESSMENT_PASS_PHRASES: tuple[str, ...] = (
+    "independent assessment passed",
+    "independent pentest passed",
+    "external assessment passed",
+    "penetration test passed",
+    "pentest passed",
+    '"assessment_status": "passed"',
+    '"pentest_status": "passed"',
+    '"critical_open": 0',
+    '"high_open": 0',
+    "trivy is the independent assessment",
+    "trivy as pentest",
+    "p10-07-c passed",
+)
+FULL_SCALE_ENVELOPE_PHRASES: tuple[str, ...] = (
+    '"qt-cap-001-p9": 10000',
+    '"qt-cap-002-p9": 1000000',
+)
+PACKET7_LIVE_BLOCKED_KEYS: tuple[str, ...] = (
+    "live_apply",
+    "live_oidc_assume",
+    "live_ssm_migrate",
+    "live_secret_rotation",
+    "live_cdn_requests",
+    "live_port_scan",
+    "live_denial_alert",
+    "live_cdn_sse",
+    "live_origin_rotation",
+    "live_paradedb_kill",
+    "live_valkey_kill",
+    "live_kms_object_lock",
+    "live_sns_ack",
+    "live_ses_send",
+    "live_managed_pool",
+    "live_managed_resources",
+    "live_managed_pitr",
+    "live_reconciliation",
+    "live_ec2_rebuild",
+    "live_instance_rebuild",
+    "live_drain",
+)
+PACKET7_LIVE_NOT_RUN_KEYS: tuple[str, ...] = ("live_managed_jwks",)
+PACKET3_ORIGIN_ARTIFACT = "docs/deployment/phase-10/packet3-origin.json"
+PACKET7_FAKE_HTTP_STATUSES: frozenset[int] = frozenset({200, 403})

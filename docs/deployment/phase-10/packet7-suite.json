@@ -1,0 +1,188 @@
+{
+  "blocked_rows": [
+    "P10-01-B",
+    "P10-01-C",
+    "P10-02-C",
+    "P10-03-A",
+    "P10-03-B",
+    "P10-03-E",
+    "P10-04-B",
+    "P10-04-C",
+    "P10-05-A",
+    "P10-05-B",
+    "P10-05-C",
+    "P10-05-E",
+    "P10-06-A",
+    "P10-06-B",
+    "P10-06-D",
+    "P10-06-E"
+  ],
+  "complete_production_equivalent_suite": "Blocked",
+  "consumed_committed_json": true,
+  "consumed_pytest_packets_1_6": false,
+  "matrices": [
+    {
+      "acceptance": [
+        {
+          "check": "P10-01-A",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-01-B",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-01-C",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-01-D",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-01-E",
+          "classification": "Passed"
+        }
+      ],
+      "packet": "P10-01",
+      "path": "docs/deployment/phase-10/packet1-gate-matrix.json",
+      "schema_version": "phase10-packet1-matrix-v1"
+    },
+    {
+      "acceptance": [
+        {
+          "check": "P10-02-A",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-02-B",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-02-C",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-02-D",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-02-E",
+          "classification": "Passed"
+        }
+      ],
+      "packet": "P10-02",
+      "path": "docs/deployment/phase-10/packet2-gate-matrix.json",
+      "schema_version": "phase10-packet2-matrix-v1"
+    },
+    {
+      "acceptance": [
+        {
+          "check": "P10-03-A",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-03-B",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-03-C",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-03-D",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-03-E",
+          "classification": "Blocked"
+        }
+      ],
+      "packet": "P10-03",
+      "path": "docs/deployment/phase-10/packet3-gate-matrix.json",
+      "schema_version": "phase10-packet3-matrix-v1"
+    },
+    {
+      "acceptance": [
+        {
+          "check": "P10-04-A",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-04-B",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-04-C",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-04-D",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-04-E",
+          "classification": "Passed"
+        }
+      ],
+      "packet": "P10-04",
+      "path": "docs/deployment/phase-10/packet4-gate-matrix.json",
+      "schema_version": "phase10-packet4-matrix-v1"
+    },
+    {
+      "acceptance": [
+        {
+          "check": "P10-05-A",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-05-B",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-05-C",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-05-D",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-05-E",
+          "classification": "Blocked"
+        }
+      ],
+      "packet": "P10-05",
+      "path": "docs/deployment/phase-10/packet5-gate-matrix.json",
+      "schema_version": "phase10-packet5-matrix-v1"
+    },
+    {
+      "acceptance": [
+        {
+          "check": "P10-06-A",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-06-B",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-06-C",
+          "classification": "Passed"
+        },
+        {
+          "check": "P10-06-D",
+          "classification": "Blocked"
+        },
+        {
+          "check": "P10-06-E",
+          "classification": "Blocked"
+        }
+      ],
+      "packet": "P10-06",
+      "path": "docs/deployment/phase-10/packet6-gate-matrix.json",
+      "schema_version": "phase10-packet6-matrix-v1"
+    }
+  ],
+  "schema_version": "phase10-packet7-suite-v1"
+}

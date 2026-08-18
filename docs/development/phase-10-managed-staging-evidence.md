@@ -870,6 +870,145 @@ overwritten. ParadeDB was not treated as canonical. RTO/RPO hours were not
 invented. Packets 1–5 remaining unchecked did not fail Packet 6 classify.
 Terraform was not applied. AWS login was not run.
 
+## Packet 7 — Complete release suite and independent external assessment
+
+Requirement ID: **P10-07**. Last Phase 10 packet. Wrapper stays `pending`.
+All seven checkboxes stay unchecked. Production is not promoted.
+
+### Requirement (quoted)
+
+> Run the complete release suite and an independent external security
+> assessment with synthetic/redacted data and no long-lived CI or runtime
+> bootstrap credential.
+
+### Concrete acceptance checks
+
+- **P10-07-A:** Complete synthetic/redacted production-equivalent suite
+  passes with no skipped/empty/stale/zero-test gate. Evidence: matrix.
+  Failure: no-go.
+- **P10-07-B:** No long-lived credential/public service/mutable
+  ParadeDB/unapproved migration. Evidence: custody/IaC report. Failure:
+  blocker.
+- **P10-07-C:** Full independent scope has zero open Critical/High and
+  owned dated Medium. Evidence: redacted report/retest. Failure: stop.
+- **P10-07-D:** One exact artifact set proves all managed gates. Evidence:
+  traceability. Failure: rerun.
+- **P10-07-E:** Promotion inputs recorded; status pending until
+  acceptance. Evidence: manifest/plan. Failure: revert.
+
+```mermaid
+flowchart TD
+  matrices["Load packet 1-6 gate matrices"] --> suite{"Every managed row Passed?"}
+  suite -->|"Blocked live rows remain"| noGoA["P10-07-A Blocked no-go"]
+  custody["OIDC private ports ParadeDB pin expand/contract Vercel"] --> passB["P10-07-B Passed"]
+  passB --> liveOidc["Live OIDC assume Blocked in same row"]
+  scope["Scope-only assessment doc"] --> notRun["P10-07-C Blocked not run"]
+  noGoA --> trace["P10-07-D Blocked"]
+  notRun --> trace
+  trace --> manifest["Promotion manifest no-go"]
+  manifest --> accept["Request for user acceptance pending"]
+```
+
+### Inspected paths (before edit)
+
+| Path | Result |
+| --- | --- |
+| `docs/deployment/phase-10/packet{1-6}-gate-matrix.json` | Present, nonempty, freeze ids match. Many live rows Blocked |
+| Independent pentest report | **None**. Do not invent one |
+| Terraform / `aws login` / CloudFront | Not run. Session expired; Terraform not installed |
+| Isolated managed staging project | None |
+| `SMART_RAG_HOLDOUT_ACCESS` | Not treated as true |
+
+### Files changed (allowed outputs only)
+
+| File | Action |
+| --- | --- |
+| `packages/core/src/smart_rag_core/release/phase10_packet7.py` | Created — suite aggregator and no-go classifier |
+| `packages/core/src/smart_rag_core/release/phase10_constants.py` | Packet 7 artifact/scope/promotion identifiers |
+| `scripts/ci/check_phase10_packet7.py` | Created — zero-collection fail-closed gate; does not re-run Packets 1-6 pytest |
+| `tests/unit/test_phase10_packet7.py` | Created — negatives always run |
+| `tests/contract/test_phase10_packet7.py` | Created — committed matrices, scope, wrapper, manifest |
+| `docs/security/phase-10-external-assessment-scope.md` | Created — scope only, status not run |
+| `docs/deployment/phase-10/phase10-phase11-promotion-manifest.json` | Created — no-go for Phase 11 |
+| `docs/deployment/phase-10/packet7-*.json` | Created by the Packet 7 gate (no secrets) |
+| `MANAGED_STAGING.md`, `QUALITY_COMMANDS.md`, `CI_TIERS.md`, `docs/README.md` | Indexed Packet 7 |
+| `.cursor/plans/.../10-phase-managed-staging.md` | Wrapper remains pending; all seven checkboxes unchecked |
+
+No `*.tf` files were added. Not added to `pr-fast.yml`.
+`STREAMING_TIMEOUTS.md` was not touched and still contains `does **not** claim`.
+
+### Identities frozen
+
+No secrets. No invented pentest findings. No 10k/1M claim.
+
+| Field | Value |
+| --- | --- |
+| api | `sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec` |
+| worker | `sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e` |
+| frontend | `sha256:e47efc373a151c7c79039009fd04f459f997127beafb00747cd91c4a9b96a5c1` |
+| crawl-proxy | `sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3` |
+| parser-sandbox | `sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a` |
+| ParadeDB | `paradedb/paradedb:pg17@sha256:dca046b8a0ddd070c368d5254cbb7f596b3b7bc67bc2efa7c0fbe881087883bb` |
+| Valkey | `valkey/valkey:8.1-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec` |
+| Envelope | keep QT-CAP-001-P9=8, QT-CAP-002-P9=16, QT-CAP-005-P8=15 |
+| Packet 7 custody sha256 | `9a9d3c644755b4e59db7513fe0869885a6a4d61147aeda2c222061d5ec766724` |
+
+### Classifications
+
+Packet 7 **does not** mark the wrapper complete. All seven checkboxes stay
+unchecked. Recommendation is **no-go for Phase 11**.
+
+| Check | Classification | Notes |
+| --- | --- | --- |
+| P10-07-A production-equivalent suite | Blocked | Packets 1-6 local gates wrote artifacts, but live apply, CDN 50s SSE, origin rotation, KMS PutObject, SNS ack, SES send, PITR restore, EC2 rebuild, and Caddy drain remain Blocked. Zero Packet 7 tests would be Failed. Suite Pass was not claimed |
+| P10-07-B custody/IaC | Passed | OIDC no long-lived GitHub secrets, private ports, digest-pinned ParadeDB, expand/contract `find_migration_violations`, Vercel public env only. Live OIDC assume Blocked in the same row. Fake 200/403 is Failed |
+| P10-07-C independent assessment | Blocked | No third-party report. Scope documented as not run. Trivy is image scan, not Packet 7-C. Critical=0 was not claimed from an assessment that did not happen |
+| P10-07-D one artifact set | Blocked | A/C and Packets 1-6 live rows remain Blocked. Freeze-identity traceability is supporting. Digest drift is Failed |
+| P10-07-E promotion inputs | Passed | Manifest exists. Wrapper pending. Seven checkboxes `[ ]`. Envelope 8/16/15. Holdout closed. Recommendation no-go. User acceptance requested below |
+
+### Commands and exit codes
+
+```powershell
+uv run ruff format packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_packet7.py scripts/ci/check_phase10_packet7.py tests/unit/test_phase10_packet7.py tests/contract/test_phase10_packet7.py
+uv run ruff check packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_packet7.py scripts/ci/check_phase10_packet7.py tests/unit/test_phase10_packet7.py tests/contract/test_phase10_packet7.py
+uv run python -m pytest tests/unit/test_phase10_packet7.py tests/contract/test_phase10_packet7.py -q
+uv run python scripts/ci/check_phase10_packet7.py
+```
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff format` on Packet 7 Python | 0 | Files formatted then left unchanged |
+| `uv run ruff check` on Packet 7 Python | 0 | All checks passed |
+| `uv run python -m pyright` on Packet 7 Python | 0 | 0 errors |
+| `uv run python -m pytest` Packet 7 unit/contract | 0 | 13 passed, 0 skipped |
+| `uv run python scripts/ci/check_phase10_packet7.py` | 0 | tests=13 failures=0 errors=0 skipped=0; custody Passed; live OIDC Blocked; A/C/D Blocked; B/E Passed |
+
+Artifacts: `docs/deployment/phase-10/packet7-{gate-matrix,suite,custody,assessment,traceability,negatives}.json` and
+`docs/deployment/phase-10/phase10-phase11-promotion-manifest.json`.
+
+Packet 7 checkbox stays **unchecked**. Packet file `status` stays
+`pending`. Phase 10 wrapper `status` remains `pending`. Holdout was not
+opened. Packets 1–6 stay unchecked. Not added to `pr-fast.yml`. Terraform
+was not applied. AWS login was not run. Production was not promoted.
+
+### Unverified / Blocked
+
+- Isolated managed staging project, CloudFront, live AWS apply.
+- Complete production-equivalent suite against that topology.
+- Independent third-party pentest/external security review and Critical/High retest.
+- Live OIDC assume, JWKS dashboard rollover, origin rotation, 50s CDN SSE,
+  KMS PutObject, SNS ack, SES send, PITR restore, EC2 rebuild, Caddy drain.
+
+### Deviations
+
+None versus Packet 7 honesty rules. A pentest report was not invented.
+Trivy was not treated as Packet 7-C. Wrapper was not set complete.
+Checkboxes were not checked. 10k/1M was not advertised.
+
+### Request for user acceptance
+
+Request for user acceptance: Phase 10 remains status pending with all seven packet checkboxes unchecked. The honest recommendation is no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production.
+
 
 
 

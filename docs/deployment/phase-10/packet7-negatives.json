@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "case": "fake_pentest_passed",
+      "exercise": "tests/unit/test_phase10_packet7.py",
+      "expected": "Phase10Packet7GateError"
+    },
+    {
+      "case": "checkbox_checked",
+      "exercise": "tests/unit/test_phase10_packet7.py",
+      "expected": "Phase10Packet7GateError"
+    },
+    {
+      "case": "wrapper_complete",
+      "exercise": "tests/unit/test_phase10_packet7.py",
+      "expected": "Phase10Packet7GateError"
+    },
+    {
+      "case": "digest_drift",
+      "exercise": "tests/unit/test_phase10_packet7.py",
+      "expected": "Failed"
+    },
+    {
+      "case": "ten_k_claim",
+      "exercise": "tests/unit/test_phase10_packet7.py",
+      "expected": "Phase10Packet7GateError"
+    },
+    {
+      "case": "zero_packet_matrices",
+      "exercise": "tests/unit/test_phase10_packet7.py",
+      "expected": "Failed"
+    },
+    {
+      "case": "holdout_opened",
+      "exercise": "tests/unit/test_phase10_packet7.py",
+      "expected": "Phase10Packet7GateError"
+    }
+  ],
+  "schema_version": "phase10-packet7-negatives-v1"
+}

@@ -1,0 +1,264 @@
+{
+  "acceptance": [
+    {
+      "check": "P10-07-A",
+      "classification": "Blocked",
+      "detail": "Packets 1-6 local policy gates collected nonzero tests and wrote artifacts, but launch-blocking managed rows remain Blocked (P10-01-B, P10-01-C, P10-02-C, P10-03-A, P10-03-B, P10-03-E, P10-04-B, P10-04-C, P10-05-A, P10-05-B, P10-05-C, P10-05-E, P10-06-A, P10-06-B, P10-06-D, P10-06-E). A complete production-equivalent suite did not pass. Packet 7 consumes committed JSON and does not re-run Packets 1-6 pytest."
+    },
+    {
+      "check": "P10-07-B",
+      "classification": "Passed",
+      "detail": "Committed custody/IaC Passed: OIDC with no long-lived GitHub secrets, private ports, digest-pinned ParadeDB, expand/contract find_migration_violations, Vercel public env only. Live OIDC assume remains Blocked (Terraform/OpenTofu are not installed; live apply is Blocked. aws sts get-caller-identity failed (session missing or expired)). Fake origin 200/403 is Failed."
+    },
+    {
+      "check": "P10-07-C",
+      "classification": "Blocked",
+      "detail": "No independent third-party pentest/external security review report exists. Scope is documented as not run. Trivy is image scan, not Packet 7-C. Critical=0 was not claimed from an assessment that did not happen."
+    },
+    {
+      "check": "P10-07-D",
+      "classification": "Blocked",
+      "detail": "One exact artifact set does not prove all managed gates while P10-07-A/C and Packets 1-6 live rows remain Blocked. Traceability of committed packet 1-6 freeze identities is supporting. Digest drift versus Phase 9 freeze is Failed."
+    },
+    {
+      "check": "P10-07-E",
+      "classification": "Passed",
+      "detail": "Promotion inputs recorded. Wrapper pending. All seven checkboxes unchecked. Recommendation is no-go for Phase 11. Envelope QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. Holdout closed. Request for user acceptance: Phase 10 remains status pending with all seven packet checkboxes unchecked. The honest recommendation is no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production."
+    }
+  ],
+  "aws_login": false,
+  "blocked_phase11_rows": [
+    {
+      "check": "P10-01-B",
+      "classification": "Blocked",
+      "detail": "IaC policy Passed. Runtime EC2/IMDS/SSH assertions are Blocked: Terraform/OpenTofu are not installed; live apply is Blocked. aws sts get-caller-identity failed (session missing or expired)"
+    },
+    {
+      "check": "P10-01-C",
+      "classification": "Blocked",
+      "detail": "Compose/IaC private-port and digest policy Passed. Network scan artifact is absent; live reachability is not Passed without a scan."
+    },
+    {
+      "check": "P10-02-C",
+      "classification": "Blocked",
+      "detail": "Immutable migration hash f967d4814d272c9d8f62d9f01501ab64963f02076fe4a2dd5ef99f8a9366ed87 over 52 files. Expand/contract policy Passed. Protected environment wiring Passed. Live SSM migrate is Blocked."
+    },
+    {
+      "check": "P10-03-A",
+      "classification": "Blocked",
+      "detail": "Committed Caddy 403 / CloudFront custom header / prefix-list origin policy Passed. Live CDN request matrix is Blocked: No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent."
+    },
+    {
+      "check": "P10-03-B",
+      "classification": "Blocked",
+      "detail": "Committed unpublished private-port and metadata-deny policy Passed. Live scan is Blocked: No EC2 host or scan artifact. Live private-port and metadata scans were not run."
+    },
+    {
+      "check": "P10-03-E",
+      "classification": "Blocked",
+      "detail": "WAF visibility_config metric names and CloudWatch egress/origin denial filters Passed. Live synthetic alarm is Blocked: CloudWatch log group and metric filters exist in IaC. Live denial alarm delivery was not proven."
+    },
+    {
+      "check": "P10-04-B",
+      "classification": "Blocked",
+      "detail": "Committed Caddy CURRENT+PREVIOUS, CloudFront custom_header, overlap<=15 minutes, and rollback runbook Passed. Live origin rotation is Blocked: No CloudFront distribution or EC2 origin. Live dual origin-secret rotation was not executed."
+    },
+    {
+      "check": "P10-04-C",
+      "classification": "Blocked",
+      "detail": "90-second CloudFront/Caddy settings Passed. Live 50-second CDN SSE is Blocked: No CloudFront 50-second SSE timeline. Local EventSource is not CDN. Supporting application SSE tests are not a CloudFront timeline."
+    },
+    {
+      "check": "P10-05-A",
+      "classification": "Blocked",
+      "detail": "KMS/Object Lock IaC Passed. Application tamper tests Passed. HMAC-as-KMS rejected. Live Object-Lock GetObject is Blocked: No live Object-Lock GetObject of a KMS-signed chain head. Terraform is not applied and AWS session is expired or missing."
+    },
+    {
+      "check": "P10-05-B",
+      "classification": "Blocked",
+      "detail": "IaC plus runbook alarm matrix Passed. Live SNS/ack/escalation is Blocked: IaC and runbook routing exist. Live SNS publish, acknowledgement, and escalation were not run."
+    },
+    {
+      "check": "P10-05-C",
+      "classification": "Blocked",
+      "detail": "SES sandbox IaC Passed. Managed Storage CORS is not claimed Passed. Live SES send is Blocked: SES sandbox IaC exists. No live SES send and no production recipient."
+    },
+    {
+      "check": "P10-05-E",
+      "classification": "Blocked",
+      "detail": "Keep QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. 10k/1M claim rejected. Live managed resources are Blocked: No live EC2/ParadeDB/Valkey/OCR measurements. Keep the signed reduced envelope; do not advertise 10k/1M."
+    },
+    {
+      "check": "P10-06-A",
+      "classification": "Blocked",
+      "detail": "Local disposable dump/restore supporting Passed with restore_returncode=1; live_database_overwritten=false. Required buckets present. Live managed PITR is Blocked: No isolated managed Supabase PITR plus four-bucket Storage restore. Local Phase 9 dump/restore is supporting only and is not a complete managed restore Pass."
+    },
+    {
+      "check": "P10-06-B",
+      "classification": "Blocked",
+      "detail": "Reconciliation runbook plus restore_incomplete policy Passed. Live orphan counts were not invented. Live managed reconciliation is Blocked: No live managed reconciliation. Orphan counts were not invented. Policy requires restore_incomplete exclusion and orphan quarantine before any BM25 rebuild."
+    },
+    {
+      "check": "P10-06-D",
+      "classification": "Blocked",
+      "detail": "Instance-rebuild runbook Passed. Targets RTO\u22644h RPO\u226424h; no invented measurements. Live timed EC2 rebuild is Blocked: No timed EC2 instance rebuild. RTO \u22644h and RPO \u226424h remain targets, not measurements."
+    },
+    {
+      "check": "P10-06-E",
+      "classification": "Blocked",
+      "detail": "Old-API/new-schema smoke Passed (prior digest sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7; freeze sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec). Expand/contract contraction absent. Forward-fix runbook present. Live drain/deploy-order/failed SSM is Blocked: No live CloudFront/Vercel deploy-order matrix and no live Caddy drain or failed SSM deploy. Compose api-blue/api-green exists; a live switch is not claimed."
+    },
+    {
+      "check": "P10-07-A",
+      "classification": "Blocked",
+      "detail": "Packets 1-6 local policy gates collected nonzero tests and wrote artifacts, but launch-blocking managed rows remain Blocked (P10-01-B, P10-01-C, P10-02-C, P10-03-A, P10-03-B, P10-03-E, P10-04-B, P10-04-C, P10-05-A, P10-05-B, P10-05-C, P10-05-E, P10-06-A, P10-06-B, P10-06-D, P10-06-E). A complete production-equivalent suite did not pass. Packet 7 consumes committed JSON and does not re-run Packets 1-6 pytest."
+    },
+    {
+      "check": "P10-07-C",
+      "classification": "Blocked",
+      "detail": "No independent third-party pentest/external security review report exists. Scope is documented as not run. Trivy is image scan, not Packet 7-C. Critical=0 was not claimed from an assessment that did not happen."
+    },
+    {
+      "check": "P10-07-D",
+      "classification": "Blocked",
+      "detail": "One exact artifact set does not prove all managed gates while P10-07-A/C and Packets 1-6 live rows remain Blocked. Traceability of committed packet 1-6 freeze identities is supporting. Digest drift versus Phase 9 freeze is Failed."
+    }
+  ],
+  "envelope": {
+    "QT-CAP-001-P9": 8,
+    "QT-CAP-002-P9": 16,
+    "QT-CAP-005-P8": 15
+  },
+  "holdout_opened": false,
+  "live_blocked": [
+    {
+      "field": "live_apply",
+      "packet": "P10-01",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_oidc_assume",
+      "packet": "P10-02",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_secret_rotation",
+      "packet": "P10-02",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_ssm_migrate",
+      "packet": "P10-02",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_cdn_requests",
+      "packet": "P10-03",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_denial_alert",
+      "packet": "P10-03",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_port_scan",
+      "packet": "P10-03",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_cdn_sse",
+      "packet": "P10-04",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_managed_jwks",
+      "packet": "P10-04",
+      "state": "Not Run"
+    },
+    {
+      "field": "live_origin_rotation",
+      "packet": "P10-04",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_paradedb_kill",
+      "packet": "P10-04",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_valkey_kill",
+      "packet": "P10-04",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_kms_object_lock",
+      "packet": "P10-05",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_managed_pool",
+      "packet": "P10-05",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_managed_resources",
+      "packet": "P10-05",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_ses_send",
+      "packet": "P10-05",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_sns_ack",
+      "packet": "P10-05",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_drain",
+      "packet": "P10-06",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_ec2_rebuild",
+      "packet": "P10-06",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_instance_rebuild",
+      "packet": "P10-06",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_managed_pitr",
+      "packet": "P10-06",
+      "state": "Blocked"
+    },
+    {
+      "field": "live_reconciliation",
+      "packet": "P10-06",
+      "state": "Blocked"
+    }
+  ],
+  "packet_checkboxes": "unchecked",
+  "paradedb_image": "paradedb/paradedb:pg17@sha256:dca046b8a0ddd070c368d5254cbb7f596b3b7bc67bc2efa7c0fbe881087883bb",
+  "phase9_image_ids": {
+    "api": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
+    "crawl-proxy": "sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3",
+    "frontend": "sha256:e47efc373a151c7c79039009fd04f459f997127beafb00747cd91c4a9b96a5c1",
+    "parser-sandbox": "sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a",
+    "worker": "sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e"
+  },
+  "production_promotion": false,
+  "recommendation": "no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close",
+  "rollback": "Keep the Phase 9 freeze identities. Do not advertise 10k/1M. Do not apply Terraform from this clone. Do not open holdout. Do not promote production.",
+  "schema_version": "phase10-phase11-promotion-manifest-v1",
+  "signed_full_chunks_not_advertised": 1000000,
+  "signed_full_hybrid_not_advertised": 10000,
+  "terraform_apply": false,
+  "user_acceptance_request": "Request for user acceptance: Phase 10 remains status pending with all seven packet checkboxes unchecked. The honest recommendation is no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production.",
+  "valkey_image": "valkey/valkey:8.1-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec",
+  "wrapper_status": "pending"
+}

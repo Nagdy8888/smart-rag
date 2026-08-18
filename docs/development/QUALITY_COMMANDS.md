@@ -35,6 +35,7 @@ uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
 uv run python scripts/ci/check_phase10_packet5.py
 uv run python scripts/ci/check_phase10_packet6.py
+uv run python scripts/ci/check_phase10_packet7.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -301,6 +302,14 @@ PITR. ParadeDB snapshots are not canonical. Rebuild before reconcile is
 Failed. It is local-only and is not a GitHub PR job. Packets 1–5 remaining
 unchecked is not a Packet 6 failure.
 
+The Phase 10 Packet 7 gate consumes committed Packets 1–6 gate matrices
+and records an honest no-go: the production-equivalent suite and
+independent assessment remain Blocked, committed custody/IaC can Pass, and
+promotion inputs stay pending. It does not re-run Packets 1–6 pytest, does
+not invent a pentest report, and does not treat Trivy as Packet 7-C. It is
+local-only and is not a GitHub PR job. Checking a Phase 10 checkbox or
+setting the wrapper complete is Failed.
+
 ```powershell
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
@@ -309,6 +318,7 @@ uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
 uv run python scripts/ci/check_phase10_packet5.py
 uv run python scripts/ci/check_phase10_packet6.py
+uv run python scripts/ci/check_phase10_packet7.py
 ```
 
 [docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)

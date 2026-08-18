@@ -1,0 +1,15 @@
+{
+  "critical_open": null,
+  "high_open": null,
+  "independent_assessor": null,
+  "kind": "scope_only",
+  "long_lived_credentials": false,
+  "medium_owned_dated": null,
+  "report_path": null,
+  "schema_version": "phase10-packet7-assessment-v1",
+  "scope_doc": "docs/security/phase-10-external-assessment-scope.md",
+  "status": "not_run",
+  "synthetic_only": true,
+  "trivy_is_pentest": false,
+  "trivy_note": "Phase 9 tar Trivy is image scan, not Packet 7-C"
+}
