@@ -170,8 +170,15 @@ ADR for instance type:
 - Origin SG HTTPS 443 from CloudFront prefix list `pl-3b927c52` only. No SSH.
 - CloudFront `dzm8yijuajwge.cloudfront.net`. WAF associated.
 - SES identity created for `staging-alerts@example.invalid` (unverified).
-- Compose files are **not** on the host yet. AWS STS/`aws login` grant
-  expired (`CreateOAuth2Token` INVALID_REQUEST), so SSM copy is Blocked.
+- Compose/Caddy/ParadeDB init files **are** on `/opt/smart-rag` (SSM copy
+  2026-08-18). Docker 25.0.14 is active. The stack was **not** started:
+  instance has 916Mi RAM and Compose `mem_limit`s exceed 1Gi.
+- SSM was `ConnectionLost`, then `Online` after reboot. `sshd` was listening
+  on `0.0.0.0:22` (security group still denied public 22); `sshd` is now
+  disabled. Remaining listen: `127.0.0.1:44923` (SSM).
+- AWS operator credentials: local profile `Nagdy-iam` (IAM user `Muna`) in
+  `%USERPROFILE%\.aws\credentials` — **not** in git. Access keys were pasted
+  in chat and must be rotated. Do not put those keys on the instance.
 - EIP probe from a workstation (not a P10-01-C qualifying scan):
   `52.206.156.176` tcp 22/80/443/5432/6379/8000/8080/8443 all `open=false`.
   Artifact:
@@ -184,8 +191,8 @@ ADR for instance type:
 
 - Live managed Supabase **Pro** project, PITR, us-east-1, proven JWKS, Pro pooling.
 - Live SES mailbox verification and SMTP delivery.
-- Live Caddy/Compose health, SSM file copy, ParadeDB/Valkey running
-  (requires a fresh `aws login --profile Nagdy`).
+- Live Caddy/Compose health and ParadeDB/Valkey running on an instance
+  that can hold the Compose `mem_limit`s (not `t3.micro` / 916Mi).
 - Qualifying P10-01-C network scan against **running** private services
   (EIP probe exists but `qualifies_for_p10_01_c: false`).
 - Live Vercel project env.
@@ -205,6 +212,10 @@ Wrapper checkbox 1 stays unchecked.
 | Hosted `documents` / `storage.objects` counts | 0 | 0 / 0; `auth.users` still 1 on reused project |
 | `aws sts get-caller-identity --profile Nagdy` | 254 | OAuth grant expired; SSM Blocked |
 | TcpClient EIP probe 2s timeout | 0 | All listed ports `open=false`; does not qualify P10-01-C |
+| Local `aws sts --profile Nagdy-iam` | 0 | IAM user `Muna` (keys not in git) |
+| SSM copy compose to `/opt/smart-rag` | 0 | Files present; Docker active |
+| `systemctl disable --now sshd` | 0 | sshd inactive; no `0.0.0.0:22` |
+| `docker compose up` | not run | Blocked: 916Mi RAM vs Compose mem_limits |
 
 ### Deviations
 

@@ -15,10 +15,11 @@ the Pro/us-east-1/PITR freeze
 ([ADR-phase10-hosted-supabase-reuse.md](../adr/ADR-phase10-hosted-supabase-reuse.md)).
 Live AWS/Vercel apply: Terraform apply created the staging VPC, CloudFront,
 WAF, SES identity, OIDC, KMS/S3 Object Lock, and EC2. Live inventory:
-[packet1-live-aws.json](./phase-10/packet1-live-aws.json). Compose is not
-yet on the instance (SSM copy still required; AWS login grant expired).
-An internet EIP probe closed 22/80/443/5432/6379/8000/8080/8443 but does
-**not** qualify as P10-01-C because ParadeDB/Valkey are not running
+[packet1-live-aws.json](./phase-10/packet1-live-aws.json).
+Compose/Caddy files were copied to `/opt/smart-rag` via SSM; the stack was
+**not** started (`t3.micro` has 916Mi RAM). An internet EIP probe closed
+22/80/443/5432/6379/8000/8080/8443 but does **not** qualify as P10-01-C
+because ParadeDB/Valkey are not running
 ([packet1-live-network-scan.json](./phase-10/packet1-live-network-scan.json)).
 Packet 1 checkbox stays unchecked.
 
