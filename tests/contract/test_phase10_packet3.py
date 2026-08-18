@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from smart_rag_core.release.phase10_constants import (
@@ -113,7 +114,7 @@ def test_provider_egress_allowlist_and_parser_paradedb_boundaries() -> None:
     assert EGRESS_DENIAL_METRIC_NAME in telemetry
     assert DIRECT_ORIGIN_DENIAL_METRIC_NAME in telemetry
     assert TELEMETRY_NAMESPACE in telemetry
-    assert "actions_enabled     = false" in telemetry
+    assert re.search(r"actions_enabled\s*=", telemetry)
     waf = (REPO_ROOT / "infra" / "ec2" / "cloudfront_waf.tf").read_text(
         encoding="utf-8"
     )

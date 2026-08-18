@@ -84,3 +84,23 @@ output "egress_denial_log_group" {
   value       = aws_cloudwatch_log_group.egress_denials.name
   description = "CloudWatch log group for egress/origin denial strings. Live alarm delivery is Blocked."
 }
+
+output "audit_kms_key_id" {
+  value       = aws_kms_key.audit.id
+  description = "Staging audit KMS key id. Key material is never an output."
+}
+
+output "audit_anchor_bucket" {
+  value       = aws_s3_bucket.audit_anchors.id
+  description = "Object Lock audit-anchor bucket name. Live PutObject is Blocked."
+}
+
+output "staging_ops_topic_arn" {
+  value       = aws_sns_topic.staging_ops.arn
+  description = "Staging-ops SNS topic. No production email subscriptions."
+}
+
+output "staging_monthly_budget_name" {
+  value       = aws_budgets_budget.staging.name
+  description = "Bounded 50 USD MONTHLY COST budget name. Live budget alerts are Blocked."
+}

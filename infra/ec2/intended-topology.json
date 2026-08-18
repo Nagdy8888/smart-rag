@@ -81,5 +81,9 @@
   "secret_rotation_lambda_present": false,
   "live_oidc_assume": "Blocked",
   "live_ssm_migrate": "Blocked",
-  "live_secret_rotation": "Blocked"
+  "live_secret_rotation": "Blocked",
+  "read_replica_endpoint": null,
+  "replica_primary_acl_recheck": false,
+  "kms_live_put_object": false,
+  "s3_object_lock_live": false
 }

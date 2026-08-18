@@ -33,6 +33,9 @@ The Terraform AWS provider 5.100 website still mentions a 60s default upper
 bound for origin timeouts. The AWS CloudFront API allows OriginReadTimeout
 1-120. Packet 1 encodes **90** and must not silently lower it.
 
+Packet 5 adds `kms_s3_audit.tf` and `alerts.tf`. Live KMS PutObject, SNS
+delivery, and the 50 USD budget alert remain **Blocked**. HMAC is not KMS.
+
 ## Review locally (no cloud)
 
 ```powershell
@@ -41,6 +44,7 @@ uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
+uv run python scripts/ci/check_phase10_packet5.py
 ```
 
 ## Apply later (when accounts and a valid session exist)

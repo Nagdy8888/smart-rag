@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "case": "hmac_claimed_as_kms",
+      "exercise": "tests/unit/test_phase10_packet5.py",
+      "expected": "Failed"
+    },
+    {
+      "case": "missing_object_lock",
+      "exercise": "tests/unit/test_phase10_packet5.py",
+      "expected": "Phase10AlertsError"
+    },
+    {
+      "case": "actions_enabled_false",
+      "exercise": "tests/unit/test_phase10_packet5.py",
+      "expected": "Phase10AlertsError"
+    },
+    {
+      "case": "production_sns_email",
+      "exercise": "tests/unit/test_phase10_packet5.py",
+      "expected": "Phase10AlertsError"
+    },
+    {
+      "case": "replica_without_primary_recheck",
+      "exercise": "tests/unit/test_phase10_packet5.py",
+      "expected": "Phase10AlertsError"
+    },
+    {
+      "case": "envelope_10k_claim",
+      "exercise": "tests/unit/test_phase10_packet5.py",
+      "expected": "Phase10AlertsError"
+    },
+    {
+      "case": "unbounded_budget",
+      "exercise": "tests/unit/test_phase10_packet5.py",
+      "expected": "Phase10AlertsError"
+    }
+  ],
+  "schema_version": "phase10-packet5-negatives-v1"
+}

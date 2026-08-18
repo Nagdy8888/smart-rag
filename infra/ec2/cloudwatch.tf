@@ -1,9 +1,9 @@
 # Packet 3 egress/origin denial telemetry. hashicorp/aws 5.100
 # aws_cloudwatch_log_group, aws_cloudwatch_log_metric_filter, and
 # aws_cloudwatch_metric_alarm. Filter patterns match Caddy denial strings.
-# Live log delivery and alarm notifications are not proven. Do not treat these
-# resources as a delivered synthetic alert. Alarm actions stay disabled until
-# Packet 5 owns routing. See
+# Packet 5 owns routing: actions_enabled is true and alarm_actions target
+# aws_sns_topic.staging_ops. Live SNS delivery remains Blocked until apply.
+# See
 # https://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/FilterAndPatternSyntax.html
 
 resource "aws_cloudwatch_log_group" "egress_denials" {
@@ -48,7 +48,8 @@ resource "aws_cloudwatch_metric_alarm" "egress_denials" {
   threshold           = 1
   alarm_description   = "Provider egress denial observed. Live delivery is Blocked."
   treat_missing_data  = "notBreaching"
-  actions_enabled     = false
+  actions_enabled     = true
+  alarm_actions       = [aws_sns_topic.staging_ops.arn]
 }
 
 data "aws_iam_policy_document" "egress_denial_logs" {

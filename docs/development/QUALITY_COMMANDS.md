@@ -33,6 +33,7 @@ uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
+uv run python scripts/ci/check_phase10_packet5.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -284,12 +285,20 @@ tests. Live managed JWKS dashboard rollover, live origin rotation, the
 Blocked. Local EventSource is not CDN. It is local-only and is not a
 GitHub PR job. Packets 1–3 remaining unchecked is not a Packet 4 failure.
 
+The Phase 10 Packet 5 gate reviews KMS/S3 Object Lock IaC, SNS/budget
+alarm routing, SES sandbox, 70% pause, local 30<42 connection math, and
+the signed reduced envelope. Live PutObject, SNS ack, SES send, managed
+Pro pooling, and EC2 measurements stay Blocked. HMAC is not KMS. It is
+local-only and is not a GitHub PR job. Packets 1–4 remaining unchecked
+is not a Packet 5 failure.
+
 ```powershell
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
+uv run python scripts/ci/check_phase10_packet5.py
 ```
 
 [docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)

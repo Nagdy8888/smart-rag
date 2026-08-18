@@ -32,7 +32,7 @@
   "live_ssm_migrate": "Blocked",
   "migration_sha256": "f967d4814d272c9d8f62d9f01501ab64963f02076fe4a2dd5ef99f8a9366ed87",
   "oidc_policy": "Passed",
-  "oidc_sha256": "2fb6154476c010ddf846850198d73f4deb2cbd98781cbd4a872e568f738334a8",
+  "oidc_sha256": "79f626810cc222cbd3af437cda52bb0743c140abd02dd5d551237af6e716ad6d",
   "packet": "P10-02",
   "packet1_checkbox": "unchecked",
   "packet2_checkbox": "unchecked",

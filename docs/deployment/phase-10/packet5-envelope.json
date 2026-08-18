@@ -1,0 +1,15 @@
+{
+  "QT-CAP-001-P9": 8,
+  "QT-CAP-002-P9": 16,
+  "QT-CAP-005-P8": 15,
+  "claimed_full_chunks": false,
+  "claimed_full_hybrid": false,
+  "decision": "keep",
+  "live_managed_resources": "Blocked",
+  "live_reason": "No live EC2/ParadeDB/Valkey/OCR measurements. Keep the signed reduced envelope; do not advertise 10k/1M.",
+  "managed_ec2_claimed": false,
+  "phase09_local_resources": "docs/deployment/phase-09/candidate-packet4-resources.json",
+  "schema_version": "phase10-packet5-envelope-v1",
+  "signed_full_chunks": 1000000,
+  "signed_full_hybrid": 10000
+}

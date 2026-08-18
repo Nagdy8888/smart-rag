@@ -2,7 +2,7 @@
 title: Audit hash chain
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-18
 audience: engineering, security
 phase_packet: Phase 2 Packet 6
 ---
@@ -69,18 +69,30 @@ Python mirror for redaction/helpers:
 `packages/core/src/smart_rag_core/security/audit_chain.py` (SQL remains
 authoritative for insert hashing).
 
-## Phase 10 anchoring (deferred)
+## Phase 10 anchoring
 
-Periodic export of chain heads to KMS-signed / Object Lock storage is **not**
-implemented. `app.audit_chain_anchors` exists as a schema placeholder from Packet 2;
-no production anchoring job runs in Phase 2.
+Periodic export of chain heads to KMS-signed / S3 Object Lock storage is
+**IaC-ready and live-Blocked**. Packet 5 committed
+`infra/ec2/kms_s3_audit.tf` (hashicorp/aws ~> 5.100): rotating
+`ENCRYPT_DECRYPT` KMS key, Object Lock **GOVERNANCE** 7 years on a new
+bucket, SSE-KMS, public access blocked. Live `PutObject` / `GetObject` of
+a KMS-signed chain head is **Blocked** (no apply, expired or missing AWS
+session). Local HMAC export in
+`packages/core/src/smart_rag_core/security/audit_export.py` still writes
+`kms: false`, `s3_object_lock: false`, `phase_10_blocker: true`. Treating
+HMAC as KMS is **Failed**.
+
+`app.audit_chain_anchors` remains the schema placeholder; the exporter job
+is a later principal and is not granted on `aws_iam_role.staging_instance`.
 
 ## Verification
 
 ```powershell
 uv run pytest tests/contract/test_audit_chain.py -q
+uv run python scripts/ci/check_phase10_packet5.py
 ```
 
 Related: [PROTECTED_MIGRATION_CREDENTIALS.md](./PROTECTED_MIGRATION_CREDENTIALS.md) ·
 [05-database-connections.md](../architecture/05-database-connections.md) ·
+[alert-routing.md](../runbooks/alert-routing.md) ·
 [ADMINISTRATION.md](../frontend/ADMINISTRATION.md)

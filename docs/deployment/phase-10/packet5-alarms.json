@@ -1,0 +1,96 @@
+{
+  "budget_unbounded": false,
+  "budget_usd": 50,
+  "live_delivery": "Blocked",
+  "live_reason": "IaC and runbook routing exist. Live SNS publish, acknowledgement, and escalation were not run.",
+  "matrix": [
+    {
+      "actions_enabled": true,
+      "alarm": "cpu",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    },
+    {
+      "actions_enabled": true,
+      "alarm": "memory",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    },
+    {
+      "actions_enabled": true,
+      "alarm": "disk",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    },
+    {
+      "actions_enabled": true,
+      "alarm": "paradedb_fallback",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    },
+    {
+      "actions_enabled": true,
+      "alarm": "valkey",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    },
+    {
+      "actions_enabled": true,
+      "alarm": "audit_anchor_gap",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    },
+    {
+      "actions_enabled": true,
+      "alarm": "ses_bounce",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    },
+    {
+      "actions_enabled": true,
+      "alarm": "openai_spend_proxy",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    },
+    {
+      "actions_enabled": true,
+      "alarm": "egress_denials",
+      "live_delivery": "Blocked",
+      "sns_staging_ops": true
+    }
+  ],
+  "policy": "Passed",
+  "required_alarms": [
+    "egress_denials",
+    "cpu",
+    "memory",
+    "disk",
+    "paradedb_fallback",
+    "valkey",
+    "audit_anchor_gap",
+    "ses_bounce",
+    "openai_spend_proxy"
+  ],
+  "runbook": "docs/runbooks/alert-routing.md",
+  "runbook_alarms": [
+    "egress_denials",
+    "cpu",
+    "memory",
+    "disk",
+    "paradedb_fallback",
+    "valkey",
+    "audit_anchor_gap",
+    "ses_bounce",
+    "openai_spend",
+    "aws_monthly_budget",
+    "aws_data_transfer",
+    "supabase_compute",
+    "supabase_storage",
+    "supabase_egress",
+    "supabase_cpu",
+    "supabase_io",
+    "supabase_connections",
+    "supabase_backup"
+  ],
+  "schema_version": "phase10-packet5-alarms-v1"
+}

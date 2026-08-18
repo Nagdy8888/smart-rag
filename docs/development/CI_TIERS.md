@@ -102,6 +102,15 @@ SSE, and EC2 kill stay Blocked. It is not added to `pr-fast.yml`. Packets
 [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) and
 [origin-secret-rotation.md](../runbooks/origin-secret-rotation.md).
 
+Phase 10 Packet 5 KMS/Object Lock/alarm/pooling policy
+(`scripts/ci/check_phase10_packet5.py`) is a local gate. Application
+tamper tests, 70% pause, and local connection-budget math can Pass. Live
+KMS PutObject, SNS ack, SES send, managed pooling, and EC2 measurements
+stay Blocked. HMAC claimed as KMS is Failed. It is not added to
+`pr-fast.yml`. Packets 1–4 remaining unchecked is not a Packet 5 failure.
+See [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) and
+[alert-routing.md](../runbooks/alert-routing.md).
+
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and
 artifact upload. A local workflow definition is not remote execution

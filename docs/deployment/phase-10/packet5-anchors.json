@@ -1,0 +1,22 @@
+{
+  "hmac_claimed_as_kms": false,
+  "hmac_flags": {
+    "kms": false,
+    "phase_10_blocker": true,
+    "s3_object_lock": false
+  },
+  "live_put_object": "Blocked",
+  "live_reason": "No live Object-Lock GetObject of a KMS-signed chain head. Terraform is not applied and AWS session is expired or missing.",
+  "policy": "Passed",
+  "schema_version": "phase10-packet5-anchors-v1",
+  "tamper_subset": {
+    "files": [
+      "tests/unit/test_fastapi_security.py::test_audit_export_detects_mutation_gap_fork_signing_and_passage"
+    ],
+    "skipped": 0,
+    "tests": 1
+  },
+  "tamper_tests": [
+    "tests/unit/test_fastapi_security.py::test_audit_export_detects_mutation_gap_fork_signing_and_passage"
+  ]
+}

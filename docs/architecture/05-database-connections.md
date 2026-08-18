@@ -2,7 +2,7 @@
 title: Database connections and pool budgets
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-18
 audience: engineering, ops
 phase_packet: Phase 2 Packet 6
 ---
@@ -23,9 +23,10 @@ replicas).
 | Worst-case provisional sum | **30** |
 | Gate | **30 < 42** ✓ |
 
-Managed custody of pooler wiring and production pool changes remains **Phase 9/10**;
-this packet proves local role settings + documented math against the selected Nano
-limit.
+Managed custody of pooler wiring and production pool changes remains
+**Phase 10**; this packet proves local role settings + documented math
+against the selected Nano limit. Managed Pro pooling is **Not Run**.
+Local worst-case math remains **30 < 42**.
 
 ## Process inventory (from `docker-compose.yml`)
 

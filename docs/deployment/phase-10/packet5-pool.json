@@ -1,0 +1,30 @@
+{
+  "budget_subset": {
+    "files": [
+      "tests/contract/test_connection_budgets.py::test_worst_case_connection_budget_under_seventy_percent"
+    ],
+    "skipped": 0,
+    "tests": 1
+  },
+  "budget_tests": [
+    "tests/contract/test_connection_budgets.py::test_worst_case_connection_budget_under_seventy_percent"
+  ],
+  "live_managed_pool": "Blocked",
+  "live_reason": "Managed Pro pooling and database pressure were not measured. Local 30<42 math and 70% pause tests are not managed pool proof.",
+  "local_budget_30_lt_42": true,
+  "pause_subset": {
+    "files": [
+      "tests/unit/test_maintenance_pause.py"
+    ],
+    "skipped": 0,
+    "tests": 12
+  },
+  "pause_tests": [
+    "tests/unit/test_maintenance_pause.py"
+  ],
+  "phase09_local_pools": "docs/deployment/phase-09/candidate-packet4-pools.json",
+  "read_replica_endpoint": null,
+  "replica_primary_acl_recheck": false,
+  "schema_version": "phase10-packet5-pool-v1",
+  "user_load_pause_percent": 70
+}

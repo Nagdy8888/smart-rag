@@ -1,4 +1,6 @@
 # Least-privilege instance role. GitHub OIDC roles live in oidc.tf (Packet 2).
+# Packet 5 audit KMS: do not grant kms:Decrypt or kms:Sign on this role.
+# The exporter job is a later principal. Database roles never receive the key.
 
 data "aws_iam_policy_document" "ec2_assume" {
   statement {

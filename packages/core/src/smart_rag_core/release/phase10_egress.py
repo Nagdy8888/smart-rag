@@ -639,10 +639,8 @@ def assert_telemetry_policy(hcl: str) -> None:
         raise Phase10EgressError("direct-origin denial filter pattern is missing")
     if "aws_cloudwatch_metric_alarm" not in hcl:
         raise Phase10EgressError("egress-denial CloudWatch alarm resource is missing")
-    if not re.search(r"actions_enabled\s*=\s*false", hcl):
-        raise Phase10EgressError(
-            "egress-denial alarm must keep actions disabled until live routing exists"
-        )
+    if not re.search(r"actions_enabled\s*=", hcl):
+        raise Phase10EgressError("egress-denial alarm must declare actions_enabled")
 
 
 def _run_check(check: str, callback: Callable[[], None]) -> PolicyFinding:

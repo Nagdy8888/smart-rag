@@ -1,11 +1,12 @@
-"""Stable identifiers for Phase 10 Packets 1-4.
+"""Stable identifiers for Phase 10 Packets 1-5.
 
 Packet 1 consumes the accepted Phase 9 promotion freeze. Packet 2 adds GitHub
 OIDC, named SSM documents, and Secrets Manager placeholders. Packet 3 asserts
 origin/egress/timeout/telemetry policy. Packet 4 classifies JWKS, origin
-rotation, CDN SSE, ParadeDB degrade, and Valkey fail-closed. None of these
-packets imply live AWS apply, managed JWKS dashboard rollover, CloudFront
-50-second streams, or EC2 ParadeDB/Valkey kill results.
+rotation, CDN SSE, ParadeDB degrade, and Valkey fail-closed. Packet 5 asserts
+KMS/S3 Object Lock IaC, alarm routing, SES/OAuth/Storage support, pooling,
+and the signed reduced envelope. None of these packets imply live AWS apply,
+KMS PutObject, SNS delivery, SES send, or managed pool pressure.
 """
 
 from __future__ import annotations
@@ -45,6 +46,13 @@ PACKET4_SSE_NAME = "packet4-sse.json"
 PACKET4_PARADEDB_NAME = "packet4-paradedb.json"
 PACKET4_VALKEY_NAME = "packet4-valkey.json"
 PACKET4_NEGATIVES_NAME = "packet4-negatives.json"
+PACKET5_MATRIX_NAME = "packet5-gate-matrix.json"
+PACKET5_ANCHORS_NAME = "packet5-anchors.json"
+PACKET5_ALARMS_NAME = "packet5-alarms.json"
+PACKET5_INTEGRATIONS_NAME = "packet5-integrations.json"
+PACKET5_POOL_NAME = "packet5-pool.json"
+PACKET5_ENVELOPE_NAME = "packet5-envelope.json"
+PACKET5_NEGATIVES_NAME = "packet5-negatives.json"
 GITHUB_WORKFLOWS_DIR = ".github/workflows"
 SSM_DOCUMENTS_DIR = "infra/ec2/ssm-documents"
 MIGRATIONS_DIR = "supabase/migrations"
@@ -78,6 +86,13 @@ PACKET4_SSE_SCHEMA_VERSION = "phase10-packet4-sse-v1"
 PACKET4_PARADEDB_SCHEMA_VERSION = "phase10-packet4-paradedb-v1"
 PACKET4_VALKEY_SCHEMA_VERSION = "phase10-packet4-valkey-v1"
 PACKET4_NEGATIVES_SCHEMA_VERSION = "phase10-packet4-negatives-v1"
+PACKET5_MATRIX_SCHEMA_VERSION = "phase10-packet5-matrix-v1"
+PACKET5_ANCHORS_SCHEMA_VERSION = "phase10-packet5-anchors-v1"
+PACKET5_ALARMS_SCHEMA_VERSION = "phase10-packet5-alarms-v1"
+PACKET5_INTEGRATIONS_SCHEMA_VERSION = "phase10-packet5-integrations-v1"
+PACKET5_POOL_SCHEMA_VERSION = "phase10-packet5-pool-v1"
+PACKET5_ENVELOPE_SCHEMA_VERSION = "phase10-packet5-envelope-v1"
+PACKET5_NEGATIVES_SCHEMA_VERSION = "phase10-packet5-negatives-v1"
 
 AWS_PROVIDER_CONSTRAINT = "~> 5.100"
 INTENDED_AWS_REGION = "us-east-1"
@@ -216,6 +231,86 @@ PACKET4_RELATIVE = (
     ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
     "04-exercise-rotations-streaming-and-degradation.md"
 )
+PACKET5_RELATIVE = (
+    ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
+    "05-exercise-anchors-alerts-and-managed-load.md"
+)
+ALERT_ROUTING_RUNBOOK = "docs/runbooks/alert-routing.md"
+AUDIT_EXPORT_MODULE = "packages/core/src/smart_rag_core/security/audit_export.py"
+KMS_S3_AUDIT_TF = "infra/ec2/kms_s3_audit.tf"
+ALERTS_TF = "infra/ec2/alerts.tf"
+STAGING_BUDGET_USD = 50
+OBJECT_LOCK_RETENTION_YEARS = 7
+OBJECT_LOCK_MODE = "GOVERNANCE"
+KMS_DELETION_WINDOW_MIN_DAYS = 7
+KMS_DELETION_WINDOW_MAX_DAYS = 30
+STAGING_SYNTHETIC_EMAIL_SUFFIX = "@example.invalid"
+PRODUCTION_EMAIL_FRAGMENTS: tuple[str, ...] = (
+    "@gmail.com",
+    "@googlemail.com",
+    "@outlook.com",
+    "@hotmail.com",
+    "@yahoo.com",
+    "@company.com",
+    "@prod.",
+    "production@",
+)
+PACKET5_REQUIRED_ALARM_RESOURCES: tuple[str, ...] = (
+    "egress_denials",
+    "cpu",
+    "memory",
+    "disk",
+    "paradedb_fallback",
+    "valkey",
+    "audit_anchor_gap",
+    "ses_bounce",
+    "openai_spend_proxy",
+)
+PACKET5_RUNBOOK_ALARM_IDS: tuple[str, ...] = (
+    "egress_denials",
+    "cpu",
+    "memory",
+    "disk",
+    "paradedb_fallback",
+    "valkey",
+    "audit_anchor_gap",
+    "ses_bounce",
+    "openai_spend",
+    "aws_monthly_budget",
+    "aws_data_transfer",
+    "supabase_compute",
+    "supabase_storage",
+    "supabase_egress",
+    "supabase_cpu",
+    "supabase_io",
+    "supabase_connections",
+    "supabase_backup",
+)
+PACKET5_AUDIT_TEST_FILES: tuple[str, ...] = (
+    (
+        "tests/unit/test_fastapi_security.py"
+        "::test_audit_export_detects_mutation_gap_fork_signing_and_passage"
+    ),
+)
+PACKET5_PAUSE_TEST_FILES: tuple[str, ...] = ("tests/unit/test_maintenance_pause.py",)
+PACKET5_BUDGET_TEST_FILES: tuple[str, ...] = (
+    (
+        "tests/contract/test_connection_budgets.py"
+        "::test_worst_case_connection_budget_under_seventy_percent"
+    ),
+)
+PACKET5_OAUTH_TEST_FILES: tuple[str, ...] = (
+    (
+        "tests/contract/test_local_auth_mail.py"
+        "::test_auth_oauth_and_local_smtp_configuration_is_explicit"
+    ),
+)
+PACKET5_CORS_TEST_FILES: tuple[str, ...] = (
+    "tests/unit/test_fastapi_security.py::test_cors_reflects_exact_origin_not_wildcard",
+    "tests/unit/test_fastapi_security.py::test_wildcard_cors_settings_fail_closed",
+)
+PHASE09_PACKET4_RESOURCES = "docs/deployment/phase-09/candidate-packet4-resources.json"
+PHASE09_PACKET4_POOLS = "docs/deployment/phase-09/candidate-packet4-pools.json"
 ORIGIN_ROTATION_RUNBOOK = "docs/runbooks/origin-secret-rotation.md"
 ORIGIN_ROTATION_OVERLAP_MAX_MINUTES = 15
 CDN_SSE_MIN_DURATION_SECONDS = 50

@@ -129,6 +129,21 @@ ParadeDB/Valkey kill is Blocked**. ParadeDB snapshots are not canonical.
 
 The Packet 4 checkbox stays **unchecked** while P10-04-C is Blocked.
 
+## Packet 5 KMS/Object Lock, alarms, SES, pooling, envelope
+
+Reviewed under `infra/ec2/kms_s3_audit.tf`, `alerts.tf`, `cloudwatch.tf`,
+and [alert-routing.md](../runbooks/alert-routing.md). Object Lock
+GOVERNANCE 7 years and a rotating audit KMS key exist in IaC. The instance
+role is denied `kms:Decrypt`/`kms:Sign`. Local HMAC export is **not** KMS.
+SNS `staging-ops` plus a 50 USD MONTHLY COST budget notify SNS only; there
+is **no production email**. Application 70% pause and local 30<42
+connection math can Pass. **Live PutObject, SNS ack, SES send, managed Pro
+pooling, and EC2 measurements are Blocked**. Envelope decision: keep
+QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. Do not claim 10k/1M.
+
+The Packet 5 checkbox stays **unchecked** while live KMS/SNS/SES/resources
+are Blocked. Packets 1–4 remaining unchecked is not a Packet 5 failure.
+
 ## Verification
 
 ```powershell
@@ -137,4 +152,5 @@ uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
 uv run python scripts/ci/check_phase10_packet4.py
+uv run python scripts/ci/check_phase10_packet5.py
 ```

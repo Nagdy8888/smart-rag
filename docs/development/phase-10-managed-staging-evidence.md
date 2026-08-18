@@ -585,4 +585,150 @@ P10-04-C remains Blocked; local EventSource was not claimed as CDN.
 ParadeDB snapshots were not accepted as canonical. Packets 1–3 remaining
 unchecked did not fail Packet 4 classify.
 
+## Packet 5 — KMS/Object Lock anchors, alarms, SES, pooling, envelope
+
+Requirement ID: **P10-05**.
+
+### Requirement (quoted)
+
+> Exercise staging KMS/S3 Object Lock audit anchors, OpenAI/AWS/Supabase
+> billing and operational alarm routing, SES/OAuth/Storage, managed
+> pooling, load, and database pressure.
+
+### Concrete acceptance checks
+
+- **P10-05-A:** Valid immutable anchor verifies; all tampering fails.
+  Evidence: report. Failure: blocker.
+- **P10-05-B:** Every operational/billing alarm reaches named
+  route/ack/escalation. Evidence: matrix. Failure: repair.
+- **P10-05-C:** SES/OAuth/Storage/Auth pass synthetically without
+  exposure. Evidence: integration report. Failure: blocker.
+- **P10-05-D:** Pool/database pressure and 70% isolation meet gates with
+  authority intact. Evidence: telemetry. Failure: sizing route.
+- **P10-05-E:** Real managed resources meet or resize/isolate/reduce/re-sign
+  envelope. Evidence: report. Failure: stop.
+
+```mermaid
+flowchart TD
+  iac["KMS Object Lock SNS budget IaC"] --> aBlock["P10-05-A Blocked live"]
+  tamper["Application tamper tests"] --> aSupport["A supporting Passed"]
+  hmac["HMAC kms false"] --> aNotKms["HMAC-as-KMS rejected"]
+  runbook["alert-routing.md matrix"] --> bBlock["P10-05-B Blocked live SNS"]
+  ses["SES sandbox IaC"] --> cBlock["P10-05-C Blocked live send"]
+  pause["70 percent pause plus 30 lt 42"] --> dPass["P10-05-D Passed"]
+  replica["No replica without recheck"] --> dPass
+  envelope["Keep QT-CAP-001-P9=8"] --> eBlock["P10-05-E Blocked live EC2"]
+  eBlock --> unchecked["Packet 5 checkbox unchecked"]
+```
+
+### Inspected paths (before edit)
+
+| Path | Result |
+| --- | --- |
+| `packages/core/src/smart_rag_core/security/audit_export.py` | Still writes `kms: false`, `s3_object_lock: false`, `phase_10_blocker: true` |
+| `tests/unit/test_fastapi_security.py::test_audit_export_detects_mutation_gap_fork_signing_and_passage` | Reused; 1 collected, 0 skipped |
+| `tests/unit/test_maintenance_pause.py` | `USER_LOAD_PAUSE_PERCENT=70`; 12 collected, 0 skipped |
+| `tests/contract/test_connection_budgets.py::test_worst_case_connection_budget_under_seventy_percent` | Local 30<42; 1 collected, 0 skipped |
+| `infra/ec2/ses.tf` | Sandbox identity; no live send |
+| `infra/ec2/cloudwatch.tf` | Packet 3 alarm existed with `actions_enabled = false`; Packet 5 set `true` plus SNS |
+| Live KMS/S3/SNS/SES/managed pool | Absent. Classified Blocked. No terraform apply, no aws login |
+
+### Files changed (allowed outputs only)
+
+| File | Action |
+| --- | --- |
+| `infra/ec2/kms_s3_audit.tf` | Created — rotating KMS key, Object Lock GOVERNANCE 7 years, SSE-KMS, public access block |
+| `infra/ec2/alerts.tf` | Created — staging-ops SNS, CloudWatch/Budgets topic policy, topology alarms, 50 USD MONTHLY budget to SNS |
+| `infra/ec2/cloudwatch.tf` | `actions_enabled = true` and `alarm_actions` to staging-ops |
+| `packages/core/src/smart_rag_core/release/phase10_alerts.py` | Created — fail-closed policy |
+| `packages/core/src/smart_rag_core/release/phase10_packet5.py` | Created — honest A–E classifier |
+| `packages/core/src/smart_rag_core/release/phase10_egress.py` | Packet 3 telemetry requires `actions_enabled` present, not false |
+| `scripts/ci/check_phase10_packet5.py` | Created — zero-collection fail-closed gate |
+| `docs/runbooks/alert-routing.md` | Created — owner/severity/route/ack/escalation; synthetic only |
+| `docs/deployment/phase-10/packet5-*.json` | Written by the Packet 5 gate |
+| `docs/deployment/phase-10/packet1-*.json` / `packet2-*.json` / `packet3-*.json` | Refreshed after `*.tf` hash change |
+| `.cursor/plans/.../10-phase-managed-staging.md` | Wrapper remains pending; Packet 5 checkbox unchecked |
+
+### Identities frozen
+
+No secrets. No invented KMS signatures, Object Lock GetObject, SNS
+deliveries, SES message ids, or managed pool telemetry.
+
+| Field | Value |
+| --- | --- |
+| Envelope decision | keep QT-CAP-001-P9=8, QT-CAP-002-P9=16, QT-CAP-005-P8=15 |
+| Budget | 50 USD COST MONTHLY, SNS only |
+| Object Lock | GOVERNANCE, 7 years |
+| HMAC flags | kms false, s3_object_lock false, phase_10_blocker true |
+| Packet 5 iac_sha256 | `2f25475b21dfe67cfee19fa8c50d200384608280e622e263cba6294cef06e6e5` |
+| Packet 1 iac_sha256 (refreshed) | `661ab394964e33e219308f7b01532dc9e6f9655132632d2361aaf022b7bd6649` |
+| Packet 2 iac_sha256 (refreshed) | `79f626810cc222cbd3af437cda52bb0743c140abd02dd5d551237af6e716ad6d` |
+| Packet 3 iac_sha256 (refreshed) | `931d12eaef39adaf0b9b547983a745d9a05c14f86d2a92d2c6f3b3446097daff` |
+| Tamper subset | 1 collected, 0 skipped |
+| Pause subset | 12 collected, 0 skipped |
+| Budget subset | 1 collected, 0 skipped |
+| OAuth support | 1 collected, 0 skipped |
+| CORS support | 2 collected, 0 skipped |
+
+### Classifications
+
+Packet 5 **does not** mark the wrapper complete. Live KMS/SNS/SES/resources
+are **Blocked**, so the Packet 5 checkbox stays unchecked. Packets 1–4 stay
+unchecked and are not required for Packet 5 classify.
+
+| Check | Classification | Notes |
+| --- | --- | --- |
+| P10-05-A anchors | Blocked | IaC Passed. Application tamper tests Passed (supporting). HMAC-as-KMS rejected. No live Object-Lock GetObject |
+| P10-05-B alarms | Blocked | IaC plus runbook matrix Passed. Live SNS/ack not run |
+| P10-05-C SES/OAuth/Storage | Blocked | SES sandbox IaC Passed. OAuth/CORS tests collected as support. Managed Storage CORS not claimed Passed. No live SES send, no production recipient |
+| P10-05-D pool/70% | Passed | Application 70% pause and local 30<42 Passed. Replica absent (replica-without-recheck would Fail). Live managed pool Blocked in the same row detail |
+| P10-05-E envelope | Blocked | Keep reduced envelope. 10k/1M rejected. Live EC2/managed measurements Blocked |
+
+### Commands and exit codes
+
+```powershell
+uv run ruff format packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_alerts.py packages/core/src/smart_rag_core/release/phase10_packet5.py packages/core/src/smart_rag_core/release/phase10_egress.py scripts/ci/check_phase10_packet5.py tests/unit/test_phase10_packet5.py tests/contract/test_phase10_packet5.py tests/contract/test_phase10_packet3.py
+uv run ruff check packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_alerts.py packages/core/src/smart_rag_core/release/phase10_packet5.py packages/core/src/smart_rag_core/release/phase10_egress.py scripts/ci/check_phase10_packet5.py tests/unit/test_phase10_packet5.py tests/contract/test_phase10_packet5.py tests/contract/test_phase10_packet3.py
+uv run python -m pytest tests/unit/test_phase10_packet5.py tests/contract/test_phase10_packet5.py tests/unit/test_phase10_packet1.py tests/contract/test_phase10_packet1.py tests/unit/test_phase10_packet3.py tests/contract/test_phase10_packet3.py tests/unit/test_phase10_packet4.py tests/contract/test_phase10_packet4.py -q
+uv run python scripts/ci/check_phase10_packet1.py
+uv run python scripts/ci/check_phase10_packet3.py
+uv run python scripts/ci/check_phase10_packet5.py
+```
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff format` on Packet 5 Python | 0 | Files formatted then left unchanged |
+| `uv run ruff check` on Packet 5 Python | 0 | All checks passed |
+| `uv run python -m pyright` on Packet 5 Python | 0 | 0 errors |
+| `uv run python -m pytest` Packet 1/3/4/5 | 0 | 51 passed, 0 skipped |
+| `uv run python scripts/ci/check_phase10_packet1.py` | 0 | tests=16; IaC policy Passed; live apply Blocked; checkbox unchecked |
+| `uv run python scripts/ci/check_phase10_packet3.py` | 0 | tests=42 crawl_subset=29 skipped=0; IaC Passed; P10-03-A/B/E Blocked; C/D Passed |
+| `uv run python scripts/ci/check_phase10_packet5.py` | 0 | tests=29 tamper=1 pause=12 budget=1 oauth=1 cors=2 skipped=0; A/B/C/E Blocked; D Passed |
+
+Artifacts: `docs/deployment/phase-10/packet5-{gate-matrix,anchors,alarms,integrations,pool,envelope,negatives}.json`.
+
+Packet 5 checkbox stays **unchecked** because live KMS/SNS/SES/resources
+are Blocked. Packet file `status` stays `pending`. Phase 10 wrapper
+`status` remains `pending`. Holdout was not opened. Packets 1–4 stay
+unchecked. Not added to `pr-fast.yml`.
+
+### Unverified / Blocked
+
+- Live KMS-signed Object Lock PutObject/GetObject of a chain head.
+- Live SNS publish, acknowledgement, and escalation.
+- Live SES sandbox send (no production recipient).
+- Managed Supabase Pro pooling and database pressure.
+- Live EC2/ParadeDB/Valkey/OCR resource measurements.
+- Packets 6–7.
+
+### Deviations
+
+None versus Packet 5 scope. HMAC was not treated as KMS. 10k/1M was not
+advertised. Replica-without-recheck remains a Failed negative and is
+absent from topology. Packet 3 telemetry no longer requires
+`actions_enabled = false`; it requires the key to be present. Packet 5
+requires `true` plus SNS. Packets 1–4 remaining unchecked did not fail
+Packet 5 classify. Terraform was not applied. AWS login was not run.
+
+
 

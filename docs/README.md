@@ -49,7 +49,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-08-18 | eng |
 | [architecture/03-components.md](./architecture/03-components.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [architecture/04-deployment.md](./architecture/04-deployment.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
-| [architecture/05-database-connections.md](./architecture/05-database-connections.md) | engineering-lead | proven | 2026-08-13 | eng, ops |
+| [architecture/05-database-connections.md](./architecture/05-database-connections.md) | engineering-lead | proven | 2026-08-18 | eng, ops |
 | [architecture/06-database-workload-isolation.md](./architecture/06-database-workload-isolation.md) | engineering-lead | proven | 2026-08-18 | eng, ops |
 | [architecture/08-data-dictionary.md](./architecture/08-data-dictionary.md) | engineering-lead | draft | 2026-08-18 | eng |
 | [development/phase-01-foundation-evidence.md](./development/phase-01-foundation-evidence.md) | engineering-lead | accepted | 2026-08-13 | eng, reviewers |
@@ -70,7 +70,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [evaluation/PHASE5_GRAPH_EVAL.md](./evaluation/PHASE5_GRAPH_EVAL.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
 | [architecture/07-bm25-projection.md](./architecture/07-bm25-projection.md) | engineering-lead | proven | 2026-08-13 | eng |
 | [security/PROTECTED_MIGRATION_CREDENTIALS.md](./security/PROTECTED_MIGRATION_CREDENTIALS.md) | engineering-lead | proven-local / iac-reviewed-managed | 2026-08-18 | eng, security, ops |
-| [security/AUDIT_CHAIN.md](./security/AUDIT_CHAIN.md) | engineering-lead | proven | 2026-08-17 | eng, security |
+| [security/AUDIT_CHAIN.md](./security/AUDIT_CHAIN.md) | engineering-lead | proven | 2026-08-18 | eng, security |
 | [evaluation/EMBEDDING_QUALIFICATION_REPORT.md](./evaluation/EMBEDDING_QUALIFICATION_REPORT.md) | engineering-lead | draft | 2026-08-12 | eng, reviewers |
 | [evaluation/DATASET_SPEC.md](./evaluation/DATASET_SPEC.md) | engineering-lead | draft | 2026-08-15 | eng, SME, reviewers |
 | [evaluation/QUERY_PROFILE_LABELING.md](./evaluation/QUERY_PROFILE_LABELING.md) | engineering-lead | draft | 2026-08-14 | eng, SME |
@@ -127,6 +127,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-parser-isolation.md](./adr/ADR-parser-isolation.md) | engineering-lead | accepted | 2026-08-18 | eng, security, ops |
 | [runbooks/SUPABASE_JWKS_ROLLOVER.md](./runbooks/SUPABASE_JWKS_ROLLOVER.md) | engineering-lead | draft | 2026-08-18 | ops, security |
 | [runbooks/origin-secret-rotation.md](./runbooks/origin-secret-rotation.md) | engineering-lead | draft | 2026-08-18 | eng, ops, security |
+| [runbooks/alert-routing.md](./runbooks/alert-routing.md) | engineering-lead | draft | 2026-08-18 | eng, ops, security |
 | [security/OPENAI_DATA_GOVERNANCE.md](./security/OPENAI_DATA_GOVERNANCE.md) | product-owner | accepted | 2026-08-13 | client, security |
 | [security/SUBPROCESSOR_GOVERNANCE.md](./security/SUBPROCESSOR_GOVERNANCE.md) | product-owner | accepted | 2026-08-13 | client, security |
 | [api/openapi.foundation.json](./api/openapi.foundation.json) | engineering-lead | draft | 2026-08-16 | eng |

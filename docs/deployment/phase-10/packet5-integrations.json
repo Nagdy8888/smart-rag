@@ -1,0 +1,30 @@
+{
+  "cors_subset": {
+    "files": [
+      "tests/unit/test_fastapi_security.py::test_cors_reflects_exact_origin_not_wildcard",
+      "tests/unit/test_fastapi_security.py::test_wildcard_cors_settings_fail_closed"
+    ],
+    "skipped": 0,
+    "tests": 2
+  },
+  "cors_tests": [
+    "tests/unit/test_fastapi_security.py::test_cors_reflects_exact_origin_not_wildcard",
+    "tests/unit/test_fastapi_security.py::test_wildcard_cors_settings_fail_closed"
+  ],
+  "live_reason": "SES sandbox IaC exists. No live SES send and no production recipient.",
+  "live_ses_send": "Blocked",
+  "managed_storage_cors": "Blocked",
+  "oauth_subset": {
+    "files": [
+      "tests/contract/test_local_auth_mail.py::test_auth_oauth_and_local_smtp_configuration_is_explicit"
+    ],
+    "skipped": 0,
+    "tests": 1
+  },
+  "oauth_tests": [
+    "tests/contract/test_local_auth_mail.py::test_auth_oauth_and_local_smtp_configuration_is_explicit"
+  ],
+  "production_recipient": false,
+  "schema_version": "phase10-packet5-integrations-v1",
+  "ses_sandbox_iac": "Passed"
+}
