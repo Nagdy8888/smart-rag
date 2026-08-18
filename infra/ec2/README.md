@@ -52,11 +52,29 @@ uv run python scripts/ci/check_phase10_packet5.py
 1. Copy `terraform.tfvars.example` to a gitignored `terraform.tfvars`.
 2. Set sensitive origin header name/value current and previous (no commit).
 3. Install Terraform or OpenTofu. Do not download them from Packet 1 CI.
-4. `terraform init` then `terraform plan` in `infra/ec2`.
+4. `aws login --profile Nagdy` (or the current profile). The AWS provider
+   does not read `aws login` sessions through IMDS. Export keys in the same
+   shell, disable IMDS, then plan:
+
+```powershell
+$env:AWS_EC2_METADATA_DISABLED = "true"
+$env:AWS_REGION = "us-east-1"
+aws configure export-credentials --profile Nagdy --format powershell | Invoke-Expression
+Set-Location infra/ec2
+terraform init
+terraform plan -input=false
+```
+
+Do not commit `terraform.tfvars`, `tfplan`, or exported keys. Packet 1 CI
+still must not apply.
+
 5. Apply only after Packet 1 review sign-off. Packet 2 adds GitHub OIDC,
    named SSM documents, and Secrets Manager placeholders without values.
    Live OIDC assume is still Blocked until GitHub Environments and a valid
    session exist.
+
+Hosted Supabase is online project `qsjivtwtmlmtksufqjik`, not local Docker.
+See [ADR-phase10-hosted-supabase-reuse.md](../../docs/adr/ADR-phase10-hosted-supabase-reuse.md).
 
 Live health, prefix-list reachability, and private-port network scans remain
 **Blocked** until a real scan artifact exists.

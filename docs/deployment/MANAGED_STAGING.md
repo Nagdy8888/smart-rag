@@ -9,13 +9,20 @@ audience: engineering, ops, reviewers
 # Managed staging
 
 Phase 10 Packet 1 reviewed isolated staging topology. **IaC policy is
-asserted in-repo. Live AWS/Supabase/Vercel/SES apply is Blocked** until a
-valid session and Terraform/OpenTofu exist. This file does not invent
-project ids, distribution domains, or provision timestamps.
+asserted in-repo.** Hosted Supabase is the existing online project
+`qsjivtwtmlmtksufqjik` (not local Docker); that reuse does **not** match
+the Pro/us-east-1/PITR freeze
+([ADR-phase10-hosted-supabase-reuse.md](../adr/ADR-phase10-hosted-supabase-reuse.md)).
+Live AWS/Vercel apply: Terraform apply created the staging VPC, CloudFront,
+WAF, SES identity, OIDC, KMS/S3 Object Lock, and EC2. Live inventory:
+[packet1-live-aws.json](./phase-10/packet1-live-aws.json). Compose is not
+yet on the instance (SSM copy still required). Private-port scan is not
+done. Packet 1 checkbox stays unchecked.
 
 Related: [infra/ec2](../../infra/ec2/README.md) ·
 [STREAMING_TIMEOUTS.md](./STREAMING_TIMEOUTS.md) ·
 [phase-10 evidence](../development/phase-10-managed-staging-evidence.md) ·
+[packet1-live-supabase.json](./phase-10/packet1-live-supabase.json) ·
 [LOCAL_RELEASE_CANDIDATE.md](./LOCAL_RELEASE_CANDIDATE.md)
 
 ## Intended plan, features, and regions
@@ -24,15 +31,16 @@ Packet 1 freeze (not a prior client-signed region):
 
 | Item | Intended value | Live |
 | --- | --- | --- |
-| AWS region | `us-east-1` | Blocked |
-| Supabase region | `us-east-1` | Blocked |
-| Supabase plan | Pro (PITR required for QT-AVL-003 RPO ≤24h) | Blocked |
-| Auth | Asymmetric JWT/JWKS, no HS256 fallback | Blocked |
-| Storage buckets | documents-quarantine, documents-originals, web-snapshots, table-artifacts | Blocked |
-| Pooling | Supavisor transaction 6543 (API/RPC), session 5432 (LangGraph/LightRAG) | Blocked |
-| `pg_search` on managed Supabase | never | n/a |
-| SES | sandbox only | Blocked |
-| Vercel | public keys only | Blocked |
+| AWS region | `us-east-1` | Applied. VPC `vpc-009cb395d9beda961` |
+| EC2 type | intended `m6i.xlarge` | Live **t3.micro** — [ADR-phase10-free-tier-ec2.md](../adr/ADR-phase10-free-tier-ec2.md) |
+| Supabase region | `us-east-1` | **eu-central-1** hosted reuse — see [ADR-phase10-hosted-supabase-reuse.md](../adr/ADR-phase10-hosted-supabase-reuse.md) |
+| Supabase plan | Pro (PITR required for QT-AVL-003 RPO ≤24h) | **Free**, no PITR. Project `qsjivtwtmlmtksufqjik` (`smart-rag`) |
+| Auth | Asymmetric JWT/JWKS, no HS256 fallback | Hosted legacy anon is HS256; FastAPI still forbids HS256. JWKS unproven |
+| Storage buckets | documents-quarantine, documents-originals, web-snapshots, table-artifacts | Present (plus `exports`). Object count 0 |
+| Pooling | Supavisor transaction 6543 (API/RPC), session 5432 (LangGraph/LightRAG) | Not measured on Free |
+| `pg_search` on managed Supabase | never | Confirmed absent on hosted |
+| SES | sandbox only | Identity `staging-alerts@example.invalid` created; not verified |
+| Vercel | public keys only | Allow-list committed; `live_values` empty |
 
 Envelope stays the Phase 9 reduce: QT-CAP-001-P9=8 Hybrid versions,
 QT-CAP-002-P9=16 chunks, QT-CAP-005-P8=15 graph versions. Do not claim

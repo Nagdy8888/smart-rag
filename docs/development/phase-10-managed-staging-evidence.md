@@ -132,25 +132,65 @@ Packet 1 checkbox stays **unchecked** because P10-01-B runtime and P10-01-C
 network scan are Blocked. Packet file `status` stays `pending`. Phase 10
 wrapper `status` remains `pending`. Holdout was not opened.
 
+### Live hosted Supabase (2026-08-18, not local)
+
+User directed Packet 1 to use **Supabase online, not local**. Org Free-plan
+limit blocked a new us-east-1 Pro project. User approved reuse of hosted
+**smart-rag** `qsjivtwtmlmtksufqjik` (eu-central-1, Free, no PITR). ADR:
+[ADR-phase10-hosted-supabase-reuse.md](../adr/ADR-phase10-hosted-supabase-reuse.md).
+Live actuals (no secrets):
+[packet1-live-supabase.json](../deployment/phase-10/packet1-live-supabase.json).
+
+- `pg_search` is **not** installed. `vector` is installed.
+- Storage buckets exist; `storage.objects` is empty. `app.documents` is empty.
+- Advisor: RLS disabled on `app.revoked_sessions` and
+  `app.mfa_recovery_requests` (not auto-enabled).
+- Legacy anon JWT is HS256. FastAPI HS256 forbid remains. Asymmetric JWKS
+  on this project is **unproven**.
+- Remaining repo migrations after Phase 2 are applied to this hosted
+  project (not local). Intended freeze constants were **not** rewritten.
+- `vercel-public-env.json` `live_values` stays `{}` (contract forbids
+  committing live keys).
+
+### Live AWS apply (2026-08-18)
+
+`terraform apply` in `infra/ec2` created isolated staging resources in
+us-east-1. Inventory:
+[packet1-live-aws.json](../deployment/phase-10/packet1-live-aws.json).
+ADR for instance type:
+[ADR-phase10-free-tier-ec2.md](../adr/ADR-phase10-free-tier-ec2.md).
+
+- Instance `i-0abe79350a3880e87` **t3.micro** running, EIP `52.206.156.176`.
+- IMDSv2 `HttpTokens=required`, hop limit 1. Both gp3 volumes encrypted.
+- Origin SG HTTPS 443 from CloudFront prefix list `pl-3b927c52` only. No SSH.
+- CloudFront `dzm8yijuajwge.cloudfront.net`. WAF associated.
+- SES identity created for `staging-alerts@example.invalid` (unverified).
+- Compose files are **not** on the host yet. Private-port scan **not** run.
+- Origin hostname in CloudFront remains the placeholder until DNS/EIP origin
+  is wired. Direct origin health is unverified.
+
 ### Unverified / Blocked
 
-- Live managed Supabase Pro project, PITR, JWKS, Storage buckets, Supavisor.
-- Live SES sandbox verification and SMTP.
-- Live CloudFront/WAF distribution, origin header, prefix-list ingress.
-- Live EC2 instance, SSM session, Compose health, IMDS hop-1 runtime.
+- Live managed Supabase **Pro** project, PITR, us-east-1, proven JWKS, Pro pooling.
+- Live SES mailbox verification and SMTP delivery.
+- Live Caddy/Compose health, SSM file copy, ParadeDB/Valkey running.
 - Live private-port and metadata network scan.
 - Live Vercel project env.
-- Terraform/OpenTofu plan/apply (tools not installed; not downloaded).
-- Packets 3–7 (egress proof, JWKS/origin rotation, KMS, restore,
-  external assessment). Packet 2 committed OIDC/SSM/workflow policy is
-  appended below; live OIDC assume/SSM migrate remains Blocked.
+- Packets 3–7 live CDN/scan/KMS PutObject/PITR/pentest. Packet 2 live OIDC
+  assume/SSM migrate remains Blocked.
 
 ### Deviations
 
-None versus Packet 1 scope. CloudFront origin timeouts remain 90 seconds in
-IaC despite the Terraform AWS provider website still documenting a 60s
-default upper bound; live apply uses the AWS API contract (OriginReadTimeout
-max 120).
+- Hosted Supabase reuse vs intended freeze: live project is Free /
+  eu-central-1 / no PITR. User approved 2026-08-18. Intended constants stay
+  Pro / us-east-1 / PITR. See
+  [ADR-phase10-hosted-supabase-reuse.md](../adr/ADR-phase10-hosted-supabase-reuse.md).
+- Live EC2 is **t3.micro** because `m6i.xlarge` was rejected as not Free
+  Tier eligible. See
+  [ADR-phase10-free-tier-ec2.md](../adr/ADR-phase10-free-tier-ec2.md).
+- CloudFront origin timeouts remain 90 seconds in IaC despite the Terraform
+  AWS provider website still documenting a 60s default upper bound; live
+  apply uses the AWS API contract (OriginReadTimeout max 120).
 
 ## Packet 2 — GitHub OIDC, protected migrations, and secrets custody
 

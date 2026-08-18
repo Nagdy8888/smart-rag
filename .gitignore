@@ -77,6 +77,8 @@ override.tf.json
 *_override.tf.json
 terraform.tfvars
 !terraform.tfvars.example
+tfplan
+*.tfplan
 !**/*.tfvars.example
 supabase/.temp/
 supabase/.branches/

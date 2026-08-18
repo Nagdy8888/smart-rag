@@ -1,0 +1,42 @@
+{
+  "schema_version": "phase10-live-aws-v1",
+  "user_approved_apply": "2026-08-18",
+  "aws_account": "665602132723",
+  "aws_region": "us-east-1",
+  "intended_instance_type": "m6i.xlarge",
+  "actual_instance_type": "t3.micro",
+  "actual_instance_type_reason": "RunInstances rejected m6i.xlarge: not Free Tier eligible",
+  "instance_id": "i-0abe79350a3880e87",
+  "instance_state": "running",
+  "origin_eip": "52.206.156.176",
+  "private_ip": "10.40.0.201",
+  "vpc_id": "vpc-009cb395d9beda961",
+  "subnet_id": "subnet-0bf2a3462703bcfa2",
+  "origin_security_group_id": "sg-02398d702405818e6",
+  "imds_http_tokens": "required",
+  "imds_hop_limit": 1,
+  "ssh_ingress": false,
+  "origin_sg_ingress": "tcp/443 from prefix list pl-3b927c52 only",
+  "volumes": [
+    {
+      "id": "vol-0bd417dd66283b900",
+      "encrypted": true,
+      "type": "gp3",
+      "size_gib": 80
+    },
+    {
+      "id": "vol-0c80971f8e03c5990",
+      "encrypted": true,
+      "type": "gp3",
+      "size_gib": 50
+    }
+  ],
+  "cloudfront_domain_name": "dzm8yijuajwge.cloudfront.net",
+  "waf_acl_id": "bc02673b-cb26-4467-934c-c81043ccfd43",
+  "ses_identity": "staging-alerts@example.invalid",
+  "ses_verified": false,
+  "compose_copied_via_ssm": false,
+  "network_scan_present": false,
+  "vercel_live_applied": false,
+  "secrets_committed": false
+}

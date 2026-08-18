@@ -23,6 +23,8 @@ audience: engineering
 | CVE pin patch (lxml/Pillow; pyarrow advisory) | accepted | 4 | [ADR-cve-pin-patch-2026-08.md](./ADR-cve-pin-patch-2026-08.md) |
 | Alpine application bases (Trivy Criticals) | accepted | 9 | [ADR-alpine-application-bases-trivy.md](./ADR-alpine-application-bases-trivy.md) |
 | Phase 9 local candidate envelope reduce | accepted | 9 | [ADR-phase9-local-envelope-reduce.md](./ADR-phase9-local-envelope-reduce.md) |
+| Phase 10 hosted Supabase reuse (not local) | accepted | 10 | [ADR-phase10-hosted-supabase-reuse.md](./ADR-phase10-hosted-supabase-reuse.md) |
+| Phase 10 live EC2 Free Tier instance type | accepted | 10 | [ADR-phase10-free-tier-ec2.md](./ADR-phase10-free-tier-ec2.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | LightRAG runtime attach without DDL | accepted | 5 | [ADR-lightrag-runtime-attach-without-ddl.md](./ADR-lightrag-runtime-attach-without-ddl.md) |

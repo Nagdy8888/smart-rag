@@ -1,0 +1,47 @@
+{
+  "schema_version": "phase10-live-supabase-v1",
+  "mode": "hosted_reuse_not_local",
+  "adr": "docs/adr/ADR-phase10-hosted-supabase-reuse.md",
+  "user_approved": "2026-08-18",
+  "intended": {
+    "region": "us-east-1",
+    "plan": "Pro",
+    "pitr": true,
+    "asymmetric_jwks": true,
+    "pg_search_on_managed": false
+  },
+  "actual": {
+    "project_ref": "qsjivtwtmlmtksufqjik",
+    "project_name": "smart-rag",
+    "api_url": "https://qsjivtwtmlmtksufqjik.supabase.co",
+    "db_host": "db.qsjivtwtmlmtksufqjik.supabase.co",
+    "region": "eu-central-1",
+    "plan": "Free",
+    "pitr": false,
+    "status": "ACTIVE_HEALTHY",
+    "postgres_major": 17,
+    "pg_search_installed": false,
+    "vector_installed": true,
+    "asymmetric_jwks_proven": false,
+    "legacy_anon_alg": "HS256",
+    "storage_buckets": [
+      "documents-originals",
+      "documents-quarantine",
+      "exports",
+      "table-artifacts",
+      "web-snapshots"
+    ],
+    "storage_objects_rows": 0,
+    "auth_users_rows": 1,
+    "app_documents_rows": 0,
+    "advisor_rls_disabled_tables": [
+      "app.revoked_sessions",
+      "app.mfa_recovery_requests"
+    ],
+    "migrations_status": "in_progress_after_phase2"
+  },
+  "p10_01_a_live": "Does not match intended freeze; classify live region/plan/PITR drift honestly",
+  "vercel_live_values_committed": false,
+  "secrets_committed": false,
+  "local_docker_used": false
+}
