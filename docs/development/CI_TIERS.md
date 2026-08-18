@@ -66,9 +66,10 @@ Packet 3 quality/latency/BM25/graph measurement
 (`scripts/ci/check_phase09_packet3.py`), Packet 4
 foreground-plus-maintenance load (`scripts/ci/check_phase09_packet4.py`),
 Packet 5 worker/ParadeDB/Valkey fault recovery
-(`scripts/ci/check_phase09_packet5.py`), and Packet 6 egress/tar-Trivy/
+(`scripts/ci/check_phase09_packet5.py`), Packet 6 egress/tar-Trivy/
 disposable restore/ParadeDB rebuild
-(`scripts/ci/check_phase09_packet6.py`)
+(`scripts/ci/check_phase09_packet6.py`), and Packet 7 blocker/handoff
+classification (`scripts/ci/check_phase09_packet7.py`)
 are local gates. They are not added to the GitHub PR job graph. See
 [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
 

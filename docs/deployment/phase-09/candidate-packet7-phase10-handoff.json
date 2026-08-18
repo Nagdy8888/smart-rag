@@ -1,0 +1,127 @@
+{
+  "items": [
+    {
+      "acceptance": "P09-07-A",
+      "classification": "Failed",
+      "item_id": "trivy_critical_findings",
+      "local_launch_blocking": true,
+      "managed_only": false,
+      "next_action": "Rebuild patched base images, freeze new Packet 1 identity, and re-run Packets 1-6. Do not waive Critical findings.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "Packet 6 tar Trivy reported unresolved Critical findings on the frozen api/worker/frontend/crawl-proxy/parser-sandbox images.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-A",
+      "classification": "Blocked",
+      "item_id": "jwt_issuer_hostname_split",
+      "local_launch_blocking": true,
+      "managed_only": false,
+      "next_action": "Align JWKS fetch and token iss on one hostname, then re-prove live EventSource. Do not rebuild in Packets 4-6.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "Frozen API expected iss is host.docker.internal; local GoTrue issues 127.0.0.1. Repair requires image or Auth hostname change.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-A",
+      "classification": "Blocked",
+      "item_id": "seventy_percent_pause",
+      "local_launch_blocking": true,
+      "managed_only": false,
+      "next_action": "Prove the pause controller on a workload that can reach 70%, or reduce/re-sign the advertised envelope with client sign-off.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "Packet 4 8-doc load peaked at 3.06% CPU; the 70% pause trigger did not fire. Live p95 stayed null because of the JWT split.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-A",
+      "classification": "Blocked",
+      "item_id": "old_api_new_schema_smoke",
+      "local_launch_blocking": true,
+      "managed_only": false,
+      "next_action": "Keep a prior API image and run authenticated read/chat/upload smoke. Do not fake this with the single Packet 1 image.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "No prior expand-compatible API digest exists to smoke against the current schema.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-B",
+      "classification": "Not Run",
+      "item_id": "live_openai_quality",
+      "local_launch_blocking": false,
+      "managed_only": false,
+      "next_action": "Run cost-capped live OpenAI evals on the frozen identity, or keep mock limits signed.",
+      "owner": "Phase 9 Packet 7",
+      "reason": "MOCK_MODEL_MODE=true. Live Recall@K and Combined +10pp were not measured.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-C",
+      "classification": "Not Run",
+      "item_id": "managed_supabase_jwks_restore",
+      "local_launch_blocking": false,
+      "managed_only": true,
+      "next_action": "Prove on staging with synthetic or redacted data.",
+      "owner": "Phase 10",
+      "reason": "Managed pooling, JWKS rollover, and database/Storage restore are not local.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-C",
+      "classification": "Not Run",
+      "item_id": "managed_oidc_migrations",
+      "local_launch_blocking": false,
+      "managed_only": true,
+      "next_action": "Run the protected expand-migration path on staging.",
+      "owner": "Phase 10",
+      "reason": "GitHub OIDC/SSM/Secrets Manager protected migrations are managed-only.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-C",
+      "classification": "Not Run",
+      "item_id": "managed_ec2_paradedb",
+      "local_launch_blocking": false,
+      "managed_only": true,
+      "next_action": "Measure real EC2/EBS/ParadeDB resources in staging.",
+      "owner": "Phase 10",
+      "reason": "Local Docker NCPU/mem is not EC2 or production ParadeDB proof.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-C",
+      "classification": "Not Run",
+      "item_id": "managed_cdn_origin_egress",
+      "local_launch_blocking": false,
+      "managed_only": true,
+      "next_action": "Prove staging CDN stream and monitored egress denials.",
+      "owner": "Phase 10",
+      "reason": "CloudFront/WAF/Caddy, 50/90s stream, origin rejection, and provider egress are managed.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-C",
+      "classification": "Not Run",
+      "item_id": "managed_kms_s3_rotation_alerts",
+      "local_launch_blocking": false,
+      "managed_only": true,
+      "next_action": "Prove anchors, rotation, and alert delivery on staging.",
+      "owner": "Phase 10",
+      "reason": "KMS/S3 Object Lock, origin-secret rotation, billing alarms, and IaC policy are managed.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    },
+    {
+      "acceptance": "P09-07-C",
+      "classification": "Not Run",
+      "item_id": "external_assessment",
+      "local_launch_blocking": false,
+      "managed_only": true,
+      "next_action": "Attach the dated assessment or delta review in Phase 10.",
+      "owner": "Phase 10",
+      "reason": "External security assessment is not locally executable.",
+      "sizing_ladder": "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    }
+  ],
+  "recommendation": "no-go for Phase 10 until Critical Trivy findings are rebuilt and Packets 1-6 are re-proven on the new identity, or the release stops.",
+  "schema_version": "phase09-candidate-packet7-handoff-v1"
+}

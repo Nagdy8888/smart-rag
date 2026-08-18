@@ -67,6 +67,9 @@ Later packets consume these committed artifacts under
 | `candidate-packet6-restore.json` | Disposable `app`+`lightrag` dump/restore and bucket inventory |
 | `candidate-packet6-rebuild.json` | ParadeDB volume destroy and worker BM25 re-projection |
 | `candidate-packet6-sizing.json` | Local RTO/RPO decision without EC2/QT-CAP-001 claims |
+| `candidate-packet7-gate-matrix.json` | Packet 7 P09-07-A–E matrix; wrapper stays pending |
+| `candidate-packet7-phase10-handoff.json` | Local blockers plus Phase 10 managed ownership |
+| `candidate-packet7-promotion-manifest.json` | Exact artifacts Phase 10 may consume; rollback; no-go |
 
 A changed git SHA, lockfile, Dockerfile, or image Id invalidates Packet 1
 evidence. Rebuild and reseed; do not reuse a stale digest.
@@ -183,6 +186,10 @@ is already migrated.
     and rebuilds BM25 through existing `Bm25ProjectionService`. Do not
     restore into live `postgres`, treat ParadeDB as canonical, or claim
     QT-CAP-001/EC2 from local NCPU.
+12. Packet 7 classifies remaining local blockers and the Phase 10 handoff.
+    It does not rebuild images, check its own checkbox, or set the wrapper
+    complete. Critical Trivy findings are a local no-go until identity is
+    re-frozen and Packets 1-6 are re-run.
 
 ```mermaid
 flowchart TD

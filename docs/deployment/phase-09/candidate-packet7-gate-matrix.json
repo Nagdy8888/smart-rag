@@ -1,0 +1,47 @@
+{
+  "acceptance": [
+    {
+      "check": "P09-07-A",
+      "classification": "Failed",
+      "detail": "Critical Trivy Failed; JWT/70%/old-API Blocked"
+    },
+    {
+      "check": "P09-07-B",
+      "classification": "Blocked",
+      "detail": "Keep QT-CAP-005-P8=15; 10k/1M unsigned; no client reduce yet"
+    },
+    {
+      "check": "P09-07-C",
+      "classification": "Passed",
+      "detail": "Managed JWKS/restore/OIDC/EC2/CDN/KMS/assessment stay Phase 10"
+    },
+    {
+      "check": "P09-07-D",
+      "classification": "Passed",
+      "detail": "Packets 1-6 artifacts present for Phase 10 consumption"
+    },
+    {
+      "check": "P09-07-E",
+      "classification": "Passed",
+      "detail": "Wrapper status pending; Packet 7 checkbox unchecked"
+    }
+  ],
+  "compose_file": "docker-compose.yml",
+  "health": {
+    "command": "scripts/phase09_candidate.py health",
+    "returncode": 0
+  },
+  "holdout_opened": false,
+  "image_ids": {
+    "api": "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
+    "crawl-proxy": "sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604",
+    "frontend": "sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+    "parser-sandbox": "sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec",
+    "worker": "sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990"
+  },
+  "image_rebuilt": false,
+  "packet7_checkbox": "unchecked",
+  "recommendation": "no-go for Phase 10 until Critical Trivy findings are rebuilt and Packets 1-6 are re-proven on the new identity, or the release stops.",
+  "schema_version": "phase09-candidate-packet7-v1",
+  "wrapper_status": "pending"
+}

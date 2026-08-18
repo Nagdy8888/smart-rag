@@ -27,6 +27,7 @@ uv run python scripts/ci/check_phase09_packet3.py --mode candidate
 uv run python scripts/ci/check_phase09_packet4.py
 uv run python scripts/ci/check_phase09_packet5.py
 uv run python scripts/ci/check_phase09_packet6.py
+uv run python scripts/ci/check_phase09_packet7.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -181,6 +182,16 @@ that inventory. Do not set `SMART_RAG_HOLDOUT_ACCESS=true`.
 
 ```powershell
 uv run python scripts/ci/check_phase09_packet6.py
+uv run python scripts/phase09_candidate.py health
+```
+
+The Phase 9 Packet 7 gate is local-only. It classifies remaining local
+blockers and the Phase 10 managed handoff. It does not rebuild images, open
+holdout, check the Packet 7 checkbox, or set the Phase 9 wrapper complete.
+Unresolved Critical Trivy findings keep P09-07-A Failed (no-go).
+
+```powershell
+uv run python scripts/ci/check_phase09_packet7.py
 uv run python scripts/phase09_candidate.py health
 ```
 

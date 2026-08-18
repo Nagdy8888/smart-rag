@@ -1,0 +1,22 @@
+{
+  "candidate_image_ids": {
+    "api": "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
+    "crawl-proxy": "sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604",
+    "frontend": "sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+    "parser-sandbox": "sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec",
+    "worker": "sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990"
+  },
+  "compose_file": "docker-compose.yml",
+  "consumed_artifacts": [
+    "docs/deployment/phase-09/candidate-image-manifest.json",
+    "docs/deployment/phase-09/candidate-packet2-gate-matrix.json",
+    "docs/deployment/phase-09/candidate-packet3-gate-matrix.json",
+    "docs/deployment/phase-09/candidate-packet4-gate-matrix.json",
+    "docs/deployment/phase-09/candidate-packet5-gate-matrix.json",
+    "docs/deployment/phase-09/candidate-packet6-gate-matrix.json",
+    "docs/deployment/phase-09/candidate-packet6-scans.json"
+  ],
+  "recommendation": "no-go for Phase 10 until Critical Trivy findings are rebuilt and Packets 1-6 are re-proven on the new identity, or the release stops.",
+  "rollback": "Keep the Packet 1 freeze. Do not promote. Rebuild only after a new identity freeze and Packets 1-6 rerun.",
+  "schema_version": "phase09-candidate-packet7-manifest-v1"
+}

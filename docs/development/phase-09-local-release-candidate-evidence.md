@@ -813,3 +813,53 @@ Artifacts:
 `docs/deployment/phase-09/candidate-packet6-{gate-matrix,scans,restore,rebuild,sizing}.json`.
 
 Packet 6 checkbox stays **unchecked** because P09-06-B Failed. Packet 4 stays **unchecked**. Packet 2 stays **unchecked**. Phase 9 wrapper `status` remains `pending`. Holdout was not opened.
+
+## Packet 7 — Resolve blockers and Phase 10 handoff
+
+**Packet:** `Resolve blockers or explicitly reduce/resign supported limits; leave managed-topology gates clearly open for Phase 10.` (`P09-07-A` … `P09-07-E`).
+**Checkbox:** **unchecked**. Wrapper `status` remains **pending**. Images were **not** rebuilt. Holdout was not opened.
+
+```mermaid
+flowchart TD
+  local[Local blockers]
+  envelope[Envelope decision]
+  managed[Phase 10 ownership]
+  manifest[Promotion manifest]
+  pending[Keep wrapper pending]
+  local --> envelope --> managed --> manifest --> pending
+```
+
+### Acceptance
+
+| Check | Class | Evidence |
+| --- | --- | --- |
+| P09-07-A | Failed | Packet 6 tar Trivy Critical remains launch-blocking. JWT iss split, 70% pause, and old-API/new-schema smoke stay Blocked. |
+| P09-07-B | Blocked | QT-CAP-005-P8 stays 15. 10k/1M and 25-user envelope were not claimed and are not client-signed reduces. |
+| P09-07-C | Passed | Managed JWKS/restore, OIDC migrations, EC2/ParadeDB, CDN/origin/egress, KMS/S3/rotation/alerts, and external assessment stay Phase 10 Not Run. None were relabeled local. |
+| P09-07-D | Passed | Packets 1-6 artifacts plus Packet 6 scans are listed in the promotion manifest. |
+| P09-07-E | Passed | Wrapper `status: pending`. Packet 7 checkbox remains `[ ]`. |
+
+**Recommendation:** no-go for Phase 10 until Critical Trivy findings are rebuilt, a new Packet 1 identity is frozen, and Packets 1-6 are re-proven, or the release stops.
+
+### Sizing ladder / later handoff
+
+- Repair Trivy: patch base images, freeze new Ids, rerun Packets 1-6. That invalidates this candidate.
+- JWT: align GoTrue iss and API JWKS hostname; live EventSource stays blocked until then.
+- 70% pause: prove on a workload that can reach 70%, or reduce/re-sign with client sign-off.
+- Old-API smoke: keep a prior expand-compatible API digest; do not fake with the single Packet 1 image.
+- Live OpenAI Recall/Combined: Not Run under `MOCK_MODEL_MODE=true`.
+- Do not infer managed success from local NCPU=20.
+
+### Commands and exit codes
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff check` on Packet 7 files | 0 | |
+| `uv run python -m pytest tests/unit/test_phase09_packet7.py -q` | 0 | 5 passed |
+| `uv run python scripts/ci/check_phase09_packet7.py` | 0 | recorded no-go; P09-07-A Failed |
+| `uv run python scripts/phase09_candidate.py health` | 0 | identity unchanged |
+
+Artifacts:
+`docs/deployment/phase-09/candidate-packet7-{gate-matrix,phase10-handoff,promotion-manifest}.json`.
+
+Packet 7 checkbox stays **unchecked**. Packets 2, 4, and 6 stay **unchecked**. Phase 9 wrapper `status` remains `pending` until you accept this exit record. Holdout was not opened.
