@@ -86,6 +86,13 @@ It reuses `scripts/ci/check_migrations.py`. It is not added to `pr-fast.yml`.
 Live OIDC assume and SSM migrate stay Blocked. See
 [PROTECTED_MIGRATION_CREDENTIALS.md](../security/PROTECTED_MIGRATION_CREDENTIALS.md).
 
+Phase 10 Packet 3 origin/egress/timeout policy
+(`scripts/ci/check_phase10_packet3.py`) is a local gate. It parses committed
+Caddy/SG/WAF/Compose/CloudWatch files and reuses crawl SSRF tests. It is
+not added to `pr-fast.yml`. Live CDN request matrix, port scans, and
+CloudWatch alarm delivery stay Blocked. See
+[MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
+
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and
 artifact upload. A local workflow definition is not remote execution

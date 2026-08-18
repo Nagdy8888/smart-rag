@@ -39,6 +39,7 @@ bound for origin timeouts. The AWS CloudFront API allows OriginReadTimeout
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
+uv run python scripts/ci/check_phase10_packet3.py
 ```
 
 ## Apply later (when accounts and a valid session exist)

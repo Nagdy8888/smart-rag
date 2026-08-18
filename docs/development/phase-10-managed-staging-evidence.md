@@ -302,3 +302,149 @@ its `iac_sha256` changed when Packet 2 added OIDC/SSM/secret Terraform.
 Packet 1 classify still Passed/Blocked as before; the checkbox stays
 unchecked.
 
+## Packet 3 — Origin rejection, egress, private ports, WAF, and 90s timeouts
+
+Requirement ID: **P10-03**.
+
+### Requirement (quoted)
+
+> Prove direct-origin rejection, provider/crawl/parser egress boundaries,
+> private ports, WAF controls, and 90-second streaming timeout
+> configuration.
+
+### Concrete acceptance checks
+
+- **P10-03-A:** Valid CDN succeeds; direct/missing/wrong-secret origin
+  fails. Evidence: request matrix. Failure: blocker.
+- **P10-03-B:** Private/metadata/management ports unreachable. Evidence:
+  scan. Failure: stop.
+- **P10-03-C:** Provider/crawl/parser/ParadeDB egress boundaries hold.
+  Evidence: matrix/logs. Failure: stop/approved ADR only.
+- **P10-03-D:** WAF/Caddy controls and ≥90-second assertions pass.
+  Evidence: IaC/runtime/drift. Failure: block streaming.
+- **P10-03-E:** Denial telemetry reaches monitoring. Evidence: synthetic
+  alert. Failure: repair.
+
+```mermaid
+flowchart TD
+  viewer["Viewer"] -->|"valid CDN"| cf["CloudFront plus WAF"]
+  cf -->|"origin header"| caddy["Caddy 90s flush -1"]
+  viewer -->|"direct missing wrong secret"| deny["Caddy 403"]
+  caddy --> api["API slots"]
+  api --> provider["Provider egress 403 default"]
+  worker["Worker"] --> crawl["Crawl proxy SSRF policy"]
+  parser["Parser network_mode none"] --> none["No network"]
+  pdb["ParadeDB private internal"] --> drop["No host ports"]
+  deny --> logs["CloudWatch filter IaC"]
+  logs -->|"live delivery"| blocked["Blocked no WAF logs"]
+```
+
+### Inspected paths (before edit)
+
+| Path | Result |
+| --- | --- |
+| `infra/ec2/cloudfront_waf.tf` | origin_read/keepalive 90, CachingDisabled, WAF CLOUDFRONT, custom header |
+| `infra/ec2/vpc.tf` | origin SG prefix list only, no SSH |
+| `infra/ec2/Caddyfile` | 90s, flush_interval -1, origin header placeholders, 403 default |
+| `infra/ec2/docker-compose.staging.yml` | no host ports on private services; parser `network_mode: none`; caddy 443 only |
+| `infra/ec2/user-data.sh` | iptables DROP 169.254.169.254, DOCKER-USER |
+| `infra/ec2/provider-egress/` | deny-by-default Caddy stub + hostname allowlist |
+| `tests/unit/test_crawl_policy.py` / `tests/contract/test_crawl_ssrf.py` | reused, not duplicated |
+| `docs/adr/ADR-private-service-tls.md` | TLS still omitted on private Docker net; no new accepted-risk ADR |
+| Live CloudFront / EC2 / WAF logs | Absent. Live rows classified Blocked |
+
+### Files changed (allowed outputs only)
+
+| File | Action |
+| --- | --- |
+| `packages/core/src/smart_rag_core/release/phase10_egress.py` | Created — origin/egress/timeout/telemetry parser |
+| `packages/core/src/smart_rag_core/release/phase10_packet3.py` | Created — honest A–E classifier |
+| `scripts/ci/check_phase10_packet3.py` | Created — zero-collection fail-closed gate plus crawl subset |
+| `tests/unit/test_phase10_packet3.py` | Created — listed negatives always run |
+| `tests/contract/test_phase10_packet3.py` | Created — committed IaC |
+| `tests/contract/test_streaming_timeout_contract.py` | Extended — staging Caddy + Terraform 90s |
+| `infra/ec2/Caddyfile` | Header/body/slow-client/connection caps |
+| `infra/ec2/cloudwatch.tf` | Log group, metric filters, alarm with actions disabled |
+| `docs/deployment/phase-10/packet3-*.json` | Written by the Packet 3 gate |
+| `.cursor/plans/.../10-phase-managed-staging.md` | Wrapper remains pending; Packet 3 checkbox unchecked |
+
+### Identities frozen
+
+No secrets. Live distribution ids, scan outputs, and alarm ARNs are absent
+because CDN/scan/alert are Blocked.
+
+| Field | Value |
+| --- | --- |
+| Envelope | QT-CAP-001-P9=8, QT-CAP-002-P9=16, QT-CAP-005-P8=15 |
+| Phase 9 api freeze | `sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec` |
+| CloudFront OriginReadTimeout | 90 (AWS API max 120; 60 rejected) |
+| Caddy flush_interval | -1 |
+| Caddy max_header_size | 16KB |
+| Caddy request_body | 16MB (FastAPI envelope) |
+| WAF rate limit | 2000 |
+| Packet 3 IaC sha256 | `ce29b1775468d4ebebdd0a82b7e72937097b1b3eca091258db03ab7a9c5c2bf4` |
+| Crawl subset | 29 collected, 0 skipped |
+| Accepted-risk ADR | none |
+
+### Classifications
+
+Packet 3 **does not** mark the wrapper complete. Live CDN requests, live
+port scan, and live CloudWatch alarm delivery are **Blocked**, so the
+Packet 3 checkbox stays unchecked. Packets 1 and 2 stay unchecked and are
+not required for Packet 3 classify.
+
+| Check | Classification | Notes |
+| --- | --- | --- |
+| P10-03-A origin | Blocked | Caddy 403 / prefix-list / custom header policy Passed. No live CDN request artifact; request-matrix HTTP statuses are null |
+| P10-03-B ports | Blocked | Compose unpublished + IMDS hop 1 + metadata DROP policy Passed. No live scan artifact |
+| P10-03-C egress | Passed | Provider 403, public allowlist, parser none, ParadeDB internal private, crawl SSRF subset required |
+| P10-03-D timeouts | Passed | CloudFront/Caddy 90s, flush -1, CachingDisabled, WAF, Caddy caps. origin_read_timeout 60 rejected. Live runtime drift Blocked |
+| P10-03-E telemetry | Blocked | WAF visibility_config metric names and CloudWatch filters exist. Live synthetic alarm not delivered |
+
+### Commands and exit codes
+
+```powershell
+uv run ruff format packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_topology.py packages/core/src/smart_rag_core/release/phase10_egress.py packages/core/src/smart_rag_core/release/phase10_packet3.py scripts/ci/check_phase10_packet3.py tests/unit/test_phase10_packet3.py tests/contract/test_phase10_packet3.py tests/contract/test_streaming_timeout_contract.py
+uv run ruff check packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_topology.py packages/core/src/smart_rag_core/release/phase10_egress.py packages/core/src/smart_rag_core/release/phase10_packet3.py scripts/ci/check_phase10_packet3.py tests/unit/test_phase10_packet3.py tests/contract/test_phase10_packet3.py tests/contract/test_streaming_timeout_contract.py
+uv run python -m pytest tests/unit/test_phase10_packet1.py tests/contract/test_phase10_packet1.py tests/unit/test_phase10_packet2.py tests/contract/test_phase10_packet2.py tests/unit/test_phase10_packet3.py tests/contract/test_phase10_packet3.py tests/contract/test_streaming_timeout_contract.py -q
+uv run python scripts/ci/check_phase10_packet1.py
+uv run python scripts/ci/check_phase10_packet2.py
+uv run python scripts/ci/check_phase10_packet3.py
+```
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff format` on Packet 3 Python | 0 | Files formatted then left unchanged |
+| `uv run ruff check` on Packet 3 Python | 0 | All checks passed |
+| `uv run python -m pyright` on Packet 3 Python | 0 | 0 errors |
+| `uv run python -m pytest` Packet 1-3 plus streaming timeout | 0 | 47 passed, 0 skipped |
+| `uv run python scripts/ci/check_phase10_packet1.py` | 0 | tests=16; IaC policy Passed; live apply Blocked; checkbox unchecked |
+| `uv run python scripts/ci/check_phase10_packet2.py` | 0 | tests=15; OIDC policy Passed; live OIDC assume Blocked; P10-02-C Blocked |
+| `uv run python scripts/ci/check_phase10_packet3.py` | 0 | tests=42 crawl_subset=29 skipped=0; IaC Passed; P10-03-A/B/E Blocked; C/D Passed |
+
+Artifacts: `docs/deployment/phase-10/packet3-{gate-matrix,origin,egress,timeouts,scans,negatives}.json`.
+
+Packet 3 checkbox stays **unchecked** because P10-03-A live CDN, P10-03-B live scan, and P10-03-E live alert are Blocked. Packet file `status` stays `pending`. Phase 10 wrapper `status` remains `pending`. Holdout was not opened. Packets 1 and 2 stay unchecked.
+
+### Unverified / Blocked
+
+- Live CloudFront distribution request matrix (valid CDN 200 plus direct
+  origin 403).
+- Live nmap/metadata reachability of private and management ports.
+- Live CloudWatch metric-filter hits and alarm notifications.
+- Packets 4–7.
+
+### Deviations
+
+None versus Packet 3 scope. Deny-by-default provider egress is asserted in
+committed Caddy/allowlist/Compose rather than waived with a new ADR.
+Private Docker TLS remains omitted under
+[ADR-private-service-tls.md](../adr/ADR-private-service-tls.md); live scan
+proof is still Blocked. CloudWatch alarm `actions_enabled = false` because
+Packet 5 owns alert routing; that is recorded as live Blocked, not Passed.
+
+Packet 1 `assert_committed_policy` hashes every `infra/ec2/*.tf` file, so
+its `iac_sha256` changed when Packet 3 added `cloudwatch.tf`. Packet 1
+classify still Passed/Blocked as before; the checkbox stays unchecked.
+
+

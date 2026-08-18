@@ -1,8 +1,9 @@
-"""Stable identifiers for Phase 10 Packet 1 topology and Packet 2 OIDC custody.
+"""Stable identifiers for Phase 10 Packets 1-3.
 
 Packet 1 consumes the accepted Phase 9 promotion freeze. Packet 2 adds GitHub
-OIDC, named SSM documents, and Secrets Manager placeholders. Neither packet
-implies live AWS assume, SSM migrate, or secret rotation.
+OIDC, named SSM documents, and Secrets Manager placeholders. Packet 3 asserts
+origin/egress/timeout/telemetry policy. None of these packets imply live AWS
+apply, CDN requests, port scans, or delivered CloudWatch alarms.
 """
 
 from __future__ import annotations
@@ -29,6 +30,12 @@ PACKET2_IAC_NAME = "packet2-iac-policy.json"
 PACKET2_LIVE_NAME = "packet2-live-providers.json"
 PACKET2_NEGATIVES_NAME = "packet2-negatives.json"
 PACKET2_MIGRATION_HASH_NAME = "packet2-migration-hash.json"
+PACKET3_MATRIX_NAME = "packet3-gate-matrix.json"
+PACKET3_ORIGIN_NAME = "packet3-origin.json"
+PACKET3_EGRESS_NAME = "packet3-egress.json"
+PACKET3_TIMEOUTS_NAME = "packet3-timeouts.json"
+PACKET3_SCANS_NAME = "packet3-scans.json"
+PACKET3_NEGATIVES_NAME = "packet3-negatives.json"
 GITHUB_WORKFLOWS_DIR = ".github/workflows"
 SSM_DOCUMENTS_DIR = "infra/ec2/ssm-documents"
 MIGRATIONS_DIR = "supabase/migrations"
@@ -49,6 +56,12 @@ PACKET2_IAC_SCHEMA_VERSION = "phase10-packet2-iac-v1"
 PACKET2_LIVE_SCHEMA_VERSION = "phase10-packet2-live-v1"
 PACKET2_NEGATIVES_SCHEMA_VERSION = "phase10-packet2-negatives-v1"
 PACKET2_MIGRATION_HASH_SCHEMA_VERSION = "phase10-packet2-migration-hash-v1"
+PACKET3_MATRIX_SCHEMA_VERSION = "phase10-packet3-matrix-v1"
+PACKET3_ORIGIN_SCHEMA_VERSION = "phase10-packet3-origin-v1"
+PACKET3_EGRESS_SCHEMA_VERSION = "phase10-packet3-egress-v1"
+PACKET3_TIMEOUTS_SCHEMA_VERSION = "phase10-packet3-timeouts-v1"
+PACKET3_SCANS_SCHEMA_VERSION = "phase10-packet3-scans-v1"
+PACKET3_NEGATIVES_SCHEMA_VERSION = "phase10-packet3-negatives-v1"
 
 AWS_PROVIDER_CONSTRAINT = "~> 5.100"
 INTENDED_AWS_REGION = "us-east-1"
@@ -179,6 +192,37 @@ PACKET2_RELATIVE = (
     ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
     "02-implement-protected-migrations-and-secrets.md"
 )
+PACKET3_RELATIVE = (
+    ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
+    "03-prove-origin-egress-and-timeouts.md"
+)
+PROVIDER_EGRESS_CADDY_FILE = "infra/ec2/provider-egress/Caddyfile"
+PROVIDER_EGRESS_ALLOWLIST_FILE = "infra/ec2/provider-egress/allowlist.txt"
+PACKET3_CRAWL_TEST_FILES: tuple[str, ...] = (
+    "tests/unit/test_crawl_policy.py",
+    "tests/contract/test_crawl_ssrf.py",
+)
+WAF_RULE_METRIC_NAMES: tuple[str, ...] = (
+    "common",
+    "bad-inputs",
+    "ip-reputation",
+    "rate",
+)
+WAF_ACL_METRIC_SUFFIX = "-waf"
+WAF_RATE_LIMIT_COMMITTED = 2000
+WAF_RATE_LIMIT_MAX = 10_000
+CADDY_MAX_HEADER_BYTES = 16 * 1024
+CADDY_MAX_HEADER_BYTES_LIMIT = 32 * 1024
+CADDY_REQUEST_BODY_BYTES = 16 * 1024 * 1024
+CADDY_REQUEST_BODY_BYTES_LIMIT = 16 * 1024 * 1024
+CADDY_MAX_CONNS_PER_HOST = 32
+CADDY_READ_HEADER_TIMEOUT_SECONDS = 15
+EGRESS_DENIAL_LOG_GROUP = "/smart-rag/staging/egress-denials"
+EGRESS_DENIAL_METRIC_NAME = "ProviderEgressDenials"
+DIRECT_ORIGIN_DENIAL_METRIC_NAME = "DirectOriginDenials"
+TELEMETRY_NAMESPACE = "SmartRag/Staging"
+EGRESS_DENIAL_FILTER_PATTERN = "provider egress denied"
+DIRECT_ORIGIN_DENIAL_FILTER_PATTERN = "direct origin denied"
 
 GITHUB_REPOSITORY = "Nagdy8888/Demo_Project_3"
 GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com"

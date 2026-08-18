@@ -1,0 +1,20 @@
+{
+  "caddy_flush_interval": -1,
+  "caddy_max_conns_per_host": 32,
+  "caddy_max_header_bytes": 16384,
+  "caddy_read_header_timeout_seconds": 15,
+  "caddy_request_body_bytes": 16777216,
+  "live_runtime_drift": "Blocked",
+  "origin_keepalive_timeout_seconds": 90,
+  "origin_read_timeout_60_rejected": true,
+  "origin_read_timeout_seconds": 90,
+  "policy": "Passed",
+  "schema_version": "phase10-packet3-timeouts-v1",
+  "waf_rate_limit": 2000,
+  "waf_rule_metrics": [
+    "common",
+    "bad-inputs",
+    "ip-reputation",
+    "rate"
+  ]
+}

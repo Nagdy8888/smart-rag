@@ -31,6 +31,7 @@ uv run python scripts/ci/check_phase09_packet7.py
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
+uv run python scripts/ci/check_phase10_packet3.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -265,10 +266,20 @@ not a GitHub PR job. Zero collected Packet 2 tests fail the gate. Do not
 run `aws sts assume-role-with-web-identity` or `ssm send-command` from this
 gate.
 
+The Phase 10 Packet 3 gate reviews direct-origin denial, unpublished
+private ports, provider/crawl/parser/ParadeDB egress, WAF/Caddy 90s
+timeouts, and CloudWatch denial-filter IaC. It reuses
+`tests/unit/test_crawl_policy.py` and `tests/contract/test_crawl_ssrf.py`
+and fails if that subset collects zero tests or skips. Live CDN requests,
+port scans, and alarm delivery stay Blocked. It is local-only and is not a
+GitHub PR job. Do not curl CloudFront, nmap the origin, or invent HTTP
+200/403 from this gate.
+
 ```powershell
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
+uv run python scripts/ci/check_phase10_packet3.py
 ```
 
 [docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)

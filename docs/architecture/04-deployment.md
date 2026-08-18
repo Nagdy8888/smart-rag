@@ -48,7 +48,10 @@ flowchart LR
 
 EC2 is rebuildable, encrypted EBS, IMDSv2 hop 1, SSM-only, CloudFront
 origin-facing prefix list ingress, no SSH. ParadeDB/Valkey/LightRAG have no
-public path. Frontend stays on Vercel with public keys only.
+public path. Frontend stays on Vercel with public keys only. Packet 3
+asserts origin 403, egress deny-by-default, unpublished private ports, and
+90s CloudFront/Caddy timeouts in IaC. Live CDN requests, port scans, and
+CloudWatch alarm delivery remain Blocked.
 
 ## Links
 

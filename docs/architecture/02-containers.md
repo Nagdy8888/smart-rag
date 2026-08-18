@@ -64,7 +64,8 @@ Vercel frontend, CloudFront/WAF → EC2 Compose (Caddy, API blue/green, worker,
 digest-pinned ParadeDB, split Valkey, crawl proxy, provider-egress stub,
 ClamAV, parser-sandbox with `network_mode: none`). Managed Supabase is
 canonical; LightRAG stays in-process. SES is sandbox in staging. Live apply
-is Blocked in Packet 1. See [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
+is Blocked in Packet 1. Packet 3 asserts origin/egress/timeout IaC; live
+CDN/scan/alarm remain Blocked. See [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
 
 ```mermaid
 flowchart TB

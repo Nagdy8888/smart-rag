@@ -2,7 +2,7 @@
 title: Crawl egress and proxy runbook
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-18
 audience: engineering, ops, security
 ---
 
@@ -64,3 +64,15 @@ Expected: `{"status":"live","egress":"restricted-fetch"}`
 ## Escalation
 
 Security-sensitive SSRF bypass reports: treat as incident, block approval domain, preserve `crawl_fetch_events` and audit rows.
+
+## Staging (Phase 10 Packet 3)
+
+Staging Compose (`infra/ec2/docker-compose.staging.yml`) keeps `crawl-proxy`
+on `private` plus `crawl_egress` with no host ports. Worker stays off
+`crawl_egress`. Packet 3 reuses `tests/unit/test_crawl_policy.py` and
+`tests/contract/test_crawl_ssrf.py`; it does not duplicate SSRF logic.
+Live staging crawl against public destinations is **Blocked** until EC2
+exists. Provider egress is a separate deny-by-default Caddy stub.
+
+Related: [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) ·
+[phase-10 evidence](../development/phase-10-managed-staging-evidence.md)

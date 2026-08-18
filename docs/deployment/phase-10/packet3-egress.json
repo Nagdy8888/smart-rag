@@ -1,0 +1,22 @@
+{
+  "accepted_risk_adr": null,
+  "allowlist_rfc1918": false,
+  "crawl_subset": {
+    "files": [
+      "tests/unit/test_crawl_policy.py",
+      "tests/contract/test_crawl_ssrf.py"
+    ],
+    "skipped": 0,
+    "tests": 29
+  },
+  "crawl_tests": [
+    "tests/unit/test_crawl_policy.py",
+    "tests/contract/test_crawl_ssrf.py"
+  ],
+  "paradedb_network": "private",
+  "parser_network_mode": "none",
+  "policy": "Passed",
+  "private_network_internal": true,
+  "provider_egress_default": 403,
+  "schema_version": "phase10-packet3-egress-v1"
+}

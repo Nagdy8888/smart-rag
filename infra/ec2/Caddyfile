@@ -1,18 +1,26 @@
 # Staging Caddy origin. 90s timeouts match CloudFront OriginReadTimeout /
 # OriginKeepaliveTimeout (AWS API max OriginReadTimeout is 120). flush_interval
 # -1 disables SSE buffering. Dual origin-header values keep Packet 4 rotation
-# possible. Do not commit real header values.
+# possible. Packet 3 adds header/body/slow-client/connection caps. Do not commit
+# real header values.
 
 {
 	servers {
+		max_header_size 16KB
 		timeouts {
 			read_timeout 90s
+			read_header_timeout 15s
 			write_timeout 90s
+			idle_timeout 90s
 		}
 	}
 }
 
 :443 {
+	request_body {
+		max_size 16MB
+	}
+
 	@origin_current {
 		header {$ORIGIN_HEADER_NAME} {$ORIGIN_HEADER_VALUE_CURRENT}
 	}
@@ -29,6 +37,7 @@
 			transport http {
 				read_timeout 90s
 				write_timeout 90s
+				max_conns_per_host 32
 			}
 		}
 	}
@@ -39,6 +48,7 @@
 			transport http {
 				read_timeout 90s
 				write_timeout 90s
+				max_conns_per_host 32
 			}
 		}
 	}
@@ -49,6 +59,7 @@
 			transport http {
 				read_timeout 90s
 				write_timeout 90s
+				max_conns_per_host 32
 			}
 		}
 	}

@@ -89,7 +89,7 @@ flowchart LR
 CloudFront `OriginReadTimeout` / `OriginKeepaliveTimeout` are **90** in
 `infra/ec2/cloudfront_waf.tf`. AWS API max OriginReadTimeout is 120. The
 Terraform provider website still mentions 60; do not lower the IaC value.
-Live CDN 50-second SSE remains Packet 3/4.
+Live CDN 50-second SSE remains Packet 4.
 
 ## Packet 2 OIDC and protected migrations
 
@@ -101,10 +101,25 @@ migrate, and 90-day rotation are **Blocked**. See
 [PROTECTED_MIGRATION_CREDENTIALS.md](../security/PROTECTED_MIGRATION_CREDENTIALS.md)
 and [PROTECTED_MIGRATION.md](../runbooks/PROTECTED_MIGRATION.md).
 
+## Packet 3 origin, egress, ports, WAF, and 90s timeouts
+
+Reviewed under `infra/ec2/Caddyfile`, `vpc.tf`, `cloudfront_waf.tf`,
+`cloudwatch.tf`, `docker-compose.staging.yml`, and
+`provider-egress/`. Direct origin without a matching CloudFront header is
+403 in Caddy; origin SG HTTPS is CloudFront prefix-list only. Provider
+egress is deny-by-default; the crawl SSRF tests stay required. Parser uses
+`network_mode: none`; ParadeDB stays on the internal `private` network.
+WAF visibility metrics and CloudWatch denial filters exist in IaC. **Live
+CDN request matrix, live port scan, and live CloudWatch alarm delivery are
+Blocked** (no distribution, EC2, or WAF logs). See
+[CRAWL_EGRESS_AND_PROXY.md](../runbooks/CRAWL_EGRESS_AND_PROXY.md) and
+[STREAMING_TIMEOUTS.md](./STREAMING_TIMEOUTS.md).
+
 ## Verification
 
 ```powershell
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
+uv run python scripts/ci/check_phase10_packet3.py
 ```

@@ -512,6 +512,23 @@ def assert_vercel_public_env(payload: Mapping[str, object]) -> None:
             raise Phase10TopologyError(f"vercel allowed key {key} is a secret")
 
 
+def compose_service_block(compose_text: str, service: str) -> str:
+    """Return the body of one Compose service.
+
+    Args:
+        compose_text: Compose YAML.
+        service: Service name.
+
+    Returns:
+        Indented service body.
+
+    Raises:
+        Phase10TopologyError: If the service is missing.
+    """
+
+    return _compose_service_block(compose_text, service)
+
+
 def _compose_service_block(compose_text: str, service: str) -> str:
     """Return the body of one Compose service.
 

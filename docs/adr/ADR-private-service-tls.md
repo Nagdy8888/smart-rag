@@ -47,6 +47,14 @@ private network pending Packet 3 egress proof. This packet does not silently
 claim TLS is enabled. Revisit again if staging spans hosts, publishes a host
 port, or Packet 3 cannot prove the private boundary.
 
+## Phase 10 Packet 3 record (2026-08-18)
+
+Packet 3 asserts deny-by-default provider egress, parser `network_mode: none`,
+ParadeDB on internal `private` only, and unpublished private ports in
+committed Compose/Caddy. **TLS is still omitted** on that single-host private
+Docker network. No new accepted-risk ADR is filed. Live port/metadata scan
+remains Blocked, so this record is IaC proof only.
+
 ## Consequences
 
 - Local Compose is simpler and still private-by-default.

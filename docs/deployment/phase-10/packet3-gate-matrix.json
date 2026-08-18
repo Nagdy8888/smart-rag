@@ -1,0 +1,56 @@
+{
+  "acceptance": [
+    {
+      "check": "P10-03-A",
+      "classification": "Blocked",
+      "detail": "Committed Caddy 403 / CloudFront custom header / prefix-list origin policy Passed. Live CDN request matrix is Blocked: No CloudFront distribution, EC2 origin, or WAF logs. Live CDN and direct-origin requests were not sent."
+    },
+    {
+      "check": "P10-03-B",
+      "classification": "Blocked",
+      "detail": "Committed unpublished private-port and metadata-deny policy Passed. Live scan is Blocked: No EC2 host or scan artifact. Live private-port and metadata scans were not run."
+    },
+    {
+      "check": "P10-03-C",
+      "classification": "Passed",
+      "detail": "Provider-egress default 403, public-only allowlist, parser network_mode none, and ParadeDB on internal private Passed. Crawl-policy/ssrf subset Passed (tests/unit/test_crawl_policy.py, tests/contract/test_crawl_ssrf.py)."
+    },
+    {
+      "check": "P10-03-D",
+      "classification": "Passed",
+      "detail": "CloudFront origin_read/keepalive 90s/90s, Caddy 90s, flush_interval -1, CachingDisabled, WAF CLOUDFRONT, and Caddy header/body/connection caps Passed. origin_read_timeout 60 is rejected. Live CDN runtime drift is Blocked."
+    },
+    {
+      "check": "P10-03-E",
+      "classification": "Blocked",
+      "detail": "WAF visibility_config metric names and CloudWatch egress/origin denial filters Passed. Live synthetic alarm is Blocked: CloudWatch log group and metric filters exist in IaC. Live denial alarm delivery was not proven."
+    }
+  ],
+  "crawl_subset": {
+    "files": [
+      "tests/unit/test_crawl_policy.py",
+      "tests/contract/test_crawl_ssrf.py"
+    ],
+    "skipped": 0,
+    "tests": 29
+  },
+  "holdout_opened": false,
+  "iac_policy": "Passed",
+  "iac_sha256": "ce29b1775468d4ebebdd0a82b7e72937097b1b3eca091258db03ab7a9c5c2bf4",
+  "live_cdn_requests": "Blocked",
+  "live_denial_alert": "Blocked",
+  "live_port_scan": "Blocked",
+  "packet": "P10-03",
+  "packet1_checkbox": "unchecked",
+  "packet2_checkbox": "unchecked",
+  "packet3_checkbox": "unchecked",
+  "phase9_image_ids": {
+    "api": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
+    "crawl-proxy": "sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3",
+    "frontend": "sha256:e47efc373a151c7c79039009fd04f459f997127beafb00747cd91c4a9b96a5c1",
+    "parser-sandbox": "sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a",
+    "worker": "sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e"
+  },
+  "schema_version": "phase10-packet3-matrix-v1",
+  "wrapper_status": "pending"
+}

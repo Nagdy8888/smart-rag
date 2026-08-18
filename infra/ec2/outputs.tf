@@ -27,7 +27,7 @@ output "origin_eip" {
 
 output "cloudfront_domain_name" {
   value       = aws_cloudfront_distribution.api.domain_name
-  description = "CloudFront domain. Live CDN stream is Packet 3/4."
+  description = "CloudFront domain. Live CDN stream is Packet 4; origin rejection is Packet 3."
 }
 
 output "waf_acl_arn" {
@@ -78,4 +78,9 @@ output "staging_migrate_document_name" {
 output "secret_rotation_max_days" {
   value       = local.secret_rotation_max_days
   description = "Custody maximum days between rotations. Live rotation Lambda is absent."
+}
+
+output "egress_denial_log_group" {
+  value       = aws_cloudwatch_log_group.egress_denials.name
+  description = "CloudWatch log group for egress/origin denial strings. Live alarm delivery is Blocked."
 }

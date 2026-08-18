@@ -11,8 +11,9 @@ audience: engineering, ops
 Local and staging **configuration** contract for SSE. This document
 does **not** claim that Caddy, CloudFront, or WAF are live or that a
 50-second CDN stream has been proven. Phase 10 Packet 1 asserts
-90-second CloudFront timeouts in reviewed IaC. Packets 3–4 own a real
-staging 50-second stream.
+90-second CloudFront timeouts in reviewed IaC. Packet 3 asserts the same
+90-second values in staging Caddy and Terraform plus origin-denial
+policy. Packet 4 owns a real staging 50-second stream.
 
 Related: [SSE.md](../api/SSE.md) ·
 [local Caddyfile](../../infra/caddy/Caddyfile) ·
@@ -47,11 +48,16 @@ Cache policy for API/SSE is managed CachingDisabled
 ## Phase 10 remaining
 
 - Prove a deliberately slow Composite run through staging CloudFront for at
-  least 50 seconds without buffering or premature origin close (Packets 3–4).
-- Direct-origin rejection and independent Vercel/API deploy skew.
+  least 50 seconds without buffering or premature origin close (Packet 4).
+- Independent Vercel/API deploy skew.
+
+Packet 3 origin-denial, egress, private-port, WAF/Caddy, and 90s IaC
+assertions are recorded in
+[phase-10-managed-staging-evidence.md](../development/phase-10-managed-staging-evidence.md).
+Live CDN requests, port scans, and CloudWatch alarm delivery remain Blocked.
 
 ## Verification
 
 ```text
-uv run python -m pytest tests/contract/test_streaming_timeout_contract.py tests/contract/test_phase10_packet1.py -q
+uv run python -m pytest tests/contract/test_streaming_timeout_contract.py tests/contract/test_phase10_packet1.py tests/contract/test_phase10_packet3.py -q
 ```

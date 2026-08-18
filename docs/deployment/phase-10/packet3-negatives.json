@@ -1,0 +1,45 @@
+{
+  "cases": [
+    {
+      "case": "origin_cidr_0_0_0_0_443",
+      "exercise": "tests/unit/test_phase10_packet3.py",
+      "expected": "Phase10EgressError"
+    },
+    {
+      "case": "direct_ip_or_header_secret",
+      "exercise": "tests/unit/test_phase10_packet3.py",
+      "expected": "Phase10EgressError"
+    },
+    {
+      "case": "private_port_or_lightrag_publish",
+      "exercise": "tests/unit/test_phase10_packet3.py",
+      "expected": "Phase10EgressError"
+    },
+    {
+      "case": "allowlist_rfc1918",
+      "exercise": "tests/unit/test_phase10_packet3.py",
+      "expected": "Phase10EgressError"
+    },
+    {
+      "case": "crawl_private_redirect",
+      "exercise": "tests/unit/test_phase10_packet3.py",
+      "expected": "CrawlPolicyError"
+    },
+    {
+      "case": "origin_read_timeout_60",
+      "exercise": "tests/unit/test_phase10_packet3.py",
+      "expected": "Phase10EgressError"
+    },
+    {
+      "case": "sse_buffering_or_header_limit_excess",
+      "exercise": "tests/unit/test_phase10_packet3.py",
+      "expected": "Phase10EgressError"
+    },
+    {
+      "case": "fake_cdn_http_status_is_not_passed",
+      "exercise": "tests/unit/test_phase10_packet3.py",
+      "expected": "Blocked"
+    }
+  ],
+  "schema_version": "phase10-packet3-negatives-v1"
+}
