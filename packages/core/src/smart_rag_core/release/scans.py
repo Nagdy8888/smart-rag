@@ -109,6 +109,43 @@ def summarize_trivy_report(
     )
 
 
+def trivy_critical_ids(
+    payload: Mapping[str, object],
+    *,
+    limit: int = 30,
+) -> tuple[str, ...]:
+    """Return unique Critical vulnerability IDs from a Trivy report.
+
+    Args:
+        payload: Trivy ``--format json`` object.
+        limit: Maximum IDs retained.
+
+    Returns:
+        Sorted VulnerabilityID values. Does not include package payloads.
+    """
+
+    found: set[str] = set()
+    results = payload.get("Results")
+    if isinstance(results, list):
+        for result in cast(list[object], results):
+            if not isinstance(result, dict):
+                continue
+            typed_result = cast(dict[str, object], result)
+            vulns = typed_result.get("Vulnerabilities")
+            if not isinstance(vulns, Sequence):
+                continue
+            for vuln in cast(Sequence[object], vulns):
+                if not isinstance(vuln, dict):
+                    continue
+                typed_vuln = cast(dict[str, object], vuln)
+                if str(typed_vuln.get("Severity", "")).upper() != "CRITICAL":
+                    continue
+                vuln_id = typed_vuln.get("VulnerabilityID")
+                if isinstance(vuln_id, str) and vuln_id:
+                    found.add(vuln_id)
+    return tuple(sorted(found)[:limit])
+
+
 def blocked_scan(image_name: str, *, tool: str, detail: str) -> ImageScanSummary:
     """Return an honest Blocked/Not Run row.
 

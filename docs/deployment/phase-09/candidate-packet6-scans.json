@@ -1,0 +1,112 @@
+{
+  "audits": {
+    "docker_sock_trivy": false,
+    "export_returncode": 0,
+    "gitleaks": "passed",
+    "pip_audit": "passed",
+    "pnpm_audit": "passed"
+  },
+  "docker_sock_mounted": false,
+  "schema_version": "phase09-candidate-packet6-scan-v1",
+  "trivy": [
+    {
+      "critical": 6,
+      "critical_ids": [
+        "CVE-2023-45853",
+        "CVE-2025-7458",
+        "CVE-2026-13221",
+        "CVE-2026-42496",
+        "CVE-2026-57433",
+        "CVE-2026-8376"
+      ],
+      "detail": "unresolved Critical findings",
+      "docker_sock_mounted": false,
+      "high": 22,
+      "low": 97,
+      "medium": 79,
+      "service": "api",
+      "status": "failed",
+      "trivy_returncode": 0
+    },
+    {
+      "critical": 6,
+      "critical_ids": [
+        "CVE-2023-45853",
+        "CVE-2025-7458",
+        "CVE-2026-13221",
+        "CVE-2026-42496",
+        "CVE-2026-57433",
+        "CVE-2026-8376"
+      ],
+      "detail": "unresolved Critical findings",
+      "docker_sock_mounted": false,
+      "high": 22,
+      "low": 97,
+      "medium": 79,
+      "service": "worker",
+      "status": "failed",
+      "trivy_returncode": 0
+    },
+    {
+      "critical": 8,
+      "critical_ids": [
+        "CVE-2023-45853",
+        "CVE-2026-13221",
+        "CVE-2026-33845",
+        "CVE-2026-42010",
+        "CVE-2026-42496",
+        "CVE-2026-57433",
+        "CVE-2026-59873",
+        "CVE-2026-8376"
+      ],
+      "detail": "unresolved Critical findings",
+      "docker_sock_mounted": false,
+      "high": 38,
+      "low": 82,
+      "medium": 97,
+      "service": "frontend",
+      "status": "failed",
+      "trivy_returncode": 0
+    },
+    {
+      "critical": 6,
+      "critical_ids": [
+        "CVE-2023-45853",
+        "CVE-2025-7458",
+        "CVE-2026-13221",
+        "CVE-2026-42496",
+        "CVE-2026-57433",
+        "CVE-2026-8376"
+      ],
+      "detail": "unresolved Critical findings",
+      "docker_sock_mounted": false,
+      "high": 21,
+      "low": 97,
+      "medium": 79,
+      "service": "crawl-proxy",
+      "status": "failed",
+      "trivy_returncode": 0
+    },
+    {
+      "critical": 8,
+      "critical_ids": [
+        "CVE-2023-45853",
+        "CVE-2025-7458",
+        "CVE-2026-13221",
+        "CVE-2026-42496",
+        "CVE-2026-57433",
+        "CVE-2026-58016",
+        "CVE-2026-6653",
+        "CVE-2026-8376"
+      ],
+      "detail": "unresolved Critical findings",
+      "docker_sock_mounted": false,
+      "high": 42,
+      "low": 200,
+      "medium": 119,
+      "service": "parser-sandbox",
+      "status": "failed",
+      "trivy_returncode": 0
+    }
+  ]
+}

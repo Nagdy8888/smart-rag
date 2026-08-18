@@ -2,7 +2,7 @@
 title: Quality commands
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-18
 audience: engineering
 ---
 
@@ -26,6 +26,7 @@ uv run python scripts/ci/check_phase09_packet2.py --mode candidate
 uv run python scripts/ci/check_phase09_packet3.py --mode candidate
 uv run python scripts/ci/check_phase09_packet4.py
 uv run python scripts/ci/check_phase09_packet5.py
+uv run python scripts/ci/check_phase09_packet6.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -69,10 +70,12 @@ Compose/Supabase artifact checks skip unless
 [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
 
 Do not retry Packet 1 Trivy via `docker run aquasec/trivy` mounting
-`docker.sock` on this Windows host until Packet 6: the 2026-08-17 attempt
-hung Docker Desktop (HTTP 500), left WSL `vmmemWSL` StopPending, and filled
-the disk with a Docker Desktop updater download. Compact scan status is
-Blocked in `docs/deployment/phase-09/candidate-scan-summary.json`.
+`docker.sock` on this Windows host: the 2026-08-17 attempt hung Docker
+Desktop (HTTP 500), left WSL `vmmemWSL` StopPending, and filled the disk
+with a Docker Desktop updater download. Packet 6 scans exact images with
+`docker save` plus `trivy image --input` tar only. Compact Packet 1 scan
+status remains Blocked in
+`docs/deployment/phase-09/candidate-scan-summary.json`.
 
 ```powershell
 uv run python scripts/phase09_candidate.py all
@@ -166,6 +169,18 @@ local proof.
 
 ```powershell
 uv run python scripts/ci/check_phase09_packet5.py
+uv run python scripts/phase09_candidate.py health
+```
+
+The Phase 9 Packet 6 gate is local-only. It fail-closes on zero collection,
+Failed egress tests, unresolved Critical Trivy findings, live-database
+overwrite, or ParadeDB-as-canonical backup. Trivy uses ``docker save`` plus
+``trivy image --input`` tar only. Do not remount docker.sock. Restore uses a
+disposable database, then drops it. ParadeDB volume destroy happens only after
+that inventory. Do not set `SMART_RAG_HOLDOUT_ACCESS=true`.
+
+```powershell
+uv run python scripts/ci/check_phase09_packet6.py
 uv run python scripts/phase09_candidate.py health
 ```
 

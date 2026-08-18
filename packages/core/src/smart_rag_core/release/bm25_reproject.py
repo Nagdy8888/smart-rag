@@ -521,6 +521,36 @@ def parse_corpus_rows(raw: str) -> tuple[tuple[str | None, UUID, UUID], ...]:
     return tuple(triples)
 
 
+def authorized_current_rows(
+    supabase: psycopg.Connection,
+) -> tuple[tuple[str | None, UUID, UUID], ...]:
+    """Load every authorized current version that may hold BM25 projection rows.
+
+    Args:
+        supabase: Open canonical connection.
+
+    Returns:
+        ``(None, document_id, version_id)`` triples. ``deletion_pending`` and
+        deleted rows are excluded. Document and version ids are not rewritten.
+    """
+
+    statuses = tuple(sorted(_REPROJECT_STATUSES | {"graph_ready"}))
+    with supabase.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT document_id::text, id::text
+            FROM app.document_versions
+            WHERE deleted_at IS NULL
+              AND status::text = ANY(%s)
+            ORDER BY id
+            """,
+            (list(statuses),),
+        )
+        return tuple(
+            (None, UUID(str(row[0])), UUID(str(row[1]))) for row in cursor.fetchall()
+        )
+
+
 def run_reproject_cli(
     *,
     supabase_url: str,
@@ -528,12 +558,13 @@ def run_reproject_cli(
     corpus_json: str,
     output: Path,
 ) -> int:
-    """Re-project stdin corpus rows and write the tmpfs JSON artifact.
+    """Re-project stdin corpus rows or authorized current versions.
 
     Args:
         supabase_url: Postgres URL reachable from this process.
         parade_url: ParadeDB writer URL reachable from this process.
-        corpus_json: Packet 2 corpus manifest JSON.
+        corpus_json: Packet 2 corpus manifest JSON, or
+            ``{"rebuild_scope":"authorized_current"}``.
         output: Destination path, typically worker ``/tmp/phase09``.
 
     Returns:
@@ -543,13 +574,27 @@ def run_reproject_cli(
         Writes ``output``. Does not change document or version ids.
     """
 
-    triples = parse_corpus_rows(corpus_json)
+    loaded: object = json.loads(corpus_json)
+    request = as_json_object(loaded, source="reproject-stdin")
+    rebuild_scope = request.get("rebuild_scope")
+    if rebuild_scope == "authorized_current":
+        with psycopg.connect(supabase_url) as supabase:
+            triples = authorized_current_rows(supabase)
+    else:
+        triples = parse_corpus_rows(corpus_json)
     outcome = reproject_corpus_rows(
         supabase_url=supabase_url,
         parade_url=parade_url,
         rows=triples,
     )
     payload = outcome_payload(outcome)
+    if rebuild_scope == "authorized_current":
+        payload["rebuild_scope"] = "authorized_current"
+        payload["sample_is_eight_doc_subset"] = False
+        payload["version_count"] = len(outcome.results)
+        payload.pop("versions", None)
+    else:
+        payload["rebuild_scope"] = "packet2_corpus"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",

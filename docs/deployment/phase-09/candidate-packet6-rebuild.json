@@ -1,0 +1,58 @@
+{
+  "bootstrap_ddl": {
+    "files": [
+      {
+        "detail": "",
+        "file": "infra/paradedb/sql/arabic_norm_v1.sql",
+        "returncode": 0
+      },
+      {
+        "detail": "",
+        "file": "infra/paradedb/migrations/20260812170000_bm25_projection.sql",
+        "returncode": 0
+      },
+      {
+        "detail": "NOTICE:  index \"bm25_chunks_search_idx\" does not exist, skipping\n",
+        "file": "infra/paradedb/migrations/20260814130000_bm25_search_index.sql",
+        "returncode": 0
+      }
+    ],
+    "image_rebuilt": false,
+    "paradedb_used_as_canonical": false,
+    "passed": true
+  },
+  "destroy": {
+    "image_rebuilt": false,
+    "paradedb_used_as_canonical": false,
+    "passed": true,
+    "rm_returncode": 0,
+    "start_returncode": 0,
+    "stop_returncode": 0,
+    "volume_destroyed": true,
+    "volumes": [
+      "smart-rag_paradedb_data"
+    ]
+  },
+  "inject_returncode": 0,
+  "paradedb_used_as_canonical": false,
+  "reproject": {
+    "parade_total_rows": 28,
+    "passed": true,
+    "rebuild_scope": "authorized_current",
+    "sql_stamped_hybrid_or_graph_ready": false,
+    "version_count": 170,
+    "worker_returncode": 0,
+    "worker_stderr": ""
+  },
+  "rows_after_destroy": {
+    "bm25_chunks": 0,
+    "returncode": 0,
+    "unpublished": true
+  },
+  "rows_after_rebuild": {
+    "bm25_chunks": 28,
+    "returncode": 0,
+    "unpublished": true
+  },
+  "schema_version": "phase09-candidate-packet6-rebuild-v1"
+}

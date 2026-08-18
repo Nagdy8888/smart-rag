@@ -2,7 +2,7 @@
 title: Phase 9 local release candidate — packet evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-18
 audience: engineering, reviewers
 ---
 
@@ -758,3 +758,58 @@ Artifacts:
 
 Packet 4 stays **unchecked** (P09-04-A Blocked). Packet 2 stays **unchecked**.
 Phase 9 wrapper `status` remains `pending`. Holdout was not opened.
+
+## Packet 6 — Egress, scans, restore, and sizing
+
+**Packet:** `Run local egress enforcement, dependency/image scans, Supabase database plus all Storage-bucket restore/reconciliation including LightRAG, clean ParadeDB projection rebuild, and instance-equivalent sizing evidence.` (`P09-06-A` … `P09-06-E`).
+**Checkbox:** **unchecked**. P09-06-A/C/D/E **Passed**. P09-06-B **Failed** (tar Trivy Critical findings on the frozen images). Managed KMS/S3 restore and EC2-equivalent proof remain Phase 10 **Not Run**.
+
+Candidate compose stayed `docker-compose.yml` only. Overlay was **not** attached. Packet 1 image Ids were unchanged. Holdout was not opened. Trivy used `docker save` plus `trivy image --input` tar. `/var/run/docker.sock` was not mounted. Restore used disposable database `phase09_p6_restore_copy`, never live `postgres`. ParadeDB was not treated as canonical backup.
+
+```mermaid
+flowchart TD
+  egress[Egress pytest]
+  scans[pip-audit pnpm gitleaks tar Trivy]
+  dump[Dump app and lightrag]
+  copy[Restore disposable DB]
+  buckets[Inventory four buckets]
+  destroy[Destroy ParadeDB volume]
+  ddl[Bootstrap projection DDL]
+  rebuild[Worker Bm25ProjectionService]
+  egress --> scans --> dump --> copy --> buckets --> destroy --> ddl --> rebuild
+```
+
+### Acceptance
+
+| Check | Class | Evidence |
+| --- | --- | --- |
+| P09-06-A | Passed | SSRF/topology/parser-network pytest 38/0/0/0. |
+| P09-06-B | Failed | pip-audit, pnpm audit, and gitleaks Passed. Tar Trivy Critical on api/worker/crawl-proxy (6) and frontend/parser-sandbox (8). Shared IDs include CVE-2023-45853, CVE-2026-13221, CVE-2026-42496, CVE-2026-57433, CVE-2026-8376. Failure route is rebuild. Packet 7 owns identity re-sign. |
+| P09-06-C | Passed | `pg_dump -Fc -n app -n lightrag` 3.4 MiB. Disposable restore `app` tables 60, `lightrag` tables 11 (`pg_restore` exit 1 warnings only). Live `postgres` not overwritten. Buckets present: documents-quarantine, documents-originals, web-snapshots, table-artifacts. |
+| P09-06-D | Passed | Volume `smart-rag_paradedb_data` destroyed. Init SQL plus Phase 2/4 bootstrap SQL applied as `paradedb`. Worker re-projected `authorized_current` (170 versions, 28 `bm25_chunks`, worker exit 0). No SQL-stamped Hybrid/Graph Ready. |
+| P09-06-E | Passed | Health before/after exit 0. Local NCPU=20 is not EC2. QT-CAP-001/002 not claimed. QT-CAP-005-P8 stays 15. |
+
+The 28 BM25 rows are derived from versions that still have canonical chunks after skip rules. They are not Packet 5's whole-database 604-chunk snapshot and are not QT-CAP-002.
+
+A first live run also Failed P09-06-D because `paradedb_writer` has DML only on a fresh volume, then a classifier used `worker_returncode or 1` and treated success `0` as missing. Those were repaired in-repo before this matrix.
+
+### Sizing ladder / later handoff
+
+- Unresolved Critical Trivy findings: Packet 7 repair = rebuild frozen images and re-prove Packets 1-6 identity, or stop.
+- `jwt_issuer_hostname_split`, 70% pause, old-API/new-schema smoke, live OpenAI Recall/Combined remain Packet 7.
+- Managed KMS/S3 Object Lock restore and EC2/EBS/ParadeDB resources remain Phase 10.
+- Do not remount docker.sock for Trivy on this host.
+
+### Commands and exit codes
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff check` on Packet 6 files | 0 | |
+| `uv run python -m pytest tests/unit/test_phase09_packet6.py -q` | 0 | 8 passed |
+| `uv run python scripts/ci/check_phase09_packet6.py` | 1 | expected: P09-06-B Failed |
+| `uv run python scripts/phase09_candidate.py health` | 0 | after rebuild |
+
+Artifacts:
+`docs/deployment/phase-09/candidate-packet6-{gate-matrix,scans,restore,rebuild,sizing}.json`.
+
+Packet 6 checkbox stays **unchecked** because P09-06-B Failed. Packet 4 stays **unchecked**. Packet 2 stays **unchecked**. Phase 9 wrapper `status` remains `pending`. Holdout was not opened.

@@ -2,7 +2,7 @@
 title: Local release candidate
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-18
 audience: engineering, ops, reviewers
 ---
 
@@ -62,6 +62,11 @@ Later packets consume these committed artifacts under
 | `candidate-packet5-gate-matrix.json` | Packet 5 P09-05-A–E Passed/Failed/Blocked/Not Run matrix |
 | `candidate-packet5-fault-matrix.json` | Kill/deny/fill/restart commands and timelines (no secrets) |
 | `candidate-packet5-reconcile.json` | Pre/post canonical counts and health after restore |
+| `candidate-packet6-gate-matrix.json` | Packet 6 P09-06-A–E Passed/Failed/Blocked/Not Run matrix |
+| `candidate-packet6-scans.json` | pip-audit/pnpm/gitleaks plus tar Trivy compact rows |
+| `candidate-packet6-restore.json` | Disposable `app`+`lightrag` dump/restore and bucket inventory |
+| `candidate-packet6-rebuild.json` | ParadeDB volume destroy and worker BM25 re-projection |
+| `candidate-packet6-sizing.json` | Local RTO/RPO decision without EC2/QT-CAP-001 claims |
 
 A changed git SHA, lockfile, Dockerfile, or image Id invalidates Packet 1
 evidence. Rebuild and reseed; do not reuse a stale digest.
@@ -171,6 +176,13 @@ is already migrated.
     stops/denies/fills each Valkey instance, then restores candidate
     health. Overlay is not candidate identity. Named ACL users and CDN
     SSE remain Phase 10. Do not destroy ParadeDB volumes here (Packet 6).
+11. Packet 6 runs local egress pytest, host pip-audit/pnpm/gitleaks, and
+    Trivy via `docker save` plus `trivy image --input` tar (never
+    docker.sock). It dumps `app`+`lightrag` into a disposable database,
+    inventories the four durable buckets, then destroys the ParadeDB volume
+    and rebuilds BM25 through existing `Bm25ProjectionService`. Do not
+    restore into live `postgres`, treat ParadeDB as canonical, or claim
+    QT-CAP-001/EC2 from local NCPU.
 
 ```mermaid
 flowchart TD
@@ -203,7 +215,7 @@ equivalent EC2 or managed Supabase capacity.
   record Blocked/Not Run; do not invent a pass. Packet 1 already attempted
   Trivy via `aquasec/trivy` docker.sock on 2026-08-17; that hung Docker
   Desktop and filled the host disk. Do not retry docker.sock Trivy on this
-  host until Packet 6 after Docker Desktop and WSL recover.
+  host. Packet 6 uses `docker save` plus `trivy image --input` tar only.
 - Graph Ready unreachable under mock-model mapping: record Failed/Blocked;
   do not SQL-stamp `graph_ready`.
 - Docker Desktop / WSL unresponsive: stop live `up`/`seed`; keep freeze and

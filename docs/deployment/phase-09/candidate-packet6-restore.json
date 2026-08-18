@@ -1,0 +1,41 @@
+{
+  "disposable_restore": {
+    "app_tables": 60,
+    "candidate_database": "phase09_p6_restore_copy",
+    "create_returncode": 0,
+    "dropped_after": true,
+    "lightrag_tables": 11,
+    "live_database_overwritten": false,
+    "passed": true,
+    "restore_returncode": 1,
+    "runtime_database": "postgres"
+  },
+  "dump": {
+    "bytes": 3446445,
+    "copy_returncode": 0,
+    "dump_returncode": 0,
+    "live_database_overwritten": false,
+    "paradedb_used_as_canonical": false,
+    "passed": true,
+    "relative_path": ".tmp-phase09/packet6/app_lightrag.dump"
+  },
+  "live_database_overwritten": false,
+  "schema_version": "phase09-candidate-packet6-restore-v1",
+  "storage": {
+    "missing": [],
+    "object_counts": {},
+    "passed": true,
+    "present": [
+      "documents-originals",
+      "documents-quarantine",
+      "table-artifacts",
+      "web-snapshots"
+    ],
+    "required_buckets": [
+      "documents-quarantine",
+      "documents-originals",
+      "web-snapshots",
+      "table-artifacts"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "claimed_managed_ec2": false,
+  "claimed_qt_cap_001": false,
+  "decision": "Repair remaining Blocked Trivy/JWT/70% items in Packet 7; keep QT-CAP-005-P8=15; do not infer EC2 from local NCPU.",
+  "health_after": {
+    "command": "scripts/phase09_candidate.py health",
+    "returncode": 0
+  },
+  "health_before": {
+    "command": "scripts/phase09_candidate.py health",
+    "returncode": 0
+  },
+  "local_candidate_not_full_envelope": true,
+  "schema_version": "phase09-candidate-packet6-sizing-v1"
+}
