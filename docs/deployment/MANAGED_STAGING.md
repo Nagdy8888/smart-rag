@@ -115,6 +115,20 @@ Blocked** (no distribution, EC2, or WAF logs). See
 [CRAWL_EGRESS_AND_PROXY.md](../runbooks/CRAWL_EGRESS_AND_PROXY.md) and
 [STREAMING_TIMEOUTS.md](./STREAMING_TIMEOUTS.md).
 
+## Packet 4 JWKS, origin rotation, CDN SSE, ParadeDB, Valkey
+
+Application JWKS (no HS256, unknown `kid`, rollover fixtures) can Pass.
+Managed staging dashboard JWKS rollover is **Not Run** (Packet 1 did not
+provision a project). Dual origin headers and the
+[origin-secret-rotation.md](../runbooks/origin-secret-rotation.md) procedure
+pass policy (`overlap <= 15` minutes); **live rotation is Blocked**. The
+real 50-second CloudFront SSE stream is **Blocked** — local EventSource is
+not CDN. Application ParadeDB dense+term degrade and Valkey fail-closed
+tests can Pass from Phase 9 plus unit/contract reuse; **live EC2
+ParadeDB/Valkey kill is Blocked**. ParadeDB snapshots are not canonical.
+
+The Packet 4 checkbox stays **unchecked** while P10-04-C is Blocked.
+
 ## Verification
 
 ```powershell
@@ -122,4 +136,5 @@ uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
+uv run python scripts/ci/check_phase10_packet4.py
 ```

@@ -1,0 +1,88 @@
+{
+  "acceptance": [
+    {
+      "check": "P10-04-A",
+      "classification": "Passed",
+      "detail": "Application JWKS (no HS256, unknown kid, standby/active/retired fixtures) Passed. Managed Supabase dashboard rollover Not Run: No isolated managed Supabase project. Managed staging dashboard standby to active to retired JWKS rollover was not run. Phase 2 project qsjivtwtmlmtksufqjik is not Phase 10 staging proof."
+    },
+    {
+      "check": "P10-04-B",
+      "classification": "Blocked",
+      "detail": "Committed Caddy CURRENT+PREVIOUS, CloudFront custom_header, overlap<=15 minutes, and rollback runbook Passed. Live origin rotation is Blocked: No CloudFront distribution or EC2 origin. Live dual origin-secret rotation was not executed."
+    },
+    {
+      "check": "P10-04-C",
+      "classification": "Blocked",
+      "detail": "90-second CloudFront/Caddy settings Passed. Live 50-second CDN SSE is Blocked: No CloudFront 50-second SSE timeline. Local EventSource is not CDN. Supporting application SSE tests are not a CloudFront timeline."
+    },
+    {
+      "check": "P10-04-D",
+      "classification": "Passed",
+      "detail": "Application Hybrid dense+term degrade and Phase 9 rebuild parity (ParadeDB not canonical) Passed. Live EC2 ParadeDB kill is Blocked: No EC2 ParadeDB kill or version-mismatch drill. Local compose degrade is not a managed host kill."
+    },
+    {
+      "check": "P10-04-E",
+      "classification": "Passed",
+      "detail": "Application Valkey fail-closed ownership and no double admission Passed. Named ACL users are Not Run. Live EC2 Valkey kill is Blocked: No EC2 Valkey kill. Application fail-closed tests are not a managed host outage."
+    }
+  ],
+  "holdout_opened": false,
+  "jwks_subset": {
+    "files": [
+      "tests/unit/test_jwks_local_issuers.py"
+    ],
+    "skipped": 0,
+    "tests": 11
+  },
+  "live_cdn_sse": "Blocked",
+  "live_managed_jwks": "Not Run",
+  "live_origin_rotation": "Blocked",
+  "live_paradedb_kill": "Blocked",
+  "live_valkey_kill": "Blocked",
+  "origin_policy": "Passed",
+  "origin_policy_sha256": "d072fb135af7007c016f9ab654c9392e5e6ce38a3dce41f7f1ed74a3a60673cf",
+  "packet": "P10-04",
+  "packet1_checkbox": "unchecked",
+  "packet2_checkbox": "unchecked",
+  "packet3_checkbox": "unchecked",
+  "packet4_checkbox": "unchecked",
+  "paradedb_subset": {
+    "files": [
+      "tests/unit/test_hybrid_run.py::test_bm25_degradation_continues_dense_and_term",
+      "tests/unit/test_readiness.py::test_paradedb_down_is_visible_and_does_not_clear_query_ready",
+      "tests/unit/test_hybrid_coverage.py::test_bm25_degraded_keeps_signal_and_applies_threshold"
+    ],
+    "skipped": 0,
+    "tests": 3
+  },
+  "phase9_image_ids": {
+    "api": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
+    "crawl-proxy": "sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3",
+    "frontend": "sha256:e47efc373a151c7c79039009fd04f459f997127beafb00747cd91c4a9b96a5c1",
+    "parser-sandbox": "sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a",
+    "worker": "sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e"
+  },
+  "schema_version": "phase10-packet4-matrix-v1",
+  "sse_support": {
+    "cdn_pass": false,
+    "files": [
+      "tests/unit/test_sse_protocol.py::test_heartbeat_interval_is_fifteen_seconds",
+      "tests/contract/test_streaming_timeout_contract.py"
+    ],
+    "skipped": 0,
+    "tests": 4
+  },
+  "valkey_subset": {
+    "files": [
+      "tests/contract/test_auth_rate_limits.py::test_missing_backends_fail_closed",
+      "tests/contract/test_auth_rate_limits.py::test_valkey_unset_cost_mutation_uses_postgres_not_fail_open",
+      "tests/contract/test_auth_rate_limits.py::test_dual_valkey_postgres_outage_fail_closed",
+      "tests/contract/test_auth_rate_limits.py::test_valkey_fast_path_enforces_ttl_counter",
+      "tests/contract/test_auth_rate_limits.py::test_low_risk_read_emergency_limiter_is_audited",
+      "tests/contract/test_auth_rate_limits.py::test_local_auth_throttling_not_claimed_as_hosted_proof"
+    ],
+    "skipped": 0,
+    "tests": 6
+  },
+  "wrapper_status": "pending"
+}

@@ -49,15 +49,18 @@ Cache policy for API/SSE is managed CachingDisabled
 
 - Prove a deliberately slow Composite run through staging CloudFront for at
   least 50 seconds without buffering or premature origin close (Packet 4).
+  Packet 4 classifies this **Blocked**. Local EventSource is not CDN.
 - Independent Vercel/API deploy skew.
 
 Packet 3 origin-denial, egress, private-port, WAF/Caddy, and 90s IaC
 assertions are recorded in
 [phase-10-managed-staging-evidence.md](../development/phase-10-managed-staging-evidence.md).
 Live CDN requests, port scans, and CloudWatch alarm delivery remain Blocked.
+Packet 4 does not invent a 50-second CloudFront timeline.
 
 ## Verification
 
 ```text
-uv run python -m pytest tests/contract/test_streaming_timeout_contract.py tests/contract/test_phase10_packet1.py tests/contract/test_phase10_packet3.py -q
+uv run python -m pytest tests/contract/test_streaming_timeout_contract.py tests/contract/test_phase10_packet1.py tests/contract/test_phase10_packet3.py tests/contract/test_phase10_packet4.py -q
+uv run python scripts/ci/check_phase10_packet4.py
 ```

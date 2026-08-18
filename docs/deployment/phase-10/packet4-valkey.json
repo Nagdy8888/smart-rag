@@ -1,0 +1,30 @@
+{
+  "application_fail_closed": "Passed",
+  "deny_passed": true,
+  "double_admission": false,
+  "fill_recovered": true,
+  "live_ec2_kill": "Blocked",
+  "live_reason": "No EC2 Valkey kill. Application fail-closed tests are not a managed host outage.",
+  "named_acl_users": false,
+  "schema_version": "phase10-packet4-valkey-v1",
+  "tests": [
+    "tests/contract/test_auth_rate_limits.py::test_missing_backends_fail_closed",
+    "tests/contract/test_auth_rate_limits.py::test_valkey_unset_cost_mutation_uses_postgres_not_fail_open",
+    "tests/contract/test_auth_rate_limits.py::test_dual_valkey_postgres_outage_fail_closed",
+    "tests/contract/test_auth_rate_limits.py::test_valkey_fast_path_enforces_ttl_counter",
+    "tests/contract/test_auth_rate_limits.py::test_low_risk_read_emergency_limiter_is_audited",
+    "tests/contract/test_auth_rate_limits.py::test_local_auth_throttling_not_claimed_as_hosted_proof"
+  ],
+  "valkey_subset": {
+    "files": [
+      "tests/contract/test_auth_rate_limits.py::test_missing_backends_fail_closed",
+      "tests/contract/test_auth_rate_limits.py::test_valkey_unset_cost_mutation_uses_postgres_not_fail_open",
+      "tests/contract/test_auth_rate_limits.py::test_dual_valkey_postgres_outage_fail_closed",
+      "tests/contract/test_auth_rate_limits.py::test_valkey_fast_path_enforces_ttl_counter",
+      "tests/contract/test_auth_rate_limits.py::test_low_risk_read_emergency_limiter_is_audited",
+      "tests/contract/test_auth_rate_limits.py::test_local_auth_throttling_not_claimed_as_hosted_proof"
+    ],
+    "skipped": 0,
+    "tests": 6
+  }
+}

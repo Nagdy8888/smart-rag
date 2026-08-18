@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "case": "hs256",
+      "exercise": "tests/unit/test_phase10_packet4.py",
+      "expected": "JwksVerificationError"
+    },
+    {
+      "case": "origin_overlap_over_15",
+      "exercise": "tests/unit/test_phase10_packet4.py",
+      "expected": "Phase10Packet4GateError"
+    },
+    {
+      "case": "missing_previous_origin_value",
+      "exercise": "tests/unit/test_phase10_packet4.py",
+      "expected": "Phase10Packet4GateError"
+    },
+    {
+      "case": "claiming_local_stream_as_cdn",
+      "exercise": "tests/unit/test_phase10_packet4.py",
+      "expected": "Failed"
+    },
+    {
+      "case": "stale_bm25_snapshot_as_canonical",
+      "exercise": "tests/unit/test_phase10_packet4.py",
+      "expected": "Phase10Packet4GateError"
+    }
+  ],
+  "schema_version": "phase10-packet4-negatives-v1"
+}

@@ -1,0 +1,22 @@
+{
+  "application_jwks": "Passed",
+  "forbidden_algorithms": [
+    "HS256",
+    "HS384",
+    "HS512"
+  ],
+  "hs256_forbidden": true,
+  "jwks_subset": {
+    "files": [
+      "tests/unit/test_jwks_local_issuers.py"
+    ],
+    "skipped": 0,
+    "tests": 11
+  },
+  "managed_dashboard_rollover": "Not Run",
+  "managed_reason": "No isolated managed Supabase project. Managed staging dashboard standby to active to retired JWKS rollover was not run. Phase 2 project qsjivtwtmlmtksufqjik is not Phase 10 staging proof.",
+  "schema_version": "phase10-packet4-jwks-v1",
+  "tests": [
+    "tests/unit/test_jwks_local_issuers.py"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "caddy_current_and_previous": true,
+  "cloudfront_custom_header": true,
+  "live_reason": "No CloudFront distribution or EC2 origin. Live dual origin-secret rotation was not executed.",
+  "live_rotation": "Blocked",
+  "overlap_minutes_max": 15,
+  "policy": "Passed",
+  "rollback_documented": true,
+  "runbook": "docs/runbooks/origin-secret-rotation.md",
+  "schema_version": "phase10-packet4-origin-v1"
+}

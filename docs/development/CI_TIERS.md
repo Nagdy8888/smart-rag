@@ -93,6 +93,15 @@ not added to `pr-fast.yml`. Live CDN request matrix, port scans, and
 CloudWatch alarm delivery stay Blocked. See
 [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
 
+Phase 10 Packet 4 JWKS/origin/SSE/ParadeDB/Valkey
+(`scripts/ci/check_phase10_packet4.py`) is a local gate. Application JWKS,
+origin dual-header policy, ParadeDB degrade, and Valkey fail-closed can
+Pass. Managed dashboard JWKS, live origin rotation, CloudFront 50-second
+SSE, and EC2 kill stay Blocked. It is not added to `pr-fast.yml`. Packets
+1–3 remaining unchecked is not a Packet 4 failure. See
+[MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) and
+[origin-secret-rotation.md](../runbooks/origin-secret-rotation.md).
+
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and
 artifact upload. A local workflow definition is not remote execution

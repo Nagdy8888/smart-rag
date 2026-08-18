@@ -40,6 +40,7 @@ uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
+uv run python scripts/ci/check_phase10_packet4.py
 ```
 
 ## Apply later (when accounts and a valid session exist)

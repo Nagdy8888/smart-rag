@@ -447,4 +447,142 @@ Packet 1 `assert_committed_policy` hashes every `infra/ec2/*.tf` file, so
 its `iac_sha256` changed when Packet 3 added `cloudwatch.tf`. Packet 1
 classify still Passed/Blocked as before; the checkbox stays unchecked.
 
+## Packet 4 — JWKS, origin rotation, CDN SSE, ParadeDB, Valkey
+
+Requirement ID: **P10-04**.
+
+### Requirement (quoted)
+
+> Exercise asymmetric JWKS rollover, dual origin-secret rotation, real
+> 50-second CDN SSE heartbeat/disconnect/resume, ParadeDB
+> outage/version mismatch/rebuild, and Valkey degraded modes.
+
+### Concrete acceptance checks
+
+- **P10-04-A:** JWKS rollover preserves valid sessions/rejects
+  revoked/unknown with no HS256/outage. Evidence: timeline. Failure:
+  blocker.
+- **P10-04-B:** Origin rotation/rollback keeps one valid secret, rejects
+  direct origin, overlap ≤15 minutes. Evidence: audit. Failure:
+  restore/stop.
+- **P10-04-C:** Real 50-second stream passes under 90-second settings with
+  one paid run. Evidence: E2E timeline. Failure: blocker.
+- **P10-04-D:** ParadeDB faults yield zero stale/unauthorized evidence and
+  rebuild parity. Evidence: report. Failure: stop.
+- **P10-04-E:** Valkey faults preserve fail-closed ownership/no double
+  admission. Evidence: matrix. Failure: blocker.
+
+```mermaid
+flowchart TD
+  appJwks["Application JWKS tests"] --> aPass["P10-04-A Passed"]
+  managed["Managed dashboard rollover"] --> aNote["Not Run in same row"]
+  originPolicy["Caddy CURRENT plus PREVIOUS"] --> bBlock["P10-04-B Blocked live"]
+  stream["CloudFront 50s timeline missing"] --> cBlock["P10-04-C Blocked"]
+  degrade["Phase 9 degrade plus unit tests"] --> dPass["P10-04-D Passed"]
+  valkey["Fail-closed Valkey tests"] --> ePass["P10-04-E Passed"]
+  cBlock --> unchecked["Packet 4 checkbox unchecked"]
+```
+
+### Inspected paths (before edit)
+
+| Path | Result |
+| --- | --- |
+| `packages/core/src/smart_rag_core/security/jwks.py` | `FORBIDDEN_ALGORITHMS` includes HS256; unknown `kid` refresh once |
+| `tests/unit/test_jwks_local_issuers.py` | Reused; 11 collected, 0 skipped |
+| `tests/contract/test_jwks_auth.py` / `test_jwks_rollover.py` | Not in the Packet 4 gate (skip without local/managed Auth) |
+| `infra/ec2/Caddyfile` | CURRENT and PREVIOUS origin placeholders |
+| `infra/ec2/cloudfront_waf.tf` | `custom_header` plus previous-value dynamic header |
+| Phase 9 Packet 5/6 artifacts | Hybrid `bm25_unavailable`; `paradedb_used_as_canonical: false` |
+| Live CloudFront / managed staging JWKS / EC2 kill | Absent. Classified Blocked or Not Run |
+
+### Files changed (allowed outputs only)
+
+| File | Action |
+| --- | --- |
+| `packages/core/src/smart_rag_core/release/phase10_packet4.py` | Created — honest A–E classifier |
+| `packages/core/src/smart_rag_core/release/phase10_constants.py` | Packet 4 artifact/test constants |
+| `scripts/ci/check_phase10_packet4.py` | Created — zero-collection fail-closed gate |
+| `tests/unit/test_phase10_packet4.py` | Created — listed negatives always run |
+| `tests/contract/test_phase10_packet4.py` | Created — committed policy; Packets 1–3 unchecked is not a failure |
+| `docs/runbooks/origin-secret-rotation.md` | Created — topology procedure; live rotation Blocked |
+| `docs/deployment/phase-10/packet4-*.json` | Written by the Packet 4 gate |
+| `.cursor/plans/.../10-phase-managed-staging.md` | Wrapper remains pending; Packet 4 checkbox unchecked |
+
+### Identities frozen
+
+No secrets. No invented CloudFront durations, JWKS kids, or kill results.
+
+| Field | Value |
+| --- | --- |
+| Envelope | QT-CAP-001-P9=8, QT-CAP-002-P9=16, QT-CAP-005-P8=15 |
+| Phase 9 api freeze | `sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec` |
+| Origin overlap max | 15 minutes |
+| CDN SSE min duration | 50 seconds (not observed) |
+| Origin policy sha256 | `d072fb135af7007c016f9ab654c9392e5e6ce38a3dce41f7f1ed74a3a60673cf` |
+| JWKS subset | 11 collected, 0 skipped |
+| ParadeDB subset | 3 collected, 0 skipped |
+| Valkey subset | 6 collected, 0 skipped |
+| SSE support (not CDN) | 4 collected, 0 skipped |
+
+### Classifications
+
+Packet 4 **does not** mark the wrapper complete. P10-04-C live CDN SSE is
+**Blocked**, so the Packet 4 checkbox stays unchecked. Packets 1–3 stay
+unchecked and are not required for Packet 4 classify.
+
+| Check | Classification | Notes |
+| --- | --- | --- |
+| P10-04-A JWKS | Passed | Application JWKS Passed (no HS256, unknown `kid`, rollover fixtures). Managed staging dashboard rollover **Not Run** |
+| P10-04-B origin | Blocked | Dual-header policy, overlap ≤15, rollback runbook Passed. Live rotation not executed |
+| P10-04-C CDN SSE | Blocked | 90s IaC Passed. No CloudFront timeline with `duration>=50` and `via=cloudfront`. Local EventSource is not CDN |
+| P10-04-D ParadeDB | Passed | Application dense+term degrade and Phase 9 rebuild parity. Snapshot-as-canonical rejected. Live EC2 kill Blocked |
+| P10-04-E Valkey | Passed | Application fail-closed / no double admission. Named ACL Not Run. Live EC2 kill Blocked |
+
+### Commands and exit codes
+
+```powershell
+uv run ruff format packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_packet4.py scripts/ci/check_phase10_packet4.py tests/unit/test_phase10_packet4.py tests/contract/test_phase10_packet4.py
+uv run ruff check packages/core/src/smart_rag_core/release/phase10_constants.py packages/core/src/smart_rag_core/release/phase10_packet4.py scripts/ci/check_phase10_packet4.py tests/unit/test_phase10_packet4.py tests/contract/test_phase10_packet4.py
+uv run python -m pytest tests/unit/test_phase10_packet4.py tests/contract/test_phase10_packet4.py tests/unit/test_phase10_packet1.py tests/contract/test_phase10_packet1.py tests/unit/test_phase10_packet2.py tests/contract/test_phase10_packet2.py tests/unit/test_phase10_packet3.py tests/contract/test_phase10_packet3.py -q
+uv run python scripts/ci/check_phase10_packet1.py
+uv run python scripts/ci/check_phase10_packet2.py
+uv run python scripts/ci/check_phase10_packet3.py
+uv run python scripts/ci/check_phase10_packet4.py
+```
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff format` on Packet 4 Python | 0 | Files formatted then left unchanged |
+| `uv run ruff check` on Packet 4 Python | 0 | All checks passed |
+| `uv run python -m pyright` on Packet 4 Python | 0 | 0 errors |
+| `uv run python -m pytest` Packet 1-4 | 0 | 54 passed, 0 skipped |
+| `uv run python scripts/ci/check_phase10_packet1.py` | 0 | tests=16; IaC policy Passed; live apply Blocked; checkbox unchecked |
+| `uv run python scripts/ci/check_phase10_packet2.py` | 0 | tests=15; OIDC policy Passed; live OIDC assume Blocked; P10-02-C Blocked |
+| `uv run python scripts/ci/check_phase10_packet3.py` | 0 | tests=42 crawl_subset=29 skipped=0; IaC Passed; P10-03-A/B/E Blocked; C/D Passed |
+| `uv run python scripts/ci/check_phase10_packet4.py` | 0 | tests=34 jwks=11 paradedb=3 valkey=6 sse_support=4 skipped=0; A/D/E Passed; B/C Blocked |
+
+Artifacts: `docs/deployment/phase-10/packet4-{gate-matrix,jwks,origin,sse,paradedb,valkey,negatives}.json`.
+
+Packet 4 checkbox stays **unchecked** because P10-04-C live CDN SSE is
+Blocked. Packet file `status` stays `pending`. Phase 10 wrapper `status`
+remains `pending`. Holdout was not opened. Packets 1–3 stay unchecked.
+
+### Unverified / Blocked
+
+- Isolated managed Supabase dashboard JWKS standby→active→retired rollover.
+- Live CloudFront dual origin-secret rotation audit.
+- Real 50-second SSE through CloudFront (`via=cloudfront`, duration≥50,
+  one paid run).
+- Live EC2 ParadeDB kill / version mismatch.
+- Live EC2 Valkey kill and named ACL users.
+- Packets 5–7.
+
+### Deviations
+
+None versus Packet 4 scope. Application JWKS is classified Passed with
+managed dashboard rollover recorded Not Run in the same row, as specified.
+P10-04-C remains Blocked; local EventSource was not claimed as CDN.
+ParadeDB snapshots were not accepted as canonical. Packets 1–3 remaining
+unchecked did not fail Packet 4 classify.
+
 

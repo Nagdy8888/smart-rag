@@ -1,9 +1,11 @@
-"""Stable identifiers for Phase 10 Packets 1-3.
+"""Stable identifiers for Phase 10 Packets 1-4.
 
 Packet 1 consumes the accepted Phase 9 promotion freeze. Packet 2 adds GitHub
 OIDC, named SSM documents, and Secrets Manager placeholders. Packet 3 asserts
-origin/egress/timeout/telemetry policy. None of these packets imply live AWS
-apply, CDN requests, port scans, or delivered CloudWatch alarms.
+origin/egress/timeout/telemetry policy. Packet 4 classifies JWKS, origin
+rotation, CDN SSE, ParadeDB degrade, and Valkey fail-closed. None of these
+packets imply live AWS apply, managed JWKS dashboard rollover, CloudFront
+50-second streams, or EC2 ParadeDB/Valkey kill results.
 """
 
 from __future__ import annotations
@@ -36,6 +38,13 @@ PACKET3_EGRESS_NAME = "packet3-egress.json"
 PACKET3_TIMEOUTS_NAME = "packet3-timeouts.json"
 PACKET3_SCANS_NAME = "packet3-scans.json"
 PACKET3_NEGATIVES_NAME = "packet3-negatives.json"
+PACKET4_MATRIX_NAME = "packet4-gate-matrix.json"
+PACKET4_JWKS_NAME = "packet4-jwks.json"
+PACKET4_ORIGIN_NAME = "packet4-origin.json"
+PACKET4_SSE_NAME = "packet4-sse.json"
+PACKET4_PARADEDB_NAME = "packet4-paradedb.json"
+PACKET4_VALKEY_NAME = "packet4-valkey.json"
+PACKET4_NEGATIVES_NAME = "packet4-negatives.json"
 GITHUB_WORKFLOWS_DIR = ".github/workflows"
 SSM_DOCUMENTS_DIR = "infra/ec2/ssm-documents"
 MIGRATIONS_DIR = "supabase/migrations"
@@ -62,6 +71,13 @@ PACKET3_EGRESS_SCHEMA_VERSION = "phase10-packet3-egress-v1"
 PACKET3_TIMEOUTS_SCHEMA_VERSION = "phase10-packet3-timeouts-v1"
 PACKET3_SCANS_SCHEMA_VERSION = "phase10-packet3-scans-v1"
 PACKET3_NEGATIVES_SCHEMA_VERSION = "phase10-packet3-negatives-v1"
+PACKET4_MATRIX_SCHEMA_VERSION = "phase10-packet4-matrix-v1"
+PACKET4_JWKS_SCHEMA_VERSION = "phase10-packet4-jwks-v1"
+PACKET4_ORIGIN_SCHEMA_VERSION = "phase10-packet4-origin-v1"
+PACKET4_SSE_SCHEMA_VERSION = "phase10-packet4-sse-v1"
+PACKET4_PARADEDB_SCHEMA_VERSION = "phase10-packet4-paradedb-v1"
+PACKET4_VALKEY_SCHEMA_VERSION = "phase10-packet4-valkey-v1"
+PACKET4_NEGATIVES_SCHEMA_VERSION = "phase10-packet4-negatives-v1"
 
 AWS_PROVIDER_CONSTRAINT = "~> 5.100"
 INTENDED_AWS_REGION = "us-east-1"
@@ -195,6 +211,66 @@ PACKET2_RELATIVE = (
 PACKET3_RELATIVE = (
     ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
     "03-prove-origin-egress-and-timeouts.md"
+)
+PACKET4_RELATIVE = (
+    ".cursor/plans/hybrid-graph-rag/10-phase-managed-staging/packets/"
+    "04-exercise-rotations-streaming-and-degradation.md"
+)
+ORIGIN_ROTATION_RUNBOOK = "docs/runbooks/origin-secret-rotation.md"
+ORIGIN_ROTATION_OVERLAP_MAX_MINUTES = 15
+CDN_SSE_MIN_DURATION_SECONDS = 50
+CDN_SSE_VIA_CLOUDFRONT = "cloudfront"
+PHASE09_PACKET5_FAULT = "docs/deployment/phase-09/candidate-packet5-fault-matrix.json"
+PHASE09_PACKET6_REBUILD = "docs/deployment/phase-09/candidate-packet6-rebuild.json"
+PACKET4_JWKS_TEST_FILES: tuple[str, ...] = ("tests/unit/test_jwks_local_issuers.py",)
+PACKET4_PARADEDB_TEST_FILES: tuple[str, ...] = (
+    "tests/unit/test_hybrid_run.py::test_bm25_degradation_continues_dense_and_term",
+    (
+        "tests/unit/test_readiness.py"
+        "::test_paradedb_down_is_visible_and_does_not_clear_query_ready"
+    ),
+    (
+        "tests/unit/test_hybrid_coverage.py"
+        "::test_bm25_degraded_keeps_signal_and_applies_threshold"
+    ),
+)
+PACKET4_VALKEY_TEST_FILES: tuple[str, ...] = (
+    "tests/contract/test_auth_rate_limits.py::test_missing_backends_fail_closed",
+    (
+        "tests/contract/test_auth_rate_limits.py"
+        "::test_valkey_unset_cost_mutation_uses_postgres_not_fail_open"
+    ),
+    (
+        "tests/contract/test_auth_rate_limits.py"
+        "::test_dual_valkey_postgres_outage_fail_closed"
+    ),
+    (
+        "tests/contract/test_auth_rate_limits.py"
+        "::test_valkey_fast_path_enforces_ttl_counter"
+    ),
+    (
+        "tests/contract/test_auth_rate_limits.py"
+        "::test_low_risk_read_emergency_limiter_is_audited"
+    ),
+    (
+        "tests/contract/test_auth_rate_limits.py"
+        "::test_local_auth_throttling_not_claimed_as_hosted_proof"
+    ),
+)
+PACKET4_SSE_SUPPORT_TEST_FILES: tuple[str, ...] = (
+    "tests/unit/test_sse_protocol.py::test_heartbeat_interval_is_fifteen_seconds",
+    "tests/contract/test_streaming_timeout_contract.py",
+)
+ORIGIN_RUNBOOK_REQUIRED_TOKENS: tuple[str, ...] = (
+    "generate and store the pending value",
+    "origin_header_value_current",
+    "origin_header_value_previous",
+    "custom_header",
+    "wait for distribution",
+    "direct-origin",
+    "15-minute overlap",
+    "abort or rollback keeps at least one valid value",
+    "every rotation is audited",
 )
 PROVIDER_EGRESS_CADDY_FILE = "infra/ec2/provider-egress/Caddyfile"
 PROVIDER_EGRESS_ALLOWLIST_FILE = "infra/ec2/provider-egress/allowlist.txt"

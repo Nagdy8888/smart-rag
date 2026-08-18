@@ -44,8 +44,14 @@ Local `jwt_expiry = 3600` in `supabase/config.toml`.
 
 | Environment | Rollover API | Packet 4 gate |
 | --- | --- | --- |
-| Local CLI (`127.0.0.1:54321`) | Env `GOTRUE_JWT_KEYS` only | ES256 JWKS present; provider lifecycle proven on managed |
-| Managed `qsjivtwtmlmtksufqjik` | `POST/PATCH …/config/auth/signing-keys` with `SUPABASE_ACCESS_TOKEN` | **Proven 2026-08-13** — see phase evidence; ops script `scripts/ops/prove_jwks_rollover.py` |
+| Local CLI (`127.0.0.1:54321`) | Env `GOTRUE_JWT_KEYS` only | Application ES256 JWKS, unknown `kid`, HS256 reject |
+| Phase 2 project `qsjivtwtmlmtksufqjik` | `POST/PATCH …/config/auth/signing-keys` with `SUPABASE_ACCESS_TOKEN` | **Not Phase 10 staging proof** — isolated staging has no project yet |
+| Isolated Phase 10 managed staging | Dashboard after Packet 1 apply | **Not Run** — no managed project; do not invent JWKS kids |
+
+Phase 10 Packet 4 classifies **application JWKS Passed** (no HS256, unknown
+`kid`, standby→active→retired fixtures) and records **managed Supabase
+dashboard rollover Not Run**. Do not treat the Phase 2 project as Packet 4
+managed staging evidence.
 
 ## Operator procedure (managed)
 
@@ -79,3 +85,9 @@ Invoke-RestMethod https://qsjivtwtmlmtksufqjik.supabase.co/auth/v1/.well-known/j
 - [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md)
 - [CONFIGURATION.md](../development/CONFIGURATION.md)
 - [ADR-privileged-auth-administration-boundary.md](../adr/ADR-privileged-auth-administration-boundary.md)
+- [origin-secret-rotation.md](./origin-secret-rotation.md)
+- [phase-10 evidence](../development/phase-10-managed-staging-evidence.md)
+
+```powershell
+uv run python scripts/ci/check_phase10_packet4.py
+```

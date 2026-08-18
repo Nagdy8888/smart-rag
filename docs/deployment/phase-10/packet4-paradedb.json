@@ -1,0 +1,26 @@
+{
+  "application_degrade": "Passed",
+  "fallback_reason": "bm25_unavailable",
+  "live_ec2_kill": "Blocked",
+  "live_reason": "No EC2 ParadeDB kill or version-mismatch drill. Local compose degrade is not a managed host kill.",
+  "paradedb_subset": {
+    "files": [
+      "tests/unit/test_hybrid_run.py::test_bm25_degradation_continues_dense_and_term",
+      "tests/unit/test_readiness.py::test_paradedb_down_is_visible_and_does_not_clear_query_ready",
+      "tests/unit/test_hybrid_coverage.py::test_bm25_degraded_keeps_signal_and_applies_threshold"
+    ],
+    "skipped": 0,
+    "tests": 3
+  },
+  "paradedb_used_as_canonical": false,
+  "phase09_fault": "docs/deployment/phase-09/candidate-packet5-fault-matrix.json",
+  "phase09_rebuild": "docs/deployment/phase-09/candidate-packet6-rebuild.json",
+  "rebuild_passed": true,
+  "schema_version": "phase10-packet4-paradedb-v1",
+  "snapshot_as_canonical_rejected": true,
+  "tests": [
+    "tests/unit/test_hybrid_run.py::test_bm25_degradation_continues_dense_and_term",
+    "tests/unit/test_readiness.py::test_paradedb_down_is_visible_and_does_not_clear_query_ready",
+    "tests/unit/test_hybrid_coverage.py::test_bm25_degraded_keeps_signal_and_applies_threshold"
+  ]
+}

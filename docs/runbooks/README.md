@@ -12,15 +12,13 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 
 | Runbook | Owner phase | Prerequisites | Status | Verification | Escalation |
 | --- | --- | --- | --- | --- | --- |
-| Runbook | Owner phase | Prerequisites | Status | Verification | Escalation |
-| --- | --- | --- | --- | --- |
 | Protected migrations / credential rotation | 2/10 | migrations exist | draft | migrate drill / Packet 2 policy | eng-lead |
-| JWKS / signing-key rollover | 2/10 | Auth asymmetric keys | planned | rollover drill | security |
+| JWKS / signing-key rollover | 2/10 | Auth asymmetric keys | draft | application JWKS tests; managed staging dashboard Not Run | security |
 | ClamAV engine/signature update | 3 | scanner image | planned | signature freshness test | eng-lead |
 | Valkey outage/recovery | 6/9 | Valkey services | planned | degraded-path test | eng-lead |
 | ParadeDB projection rebuild/fallback | 4/9 | BM25 outbox | planned | rebuild timing | eng-lead |
 | Local/in-app admin alerts | 6/8 | alert contract | planned | ack path | eng-lead |
-| Origin-secret dual rotation | 10 | CloudFront | planned | skew test | eng-lead |
+| Origin-secret dual rotation | 10 | CloudFront | draft | Packet 4 policy; live rotation Blocked | eng-lead |
 | LightRAG private-schema bootstrap | 5 | Packet 1 pin + Packet 2 migrations | draft | fingerprint + role matrix | eng-lead |
 | LightRAG workspace cleanup/rebuild | 5 | Packet 7 pointer/delete | draft | switch + tombstone tests | eng-lead |
 | LightRAG snapshot restore / pointer rollback | 5 | Packet 7 isolated copy | draft | same-schema refuse + restore script | eng-lead |
@@ -34,4 +32,6 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 [lightrag-schema-bootstrap.md](./lightrag-schema-bootstrap.md) ·
 [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](./GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) ·
 [PROTECTED_MIGRATION.md](./PROTECTED_MIGRATION.md) ·
+[SUPABASE_JWKS_ROLLOVER.md](./SUPABASE_JWKS_ROLLOVER.md) ·
+[origin-secret-rotation.md](./origin-secret-rotation.md) ·
 [docs index](../README.md)

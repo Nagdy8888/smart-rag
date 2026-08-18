@@ -32,6 +32,7 @@ uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
+uv run python scripts/ci/check_phase10_packet4.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -275,11 +276,20 @@ port scans, and alarm delivery stay Blocked. It is local-only and is not a
 GitHub PR job. Do not curl CloudFront, nmap the origin, or invent HTTP
 200/403 from this gate.
 
+The Phase 10 Packet 4 gate reviews application JWKS (no HS256), origin
+dual-header policy plus the origin-secret rotation runbook, 90s timeout
+assertions, ParadeDB degrade/rebuild-not-canonical, and Valkey fail-closed
+tests. Live managed JWKS dashboard rollover, live origin rotation, the
+50-second CloudFront SSE timeline, and EC2 ParadeDB/Valkey kill stay
+Blocked. Local EventSource is not CDN. It is local-only and is not a
+GitHub PR job. Packets 1–3 remaining unchecked is not a Packet 4 failure.
+
 ```powershell
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
 uv run python scripts/ci/check_phase10_packet3.py
+uv run python scripts/ci/check_phase10_packet4.py
 ```
 
 [docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)
