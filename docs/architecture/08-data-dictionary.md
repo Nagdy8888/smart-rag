@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-18
 audience: engineering, reviewers
 ---
 
@@ -179,7 +179,7 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - `audit_events` rejects UPDATE/DELETE (append-only trigger).
 - `llm_usage` rejects UPDATE/DELETE (append-only trigger). Runtime roles have no table DML; query usage is inserted only through `app.record_query_llm_usage`.
 - RLS is enabled on all exposed tables; Storage quarantine INSERT is reservation-scoped; no authenticated SELECT on quarantine.
-- `document_scan_events` is append-only; `result=clean` inserts are blocked for non-`app_worker` roles until Phase 3.
+- `document_scan_events` is append-only; `result=clean` inserts are blocked for non-`app_worker` roles. `app_worker` has SELECT/INSERT RLS (`document_scan_events_worker_select` / `document_scan_events_worker_insert`); grants alone do not bypass ENABLE RLS.
 - ACL/visibility downgrade clears `graph_eligible` and atomically enqueues `graph_acl_remove`.
 - Company retention defaults: `retention_days=365`, `quarantine_ttl_hours=24`, `legal_hold_enabled=false` (Phase 1 signed defaults).
 - Packet 2 vendor tables are private to schema `lightrag` with FORCE RLS and `app_lightrag` DML only. `anon` / `authenticated` / `service_role` have no vendor access. AGE is absent.

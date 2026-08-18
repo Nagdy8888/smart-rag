@@ -76,7 +76,7 @@ class WorkerLifecycle:
         if checkpoint_dsn is not None:
             self._checkpointer = open_ingestion_checkpointer(
                 checkpoint_dsn,
-                max_size=settings.worker_concurrency,
+                max_size=max(8, settings.worker_concurrency * 4),
             )
             saver = self._checkpointer.saver
         if settings.lightrag_db_url is not None:
@@ -114,7 +114,18 @@ class WorkerLifecycle:
             in_flight: set[Future[None]] = set()
             self._enqueue_query_maintenance()
             while not self._stop_event.is_set():
-                in_flight = {future for future in in_flight if not future.done()}
+                still_running: set[Future[None]] = set()
+                for future in in_flight:
+                    if not future.done():
+                        still_running.add(future)
+                        continue
+                    exc = future.exception()
+                    if exc is not None:
+                        LOGGER.exception(
+                            "ingestion job future failed",
+                            exc_info=exc,
+                        )
+                in_flight = still_running
                 self._graph_loop.process_once()
                 if len(in_flight) >= self._settings.worker_concurrency:
                     time.sleep(1)
@@ -285,6 +296,10 @@ class WorkerLifecycle:
 
         Args:
             job: Claimed ingestion job with a lease token.
+
+        Side Effects:
+            Unexpected exceptions (including scan-event RLS failures) are
+            logged and persisted through ``fail`` so the lease is not orphaned.
         """
 
         postgres_url = self._require_postgres_url()
@@ -389,6 +404,9 @@ class WorkerLifecycle:
                 connection.commit()
         except (JobLeaseError, JobRepositoryError, psycopg.Error) as exc:
             LOGGER.exception("job %s failed: %s", job.id, exc)
+            self._fail_job(job.id, lease_token, str(exc))
+        except Exception as exc:
+            LOGGER.exception("job %s failed with unexpected error: %s", job.id, exc)
             self._fail_job(job.id, lease_token, str(exc))
         finally:
             stop_heartbeat.set()

@@ -2,7 +2,7 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-18
 owning_phase: 3
 audience: engineering
 ---
@@ -46,7 +46,7 @@ Phase 3 stores heading ancestry on each chunk (`section_path`). Phase 4 whole-do
 
 ## Typed tables
 
-CSV/XLSX cells materialize to private **`table-artifacts`** Parquet (`table_parquet_v1`) with explicit Arrow schema, provenance JSON per row, manifest hash linkage, and no flatten-only prose substitution.
+CSV/XLSX cells materialize to private **`table-artifacts`** Parquet (`table_parquet_v1`) with explicit Arrow schema, provenance JSON per row, manifest hash linkage, and no flatten-only prose substitution. Hybrid indexing treats those Parquet artifacts as sufficient content: `build_hierarchical_chunks` returns no passages for `csv`/`xlsx`, and `index_hybrid_content` persists tables without calling the embedding gateway. BM25 verification then accepts a matching empty projection when `document_tables` rows exist.
 
 ## Verification
 

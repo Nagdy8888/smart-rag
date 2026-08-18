@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Literal, TypeAlias, TypedDict, cast
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import psycopg
 from langchain_core.runnables import RunnableConfig
@@ -17,14 +18,18 @@ from smart_rag_core.gateways.embedding import create_embedding_gateway
 from smart_rag_core.gateways.storage import StorageGateway
 from smart_rag_core.ingestion.canonical.repository import CanonicalRepository
 from smart_rag_core.ingestion.chunking.service import chunk_parse_result
+from smart_rag_core.ingestion.chunking.types import ChunkingResult
+from smart_rag_core.ingestion.embeddings.policy import embedding_policy_hash
 from smart_rag_core.ingestion.embeddings.service import (
     EmbeddingBatchInput,
+    EmbeddingBatchResult,
     EmbeddingService,
 )
 from smart_rag_core.ingestion.governance import ExtractionGovernanceInput
 from smart_rag_core.ingestion.parser.service import ParserInvocation, ParserService
 from smart_rag_core.ingestion.parser.types import ParseDisposition, ParseResult
 from smart_rag_core.ingestion.parser.website import merge_website_parse_results
+from smart_rag_core.ingestion.tables.storage import upload_table_artifact
 from smart_rag_core.jobs.exceptions import JobLeaseError
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.jobs.ledger import JobOperationLedger
@@ -295,7 +300,7 @@ def index_hybrid_content(
         document_id=document_id,
         version_id=version_id,
     )
-    if not chunking.chunks:
+    if not hybrid_index_has_content(chunking):
         return {**state, "status": "index_failed", "detail": "no chunks produced"}
 
     settings = SharedSettings.model_construct(
@@ -318,6 +323,27 @@ def index_hybrid_content(
     )
     embed_operation_key = f"{state['operation_key']}:embed"
 
+    for artifact in chunking.table_artifacts:
+        parquet_path = artifact.manifest.parquet_path
+        filename = parquet_path.rsplit("/", 1)[-1]
+        sheet_name = parquet_path.rstrip("/").split("/")[-2]
+        try:
+            upload_table_artifact(
+                storage,
+                document_id=document_id,
+                version_id=version_id,
+                sheet_name=sheet_name,
+                filename=filename,
+                parquet_bytes=artifact.parquet_bytes,
+                expected_hash=artifact.manifest.content_hash_sha256,
+            )
+        except Exception as exc:
+            return {
+                **state,
+                "status": "index_failed",
+                "detail": f"table artifact upload failed: {exc}"[:500],
+            }
+
     with psycopg.connect(postgres_url) as connection:
         connection.execute("SET ROLE app_worker")
         ledger = JobOperationLedger(connection)
@@ -336,26 +362,32 @@ def index_hybrid_content(
                 "detail": "canonical ledger replay",
             }
 
-        embedding_service = EmbeddingService(connection, gateway=gateway)
-        try:
-            embedding = embedding_service.embed_version(
-                EmbeddingBatchInput(
-                    version_id=version_id,
-                    document_title=str(state["document_title"]),
-                    chunks=chunking.chunks,
-                    chunking_config_hash=chunking.config_hash,
-                    operation_key=embed_operation_key,
-                    governance=governance_input,
-                    estimated_cost_usd=Decimal("0.05"),
+        if chunking.chunks:
+            embedding_service = EmbeddingService(connection, gateway=gateway)
+            try:
+                embedding = embedding_service.embed_version(
+                    EmbeddingBatchInput(
+                        version_id=version_id,
+                        document_title=str(state["document_title"]),
+                        chunks=chunking.chunks,
+                        chunking_config_hash=chunking.config_hash,
+                        operation_key=embed_operation_key,
+                        governance=governance_input,
+                        estimated_cost_usd=Decimal("0.05"),
+                    )
                 )
+            except Exception as exc:
+                connection.rollback()
+                return {
+                    **state,
+                    "status": "index_failed",
+                    "detail": str(exc)[:500],
+                }
+        else:
+            embedding = table_only_embedding_result(
+                version_id=version_id,
+                chunking=chunking,
             )
-        except Exception as exc:
-            connection.rollback()
-            return {
-                **state,
-                "status": "index_failed",
-                "detail": str(exc)[:500],
-            }
 
         repository = CanonicalRepository(connection)
         try:
@@ -398,6 +430,62 @@ def index_hybrid_content(
         "bm25_job_id": str(bm25_job_id),
         "detail": "canonical persisted; bm25 projection pending",
     }
+
+
+def hybrid_index_has_content(chunking: ChunkingResult) -> bool:
+    """Return whether indexing received passages or typed table artifacts.
+
+    CSV/XLSX parses emit Parquet table artifacts and intentionally skip prose
+    chunks. Those versions are still Hybrid-indexable.
+
+    Args:
+        chunking: Closed chunking result for one version.
+
+    Returns:
+        ``True`` when at least one passage/parent chunk or table artifact exists.
+    """
+
+    return bool(chunking.chunks) or bool(chunking.table_artifacts)
+
+
+def table_only_embedding_result(
+    *,
+    version_id: UUID,
+    chunking: ChunkingResult,
+) -> EmbeddingBatchResult:
+    """Build embedding metadata for table-only versions with no passages.
+
+    Args:
+        version_id: Canonical version identifier.
+        chunking: Chunking output that contains table artifacts and no chunks.
+
+    Returns:
+        Embedding batch result with an empty ``embedded`` tuple and a hash
+        derived from table artifact content hashes.
+    """
+
+    payload = [
+        {
+            "path": artifact.manifest.parquet_path,
+            "hash": artifact.manifest.content_hash_sha256,
+            "rows": artifact.manifest.row_count,
+        }
+        for artifact in chunking.table_artifacts
+    ]
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    chunk_set_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return EmbeddingBatchResult(
+        version_id=version_id,
+        policy_hash=embedding_policy_hash(
+            chunking_config_hash=chunking.config_hash
+        ),
+        chunk_set_hash=chunk_set_hash,
+        embedded=(),
+        ledger_id=uuid5(NAMESPACE_URL, f"table-only-embed:{version_id}:{chunk_set_hash}"),
+        provider_request_id="table_only",
+        actual_cost_usd=Decimal("0"),
+        attempt_count=1,
+    )
 
 
 def _parse_website_snapshots(

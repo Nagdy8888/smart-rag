@@ -1,0 +1,14 @@
+{
+  "classification": "Passed",
+  "freeze_api_id": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
+  "holdout_opened": false,
+  "image_rebuilt": false,
+  "next_action": "Keep the prior digest for the next expand window.",
+  "reason": "Prior API image served authenticated read/chat/upload against the current schema.",
+  "requested": "sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7",
+  "resolved_image_id": "sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7",
+  "restored_freeze": true,
+  "schema_version": "phase09-candidate-old-api-smoke-v1",
+  "smoke_ran": true,
+  "steps": []
+}

@@ -65,6 +65,7 @@ class Bm25ProjectionVerifier:
 
         supabase_rows = self._fetch_supabase_chunks(version_id)
         parade_count = self._indexer.count_rows_for_version(version_id)
+        table_count = self._count_tables(version_id)
         hash_matches = 0
         hash_mismatches = 0
         for row in supabase_rows:
@@ -108,10 +109,11 @@ class Bm25ProjectionVerifier:
                     detail="sample_query_not_deterministic",
                 )
 
-        passed = (
-            len(supabase_rows) == parade_count
-            and hash_mismatches == 0
-            and len(supabase_rows) > 0
+        passed = bm25_projection_matches(
+            supabase_row_count=len(supabase_rows),
+            parade_row_count=parade_count,
+            hash_mismatches=hash_mismatches,
+            table_row_count=table_count,
         )
         return Bm25VerificationResult(
             passed=passed,
@@ -177,6 +179,28 @@ class Bm25ProjectionVerifier:
             )
             return [dict(row) for row in cursor.fetchall()]
 
+    def _count_tables(self, version_id: UUID) -> int:
+        """Count typed table artifacts for one version.
+
+        Args:
+            version_id: Canonical document version identifier.
+
+        Returns:
+            Number of ``document_tables`` rows for the version.
+        """
+
+        with self._supabase.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COUNT(*)::bigint
+                FROM app.document_tables
+                WHERE version_id = %s
+                """,
+                (version_id,),
+            )
+            row = cursor.fetchone()
+            return int(row[0]) if row is not None else 0
+
     def _parade_content_hash(self, chunk_id: UUID) -> str | None:
         """Return the ParadeDB content hash for one projected chunk.
 
@@ -203,3 +227,32 @@ def _sample_query_text(raw_text: str) -> str:
 
     tokens = raw_text.split()
     return " ".join(tokens[:6]) if tokens else raw_text[:32]
+
+
+def bm25_projection_matches(
+    *,
+    supabase_row_count: int,
+    parade_row_count: int,
+    hash_mismatches: int,
+    table_row_count: int,
+) -> bool:
+    """Return whether canonical BM25 projection verification passed.
+
+    Table-only CSV/XLSX versions have zero representative chunks. Empty
+    ParadeDB counts then match when typed table artifacts exist.
+
+    Args:
+        supabase_row_count: Authoritative representative chunk count.
+        parade_row_count: Derived ParadeDB row count for the version.
+        hash_mismatches: Count of content-hash disagreements.
+        table_row_count: Canonical ``document_tables`` rows for the version.
+
+    Returns:
+        ``True`` when counts match and either passages exist or tables do.
+    """
+
+    if supabase_row_count != parade_row_count or hash_mismatches != 0:
+        return False
+    if supabase_row_count > 0:
+        return True
+    return table_row_count > 0

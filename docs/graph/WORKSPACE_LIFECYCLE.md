@@ -2,7 +2,7 @@
 title: Graph workspace lifecycle
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-18
 audience: engineering, reviewers
 phase_packet: Phase 5 Packet 7
 ---
@@ -20,6 +20,7 @@ Related: [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [RETRIEVAL.md](./RETRIEVAL.md) ·
 [JOB_STATE_MACHINE.md](../ingestion/JOB_STATE_MACHINE.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
+[06-database-workload-isolation.md](../architecture/06-database-workload-isolation.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [ENTITY_RULES.md](./ENTITY_RULES.md) ·
 [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](../runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) ·
@@ -121,7 +122,7 @@ invalidate live maps immediately. They do not switch the pointer.
 | `index` | normal | `graph_index` | skipped when pending index greater than 50 | `updating`, or `active` after Packet 4 maps verify and the pointer already names this workspace |
 | `remove` | maintenance | `graph_maintenance` | always claimable | `filtered_dirty` |
 | `graph_acl_remove` | maintenance | `graph_maintenance` | always claimable | `filtered_dirty` |
-| `rebuild` | maintenance | `graph_maintenance` | always claimable | isolate_only: `{workspace}__rebuild` in `building`; `verified_switch`: pointer CAS to that workspace |
+| `rebuild` | maintenance | `graph_maintenance` | pause at 70% CPU/IO/memory or Hybrid p95 breach | isolate_only: `{workspace}__rebuild` in `building`; `verified_switch`: pointer CAS to that workspace |
 | reconciliation payload | maintenance | none extra | low priority | inspect vendor status; stay `quarantined` |
 
 Claims already order `critical` then `high` then `normal` then `low`.

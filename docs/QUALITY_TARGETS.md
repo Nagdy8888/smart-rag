@@ -2,7 +2,7 @@
 title: Quality, capacity, cost, and launch targets
 owner: product-owner / engineering-lead
 status: accepted
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-18
 audience: client-approver, engineering
 provenance: .cursor/plans/hybrid-graph-rag/00-global-contracts.md (provisional measurable targets)
 approval_status: accepted
@@ -245,6 +245,26 @@ Hybrid 25-second / 7-call envelope because QUALITY_TARGETS has no sixth
 deadline. Optional manifests remain three per the global contract (no
 `QT-TL-004` row).
 
+## 16. Phase 9 local candidate envelope (reduced)
+
+Phase 1 signed QT-CAP-001/002 remain 10,000 versions / 1,000,000 chunks as
+the aspiration to raise toward after measured load. Phase 9 Packet 4 proved
+foreground-plus-maintenance behavior only on the Packet 2 labeled 8-version
+/ 16-chunk subset. Live 70% CPU/IO pause did not fire. On 2026-08-18 the
+user signed the reduce so Phase 9 can close and Phase 10 can start. Details:
+[ADR-phase9-local-envelope-reduce.md](./adr/ADR-phase9-local-envelope-reduce.md)
+· [LOCAL_RELEASE_CANDIDATE.md](./deployment/LOCAL_RELEASE_CANDIDATE.md).
+
+| ID | Target | Unit | Provenance | Approval | Approver | Approval date | Measure in | On failure |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| QT-CAP-001-P9 | 8 Hybrid document versions (Packet 2 labeled subset) | document versions (reduced) | Phase 9 Packets 1-4; QT-CAP-001 | accepted | user (Cursor chat) | 2026-08-18 | Phase 9 local candidate | Do not advertise 10,000 until a signed raise with 70% isolation proof |
+| QT-CAP-002-P9 | 16 canonical chunks | chunks (reduced) | Phase 9 Packets 1-4; QT-CAP-002 | accepted | user (Cursor chat) | 2026-08-18 | Phase 9 local candidate | Do not claim 1,000,000 chunks |
+| QT-CAP-003-P9 | Unverified; not 25 concurrent users | users (reduced) | Phase 9 Packet 4 | accepted | user (Cursor chat) | 2026-08-18 | Phase 10 managed load | Do not advertise 25 users from local Docker |
+
+QT-CAP-004 = 5 simultaneous query runs remains proven on this subset.
+Graph stays [QT-CAP-005-P8](#14-packet-8-supported-graph-envelope-reduced)
+= 15. Do not claim QT-CAP-005 = 2,000 from this freeze.
+
 ## Decision record
 
 | Field | Value |
@@ -267,3 +287,5 @@ deadline. Optional manifests remain three per the global contract (no
 - [Frozen graph manifest](./graph/FROZEN_GRAPH_MANIFEST.md)
 - [Graph scaling options](./graph/SCALING_OPTIONS.md)
 - [Phase 6 graph handoff](./graph/PHASE6_HANDOFF.md)
+- [Phase 9 local envelope reduce ADR](./adr/ADR-phase9-local-envelope-reduce.md)
+- [Local release candidate](./deployment/LOCAL_RELEASE_CANDIDATE.md)

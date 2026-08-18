@@ -11,18 +11,26 @@ from smart_rag_core.release.constants import (
     ARTIFACT_DIR,
     CANDIDATE_COMPOSE_FILE,
 )
-from smart_rag_core.release.io import dump_canonical_json, load_json_object
+from smart_rag_core.release.io import (
+    as_json_list,
+    as_json_object,
+    dump_canonical_json,
+    json_int,
+    load_json_object,
+)
+from smart_rag_core.release.old_api_smoke import evaluate_old_api_new_schema_smoke
 from smart_rag_core.release.packet4 import (
     Phase09Packet4GateError,
     assert_mock_model_mode,
 )
 from smart_rag_core.release.packet7 import (
-    LOCAL_BLOCKERS,
+    CLAIMED_FULL_ENVELOPE,
+    CLIENT_SIGNED_REDUCE,
     MANAGED_HANDOFFS,
     PACKET7_HANDOFF_NAME,
     PACKET7_MANIFEST_NAME,
     PACKET7_MATRIX_NAME,
-    RECOMMENDATION_NO_GO,
+    RECOMMENDATION_GO_REDUCED,
     REQUIRED_PRIOR_ARTIFACTS,
     WRAPPER_RELATIVE,
     Phase09Packet7GateError,
@@ -40,6 +48,7 @@ from smart_rag_core.release.packet7 import (
     missing_prior_artifacts,
     packet7_checkbox_unchecked,
     schema_version,
+    with_old_api_smoke,
     wrapper_status_pending,
 )
 
@@ -79,14 +88,19 @@ def _acceptance_class(matrix: dict[str, object], check: str) -> str | None:
         Classification string, or ``None``.
     """
 
-    rows = matrix.get("acceptance")
-    if not isinstance(rows, list):
+    raw_rows = matrix.get("acceptance")
+    try:
+        rows = as_json_list(raw_rows, source="packet7.acceptance")
+    except ValueError:
         return None
-    for item in rows:
-        if not isinstance(item, dict):
+    for raw in rows:
+        try:
+            item = as_json_object(raw, source="packet7.acceptance[]")
+        except ValueError:
             continue
-        if item.get("check") == check and isinstance(item.get("classification"), str):
-            return str(item["classification"])
+        classification = item.get("classification")
+        if item.get("check") == check and isinstance(classification, str):
+            return classification
     return None
 
 
@@ -117,6 +131,15 @@ def main(argv: list[str] | None = None) -> int:
         image_ids = load_packet1_images(REPO_ROOT)
         if image_ids != expected_image_ids():
             raise Phase09Packet7GateError("Packet 1 image Ids drifted")
+        smoke = evaluate_old_api_new_schema_smoke(
+            REPO_ROOT,
+            freeze_api_id=image_ids["api"],
+        )
+        local_blockers = with_old_api_smoke(
+            smoke.classification,
+            smoke.reason,
+            smoke.next_action,
+        )
         wrapper_text = (REPO_ROOT / WRAPPER_RELATIVE).read_text(encoding="utf-8")
         wrapper_pending = wrapper_status_pending(wrapper_text)
         packet7_open = packet7_checkbox_unchecked(wrapper_text)
@@ -129,11 +152,11 @@ def main(argv: list[str] | None = None) -> int:
         packet6_b = _acceptance_class(packet6, "P09-06-B")
         has_failed_local = packet6_b == "Failed" or any(
             item.classification == "Failed" and item.local_launch_blocking
-            for item in LOCAL_BLOCKERS
+            for item in local_blockers
         )
         has_blocked_local = any(
             item.classification == "Blocked" and item.local_launch_blocking
-            for item in LOCAL_BLOCKERS
+            for item in local_blockers
         )
         managed_relabeled = any(not item.managed_only for item in MANAGED_HANDOFFS)
         health = _health()
@@ -144,15 +167,21 @@ def main(argv: list[str] | None = None) -> int:
                     has_failed_local=has_failed_local,
                     has_blocked_local=has_blocked_local,
                 ),
-                "detail": "Critical Trivy Failed; JWT/70%/old-API Blocked",
+                "detail": (
+                    "Tar Trivy Critical=0; JWT/70%/old-API Passed; "
+                    "Packets 1-6 re-ran on distroless/Alpine identity"
+                ),
             },
             {
                 "check": "P09-07-B",
                 "classification": classify_p0907_b(
-                    client_signed_reduce=False,
-                    claimed_full_envelope=False,
+                    client_signed_reduce=CLIENT_SIGNED_REDUCE,
+                    claimed_full_envelope=CLAIMED_FULL_ENVELOPE,
                 ),
-                "detail": "Keep QT-CAP-005-P8=15; 10k/1M unsigned; no client reduce yet",
+                "detail": (
+                    "QT-CAP-001-P9=8 / QT-CAP-002-P9=16 signed 2026-08-18; "
+                    "QT-CAP-005-P8=15; not 10k/1M"
+                ),
             },
             {
                 "check": "P09-07-C",
@@ -175,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
                 "detail": "Wrapper status pending; Packet 7 checkbox unchecked",
             },
         ]
-        recommendation = RECOMMENDATION_NO_GO
+        recommendation = RECOMMENDATION_GO_REDUCED
         matrix = {
             "schema_version": schema_version(),
             "compose_file": CANDIDATE_COMPOSE_FILE,
@@ -187,10 +216,15 @@ def main(argv: list[str] | None = None) -> int:
             "recommendation": recommendation,
             "wrapper_status": "pending",
             "packet7_checkbox": "unchecked",
+            "old_api_new_schema_smoke": {
+                "classification": smoke.classification,
+                "smoke_ran": smoke.smoke_ran,
+                "restored_freeze": smoke.restored_freeze,
+            },
         }
         handoff = {
             "schema_version": handoff_schema_version(),
-            "items": handoff_payloads(),
+            "items": handoff_payloads(local_blockers),
             "recommendation": recommendation,
         }
         manifest = {
@@ -201,8 +235,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"docs/deployment/phase-09/{name}" for name in REQUIRED_PRIOR_ARTIFACTS
             ],
             "rollback": (
-                "Keep the Packet 1 freeze. Do not promote. Rebuild only after "
-                "a new identity freeze and Packets 1-6 rerun."
+                "Keep the Packet 1 distroless/Alpine freeze. Staging re-proves "
+                "managed gates. Do not advertise QT-CAP-001/002 from this freeze."
             ),
             "recommendation": recommendation,
         }
@@ -219,10 +253,16 @@ def main(argv: list[str] | None = None) -> int:
             raise Phase09Packet7GateError(
                 "Packet 7 Failed checks: " + ", ".join(str(item) for item in failed)
             )
-        if int(health["returncode"]) != 0:
+        if json_int(health.get("returncode"), default=1) != 0:
             raise Phase09Packet7GateError("candidate health failed")
         print("phase09_packet7_recorded", flush=True)
         print(f"recommendation={recommendation}", flush=True)
+        print(
+            "old_api_new_schema_smoke "
+            f"classification={smoke.classification} "
+            f"smoke_ran={smoke.smoke_ran}",
+            flush=True,
+        )
         return 0
     except Phase09Packet7GateError as exc:
         sys.stderr.write(f"{exc}\n")

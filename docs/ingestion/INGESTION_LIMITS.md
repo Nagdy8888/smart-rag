@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-18
 audience: engineering, ops
 ---
 
@@ -10,7 +10,7 @@ audience: engineering, ops
 
 Single source of truth for Phase 3 durable job, worker, admission, and graph-handoff bounds. Values fixed by [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) or the global contract require ADR approval to change. Unspecified defaults are conservative placeholders with explicit review triggers.
 
-Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [MAPPING.md](../graph/MAPPING.md)
+Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [MAPPING.md](../graph/MAPPING.md) · [06-database-workload-isolation.md](../architecture/06-database-workload-isolation.md)
 
 ## Limit registry
 
@@ -23,6 +23,7 @@ Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](..
 | Worker concurrency | jobs | 2 | 8 | Plan Packet 2; provisional single-host | worker | Poll/claim bounded | CPU/memory saturation on launch hardware |
 | Pending ingestion cap | jobs | 100 | 100 | Plan Packet 2 backpressure | admission | `JobAdmissionError` on enqueue | Sustained cap hits >1h/day |
 | Graph index handoff pause | pending `index` jobs | 50 | 50 | Plan Packet 2 graph-handoff pause | admission/claim | Block new `index` claims; allow remove/ACL/rebuild | Pending handoffs >50 for >30m |
+| Maintenance user-load pause | CPU/IO/memory percent | 70 | 70 | Global contracts; QT-LAT-001 p95 | HNSW/LightRAG rebuild/BM25 subset rebuild | Skip maintenance; rebuild jobs fail transient `maintenance_paused` | Live 8-doc Packet 4 stayed at 3.06% CPU; fixture-proven only |
 | Max job attempts | count | 8 | 8 | Phase 2 schema default | worker | Dead-letter after exhaustion | >5% jobs exhaust attempts |
 | Retry backoff base | seconds | 30 | 300 | Measured conservative | worker | `next_attempt_at` scheduling | Retry storm under outage |
 | Retry backoff ceiling | seconds | 3600 | 86400 | Measured conservative | worker | Caps delay before reclaim | Oldest pending retry >24h |
@@ -73,6 +74,16 @@ Claim ordering is deterministic: `critical` → `high` → `normal` → `low`, t
 
 When `COUNT(*) FROM app.lightrag_index_jobs WHERE status = 'pending' AND operation = 'index'` exceeds **50**, `app.claim_lightrag_index_job` skips new `index` operations while still claiming `remove`, `graph_acl_remove`, and `rebuild`.
 
+## Maintenance user-load pause
+
+HNSW `REINDEX`, LightRAG `rebuild`, and Packet 4 BM25 subset rebuild call
+`MaintenancePauseController` before starting work. The trigger is **70%**
+database CPU, IO, or memory, or Hybrid first-evidence p95 above QT-LAT-001
+(2000 ms). Missing or invalid telemetry is fail-closed on those gated
+paths. Fixture tests prove the 70% fire. Live Packet 4 8-doc CPU peaked at
+3.06% and remains **Blocked**. Do not claim QT-CAP-001/002 from that subset.
+See [06-database-workload-isolation.md](../architecture/06-database-workload-isolation.md).
+
 ## Budget admission
 
 Daily ingestion spend uses durable `app.budget_reservations` with `reservation_kind = 'ingestion_daily'`. Enqueue reserves an estimated USD amount against `app.company_settings.daily_ingestion_budget_usd` (default from QT-COST-002). Completion/failure true-ups adjust committed/released amounts without bypassing the daily cap.
@@ -106,7 +117,9 @@ Graph mutations use separate kinds: `graph_index` (daily cap `daily_graph_index_
 | Crawl policy version | text | `crawl_v1` | — | Packet 4 sign-off | worker | deny crawl | Policy drift |
 | Egress path | policy | crawl-proxy only | — | ADR deny-by-default | infra | block job | Direct egress probe |
 
-Crawl proxy image: built from `infra/crawl-proxy` (Python 3.11 slim + `brotli==1.1.0`). Only `crawl-proxy` joins the non-internal `egress` Compose network; API/worker/parser remain on `private` without public routes.
+Crawl proxy image: built from `infra/crawl-proxy` (trixie builder, distroless
+runtime, `brotli==1.1.0`). Only `crawl-proxy` joins the non-internal `egress`
+Compose network; API/worker/parser remain on `private` without public routes.
 
 Primary references: [RFC 9309 robots](https://www.rfc-editor.org/rfc/rfc9309.html), [Python urllib.robotparser](https://docs.python.org/3/library/urllib.robotparser.html), [httpx redirects](https://www.python-httpx.org/compatibility/#redirects) (disabled; manual hop revalidation), [ipaddress](https://docs.python.org/3/library/ipaddress.html).
 

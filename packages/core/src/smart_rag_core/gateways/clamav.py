@@ -192,7 +192,7 @@ class ClamAvClient:
         )
 
     def _command(self, payload: bytes) -> bytes:
-        """Send one ``clamd`` command and read the full response."""
+        """Send one ``clamd`` z-protocol command and read the NUL-terminated reply."""
 
         try:
             with socket.create_connection(
@@ -201,15 +201,9 @@ class ClamAvClient:
             ) as sock:
                 sock.sendall(payload)
                 sock.shutdown(socket.SHUT_WR)
-                chunks: list[bytes] = []
-                while True:
-                    part = sock.recv(4096)
-                    if not part:
-                        break
-                    chunks.append(part)
+                return _recv_until_nul(sock)
         except OSError as exc:
             raise ClamAvError(f"clamd transport failure: {exc}") from exc
-        return b"".join(chunks)
 
     def _instream(self, data: bytes) -> bytes:
         """Execute ``INSTREAM`` for one byte sequence."""
@@ -227,16 +221,37 @@ class ClamAvClient:
                     sock.sendall(chunk)
                     offset += len(chunk)
                 sock.sendall(struct.pack("!I", 0))
-                sock.shutdown(socket.SHUT_WR)
-                chunks: list[bytes] = []
-                while True:
-                    part = sock.recv(4096)
-                    if not part:
-                        break
-                    chunks.append(part)
+                return _recv_until_nul(sock)
         except OSError as exc:
             raise ClamAvError(f"clamd instream failure: {exc}") from exc
-        return b"".join(chunks)
+
+
+def _recv_until_nul(sock: socket.socket) -> bytes:
+    """Read one clamd z-protocol reply, stopping at the first NUL.
+
+    clamd keeps the TCP session open after ``zCOMMAND`` replies. Reading until
+    EOF therefore blocks until the socket timeout instead of returning ``PONG``,
+    ``VERSION``, ``STATS``, or ``INSTREAM`` results.
+
+    Args:
+        sock: Connected clamd socket with a read timeout.
+
+    Returns:
+        Raw reply bytes including the terminating NUL when present.
+
+    Raises:
+        OSError: When the socket read fails.
+    """
+
+    chunks: list[bytes] = []
+    while True:
+        part = sock.recv(4096)
+        if not part:
+            break
+        chunks.append(part)
+        if b"\x00" in part:
+            break
+    return b"".join(chunks)
 
 
 def _clamd_text(raw: bytes) -> str:

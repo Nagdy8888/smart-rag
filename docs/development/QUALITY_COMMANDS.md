@@ -93,8 +93,12 @@ candidate suite rows are not clobbered. Do not set
 `SMART_RAG_HOLDOUT_ACCESS=true`. `check_schema_determinism.py` wipes Packet 1
 seed; reseed immediately with `phase09_candidate.py seed` on candidate compose
 only (worker `exec` copies artifacts; `compose cp` cannot see worker `/tmp`
-tmpfs). Old-API/new-schema authenticated smoke has no existing repository
-script; Packet 2 records it Blocked rather than inventing a pass. Managed
+tmpfs). Old-API/new-schema authenticated smoke is
+`scripts/ci/check_old_api_new_schema_smoke.py` plus
+`smart_rag_core.release.old_api_smoke`. Unset or missing
+`SMART_RAG_OLD_API_IMAGE` classifies Blocked (not a pytest skip and not
+zero-collection success). The env must not equal the Packet 1 freeze API
+Id. Packet 2/7 consume that classification. Managed
 JWKS/CDN/KMS/OIDC/restore/assessment stay Phase 10 handoffs. Do not retry
 Trivy via docker.sock.
 
@@ -164,9 +168,9 @@ tests, Packet 2 corpus-identity drift, or Packet 1 image-Id drift. Candidate
 compose is `docker-compose.yml` only. It kills, denies, fills, and restarts
 worker/ParadeDB/Valkey, then restores them. It does not destroy the ParadeDB
 volume (Packet 6), rebuild images, or set `SMART_RAG_HOLDOUT_ACCESS=true`.
-Named Valkey ACL users and managed CDN SSE faults stay Phase 10. Live docker
-EventSource remains JWT-blocked for Packet 7; ASGI resume/heartbeat is the
-local proof.
+Named Valkey ACL users and managed CDN SSE faults stay Phase 10. Packet 5
+ASGI resume/heartbeat is the local Packet 5 proof. Live docker EventSource
+JWT iss split was repaired in Packet 7 (`APP_ENV=local` hostname pair).
 
 ```powershell
 uv run python scripts/ci/check_phase09_packet5.py
@@ -188,9 +192,20 @@ uv run python scripts/phase09_candidate.py health
 The Phase 9 Packet 7 gate is local-only. It classifies remaining local
 blockers and the Phase 10 managed handoff. It does not rebuild images, open
 holdout, check the Packet 7 checkbox, or set the Phase 9 wrapper complete.
-Unresolved Critical Trivy findings keep P09-07-A Failed (no-go).
+After Phase 9 close, re-running this script fails P09-07-E because the
+wrapper is complete; that is expected. Unresolved Critical Trivy findings
+keep P09-07-A Failed (no-go). The distroless/Alpine freeze reports
+Critical=0. Old-API smoke uses the running Compose ``api`` image as the
+current slot. Set `SMART_RAG_OLD_API_IMAGE` to a prior digest that is not
+that running Id. The advertised envelope is QT-CAP-001-P9 / QT-CAP-002-P9.
+Live 70% pause is measured with:
 
 ```powershell
+uv run python scripts/ci/check_phase09_seventy_live.py
+```
+
+```powershell
+uv run python scripts/ci/check_old_api_new_schema_smoke.py
 uv run python scripts/ci/check_phase09_packet7.py
 uv run python scripts/phase09_candidate.py health
 ```

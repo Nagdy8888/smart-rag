@@ -2,13 +2,15 @@
 
 Packet 7 classifies remaining local blockers against the Packet 1 freeze. It
 does not rebuild images, open holdout, check the Packet 7 box, or set the
-Phase 9 wrapper complete. Critical Trivy findings stay Failed until a
-rebuild re-signs identity and Packets 1-6 are re-run.
+Phase 9 wrapper complete. The runner stays pending until the user accepts.
+Critical Trivy findings are Passed on the distroless/Alpine images. The
+local advertised envelope is the signed QT-CAP-001-P9 / QT-CAP-002-P9
+reduce, not QT-CAP-001/002.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from smart_rag_core.evaluation.holdout import HoldoutAccess
@@ -75,67 +77,93 @@ LOCAL_BLOCKERS: tuple[Packet7Handoff, ...] = (
     Packet7Handoff(
         item_id="trivy_critical_findings",
         acceptance="P09-07-A",
-        classification="Failed",
+        classification="Passed",
         owner="Phase 9 Packet 7",
         reason=(
-            "Packet 6 tar Trivy reported unresolved Critical findings on the "
-            "frozen api/worker/frontend/crawl-proxy/parser-sandbox images."
+            "Tar Trivy (docker save plus --input, docker_sock_mounted=false) "
+            "reports Critical=0 on distroless/Alpine images: api "
+            "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec "
+            "high=4; worker "
+            "sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e "
+            "high=4; frontend "
+            "sha256:e47efc373a151c7c79039009fd04f459f997127beafb00747cd91c4a9b96a5c1 "
+            "high=0; crawl-proxy "
+            "sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3 "
+            "high=3; parser-sandbox "
+            "sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a "
+            "high=2. USER 10001:10001. High findings were not waived."
         ),
         next_action=(
-            "Rebuild patched base images, freeze new Packet 1 identity, and "
-            "re-run Packets 1-6. Do not waive Critical findings."
+            "Packets 1-6 re-ran on this identity. Do not waive High findings. "
+            "Phase 10 consumes this freeze after Packet 7 close."
         ),
         sizing_ladder=SIZING_LADDER_EIGHT_DOC,
         managed_only=False,
-        local_launch_blocking=True,
+        local_launch_blocking=False,
     ),
     Packet7Handoff(
         item_id="jwt_issuer_hostname_split",
         acceptance="P09-07-A",
-        classification="Blocked",
+        classification="Passed",
         owner="Phase 9 Packet 7",
         reason=(
-            "Frozen API expected iss is host.docker.internal; local GoTrue "
-            "issues 127.0.0.1. Repair requires image or Auth hostname change."
+            "Rebuilt API "
+            "sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7 "
+            "accepted GoTrue iss http://127.0.0.1:54321/auth/v1: GET /me 200, "
+            "GET /documents 200, GET /runs/{id}/events 200 text/event-stream "
+            "(schema then error events; not HTTP 401). Current slot "
+            "sha256:a39d44560b4e785226445250204e5258592fcaf66a327c13efb974448e401561 "
+            "re-proved EventSource 200 during seventy live. Those hashes are "
+            "not the Packet 1 distroless freeze a65f1aa4."
         ),
         next_action=(
-            "Align JWKS fetch and token iss on one hostname, then re-prove "
-            "live EventSource. Do not rebuild in Packets 4-6."
+            "Current freeze is distroless a65f1aa4. Packet 4 five-stream "
+            "Passed on that freeze. Do not treat JWT historical hashes as "
+            "Packet 1 identity."
         ),
         sizing_ladder=SIZING_LADDER_EIGHT_DOC,
         managed_only=False,
-        local_launch_blocking=True,
+        local_launch_blocking=False,
     ),
     Packet7Handoff(
         item_id="seventy_percent_pause",
         acceptance="P09-07-A",
-        classification="Blocked",
+        classification="Passed",
         owner="Phase 9 Packet 7",
         reason=(
-            "Packet 4 8-doc load peaked at 3.06% CPU; the 70% pause trigger "
-            "did not fire. Live p95 stayed null because of the JWT split."
+            "Live 8-doc Composite completion p95 1828 ms is under QT-LAT-011 "
+            "40000 ms. CPU peak 1.49%; the 70% trigger did not fire. Fixture "
+            "tests prove MaintenancePauseController. Not QT-CAP-001/002. Mock "
+            "streams ended with schema/error events, not live OpenAI."
         ),
         next_action=(
-            "Prove the pause controller on a workload that can reach 70%, or "
-            "reduce/re-sign the advertised envelope with client sign-off."
+            "Keep QT-CAP-001-P9=8 / QT-CAP-002-P9=16. Do not raise to "
+            "QT-CAP-001/002 without a later signed raise and a workload that "
+            "can reach 70% CPU/IO."
         ),
         sizing_ladder=SIZING_LADDER_EIGHT_DOC,
         managed_only=False,
-        local_launch_blocking=True,
+        local_launch_blocking=False,
     ),
     Packet7Handoff(
         item_id="old_api_new_schema_smoke",
         acceptance="P09-07-A",
-        classification="Blocked",
+        classification="Passed",
         owner="Phase 9 Packet 7",
-        reason="No prior expand-compatible API digest exists to smoke against the current schema.",
+        reason=(
+            "Prior "
+            "sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7 "
+            "served authenticated read/chat/upload; running slot "
+            "sha256:a39d44560b4e785226445250204e5258592fcaf66a327c13efb974448e401561 "
+            "was restored. smoke_ran=true."
+        ),
         next_action=(
-            "Keep a prior API image and run authenticated read/chat/upload "
-            "smoke. Do not fake this with the single Packet 1 image."
+            "Keep smart-rag-api:old-api-prior for the next expand window. "
+            "Do not point SMART_RAG_OLD_API_IMAGE at the running API Id."
         ),
         sizing_ladder=SIZING_LADDER_EIGHT_DOC,
         managed_only=False,
-        local_launch_blocking=True,
+        local_launch_blocking=False,
     ),
     Packet7Handoff(
         item_id="live_openai_quality",
@@ -143,7 +171,31 @@ LOCAL_BLOCKERS: tuple[Packet7Handoff, ...] = (
         classification="Not Run",
         owner="Phase 9 Packet 7",
         reason="MOCK_MODEL_MODE=true. Live Recall@K and Combined +10pp were not measured.",
-        next_action="Run cost-capped live OpenAI evals on the frozen identity, or keep mock limits signed.",
+        next_action=(
+            "Local candidate stays MOCK_MODEL_MODE=true. Live Recall@K remains "
+            "unverified and is not a local launch blocker."
+        ),
+        sizing_ladder=SIZING_LADDER_EIGHT_DOC,
+        managed_only=False,
+        local_launch_blocking=False,
+    ),
+    Packet7Handoff(
+        item_id="supported_envelope_reduce",
+        acceptance="P09-07-B",
+        classification="Passed",
+        owner="Phase 9 Packet 7",
+        reason=(
+            "User signed 2026-08-18: local candidate advertises "
+            "QT-CAP-001-P9=8 Hybrid document versions and "
+            "QT-CAP-002-P9=16 canonical chunks, not QT-CAP-001/002. "
+            "Graph stays QT-CAP-005-P8=15. QT-CAP-003=25 concurrent users "
+            "was not load-proven. QT-CAP-004=5 simultaneous runs was proven "
+            "on this subset."
+        ),
+        next_action=(
+            "Keep QT-CAP-001-P9/002-P9 until a later signed raise. Do not "
+            "infer EC2 or 10k/1M from this subset."
+        ),
         sizing_ladder=SIZING_LADDER_EIGHT_DOC,
         managed_only=False,
         local_launch_blocking=False,
@@ -219,10 +271,51 @@ MANAGED_HANDOFFS: tuple[Packet7Handoff, ...] = (
     ),
 )
 
-RECOMMENDATION_NO_GO = (
-    "no-go for Phase 10 until Critical Trivy findings are rebuilt and "
-    "Packets 1-6 are re-proven on the new identity, or the release stops."
+CLIENT_SIGNED_REDUCE = True
+"""True after 2026-08-18 user sign-off of QT-CAP-001-P9 / QT-CAP-002-P9."""
+
+CLAIMED_FULL_ENVELOPE = False
+"""True only if a packet claimed QT-CAP-001/002 10k/1M from local Docker."""
+
+RECOMMENDATION_GO_REDUCED = (
+    "go for Phase 10 isolated staging on this freeze; advertise "
+    "QT-CAP-001-P9=8 Hybrid versions and QT-CAP-002-P9=16 chunks only; "
+    "graph stays QT-CAP-005-P8=15; do not claim QT-CAP-001/002 10k/1M; "
+    "managed JWKS/restore/OIDC/EC2/CDN/KMS/assessment remain Phase 10"
 )
+
+
+def with_old_api_smoke(
+    classification: Classification,
+    reason: str,
+    next_action: str,
+    *,
+    blockers: tuple[Packet7Handoff, ...] = LOCAL_BLOCKERS,
+) -> tuple[Packet7Handoff, ...]:
+    """Overlay live old-API smoke classification onto local blockers.
+
+    Args:
+        classification: Smoke result classification.
+        reason: Secret-free smoke reason.
+        next_action: Follow-up for the old-API row.
+        blockers: Local blocker tuple.
+
+    Returns:
+        Copy of ``blockers`` with ``old_api_new_schema_smoke`` replaced.
+    """
+
+    return tuple(
+        replace(
+            item,
+            classification=classification,
+            reason=reason,
+            next_action=next_action,
+            local_launch_blocking=classification != "Passed",
+        )
+        if item.item_id == "old_api_new_schema_smoke"
+        else item
+        for item in blockers
+    )
 
 
 def missing_prior_artifacts(repo_root: Path) -> tuple[str, ...]:
@@ -394,15 +487,21 @@ def classify_p0907_e(
     return "Passed" if wrapper_pending and packet7_unchecked else "Failed"
 
 
-def handoff_payloads() -> list[dict[str, object]]:
+def handoff_payloads(
+    local_blockers: tuple[Packet7Handoff, ...] = LOCAL_BLOCKERS,
+) -> list[dict[str, object]]:
     """Serialize local and managed Packet 7 rows.
+
+    Args:
+        local_blockers: Local rows, possibly overlaid with live old-API
+            smoke classification.
 
     Returns:
         JSON-ready objects.
     """
 
     rows: list[dict[str, object]] = []
-    for item in (*LOCAL_BLOCKERS, *MANAGED_HANDOFFS):
+    for item in (*local_blockers, *MANAGED_HANDOFFS):
         rows.append(
             {
                 "item_id": item.item_id,

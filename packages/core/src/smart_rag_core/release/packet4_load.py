@@ -15,6 +15,10 @@ from uuid import UUID, uuid4
 import psycopg
 
 from smart_rag_core.jobs.graph_writer import graph_advisory_lock_keys
+from smart_rag_core.jobs.maintenance_pause import (
+    DatabasePressureSample,
+    evaluate_maintenance_pause,
+)
 from smart_rag_core.query_admission.payload import hash_query_admission_payload
 from smart_rag_core.query_admission.service import admit_query_run
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
@@ -29,6 +33,7 @@ from smart_rag_core.release.packet4 import (
     QT_LAT_009_MS,
     QT_LAT_010_MS,
     QT_LAT_011_MS,
+    RUNTIME_PAUSE_CONTROLLER,
     SELECTED_TIER_HARD_LIMIT,
     SIZING_LADDER_SEVENTY,
     WORST_CASE_CAPS,
@@ -132,16 +137,37 @@ def measure_supabase_pools(connection: psycopg.Connection) -> dict[str, object]:
     }
 
 
-def reindex_hnsw(connection: psycopg.Connection) -> dict[str, object]:
+def reindex_hnsw(
+    connection: psycopg.Connection,
+    *,
+    pressure: DatabasePressureSample | None = None,
+) -> dict[str, object]:
     """Rebuild the canonical chunk HNSW index on the 8-doc subset.
 
     Args:
         connection: Autocommit postgres connection.
+        pressure: Injected database CPU/IO/memory and optional Hybrid p95.
+            Missing telemetry pauses fail-closed and skips REINDEX.
 
     Returns:
-        Duration and success flag. Sample is 16 chunks, not 1M.
+        Duration, pause decision, and success flag. Sample is 16 chunks,
+        not 1M. Do not claim QT-CAP-001/002.
     """
 
+    decision = evaluate_maintenance_pause(pressure, require_telemetry=True)
+    if decision.paused:
+        return {
+            "index": _HNSW_INDEX,
+            "elapsed_ms": 0.0,
+            "passed": True,
+            "paused": True,
+            "reindex_executed": False,
+            "trigger_70_percent_fired": decision.trigger_70_percent_fired,
+            "fail_closed": decision.fail_closed,
+            "pause_reasons": list(decision.reasons),
+            "sample_is_eight_doc_subset": True,
+            "detail": "maintenance_paused_before_reindex",
+        }
     started = time.monotonic()
     connection.autocommit = True
     connection.execute("SET ROLE postgres")
@@ -152,6 +178,11 @@ def reindex_hnsw(connection: psycopg.Connection) -> dict[str, object]:
             "index": _HNSW_INDEX,
             "elapsed_ms": elapsed_ms,
             "passed": True,
+            "paused": False,
+            "reindex_executed": True,
+            "trigger_70_percent_fired": False,
+            "fail_closed": False,
+            "pause_reasons": [],
             "sample_is_eight_doc_subset": True,
             "detail": "REINDEX on seeded chunks, not the 1M envelope",
         }
@@ -160,6 +191,11 @@ def reindex_hnsw(connection: psycopg.Connection) -> dict[str, object]:
             "index": _HNSW_INDEX,
             "elapsed_ms": (time.monotonic() - started) * 1000.0,
             "passed": False,
+            "paused": False,
+            "reindex_executed": False,
+            "trigger_70_percent_fired": False,
+            "fail_closed": False,
+            "pause_reasons": [],
             "sample_is_eight_doc_subset": True,
             "detail": type(exc).__name__,
         }
@@ -361,6 +397,7 @@ def rebuild_bm25_subset(
     parade_url: str,
     triples: Sequence[tuple[str, UUID, UUID]],
     limit: int = 3,
+    pressure: DatabasePressureSample | None = None,
 ) -> dict[str, object]:
     """Re-run BM25 projection on a bounded Packet 2 subset during load.
 
@@ -369,11 +406,29 @@ def rebuild_bm25_subset(
         parade_url: Worker-reachable ParadeDB writer URL.
         triples: Corpus triples.
         limit: Maximum versions to rebuild in this window.
+        pressure: Injected database pressure. Missing telemetry pauses
+            fail-closed and skips projection.
 
     Returns:
-        Rebuild summary. Sample remains the 8-doc subset.
+        Rebuild summary. Sample remains the 8-doc subset. Not QT-CAP-002.
     """
 
+    decision = evaluate_maintenance_pause(pressure, require_telemetry=True)
+    if decision.paused:
+        return {
+            "attempted": 0,
+            "passed": 0,
+            "skipped": 0,
+            "failed": 0,
+            "elapsed_ms": 0.0,
+            "paused": True,
+            "rebuild_executed": False,
+            "trigger_70_percent_fired": decision.trigger_70_percent_fired,
+            "fail_closed": decision.fail_closed,
+            "pause_reasons": list(decision.reasons),
+            "sample_is_eight_doc_subset": True,
+            "driver": "Bm25ProjectionService.process_upsert_job",
+        }
     selected = list(triples[:limit])
     started = time.monotonic()
     passed = 0
@@ -403,6 +458,11 @@ def rebuild_bm25_subset(
         "skipped": skipped,
         "failed": failed,
         "elapsed_ms": (time.monotonic() - started) * 1000.0,
+        "paused": False,
+        "rebuild_executed": True,
+        "trigger_70_percent_fired": False,
+        "fail_closed": False,
+        "pause_reasons": [],
         "sample_is_eight_doc_subset": True,
         "driver": "Bm25ProjectionService.process_upsert_job",
     }
@@ -438,10 +498,7 @@ def classify_seventy_percent(
         "passed": passed,
         "sample_is_eight_doc_subset": True,
         "sizing_ladder": SIZING_LADDER_SEVENTY,
-        "runtime_pause_controller": (
-            "No in-process 70% pause controller was observed. Architecture "
-            "docs define the trigger; Packet 4 measures whether it fires."
-        ),
+        "runtime_pause_controller": RUNTIME_PAUSE_CONTROLLER,
     }
 
 
@@ -464,6 +521,41 @@ def parse_cpu_percent(raw: object) -> float | None:
         return float(stripped)
     except ValueError:
         return None
+
+
+def pressure_sample_from_docker_rows(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    hybrid_p95_ms: float | None = None,
+) -> DatabasePressureSample | None:
+    """Build a pressure sample from one ``docker stats`` snapshot.
+
+    Args:
+        rows: Per-container stats objects.
+        hybrid_p95_ms: Optional live Hybrid first-evidence p95.
+
+    Returns:
+        Sample using peak CPU and memory percents, or ``None`` when every
+        container lacks both readings.
+    """
+
+    cpu_values: list[float] = []
+    mem_values: list[float] = []
+    for row in rows:
+        cpu = parse_cpu_percent(row.get("CPUPerc"))
+        mem = parse_cpu_percent(row.get("MemPerc"))
+        if cpu is not None:
+            cpu_values.append(cpu)
+        if mem is not None:
+            mem_values.append(mem)
+    if not cpu_values and not mem_values:
+        return None
+    return DatabasePressureSample(
+        cpu_percent=max(cpu_values) if cpu_values else None,
+        io_percent=None,
+        memory_percent=max(mem_values) if mem_values else None,
+        hybrid_p95_ms=hybrid_p95_ms,
+    )
 
 
 def parse_mem_usage_bytes(raw: object) -> int | None:

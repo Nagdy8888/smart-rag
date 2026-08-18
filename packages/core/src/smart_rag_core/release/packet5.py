@@ -187,15 +187,16 @@ HANDOFFS: tuple[Packet5Handoff, ...] = (
     Packet5Handoff(
         item_id="jwt_issuer_hostname_split",
         acceptance="P09-05-D",
-        classification="Blocked",
+        classification="Passed",
         owner="Phase 9 Packet 7",
         reason=(
-            "Frozen API expected iss is host.docker.internal; local GoTrue "
-            "issues 127.0.0.1. Live docker EventSource stays 401."
+            "Rebuilt API accepted GoTrue 127.0.0.1 iss on live /me, "
+            "/documents, and EventSource 200. Packet 1 freeze remains "
+            "invalid; Packet 5 identity was not re-signed."
         ),
         next_action=(
-            "Repair JWKS-URL vs iss split without rebuilding Packet 1 images "
-            "unless Packet 7 explicitly resigns identity."
+            "Re-run Packet 5 resume/EventSource only after a new Packet 1 "
+            "freeze. Do not reuse the deleted pre-repair API digest."
         ),
         sizing_ladder=SIZING_LADDER_JWT,
         managed_only=False,

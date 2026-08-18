@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from smart_rag_core.gateways.storage import StorageGateway
+from smart_rag_core.gateways.storage import StorageGateway, StorageGatewayError
 from smart_rag_core.ingestion.tables.limits import TABLE_ARTIFACT_BUCKET
 
 
@@ -58,6 +58,10 @@ def upload_table_artifact(
 
     Raises:
         StorageGatewayError: When upload or verification fails.
+
+    Idempotency:
+        A prior identical object (same hash and size) is treated as success so
+        hybrid-index retries do not fail on immutable ``x-upsert: false``.
     """
 
     path = table_artifact_storage_path(
@@ -66,12 +70,21 @@ def upload_table_artifact(
         sheet_name=sheet_name,
         filename=filename,
     )
-    gateway.upload_object(
-        bucket=TABLE_ARTIFACT_BUCKET,
-        object_path=path,
-        data=parquet_bytes,
-        content_type="application/vnd.apache.parquet",
-    )
+    try:
+        gateway.upload_object(
+            bucket=TABLE_ARTIFACT_BUCKET,
+            object_path=path,
+            data=parquet_bytes,
+            content_type="application/vnd.apache.parquet",
+        )
+    except StorageGatewayError:
+        gateway.verify_object(
+            bucket=TABLE_ARTIFACT_BUCKET,
+            object_path=path,
+            expected_hash=expected_hash,
+            expected_bytes=len(parquet_bytes),
+        )
+        return path
     gateway.verify_object(
         bucket=TABLE_ARTIFACT_BUCKET,
         object_path=path,

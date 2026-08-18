@@ -2,7 +2,7 @@
 title: Identity propagation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-18
 audience: engineering, security, reviewers
 ---
 
@@ -50,6 +50,13 @@ FastAPI dependency: `apps/backend/src/smart_rag_api/dependencies/identity.py`.
 
 - Reads `Authorization: Bearer` and verifies through
   `packages/core/src/smart_rag_core/security/jwks.py`.
+  JWKS is always fetched from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`.
+  When `APP_ENV=local` and `SUPABASE_URL` is `http://127.0.0.1:54321` or
+  `http://host.docker.internal:54321`, `iss` may be either
+  `http://127.0.0.1:54321/auth/v1` or
+  `http://host.docker.internal:54321/auth/v1`. Other environments require
+  `iss` to equal `{SUPABASE_URL}/auth/v1`. HS256 remains forbidden. Arbitrary
+  issuers are rejected.
 - Loads profile + company settings via `app_api` Postgres reads.
 - Rejects disabled users, revoked sessions, and missing MFA for
   owner/admin/upload-capable members.
@@ -157,6 +164,7 @@ sequenceDiagram
 
 ## Related documents
 
+- [CONFIGURATION.md](../development/CONFIGURATION.md)
 - [AUTHORIZATION_MODEL.md](./AUTHORIZATION_MODEL.md)
 - [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
 - [05-database-connections.md](../architecture/05-database-connections.md)

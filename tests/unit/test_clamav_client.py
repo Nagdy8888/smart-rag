@@ -25,6 +25,10 @@ _parse_stats = cast(
     module_attr(clamav_mod, "_parse_stats"),
 )
 _clamd_text = cast(Callable[[bytes], str], module_attr(clamav_mod, "_clamd_text"))
+_recv_until_nul = cast(
+    Callable[[object], bytes],
+    module_attr(clamav_mod, "_recv_until_nul"),
+)
 _parse_version_signature_timestamp = cast(
     Callable[[str], datetime | None],
     module_attr(clamav_mod, "_parse_version_signature_timestamp"),
@@ -59,7 +63,18 @@ def test_parse_scan_response_maps_ok_to_clean() -> None:
     assert threat is None
 
 
-def test_ping_accepts_null_terminated_pong() -> None:
+def test_recv_until_nul_stops_without_eof() -> None:
+    """z-protocol replies are complete at NUL; the socket may stay open."""
+
+    class _OpenAfterNul:
+        def __init__(self) -> None:
+            self._chunks = [b"PONG\x00", b"SHOULD_NOT_READ"]
+
+        def recv(self, _size: int) -> bytes:
+            return self._chunks.pop(0) if self._chunks else b""
+
+    received = _recv_until_nul(_OpenAfterNul())
+    assert received == b"PONG\x00"
     """Live clamd z-protocol terminates ``PONG`` with NUL."""
 
     assert _clamd_text(b"PONG\x00") == "PONG"

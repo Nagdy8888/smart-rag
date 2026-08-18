@@ -6,7 +6,7 @@
   "embedding_dimensions": 1024,
   "embedding_model": "text-embedding-3-large",
   "frozen_retrieval_profile_id": "hybrid_default_v1",
-  "git_commit_sha": "7438b54abe70a57652f85c90f678d5ad2f58192a",
+  "git_commit_sha": "f3a6960aa8feb454a420376002a485e6ee6a6739",
   "git_dirty": true,
   "graph_pipeline_version": "graph_pipeline_v1",
   "lightrag_handoff_version": "lightrag_v1",
@@ -217,6 +217,10 @@
     {
       "filename": "20260816210000_query_memory_store_reaper_v1.sql",
       "sha256": "82b1a52f8b62624a2f48b53244aa73bd5a8e13f620ee181aa3b5b25c060ab73c"
+    },
+    {
+      "filename": "20260818140000_document_scan_events_worker_rls_v1.sql",
+      "sha256": "64a50919f921956f5a7c0ccc0ee31b22a3a25219d415a001fb6576421a0eaaa4"
     }
   ],
   "mock_model_mode": true,

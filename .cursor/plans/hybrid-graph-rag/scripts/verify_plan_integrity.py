@@ -250,6 +250,10 @@ def validate_phase_structure(errors: list[str]) -> None:
 def validate_split_packets(errors: list[str]) -> None:
     """Validate linked packet contracts for split-source phases.
 
+    Packet front matter may be ``pending`` while work is open or ``complete``
+    after the wrapper checkbox is checked. Wrapper ``status: complete`` is a
+    separate phase-exit marker.
+
     Args:
         errors: Mutable error accumulator.
     """
@@ -312,8 +316,11 @@ def validate_split_packets(errors: list[str]) -> None:
                 errors,
             )
             require(
-                "status: pending" in packet_text,
-                f"{repo_relative(packet_path)} must remain pending",
+                "status: pending" in packet_text or "status: complete" in packet_text,
+                (
+                    f"{repo_relative(packet_path)} must declare status pending "
+                    "or complete"
+                ),
                 errors,
             )
             require(

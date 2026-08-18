@@ -1,7 +1,7 @@
 ---
 phase: 9
 packet: 6
-status: pending
+status: complete
 title: "Run local egress enforcement, dependency/image scans, Supabase database plus all Storage-bucket restore/reconciliation including LightRAG, clean ParadeDB projection rebuild, and instance-equivalent sizing evidence."
 requirement_ids: [P09-06]
 ---

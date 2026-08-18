@@ -1,0 +1,131 @@
+{
+  "api_base": "http://127.0.0.1:8000",
+  "busy_loop": false,
+  "cpu_peaks": [
+    0.13,
+    1.27,
+    0.0,
+    0.01,
+    0.0,
+    0.0,
+    0.15,
+    0.14,
+    0.16,
+    1.49,
+    0.0,
+    0.01,
+    0.0,
+    0.01,
+    0.18,
+    0.18
+  ],
+  "holdout_opened": false,
+  "live": {
+    "detail": null,
+    "inspect_ms": 108.99999999674037,
+    "inspect_ok": true,
+    "inspect_status": 200,
+    "jwt_eventsource_401": false,
+    "passed": true,
+    "stream_http": [
+      {
+        "events": [
+          "schema",
+          "error"
+        ],
+        "status_code": 200,
+        "terminal": true
+      },
+      {
+        "events": [
+          "schema",
+          "error"
+        ],
+        "status_code": 200,
+        "terminal": true
+      },
+      {
+        "events": [
+          "schema",
+          "error"
+        ],
+        "status_code": 200,
+        "terminal": true
+      },
+      {
+        "events": [
+          "schema",
+          "error"
+        ],
+        "status_code": 200,
+        "terminal": true
+      },
+      {
+        "events": [
+          "schema",
+          "error"
+        ],
+        "status_code": 200,
+        "terminal": true
+      }
+    ],
+    "streams": {
+      "completion_ms": [
+        1827.9999999940628,
+        1827.9999999940628,
+        1827.9999999940628,
+        1827.9999999940628,
+        1827.9999999940628
+      ],
+      "completion_p95_ms": 1827.9999999940628,
+      "completion_sample_size": 5,
+      "first_token_ms": [],
+      "first_token_p95_ms": null,
+      "first_token_sample_size": 0,
+      "heartbeat_counts": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "heartbeat_jitter_gate_seconds": 2.0,
+      "inspection_gate_ms": 5000.0,
+      "lag_gate_seconds": 0.05,
+      "lag_p95_seconds": null,
+      "lag_passed": false,
+      "live_completed_before_15s_heartbeat": true,
+      "missed_15s_heartbeats": 0,
+      "mock_answers_may_be_fast": true,
+      "mock_model_mode": true,
+      "qt_cap_004": 5,
+      "qt_cap_004_passed": true,
+      "qt_lat_010_ms": 12000.0,
+      "qt_lat_010_passed": false,
+      "qt_lat_011_ms": 40000.0,
+      "qt_lat_011_passed": true,
+      "simultaneous_runs": 5,
+      "table_gate_ms": 5000.0
+    }
+  },
+  "percentile_probe": 1.325,
+  "qt_cap_001_claimed": false,
+  "qt_cap_002_claimed": false,
+  "qt_lat_001_ms": 2000.0,
+  "qt_lat_011_ms": 40000.0,
+  "sample_is_eight_doc_subset": true,
+  "schema_version": "phase09-candidate-seventy-live-v1",
+  "seventy_percent": {
+    "classification": "Passed",
+    "cpu_peak_percent": 1.49,
+    "detail": "Live 8-doc Composite p95 versus QT-LAT-011. 70% CPU trigger is recorded, not forced. Not QT-CAP-001/002.",
+    "foreground_gate_ms": 40000.0,
+    "foreground_p95_held": true,
+    "foreground_p95_ms": 1827.9999999940628,
+    "passed": true,
+    "runtime_pause_controller": "In-process MaintenancePauseController gates HNSW REINDEX, LightRAG clean rebuild, and BM25 subset rebuild. Fixture tests prove the 70% trigger. Live 8-doc Packet 4 peaked at 3.06% CPU and did not fire. Do not claim QT-CAP-001/002 from that subset.",
+    "sample_is_eight_doc_subset": true,
+    "sizing_ladder": "On this 8-doc subset, live 70% CPU/IO pause is measured rather than forced with unbounded load. Fixture tests prove MaintenancePauseController at 70%. If foreground p95 holds, P09-04-A can pass without the live trigger firing. Do not raise the advertised envelope or claim QT-CAP-001/002 from this subset.",
+    "trigger_70_percent_fired": false
+  }
+}

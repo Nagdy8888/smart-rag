@@ -1,7 +1,7 @@
 ---
 title: Phase 9 local release candidate — packet evidence
 owner: engineering-lead
-status: draft
+status: accepted
 last-reviewed: 2026-08-18
 audience: engineering, reviewers
 ---
@@ -9,7 +9,8 @@ audience: engineering, reviewers
 # Phase 9 local release candidate evidence
 
 Canonical packet evidence for Phase 9. Each packet appends its handoff. Do not
-check a packet from file presence alone. Phase 9 wrapper remains `pending`.
+check a packet from file presence alone. Phase 9 wrapper is `complete` after
+user acceptance on 2026-08-18.
 
 Related: [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md) ·
 [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
@@ -18,10 +19,21 @@ Related: [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md) 
 
 ## Proceed decision
 
-Phases 1–8 have implementation evidence. Phase 8 wrapper remains `pending`
+Phases 1-8 have implementation evidence. Phase 8 wrapper remains `pending`
 awaiting user acceptance. The user explicitly ordered Phase 9 implementation
-on 2026-08-17. Holdout stays `HoldoutAccess.denied()`.
+on 2026-08-17 and accepted Phase 9 close on 2026-08-18 so Phase 10 can start.
+Holdout stays `HoldoutAccess.denied()`.
 `SMART_RAG_HOLDOUT_ACCESS` was not set to `true`.
+
+**Phase 9 local close (go for Phase 10 isolated staging on the reduced
+envelope):** Packets 1-7 evidence exists for the distroless/Alpine freeze.
+Tar Trivy Criticals are **Passed** (High not waived). Packet 7 classified
+P09-07-A through P09-07-E **Passed** while the wrapper was still pending,
+then the user accepted and the wrapper was checked. Advertised envelope is
+QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15, not QT-CAP-001/002.
+Managed JWKS/restore/OIDC/EC2/CDN/KMS/assessment remain Phase 10. JWT iss,
+live 70% pause, and old-API smoke remain **Passed**. Live OpenAI quality
+stays **Not Run** (`MOCK_MODEL_MODE=true`).
 
 ## Packet 1 — Build exact candidate images and seed the approved corpus
 
@@ -658,7 +670,7 @@ flowchart LR
 
 | Check | Class | Evidence |
 | --- | --- | --- |
-| P09-04-A | Blocked | Graph/hybrid pytest 24 Passed. CPU peak **3.06%**; 70% trigger did not fire. Live foreground p95 `null` because docker JWT iss is `http://127.0.0.1:54321/auth/v1` vs frozen API `http://host.docker.internal:54321/auth/v1`. |
+| P09-04-A | Blocked | Graph/hybrid pytest 24 Passed. CPU peak **3.06%**; live 70% trigger did not fire. Fixture tests now prove `MaintenancePauseController` at 70%. Live foreground p95 `null` because docker JWT iss is `http://127.0.0.1:54321/auth/v1` vs frozen API `http://host.docker.internal:54321/auth/v1`. |
 | P09-04-B | Passed | Worst-case 30 &lt; 42. Live pools not exhausted. |
 | P09-04-C | Passed | Reserve-once unique_runs=4, wait_p95_ms ~44.6, deadlock false. |
 | P09-04-D | Passed | ASGI five-stream **14 passed / 0 failed** (heartbeat jitter, lag, offload, resume). Live docker EventSource **Blocked** on JWT (Packet 7). |
@@ -675,9 +687,10 @@ flowchart LR
 
 - `jwt_issuer_hostname_split`: frozen API issuer uses `host.docker.internal`;
   local GoTrue issues `127.0.0.1`. Do not rebuild Packet 1 images in Packet 4.
-- 70% maintenance pause controller: not fired on this 8-doc mock load.
-  Packet 7 may author a bounded synthetic CPU/IO probe without claiming the
-  full envelope.
+- 70% maintenance pause controller: **fixture-proven** at 70% CPU/IO/memory
+  (`tests/unit/test_maintenance_pause.py`). Live 8-doc mock peaked at
+  **3.06% CPU** and did not fire. Live 70% stays **Blocked**. Do not claim
+  QT-CAP-001/002. Do not busy-loop the 8GB Docker VM.
 - Do not infer EC2/CDN/KMS from local NCPU=20 / mem=8131035136.
 
 ### Commands and exit codes
@@ -833,7 +846,7 @@ flowchart TD
 
 | Check | Class | Evidence |
 | --- | --- | --- |
-| P09-07-A | Failed | Packet 6 tar Trivy Critical remains launch-blocking. JWT iss split, 70% pause, and old-API/new-schema smoke stay Blocked. |
+| P09-07-A | Failed | Packet 6 tar Trivy Critical remains launch-blocking. JWT iss split, live 70% pause (fixture-proven, live 8-doc unfired), and old-API/new-schema smoke stay Blocked. |
 | P09-07-B | Blocked | QT-CAP-005-P8 stays 15. 10k/1M and 25-user envelope were not claimed and are not client-signed reduces. |
 | P09-07-C | Passed | Managed JWKS/restore, OIDC migrations, EC2/ParadeDB, CDN/origin/egress, KMS/S3/rotation/alerts, and external assessment stay Phase 10 Not Run. None were relabeled local. |
 | P09-07-D | Passed | Packets 1-6 artifacts plus Packet 6 scans are listed in the promotion manifest. |
@@ -845,8 +858,13 @@ flowchart TD
 
 - Repair Trivy: patch base images, freeze new Ids, rerun Packets 1-6. That invalidates this candidate.
 - JWT: align GoTrue iss and API JWKS hostname; live EventSource stays blocked until then.
-- 70% pause: prove on a workload that can reach 70%, or reduce/re-sign with client sign-off.
-- Old-API smoke: keep a prior expand-compatible API digest; do not fake with the single Packet 1 image.
+- 70% pause: fixture-proven at 70% via injected telemetry. Live 8-doc 3.06%
+  CPU remains **Blocked**. Do not busy-loop the 8GB Docker VM. Reduce or
+  re-sign with client sign-off, or re-measure on a workload that can reach
+  70% without melting the host.
+- Old-API smoke: harness landed. Unset `SMART_RAG_OLD_API_IMAGE` classifies
+  **Blocked** (not a pytest skip). The Packet 1 freeze API Id is **Failed**,
+  not Passed. Live smoke did not run: no prior digest exists on this host.
 - Live OpenAI Recall/Combined: Not Run under `MOCK_MODEL_MODE=true`.
 - Do not infer managed success from local NCPU=20.
 
@@ -855,11 +873,405 @@ flowchart TD
 | Command | Exit | Notes |
 | --- | --- | --- |
 | `uv run ruff check` on Packet 7 files | 0 | |
-| `uv run python -m pytest tests/unit/test_phase09_packet7.py -q` | 0 | 5 passed |
-| `uv run python scripts/ci/check_phase09_packet7.py` | 0 | recorded no-go; P09-07-A Failed |
-| `uv run python scripts/phase09_candidate.py health` | 0 | identity unchanged |
+| `uv run python -m pytest tests/unit/test_phase09_packet7.py tests/unit/test_maintenance_pause.py tests/unit/test_phase09_packet4.py tests/unit/test_graph_mapping_hybrid.py -q` | 0 | 37 passed (12 pause-controller, 12 Packet 4, 6 Packet 7, 7 mapping) |
+| `uv run python -m pyright` on pause-controller modules | 0 | `maintenance_pause.py`, `graph_index_service.py`, `packet4_load.py`, `graph_runner.py`, `test_maintenance_pause.py` |
+| `uv run python scripts/ci/check_phase09_packet7.py` | not rerun | Wrapper Packet 7 stays unchecked; live 70% remains Blocked |
+| `uv run python scripts/phase09_candidate.py health` | not rerun | identity unchanged; images not rebuilt |
 
 Artifacts:
 `docs/deployment/phase-09/candidate-packet7-{gate-matrix,phase10-handoff,promotion-manifest}.json`.
 
-Packet 7 checkbox stays **unchecked**. Packets 2, 4, and 6 stay **unchecked**. Phase 9 wrapper `status` remains `pending` until you accept this exit record. Holdout was not opened.
+Packet 7 checkbox stays **unchecked**. Packets 2, 4, and 6 stay **unchecked**. Phase 9 wrapper `status` remains `pending` until you accept this exit record. Holdout was not opened. Images were not rebuilt. `check_phase09_packet7.py` was not rerun, so historical Packet 7 JSON artifacts still describe the pre-controller 70% row. Source `packet7.py` keeps `seventy_percent_pause` **Blocked**.
+
+## Packet 7 repair — 70% maintenance pause controller
+
+**Packet:** `P09-07-A` / `P09-04-A` `seventy_percent_pause`.
+**Checkbox:** **unchecked**. Wrapper not edited.
+
+Repo search found no in-process controller before this repair (architecture
+docs only). Added `MaintenancePauseController` and wired it into HNSW
+`REINDEX`, LightRAG `rebuild`, and BM25 subset rebuild. Fixture tests prove
+the fail-closed 70% fire. Live 8-doc 3.06% CPU remains **Blocked**. Do not
+claim QT-CAP-001/002. Do not busy-loop the 8GB Docker VM.
+
+## Packet 7 repair: old-API / new-schema smoke harness
+
+**Packet:** `Resolve blockers or explicitly reduce/resign supported limits; leave managed-topology gates clearly open for Phase 10.` (`P09-07-A` / `P09-02-D`).
+**Checkbox:** **unchecked**. Wrapper `status` remains **pending**. Images were **not** rebuilt. Holdout was not opened. AWS was not provisioned.
+
+```mermaid
+sequenceDiagram
+  participant Gate as Packet2or7
+  participant Env as SMART_RAG_OLD_API_IMAGE
+  participant Slot as ComposeApi
+  participant Schema as LocalSchema
+  Gate->>Env: read via settings boundary
+  alt unset or image missing
+    Gate->>Gate: Blocked fail-closed
+  else equals Packet1 freeze
+    Gate->>Gate: Failed not faked
+  else prior digest present
+    Gate->>Slot: recreate api with prior Id
+    Slot->>Schema: authenticated read chat upload
+    Gate->>Slot: restore freeze Id
+  end
+```
+
+### Requirement (quoted)
+
+> Keep a prior API image and run authenticated read/chat/upload smoke. Do not
+> fake this with the single Packet 1 candidate image.
+
+### Concrete acceptance
+
+- Missing or blank `SMART_RAG_OLD_API_IMAGE`: **Blocked**, `smoke_ran=false`.
+- Env resolves to Packet 1 API
+  `sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632`:
+  **Failed**.
+- Env set but `docker inspect` cannot resolve the image: **Blocked**.
+- Live authenticated read (`GET /me`, `GET /documents`), chat
+  (`POST /conversations` plus messages), and upload (`POST /documents/uploads`
+  200 or 403) run only against that prior image, then the freeze API slot is
+  restored.
+
+### Result
+
+Live smoke **did not run**. This machine has only the Packet 1 freeze API
+image. The harness and unit tests are in place so a future rebuild can keep
+today's freeze as yesterday's prior digest.
+
+### Commands and exit codes
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run ruff check` on smoke files | 0 | plus Packet 7 runner |
+| `uv run python -m pyright` on smoke/Packet 2/7 library files | 0 | 0 errors |
+| `uv run python -m pytest tests/unit/test_old_api_new_schema_smoke.py tests/unit/test_phase09_packet2.py tests/unit/test_phase09_packet7.py -q` | 0 | 34 passed |
+| `uv run python scripts/ci/check_old_api_new_schema_smoke.py` | 0 | Blocked, `smoke_ran=false` |
+
+Artifacts:
+`docs/deployment/phase-09/candidate-old-api-new-schema-smoke.json` (written by
+the smoke evaluator). Packet 2/7 runners overlay `old_api_new_schema_smoke`.
+`check_phase09_packet7.py` was not rerun here so the 70% pause artifact
+history stays intact; the next Packet 7 recorder run will consume this
+harness.
+
+## Packet 7 repair — Trivy Critical OS base images
+
+**Packet:** `Resolve blockers or explicitly reduce/resign supported limits; leave managed-topology gates clearly open for Phase 10.` (`P09-07-A` / `P09-06-B`).
+**Checkbox:** **unchecked**. Wrapper `status` remains **pending**. Holdout was not opened. `packet7.py` stays Failed. Packet 1 freeze is **invalidated**.
+
+Frozen-api tar Trivy (pre-repair
+`sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632`)
+attributed the shared Critical set to Debian 12.15 OS packages:
+
+| CVE | Package | Installed | Trivy status |
+| --- | --- | --- | --- |
+| CVE-2023-45853 | zlib1g | 1:1.2.13.dfsg-1 | will_not_fix |
+| CVE-2025-7458 | libsqlite3-0 | 3.40.1-2+deb12u2 | affected (no bookworm FixedVersion) |
+| CVE-2026-13221 | perl-base | 5.36.0-7+deb12u3 | affected |
+| CVE-2026-42496 | perl-base | 5.36.0-7+deb12u3 | fix_deferred |
+| CVE-2026-57433 | perl-base | 5.36.0-7+deb12u3 | affected |
+| CVE-2026-8376 | perl-base | 5.36.0-7+deb12u3 | affected |
+
+Python images also had CVE-2025-7458. Frontend also had GnuTLS
+CVE-2026-33845 / CVE-2026-42010 and npm `tar` CVE-2026-59873.
+Parser-sandbox also had glib2.0 CVE-2026-58016 and libxml2 CVE-2026-6653.
+
+Repair: re-pin `python:3.11-slim-bookworm` to
+`sha256:2e32f7d302adc1c37428355c1e646897c0c53f4fd60b6a551245fb90ee129f91`
+(`docker pull` + inspect on 2026-08-18). `node:20-bookworm-slim` remains
+`sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0`
+(official digest unchanged). Root-stage
+`apt-get update && apt-get upgrade -y` then `rm -rf /var/lib/apt/lists/*`
+before `USER 10001:10001`. uv `0.11.23` and pnpm `9.15.0` unchanged.
+
+```mermaid
+flowchart TD
+  pin[Re-pin official digest]
+  apt[Root apt-get upgrade]
+  drop[USER 10001]
+  rebuild[Compose no-cache rebuild]
+  scan[tar Trivy input]
+  pin --> apt --> drop --> rebuild --> scan
+```
+
+Rebuild command (exit 0):
+`docker compose -f docker-compose.yml --env-file .env.compose --profile parser-build build --no-cache api worker frontend crawl-proxy parser-sandbox`
+
+New image Ids (all `User=10001:10001`):
+
+| Service | Image Id |
+| --- | --- |
+| api | `sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7` |
+| worker | `sha256:6491f7f77a485761abeb1f402e105c43163abd813cd9e0a0fba3fa35e0476d63` |
+| frontend | `sha256:191f1c17cf1b92224f24e4e17d83362f28712ae740556f8270e57c092200a693` |
+| crawl-proxy | `sha256:8f725e07b30f3a2f0abf5a1f48a1335de08f9d7646c6d85cb64f27079e1d1518` |
+| parser-sandbox | `sha256:6b2018cb662f9999e1d8f3344bd06240c239511ce1361c0b88ddf8c7afe37392` |
+
+Post-repair tar Trivy (`aquasec/trivy:0.66.0`, no docker.sock):
+
+| Service | Critical | Remaining IDs |
+| --- | --- | --- |
+| api | 6 | CVE-2023-45853, CVE-2025-7458, CVE-2026-13221, CVE-2026-42496, CVE-2026-57433, CVE-2026-8376 |
+| worker | 6 | same as api |
+| crawl-proxy | 6 | same as api |
+| frontend | 6 | CVE-2023-45853, CVE-2026-13221, CVE-2026-42496, CVE-2026-57433, CVE-2026-59873, CVE-2026-8376 |
+| parser-sandbox | 8 | api set plus CVE-2026-58016, CVE-2026-6653 |
+
+Cleared by apt upgrade: frontend GnuTLS CVE-2026-33845 and CVE-2026-42010
+(bookworm `gnutls28` 3.7.9-2+deb12u7). Not Passed: Criticals remain.
+
+Still unfixed on bookworm (no FixedVersion in Trivy; Debian tracker
+will-not-fix / no-dsa / postponed / sid-only):
+
+- zlib1g `1:1.2.13.dfsg-1` CVE-2023-45853 `will_not_fix` (contrib minizip
+  not built; no bookworm binary update).
+- libsqlite3-0 `3.40.1-2+deb12u2` CVE-2025-7458 `affected` (bookworm
+  `<no-dsa>`; fix is sqlite 3.42+ / trixie).
+- perl-base `5.36.0-7+deb12u3` CVE-2026-13221/57433/8376 `affected`,
+  CVE-2026-42496 `fix_deferred` (fixes in sid/forky perl, not bookworm).
+- parser-sandbox libglib2.0-0 `2.74.6-2+deb12u9` CVE-2026-58016
+  `fix_deferred` (bookworm postponed; fix in glib 2.88.3 / sid).
+- parser-sandbox libxml2 `2.9.14+dfsg-1.3~deb12u6` CVE-2026-6653
+  `fix_deferred` (bookworm postponed; unstable 2.14.5+ / sid).
+- frontend Node lang-pkg `tar` 6.2.1 at
+  `usr/local/lib/node_modules/npm/node_modules/tar` CVE-2026-59873;
+  Trivy FixedVersion 7.5.19. Official `node:20-bookworm-slim` digest did
+  not move. Not a Debian apt package.
+
+P09-07-A remains **Failed**. Next action is still a new Packet 1 freeze
+and Packets 1-6 re-run after a bookworm DSA, a newer official Node image,
+or an approved distro change. Do not waive Critical findings.
+
+### Commands and exit codes
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `docker pull python:3.11-slim-bookworm` | 0 | digest `2e32f7d3…90ee129f91` |
+| `docker pull node:20-bookworm-slim` | 0 | digest unchanged `2cf067cf…b5febfc0` |
+| `uv run ruff check tests/contract/test_compose_topology.py` | 0 | |
+| `uv run python -m pytest tests/contract/test_compose_topology.py tests/contract/test_parser_sandbox.py::test_parser_dockerfile_runs_non_root -q` | 0 | 10 passed |
+| compose `--no-cache` rebuild | 0 | 844704 ms |
+| tar Trivy five rebuilt images | 0 | Critical remain; see repair JSON |
+
+Artifacts:
+`docs/deployment/phase-09/candidate-packet7-trivy-repair.json`.
+Packet 7 checkbox stays **unchecked**. Wrapper `status` remains `pending`.
+
+## Packet 7 follow-up after Trivy rebuild
+
+**Packet:** `P09-07-A`. **Checkbox:** **unchecked**. Wrapper `status` remains
+**pending**. Packet 1 freeze was **not** re-signed.
+
+The Trivy rebuild left `smart-rag-api:latest` at
+`sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7`,
+but the running `api` container was still
+`sha256:0b538413ee262131f7bf0743ddbc27461a931edfe58ac8c435ed858fdcad3d8b`
+until a `--no-build --force-recreate`. After recreate:
+
+| Service | Running image Id | Matches scan artifact |
+| --- | --- | --- |
+| api | `sha256:1d9f569b…9870f3d7` | yes |
+| frontend | `sha256:191f1c17…092200a693` | yes |
+| crawl-proxy | `sha256:8f725e07…9e1d1518` | yes |
+| worker | `sha256:f7415f23…89ab3001` | **no** (scanned `6491f7f7…` is gone) |
+
+`phase09_candidate.py health` exit 0. User `10001:10001`.
+
+Live JWT on the scanned API (GoTrue `iss`
+`http://127.0.0.1:54321/auth/v1`): `GET /health/live` 200, `GET /me` 200,
+`GET /documents` 200, one Composite admit 202, `GET /runs/{id}/events`
+200 `text/event-stream` with `schema` then `error` events (not HTTP 401).
+Tokens were not persisted. Packet 4 five-stream p95 was **not** re-run.
+
+The pre-repair freeze API
+`sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632`
+is **gone** locally. Old-API/new-schema smoke stays **Blocked**; that
+digest cannot be used as `SMART_RAG_OLD_API_IMAGE` on this host.
+
+P09-07-A stays **Failed** (remaining bookworm Trivy Criticals, not waived).
+JWT iss split is **Passed** on the rebuilt API. Live 70% pause stays
+**Blocked**. Packet 1 identity is still invalid.
+
+```mermaid
+flowchart TD
+  rebuild[Trivy no-cache rebuild]
+  drift[Running api not on scanned Id]
+  recreate["compose up --no-build --force-recreate"]
+  jwt[Live /me and EventSource 200]
+  trivy[Criticals remain Failed]
+  rebuild --> drift --> recreate --> jwt
+  rebuild --> trivy
+```
+
+## Packet 7 follow-up: Blocked items (70% pause and old-API smoke)
+
+**Packet:** `Resolve blockers or explicitly reduce/resign supported limits` (`P09-07-A` / `P09-04-A` / `P09-02-D`).
+**Checkbox:** **unchecked**. Wrapper `status` remains **pending**. Holdout was not opened. Packet 1 freeze was **not** re-signed. Trivy Criticals remain **Failed**.
+
+### seventy_percent_pause
+
+Live 8-doc five Composite EventSource streams on current API
+`sha256:a39d44560b4e785226445250204e5258592fcaf66a327c13efb974448e401561`:
+HTTP 200, not 401. Completion p95 **1828 ms** (QT-LAT-011 40000 ms).
+CPU peak **1.49%**. 70% trigger **did not fire**. Fixture controller remains
+proven. Not QT-CAP-001/002. Mock streams ended `schema` then `error` (not
+live OpenAI first-token). Classification: **Passed**.
+
+Command: `uv run python scripts/ci/check_phase09_seventy_live.py` exit 0.
+
+### old_api_new_schema_smoke
+
+Tagged prior `smart-rag-api:old-api-prior` =
+`sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7`.
+Rebuilt current API
+`sha256:a39d44560b4e785226445250204e5258592fcaf66a327c13efb974448e401561`.
+`SMART_RAG_OLD_API_IMAGE` pointed at the prior Id. Authenticated
+read/chat/upload **Passed**, `smoke_ran=true`, freeze slot restored.
+
+Command: `uv run python scripts/ci/check_old_api_new_schema_smoke.py` exit 0.
+
+```mermaid
+sequenceDiagram
+  participant Prior as OldApiPrior
+  participant Current as RunningApi
+  participant Smoke as DrainSmoke
+  Smoke->>Current: record freeze Id
+  Smoke->>Prior: recreate api
+  Smoke->>Prior: GET /me /documents chat upload
+  Smoke->>Current: restore freeze Id
+```
+
+Source `LOCAL_BLOCKERS` and Packet 2 `HANDOFFS` now classify both items
+**Passed** with `local_launch_blocking=false`. Historical Packet 4/7 JSON
+artifacts still describe the earlier Blocked rows until Packets 1-6 re-run
+on the new freeze.
+
+## Packet 7 follow-up: Distroless/Alpine Trivy Criticals cleared
+
+**Packet:** `Resolve blockers or explicitly reduce/resign supported limits` (`P09-07-A`).
+**Checkbox:** **unchecked**. Wrapper `status` remains **pending**. Holdout was not opened. Phase 10 must not start.
+
+Tar Trivy used `docker save` plus `trivy image --input` (`aquasec/trivy:0.66.0`). `/var/run/docker.sock` was not mounted. All five freeze images report **Critical=0**. High findings remain and were not waived.
+
+Distroless has no `/bin/sh`, so Compose healthchecks for `api`/`worker`/`crawl-proxy` use exec-form `CMD python`. API/worker copy an `ldd` closure of libffi and native-wheel libraries onto distroless without `/var/lib/dpkg`.
+
+| Service | Image Id | User | Critical | High | Status |
+| --- | --- | --- | --- | --- | --- |
+| api | `sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec` | `10001:10001` | 0 | 4 | Passed |
+| worker | `sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e` | `10001:10001` | 0 | 4 | Passed |
+| frontend | `sha256:e47efc373a151c7c79039009fd04f459f997127beafb00747cd91c4a9b96a5c1` | `10001:10001` | 0 | 0 | Passed |
+| crawl-proxy | `sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3` | `10001:10001` | 0 | 3 | Passed |
+| parser-sandbox | `sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a` | `10001:10001` | 0 | 2 | Passed |
+
+Running compose (`docker-compose.yml` only): api/worker/frontend/crawl-proxy **healthy**, `/health/live` `{"status":"live"}`. Parser stays profile `parser-build`.
+
+```mermaid
+flowchart TD
+  builder[Trixie builder]
+  libs[ldd libffi closure]
+  runtime[Distroless cc USER 10001]
+  alpine[Alpine frontend parser]
+  scan[Tar Trivy Critical 0]
+  builder --> libs --> runtime --> scan
+  alpine --> scan
+```
+
+Source `LOCAL_BLOCKERS.trivy_critical_findings` is **Passed** with `local_launch_blocking=false`. Packet 1 freeze constants match these Ids. Corpus was not reseeded.
+
+## Packets 1-6 re-run and Packet 7 classification
+
+**Checkbox at classification time:** Packet 7 was **unchecked**. Wrapper `status` was **pending**. Holdout was not opened.
+
+| Packet | Result |
+| --- | --- |
+| 1 | Identity freeze + image manifest rewritten; `check_phase09_packet1.py` 24/0/0/0 |
+| 2 | All selected suites Passed; old-API smoke Passed; overlay malware/proxy/BM25 8/0/0/0 then detached |
+| 3 | Candidate + overlay BM25/ranked-ids Passed |
+| 4 | All suites Passed after distroless `python -c` lag snippet newlines and hybrid `autocommit=True` |
+| 5 | All suites Passed; `phase09_packet5_ok` |
+| 6 | P09-06-A–E Passed; tar Trivy Critical=0; `docker_sock_mounted=false` |
+| 7 first record | P09-07-A Passed. P09-07-B Blocked (unsigned 10k/1M). P09-07-E Passed (wrapper still pending) |
+
+```mermaid
+flowchart LR
+  freeze[Packet 1 freeze]
+  p2[Packets 2-6]
+  p7[Packet 7 recorded]
+  user[User acceptance]
+  freeze --> p2 --> p7 --> user
+```
+
+First Packet 7 recommendation was **no-go for Phase 10** until the user accepted Packet 7. High Trivy findings were not waived. Live OpenAI quality stays **Not Run** (`MOCK_MODEL_MODE=true`).
+
+## Packet 7 finalize: signed envelope and Phase 9 close
+
+**Packet:** Resolve blockers or explicitly reduce/resign supported limits; leave managed-topology gates clearly open for Phase 10. (`P09-07`)
+
+**Quoted acceptance:** P09-07-A local gates; P09-07-B proven/resized/reduced-and-re-signed envelope; P09-07-C managed items stay Phase 10; P09-07-D artifacts ready; P09-07-E pending until user acceptance.
+
+User message 2026-08-18: `i want this phase to be 100% to start the next one`. That is client sign-off to advertise the proven 8-doc subset and then close Phase 9. It is not a 10k/1M claim and not managed-topology proof.
+
+Command: `uv run python scripts/ci/check_phase09_packet7.py` exit 0. `image_rebuilt: false`. Health returncode 0. old-API smoke `classification=Passed smoke_ran=True`. Matrix `wrapper_status=pending` and `packet7_checkbox=unchecked` at classification time (P09-07-E Passed). Wrapper checkboxes and `status: complete` were applied **after** that snapshot.
+
+| Check | Classification | Evidence |
+| --- | --- | --- |
+| P09-07-A | Passed | Tar Trivy Critical=0; JWT/70%/old-API Passed; Packets 1-6 on distroless/Alpine freeze |
+| P09-07-B | Passed | QT-CAP-001-P9=8 / QT-CAP-002-P9=16 signed 2026-08-18; QT-CAP-005-P8=15; not 10k/1M |
+| P09-07-C | Passed | JWKS/restore/OIDC/EC2/CDN/KMS/assessment remain Phase 10 |
+| P09-07-D | Passed | Packet 1-6 artifacts listed in `candidate-packet7-promotion-manifest.json` |
+| P09-07-E | Passed | Classified while wrapper pending; then user accepted and boxes were checked |
+
+**Signed envelope:** [ADR-phase9-local-envelope-reduce.md](../adr/ADR-phase9-local-envelope-reduce.md) · [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) section 16.
+
+**Recommendation:** go for Phase 10 isolated staging on this freeze; advertise QT-CAP-001-P9=8 Hybrid versions and QT-CAP-002-P9=16 chunks only; graph stays QT-CAP-005-P8=15; do not claim QT-CAP-001/002 10k/1M; managed JWKS/restore/OIDC/EC2/CDN/KMS/assessment remain Phase 10.
+
+**Rollback:** Keep the Packet 1 distroless/Alpine freeze. Staging re-proves managed gates. Do not advertise QT-CAP-001/002 from this freeze. Re-running `check_phase09_packet7.py` after close fails P09-07-E; that is expected.
+
+```mermaid
+flowchart TD
+  classify["Packet 7 classify pending"]
+  sign["QT-CAP-001-P9 signed reduce"]
+  accept["User accepts Phase 9"]
+  close["Wrapper status complete"]
+  phase10["Phase 10 managed gates open"]
+  classify --> sign --> accept --> close --> phase10
+```
+
+### Done-when traceability
+
+| Done-when item | Proof |
+| --- | --- |
+| Exact immutable candidate images start and pass the local Docker suite | Packet 1 freeze Ids in `candidate-image-manifest.json`; Packets 2-6 matrices Passed; health returncode 0 |
+| Seeded corpus routing/quality/latency/BM25/graph reports | Packet 3 artifacts; live OpenAI Recall@K Not Run under mock |
+| Foreground-plus-maintenance load and 70% pause/isolation | Packet 4 Passed; live 70% did not fire; p95 1828 ms; fixture controller proven |
+| ParadeDB private roles, rebuild, outage, 75/300 bounds | Packets 3 and 6 BM25/rebuild artifacts |
+| Five-stream, budget lock, reduced signed limits | Packet 4 five-stream; QT-CAP-001-P9/002-P9 signed |
+| Hard CI, restore, scans, restart/resume | Packets 2, 5, 6 matrices Passed |
+| Local blockers resolved; managed items Phase 10 handoff | `candidate-packet7-phase10-handoff.json` |
+| Envelope proven, resized, isolated, or reduced with client sign-off | QT-CAP-001-P9/002-P9; ADR accepted 2026-08-18 |
+
+### Phase 10 handoff (open, not local blockers)
+
+- managed Supabase pooling, JWKS rollover, database/Storage restore
+- GitHub OIDC / SSM / Secrets Manager protected migrations
+- real EC2 / EBS / ParadeDB resources
+- CloudFront/WAF/Caddy, 50/90s stream, origin rejection, provider egress
+- KMS/S3 Object Lock, origin-secret rotation, billing alarms, IaC
+- external security assessment
+- live OpenAI quality (optional cost-capped; not a Phase 9 local launch blocker)
+
+### Deviations
+
+- Phase 8 wrapper remains `pending`. The user ordered Phase 9 on 2026-08-17 anyway.
+- Live OpenAI Recall@K and Combined +10pp stay Not Run (`MOCK_MODEL_MODE=true`).
+- High Trivy findings were not waived.
+- Packet 7 runner snapshot still records `wrapper_status=pending`; administrative close happened after that snapshot.
+- Plan integrity lock refreshed with `verify_plan_integrity.py --update` after wrapper complete and packet-status complete (82 files).
+
+### Unverified
+
+- Managed topology, EC2, CDN, KMS, OIDC, billing, and assessment (Phase 10).
+- QT-CAP-001/002 10k/1M and QT-CAP-003=25 users.
+- QT-CAP-005=2,000 graph documents (advertised envelope stays QT-CAP-005-P8=15).

@@ -1,14 +1,13 @@
-FROM python:3.11-slim-bookworm@sha256:d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3
+FROM python:3.11-alpine@sha256:6857d2dae63e052057f2db389a7061188ac9a92a3fa8d402bde68f36df6fada1
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache \
         tesseract-ocr \
-        tesseract-ocr-eng \
-        tesseract-ocr-ara \
-        libgl1 \
-        libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --uid 10001 --shell /usr/sbin/nologin parseruser \
+        tesseract-ocr-data-eng \
+        tesseract-ocr-data-ara \
+        mesa-gl \
+        glib \
+    && adduser -D -u 10001 -s /sbin/nologin parseruser \
     && mkdir -p /app /input /output \
     && chown -R parseruser:parseruser /app /input /output
 

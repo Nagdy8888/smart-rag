@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-18
 audience: engineering, security
 ---
 
@@ -38,8 +38,12 @@ flowchart TD
 ```
 
 Routers receive services through `Depends`. Services receive DSNs and optional
-Valkey clients from `smart_rag_api.dependencies.services`. Identity is
-JWKS-verified `CallerContext` (test bypass only when `APP_ENV=test`).
+Valkey clients from `smart_rag_api.dependencies.services`. Identity is JWKS-verified `CallerContext` (test bypass only when `APP_ENV=test`).
+Local Docker (`APP_ENV=local`) accepts the documented GoTrue `iss` pair
+`http://127.0.0.1:54321/auth/v1` and
+`http://host.docker.internal:54321/auth/v1` when `SUPABASE_URL` is one of
+those origins; JWKS fetch stays on `SUPABASE_URL`. Staging and production
+keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 
 ## Endpoint authorization matrix
 

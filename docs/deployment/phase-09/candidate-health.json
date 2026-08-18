@@ -2,7 +2,7 @@
   "api_live": "passed",
   "detail": "{\"publishers\": {\"api\": [8000, 8000], \"clamav\": [], \"crawl-proxy\": [], \"frontend\": [3000, 3000], \"paradedb\": [], \"valkey-cache\": [], \"valkey-limits\": [], \"worker\": []}}",
   "frontend_live": "passed",
-  "mock_model_mode": "true",
+  "mock_model_mode": "unverified",
   "overlay_used": false,
   "pg_search": "passed",
   "private_ports": "passed",

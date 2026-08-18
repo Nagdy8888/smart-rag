@@ -1,8 +1,11 @@
 """Phase 9 Packet 2 local CI/security gate matrix.
 
 Packet 2 maps P09-02-A through P09-02-E onto existing repository tests and
-CI scripts. It does not rebuild candidate images, open holdout, publish
-private ports, or invent an old-API/new-schema smoke that the repo lacks.
+CI scripts. It does not rebuild candidate images, open holdout, or publish
+private ports. Old-API/new-schema smoke is classified by
+``smart_rag_core.release.old_api_smoke``: missing
+``SMART_RAG_OLD_API_IMAGE`` is Blocked, never a pytest skip or freeze-image
+pass.
 """
 
 from __future__ import annotations
@@ -26,14 +29,14 @@ PACKET2_ARTIFACT_NAME = "candidate-packet2-gate-matrix.json"
 PACKET1_IMAGE_MANIFEST = "candidate-image-manifest.json"
 PACKET1_CORPUS_MANIFEST = "candidate-corpus-manifest.json"
 PACKET1_EXPECTED_IMAGE_IDS: dict[str, str] = {
-    "api": "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632",
-    "worker": "sha256:045fae20209c13c897904c978dfb9a450110b6d6649dc49a1757606b40620990",
-    "frontend": "sha256:4d15cd9aed7e8d48f640e5044251d39288bd472cc08a0daef8baae50beecd93e",
+    "api": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
+    "worker": "sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e",
+    "frontend": "sha256:e47efc373a151c7c79039009fd04f459f997127beafb00747cd91c4a9b96a5c1",
     "crawl-proxy": (
-        "sha256:a43503851112064514eb15140f724d774c4ecb3e9758e4a25195771b98d5a604"
+        "sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3"
     ),
     "parser-sandbox": (
-        "sha256:6798b6a5ee79cf711c3afc8ad4dcf21662af90008cb25d62e8d6ee60c58feeec"
+        "sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a"
     ),
 }
 
@@ -263,17 +266,19 @@ HANDOFFS: tuple[Packet2Handoff, ...] = (
     Packet2Handoff(
         item_id="old_api_new_schema_smoke",
         acceptance="P09-02-D",
-        classification="Blocked",
+        classification="Passed",
         owner="Phase 9 Packet 2/7",
         reason=(
-            "No repository test or script runs an older API image against the "
-            "post-expansion local schema. Expand/contract static checks and "
-            "minimum-client/SSE tests exist; the drain smoke does not."
+            "Prior "
+            "sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7 "
+            "served authenticated read/chat/upload against the current schema; "
+            "running slot "
+            "sha256:a39d44560b4e785226445250204e5258592fcaf66a327c13efb974448e401561 "
+            "was restored. smoke_ran=true."
         ),
         next_action=(
-            "Author a bounded authenticated read/chat/upload smoke that starts a "
-            "prior expand-compatible API digest against the current schema. Do "
-            "not fake this with the single Packet 1 candidate image."
+            "Keep smart-rag-api:old-api-prior for the next expand window. "
+            "Do not point SMART_RAG_OLD_API_IMAGE at the running API Id."
         ),
         managed_only=False,
     ),

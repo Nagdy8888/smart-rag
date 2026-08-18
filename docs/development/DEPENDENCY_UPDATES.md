@@ -2,7 +2,7 @@
 title: Dependency updates
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-15
+last-reviewed: 2026-08-18
 audience: engineering
 ---
 

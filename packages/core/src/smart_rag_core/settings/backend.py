@@ -19,6 +19,8 @@ class BackendSettings(SharedSettings):
         bind_port: HTTP bind port from ``API_BIND_PORT``. Public, default
             ``8000``.
         supabase_url: Supabase project URL from ``SUPABASE_URL``. Public.
+            JWKS fetch uses this origin. Local ``APP_ENV`` may accept the
+            documented ``127.0.0.1`` / ``host.docker.internal`` ``iss`` pair.
         supabase_jwt_audience: Required JWT audience from
             ``SUPABASE_JWT_AUDIENCE``. Default ``authenticated``.
         jwks_cache_seconds: JWKS cache TTL from ``JWKS_CACHE_SECONDS``; max
@@ -68,7 +70,11 @@ class BackendSettings(SharedSettings):
     supabase_url: AnyHttpUrl = Field(
         default=AnyHttpUrl("http://127.0.0.1:54321"),
         validation_alias="SUPABASE_URL",
-        description="Supabase project URL for JWKS discovery.",
+        description=(
+            "Supabase project URL for JWKS discovery. When APP_ENV=local and "
+            "the origin is 127.0.0.1:54321 or host.docker.internal:54321, "
+            "iss may use either hostname."
+        ),
         json_schema_extra={"security": "public"},
     )
     supabase_jwt_audience: str = Field(

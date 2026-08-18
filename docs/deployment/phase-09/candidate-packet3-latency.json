@@ -62,7 +62,7 @@
   "completion_p95_ms": null,
   "deadline_exhaustion_route": "verified partial or insufficient evidence",
   "first_evidence_p50_ms": null,
-  "first_evidence_p95_ms": 560.8249749998322,
+  "first_evidence_p95_ms": 350.3916500048945,
   "first_token_p50_ms": null,
   "first_token_p95_ms": null,
   "hardware": {

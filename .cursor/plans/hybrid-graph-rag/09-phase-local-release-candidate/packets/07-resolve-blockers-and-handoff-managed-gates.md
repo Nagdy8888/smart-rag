@@ -1,7 +1,7 @@
 ---
 phase: 9
 packet: 7
-status: pending
+status: complete
 title: "Resolve blockers or explicitly reduce/resign supported limits; leave managed-topology gates clearly open for Phase 10."
 requirement_ids: [P09-07]
 ---

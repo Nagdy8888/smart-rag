@@ -61,6 +61,10 @@ from smart_rag_core.jobs.limits import (
     GRAPH_PIPELINE_VERSION,
     LIGHTRAG_HANDOFF_VERSION,
 )
+from smart_rag_core.jobs.maintenance_pause import (
+    MaintenancePauseController,
+    pause_error_code,
+)
 from smart_rag_core.retrieval.graph import (
     LIGHTRAG_PINNED_VERSION,
     opaque_graph_source_basename,
@@ -138,6 +142,7 @@ class GraphIndexService:
         repository: LightragIndexJobRepository,
         mapper: GraphMappingService | None = None,
         mapping_support: MappingSupportCallbacks | None = None,
+        pause_controller: MaintenancePauseController | None = None,
     ) -> None:
         """Bind application connection, indexer, and writer guard.
 
@@ -153,12 +158,17 @@ class GraphIndexService:
                 callbacks from ``bind_mapping_support``. When omitted,
                 unresolved chunks stay unmapped. Repair must not attach these
                 callbacks.
+            pause_controller: User-load pause for clean rebuilds. Defaults
+                to fail-closed missing telemetry.
         """
 
         self._connection = connection
         self._indexer = indexer
         self._writer = writer
         self._repository = repository
+        self._pause_controller = pause_controller or (
+            MaintenancePauseController.fail_closed()
+        )
         if mapper is not None:
             self._mapper = mapper
         else:
@@ -779,13 +789,23 @@ class GraphIndexService:
             payload: ``isolate_only`` (default) or ``verified_switch``.
 
         Returns:
-            Isolation-only ``building`` or switched ``active``.
+            Isolation-only ``building`` or switched ``active``. Paused
+            rebuilds return transient ``maintenance_paused`` without
+            isolating or switching.
         """
 
         self._writer.verify_lock_and_lease(
             job_id=job_id,
             job_lease_token=job_lease_token,
         )
+        decision = self._pause_controller.decide()
+        if decision.paused:
+            return GraphJobOutcome(
+                kind="failed",
+                error_category=JobErrorCategory.TRANSIENT,
+                last_error=pause_error_code(decision),
+                reservation_kind="graph_maintenance",
+            )
         if payload.get("verified_switch") is True:
             return self._switch_rebuild_workspace(payload=payload)
         isolated_id = self._writer.ensure_building_rebuild_workspace()

@@ -1,7 +1,7 @@
 ---
 phase: 9
 packet: 4
-status: pending
+status: complete
 title: "Run foreground-plus-maintenance Supabase/HNSW/ParadeDB/graph load, connection caps, budget-lock contention, CPU offload, and five-stream event-loop tests."
 requirement_ids: [P09-04]
 ---

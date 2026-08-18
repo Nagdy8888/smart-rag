@@ -19,7 +19,6 @@ from smart_rag_core.release.packet2 import (
     classify_suite_counts,
     junit_counts,
     load_packet1_image_ids,
-    local_handoffs_block,
     merge_suite_rows,
     missing_pytest_files,
     pytest_spec_path,
@@ -90,15 +89,14 @@ def test_managed_jwks_is_not_a_packet2_pytest_suite() -> None:
     assert handoff.acceptance == "P09-02-B"
 
 
-def test_old_api_new_schema_is_blocked_local_gap() -> None:
-    """Missing old-slot smoke is Blocked locally, not relabeled as managed."""
+def test_old_api_new_schema_passed_local_drain() -> None:
+    """Live prior-slot smoke is local Packet 2/7 evidence, not managed."""
 
-    item = local_handoffs_block("P09-02-D")
-    assert item is not None
-    assert item.item_id == "old_api_new_schema_smoke"
-    assert item.classification == "Blocked"
+    item = next(row for row in HANDOFFS if row.item_id == "old_api_new_schema_smoke")
+    assert item.acceptance == "P09-02-D"
+    assert item.classification == "Passed"
     assert item.managed_only is False
-    assert "Do not fake" in item.next_action
+    assert "old-api-prior" in item.next_action
 
 
 def test_trivy_is_packet6_blocked_and_not_retried() -> None:

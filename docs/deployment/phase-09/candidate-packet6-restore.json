@@ -11,7 +11,7 @@
     "runtime_database": "postgres"
   },
   "dump": {
-    "bytes": 3446445,
+    "bytes": 7661455,
     "copy_returncode": 0,
     "dump_returncode": 0,
     "live_database_overwritten": false,
@@ -23,7 +23,11 @@
   "schema_version": "phase09-candidate-packet6-restore-v1",
   "storage": {
     "missing": [],
-    "object_counts": {},
+    "object_counts": {
+      "documents-originals": 1,
+      "documents-quarantine": 1,
+      "table-artifacts": 1
+    },
     "passed": true,
     "present": [
       "documents-originals",

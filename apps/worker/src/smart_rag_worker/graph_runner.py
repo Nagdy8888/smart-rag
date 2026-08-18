@@ -23,6 +23,7 @@ from smart_rag_core.jobs.graph_writer import (
     heartbeat_graph_writer_lease,
 )
 from smart_rag_core.jobs.lightrag_repository import LightragIndexJobRepository
+from smart_rag_core.jobs.maintenance_pause import MaintenancePauseController
 from smart_rag_core.retrieval.graph import DEFAULT_GRAPH_WORKSPACE, GraphIndexer
 from smart_rag_core.retrieval.lightrag_adapter import LightRagRuntimeAdapter
 from smart_rag_core.retrieval.lightrag_indexer import LightRagGraphIndexer
@@ -40,6 +41,7 @@ class GraphWorkerLoop:
         settings: WorkerSettings,
         *,
         adapter: LightRagRuntimeAdapter | None,
+        pause_controller: MaintenancePauseController | None = None,
     ) -> None:
         """Capture worker settings and the optional attached adapter.
 
@@ -47,10 +49,16 @@ class GraphWorkerLoop:
             settings: Validated worker settings.
             adapter: Runtime adapter bound in ``WorkerLifecycle``, or ``None``
                 when ``LIGHTRAG_DB_URL`` is unset.
+            pause_controller: User-load pause for LightRAG rebuilds. Defaults
+                to unmeasured-allows so missing docker telemetry does not
+                dead-letter rebuilds. Inject fixtures to prove 70%.
         """
 
         self._settings = settings
         self._adapter = adapter
+        self._pause_controller = (
+            pause_controller or MaintenancePauseController.unmeasured_allows()
+        )
         self._indexer: GraphIndexer | None = (
             LightRagGraphIndexer(adapter) if adapter is not None else None
         )
@@ -217,6 +225,7 @@ class GraphWorkerLoop:
                         lease_seconds=self._settings.job_lease_seconds,
                     ),
                     mapping_support=bind_mapping_support(work_conn, self._settings),
+                    pause_controller=self._pause_controller,
                 )
                 outcome = asyncio.run(
                     service.process_claimed_job(

@@ -40,7 +40,7 @@
     "passed": true,
     "rebuild_scope": "authorized_current",
     "sql_stamped_hybrid_or_graph_ready": false,
-    "version_count": 170,
+    "version_count": 426,
     "worker_returncode": 0,
     "worker_stderr": ""
   },

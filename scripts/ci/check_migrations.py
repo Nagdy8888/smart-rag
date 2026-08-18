@@ -61,6 +61,7 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260816190000_fastapi_security_rpcs_v1.sql",
     "20260816200000_query_run_events_v1.sql",
     "20260816210000_query_memory_store_reaper_v1.sql",
+    "20260818140000_document_scan_events_worker_rls_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

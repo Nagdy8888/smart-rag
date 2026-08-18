@@ -5,8 +5,9 @@
       "driver": "Bm25ProjectionService.process_upsert_job",
       "identity_drift": false,
       "image_rebuilt": false,
-      "parade_total_rows": 1051,
+      "parade_total_rows": 116,
       "passed": true,
+      "rebuild_scope": "packet2_corpus",
       "sample_is_eight_doc_subset": true,
       "schema_version": "phase09-candidate-packet4-bm25-v1",
       "sql_stamped_hybrid_or_graph_ready": false,
@@ -30,7 +31,7 @@
           "detail": "",
           "document_id": "1b0d09c0-e050-474a-a77f-9158792891f5",
           "driver": "Bm25ProjectionService.process_upsert_job",
-          "job_id": "3e5bbc4b-98e7-4f77-845a-0dbc81428d37",
+          "job_id": "a0b19aef-fb3d-452a-b782-1f717023647d",
           "parade_row_count": 2,
           "passed": true,
           "skipped": false,
@@ -43,7 +44,7 @@
           "detail": "",
           "document_id": "769f3b6c-668b-40d2-ac3f-5377a64f831a",
           "driver": "Bm25ProjectionService.process_upsert_job",
-          "job_id": "b8aabef0-2081-49ed-9c35-3a0c15df52c0",
+          "job_id": "5c65bf9e-d45d-44e4-ad26-6e407e9f6631",
           "parade_row_count": 2,
           "passed": true,
           "skipped": false,
@@ -66,12 +67,12 @@
     "shared_row": "company_settings plus profile FOR UPDATE at admit only",
     "unique_runs": 4,
     "wait_ms": [
-      15.99999999962165,
-      30.999999999039574,
-      30.999999999039574,
-      47.00000000048021
+      16.00000000325963,
+      16.00000000325963,
+      31.999999991967343,
+      46.999999991385266
     ],
-    "wait_p95_ms": 44.60000000026412,
+    "wait_p95_ms": 44.74999999147258,
     "workers": 4
   },
   "graph": {
@@ -83,13 +84,20 @@
     "workspace_key": "company_default"
   },
   "hnsw": {
-    "detail": "REINDEX on seeded chunks, not the 1M envelope",
-    "elapsed_ms": 281.00000000085856,
+    "detail": "maintenance_paused_before_reindex",
+    "elapsed_ms": 0.0,
+    "fail_closed": false,
     "index": "app.document_chunks_embedding_hnsw_idx",
     "passed": true,
-    "sample_is_eight_doc_subset": true
+    "pause_reasons": [
+      "cpu_at_or_above_70pct"
+    ],
+    "paused": true,
+    "reindex_executed": false,
+    "sample_is_eight_doc_subset": true,
+    "trigger_70_percent_fired": true
   },
-  "runtime_pause_controller": "No in-process 70% pause controller was observed. Architecture docs define the trigger; Packet 4 measures whether it fires.",
+  "runtime_pause_controller": "In-process MaintenancePauseController gates HNSW REINDEX, LightRAG clean rebuild, and BM25 subset rebuild. Fixture tests prove the 70% trigger. Live 8-doc Packet 4 peaked at 3.06% CPU and did not fire. Do not claim QT-CAP-001/002 from that subset.",
   "sample_is_eight_doc_subset": true,
   "schema_version": "phase09-candidate-packet4-contention-v1",
   "threads_alive": false

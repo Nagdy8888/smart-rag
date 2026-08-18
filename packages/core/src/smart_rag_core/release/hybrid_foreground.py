@@ -82,16 +82,17 @@ def run_hybrid_foreground(
         Timing payload with ``first_evidence_ms`` samples.
 
     Side Effects:
-        Opens two database connections and runs retrieve. Mock embeddings
-        follow worker ``MOCK_MODEL_MODE``.
+        Opens two autocommit database connections and runs retrieve. Mock
+        embeddings follow worker ``MOCK_MODEL_MODE``. Autocommit keeps the
+        connection idle so ``retrieval_transaction`` can begin.
     """
 
     settings = SharedSettings()
     gateway = create_embedding_gateway(settings)
     samples: list[dict[str, object]] = []
     with (
-        psycopg.connect(supabase_url) as supabase,
-        psycopg.connect(parade_url, connect_timeout=8) as parade,
+        psycopg.connect(supabase_url, autocommit=True) as supabase,
+        psycopg.connect(parade_url, connect_timeout=8, autocommit=True) as parade,
     ):
         caller = _load_caller(supabase, user_id)
         retriever = HybridRetriever(

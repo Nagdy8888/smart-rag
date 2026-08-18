@@ -54,12 +54,12 @@
   "inject_degrade_returncode": 0,
   "overlay_file_is_candidate": false,
   "parade_rows_after": {
-    "bm25_chunks": 1051,
+    "bm25_chunks": 116,
     "returncode": 0,
     "unpublished": true
   },
   "parade_rows_before": {
-    "bm25_chunks": 1051,
+    "bm25_chunks": 116,
     "returncode": 0,
     "unpublished": true
   },

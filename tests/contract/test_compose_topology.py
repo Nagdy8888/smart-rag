@@ -12,6 +12,17 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_PATH = REPO_ROOT / "docker-compose.yml"
 PROXY_SERVER = REPO_ROOT / "infra" / "crawl-proxy" / "server.py"
+IMAGE_DIGESTS = REPO_ROOT / "infra" / "paradedb" / "IMAGE_DIGESTS.md"
+PYTHON_DISTROLESS_DOCKERFILES: tuple[str, ...] = (
+    "apps/backend/Dockerfile",
+    "apps/worker/Dockerfile",
+    "apps/agents/Dockerfile",
+    "infra/crawl-proxy/Dockerfile",
+)
+ALPINE_DOCKERFILES: tuple[str, ...] = (
+    "apps/frontend/Dockerfile",
+    "infra/parser-sandbox/Dockerfile",
+)
 
 
 def _mapping(value: object) -> dict[str, object]:
@@ -170,3 +181,99 @@ def test_application_images_run_as_non_root() -> None:
 
     assert _service("api")["user"] == "10001:10001"
     assert _service("worker")["user"] == "10001:10001"
+
+
+def test_distroless_healthchecks_use_exec_form() -> None:
+    """Distroless runtimes have no /bin/sh, so healthchecks cannot use CMD-SHELL."""
+
+    for name in ("api", "worker", "crawl-proxy"):
+        healthcheck = _mapping(_service(name)["healthcheck"])
+        test = _string_list(healthcheck["test"])
+        assert test[0] == "CMD", f"{name} healthcheck must use exec-form CMD"
+        assert test[1] == "python", f"{name} healthcheck must invoke python directly"
+
+
+def _digest_pin(prefix: str) -> str:
+    """Return one ``name@sha256:`` pin from IMAGE_DIGESTS.md.
+
+    Args:
+        prefix: Line prefix such as ``library/python:3.11-alpine``.
+
+    Returns:
+        The matching pin without the ``library/`` registry prefix.
+
+    Raises:
+        AssertionError: If the pin is missing or malformed.
+    """
+
+    for line in IMAGE_DIGESTS.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith(prefix + "@sha256:"):
+            pin = stripped.removeprefix("library/")
+            assert "@sha256:" in pin
+            return pin
+    raise AssertionError(f"missing IMAGE_DIGESTS pin for {prefix}")
+
+
+def test_application_dockerfiles_pin_current_base_digests() -> None:
+    """Application Dockerfiles must match the documented official digest pins."""
+
+    python_trixie = _digest_pin("library/python:3.11-slim-trixie")
+    python_alpine = _digest_pin("library/python:3.11-alpine")
+    node_pin = _digest_pin("library/node:20-alpine")
+    distroless_pin = _digest_pin("gcr.io/distroless/cc-debian13:nonroot")
+    for relative in PYTHON_DISTROLESS_DOCKERFILES:
+        content = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        assert python_trixie in content, f"{relative} missing {python_trixie}"
+        assert distroless_pin in content, f"{relative} missing {distroless_pin}"
+        assert "ghcr.io/astral-sh/uv:0.11.23" in content or relative.startswith(
+            "infra/"
+        )
+    parser = (REPO_ROOT / "infra/parser-sandbox/Dockerfile").read_text(encoding="utf-8")
+    assert python_alpine in parser
+    frontend = (REPO_ROOT / "apps/frontend/Dockerfile").read_text(encoding="utf-8")
+    assert frontend.count(f"FROM {node_pin}") == 2
+    assert "pnpm@9.15.0" in frontend
+    assert "rm -rf /usr/local/lib/node_modules/npm" in frontend
+
+
+def test_application_dockerfiles_upgrade_as_root_before_user_10001() -> None:
+    """Builder OS upgrades must finish before the runtime drops to UID 10001."""
+
+    for relative in PYTHON_DISTROLESS_DOCKERFILES:
+        content = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        runtime_idx = content.rfind("FROM gcr.io/distroless/cc-debian13:nonroot")
+        user_idx = content.find("USER 10001:10001")
+        upgrade_idx = content.find("apt-get upgrade -y")
+        assert runtime_idx >= 0, f"{relative} must use distroless runtime"
+        assert 0 <= upgrade_idx < runtime_idx < user_idx, (
+            f"{relative} must apt-get upgrade in the builder before distroless USER 10001"
+        )
+        runtime = content[runtime_idx:]
+        assert "apt-get" not in runtime
+        assert "apk " not in runtime
+    for relative in ALPINE_DOCKERFILES:
+        content = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        user_idx = content.find("USER 10001:10001")
+        upgrade_idx = content.find("apk upgrade --no-cache")
+        assert user_idx >= 0, f"{relative} must drop to USER 10001:10001"
+        assert 0 <= upgrade_idx < user_idx, (
+            f"{relative} must apk upgrade as root before USER 10001"
+        )
+        assert "USER 10001:10001" not in content[:upgrade_idx]
+
+
+def test_distroless_venv_images_copy_extra_shared_libs() -> None:
+    """API/worker/agents copy libffi and wheel .so deps without dpkg metadata."""
+
+    for relative in (
+        "apps/backend/Dockerfile",
+        "apps/worker/Dockerfile",
+        "apps/agents/Dockerfile",
+    ):
+        content = (REPO_ROOT / relative).read_text(encoding="utf-8")
+        assert "infra/docker/collect_runtime_shared_libs.py" in content
+        runtime_idx = content.rfind("FROM gcr.io/distroless/cc-debian13:nonroot")
+        runtime = content[runtime_idx:]
+        assert "COPY --from=builder --chown=10001:10001 /runtime-so/ /" in runtime
+        assert "/var/lib/dpkg" not in content

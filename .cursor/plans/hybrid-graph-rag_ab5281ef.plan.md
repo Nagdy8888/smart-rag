@@ -28,7 +28,7 @@ todos:
     status: pending
   - id: phase-09-local-release-candidate
     content: Execute Phase 9: Local release candidate from its dedicated plan file.
-    status: pending
+    status: completed
   - id: phase-10-managed-staging
     content: Execute Phase 10: Managed staging from its dedicated plan file.
     status: pending

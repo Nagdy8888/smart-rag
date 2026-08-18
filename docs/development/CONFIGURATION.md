@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-18
 audience: developers, operators
 ---
 
@@ -18,7 +18,7 @@ Validation errors list field paths and categories but omit source values.
 
 | Variable | Type / default | Security | Contract |
 | --- | --- | --- | --- |
-| `APP_ENV` | `local`, `test`, `staging`, or `production`; `local` | public | Deployment label added to every structured log |
+| `APP_ENV` | `local`, `test`, `staging`, or `production`; `local` | public | Deployment label added to every structured log. `local` also enables the documented JWT `iss` hostname pair under backend `SUPABASE_URL` |
 | `MOCK_MODEL_MODE` | boolean; `true` | public | Secure default; selects frozen fixtures and denies DNS access to `api.openai.com` |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; `INFO` | public | Root JSON log threshold |
 | `OPENAI_API_KEY` | optional secret in mock mode | secret | Required when `MOCK_MODEL_MODE=false`; never logged or represented in plaintext |
@@ -37,6 +37,7 @@ Validation errors list field paths and categories but omit source values.
 | `SMART_RAG_REQUIRE_CRAWL_PROXY` | `1` fails closed | public | Live proxy overlay tests fail instead of skip |
 | `SMART_RAG_REQUIRE_JOB_INTEGRATION` | `1` fails closed | public | Postgres job/checkpointer tests fail instead of skip |
 | `SMART_RAG_REQUIRE_PHASE09_CANDIDATE` | `1` fails closed | public | Phase 9 Packet 1 live Compose/Supabase/artifact contract tests fail instead of skip |
+| `SMART_RAG_OLD_API_IMAGE` | Docker image Id (`sha256:` hex) | public | Prior expand-compatible API image for Packet 2/7 old-slot/new-schema authenticated read/chat/upload smoke. Unset or a missing local image classifies Blocked (not a pytest skip). Must not equal the Packet 1 freeze API Id |
 | `SMART_RAG_HOLDOUT_ACCESS` | boolean; `false` | public | Default denies sealed holdout labels. Packet 8 freeze refuses to run when true. Enable only for an independently SME-sealed holdout or dataset seal verify |
 | `SMART_RAG_HOLDOUT_ACCESS_PURPOSE` | `packet8_immutable_holdout` or `dataset_seal_verify` | internal | Required when holdout access is enabled |
 | `SMART_RAG_HOLDOUT_ACCESS_ACTOR` | safe identifier | internal | Auditable actor required when holdout access is enabled |
@@ -81,6 +82,8 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | --- | --- | --- | --- |
 | `API_BIND_HOST` | non-empty string; `0.0.0.0` | public | Uvicorn bind address used only by the console entrypoint |
 | `API_BIND_PORT` | integer 1–65,535; `8000` | public | Uvicorn container port |
+| `SUPABASE_URL` | HTTP origin; `http://127.0.0.1:54321` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. See local `iss` aliases below. |
+| `SUPABASE_JWT_AUDIENCE` | non-empty string; `authenticated` | public | Required JWT `aud` claim |
 | `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
 | `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api` |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. |
@@ -93,6 +96,16 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `REQUEST_MAX_BODY_BYTES` | 1024–16_777_216; `1048576` | public | JSON/body cap; oversized → 413 |
 | `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |
 | `RATE_LIMIT_RETRY_AFTER_SECONDS` | 1–3600; `60` | public | `Retry-After` on limiter 429/503 |
+
+Host `.env` sets `SUPABASE_URL=http://127.0.0.1:54321`. Compose API sets
+`SUPABASE_URL=http://host.docker.internal:54321` so the container can fetch
+JWKS from local GoTrue. When `APP_ENV=local` and `SUPABASE_URL` is one of
+those two origins, FastAPI accepts `iss`
+`http://127.0.0.1:54321/auth/v1` or
+`http://host.docker.internal:54321/auth/v1`. Signature, `kid`, and `alg`
+still verify against the configured JWKS URL. Staging and production never
+expand aliases. Do not mutate `GOTRUE_JWT_ISSUER` to paper over this split.
+See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 
 `X-Client-Version` is a request header, not an environment variable. New paid
 `POST /conversations/{conversation_id}/messages` must send a semver-like value

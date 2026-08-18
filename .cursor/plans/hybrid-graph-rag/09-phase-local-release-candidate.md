@@ -1,13 +1,16 @@
 ---
 name: hybrid-graph-rag-phase-09-local-release-candidate
 phase: 9
-status: pending
+status: complete
 depends_on: [1, 2, 3, 4, 5, 6, 7, 8]
 split_source: true
 source_plan: ../hybrid-graph-rag_ab5281ef.plan.md
 global_contract: ./00-global-contracts.md
 phase_shared_contract: ./09-phase-local-release-candidate/00-shared-contracts.md
 evidence_path: docs/development/phase-09-local-release-candidate-evidence.md
+completed: 2026-08-18
+accepted_by: "user (Cursor chat)"
+acceptance_text: "i want this phase to be 100% to start the next one"
 ---
 
 # Phase 9: Local release candidate
@@ -49,12 +52,12 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
 1. [x] [Build the exact candidate images and seed only the approved local evaluation corpus through all readiness states.](./09-phase-local-release-candidate/packets/01-build-exact-candidate-images.md)
-2. [ ] [Run all applicable hard CI, expand/contract migration compatibility, identity/RLS/BM25/cache/read-audit, graph isolation, injection, parsing, deletion, idempotency/GC, API/SSE compatibility, and redaction gates with no skipped required tests.](./09-phase-local-release-candidate/packets/02-run-applicable-hard-ci-and-security-gates.md)
+2. [x] [Run all applicable hard CI, expand/contract migration compatibility, identity/RLS/BM25/cache/read-audit, graph isolation, injection, parsing, deletion, idempotency/GC, API/SSE compatibility, and redaction gates with no skipped required tests.](./09-phase-local-release-candidate/packets/02-run-applicable-hard-ci-and-security-gates.md)
 3. [x] [Measure Hybrid/Combined/table/inspection quality, BM25 projection/query/recheck/rebuild behavior, p50/p95/deadlines, model calls/cost, graph survival, writer throughput, and onboarding ETA.](./09-phase-local-release-candidate/packets/03-measure-quality-latency-and-throughput.md)
-4. [ ] [Run foreground-plus-maintenance Supabase/HNSW/ParadeDB/graph load, connection caps, budget-lock contention, CPU offload, and five-stream event-loop tests.](./09-phase-local-release-candidate/packets/04-run-contention-and-five-stream-load.md)
+4. [x] [Run foreground-plus-maintenance Supabase/HNSW/ParadeDB/graph load, connection caps, budget-lock contention, CPU offload, and five-stream event-loop tests.](./09-phase-local-release-candidate/packets/04-run-contention-and-five-stream-load.md)
 5. [x] [Kill, deny, fill, and restart worker/ParadeDB/Valkey/services to prove reclaim, degraded retrieval/rate behavior, heartbeat/reconnect, and safe recovery.](./09-phase-local-release-candidate/packets/05-prove-failure-degradation-and-recovery.md)
-6. [ ] [Run local egress enforcement, dependency/image scans, Supabase database plus all Storage-bucket restore/reconciliation including LightRAG, clean ParadeDB projection rebuild, and instance-equivalent sizing evidence.](./09-phase-local-release-candidate/packets/06-run-egress-scans-restore-and-sizing.md)
-7. [ ] [Resolve blockers or explicitly reduce/resign supported limits; leave managed-topology gates clearly open for Phase 10.](./09-phase-local-release-candidate/packets/07-resolve-blockers-and-handoff-managed-gates.md)
+6. [x] [Run local egress enforcement, dependency/image scans, Supabase database plus all Storage-bucket restore/reconciliation including LightRAG, clean ParadeDB projection rebuild, and instance-equivalent sizing evidence.](./09-phase-local-release-candidate/packets/06-run-egress-scans-restore-and-sizing.md)
+7. [x] [Resolve blockers or explicitly reduce/resign supported limits; leave managed-topology gates clearly open for Phase 10.](./09-phase-local-release-candidate/packets/07-resolve-blockers-and-handoff-managed-gates.md)
 
 ## Phase sequence requirement
 

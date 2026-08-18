@@ -1,6 +1,6 @@
 ---
 phase: 9
-status: pending
+status: complete
 title: Phase 9 shared contracts
 source_wrapper: ../09-phase-local-release-candidate.md
 evidence_path: docs/development/phase-09-local-release-candidate-evidence.md

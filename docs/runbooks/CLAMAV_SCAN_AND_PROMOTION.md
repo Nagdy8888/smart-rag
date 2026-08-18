@@ -2,7 +2,7 @@
 title: ClamAV scan and Storage promotion runbook
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-18
 audience: engineering, operations
 ---
 
@@ -36,7 +36,7 @@ flowchart LR
 1. `PING` proves daemon responsiveness only; it is **not** scan readiness.
 2. Before scan, read `VERSION` and `STATS`; reject signatures older than 24 hours.
 3. Scan the exact downloaded object stream; never scan directories or caller paths.
-4. Persist append-only `document_scan_events` including engine, signature ids/timestamps, config version, bytes examined, and result.
+4. Persist append-only `document_scan_events` including engine, signature ids/timestamps, config version, bytes examined, and result. `app_worker` needs both INSERT grants **and** RLS policies `document_scan_events_worker_insert` / `document_scan_events_worker_select`; a grant without a policy fails closed with `InsufficientPrivilege` and used to orphan the job lease.
 5. Run metadata governance; extracted-text detectors arrive in Packet 5. Until then, real content requires reviewer approval and cannot enable external processing.
 6. Promotion saga: intent → copy → verify hash/size → transactional DB switch → delete quarantine source.
 

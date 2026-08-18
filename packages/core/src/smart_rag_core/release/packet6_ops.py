@@ -355,7 +355,9 @@ def scan_image_tar(
         image_id: Frozen image Id.
 
     Returns:
-        Compact scan row. Tar files are deleted afterward.
+        Compact scan row. Tar files are deleted afterward. ``docker save``
+        is allowed 600 seconds because distroless copies of ``/usr/local``
+        are large.
     """
 
     docker = shutil.which("docker") or "docker"
@@ -364,7 +366,7 @@ def scan_image_tar(
     tar_path = tar_dir / f"{service}.tar"
     saved = _run(
         [docker, "save", "-o", str(tar_path), image_id],
-        timeout_seconds=180,
+        timeout_seconds=600,
     )
     if saved.returncode != 0 or not tar_path.is_file():
         return {

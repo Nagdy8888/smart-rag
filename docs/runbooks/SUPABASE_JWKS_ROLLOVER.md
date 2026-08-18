@@ -2,7 +2,7 @@
 title: Supabase JWKS signing-key rollover
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-18
 audience: engineering, ops, security
 ---
 
@@ -62,7 +62,7 @@ Local `jwt_expiry = 3600` in `supabase/config.toml`.
 | --- | --- |
 | Unknown `kid` spike after refresh | Check Supabase Auth status; verify JWKS URL reachable |
 | JWKS fetch errors | Fail closed (401/503); do not fall back to JWT secret |
-| All tokens fail after rollover | Confirm issuer URL matches `SUPABASE_URL/auth/v1` |
+| All tokens fail after rollover | Confirm issuer URL matches `SUPABASE_URL/auth/v1`. Local Docker may use the documented `127.0.0.1` / `host.docker.internal` `iss` pair only when `APP_ENV=local`. |
 
 ## Verification commands
 
@@ -77,4 +77,5 @@ Invoke-RestMethod https://qsjivtwtmlmtksufqjik.supabase.co/auth/v1/.well-known/j
 ## Related documents
 
 - [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md)
+- [CONFIGURATION.md](../development/CONFIGURATION.md)
 - [ADR-privileged-auth-administration-boundary.md](../adr/ADR-privileged-auth-administration-boundary.md)

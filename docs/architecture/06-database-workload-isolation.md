@@ -2,9 +2,9 @@
 title: Database workload isolation
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-18
 audience: engineering, ops
-phase_packet: Phase 2 Packet 6
+phase_packet: Phase 2 Packet 6 / Phase 9 Packet 7
 ---
 
 # Database workload isolation
@@ -51,6 +51,20 @@ approved windows and **pause automatically** when:
 
 Foreground query traffic must not share unbounded `work_mem` with maintenance.
 
+The runtime controller is
+`smart_rag_core.jobs.maintenance_pause.MaintenancePauseController`.
+HNSW `REINDEX`, LightRAG `rebuild` jobs, and Packet 4 BM25 subset rebuild
+call it before starting work. Injected fixtures prove the trigger at 70%.
+Missing or invalid telemetry is fail-closed for those gated paths (they do
+not treat unknown pressure as below threshold). The worker's live rebuild
+loop uses unmeasured-allows until docker or cloud scrape is injected, so
+missing host telemetry does not dead-letter rebuilds.
+
+Live Phase 9 Packet 4 on the labeled 8-version / 16-chunk subset peaked at
+3.06% CPU and did not fire. That subset is not QT-CAP-001/002. Live 70%
+remains **Blocked**. Do not busy-loop the 8GB Docker VM to force the
+trigger.
+
 ## Escalation ladder (signed triggers)
 
 1. **Tune and vertical resize** — index params, `work_mem`, tier RAM/CPU.
@@ -71,8 +85,8 @@ No replica or graph store bypasses primary canonical authorization.
   role in Phase 9 load tests. Packet 4 measured these on the labeled 8-version
   / 16-chunk candidate subset; see
   [phase-09-local-release-candidate-evidence.md](../development/phase-09-local-release-candidate-evidence.md).
-  The 70% pause controller is still documentation-only; Packet 4 records
-  whether the trigger fired rather than claiming a runtime controller.
+  The in-process 70% pause controller is fixture-proven. Live Packet 4 did
+  not reach 70% CPU, so the live trigger stays Blocked on that 8-doc mock.
 - ParadeDB isolation metrics remain separate (CPU/memory/lag/rebuild duration).
 
 ## Related
@@ -80,3 +94,5 @@ No replica or graph store bypasses primary canonical authorization.
 - [05-database-connections.md](./05-database-connections.md)
 - [AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./AVAILABILITY_AND_ISOLATION_TRIGGERS.md)
 - [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
+- [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md)
+- [phase-09-local-release-candidate-evidence.md](../development/phase-09-local-release-candidate-evidence.md)

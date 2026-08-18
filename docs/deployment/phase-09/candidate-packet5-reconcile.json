@@ -1,29 +1,29 @@
 {
   "after": {
     "budget_reservations": 2,
-    "chunks": 604,
+    "chunks": 1539,
     "ingestion_jobs": 3,
     "ledger_rows": 1,
     "lightrag_doc_status": 0,
     "lightrag_jobs": 52,
     "passed": true,
-    "versions": 248
+    "versions": 600
   },
   "before": {
     "budget_reservations": 2,
-    "chunks": 604,
+    "chunks": 1539,
     "ingestion_jobs": 1,
     "ledger_rows": 1,
     "lightrag_doc_status": 0,
     "lightrag_jobs": 52,
     "passed": true,
-    "versions": 248
+    "versions": 600
   },
   "drift": {
     "authority_transferred": false,
     "canonical_matched": true,
-    "chunks_after": 604,
-    "chunks_before": 604,
+    "chunks_after": 1539,
+    "chunks_before": 1539,
     "duplicate_canonical": false,
     "ingestion_jobs_after": 3,
     "ingestion_jobs_before": 1,
@@ -31,8 +31,8 @@
     "ledger_rows_before": 1,
     "lightrag_doc_status_after": 0,
     "lightrag_doc_status_before": 0,
-    "versions_after": 248,
-    "versions_before": 248
+    "versions_after": 600,
+    "versions_before": 600
   },
   "health_after": {
     "command": "scripts/phase09_candidate.py health",
@@ -44,11 +44,11 @@
   },
   "identity_held": true,
   "jwt": {
-    "aligned": false,
+    "aligned": true,
     "api_expected_iss": "http://host.docker.internal:54321/auth/v1",
-    "classification": "Blocked",
-    "detail": "GoTrue and the frozen API share one JWKS kid but two hostnames. Packet 4 does not rebuild images or mutate GOTRUE_JWT_ISSUER.",
-    "sizing_ladder": "Frozen Packet 1 API binds JWKS fetch and expected iss to one SUPABASE_URL (host.docker.internal). Local GoTrue stamps http://127.0.0.1:54321/auth/v1. Do not rebuild images in Packet 4. Repair is a JWKS-URL vs iss split or a single managed hostname (Phase 10). Do not mutate GOTRUE_JWT_ISSUER in a way that breaks host JWKS contracts.",
+    "classification": "Passed",
+    "detail": "Local APP_ENV aliases accept both 127.0.0.1 and host.docker.internal iss values against one JWKS URL.",
+    "sizing_ladder": "APP_ENV=local accepts the documented 127.0.0.1 / host.docker.internal iss pair while JWKS still loads from SUPABASE_URL. Staging and production stay single-issuer. Do not mutate GOTRUE_JWT_ISSUER. Packet 1 freeze is the distroless/Alpine identity; do not reuse sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632.",
     "token_iss": "http://127.0.0.1:54321/auth/v1"
   },
   "overlay": {

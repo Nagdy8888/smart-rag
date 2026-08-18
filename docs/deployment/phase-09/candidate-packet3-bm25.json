@@ -10,10 +10,10 @@
     "seeded_graph_eligible_versions": 2
   },
   "lag": {
-    "completed_count": 42,
-    "job_count": 66,
-    "lag_p50_seconds": 35.695676,
-    "lag_p95_seconds": 98.86994799999997,
+    "completed_count": 141,
+    "job_count": 175,
+    "lag_p50_seconds": 21.092211,
+    "lag_p95_seconds": 75.421788,
     "qt_bm25_002_live": false,
     "qt_bm25_003_passed": true,
     "qt_bm25_003_seconds": 300.0,

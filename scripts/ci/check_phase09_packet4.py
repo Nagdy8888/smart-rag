@@ -69,6 +69,7 @@ from smart_rag_core.release.packet4_load import (
     graph_advisory_lock_cycle,
     measure_budget_lock_contention,
     measure_supabase_pools,
+    pressure_sample_from_docker_rows,
     reindex_hnsw,
     sse_event_names,
     stream_gate_payload,
@@ -83,19 +84,26 @@ CLIENT_VERSION = "0.1.0"
 _PASSWORD = "Phase6Ui9x"  # noqa: S105 - disposable local Auth user
 WORKER_REPROJECT_PATH = "/tmp/bm25_reproject.py"  # noqa: S108 - worker tmpfs
 WORKER_HYBRID_PATH = "/tmp/hybrid_foreground.py"  # noqa: S108 - worker tmpfs
-_LAG_SNIPPET = (
-    "import asyncio,json;"
-    "from smart_rag_core.runtime.offload import sample_event_loop_lag;"
-    "async def m():"
-    " s=await sample_event_loop_lag(samples=20,interval_seconds=0.01);"
-    " print(json.dumps({"
-    "'p95_seconds':s.p95_seconds,"
-    "'lag_seconds':s.lag_seconds,"
-    "'gate_seconds':0.05,"
-    "'passed':s.p95_seconds<0.05"
-    "}));"
-    "asyncio.run(m())"
-)
+_LAG_SNIPPET = """
+import asyncio
+import json
+from smart_rag_core.runtime.offload import sample_event_loop_lag
+
+async def main() -> None:
+    sample = await sample_event_loop_lag(samples=20, interval_seconds=0.01)
+    print(
+        json.dumps(
+            {
+                "p95_seconds": sample.p95_seconds,
+                "lag_seconds": sample.lag_seconds,
+                "gate_seconds": 0.05,
+                "passed": sample.p95_seconds < 0.05,
+            }
+        )
+    )
+
+asyncio.run(main())
+""".strip()
 
 
 def _as_map(value: Any, *, source: str) -> dict[str, object]:
@@ -997,12 +1005,13 @@ def _run_maintenance(db_url: str, corpus_json: str) -> dict[str, object]:
     """
 
     results: dict[str, object] = {}
+    pressure = pressure_sample_from_docker_rows(_docker_stats())
 
     def _hnsw() -> None:
-        """Reindex the canonical HNSW index."""
+        """Reindex the canonical HNSW index unless the 70% pause fires."""
 
         with psycopg.connect(db_url) as connection:
-            results["hnsw"] = reindex_hnsw(connection)
+            results["hnsw"] = reindex_hnsw(connection, pressure=pressure)
 
     def _graph() -> None:
         """Probe concurrency-one graph advisory lock."""
@@ -1238,13 +1247,19 @@ def _target_rows(
                         "on the Packet 2 7-case subset beside maintenance. "
                         "Not live OpenAI."
                     ),
-                    passed=hybrid_ok if isinstance(hybrid_n, int) and hybrid_n > 0 else None,
+                    passed=hybrid_ok
+                    if isinstance(hybrid_n, int) and hybrid_n > 0
+                    else None,
                 )
             )
             continue
         if spec.target_id in {"QT-LAT-010"}:
             passed = stream_map.get("qt_lat_010_passed") is True
-            sampled = isinstance(first_n, int) and not isinstance(first_n, bool) and first_n > 0
+            sampled = (
+                isinstance(first_n, int)
+                and not isinstance(first_n, bool)
+                and first_n > 0
+            )
             rows.append(
                 classify_target(
                     spec,

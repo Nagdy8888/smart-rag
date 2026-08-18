@@ -67,12 +67,23 @@ Later packets consume these committed artifacts under
 | `candidate-packet6-restore.json` | Disposable `app`+`lightrag` dump/restore and bucket inventory |
 | `candidate-packet6-rebuild.json` | ParadeDB volume destroy and worker BM25 re-projection |
 | `candidate-packet6-sizing.json` | Local RTO/RPO decision without EC2/QT-CAP-001 claims |
-| `candidate-packet7-gate-matrix.json` | Packet 7 P09-07-A–E matrix; wrapper stays pending |
+| `candidate-packet7-gate-matrix.json` | Packet 7 P09-07-A–E matrix; last runner snapshot while wrapper pending |
 | `candidate-packet7-phase10-handoff.json` | Local blockers plus Phase 10 managed ownership |
-| `candidate-packet7-promotion-manifest.json` | Exact artifacts Phase 10 may consume; rollback; no-go |
+| `candidate-packet7-promotion-manifest.json` | Exact artifacts Phase 10 may consume; rollback; reduced-envelope go |
+| `candidate-old-api-new-schema-smoke.json` | Packet 2/7 old-slot/new-schema smoke classification |
+| `candidate-packet4-seventy-live.json` | Live 8-doc Composite p95 and CPU peaks for 70% pause |
+| `candidate-packet7-trivy-repair.json` | Distroless/Alpine tar Trivy compact rows; Critical=0; High counts recorded |
 
 A changed git SHA, lockfile, Dockerfile, or image Id invalidates Packet 1
 evidence. Rebuild and reseed; do not reuse a stale digest.
+
+Application Dockerfiles pin official `python:3.11-slim-trixie` builders plus
+`gcr.io/distroless/cc-debian13:nonroot` runtimes for API/worker/crawl-proxy,
+and Alpine pins for frontend/parser. Distroless has no `/bin/sh`, so those
+three Compose healthchecks use exec-form `CMD python`. See
+[`IMAGE_DIGESTS.md`](../../infra/paradedb/IMAGE_DIGESTS.md),
+[ADR-alpine-application-bases-trivy.md](../adr/ADR-alpine-application-bases-trivy.md),
+and [containers](../architecture/02-containers.md).
 
 ## Private-port invariant
 
@@ -157,8 +168,12 @@ is already migrated.
    attached, then the overlay is removed. Packet 2 ran schema determinism
    (two matching resets) and reseeded; later packets must consume the
    rewritten `candidate-corpus-manifest.json` document/version ids. Image Ids
-   stay the Packet 1 freeze. Old-API/new-schema smoke is Blocked until a
-   prior API digest exists. Do not retry Trivy via docker.sock.
+   stay the Packet 1 freeze. Old-API/new-schema smoke is Blocked when
+   `SMART_RAG_OLD_API_IMAGE` is unset or the image is missing; it is Failed
+    if that env resolves to the Packet 1 freeze API Id. Do not retry Trivy
+    via docker.sock. The 2026-08-18 distroless/Alpine repair cleared Trivy
+    Criticals (`candidate-packet7-trivy-repair.json`). High findings remain.
+    Packets 1-6 must re-run on the new Packet 1 freeze before Phase 10.
 8. Packet 3 measures quality/latency/BM25/graph against signed
    [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) on this corpus. Live-model
    Recall@K and Combined +10pp stay Not Run under `MOCK_MODEL_MODE=true`.
@@ -187,9 +202,15 @@ is already migrated.
     restore into live `postgres`, treat ParadeDB as canonical, or claim
     QT-CAP-001/EC2 from local NCPU.
 12. Packet 7 classifies remaining local blockers and the Phase 10 handoff.
-    It does not rebuild images, check its own checkbox, or set the wrapper
-    complete. Critical Trivy findings are a local no-go until identity is
-    re-frozen and Packets 1-6 are re-run.
+    It does not rebuild images. The runner refuses to check its own
+    checkbox or set the wrapper complete (P09-07-E). After user
+    acceptance the wrapper is checked administratively. Critical Trivy
+    findings are Passed on the distroless/Alpine freeze (High not
+    waived). Old-API/new-schema smoke reads `SMART_RAG_OLD_API_IMAGE`.
+    Unset or a missing prior image is Blocked; a prior Id equal to the
+    running `api` slot is Failed. Live drain on
+    `smart-rag-api:old-api-prior` versus historical slot `a39d4456…`
+    Passed. The advertised envelope is QT-CAP-001-P9 / QT-CAP-002-P9.
 
 ```mermaid
 flowchart TD
@@ -203,11 +224,15 @@ flowchart TD
 
 ## Sizing
 
-Signed envelopes remain QT-CAP-001 10,000 versions, QT-CAP-002 1e6 chunks,
-QT-CAP-005 2,000 graph versions, with Phase 5 Packet 8 reduced graph
-advertisement QT-CAP-005-P8 = 15. Packet 1 records local Docker `NCPU` /
-`MemTotal` and Compose `mem_limit` values. It does **not** claim instance-
-equivalent EC2 or managed Supabase capacity.
+Phase 1 aspiration rows remain QT-CAP-001 10,000 versions, QT-CAP-002 1e6
+chunks, and QT-CAP-005 2,000 graph versions. The **local candidate
+advertised envelope**, signed 2026-08-18, is QT-CAP-001-P9 = 8 Hybrid
+versions, QT-CAP-002-P9 = 16 chunks, and QT-CAP-005-P8 = 15 graph
+documents. Do not claim 10k/1M or 2,000 graph docs from this freeze.
+See [ADR-phase9-local-envelope-reduce.md](../adr/ADR-phase9-local-envelope-reduce.md).
+Packet 1 records local Docker `NCPU` / `MemTotal` and Compose `mem_limit`
+values. It does **not** claim instance-equivalent EC2 or managed Supabase
+capacity.
 
 ## Failure modes
 

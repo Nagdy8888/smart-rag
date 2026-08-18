@@ -332,9 +332,21 @@ def test_cleanup_uses_storage_api_not_sql_delete(
 def test_scan_events_block_fake_clean_for_app_api(
     db_connection: psycopg.Connection,
 ) -> None:
-    """Phase 2 cannot represent scans as clean via app_api."""
+    """Phase 2 cannot represent scans as clean via app_api; app_worker can."""
 
     with db_connection.cursor() as cursor:
+        cursor.execute("RESET ROLE")
+        cursor.execute("SET ROLE app_worker")
+        cursor.execute(
+            """
+            INSERT INTO app.document_scan_events (result, object_hash)
+            VALUES ('clean', 'worker-rls-clean')
+            RETURNING id
+            """
+        )
+        worker_clean = cursor.fetchone()
+        assert worker_clean is not None
+        cursor.execute("RESET ROLE")
         cursor.execute("SET ROLE app_api")
         cursor.execute("SAVEPOINT fake_clean")
         with pytest.raises(psycopg.Error):

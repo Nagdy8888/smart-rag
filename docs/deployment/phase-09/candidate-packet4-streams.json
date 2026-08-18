@@ -1,9 +1,188 @@
 {
   "asgi_heartbeat_gate": "tests/contract/test_sse_heartbeat.py five held streams",
+  "consumed_live_nodeid": "tests/contract/test_thin_developer_ui_live.py::test_thin_ui_live_five_composite_streams",
   "cpu_slice_budget_ms": 10,
   "live": {
-    "detail": "conversation_create_401",
-    "passed": false
+    "asgi_five_stream_passed": true,
+    "classification": "Passed",
+    "conversation_created": true,
+    "event_loop_lag": {
+      "gate_seconds": 0.05,
+      "lag_seconds": 0.00020651100043323802,
+      "p95_seconds": 0.0002640360000805229,
+      "passed": true
+    },
+    "hybrid_retrieve": {
+      "cases": [
+        {
+          "case_id": "p4-acl_negative-0003"
+        },
+        {
+          "case_id": "p4-alias-0003"
+        },
+        {
+          "case_id": "p4-arabic_mixed-0003"
+        },
+        {
+          "case_id": "p4-exact_code-0003"
+        },
+        {
+          "case_id": "p4-latest_as_of-0003"
+        },
+        {
+          "case_id": "p4-media_limitation-0002"
+        },
+        {
+          "case_id": "p4-tabular_aggregation-0003"
+        }
+      ],
+      "driver": "HybridRetriever.retrieve",
+      "first_evidence_ms": [
+        270.8343180001975,
+        178.65459399945394,
+        182.6966110002104,
+        162.35781500108715,
+        158.23113000078592,
+        157.41833399988536,
+        189.8245800002769
+      ],
+      "first_evidence_p95_ms": 246.53139660022129,
+      "mock_model_mode": true,
+      "overlay_required": false,
+      "passed": true,
+      "sample_is_eight_doc_subset": true,
+      "sample_size": 7,
+      "schema_version": "phase09-candidate-packet4-hybrid-foreground-v1",
+      "unpublished_paradedb": true,
+      "worker_returncode": 0
+    },
+    "inspect_ms": 63.00000000919681,
+    "inspect_ok": true,
+    "inspect_status": 200,
+    "jwt": {
+      "aligned": true,
+      "api_expected_iss": "http://host.docker.internal:54321/auth/v1",
+      "classification": "Passed",
+      "detail": "Local APP_ENV aliases accept both 127.0.0.1 and host.docker.internal iss values against one JWKS URL.",
+      "sizing_ladder": "APP_ENV=local accepts the documented 127.0.0.1 / host.docker.internal iss pair while JWKS still loads from SUPABASE_URL. Staging and production stay single-issuer. Do not mutate GOTRUE_JWT_ISSUER. Packet 1 freeze is the distroless/Alpine identity; do not reuse sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632.",
+      "token_iss": "http://127.0.0.1:54321/auth/v1"
+    },
+    "lag": {
+      "gate_seconds": 0.05,
+      "lag_seconds": 0.00016841700038639808,
+      "p95_seconds": 0.0003248490013356784,
+      "passed": true
+    },
+    "passed": true,
+    "resume": {
+      "content_type": "text/event-stream; charset=utf-8",
+      "status_code": 200
+    },
+    "simultaneous_runs": 5,
+    "stream_rows": [
+      {
+        "completion_ms": 1875.0,
+        "content_type": "text/event-stream",
+        "events": [
+          "schema",
+          "error"
+        ],
+        "first_token_ms": null,
+        "heartbeat_count": 0,
+        "status_code": 200,
+        "terminal": true
+      },
+      {
+        "completion_ms": 1875.0,
+        "content_type": "text/event-stream",
+        "events": [
+          "schema",
+          "error"
+        ],
+        "first_token_ms": null,
+        "heartbeat_count": 0,
+        "status_code": 200,
+        "terminal": true
+      },
+      {
+        "completion_ms": 1875.0,
+        "content_type": "text/event-stream",
+        "events": [
+          "schema",
+          "error"
+        ],
+        "first_token_ms": null,
+        "heartbeat_count": 0,
+        "status_code": 200,
+        "terminal": true
+      },
+      {
+        "completion_ms": 1875.0,
+        "content_type": "text/event-stream",
+        "events": [
+          "schema",
+          "error"
+        ],
+        "first_token_ms": null,
+        "heartbeat_count": 0,
+        "status_code": 200,
+        "terminal": true
+      },
+      {
+        "completion_ms": 1875.0,
+        "content_type": "text/event-stream",
+        "events": [
+          "schema",
+          "error"
+        ],
+        "first_token_ms": null,
+        "heartbeat_count": 0,
+        "status_code": 200,
+        "terminal": true
+      }
+    ],
+    "streams": {
+      "completion_ms": [
+        1875.0,
+        1875.0,
+        1875.0,
+        1875.0,
+        1875.0
+      ],
+      "completion_p95_ms": 1875.0,
+      "completion_sample_size": 5,
+      "first_token_ms": [],
+      "first_token_p95_ms": null,
+      "first_token_sample_size": 0,
+      "heartbeat_counts": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "heartbeat_jitter_gate_seconds": 2.0,
+      "inspection_gate_ms": 5000.0,
+      "lag_gate_seconds": 0.05,
+      "lag_p95_seconds": 0.0003248490013356784,
+      "lag_passed": true,
+      "live_completed_before_15s_heartbeat": true,
+      "missed_15s_heartbeats": 0,
+      "mock_answers_may_be_fast": true,
+      "mock_model_mode": true,
+      "qt_cap_004": 5,
+      "qt_cap_004_passed": true,
+      "qt_lat_010_ms": 12000.0,
+      "qt_lat_010_passed": false,
+      "qt_lat_011_ms": 40000.0,
+      "qt_lat_011_passed": true,
+      "simultaneous_runs": 5,
+      "table_gate_ms": 5000.0
+    },
+    "table_admit_ms": 93.99999999732245,
+    "table_admit_status": 400,
+    "table_route": "Auto chat admits Composite; not a dedicated table route",
+    "table_stream": null
   },
   "mock_model_mode": true,
   "schema_version": "phase09-candidate-packet4-streams-v1"

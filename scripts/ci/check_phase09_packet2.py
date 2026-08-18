@@ -16,6 +16,10 @@ from smart_rag_core.release.io import (
     dump_canonical_json,
     load_json_object,
 )
+from smart_rag_core.release.old_api_smoke import (
+    apply_outcome_to_handoff_row,
+    evaluate_old_api_new_schema_smoke,
+)
 from smart_rag_core.release.packet2 import (
     PACKET2_ARTIFACT_NAME,
     PYTEST_SUITES,
@@ -134,6 +138,7 @@ def _write_artifact(
     image_ids: dict[str, str],
     suite_rows: list[dict[str, object]],
     merge: bool,
+    handoffs: list[dict[str, object]] | None = None,
 ) -> None:
     """Write or merge the Packet 2 gate matrix artifact.
 
@@ -142,6 +147,8 @@ def _write_artifact(
         image_ids: Packet 1 service image Ids.
         suite_rows: Suite rows from this run.
         merge: When true, replace matching ``suite_id`` rows in an existing file.
+        handoffs: Optional overlaid handoff rows. Default static Packet 2
+            handoffs.
 
     Side Effects:
         Overwrites ``docs/deployment/phase-09/candidate-packet2-gate-matrix.json``.
@@ -168,7 +175,7 @@ def _write_artifact(
         "overlay_file_is_candidate": False,
         "candidate_image_ids": image_ids,
         "suites": suites,
-        "handoffs": handoff_payloads(),
+        "handoffs": handoffs if handoffs is not None else handoff_payloads(),
         "commands": existing_commands,
     }
     dump_canonical_json(payload, ARTIFACT_PATH)
@@ -233,15 +240,34 @@ def main(argv: list[str] | None = None) -> int:
         assert_holdout_sealed(REPO_ROOT)
         merge = bool(parsed.merge_artifact)
         rows, failures = _mode_rows(mode, emit_unselected=not merge)
+        smoke = evaluate_old_api_new_schema_smoke(
+            REPO_ROOT,
+            freeze_api_id=image_ids["api"],
+            run_live=not failures,
+        )
+        handoffs = [
+            apply_outcome_to_handoff_row(row, smoke)
+            if row.get("item_id") == "old_api_new_schema_smoke"
+            else row
+            for row in handoff_payloads()
+        ]
         _write_artifact(
             mode=mode,
             image_ids=image_ids,
             suite_rows=rows,
             merge=merge,
+            handoffs=handoffs,
         )
         print(f"wrote {ARTIFACT_PATH.relative_to(REPO_ROOT)}")
+        print(
+            "old_api_new_schema_smoke "
+            f"classification={smoke.classification} "
+            f"smoke_ran={smoke.smoke_ran}"
+        )
         if failures:
             raise Phase09Packet2GateError("; ".join(failures))
+        if smoke.classification == "Failed":
+            raise Phase09Packet2GateError(smoke.reason)
     except Phase09Packet2GateError as exc:
         print(str(exc), file=sys.stderr)
         return 1

@@ -8,67 +8,67 @@
   },
   "containers": {
     "smart-rag-api-1": {
-      "cpu_percent": 0.13,
-      "mem_usage": "170.2MiB / 7.573GiB",
-      "mem_used_bytes": 178467635,
-      "net_io": "285kB / 263kB"
+      "cpu_percent": 0.12,
+      "mem_usage": "168.2MiB / 7.573GiB",
+      "mem_used_bytes": 176370483,
+      "net_io": "1.84MB / 1.68MB"
     },
     "smart-rag-clamav-1": {
-      "cpu_percent": 0.01,
-      "mem_usage": "963.7MiB / 2GiB",
-      "mem_used_bytes": 1010512691,
-      "net_io": "2.38kB / 126B"
+      "cpu_percent": 0.0,
+      "mem_usage": "965.7MiB / 2GiB",
+      "mem_used_bytes": 1012609843,
+      "net_io": "1.84kB / 126B"
     },
     "smart-rag-crawl-proxy-1": {
-      "cpu_percent": 0.01,
-      "mem_usage": "18.81MiB / 128MiB",
-      "mem_used_bytes": 19723714,
-      "net_io": "3.59kB / 252B"
+      "cpu_percent": 6.85,
+      "mem_usage": "17.86MiB / 128MiB",
+      "mem_used_bytes": 18727567,
+      "net_io": "2.93kB / 252B"
     },
     "smart-rag-frontend-1": {
       "cpu_percent": 0.0,
-      "mem_usage": "63.68MiB / 7.573GiB",
-      "mem_used_bytes": 66773319,
-      "net_io": "4.9kB / 73.4kB"
+      "mem_usage": "88.96MiB / 7.573GiB",
+      "mem_used_bytes": 93281320,
+      "net_io": "6.96kB / 117kB"
     },
     "smart-rag-paradedb-1": {
-      "cpu_percent": 0.02,
-      "mem_usage": "31.91MiB / 2GiB",
-      "mem_used_bytes": 33460060,
-      "net_io": "240kB / 249kB"
+      "cpu_percent": 0.44,
+      "mem_usage": "34.76MiB / 2GiB",
+      "mem_used_bytes": 36448501,
+      "net_io": "709kB / 752kB"
     },
     "smart-rag-valkey-cache-1": {
-      "cpu_percent": 0.14,
-      "mem_usage": "8.945MiB / 320MiB",
-      "mem_used_bytes": 9379512,
-      "net_io": "26.9kB / 15.2kB"
+      "cpu_percent": 0.11,
+      "mem_usage": "5.73MiB / 320MiB",
+      "mem_used_bytes": 6008340,
+      "net_io": "889kB / 584kB"
     },
     "smart-rag-valkey-limits-1": {
-      "cpu_percent": 0.2,
-      "mem_usage": "14.07MiB / 128MiB",
-      "mem_used_bytes": 14753464,
-      "net_io": "29.4kB / 16.7kB"
+      "cpu_percent": 0.15,
+      "mem_usage": "9.879MiB / 128MiB",
+      "mem_used_bytes": 10358882,
+      "net_io": "1.06MB / 682kB"
     },
     "smart-rag-worker-1": {
-      "cpu_percent": 3.06,
-      "mem_usage": "223.8MiB / 7.573GiB",
-      "mem_used_bytes": 234671308,
-      "net_io": "13.1MB / 11.1MB"
+      "cpu_percent": 0.0,
+      "mem_usage": "243.5MiB / 7.573GiB",
+      "mem_used_bytes": 255328256,
+      "net_io": "6.44MB / 3.76MB"
     }
   },
-  "cpu_peak_percent": 3.06,
+  "cpu_peak_percent": 6.85,
   "local_not_ec2": true,
   "ocr_pages_per_hour": "Not Run",
   "schema_version": "phase09-candidate-packet4-resources-v1",
   "seventy_percent": {
-    "cpu_peak_percent": 3.06,
-    "foreground_gate_ms": 40000.0,
-    "foreground_p95_held": false,
-    "foreground_p95_ms": null,
-    "passed": false,
-    "runtime_pause_controller": "No in-process 70% pause controller was observed. Architecture docs define the trigger; Packet 4 measures whether it fires.",
+    "cpu_peak_percent": 6.85,
+    "foreground_gate_ms": 2000.0,
+    "foreground_p95_held": true,
+    "foreground_p95_ms": 246.53139660022129,
+    "passed": true,
+    "runtime_pause_controller": "In-process MaintenancePauseController gates HNSW REINDEX, LightRAG clean rebuild, and BM25 subset rebuild. Fixture tests prove the 70% trigger. Live 8-doc Packet 4 peaked at 3.06% CPU and did not fire. Do not claim QT-CAP-001/002 from that subset.",
     "sample_is_eight_doc_subset": true,
-    "sizing_ladder": "On this 8-doc subset, 70% CPU/IO pause is measured rather than forced with unbounded load. If foreground p95 holds, P09-04-A can pass without the trigger firing. Implement/prove the pause controller before raising the advertised envelope.",
+    "sizing_ladder": "On this 8-doc subset, live 70% CPU/IO pause is measured rather than forced with unbounded load. Fixture tests prove MaintenancePauseController at 70%. If foreground p95 holds, P09-04-A can pass without the live trigger firing. Do not raise the advertised envelope or claim QT-CAP-001/002 from this subset.",
     "trigger_70_percent_fired": false
   },
   "valkey_oom": "Not Run; Packet 5"

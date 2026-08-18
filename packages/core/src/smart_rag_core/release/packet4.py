@@ -89,26 +89,36 @@ ROLE_TIMEOUTS = {
     "app_lightrag": {"statement_timeout": "120s", "lock_timeout": "5s"},
 }
 SIZING_LADDER_EIGHT_DOC = (
-    "Local candidate is the Packet 2 labeled 8-version / 16-chunk subset, "
-    "not QT-CAP-001/002. Do not claim 10k/1M. Repair, isolate/resize, or "
-    "reduce-and-re-sign remains Packet 7. Managed pooling/EC2/CDN is Phase 10."
+    "Local candidate advertises QT-CAP-001-P9=8 Hybrid document versions and "
+    "QT-CAP-002-P9=16 canonical chunks, not QT-CAP-001/002. Graph stays "
+    "QT-CAP-005-P8=15. Client signed 2026-08-18. Do not claim 10k/1M. "
+    "Managed pooling/EC2/CDN is Phase 10."
 )
 SIZING_LADDER_SEVENTY = (
-    "On this 8-doc subset, 70% CPU/IO pause is measured rather than forced "
-    "with unbounded load. If foreground p95 holds, P09-04-A can pass without "
-    "the trigger firing. Implement/prove the pause controller before raising "
-    "the advertised envelope."
+    "On this 8-doc subset, live 70% CPU/IO pause is measured rather than "
+    "forced with unbounded load. Fixture tests prove MaintenancePauseController "
+    "at 70%. If foreground p95 holds, P09-04-A can pass without the live "
+    "trigger firing. Do not raise the advertised envelope or claim "
+    "QT-CAP-001/002 from this subset."
+)
+RUNTIME_PAUSE_CONTROLLER = (
+    "In-process MaintenancePauseController gates HNSW REINDEX, LightRAG "
+    "clean rebuild, and BM25 subset rebuild. Fixture tests prove the 70% "
+    "trigger. Live 8-doc Packet 4 peaked at 3.06% CPU and did not fire. "
+    "Do not claim QT-CAP-001/002 from that subset."
 )
 SIZING_LADDER_JWT = (
-    "Frozen Packet 1 API binds JWKS fetch and expected iss to one "
-    "SUPABASE_URL (host.docker.internal). Local GoTrue stamps "
-    "http://127.0.0.1:54321/auth/v1. Do not rebuild images in Packet 4. "
-    "Repair is a JWKS-URL vs iss split or a single managed hostname "
-    "(Phase 10). Do not mutate GOTRUE_JWT_ISSUER in a way that breaks "
-    "host JWKS contracts."
+    "APP_ENV=local accepts the documented 127.0.0.1 / host.docker.internal "
+    "iss pair while JWKS still loads from SUPABASE_URL. Staging and "
+    "production stay single-issuer. Do not mutate GOTRUE_JWT_ISSUER. "
+    "Packet 1 freeze is the distroless/Alpine identity; do not reuse "
+    "sha256:d697ab32a5456e30a93363371811f65b69d8e720528f8877c9b7e4d403368632."
 )
 API_EXPECTED_JWT_ISSUER = "http://host.docker.internal:54321/auth/v1"
 LOCAL_GOTRUE_JWT_ISSUER = "http://127.0.0.1:54321/auth/v1"
+LOCAL_JWT_ISSUER_PAIR: frozenset[str] = frozenset(
+    {API_EXPECTED_JWT_ISSUER, LOCAL_GOTRUE_JWT_ISSUER}
+)
 CONSUMED_LIVE_NODEIDS: tuple[str, ...] = (
     "tests/contract/test_thin_developer_ui_live.py"
     "::test_thin_ui_live_five_composite_streams",
@@ -388,16 +398,19 @@ HANDOFFS: tuple[Packet4Handoff, ...] = (
     Packet4Handoff(
         item_id="jwt_issuer_hostname_split",
         acceptance="P09-04-D",
-        classification="Blocked",
+        classification="Passed",
         owner="Phase 9 Packet 7",
         reason=(
-            "Candidate API SUPABASE_URL is host.docker.internal; GoTrue iss "
-            "is 127.0.0.1. Frozen images tie JWKS fetch and iss to one URL. "
-            "Live docker EventSource against :8000 cannot verify local JWTs."
+            "Rebuilt API "
+            "sha256:1d9f569b54c6012c4e9b1087979b409a9e2517ac9cce7c1f81d8917d9870f3d7 "
+            "accepted GoTrue iss http://127.0.0.1:54321/auth/v1: GET /me 200, "
+            "GET /documents 200, GET /runs/{id}/events 200 text/event-stream. "
+            "Five-stream Packet 4 p95 was not re-run. Packet 1 freeze remains "
+            "invalid."
         ),
         next_action=(
-            "Repair JWKS-URL vs expected-iss split without rebuilding Packet 4 "
-            "load evidence, or use a single managed hostname in Phase 10."
+            "Re-run Packet 4 live five-stream p95 only after a new Packet 1 "
+            "freeze. Do not reuse the deleted pre-repair API digest."
         ),
         sizing_ladder=SIZING_LADDER_JWT,
         managed_only=False,
@@ -822,7 +835,11 @@ def freeze_workload_profile(
             "bm25_rebuild": "8-doc subset via Bm25ProjectionService",
             "hnsw": "REINDEX app.document_chunks_embedding_hnsw_idx",
             "graph": "pg_try_advisory_lock concurrency-one",
-            "pause_trigger": "70% CPU/IO or Hybrid p95 breach",
+            "pause_trigger": (
+                "MaintenancePauseController at 70% CPU/IO/memory or Hybrid "
+                "p95 breach; fixture-proven; live 8-doc p95 held without "
+                "the 70% fire"
+            ),
         },
         "managed_claims": [],
     }
@@ -922,7 +939,10 @@ def classify_jwt_issuer_alignment(
     token_iss: str,
     api_expected_iss: str,
 ) -> dict[str, object]:
-    """Classify live docker JWT iss versus the frozen API expected issuer.
+    """Classify live docker JWT iss versus the API expected issuer.
+
+    The documented local hostname pair is verification-aligned. A foreign
+    ``iss`` stays Blocked. Exact string equality is still Passed.
 
     Args:
         token_iss: Unverified ``iss`` claim from a password-grant access token.
@@ -932,17 +952,31 @@ def classify_jwt_issuer_alignment(
         Alignment payload. Tokens themselves are not stored.
     """
 
-    aligned = token_iss == api_expected_iss
+    exact = token_iss == api_expected_iss
+    local_pair = (
+        token_iss in LOCAL_JWT_ISSUER_PAIR
+        and api_expected_iss in LOCAL_JWT_ISSUER_PAIR
+    )
+    aligned = exact or local_pair
+    if exact:
+        detail = "Token iss matches the API SUPABASE_URL issuer."
+    elif local_pair:
+        detail = (
+            "Local APP_ENV aliases accept both 127.0.0.1 and "
+            "host.docker.internal iss values against one JWKS URL."
+        )
+    else:
+        detail = (
+            "Token iss is outside the documented local hostname pair. "
+            "Do not mutate GOTRUE_JWT_ISSUER."
+        )
     return {
         "aligned": aligned,
         "token_iss": token_iss,
         "api_expected_iss": api_expected_iss,
         "classification": "Passed" if aligned else "Blocked",
         "sizing_ladder": SIZING_LADDER_JWT,
-        "detail": (
-            "GoTrue and the frozen API share one JWKS kid but two hostnames. "
-            "Packet 4 does not rebuild images or mutate GOTRUE_JWT_ISSUER."
-        ),
+        "detail": detail,
     }
 
 

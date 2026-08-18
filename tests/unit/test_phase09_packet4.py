@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 from pathlib import Path
 
-from smart_rag_core.release import bm25_reproject
+from smart_rag_core.release import bm25_reproject, hybrid_foreground
 from smart_rag_core.release.bm25_reproject import REPROJECT_SCHEMA_VERSION
 from smart_rag_core.release.constants import (
     CANDIDATE_COMPOSE_FILE,
@@ -22,6 +22,7 @@ from smart_rag_core.release.packet4 import (
     HANDOFFS,
     LOCAL_GOTRUE_JWT_ISSUER,
     PYTEST_SUITES,
+    RUNTIME_PAUSE_CONTROLLER,
     TARGET_SPECS,
     classify_jwt_issuer_alignment,
     classify_suite_counts,
@@ -38,6 +39,10 @@ from smart_rag_core.release.packet4_load import (
     parse_cpu_percent,
     parse_mem_usage_bytes,
     stream_gate_payload,
+)
+from smart_rag_core.release.packet4_seventy_live import (
+    SeventyLiveHooks,
+    measure_live_seventy_pause,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +61,22 @@ def test_packet4_mapped_pytest_files_exist() -> None:
     assert (REPO_ROOT / CANDIDATE_COMPOSE_FILE).is_file()
     assert (REPO_ROOT / PACKET8_OVERLAY_FILE).is_file()
     assert CANDIDATE_COMPOSE_FILE != PACKET8_OVERLAY_FILE
+
+
+def test_hybrid_foreground_uses_autocommit() -> None:
+    """Worker inject must leave connections idle for retrieval_transaction."""
+
+    source = inspect.getsource(hybrid_foreground.run_hybrid_foreground)
+    assert "autocommit=True" in source
+
+
+def test_event_loop_lag_snippet_compiles() -> None:
+    """Distroless ``python -c`` cannot use ``async def`` after a semicolon."""
+
+    text = RUNNER.read_text(encoding="utf-8")
+    start = text.index('_LAG_SNIPPET = """') + len('_LAG_SNIPPET = """')
+    end = text.index('""".strip()', start)
+    compile(text[start:end].strip(), "<lag-snippet>", "exec")
 
 
 def test_zero_collection_is_failed() -> None:
@@ -90,7 +111,9 @@ def test_overlay_is_not_candidate_identity() -> None:
         if suite.suite_id == "five_stream_lag_heartbeat_offload"
     )
     assert any("test_sse_heartbeat.py" in item for item in five.pytest_args)
-    assert not any("test_thin_ui_live_five_composite_streams" in item for item in five.pytest_args)
+    assert not any(
+        "test_thin_ui_live_five_composite_streams" in item for item in five.pytest_args
+    )
     assert CONSUMED_LIVE_NODEIDS[0].endswith("test_thin_ui_live_five_composite_streams")
 
 
@@ -99,8 +122,8 @@ def test_packet1_image_ids_stay_frozen() -> None:
 
     ids = expected_image_ids()
     assert ids == PACKET1_EXPECTED_IMAGE_IDS
-    assert ids["api"].endswith("403368632")
-    assert ids["worker"].endswith("40620990")
+    assert ids["api"].endswith("e3633ec")
+    assert ids["worker"].endswith("a97fe96e")
     assert EXPECTED_EXACT_CODE_DOCUMENT_ID == ("3367635d-7b03-4be7-945c-dd207c848e02")
     assert FROZEN_DOCKER_NCPU == 20
     assert FROZEN_DOCKER_MEM_BYTES == 8_131_035_136
@@ -144,35 +167,31 @@ def test_qt_cap_001_is_not_run() -> None:
     assert oom.classification == "Not Run"
 
 
-def test_jwt_issuer_mismatch_is_blocked() -> None:
-    """Live docker EventSource cannot pass when GoTrue iss differs from API URL."""
+def test_jwt_local_issuer_pair_is_aligned() -> None:
+    """Documented 127.0.0.1 / host.docker.internal iss pair is verification-aligned."""
 
-    blocked = classify_jwt_issuer_alignment(
+    aliases = classify_jwt_issuer_alignment(
         token_iss=LOCAL_GOTRUE_JWT_ISSUER,
         api_expected_iss=API_EXPECTED_JWT_ISSUER,
     )
-    assert blocked["aligned"] is False
-    assert blocked["classification"] == "Blocked"
-    aligned = classify_jwt_issuer_alignment(
+    assert aliases["aligned"] is True
+    assert aliases["classification"] == "Passed"
+    exact = classify_jwt_issuer_alignment(
         token_iss=API_EXPECTED_JWT_ISSUER,
         api_expected_iss=API_EXPECTED_JWT_ISSUER,
     )
-    assert aligned["classification"] == "Passed"
-    spec = next(item for item in TARGET_SPECS if item.target_id == "QT-LAT-010")
-    row = classify_target(
-        spec,
-        measured=None,
-        mock_model_mode=True,
-        sample_size=0,
-        detail="jwt",
-        passed=None,
-        blocked=True,
+    assert exact["classification"] == "Passed"
+    foreign_iss = "https://auth.evil.example/auth/v1"
+    foreign = classify_jwt_issuer_alignment(
+        token_iss=foreign_iss,
+        api_expected_iss=API_EXPECTED_JWT_ISSUER,
     )
-    assert row["classification"] == "Blocked"
+    assert foreign["aligned"] is False
+    assert foreign["classification"] == "Blocked"
     jwt_handoff = next(
         item for item in HANDOFFS if item.item_id == "jwt_issuer_hostname_split"
     )
-    assert jwt_handoff.classification == "Blocked"
+    assert jwt_handoff.classification == "Passed"
     assert jwt_handoff.owner == "Phase 9 Packet 7"
 
 
@@ -266,6 +285,9 @@ def test_seventy_percent_can_pass_without_trigger() -> None:
         foreground_gate_ms=40000.0,
     )
     assert missed["passed"] is False
+    assert held["runtime_pause_controller"] == RUNTIME_PAUSE_CONTROLLER
+    assert "QT-CAP-001" in RUNTIME_PAUSE_CONTROLLER
+    assert "3.06%" in RUNTIME_PAUSE_CONTROLLER
 
 
 def test_stream_gate_ignores_heartbeats_when_mock_is_short() -> None:
@@ -285,3 +307,44 @@ def test_stream_gate_ignores_heartbeats_when_mock_is_short() -> None:
     assert payload["lag_passed"] is True
     assert parse_cpu_percent("12.5%") == 12.5
     assert parse_mem_usage_bytes("120MiB / 2GiB") == 120 * 1024 * 1024
+
+
+def test_live_seventy_probe_passes_on_held_p95_without_busy_loop(
+    tmp_path: Path,
+) -> None:
+    """Injected 8-doc p95 hold classifies Passed without a 70% fire."""
+
+    def _stats() -> list[dict[str, object]]:
+        return [{"Name": "smart-rag-api-1", "CPUPerc": "4.00%"}]
+
+    def _foreground(token: str) -> dict[str, object]:
+        del token
+        return {
+            "passed": True,
+            "jwt_eventsource_401": False,
+            "inspect_ms": 50.0,
+            "inspect_ok": True,
+            "streams": {
+                "first_token_p95_ms": 40.0,
+                "completion_p95_ms": 800.0,
+                "simultaneous_runs": 5,
+            },
+        }
+
+    probe_token = "unit-test-token"  # noqa: S105
+    payload = measure_live_seventy_pause(
+        tmp_path,
+        token=probe_token,
+        hooks=SeventyLiveHooks(docker_stats=_stats, foreground=_foreground),
+        write_artifact=True,
+    )
+    seventy = payload["seventy_percent"]
+    assert isinstance(seventy, dict)
+    assert seventy["passed"] is True
+    assert seventy["trigger_70_percent_fired"] is False
+    assert seventy["classification"] == "Passed"
+    assert payload["busy_loop"] is False
+    assert payload["qt_cap_001_claimed"] is False
+    artifact = tmp_path / "docs" / "deployment" / "phase-09"
+    artifact = artifact / "candidate-packet4-seventy-live.json"
+    assert artifact.is_file()

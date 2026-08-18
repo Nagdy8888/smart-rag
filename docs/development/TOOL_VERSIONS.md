@@ -2,7 +2,7 @@
 title: Tool and dependency versions (Phase 1)
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-18
 audience: engineering
 ---
 
@@ -18,6 +18,21 @@ Recorded during Phase 1 Packets 2–4 from host tools, current primary documenta
 | Python (workspace) | 3.11.x (`requires-python = >=3.11,<3.13`) | Selected via uv |
 | Node.js | 20.20.2 | Engine `>=20` |
 | pnpm | 9.15.0 | `packageManager` in root `package.json` |
+
+## Official application base image pins (verified 2026-08-18)
+
+`docker pull` plus `docker inspect --format '{{.RepoDigests}} {{.Id}}'`. CPython
+builders `apt-get upgrade` on trixie; scanned runtimes are distroless/cc or
+Alpine after `apk upgrade --no-cache`, then `USER 10001:10001`.
+
+| Image | Digest |
+| --- | --- |
+| `python:3.11-slim-trixie` | `sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7` |
+| `python:3.11-alpine` | `sha256:6857d2dae63e052057f2db389a7061188ac9a92a3fa8d402bde68f36df6fada1` |
+| `node:20-alpine` | `sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293` |
+| `gcr.io/distroless/cc-debian13:nonroot` | `sha256:d97bc0a941b8d4be647dc0ee75b264ddbb772f1ac5ba690a4309c00723b23775` |
+
+Canonical copy: [`infra/paradedb/IMAGE_DIGESTS.md`](../../infra/paradedb/IMAGE_DIGESTS.md).
 
 ## Primary documentation used
 

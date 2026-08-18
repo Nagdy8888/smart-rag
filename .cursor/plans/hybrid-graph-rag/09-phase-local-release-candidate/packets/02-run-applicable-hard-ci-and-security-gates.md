@@ -1,7 +1,7 @@
 ---
 phase: 9
 packet: 2
-status: pending
+status: complete
 title: "Run all applicable hard CI, expand/contract migration compatibility, identity/RLS/BM25/cache/read-audit, graph isolation, injection, parsing, deletion, idempotency/GC, API/SSE compatibility, and redaction gates with no skipped required tests."
 requirement_ids: [P09-02]
 ---
