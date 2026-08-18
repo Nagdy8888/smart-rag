@@ -52,40 +52,23 @@ uv run python scripts/ci/check_phase10_packet5.py
 1. Copy `terraform.tfvars.example` to a gitignored `terraform.tfvars`.
 2. Set sensitive origin header name/value current and previous (no commit).
 3. Install Terraform or OpenTofu. Do not download them from Packet 1 CI.
-4. `aws login --profile Nagdy` once per browser session. `aws login` access
-   tokens last **15 minutes**; the CLI refresh token lasts **up to 12 hours**.
-   Do **not** pipe `export-credentials` into the shell: those env vars do not
-   refresh, so Terraform dies when the 15-minute snapshot expires (often in
-   a few minutes). HashiCorp AWS provider 5.x also does not read `login_session`
-   natively. Use a dedicated `credential_process` profile so Terraform
-   re-fetches before expiry:
-
-```ini
-[profile Nagdy]
-login_session = arn:aws:iam::665602132723:root
-region = us-east-1
-
-[profile Nagdy-terraform]
-credential_process = aws configure export-credentials --profile Nagdy --format process
-region = us-east-1
-```
+4. This workstation uses IAM user `Muna` via local profile `Nagdy-iam`
+   (`%USERPROFILE%\.aws\credentials`). Those keys are not in git and must
+   not be pasted into chat, `.env`, or the instance. Terraform 5.x can use
+   this profile directly (no `export-credentials` into the shell).
 
 ```powershell
 Remove-Item Env:AWS_ACCESS_KEY_ID, Env:AWS_SECRET_ACCESS_KEY, Env:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
 $env:AWS_EC2_METADATA_DISABLED = "true"
 $env:AWS_REGION = "us-east-1"
-$env:AWS_PROFILE = "Nagdy-terraform"
+$env:AWS_PROFILE = "Nagdy-iam"
 Set-Location infra/ec2
 terraform init
 terraform plan -input=false
 ```
 
-CLI/SSM in the same shell should use `--profile Nagdy` (the login profile),
-not `Nagdy-terraform`. Do not run `aws login` from multiple agents at once;
-a new grant revokes the previous refresh token.
-
-Prefer the IAM user `Nagdy` over root for daily CLI use so refresh can last
-the full 12 hours. Root console/STS sessions are shorter.
+Keep `aws login` profiles (`Nagdy`, `Nagdy-terraform`) only as a fallback
+when `Nagdy-iam` is absent. Do not pipe `export-credentials` into env vars.
 
 Do not commit `terraform.tfvars`, `tfplan`, or exported keys. Packet 1 CI
 still must not apply.
