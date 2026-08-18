@@ -3,7 +3,7 @@ title: ADR — Private service TLS (ParadeDB / Valkey)
 adr_id: ADR-private-service-tls
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-18
 approver: "user (Cursor chat; continuing Phase 1–5 mandate)"
 approval_date: "2026-08-12"
 ---
@@ -36,6 +36,16 @@ Re-open this ADR and require TLS (or equivalent private-link encryption) before 
 - Services span hosts or leave a single trusted private network;
 - Compliance requires encryption-in-transit for datastore/cache;
 - A host port or shared network path becomes unavoidable.
+
+## Phase 10 Packet 1 record (2026-08-18)
+
+Staging IaC under `infra/ec2/` keeps ParadeDB and both Valkey instances on a
+**single-host private Docker network** (`private`, `internal: true`) with **no
+host ports**, distinct credentials, and hard `mem_limit` values. Those are the
+same compensating controls as local Compose. **TLS is still omitted** on that
+private network pending Packet 3 egress proof. This packet does not silently
+claim TLS is enabled. Revisit again if staging spans hosts, publishes a host
+port, or Packet 3 cannot prove the private boundary.
 
 ## Consequences
 

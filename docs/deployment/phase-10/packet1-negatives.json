@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "case": "ssh_ingress",
+      "exercise": "tests/unit/test_phase10_packet1.py",
+      "expected": "Phase10TopologyError"
+    },
+    {
+      "case": "imdsv1_optional_tokens",
+      "exercise": "tests/unit/test_phase10_packet1.py",
+      "expected": "Phase10TopologyError"
+    },
+    {
+      "case": "public_private_ports",
+      "exercise": "tests/unit/test_phase10_packet1.py",
+      "expected": "Phase10TopologyError"
+    },
+    {
+      "case": "vercel_service_role",
+      "exercise": "tests/unit/test_phase10_packet1.py",
+      "expected": "Phase10TopologyError"
+    },
+    {
+      "case": "production_seed",
+      "exercise": "tests/unit/test_phase10_packet1.py",
+      "expected": "Phase10TopologyError"
+    },
+    {
+      "case": "mutable_paradedb_digest",
+      "exercise": "tests/unit/test_phase10_packet1.py",
+      "expected": "Phase10TopologyError"
+    },
+    {
+      "case": "origin_timeout_not_90",
+      "exercise": "tests/unit/test_phase10_packet1.py",
+      "expected": "Phase10TopologyError"
+    }
+  ],
+  "schema_version": "phase10-packet1-negatives-v1"
+}

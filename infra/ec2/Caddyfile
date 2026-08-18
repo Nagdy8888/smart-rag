@@ -1,0 +1,59 @@
+# Staging Caddy origin. 90s timeouts match CloudFront OriginReadTimeout /
+# OriginKeepaliveTimeout (AWS API max OriginReadTimeout is 120). flush_interval
+# -1 disables SSE buffering. Dual origin-header values keep Packet 4 rotation
+# possible. Do not commit real header values.
+
+{
+	servers {
+		timeouts {
+			read_timeout 90s
+			write_timeout 90s
+		}
+	}
+}
+
+:443 {
+	@origin_current {
+		header {$ORIGIN_HEADER_NAME} {$ORIGIN_HEADER_VALUE_CURRENT}
+	}
+	@origin_previous {
+		header {$ORIGIN_HEADER_NAME} {$ORIGIN_HEADER_VALUE_PREVIOUS}
+	}
+	@origin_pending_name {
+		header {$ORIGIN_HEADER_NAME_PENDING} {$ORIGIN_HEADER_VALUE_PENDING}
+	}
+
+	handle @origin_current {
+		reverse_proxy {$ACTIVE_API_UPSTREAM} {
+			flush_interval -1
+			transport http {
+				read_timeout 90s
+				write_timeout 90s
+			}
+		}
+	}
+
+	handle @origin_previous {
+		reverse_proxy {$ACTIVE_API_UPSTREAM} {
+			flush_interval -1
+			transport http {
+				read_timeout 90s
+				write_timeout 90s
+			}
+		}
+	}
+
+	handle @origin_pending_name {
+		reverse_proxy {$ACTIVE_API_UPSTREAM} {
+			flush_interval -1
+			transport http {
+				read_timeout 90s
+				write_timeout 90s
+			}
+		}
+	}
+
+	handle {
+		respond "direct origin denied" 403
+	}
+}

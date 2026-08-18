@@ -2,7 +2,7 @@
 title: C4 — Deployment views
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-18
 audience: engineering, operations
 ---
 
@@ -22,17 +22,33 @@ audience: engineering, operations
 
 Start: `.\scripts\dev.ps1` · Stop: `.\scripts\stop.ps1` · Reset: `.\scripts\reset.ps1 -ConfirmReset` · Candidate freeze: [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md)
 
-## Staging / production (planned)
+## Staging (Packet 1 IaC; live apply Blocked)
+
+Reviewed Terraform and `infra/ec2/docker-compose.staging.yml`. Live
+CloudFront/EC2/Supabase/Vercel/SES are **not** proven. See
+[MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
 
 ```mermaid
 flowchart LR
-  vercel["Vercel"] --> cf["CloudFront WAF"]
-  cf --> ec2["EC2 Compose"]
-  vercel --> supabase["ManagedSupabase"]
-  ec2 --> supabase
-  ec2 --> parade["PrivateParadeDB"]
-  ec2 --> openai["OpenAI"]
+  vercel["VercelStaging"] --> supabaseAuth["ManagedSupabaseAuth"]
+  vercel --> cf["CloudFrontWAF"]
+  cf -->|"origin header 90s"| caddy["CaddyOnEC2"]
+  caddy --> blue["ApiBlue"]
+  caddy --> green["ApiGreen"]
+  blue --> privateNet["PrivateDockerNet"]
+  green --> privateNet
+  worker["Worker"] --> privateNet
+  privateNet --> pdb["ParadeDBNoHostPorts"]
+  privateNet --> valkey["ValkeyLimitsAndCache"]
+  worker --> crawl["CrawlProxy"]
+  blue --> egress["ProviderEgressStub"]
+  worker --> egress
+  ses["SESSandbox"] --> supabase["ManagedSupabase"]
 ```
+
+EC2 is rebuildable, encrypted EBS, IMDSv2 hop 1, SSM-only, CloudFront
+origin-facing prefix list ingress, no SSH. ParadeDB/Valkey/LightRAG have no
+public path. Frontend stays on Vercel with public keys only.
 
 ## Links
 

@@ -1,0 +1,14 @@
+# Named provider destinations for the egress stub. Packet 3 proves denials.
+# Hostnames only. No credentials.
+
+api.openai.com
+api.smith.langchain.com
+*.supabase.co
+ssm.us-east-1.amazonaws.com
+ssmmessages.us-east-1.amazonaws.com
+ec2messages.us-east-1.amazonaws.com
+ecr.us-east-1.amazonaws.com
+api.ecr.us-east-1.amazonaws.com
+secretsmanager.us-east-1.amazonaws.com
+logs.us-east-1.amazonaws.com
+s3.us-east-1.amazonaws.com

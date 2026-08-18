@@ -28,6 +28,8 @@ uv run python scripts/ci/check_phase09_packet4.py
 uv run python scripts/ci/check_phase09_packet5.py
 uv run python scripts/ci/check_phase09_packet6.py
 uv run python scripts/ci/check_phase09_packet7.py
+uv run python scripts/phase10_staging.py assert-iac
+uv run python scripts/ci/check_phase10_packet1.py
 ```
 
 GitHub CI invokes one `--tier` per job (or a paired reusable job such as
@@ -246,4 +248,17 @@ docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb30
 pre-buffering that Python bindings do not expose. Packet 8 keeps
 `pyarrow==19.0.1`. See [ADR-cve-pin-patch-2026-08.md](../adr/ADR-cve-pin-patch-2026-08.md).
 
-[docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md)
+The Phase 10 Packet 1 gate reviews isolated staging IaC (encrypted IMDSv2
+EC2, CloudFront 90s timeouts, digest-pinned ParadeDB/Valkey, Vercel public
+keys only). It is local-only and is not a GitHub PR job. Zero collected
+Packet 1 tests fail the gate. Live AWS/Supabase/Vercel/SES apply is Blocked
+when Terraform/OpenTofu or the AWS session is missing. Do not run
+`aws login` or `terraform apply` from this gate. See
+[MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
+
+```powershell
+uv run python scripts/phase10_staging.py assert-iac
+uv run python scripts/ci/check_phase10_packet1.py
+```
+
+[docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)

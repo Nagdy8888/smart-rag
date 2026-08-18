@@ -1,0 +1,321 @@
+# Staging Compose for EC2. Consumes the Phase 9 freeze image ids.
+# LightRAG is in-process inside api/worker; it is not a service.
+# Do not merge the Packet 8 host-pytest overlay. Private services have no host ports.
+
+name: smart-rag-staging
+
+networks:
+  edge:
+    driver: bridge
+  private:
+    driver: bridge
+    internal: true
+  crawl_egress:
+    driver: bridge
+  provider:
+    driver: bridge
+  provider_egress:
+    driver: bridge
+
+volumes:
+  paradedb_data:
+  valkey_limits_data:
+  valkey_cache_data:
+  clamav_db:
+
+services:
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    networks:
+      - edge
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    environment:
+      ORIGIN_HEADER_NAME: ${ORIGIN_HEADER_NAME:?set ORIGIN_HEADER_NAME}
+      ORIGIN_HEADER_VALUE_CURRENT: ${ORIGIN_HEADER_VALUE:?set ORIGIN_HEADER_VALUE}
+      ORIGIN_HEADER_VALUE_PREVIOUS: ${ORIGIN_HEADER_VALUE_PREVIOUS:?set ORIGIN_HEADER_VALUE_PREVIOUS}
+      ORIGIN_HEADER_NAME_PENDING: ${ORIGIN_HEADER_NAME_PENDING:?set ORIGIN_HEADER_NAME_PENDING}
+      ORIGIN_HEADER_VALUE_PENDING: ${ORIGIN_HEADER_VALUE_PENDING:?set ORIGIN_HEADER_VALUE_PENDING}
+      ACTIVE_API_UPSTREAM: ${ACTIVE_API_UPSTREAM:-api-blue:8000}
+    depends_on:
+      api-blue:
+        condition: service_healthy
+    mem_limit: 256m
+
+  api-blue:
+    image: ${STAGING_API_REPOSITORY:-smart-rag-api}@sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec
+    restart: unless-stopped
+    user: "10001:10001"
+    environment:
+      APP_ENV: staging
+      MOCK_MODEL_MODE: ${MOCK_MODEL_MODE:-true}
+      SMART_RAG_HOLDOUT_ACCESS: "false"
+      SUPABASE_URL: ${STAGING_SUPABASE_URL:?set STAGING_SUPABASE_URL}
+      SUPABASE_DB_URL: ${STAGING_SUPABASE_TRANSACTION_URL:?set STAGING_SUPABASE_TRANSACTION_URL}
+      VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
+      VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
+      PARADEDB_URL: postgresql://${PARADEDB_READER_USER:-paradedb_reader}:${PARADEDB_READER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
+      CRAWL_PROXY_URL: http://crawl-proxy:8080
+      PROVIDER_EGRESS_URL: http://provider-egress-proxy:8080
+    networks:
+      - edge
+      - private
+      - provider
+    depends_on:
+      paradedb:
+        condition: service_healthy
+      valkey-limits:
+        condition: service_healthy
+      valkey-cache:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+
+  api-green:
+    image: ${STAGING_API_REPOSITORY:-smart-rag-api}@sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec
+    restart: unless-stopped
+    user: "10001:10001"
+    environment:
+      APP_ENV: staging
+      MOCK_MODEL_MODE: ${MOCK_MODEL_MODE:-true}
+      SMART_RAG_HOLDOUT_ACCESS: "false"
+      SUPABASE_URL: ${STAGING_SUPABASE_URL:?set STAGING_SUPABASE_URL}
+      SUPABASE_DB_URL: ${STAGING_SUPABASE_TRANSACTION_URL:?set STAGING_SUPABASE_TRANSACTION_URL}
+      VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
+      VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
+      PARADEDB_URL: postgresql://${PARADEDB_READER_USER:-paradedb_reader}:${PARADEDB_READER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
+      CRAWL_PROXY_URL: http://crawl-proxy:8080
+      PROVIDER_EGRESS_URL: http://provider-egress-proxy:8080
+    networks:
+      - edge
+      - private
+      - provider
+    depends_on:
+      paradedb:
+        condition: service_healthy
+      valkey-limits:
+        condition: service_healthy
+      valkey-cache:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+
+  worker:
+    image: ${STAGING_WORKER_REPOSITORY:-smart-rag-worker}@sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e
+    restart: unless-stopped
+    user: "10001:10001"
+    environment:
+      APP_ENV: staging
+      MOCK_MODEL_MODE: ${MOCK_MODEL_MODE:-true}
+      SMART_RAG_HOLDOUT_ACCESS: "false"
+      SUPABASE_URL: ${STAGING_SUPABASE_URL:?set STAGING_SUPABASE_URL}
+      SUPABASE_DB_URL: ${STAGING_SUPABASE_SESSION_URL:?set STAGING_SUPABASE_SESSION_URL}
+      VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
+      VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
+      PARADEDB_URL: postgresql://${PARADEDB_WRITER_USER:-paradedb_writer}:${PARADEDB_WRITER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
+      CRAWL_PROXY_URL: http://crawl-proxy:8080
+      PROVIDER_EGRESS_URL: http://provider-egress-proxy:8080
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+    networks:
+      - private
+      - provider
+    depends_on:
+      paradedb:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+      crawl-proxy:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import smart_rag_worker; print('live')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 2g
+
+  paradedb:
+    image: paradedb/paradedb:pg17@sha256:dca046b8a0ddd070c368d5254cbb7f596b3b7bc67bc2efa7c0fbe881087883bb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PARADEDB_BOOTSTRAP_USER:-paradedb}
+      POSTGRES_PASSWORD: ${PARADEDB_BOOTSTRAP_PASSWORD:?set PARADEDB_BOOTSTRAP_PASSWORD}
+      POSTGRES_DB: ${PARADEDB_DB:-paradedb}
+    volumes:
+      - paradedb_data:/var/lib/postgresql/data
+      - ../paradedb/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "psql -U $$POSTGRES_USER -d $$POSTGRES_DB -tAc \"SELECT 1 FROM pg_extension WHERE extname='pg_search'\" | grep -q 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    mem_limit: 2g
+
+  valkey-limits:
+    image: valkey/valkey:8.1-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
+    restart: unless-stopped
+    command:
+      [
+        "valkey-server",
+        "--requirepass",
+        "${VALKEY_LIMITS_PASSWORD:?set VALKEY_LIMITS_PASSWORD}",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    environment:
+      VALKEY_LIMITS_PASSWORD: ${VALKEY_LIMITS_PASSWORD}
+    volumes:
+      - valkey_limits_data:/data
+    networks:
+      - private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "valkey-cli -a \"$$VALKEY_LIMITS_PASSWORD\" --no-auth-warning ping | grep -q PONG",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 128m
+
+  valkey-cache:
+    image: valkey/valkey:8.1-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec
+    restart: unless-stopped
+    command:
+      [
+        "valkey-server",
+        "--requirepass",
+        "${VALKEY_CACHE_PASSWORD:?set VALKEY_CACHE_PASSWORD}",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    environment:
+      VALKEY_CACHE_PASSWORD: ${VALKEY_CACHE_PASSWORD}
+    volumes:
+      - valkey_cache_data:/data
+    networks:
+      - private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "valkey-cli -a \"$$VALKEY_CACHE_PASSWORD\" --no-auth-warning ping | grep -q PONG",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 320m
+
+  crawl-proxy:
+    image: ${STAGING_CRAWL_REPOSITORY:-smart-rag-crawl-proxy}@sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3
+    restart: unless-stopped
+    networks:
+      - private
+      - crawl_egress
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 128m
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  provider-egress-proxy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    networks:
+      - provider
+      - provider_egress
+    volumes:
+      - ./provider-egress/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./provider-egress/allowlist.txt:/etc/smart-rag/allowlist.txt:ro
+    expose:
+      - "8080"
+    mem_limit: 128m
+
+  clamav:
+    image: clamav/clamav:stable@sha256:78810772a92b4a9168115bc6b2e0ffd702640893b9577f8c3d0432762d2655c4
+    restart: unless-stopped
+    networks:
+      - private
+    expose:
+      - "3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    mem_limit: 2g
+
+  parser-sandbox:
+    image: ${STAGING_PARSER_REPOSITORY:-smart-rag-parser-sandbox}@sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a
+    restart: unless-stopped
+    user: "10001:10001"
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g

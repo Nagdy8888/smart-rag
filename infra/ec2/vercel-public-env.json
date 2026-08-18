@@ -1,0 +1,10 @@
+{
+  "schema_version": "phase10-vercel-public-env-v1",
+  "allowed_keys": [
+    "NEXT_PUBLIC_API_BASE_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  ],
+  "live_applied": false,
+  "live_values": {}
+}

@@ -58,9 +58,41 @@ flowchart TD
 
 Packet 8 local proof uses the optional overlay [`docker-compose.packet8.yml`](../../docker-compose.packet8.yml). It attaches ClamAV and ParadeDB to a non-internal `packet8-host` bridge and publishes ClamAV `:13310`, ParadeDB `:54329`, and crawl-proxy `:18080` so host pytest can reach them. The default `private` network stays `internal: true`. Do not apply that overlay in staging or production.
 
-## Staging / production (planned)
+## Staging / production (Packet 1 IaC)
 
-Vercel frontend, CloudFront/WAF → EC2 Compose (API blue/green, worker, ParadeDB, Valkey, crawl proxy), managed Supabase, SES. See Phase 10–11.
+Vercel frontend, CloudFront/WAF → EC2 Compose (Caddy, API blue/green, worker,
+digest-pinned ParadeDB, split Valkey, crawl proxy, provider-egress stub,
+ClamAV, parser-sandbox with `network_mode: none`). Managed Supabase is
+canonical; LightRAG stays in-process. SES is sandbox in staging. Live apply
+is Blocked in Packet 1. See [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
+
+```mermaid
+flowchart TB
+  subgraph edgeNet ["edge"]
+    caddy["caddy host 443"]
+    blue["api-blue no host port"]
+    green["api-green no host port"]
+  end
+  subgraph privateNet ["private internal"]
+    pdb["paradedb no host port"]
+    vl["valkey-limits noeviction"]
+    vc["valkey-cache allkeys-lru"]
+    clam["clamav"]
+    workerN["worker"]
+    crawl["crawl-proxy"]
+  end
+  subgraph noneNet ["network_mode none"]
+    parser["parser-sandbox"]
+  end
+  caddy --> blue
+  caddy --> green
+  blue --> pdb
+  green --> pdb
+  workerN --> pdb
+  workerN --> crawl
+```
+
+Do not apply `docker-compose.packet8.yml` in staging.
 
 ## Links
 

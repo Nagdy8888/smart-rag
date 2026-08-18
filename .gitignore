@@ -64,6 +64,20 @@ test-results/
 
 # Docker / local data volumes dumps
 *.log
+
+# Terraform local state (reviewed *.tf stays committed)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+terraform.tfvars
+!terraform.tfvars.example
+!**/*.tfvars.example
 supabase/.temp/
 supabase/.branches/
 

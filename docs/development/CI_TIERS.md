@@ -73,6 +73,12 @@ classification (`scripts/ci/check_phase09_packet7.py`)
 are local gates. They are not added to the GitHub PR job graph. See
 [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
 
+Phase 10 Packet 1 managed-staging IaC/policy
+(`scripts/phase10_staging.py`, `scripts/ci/check_phase10_packet1.py`)
+is also a local gate. It parses committed Terraform/Compose/Caddy/inventory
+in Python. It is not added to the GitHub PR job graph and does not apply
+cloud resources. See [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md).
+
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and
 artifact upload. A local workflow definition is not remote execution

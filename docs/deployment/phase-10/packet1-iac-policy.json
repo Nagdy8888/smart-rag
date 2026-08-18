@@ -1,0 +1,77 @@
+{
+  "findings": [
+    {
+      "check": "no_ssh",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "imdsv2",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "encrypted_ebs",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "cloudfront_timeouts",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "cloudfront_policies",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "iam_provider",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "sensitive_variables",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "compose",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "caddy",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "user_data",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "inventory",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "vercel_env",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "phase9_images",
+      "detail": "ok",
+      "passed": true
+    },
+    {
+      "check": "synthetic_corpus",
+      "detail": "ok",
+      "passed": true
+    }
+  ],
+  "iac_sha256": "bf09959e2f70b89b10851245691992d28a4e4dcae79b2d476a6eff6fa2dcac1f",
+  "passed": true,
+  "schema_version": "phase10-packet1-iac-v1"
+}

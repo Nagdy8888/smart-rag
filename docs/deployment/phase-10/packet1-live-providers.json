@@ -1,0 +1,15 @@
+{
+  "apply_reason": "Terraform/OpenTofu are not installed; live apply is Blocked. aws sts get-caller-identity failed (session missing or expired)",
+  "apply_state": "Blocked",
+  "aws_cli_installed": true,
+  "network_scan_artifact": null,
+  "runtime_ec2_assertions": "Blocked",
+  "schema_version": "phase10-packet1-live-v1",
+  "ses_provision": "Blocked",
+  "sts_detail": "aws sts get-caller-identity failed (session missing or expired)",
+  "sts_ok": false,
+  "supabase_provision": "Blocked",
+  "terraform_installed": false,
+  "tofu_installed": false,
+  "vercel_provision": "Blocked"
+}

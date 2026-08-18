@@ -1,0 +1,15 @@
+# Non-secret example only. Copy to terraform.tfvars (gitignored).
+# Never put origin header values, database URLs, or AWS keys here.
+
+aws_region       = "us-east-1"
+project_name     = "smart-rag-staging"
+instance_type    = "m6i.xlarge"
+origin_hostname  = "origin.staging.example.invalid"
+ses_from_email   = "staging-alerts@example.invalid"
+
+# Sensitive variables have no defaults. Set them in terraform.tfvars or the
+# environment at apply time, never in git:
+# origin_header_name
+# origin_header_value
+# origin_header_name_previous
+# origin_header_value_previous

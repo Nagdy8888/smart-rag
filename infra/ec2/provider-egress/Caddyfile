@@ -1,0 +1,28 @@
+# Provider-egress stub. Deny by default. Packet 3 proves monitored isolation.
+# This is not a live forward-proxy proof.
+
+{
+	servers {
+		timeouts {
+			read_timeout 90s
+			write_timeout 90s
+		}
+	}
+}
+
+:8080 {
+	@openai host api.openai.com
+	@langsmith host api.smith.langchain.com
+
+	handle @openai {
+		reverse_proxy https://api.openai.com
+	}
+
+	handle @langsmith {
+		reverse_proxy https://api.smith.langchain.com
+	}
+
+	handle {
+		respond "provider egress denied" 403
+	}
+}
