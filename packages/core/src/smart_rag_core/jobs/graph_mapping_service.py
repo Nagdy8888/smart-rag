@@ -1277,7 +1277,7 @@ async def _invoke_maybe_threaded(func: Any, *args: Any) -> Any:
     """Call a sync mapping callback off the running event loop.
 
     Hybrid retrieve and support rerank use ``asyncio.run`` internally. Mapping
-    already runs inside ``asyncio.run(process_claimed_job)``, so those
+    already runs on the worker's long-lived LightRAG loop, so those
     callbacks must execute on a worker thread.
 
     Args:

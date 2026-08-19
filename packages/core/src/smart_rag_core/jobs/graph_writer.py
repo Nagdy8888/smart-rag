@@ -301,6 +301,11 @@ class GraphWriterGuard:
     def session_holds_advisory_lock(self) -> bool:
         """Return whether this backend session still holds the writer lock.
 
+        Postgres 17 stores a two-``int4`` ``pg_advisory_lock(key1, key2)`` as
+        ``pg_locks.objsubid = 2``. Older catalogs used ``1``. Accept both so
+        hosted Supabase does not report ``advisory_lock_lost`` immediately
+        after a successful ``pg_try_advisory_lock``.
+
         Returns:
             True when ``pg_locks`` shows a granted session advisory lock for
             this backend PID and key pair.
@@ -319,7 +324,7 @@ class GraphWriterGuard:
                   WHERE locktype = 'advisory'
                     AND granted
                     AND pid = pg_backend_pid()
-                    AND objsubid = 1
+                    AND objsubid IN (1, 2)
                     AND classid = %s::oid
                     AND objid = %s::oid
                 )

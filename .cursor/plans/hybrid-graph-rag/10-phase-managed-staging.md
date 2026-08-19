@@ -49,7 +49,7 @@ The scope lock controls implementation sequencing; it does not weaken any securi
 
 Complete these in order. A checked box requires committed implementation evidence in the phase exit record, not only code presence.
 
-1. [ ] [Provision isolated managed Supabase, SES sandbox, CloudFront/WAF, EC2 blue/green services plus digest-pinned private ParadeDB, private Valkey/proxy networks, and Vercel staging from reviewed IaC.](./10-phase-managed-staging/packets/01-provision-isolated-managed-staging.md)
+1. [x] [Provision isolated managed Supabase, SES sandbox, CloudFront/WAF, EC2 blue/green services plus digest-pinned private ParadeDB, private Valkey/proxy networks, and Vercel staging from reviewed IaC.](./10-phase-managed-staging/packets/01-provision-isolated-managed-staging.md)
 2. [ ] [Implement GitHub OIDC, protected immutable expand/contract migrations, short-lived credential retrieval, environment separation, and secrets custody.](./10-phase-managed-staging/packets/02-implement-protected-migrations-and-secrets.md)
 3. [ ] [Prove direct-origin rejection, provider/crawl/parser egress boundaries, private ports, WAF controls, and 90-second streaming timeout configuration.](./10-phase-managed-staging/packets/03-prove-origin-egress-and-timeouts.md)
 4. [ ] [Exercise asymmetric JWKS rollover, dual origin-secret rotation, real 50-second CDN SSE heartbeat/disconnect/resume, ParadeDB outage/version mismatch/rebuild, and Valkey degraded modes.](./10-phase-managed-staging/packets/04-exercise-rotations-streaming-and-degradation.md)

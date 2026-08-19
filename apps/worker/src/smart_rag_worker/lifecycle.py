@@ -40,6 +40,11 @@ from smart_rag_core.ingestion.parser.sandbox.launcher import (
 )
 from smart_rag_core.jobs.exceptions import JobLeaseError, JobRepositoryError
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
+from smart_rag_core.observability.ingest_progress import log_ingest_progress
+from smart_rag_core.observability.ingest_trace import (
+    ingest_run_name_for_job_kind,
+    invoke_traced_ingestion,
+)
 from smart_rag_core.retrieval.lightrag_adapter import (
     LightRagRuntimeAdapter,
     bind_process_runtime_adapter,
@@ -56,6 +61,29 @@ from smart_rag_worker.privileged_storage import load_worker_privileged_storage_s
 LOGGER = logging.getLogger(__name__)
 
 
+def patch_checkpoint_lease_token(
+    graph: Any,
+    config: dict[str, object],
+    lease_token: str,
+) -> None:
+    """Overwrite checkpointed ``lease_token`` with the currently claimed token.
+
+    Args:
+        graph: Compiled graph exposing ``update_state``.
+        config: Runnable config including ``thread_id``.
+        lease_token: Token from the latest job claim.
+
+    Side Effects:
+        Writes a new checkpoint when ``lease_token`` is non-empty. Resume via
+        ``invoke(None)`` otherwise keeps the failed attempt's token, and
+        canonical ledger writes fail with ``invalid_or_expired_lease``.
+    """
+
+    if not lease_token:
+        return
+    graph.update_state(config, {"lease_token": lease_token})  # pyright: ignore[reportUnknownMemberType]
+
+
 class WorkerLifecycle:
     """Polls ingestion jobs and executes probe or scan/promote graphs."""
 
@@ -68,8 +96,10 @@ class WorkerLifecycle:
         Side Effects:
             Opens a Postgres checkpointer pool when a database URL is
             configured. Runtime never calls ``PostgresSaver.setup()``.
-            When ``LIGHTRAG_DB_URL`` is set, attaches the runtime LightRAG
-            adapter without schema-admin ``initialize_storages``.
+            When ``LIGHTRAG_DB_URL`` is set, opens one long-lived asyncio
+            loop, attaches the runtime LightRAG adapter on that loop, and
+            reuses it for graph jobs. Never ``asyncio.run`` after attach,
+            because that closes the asyncpg pool.
         """
 
         assert_worker_parser_sandbox(settings)
@@ -85,14 +115,17 @@ class WorkerLifecycle:
                 max_size=max(8, settings.worker_concurrency * 4),
             )
             saver = self._checkpointer.saver
-        if settings.lightrag_db_url is not None:
-            self._lightrag_adapter = asyncio.run(
-                bind_process_runtime_adapter(
-                    dsn=settings.lightrag_db_url,
-                    settings=settings,
-                )
-            )
+        self._lightrag_loop: asyncio.AbstractEventLoop | None = None
         try:
+            if settings.lightrag_db_url is not None:
+                self._lightrag_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._lightrag_loop)
+                self._lightrag_adapter = self._lightrag_loop.run_until_complete(
+                    bind_process_runtime_adapter(
+                        dsn=settings.lightrag_db_url,
+                        settings=settings,
+                    )
+                )
             self._probe_graph = build_probe_ingestion_graph(checkpointer=saver)
             self._scan_graph = build_scan_promote_ingestion_graph(checkpointer=saver)
             self._crawl_graph = build_crawl_ingestion_graph(checkpointer=saver)
@@ -101,6 +134,7 @@ class WorkerLifecycle:
             self._graph_loop = GraphWorkerLoop(
                 settings,
                 adapter=self._lightrag_adapter,
+                async_loop=self._lightrag_loop,
             )
         except BaseException:
             self.stop()
@@ -160,8 +194,18 @@ class WorkerLifecycle:
 
         self._stop_event.set()
         if self._lightrag_adapter is not None:
-            asyncio.run(self._lightrag_adapter.finalize())
+            loop = self._lightrag_loop
+            if loop is None or loop.is_closed():
+                asyncio.run(self._lightrag_adapter.finalize())
+            else:
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(self._lightrag_adapter.finalize())
             self._lightrag_adapter = None
+        if self._lightrag_loop is not None:
+            if not self._lightrag_loop.is_closed():
+                self._lightrag_loop.close()
+            self._lightrag_loop = None
+            asyncio.set_event_loop(None)
         if self._checkpointer is not None:
             self._checkpointer.close()
             self._checkpointer = None
@@ -223,6 +267,8 @@ class WorkerLifecycle:
         Args:
             job: Claimed ingestion job. ``thread_id`` equals ``job.id`` so a
                 crashed worker resumes the same checkpoint thread.
+                ``job_lease_token`` is the live claim token, not a checkpointed
+                value from a prior attempt.
 
         Returns:
             ``{"configurable": ...}`` mapping for ``graph.invoke`` / ``get_state``.
@@ -230,8 +276,9 @@ class WorkerLifecycle:
 
         return {
             "configurable": {
-                "thread_id": str(job.id),
                 **self._graph_config(),
+                "thread_id": str(job.id),
+                "job_lease_token": job.lease_token or "",
             }
         }
 
@@ -259,7 +306,9 @@ class WorkerLifecycle:
 
         Side Effects:
             Writes checkpoints when a PostgresSaver is bound. Ledgered node
-            side effects remain idempotent under replay.
+            side effects remain idempotent under replay. Resume patches
+            ``lease_token`` from the current claim so canonical ledger writes
+            do not use a checkpointed token from a failed attempt.
         """
 
         if self._checkpointer is None:
@@ -269,7 +318,12 @@ class WorkerLifecycle:
         snapshot = graph.get_state(config)  # pyright: ignore[reportUnknownMemberType]
         next_nodes = tuple(snapshot.next or ())
         values = _graph_result_mapping(snapshot.values)
+        lease_token = str(initial_input.get("lease_token") or "")
+        configurable = config.get("configurable")
+        if isinstance(configurable, dict) and lease_token:
+            configurable["job_lease_token"] = lease_token
         if next_nodes:
+            patch_checkpoint_lease_token(graph, config, lease_token)
             return _graph_result_mapping(
                 graph.invoke(None, config)  # pyright: ignore[reportUnknownMemberType]
             )
@@ -277,6 +331,50 @@ class WorkerLifecycle:
             return values
         return _graph_result_mapping(
             graph.invoke(initial_input, config)  # pyright: ignore[reportUnknownMemberType]
+        )
+
+    def _invoke_traced_graph(
+        self,
+        job: IngestionJobRecord,
+        graph: Any,
+        initial_input: Mapping[str, object],
+        config: dict[str, object],
+        *,
+        success_statuses: tuple[str, ...],
+    ) -> dict[str, object]:
+        """Invoke one ingestion graph inside a redacted LangSmith parent run.
+
+        Args:
+            job: Claimed job providing ``job_id`` and hashed document/version
+                ids.
+            graph: Compiled ingestion graph.
+            initial_input: Fresh-run state payload.
+            config: Runnable config including ``thread_id``.
+            success_statuses: Terminal success markers for resume.
+
+        Returns:
+            Graph result mapping.
+
+        Side Effects:
+            Binds ``job_id`` correlation, emits one ``[hybrid]`` claimed line,
+            and opens ``ingestion.scan`` / ``ingestion.index`` (or crawl/probe)
+            when tracing is on.
+        """
+
+        run_name = ingest_run_name_for_job_kind(job.job_kind) or "ingestion.probe"
+        log_ingest_progress("hybrid", job.job_kind, job.id)
+        return invoke_traced_ingestion(
+            lambda: self._invoke_graph(
+                graph,
+                initial_input,
+                config,
+                success_statuses=success_statuses,
+            ),
+            settings=self._settings,
+            job_id=job.id,
+            run_name=run_name,
+            document_id=job.document_id,
+            version_id=job.version_id,
         )
 
     def _claim_one(self) -> IngestionJobRecord | None:
@@ -339,7 +437,8 @@ class WorkerLifecycle:
             configurable["lease_lost"] = lease_lost
             if job.job_kind == "scan_promote":
                 graph_input = _scan_graph_input_from_job(job)
-                result = self._invoke_graph(
+                result = self._invoke_traced_graph(
+                    job,
                     self._scan_graph,
                     graph_input,
                     config,
@@ -349,7 +448,8 @@ class WorkerLifecycle:
                 detail = str(result.get("detail", "scan_promote_failed"))
             elif job.job_kind == "website_crawl":
                 graph_input = _crawl_graph_input_from_job(job)
-                result = self._invoke_graph(
+                result = self._invoke_traced_graph(
+                    job,
                     self._crawl_graph,
                     graph_input,
                     config,
@@ -359,7 +459,8 @@ class WorkerLifecycle:
                 detail = str(result.get("detail", "website_crawl_failed"))
             elif job.job_kind == "hybrid_index":
                 graph_input = _index_graph_input_from_job(job)
-                result = self._invoke_graph(
+                result = self._invoke_traced_graph(
+                    job,
                     self._index_graph,
                     graph_input,
                     config,
@@ -375,7 +476,8 @@ class WorkerLifecycle:
                 success, detail = self._process_query_maintenance(job)
             else:
                 graph_input = _probe_graph_input_from_job(job)
-                result = self._invoke_graph(
+                result = self._invoke_traced_graph(
+                    job,
                     self._probe_graph,
                     graph_input,
                     config,
@@ -393,6 +495,7 @@ class WorkerLifecycle:
                 )
                 if lease_lost.is_set():
                     LOGGER.warning("lease lost for job %s; refusing complete()", job.id)
+                    _log_hybrid_job_outcome(job, reason_code="lease_lost")
                     try:
                         repository.fail(
                             job.id,
@@ -409,6 +512,7 @@ class WorkerLifecycle:
                         )
                 elif success:
                     completed = repository.complete(job.id, lease_token)
+                    _log_hybrid_job_outcome(job, reason_code=None)
                     if job.job_kind not in {
                         "query_memory_reaper",
                         "langsmith_trace_deletion",
@@ -416,6 +520,7 @@ class WorkerLifecycle:
                     }:
                         self._true_up_budget(connection, completed)
                 else:
+                    _log_hybrid_job_outcome(job, reason_code="job_failed")
                     repository.fail(
                         job.id,
                         lease_token,
@@ -425,9 +530,11 @@ class WorkerLifecycle:
                 connection.commit()
         except (JobLeaseError, JobRepositoryError, psycopg.Error) as exc:
             LOGGER.exception("job %s failed: %s", job.id, exc)
+            _log_hybrid_job_outcome(job, reason_code="job_failed")
             self._fail_job(job.id, lease_token, str(exc))
         except Exception as exc:
             LOGGER.exception("job %s failed with unexpected error: %s", job.id, exc)
+            _log_hybrid_job_outcome(job, reason_code="unexpected_error")
             self._fail_job(job.id, lease_token, str(exc))
         finally:
             stop_heartbeat.set()
@@ -631,6 +738,46 @@ def assert_worker_parser_sandbox(settings: WorkerSettings) -> None:
         return
     if not docker_sandbox_available():
         raise JobRepositoryError("parser_sandbox_docker_required")
+
+
+def _log_hybrid_job_outcome(
+    job: IngestionJobRecord,
+    *,
+    reason_code: str | None,
+) -> None:
+    """Emit one ``[hybrid]`` completion or failure line without job detail text.
+
+    Args:
+        job: Claimed ingestion job.
+        reason_code: ``None`` on success; a short token on failure.
+
+    Side Effects:
+        Logs one progress line. Maintenance jobs stay quiet.
+    """
+
+    if job.job_kind in {
+        "query_memory_reaper",
+        "langsmith_trace_deletion",
+        "query_reservation_true_up",
+    }:
+        return
+    if reason_code is None:
+        log_ingest_progress("hybrid", f"{job.job_kind}_done", job.id)
+        return
+    category = (
+        JobErrorCategory.TRANSIENT
+        if reason_code in {"lease_lost", "job_failed", "unexpected_error"}
+        else JobErrorCategory.VALIDATION
+    )
+    if reason_code == "job_failed":
+        category = JobErrorCategory.VALIDATION
+    log_ingest_progress(
+        "hybrid",
+        f"{job.job_kind}_failed",
+        job.id,
+        error_category=category,
+        reason_code=reason_code,
+    )
 
 
 def heartbeat_until_stopped(

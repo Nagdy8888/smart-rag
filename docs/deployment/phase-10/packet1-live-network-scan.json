@@ -1,21 +1,25 @@
 {
   "schema_version": "phase10-live-network-scan-v1",
   "qualifies_for_p10_01_c": true,
-  "qualifies_reason": "ParadeDB and both Valkey containers are running and healthy on the private Docker network. Host ss -lnt is SSM-only. Workstation TCP probe of EIP 52.206.156.176 found 22/80/443/5432/6379/8000/8080/8443 closed.",
-  "scanned_at": "2026-08-19T11:12:00Z",
-  "method": "Python socket connect 2.5s timeout from a workstation outside the VPC, plus SSM ss -lnt and docker compose ps on the instance",
+  "qualifies_reason": "ParadeDB, both Valkey containers, api-blue, and crawl-proxy are healthy on the private Docker network. Caddy and provider-egress-proxy are running. Host ss -lnt is 443 plus SSM. Workstation TCP probe of EIP 52.206.156.176 found 22/80/443/5432/6379/8000/8080/8443 closed. Direct origin without the CloudFront header returned 403 on localhost:443. CloudFront https://dzm8yijuajwge.cloudfront.net/health/live returned 200.",
+  "scanned_at": "2026-08-19T12:16:25Z",
+  "method": "Python socket connect 2.5s timeout from a workstation outside the VPC, plus SSM ss -lnt, docker inspect, localhost curl without origin header, and urllib GET of CloudFront /health/live",
   "target_eip": "52.206.156.176",
-  "instance_id": "i-0abe79350a3880e87",
+  "instance_id": "i-067ea167673dbc187",
   "compose_copied_via_ssm": true,
   "compose_started": true,
   "compose_services_healthy": [
+    "api-blue",
     "paradedb",
     "valkey-limits",
-    "valkey-cache"
+    "valkey-cache",
+    "crawl-proxy"
   ],
   "aws_session": "Nagdy-iam",
-  "ssm_listen": ["127.0.0.1:46521"],
+  "ssm_listen": ["127.0.0.1:44397"],
   "sshd": "inactive",
+  "local_origin_without_header_status": 403,
+  "cloudfront_health_live_status": 200,
   "results": [
     {"port": 22, "open": false},
     {"port": 80, "open": false},
@@ -28,8 +32,9 @@
   ],
   "notes": [
     "Origin SG allows tcp/443 only from CloudFront prefix list pl-3b927c52.",
-    "sshd was listening after image pull; disabled again via SSM. Public 22 remains closed.",
-    "API/Caddy are not started (profile t3micro-edge). Packet 1 checkbox stays unchecked.",
-    "CI check_phase10_packet1.py does not ingest this artifact, so the local gate matrix may still list C as Blocked."
+    "Host listens on 0.0.0.0:443; workstation 443 remains closed because SG is CloudFront-only.",
+    "Caddy 2.8.4 uses http_port 443 plus Caddyfile.http443. ACME cannot complete on this SG.",
+    "Worker, api-green, ClamAV, and parser-sandbox stay on profile not-on-t3micro and were not started.",
+    "Prior instance i-0abe79350a3880e87 was replaced; this scan is for i-067ea167673dbc187."
   ]
 }

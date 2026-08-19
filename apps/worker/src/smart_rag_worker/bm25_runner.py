@@ -11,6 +11,8 @@ from smart_rag_core.ingestion.bm25_projection import Bm25ProjectionService
 from smart_rag_core.ingestion.bm25_reconcile import Bm25ReconcileDecision
 from smart_rag_core.jobs.bm25_repository import Bm25IndexJobRepository
 from smart_rag_core.jobs.exceptions import JobLeaseError, JobRepositoryError
+from smart_rag_core.observability.ingest_progress import log_ingest_progress
+from smart_rag_core.observability.logging import correlation_context
 from smart_rag_core.schema.enums import JobErrorCategory
 from smart_rag_core.settings.worker import WorkerSettings
 
@@ -133,6 +135,7 @@ class Bm25WorkerLoop:
         lease_token = str(job["lease_token"])
         version_id = UUID(str(job["version_id"]))
         operation = str(job["operation"])
+        log_ingest_progress("hybrid", "bm25", job_id)
 
         stop_heartbeat = threading.Event()
 
@@ -158,32 +161,35 @@ class Bm25WorkerLoop:
         )
         heartbeat_thread.start()
         try:
-            with (
-                psycopg.connect(postgres_url) as supabase,
-                psycopg.connect(parade_url) as parade,
-            ):
-                supabase.execute("SET ROLE app_worker")
-                parade.execute("SET ROLE paradedb_writer")
-                service = Bm25ProjectionService(supabase, parade)
-                if operation == "delete":
-                    success = service.process_delete_job(version_id=version_id)
-                else:
-                    success = service.process_upsert_job(
-                        version_id=version_id,
-                        job_id=job_id,
-                    )
-                if success:
-                    supabase.commit()
-                    parade.commit()
-                else:
-                    supabase.rollback()
-                    parade.rollback()
+            with correlation_context(job_id=str(job_id)):
+                with (
+                    psycopg.connect(postgres_url) as supabase,
+                    psycopg.connect(parade_url) as parade,
+                ):
+                    supabase.execute("SET ROLE app_worker")
+                    parade.execute("SET ROLE paradedb_writer")
+                    service = Bm25ProjectionService(supabase, parade)
+                    if operation == "delete":
+                        success = service.process_delete_job(version_id=version_id)
+                    else:
+                        success = service.process_upsert_job(
+                            version_id=version_id,
+                            job_id=job_id,
+                        )
+                    if success:
+                        supabase.commit()
+                        parade.commit()
+                    else:
+                        supabase.rollback()
+                        parade.rollback()
 
             with psycopg.connect(postgres_url) as connection:
                 connection.execute("SET ROLE app_worker")
                 repository = self._repository(connection)
                 if success:
                     repository.complete(job_id, lease_token)
+                    stage = "hybrid_ready" if operation != "delete" else "bm25_delete_done"
+                    log_ingest_progress("hybrid", stage, job_id)
                 else:
                     repository.fail(
                         job_id,
@@ -191,10 +197,24 @@ class Bm25WorkerLoop:
                         error_category=JobErrorCategory.TRANSIENT,
                         last_error="bm25_projection_verification_failed",
                     )
+                    log_ingest_progress(
+                        "hybrid",
+                        "bm25_failed",
+                        job_id,
+                        error_category=JobErrorCategory.TRANSIENT,
+                        reason_code="bm25_verify_failed",
+                    )
                 connection.commit()
             return True
         except (JobLeaseError, JobRepositoryError, psycopg.Error) as exc:
             LOGGER.exception("bm25 job %s failed: %s", job_id, exc)
+            log_ingest_progress(
+                "hybrid",
+                "bm25_failed",
+                job_id,
+                error_category=JobErrorCategory.TRANSIENT,
+                reason_code="job_failed",
+            )
             return True
         finally:
             stop_heartbeat.set()

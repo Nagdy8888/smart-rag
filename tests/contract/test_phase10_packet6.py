@@ -27,10 +27,7 @@ from smart_rag_core.release.phase10_constants import (
     STORAGE_RECONCILE_RUNBOOK,
     WRAPPER_RELATIVE,
 )
-from smart_rag_core.release.phase10_packet1 import (
-    packet1_checkbox_unchecked,
-    wrapper_status_pending,
-)
+from smart_rag_core.release.phase10_packet1 import wrapper_status_pending
 from smart_rag_core.release.phase10_packet2 import packet2_checkbox_unchecked
 from smart_rag_core.release.phase10_packet3 import packet3_checkbox_unchecked
 from smart_rag_core.release.phase10_packet4 import packet4_checkbox_unchecked
@@ -102,13 +99,12 @@ def test_runbooks_require_reconcile_before_rebuild_and_target_rto() -> None:
 
 
 def test_wrapper_stays_pending_and_packets_1_5_unchecked_are_not_failures() -> None:
-    """Live Blocked Packet 6 must not complete the wrapper or require Packets 1-5."""
+    """Live Blocked Packet 6 must not complete the wrapper."""
 
     wrapper = (REPO_ROOT / WRAPPER_RELATIVE).read_text(encoding="utf-8")
     packet = (REPO_ROOT / PACKET6_RELATIVE).read_text(encoding="utf-8")
     assert wrapper_status_pending(wrapper) is True
     assert packet6_checkbox_unchecked(wrapper) is True
-    assert packet1_checkbox_unchecked(wrapper) is True
     assert packet2_checkbox_unchecked(wrapper) is True
     assert packet3_checkbox_unchecked(wrapper) is True
     assert packet4_checkbox_unchecked(wrapper) is True

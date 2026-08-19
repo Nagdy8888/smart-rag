@@ -77,14 +77,14 @@ def test_synthetic_corpus_holdout_stays_sealed() -> None:
         assert str(row.get("split") or "") in {"development", "qualification"}
 
 
-def test_wrapper_and_packet_stay_pending() -> None:
-    """Live Blocked Packet 1 must not complete the Phase 10 wrapper."""
+def test_wrapper_stays_pending_after_packet1() -> None:
+    """Packet 1 may complete; the Phase 10 wrapper stays pending."""
 
     wrapper = (REPO_ROOT / WRAPPER_RELATIVE).read_text(encoding="utf-8")
     packet = (REPO_ROOT / PACKET1_RELATIVE).read_text(encoding="utf-8")
     assert wrapper_status_pending(wrapper) is True
-    assert packet1_checkbox_unchecked(wrapper) is True
-    assert "status: pending" in packet.split("---", 2)[1]
+    assert packet1_checkbox_unchecked(wrapper) is False
+    assert "status: complete" in packet.split("---", 2)[1]
     assert (REPO_ROOT / STAGING_COMPOSE_FILE).is_file()
     assert (REPO_ROOT / STAGING_CADDY_FILE).is_file()
     assert (REPO_ROOT / STAGING_CADDY_HTTP443_FILE).is_file()

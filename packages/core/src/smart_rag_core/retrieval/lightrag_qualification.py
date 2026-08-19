@@ -34,6 +34,7 @@ from smart_rag_core.retrieval.graph import (
     GRAPH_FIELD_SEP,
     LIGHTRAG_CHUNK_OVERLAP_TOKEN_SIZE,
     LIGHTRAG_CHUNK_TOKEN_SIZE,
+    LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
     LIGHTRAG_TIKTOKEN_MODEL,
     QUALIFICATION_POSTGRES_CONNECTION_RETRIES,
     QUALIFICATION_POSTGRES_MAX_CONNECTIONS,
@@ -640,9 +641,18 @@ async def open_qualification_session(
         embedding_func=embedding_func,
         llm_model_func=callbacks.extract_llm,
         role_llm_configs={
-            "extract": RoleLLMConfig(func=callbacks.extract_llm, timeout=30),
-            "keyword": RoleLLMConfig(func=callbacks.keyword_llm, timeout=30),
-            "query": RoleLLMConfig(func=callbacks.query_llm, timeout=30),
+            "extract": RoleLLMConfig(
+                func=callbacks.extract_llm,
+                timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
+            ),
+            "keyword": RoleLLMConfig(
+                func=callbacks.keyword_llm,
+                timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
+            ),
+            "query": RoleLLMConfig(
+                func=callbacks.query_llm,
+                timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
+            ),
         },
         enable_llm_cache=enable_llm_cache,
         enable_llm_cache_for_entity_extract=enable_llm_cache,
@@ -655,7 +665,7 @@ async def open_qualification_session(
         embedding_func_max_async=1,
         max_parallel_insert=1,
         auto_manage_storages_states=False,
-        default_llm_timeout=30,
+        default_llm_timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
         default_embedding_timeout=30,
         cosine_better_than_threshold=QUALIFICATION_COSINE_BETTER_THAN_THRESHOLD,
     )

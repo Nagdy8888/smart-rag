@@ -1,9 +1,11 @@
 ---
 schemaVersion: "2.2"
 description: >-
-  One-shot staging deploy of digest-pinned Compose services. Does not fetch
-  database secrets. Unsets process environment on EXIT. Records operator and
-  result.
+  One-shot staging deploy of digest-pinned Compose services with the t3.micro
+  overlay and t3micro-edge profile. Does not fetch database secrets. Does not
+  start worker, ClamAV, parser, or api-green. Unsets process environment on
+  EXIT. Records operator and result. Do not send this document until the
+  operator says the instance is ready.
 parameters:
   Operator:
     type: String
@@ -31,8 +33,18 @@ mainSteps:
             RESULT="blocked_compose"
             exit 1
           fi
+          if [ ! -f /opt/smart-rag/docker-compose.t3micro.yml ]; then
+            echo "blocked: t3micro overlay is missing on the instance"
+            RESULT="blocked_overlay"
+            exit 1
+          fi
+          if [ ! -f /opt/smart-rag/.env ]; then
+            echo "blocked: staging env file is missing on the instance"
+            RESULT="blocked_env"
+            exit 1
+          fi
           cd /opt/smart-rag
-          docker compose -f docker-compose.staging.yml pull
-          docker compose -f docker-compose.staging.yml up -d
+          docker compose -f docker-compose.staging.yml -f docker-compose.t3micro.yml --env-file /opt/smart-rag/.env pull
+          docker compose -f docker-compose.staging.yml -f docker-compose.t3micro.yml --env-file /opt/smart-rag/.env --profile t3micro-edge up -d
           RESULT="ok"
           echo "deploy completed without database secrets in the GitHub role"

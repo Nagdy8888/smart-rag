@@ -25,15 +25,18 @@ linked. Live inventory (no secrets):
 Live inventory (profile `Nagdy-iam`, no secrets):
 [phase10-live-aws-inventory.json](./phase-10/phase10-live-aws-inventory.json).
 Compose/Caddy files are on `/opt/smart-rag`; Docker Compose **v2.32.4** is
-installed. **ParadeDB and both Valkey services are healthy** on the private
-Docker network (`docker-compose.t3micro.yml`). API/Caddy are not started
-(`t3micro-edge` profile). Phase 9 API/worker/crawl-proxy/parser-sandbox
-freeze digests are in ECR as tag `p9-freeze`. CloudFront origin timeouts
-are live 90/90 with placeholder origin hostname. An internet EIP probe
-closed 22/80/443/5432/6379/8000/8080/8443 with those private services
-running
+installed. **t3micro-edge** is running: ParadeDB, both Valkey services,
+api-blue, crawl-proxy (healthy), plus Caddy and provider-egress-proxy
+(running). Worker/api-green/ClamAV/parser stay off. CloudFront origin is
+`52.206.156.176.sslip.io` with `origin_protocol_policy http-only` and
+timeouts 90/90. Viewer `https://dzm8yijuajwge.cloudfront.net/health/live`
+returned HTTP 200. Direct origin without the CloudFront header returned
+403. An internet EIP probe closed 22/80/443/5432/6379/8000/8080/8443
 ([packet1-live-network-scan.json](./phase-10/packet1-live-network-scan.json)).
-Packet 1 checkbox stays unchecked.
+Instance `i-067ea167673dbc187` replaced terminated `i-0abe79350a3880e87`
+(AMI `most_recent` replace; `ignore_changes` now set). Packet 1 may be
+checked when P10-01-A through E Pass; the Phase 10 wrapper stays
+`pending`.
 
 Related: [infra/ec2](../../infra/ec2/README.md) ·
 [STREAMING_TIMEOUTS.md](./STREAMING_TIMEOUTS.md) ·
@@ -41,6 +44,7 @@ Related: [infra/ec2](../../infra/ec2/README.md) ·
 [packet1-live-supabase.json](./phase-10/packet1-live-supabase.json) ·
 [packet1-live-vercel.json](./phase-10/packet1-live-vercel.json) ·
 [staging secrets runbook](../runbooks/phase10-staging-secrets.md) ·
+[demo local ingest / AWS ask](../runbooks/demo-local-ingest-aws-ask.md) ·
 [LOCAL_RELEASE_CANDIDATE.md](./LOCAL_RELEASE_CANDIDATE.md)
 
 ## Intended plan, features, and regions
@@ -90,27 +94,23 @@ Seed identity:
 flowchart LR
   vercel["VercelStaging"] --> auth["ManagedSupabaseAuth"]
   vercel --> cf["CloudFrontWAF"]
-  cf -->|"origin header plus 90s"| caddy["CaddyOnEC2"]
+  cf -->|"origin header plus 90s HTTP"| caddy["CaddyHttpOn443"]
   caddy --> blue["ApiBlue"]
-  caddy --> green["ApiGreen"]
   blue --> privateNet["PrivateDockerNet"]
-  green --> privateNet
-  worker["Worker"] --> privateNet
   privateNet --> pdb["ParadeDBNoHostPorts"]
   privateNet --> valkey["ValkeyLimitsAndCache"]
-  worker --> crawl["CrawlProxy"]
   blue --> egress["ProviderEgressStub"]
-  ses["SESSandbox"] --> mail["AuthEmail"]
+  ses["SESSandboxPending"] --> mail["AuthEmail"]
 ```
 
 | Layer | Committed | Live Packet 1 |
 | --- | --- | --- |
-| Terraform under `infra/ec2/` | Reviewed: encrypted EBS, IMDSv2 hop 1, SSM-only, CloudFront prefix list, WAF, SES sandbox | Apply Blocked |
-| `docker-compose.staging.yml` | Blue/green API, digest-pinned ParadeDB/Valkey, no private host ports | Not started |
-| Staging `Caddyfile` | 90s, `flush_interval -1`, current+previous origin headers | Not started |
-| Network scan | Policy only | Blocked (no scan artifact) |
+| Terraform under `infra/ec2/` | Encrypted EBS, IMDSv2 hop 1, SSM-only, CloudFront prefix list, WAF, SES sandbox | Instance `i-067ea167673dbc187` `t3.micro`; EIP `52.206.156.176`; origin `52.206.156.176.sslip.io` http-only 90/90 |
+| `docker-compose.t3micro.yml` | ParadeDB/Valkey default; edge via `t3micro-edge` | api-blue, ParadeDB, Valkey, crawl-proxy healthy; Caddy/egress running; worker/green/ClamAV/parser off |
+| Staging `Caddyfile.http443` | `http_port 443`, 90s, `flush_interval -1`, current+previous origin headers | Local unmatched header 403; CloudFront `/health/live` 200 |
+| Network scan | Policy plus live artifact | EIP 22/80/443/5432/6379/8000/8080/8443 closed |
 | Vercel/SES env | Public-key allow-list | Vercel public env applied; SES identity still unverified |
-| GitHub OIDC / SSM migrate | Reviewed IaC and protected workflows | Live assume/SendCommand Blocked |
+| GitHub OIDC / SSM migrate | Reviewed IaC and protected workflows | Live assume/SendCommand for migrate remains Packet 2 |
 
 CloudFront `OriginReadTimeout` / `OriginKeepaliveTimeout` are **90** in
 `infra/ec2/cloudfront_waf.tf`. AWS API max OriginReadTimeout is 120. The

@@ -2,6 +2,7 @@
 # staging host; m6i.xlarge is not used. Default `up -d` starts only
 # ParadeDB and split Valkey. Edge/API stay behind profile t3micro-edge.
 # Worker, api-green, ClamAV, and parser stay behind not-on-t3micro.
+# bm25-reproject stays behind demo-reproject and is never default `up`.
 # Do not publish private host ports. Phase 9 image digests stay in the
 # base file. Packet 5 load is not claimed on 1Gi RAM.
 #
@@ -68,3 +69,7 @@ services:
 
   parser-sandbox:
     profiles: ["not-on-t3micro"]
+
+  bm25-reproject:
+    profiles: ["demo-reproject"]
+    mem_limit: 280m

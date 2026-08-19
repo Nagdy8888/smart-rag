@@ -807,3 +807,45 @@ def test_openai_adapter_rejects_wrong_dimension() -> None:
                     )
                 )
             )
+
+
+def test_embed_inputs_in_batches_emits_count_only_progress() -> None:
+    """Gateway calls split on the default batch size without copying canary text."""
+
+    from smart_rag_core.ingestion.embeddings.service import _embed_inputs_in_batches
+    from smart_rag_core.ingestion.limits import DEFAULT_EMBEDDING_BATCH_SIZE
+
+    gateway = EmbeddingGateway(MockEmbeddingAdapter(fixture_id="test"))
+    canary = "SECRET_COMPANY_PASSAGE_DO_NOT_EXPORT"
+    texts = tuple(f"token-{index}" for index in range(DEFAULT_EMBEDDING_BATCH_SIZE + 1))
+    seen: list[tuple[str, dict[str, int]]] = []
+
+    def _progress(stage: str, counts: dict[str, int]) -> None:
+        """Capture batch progress counters.
+
+        Args:
+            stage: Progress stage token.
+            counts: Integer counters.
+        """
+
+        seen.append((stage, dict(counts)))
+
+    response = _embed_inputs_in_batches(
+        gateway,
+        operation_key="op-batch",
+        contextual_inputs=texts,
+        progress=_progress,
+    )
+    assert len(response.vectors) == DEFAULT_EMBEDDING_BATCH_SIZE + 1
+    assert len(seen) == 2
+    assert seen[0] == (
+        "embed_batch",
+        {
+            "batch_index": 1,
+            "batch_count": 2,
+            "chunks": DEFAULT_EMBEDDING_BATCH_SIZE,
+        },
+    )
+    assert seen[1][1]["batch_index"] == 2
+    assert seen[1][1]["chunks"] == 1
+    assert canary not in str(seen)

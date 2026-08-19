@@ -51,6 +51,11 @@
       "passed": true
     },
     {
+      "check": "caddy_http443",
+      "detail": "ok",
+      "passed": true
+    },
+    {
       "check": "user_data",
       "detail": "ok",
       "passed": true
@@ -76,7 +81,7 @@
       "passed": true
     }
   ],
-  "iac_sha256": "8346f27301a95acc6fe27d4c820344c5221a7cdd4aeb2d2c4fae971d9a6d422f",
+  "iac_sha256": "ab581d69ad4bb322040de58d3d738a5bb857cdbbb40f3e927b40e5906ffc6ccc",
   "passed": true,
   "schema_version": "phase10-packet1-iac-v1"
 }

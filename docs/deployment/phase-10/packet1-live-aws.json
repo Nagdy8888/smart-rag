@@ -6,10 +6,12 @@
   "intended_instance_type": "t3.micro",
   "actual_instance_type": "t3.micro",
   "actual_instance_type_reason": "Operator 2026-08-19: t3.micro is the accepted staging host; never m6i.xlarge",
-  "instance_id": "i-0abe79350a3880e87",
+  "instance_id": "i-067ea167673dbc187",
+  "prior_instance_id_terminated": "i-0abe79350a3880e87",
+  "prior_instance_termination_reason": "terraform apply replaced the host because data.aws_ami.al2023 is most_recent and user_data_replace_on_change was true. EBS delete_on_termination wiped ParadeDB/Valkey data. ec2.tf now sets user_data_replace_on_change=false and lifecycle ignore_changes=[ami, user_data].",
   "instance_state": "running",
   "origin_eip": "52.206.156.176",
-  "private_ip": "10.40.0.201",
+  "private_ip": "10.40.0.73",
   "vpc_id": "vpc-009cb395d9beda961",
   "subnet_id": "subnet-0bf2a3462703bcfa2",
   "origin_security_group_id": "sg-02398d702405818e6",
@@ -19,26 +21,50 @@
   "origin_sg_ingress": "tcp/443 from prefix list pl-3b927c52 only",
   "volumes": [
     {
-      "id": "vol-0bd417dd66283b900",
+      "id": "vol-076441c69ef845f18",
       "encrypted": true,
       "type": "gp3",
       "size_gib": 80
     },
     {
-      "id": "vol-0c80971f8e03c5990",
+      "id": "vol-0b34e1633002ffbdf",
       "encrypted": true,
       "type": "gp3",
       "size_gib": 50
     }
   ],
   "cloudfront_domain_name": "dzm8yijuajwge.cloudfront.net",
+  "cloudfront_distribution_id": "E2W9UNLLZ6I383",
+  "cloudfront_origin_hostname": "52.206.156.176.sslip.io",
+  "cloudfront_origin_protocol_policy": "http-only",
+  "cloudfront_origin_read_timeout_seconds": 90,
+  "cloudfront_origin_keepalive_timeout_seconds": 90,
+  "cloudfront_health_live_status": 200,
+  "local_origin_without_header_status": 403,
   "waf_acl_id": "bc02673b-cb26-4467-934c-c81043ccfd43",
   "ses_identity": "staging-alerts@example.invalid",
   "ses_verified": false,
   "compose_copied_via_ssm": true,
   "compose_started": true,
   "compose_start_blocked_reason": "",
-  "compose_services_healthy": ["paradedb", "valkey-limits", "valkey-cache"],
+  "compose_profile": "t3micro-edge",
+  "compose_services_healthy": [
+    "api-blue",
+    "paradedb",
+    "valkey-limits",
+    "valkey-cache",
+    "crawl-proxy"
+  ],
+  "compose_services_running_no_healthcheck": [
+    "caddy",
+    "provider-egress-proxy"
+  ],
+  "compose_services_not_started": [
+    "api-green",
+    "worker",
+    "clamav",
+    "parser-sandbox"
+  ],
   "resize_attempted": "m6i.xlarge",
   "resize_result": "FreeTierRestrictionError: ModifyInstanceAttribute not available for free plan accounts. Instance left t3.micro and restarted.",
   "freeze_images_on_workstation": true,
@@ -48,7 +74,11 @@
   "docker_compose_plugin_on_instance": "v2.32.4",
   "ssm_ping": "Online",
   "sshd_disabled": true,
-  "host_listen_ports_after_sshd_disable": ["127.0.0.1:46521"],
+  "host_listen_ports_after_sshd_disable": [
+    "0.0.0.0:443",
+    "[::]:443",
+    "127.0.0.1:44397"
+  ],
   "network_scan_present": true,
   "eip_probe_artifact": "docs/deployment/phase-10/packet1-live-network-scan.json",
   "eip_probe_qualifies_for_p10_01_c": true,

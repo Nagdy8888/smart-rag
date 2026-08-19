@@ -765,11 +765,17 @@ def assert_caddy_http443_policy(caddy_text: str) -> None:
 
     Raises:
         Phase10TopologyError: If HTTP-on-443, dual headers, 90s, or 403 drift.
+
+    Notes:
+        Caddy 2.8.4 rejects ``http://:443`` unless ``http_port 443`` is set,
+        because HTTP-on-443 otherwise violates scheme/port convention.
     """
 
     assert_caddy_policy(caddy_text)
     if "auto_https off" not in caddy_text:
         raise Phase10TopologyError("t3.micro Caddy must disable ACME auto_https")
+    if "http_port 443" not in caddy_text:
+        raise Phase10TopologyError("t3.micro Caddy must set http_port 443")
     if "http://:443" not in caddy_text:
         raise Phase10TopologyError("t3.micro Caddy must listen HTTP on 443")
 

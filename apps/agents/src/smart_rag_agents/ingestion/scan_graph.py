@@ -30,6 +30,7 @@ from smart_rag_core.jobs.ingestion_repository import (
     IngestionJobRepository,
     configurable_lease_lost,
 )
+from smart_rag_core.observability.ingest_progress import log_ingest_progress
 from smart_rag_core.repositories.notifications import AdminNotificationRepository
 from smart_rag_core.repositories.scan_events import ScanEventRepository
 from smart_rag_core.schema.enums import ScanResult
@@ -251,6 +252,8 @@ def scan_and_govern(
     )
     if any(value is None for value in required):
         return {**state, "status": "scan_failed", "detail": "missing scan payload"}
+
+    log_ingest_progress("hybrid", "scan", UUID(str(state["job_id"])))
 
     byte_size_value = cast(int, state["byte_size"])
     configurable = cast(dict[str, object], config.get("configurable", {}))

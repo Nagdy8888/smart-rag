@@ -41,6 +41,7 @@ from smart_rag_core.release.phase10_packet7 import (
     classify_p1007_e,
     fake_origin_http_claimed,
     freeze_image_ids_match,
+    later_phase10_checkboxes_unchecked,
     packet7_checkbox_unchecked,
     recommendation_is_go,
 )
@@ -104,7 +105,7 @@ def test_fake_pentest_passed_fails() -> None:
 
 
 def test_checkbox_checked_fails() -> None:
-    """Checking any Phase 10 packet box fails Packet 7-E and evaluate."""
+    """Checking Packet 7 fails Packet 7-E and evaluate."""
 
     checked = _UNCHECKED_WRAPPER.replace(
         "7. [ ] [Run the complete release suite",
@@ -114,7 +115,7 @@ def test_checkbox_checked_fails() -> None:
     assert packet7_checkbox_unchecked(checked) is False
     assert all_phase10_checkboxes_unchecked(_UNCHECKED_WRAPPER) is True
     assert all_phase10_checkboxes_unchecked(checked) is False
-    with pytest.raises(Phase10Packet7GateError, match="unchecked"):
+    with pytest.raises(Phase10Packet7GateError, match="packets 2-7"):
         assert_wrapper_pending_unchecked(checked, _PACKET_PENDING)
     assert (
         classify_p1007_e(
@@ -128,6 +129,19 @@ def test_checkbox_checked_fails() -> None:
         )
         == "Failed"
     )
+
+
+def test_packet1_checked_still_allows_packet7_pending_gate() -> None:
+    """Packet 1 may be checked while packets 2-7 stay unchecked."""
+
+    checked_packet1 = _UNCHECKED_WRAPPER.replace(
+        "1. [ ] [Provision isolated managed Supabase",
+        "1. [x] [Provision isolated managed Supabase",
+    )
+    assert packet1_checkbox_unchecked(checked_packet1) is False
+    assert later_phase10_checkboxes_unchecked(checked_packet1) is True
+    assert all_phase10_checkboxes_unchecked(checked_packet1) is False
+    assert_wrapper_pending_unchecked(checked_packet1, _PACKET_PENDING)
 
 
 def test_wrapper_complete_fails() -> None:

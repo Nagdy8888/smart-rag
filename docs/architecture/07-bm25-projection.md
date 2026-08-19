@@ -2,7 +2,7 @@
 title: BM25 projection architecture
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering
 phase_packet: Phase 2 Packet 6
 ---
@@ -113,4 +113,6 @@ uv run pytest tests/contract/test_paradedb_bm25.py tests/contract/test_compose_t
 
 Related: [ARABIC_NORMALIZATION.md](../retrieval/ARABIC_NORMALIZATION.md) ·
 [BM25_PROJECTION_CONTRACT.md](../retrieval/BM25_PROJECTION_CONTRACT.md) ·
-[05-database-connections.md](./05-database-connections.md)
+[05-database-connections.md](./05-database-connections.md) ·
+[bm25-rebuild.md](../runbooks/bm25-rebuild.md) ·
+[demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md)

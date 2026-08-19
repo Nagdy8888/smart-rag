@@ -26,6 +26,7 @@ from smart_rag_core.ingestion.embeddings.policy import (
     embedding_policy_hash,
 )
 from smart_rag_core.ingestion.limits import (
+    DEFAULT_EMBEDDING_BATCH_SIZE,
     DEFAULT_EMBEDDING_MAX_INPUTS,
 )
 from smart_rag_core.jobs.admission import JobAdmissionService
@@ -33,6 +34,8 @@ from smart_rag_core.security.external_processing import (
     ExternalProcessingDecisionInput,
     decide_external_processing,
 )
+
+EmbeddingProgressCallback = Callable[[str, dict[str, int]], None]
 
 
 class EmbeddingGateError(RuntimeError):
@@ -91,11 +94,19 @@ class EmbeddingService:
         self._gateway = gateway
         self._admission = admission or JobAdmissionService(connection)
 
-    def embed_version(self, batch: EmbeddingBatchInput) -> EmbeddingBatchResult:
+    def embed_version(
+        self,
+        batch: EmbeddingBatchInput,
+        *,
+        progress: EmbeddingProgressCallback | None = None,
+    ) -> EmbeddingBatchResult:
         """Embed representative chunks after governance and ledger reservation.
 
         Args:
             batch: Version-scoped embedding inputs and governance evidence.
+            progress: Optional count-only callback invoked once per gateway
+                batch (``embed_batch`` with ``batch_index`` / ``batch_count`` /
+                ``chunks``). Callers must not pass source text.
 
         Returns:
             Embedded chunks with stable ledger metadata.
@@ -178,15 +189,11 @@ class EmbeddingService:
         )
 
         try:
-            response = _run_embed_coroutine(
-                lambda: self._gateway.embed(
-                    EmbeddingRequest(
-                        operation_key=batch.operation_key,
-                        inputs=tuple(contextual_inputs),
-                        model=EMBEDDING_MODEL,
-                        dimensions=EMBEDDING_DIMENSIONS,
-                    )
-                )
+            response = _embed_inputs_in_batches(
+                self._gateway,
+                operation_key=batch.operation_key,
+                contextual_inputs=tuple(contextual_inputs),
+                progress=progress,
             )
         except TimeoutError as exc:
             self._record_ledger(
@@ -403,6 +410,75 @@ class EmbeddingService:
                 raise EmbeddingGateError("embedding_ledger_vectors_missing")
             parsed.append(tuple(float(value) for value in vector))
         return ledger_id, tuple(parsed)
+
+
+def _embed_inputs_in_batches(
+    gateway: EmbeddingGateway,
+    *,
+    operation_key: str,
+    contextual_inputs: tuple[str, ...],
+    progress: EmbeddingProgressCallback | None,
+) -> Any:
+    """Embed texts in ``DEFAULT_EMBEDDING_BATCH_SIZE`` gateway calls.
+
+    Args:
+        gateway: Shared embedding gateway.
+        operation_key: Durable operation key copied onto each request.
+        contextual_inputs: Representative contextual strings, never logged.
+        progress: Optional count-only callback.
+
+    Returns:
+        Combined gateway response with concatenated vectors and summed cost.
+
+    Raises:
+        TimeoutError: When a provider client times out.
+        EmbeddingGateError: When a batch returns the wrong vector count.
+    """
+
+    from smart_rag_core.gateways.embedding import EmbeddingResponse
+
+    batch_size = DEFAULT_EMBEDDING_BATCH_SIZE
+    batch_count = math.ceil(len(contextual_inputs) / batch_size)
+    vectors: list[tuple[float, ...]] = []
+    total_cost = Decimal("0")
+    last_response: EmbeddingResponse | None = None
+    for batch_index, start in enumerate(
+        range(0, len(contextual_inputs), batch_size),
+        start=1,
+    ):
+        chunk_inputs = contextual_inputs[start : start + batch_size]
+        if progress is not None:
+            progress(
+                "embed_batch",
+                {
+                    "batch_index": batch_index,
+                    "batch_count": batch_count,
+                    "chunks": len(chunk_inputs),
+                },
+            )
+        response = _run_embed_coroutine(
+            lambda inputs=chunk_inputs: gateway.embed(
+                EmbeddingRequest(
+                    operation_key=operation_key,
+                    inputs=inputs,
+                    model=EMBEDDING_MODEL,
+                    dimensions=EMBEDDING_DIMENSIONS,
+                )
+            )
+        )
+        if len(response.vectors) != len(chunk_inputs):
+            raise EmbeddingGateError("embedding_vector_count_mismatch")
+        vectors.extend(response.vectors)
+        total_cost += response.estimated_cost_usd
+        last_response = response
+    if last_response is None:
+        raise EmbeddingGateError("embedding_batch_empty")
+    return last_response.model_copy(
+        update={
+            "vectors": tuple(vectors),
+            "estimated_cost_usd": total_cost,
+        }
+    )
 
 
 def _run_embed_coroutine(factory: Callable[[], Any]) -> Any:

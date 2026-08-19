@@ -23,7 +23,7 @@
     {
       "check": "P10-07-E",
       "classification": "Passed",
-      "detail": "Promotion inputs recorded. Wrapper pending. All seven checkboxes unchecked. Recommendation is no-go for Phase 11. Envelope QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. Holdout closed. Request for user acceptance: Phase 10 remains status pending with all seven packet checkboxes unchecked. The honest recommendation is no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production."
+      "detail": "Promotion inputs recorded. Wrapper pending. Packets 2-7 stay unchecked. Recommendation is no-go for Phase 11. Envelope QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15. Holdout closed. Request for user acceptance: Phase 10 remains status pending with packets 2-7 unchecked. The honest recommendation is no-go for Phase 11 until remaining managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production."
     }
   ],
   "aws_login": false,
@@ -258,7 +258,7 @@
   "signed_full_chunks_not_advertised": 1000000,
   "signed_full_hybrid_not_advertised": 10000,
   "terraform_apply": false,
-  "user_acceptance_request": "Request for user acceptance: Phase 10 remains status pending with all seven packet checkboxes unchecked. The honest recommendation is no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production.",
+  "user_acceptance_request": "Request for user acceptance: Phase 10 remains status pending with packets 2-7 unchecked. The honest recommendation is no-go for Phase 11 until remaining managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production.",
   "valkey_image": "valkey/valkey:8.1-alpine@sha256:a038175878d66b9d274fbf8be73c0305e93798b83917647f167e18cef3c71eec",
   "wrapper_status": "pending"
 }

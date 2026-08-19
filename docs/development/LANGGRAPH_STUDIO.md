@@ -56,12 +56,13 @@ prove retrieval quality against canonical evidence.
 
 1. Workspace sync: `uv sync --all-packages --group dev --python 3.11 --frozen`.
    The `langgraph-cli[inmem]` extra provides `langgraph dev`.
-2. A LangSmith account and API key for the **hosted Studio UI** at
-   `smith.langchain.com/studio`. Keep `LANGSMITH_TRACING=false` (default)
-   unless you intentionally export redacted gateway spans. See
-   [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md).
-3. Put `LANGSMITH_API_KEY` in gitignored `.env` at the repo root. Do not
-   commit it. Mock-model mode does not need a live OpenAI key.
+2. A LangSmith account. Open Studio in the browser at the printed
+   `smith.langchain.com/studio/?baseUrl=...` URL and sign in. Keep
+   `LANGSMITH_TRACING=false` (default) unless you intentionally export
+   redacted gateway spans. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md).
+3. Optional: `LANGSMITH_API_KEY` in gitignored `.env` if you want CLI/SDK
+   tracing. Mock-model mode does not need a live OpenAI key. The local
+   Agent Server starts without the key.
 
 Safari and some networks block `localhost` callbacks. Use Chrome/Edge, or
 add `--tunnel` as documented in
@@ -115,16 +116,18 @@ fail closed with `admission_rejected`.
 
 | Condition | Behavior |
 | --- | --- |
-| Missing `LANGSMITH_API_KEY` | Hosted Studio UI cannot attach. The local API may still start. |
+| Missing LangSmith browser session | Hosted Studio at smith.langchain.com cannot attach. Local `GET /ok` still works. |
+| Missing `LANGSMITH_API_KEY` | Local API still starts. Gateway tracing stays off unless `LANGSMITH_TRACING=true`. |
 | `query` graph invoked with empty state | `admission_rejected` (production-shaped fail-closed) |
 | `query_studio` with empty query | Seed succeeds; `prepare_query` sets `routing_rejected` / `empty_query` |
 | Unknown `route_family` | `admission_rejected`; no synthetic context |
 | Unbound retrievers | Nodes run; evidence stays empty; no fabricated Hybrid success |
 | `langgraph up` / Docker Agent Server | Not this local path. Checkpointer-free `langgraph.json` graphs still must not call `PostgresSaver.setup()` |
 
-Interactive `langgraph dev` on a given host is **unverified** until the
-command above stays healthy on that machine. Config validation is covered
-by `tests/contract/test_langgraph_config.py`.
+Interactive `langgraph dev` from `apps/agents` loaded `query`, `query_studio`,
+and `ingestion`. `GET http://127.0.0.1:2024/ok` returned `{"ok":true}`. Keep
+`LANGSMITH_TRACING=false`. Hosted Studio at smith.langchain.com still needs a
+LangSmith browser login; the local API starts without `LANGSMITH_API_KEY`.
 
 ## Verification
 

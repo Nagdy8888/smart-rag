@@ -79,7 +79,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [evaluation/QUERY_PROFILE_LABELING.md](./evaluation/QUERY_PROFILE_LABELING.md) | engineering-lead | draft | 2026-08-14 | eng, SME |
 | [development/TOOL_VERSIONS.md](./development/TOOL_VERSIONS.md) | engineering-lead | draft | 2026-08-18 | eng |
 | [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-08-19 | eng |
-| [development/LANGSMITH_TRACING.md](./development/LANGSMITH_TRACING.md) | engineering-lead | draft | 2026-08-14 | eng, ops, security |
+| [development/LANGSMITH_TRACING.md](./development/LANGSMITH_TRACING.md) | engineering-lead | draft | 2026-08-19 | eng, ops, security |
 | [development/LANGGRAPH_STUDIO.md](./development/LANGGRAPH_STUDIO.md) | engineering-lead | draft | 2026-08-19 | eng |
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
 | [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-08-19 | eng |
@@ -88,7 +88,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [development/PYRIGHT_BASELINE.md](./development/PYRIGHT_BASELINE.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [development/CI_TIERS.md](./development/CI_TIERS.md) | engineering-lead | draft | 2026-08-18 | eng |
 | [development/DEPENDENCY_UPDATES.md](./development/DEPENDENCY_UPDATES.md) | engineering-lead | draft | 2026-08-18 | eng |
-| [adr/README.md](./adr/README.md) | engineering-lead | draft | 2026-08-15 | eng |
+| [adr/README.md](./adr/README.md) | engineering-lead | draft | 2026-08-19 | eng |
 | [adr/ADR-hybrid-pilot-release-cut.md](./adr/ADR-hybrid-pilot-release-cut.md) | product-owner | accepted | 2026-08-15 | client, eng |
 | [adr/ADR-phase4-engineering-close.md](./adr/ADR-phase4-engineering-close.md) | product-owner | accepted | 2026-08-15 | client, eng |
 | [adr/ADR-lightrag-identical-content-collapse.md](./adr/ADR-lightrag-identical-content-collapse.md) | engineering-lead | superseded | 2026-08-16 | eng, reviewers |
@@ -99,6 +99,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-phase9-local-envelope-reduce.md](./adr/ADR-phase9-local-envelope-reduce.md) | product-owner | accepted | 2026-08-18 | client, engineering |
 | [adr/ADR-phase10-hosted-supabase-reuse.md](./adr/ADR-phase10-hosted-supabase-reuse.md) | product-owner | accepted | 2026-08-18 | client, engineering, ops |
 | [adr/ADR-phase10-free-tier-ec2.md](./adr/ADR-phase10-free-tier-ec2.md) | engineering-lead | accepted | 2026-08-19 | engineering, ops |
+| [adr/ADR-demo-local-ingest-aws-ask.md](./adr/ADR-demo-local-ingest-aws-ask.md) | product-owner / engineering-lead | accepted | 2026-08-19 | client, engineering, ops |
 | [runbooks/phase10-staging-secrets.md](./runbooks/phase10-staging-secrets.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [adr/ADR-paradedb-edition-availability.md](./adr/ADR-paradedb-edition-availability.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-private-service-tls.md](./adr/ADR-private-service-tls.md) | engineering-lead | accepted | 2026-08-18 | eng, security |
@@ -139,12 +140,14 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [runbooks/alert-routing.md](./runbooks/alert-routing.md) | engineering-lead | draft | 2026-08-18 | eng, ops, security |
 | [runbooks/storage-db-reconciliation.md](./runbooks/storage-db-reconciliation.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [runbooks/bm25-rebuild.md](./runbooks/bm25-rebuild.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
+| [runbooks/demo-local-ingest-aws-ask.md](./runbooks/demo-local-ingest-aws-ask.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
+| [datasets/MovieSummaries/DEMO_SLICES.md](./datasets/MovieSummaries/DEMO_SLICES.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [runbooks/instance-rebuild.md](./runbooks/instance-rebuild.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [security/OPENAI_DATA_GOVERNANCE.md](./security/OPENAI_DATA_GOVERNANCE.md) | product-owner | accepted | 2026-08-13 | client, security |
 | [security/SUBPROCESSOR_GOVERNANCE.md](./security/SUBPROCESSOR_GOVERNANCE.md) | product-owner | accepted | 2026-08-13 | client, security |
 | [api/openapi.foundation.json](./api/openapi.foundation.json) | engineering-lead | draft | 2026-08-16 | eng |
 | [api/GLOSSARY_IMPORT.md](./api/GLOSSARY_IMPORT.md) | engineering-lead | draft | 2026-08-14 | eng, security |
-| [runbooks/README.md](./runbooks/README.md) | engineering-lead | draft | 2026-08-18 | ops |
+| [runbooks/README.md](./runbooks/README.md) | engineering-lead | draft | 2026-08-19 | ops |
 | [runbooks/PROTECTED_MIGRATION.md](./runbooks/PROTECTED_MIGRATION.md) | engineering-lead | draft | 2026-08-18 | eng, ops, security |
 | [runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](./runbooks/GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) | engineering-lead | draft | 2026-08-16 | eng, ops |
 | [runbooks/lightrag-schema-bootstrap.md](./runbooks/lightrag-schema-bootstrap.md) | engineering-lead | draft | 2026-08-16 | eng, ops |
@@ -152,5 +155,6 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [reviews/2026-08-16-phases-01-05-implementation-review.md](./reviews/2026-08-16-phases-01-05-implementation-review.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
 | [reviews/2026-08-16-phases-01-05-closeout.md](./reviews/2026-08-16-phases-01-05-closeout.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
 | [reviews/2026-08-19-production-readiness/README.md](./reviews/2026-08-19-production-readiness/README.md) | independent-reviewer | draft | 2026-08-19 | eng, security, ops, client-approver |
+| [reviews/2026-08-19-comprehensive-audit/README.md](./reviews/2026-08-19-comprehensive-audit/README.md) | independent-reviewer | draft | 2026-08-19 | eng, security, ops, product, client-approver |
 
 Back to [root README](../README.md).

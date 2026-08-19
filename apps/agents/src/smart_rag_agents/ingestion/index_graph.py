@@ -36,9 +36,15 @@ from smart_rag_core.ingestion.tables.storage import upload_table_artifact
 from smart_rag_core.jobs.exceptions import JobLeaseError
 from smart_rag_core.jobs.ingestion_repository import (
     IngestionJobRepository,
+    configurable_job_lease_token,
     configurable_lease_lost,
 )
 from smart_rag_core.jobs.ledger import JobOperationLedger
+from smart_rag_core.observability.ingest_progress import log_ingest_progress
+from smart_rag_core.observability.ingest_trace import (
+    INGEST_RUN_PARSE,
+    nest_traced_ingestion,
+)
 from smart_rag_core.repositories.scan_events import ScanEventRepository
 from smart_rag_core.security.external_processing import (
     CategoryDisposition,
@@ -151,7 +157,9 @@ def validate_index_lease(
         try:
             repository.validate_active_lease(
                 job_id=UUID(state["job_id"]),
-                lease_token=state["lease_token"],
+                lease_token=configurable_job_lease_token(
+                    config, state["lease_token"]
+                ),
             )
         except JobLeaseError:
             connection.rollback()
@@ -270,17 +278,25 @@ def index_hybrid_content(
         ``indexed`` or ``index_failed`` plus chunk/BM25 identifiers.
 
     Persistence writes:
-        Canonical chunks/tables, embedding ledger, BM25 outbox, job ledger.
+        Embedding ledger commits on its own connection before canonical
+        persist so OpenAI batches are not rolled back when the later write
+        fails. Canonical chunks/tables, BM25 outbox, and the job-operation
+        ledger share a second transaction. Ledger writes use
+        ``configurable.job_lease_token``, not a checkpointed prior claim.
 
     External/model calls:
         Parser sandbox (Docker) and embedding gateway after governance.
 
     Budget/deadline behavior:
         Embedding reservation via ledger; lease-lost aborts without complete.
+        The embedding transaction is closed before canonical persist so the
+        worker heartbeat can renew ``ingestion_jobs.lease_expires_at``.
 
     Failure/fallback route:
         Missing/stale scan, unverified providers for real company content,
-        sandbox launch failure, or governance deny fail the job.
+        sandbox launch failure, or governance deny fail the job. An invalid
+        lease on the canonical ledger write returns ``index_failed`` instead
+        of raising, so LangSmith ``ingestion.index`` is not an uncaught error.
     """
 
     if configurable_lease_lost(config):
@@ -308,6 +324,8 @@ def index_hybrid_content(
     )
     if crawl_run_id is None and any(value is None for value in file_payload):
         return {**state, "status": "index_failed", "detail": "missing index payload"}
+
+    log_ingest_progress("hybrid", "parse", UUID(str(state["job_id"])))
 
     configurable = cast(dict[str, object], config.get("configurable", {}))
     postgres_url = configurable.get("postgres_url")
@@ -358,15 +376,19 @@ def index_hybrid_content(
     )
     if isinstance(crawl_run_id, str) and crawl_run_id:
         try:
-            parse_result, governance_detail, promotion_allowed = (
-                _parse_website_snapshots(
+            parse_result, governance_detail, promotion_allowed = nest_traced_ingestion(
+                lambda: _parse_website_snapshots(
                     postgres_url=postgres_url,
                     storage=storage,
                     parser=parser,
                     crawl_run_id=UUID(crawl_run_id),
                     governance=governance,
                     scan_evidence_current=scan_current,
-                )
+                ),
+                job_id=state["job_id"],
+                run_name=INGEST_RUN_PARSE,
+                document_id=state["document_id"],
+                version_id=state["version_id"],
             )
         except ParserSandboxError as exc:
             return {
@@ -396,15 +418,21 @@ def index_hybrid_content(
                 "detail": "content hash mismatch after download",
             }
         try:
-            outcome = parser.parse_and_govern(
-                ParserInvocation(
-                    payload=payload,
-                    content_hash=str(state["content_hash"]),
-                    filename=str(state["filename"]),
-                    media_type=state["media_type"],
+            outcome = nest_traced_ingestion(
+                lambda: parser.parse_and_govern(
+                    ParserInvocation(
+                        payload=payload,
+                        content_hash=str(state["content_hash"]),
+                        filename=str(state["filename"]),
+                        media_type=state["media_type"],
+                    ),
+                    governance=governance,
+                    scan_evidence_current=scan_current,
                 ),
-                governance=governance,
-                scan_evidence_current=scan_current,
+                job_id=state["job_id"],
+                run_name=INGEST_RUN_PARSE,
+                document_id=state["document_id"],
+                version_id=state["version_id"],
             )
         except ParserSandboxError as exc:
             return {
@@ -431,11 +459,17 @@ def index_hybrid_content(
         document_id=document_id,
         version_id=version_id,
     )
+    log_ingest_progress(
+        "hybrid",
+        "chunked",
+        UUID(str(state["job_id"])),
+        chunks=len(chunking.chunks),
+    )
     if not hybrid_index_has_content(chunking):
         return {**state, "status": "index_failed", "detail": "no chunks produced"}
 
-    settings = SharedSettings.model_construct(
-        mock_model_mode=bool(mock_model_mode),
+    settings = SharedSettings().model_copy(
+        update={"mock_model_mode": bool(mock_model_mode)}
     )
     gateway = create_embedding_gateway(settings)
 
@@ -468,13 +502,31 @@ def index_hybrid_content(
                 "detail": f"table artifact upload failed: {exc}"[:500],
             }
 
+    lease_token = configurable_job_lease_token(config, state["lease_token"])
+    canonical_operation_key = f"{state['operation_key']}:canonical"
+
+    def _embed_progress(stage: str, counts: dict[str, int]) -> None:
+        """Forward embedding batch counts to the hybrid TTY prefix.
+
+        Args:
+            stage: Progress stage token.
+            counts: Integer counters only.
+        """
+
+        log_ingest_progress(
+            "hybrid",
+            stage,
+            UUID(str(state["job_id"])),
+            **counts,
+        )
+
     with psycopg.connect(postgres_url) as connection:
         connection.execute("SET ROLE app_worker")
         ledger = JobOperationLedger(connection)
         existing = ledger.fetch_result(
             job_table="ingestion_jobs",
             job_id=UUID(state["job_id"]),
-            operation_key=f"{state['operation_key']}:canonical",
+            operation_key=canonical_operation_key,
         )
         if existing is not None:
             connection.rollback()
@@ -498,7 +550,8 @@ def index_hybrid_content(
                         operation_key=embed_operation_key,
                         governance=governance_input,
                         estimated_cost_usd=Decimal("0.05"),
-                    )
+                    ),
+                    progress=_embed_progress,
                 )
             except Exception as exc:
                 connection.rollback()
@@ -512,6 +565,25 @@ def index_hybrid_content(
                 version_id=version_id,
                 chunking=chunking,
             )
+        connection.commit()
+
+    with psycopg.connect(postgres_url) as connection:
+        connection.execute("SET ROLE app_worker")
+        ledger = JobOperationLedger(connection)
+        existing = ledger.fetch_result(
+            job_table="ingestion_jobs",
+            job_id=UUID(state["job_id"]),
+            operation_key=canonical_operation_key,
+        )
+        if existing is not None:
+            connection.rollback()
+            return {
+                **state,
+                "status": "indexed",
+                "chunk_set_hash": str(existing.get("chunk_set_hash", "")),
+                "bm25_job_id": str(existing.get("bm25_job_id", "")),
+                "detail": "canonical ledger replay",
+            }
 
         repository = CanonicalRepository(connection)
         try:
@@ -526,6 +598,24 @@ def index_hybrid_content(
                 table_artifacts=chunking.table_artifacts,
                 is_current=not state["graph_eligible"],
             )
+            ledger.record_completed(
+                job_table="ingestion_jobs",
+                job_id=UUID(state["job_id"]),
+                operation_key=canonical_operation_key,
+                lease_token=lease_token,
+                result_ref={
+                    "chunk_set_hash": embedding.chunk_set_hash,
+                    "bm25_job_id": str(bm25_job_id),
+                    "embedding_ledger_id": str(embedding.ledger_id),
+                },
+            )
+        except JobLeaseError as exc:
+            connection.rollback()
+            return {
+                **state,
+                "status": "index_failed",
+                "detail": str(exc)[:500],
+            }
         except Exception as exc:
             connection.rollback()
             return {
@@ -533,18 +623,6 @@ def index_hybrid_content(
                 "status": "index_failed",
                 "detail": str(exc)[:500],
             }
-
-        ledger.record_completed(
-            job_table="ingestion_jobs",
-            job_id=UUID(state["job_id"]),
-            operation_key=f"{state['operation_key']}:canonical",
-            lease_token=state["lease_token"],
-            result_ref={
-                "chunk_set_hash": embedding.chunk_set_hash,
-                "bm25_job_id": str(bm25_job_id),
-                "embedding_ledger_id": str(embedding.ledger_id),
-            },
-        )
         connection.commit()
 
     return {

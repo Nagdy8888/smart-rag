@@ -16,11 +16,16 @@ from smart_rag_core.security.external_processing import (
 )
 
 _CARD_PATTERN = re.compile(r"\b(?:\d[ -]*?){13,19}\b")
-_SECRET_PATTERN = re.compile(r"(?i)\b(api[_-]?key|secret|password|token|credential)\b")
-_NATIONAL_ID_PATTERN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-_HEALTH_MARKER_PATTERN = re.compile(
-    r"(?i)\b(patient|diagnosis|phi|hipaa|medical record)\b"
+# Bare "secret"/"password"/"patient" appear in fiction and must not fail-close ingest.
+_SECRET_PATTERN = re.compile(
+    r"(?i)("
+    r"\bapi[_-]?key\b|"
+    r"\bsecret[_-]?key\b|"
+    r"\b(password|secret|token|credential)\s*="
+    r")"
 )
+_NATIONAL_ID_PATTERN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+_HEALTH_MARKER_PATTERN = re.compile(r"(?i)\b(hipaa|phi|medical record)\b")
 
 
 def _provider_settings_verified_for_process() -> bool:

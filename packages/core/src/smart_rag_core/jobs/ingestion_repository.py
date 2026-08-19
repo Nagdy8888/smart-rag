@@ -418,6 +418,33 @@ class IngestionJobRepository:
             return _row_to_ingestion_job(row)
 
 
+def configurable_job_lease_token(
+    config: Mapping[str, object] | object,
+    fallback: str,
+) -> str:
+    """Return the currently claimed lease token from runnable config.
+
+    Checkpointed graph state keeps the token from the first attempt. A later
+    ``claim()`` issues a new token; canonical ledger RPCs must present that
+    live token. The worker stores it on ``configurable.job_lease_token``.
+
+    Args:
+        config: LangGraph runnable config or a mapping with ``configurable``.
+        fallback: Token from checkpointed state when config has none.
+
+    Returns:
+        The claimed token when present and non-empty; otherwise ``fallback``.
+    """
+
+    mapping = _as_mapping(config)
+    configurable = mapping.get("configurable", mapping)
+    if isinstance(configurable, dict):
+        token = configurable.get("job_lease_token")
+        if isinstance(token, str) and token.strip():
+            return token
+    return fallback
+
+
 def configurable_lease_lost(config: Mapping[str, object] | object) -> bool:
     """Return whether a worker heartbeat marked the graph lease lost.
 

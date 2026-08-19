@@ -193,6 +193,17 @@ def test_api_and_worker_use_app_runtime_not_superuser() -> None:
     assert "SUPABASE_STORAGE_ADMIN_SECRET" not in worker_env
 
 
+def test_api_and_worker_supabase_url_can_target_hosted_auth() -> None:
+    """Compose API JWKS origin interpolates ``SUPABASE_URL`` like the worker."""
+
+    api_env = _mapping(_service("api")["environment"])
+    worker_env = _mapping(_service("worker")["environment"])
+    api_url = api_env["SUPABASE_URL"]
+    worker_url = worker_env["SUPABASE_URL"]
+    assert api_url == "${SUPABASE_URL:-http://host.docker.internal:54321}"
+    assert worker_url == "${SUPABASE_URL:-http://host.docker.internal:54321}"
+
+
 def test_staging_api_green_requires_blue_green_profile() -> None:
     """Default staging Compose must start api-blue only."""
 

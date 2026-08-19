@@ -539,11 +539,11 @@ LONG_LIVED_WORKFLOW_FRAGMENTS: tuple[str, ...] = (
 )
 
 USER_ACCEPTANCE_REQUEST = (
-    "Request for user acceptance: Phase 10 remains status pending with all "
-    "seven packet checkboxes unchecked. The honest recommendation is no-go "
-    "for Phase 11 until live AWS/managed staging proof and an independent "
-    "external security assessment close. Please accept this pending/no-go "
-    "state; do not promote production."
+    "Request for user acceptance: Phase 10 remains status pending with "
+    "packets 2-7 unchecked. The honest recommendation is no-go for Phase 11 "
+    "until remaining managed staging proof and an independent external "
+    "security assessment close. Please accept this pending/no-go state; do "
+    "not promote production."
 )
 PHASE11_NO_GO_RECOMMENDATION = (
     "no-go for Phase 11 until live AWS/managed staging proof and an "

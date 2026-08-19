@@ -28,5 +28,5 @@
   "api_base_is_cloudfront": true,
   "cloudfront_hostname": "dzm8yijuajwge.cloudfront.net",
   "api_origin_placeholder_still": true,
-  "notes": "CLI file deploy after Hobby-as-Team login. GitHub App not installed on Demo_Project_3. CloudFront origin hostname remains origin.staging.example.invalid; API/Caddy not started."
+  "notes": "CLI file deploy after Hobby-as-Team login. GitHub App not installed on Demo_Project_3. CloudFront origin is 52.206.156.176.sslip.io with origin_protocol_policy http-only. Viewer HTTPS /health/live returned 200. Public env remains the three NEXT_PUBLIC_* keys only. live_values stay uncommitted."
 }

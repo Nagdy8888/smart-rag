@@ -493,8 +493,9 @@ def classify_packet1(
                 "Committed intended-topology.json matches Phase 9 promotion "
                 "image ids, Pro/us-east-1/PITR/Supavisor features, and the "
                 "QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15 "
-                "envelope. Live Supabase/AWS/Vercel/SES projects were not "
-                "created."
+                "envelope. Live hosted Supabase is Free/eu-central-1/no PITR "
+                "(ADR-phase10-hosted-supabase-reuse). Live AWS and Vercel "
+                "exist; SES sandbox identity remains pending."
             ),
         ),
         AcceptanceRow(

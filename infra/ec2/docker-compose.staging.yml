@@ -180,6 +180,37 @@ services:
       - /tmp
     mem_limit: 2g
 
+  bm25-reproject:
+    profiles:
+      - demo-reproject
+    image: ${STAGING_WORKER_REPOSITORY:-smart-rag-worker}@sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e
+    restart: "no"
+    user: "10001:10001"
+    stdin_open: true
+    command:
+      [
+        "python",
+        "-m",
+        "smart_rag_core.release.bm25_reproject",
+      ]
+    environment:
+      APP_ENV: staging
+      MOCK_MODEL_MODE: "true"
+      SMART_RAG_HOLDOUT_ACCESS: "false"
+      SUPABASE_URL: ${STAGING_SUPABASE_URL:?set STAGING_SUPABASE_URL}
+      SUPABASE_DB_URL: ${STAGING_SUPABASE_SESSION_URL:?set STAGING_SUPABASE_SESSION_URL}
+      PARADEDB_URL: postgresql://${PARADEDB_WRITER_USER:-paradedb_writer}:${PARADEDB_WRITER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
+    networks:
+      - private
+      - provider
+    depends_on:
+      paradedb:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 280m
+
   paradedb:
     image: paradedb/paradedb:pg17@sha256:dca046b8a0ddd070c368d5254cbb7f596b3b7bc67bc2efa7c0fbe881087883bb
     restart: unless-stopped

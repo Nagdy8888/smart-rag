@@ -20,10 +20,7 @@ from smart_rag_core.release.phase10_constants import (
     STAGING_CADDY_FILE,
     WRAPPER_RELATIVE,
 )
-from smart_rag_core.release.phase10_packet1 import (
-    packet1_checkbox_unchecked,
-    wrapper_status_pending,
-)
+from smart_rag_core.release.phase10_packet1 import wrapper_status_pending
 from smart_rag_core.release.phase10_packet2 import packet2_checkbox_unchecked
 from smart_rag_core.release.phase10_packet3 import packet3_checkbox_unchecked
 from smart_rag_core.release.phase10_packet4 import (
@@ -80,13 +77,12 @@ def test_phase09_rebuild_is_not_canonical_authority() -> None:
 
 
 def test_wrapper_stays_pending_and_packets_1_3_unchecked_are_not_failures() -> None:
-    """Live Blocked Packet 4 must not complete the wrapper or require Packets 1-3."""
+    """Live Blocked Packet 4 must not complete the wrapper."""
 
     wrapper = (REPO_ROOT / WRAPPER_RELATIVE).read_text(encoding="utf-8")
     packet = (REPO_ROOT / PACKET4_RELATIVE).read_text(encoding="utf-8")
     assert wrapper_status_pending(wrapper) is True
     assert packet4_checkbox_unchecked(wrapper) is True
-    assert packet1_checkbox_unchecked(wrapper) is True
     assert packet2_checkbox_unchecked(wrapper) is True
     assert packet3_checkbox_unchecked(wrapper) is True
     assert packet4_status_pending(packet) is True

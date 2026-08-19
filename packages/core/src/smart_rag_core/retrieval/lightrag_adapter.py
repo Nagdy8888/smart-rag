@@ -44,6 +44,7 @@ from smart_rag_core.retrieval.graph import (
     DEFAULT_GRAPH_WORKSPACE,
     LIGHTRAG_CHUNK_OVERLAP_TOKEN_SIZE,
     LIGHTRAG_CHUNK_TOKEN_SIZE,
+    LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
     LIGHTRAG_PINNED_VERSION,
     LIGHTRAG_RUNTIME_ROLE,
     LIGHTRAG_SEARCH_PATH,
@@ -413,6 +414,33 @@ def assert_fingerprint_matches(
         raise LightRagAdapterError(f"schema_fingerprint_drift:{drift[0]}")
 
 
+def pooler_safe_asyncpg_kwargs(
+    kwargs: dict[str, object],
+    *,
+    host: str | None = None,
+) -> dict[str, object]:
+    """Disable prepared statements on pooled Postgres connections.
+
+    Hosted Supabase session poolers close asyncpg connections that use a
+    statement cache, which aborts LightRAG extract with
+    ``connection was closed in the middle of operation``. TLS is left to
+    the vendor ``POSTGRES_SSL_MODE`` so Windows trust-store failures do
+    not block attach.
+
+    Args:
+        kwargs: Keyword arguments destined for ``asyncpg.create_pool``.
+        host: Unused; kept so callers can pass the DSN host later.
+
+    Returns:
+        A new mapping with ``statement_cache_size=0``.
+    """
+
+    del host
+    updated = dict(kwargs)
+    updated.setdefault("statement_cache_size", 0)
+    return updated
+
+
 async def _set_runtime_role(connection: object) -> None:
     """Apply ``SET ROLE app_lightrag`` on one pooled connection.
 
@@ -733,9 +761,18 @@ async def construct_lightrag_engine(
         embedding_func=embedding_func,
         llm_model_func=callbacks.extract_llm,
         role_llm_configs={
-            "extract": RoleLLMConfig(func=callbacks.extract_llm, timeout=30),
-            "keyword": RoleLLMConfig(func=callbacks.keyword_llm, timeout=30),
-            "query": RoleLLMConfig(func=callbacks.query_llm, timeout=30),
+            "extract": RoleLLMConfig(
+                func=callbacks.extract_llm,
+                timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
+            ),
+            "keyword": RoleLLMConfig(
+                func=callbacks.keyword_llm,
+                timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
+            ),
+            "query": RoleLLMConfig(
+                func=callbacks.query_llm,
+                timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
+            ),
         },
         enable_llm_cache=enable_llm_cache,
         enable_llm_cache_for_entity_extract=enable_llm_cache,
@@ -748,7 +785,7 @@ async def construct_lightrag_engine(
         embedding_func_max_async=1,
         max_parallel_insert=1,
         auto_manage_storages_states=False,
-        default_llm_timeout=30,
+        default_llm_timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
         default_embedding_timeout=30,
         cosine_better_than_threshold=cosine_better_than_threshold,
     )
@@ -909,6 +946,7 @@ async def runtime_attach_without_ddl() -> AsyncGenerator[None]:
             Vendor connection pool.
         """
 
+        kwargs = pooler_safe_asyncpg_kwargs(dict(kwargs))
         original_init = kwargs.get("init")
         original_reset = kwargs.get("reset")
 

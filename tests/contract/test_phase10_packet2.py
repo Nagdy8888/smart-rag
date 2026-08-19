@@ -22,10 +22,7 @@ from smart_rag_core.release.phase10_oidc import (
     assert_committed_oidc_policy,
     prefixes_distinct,
 )
-from smart_rag_core.release.phase10_packet1 import (
-    packet1_checkbox_unchecked,
-    wrapper_status_pending,
-)
+from smart_rag_core.release.phase10_packet1 import wrapper_status_pending
 from smart_rag_core.release.phase10_packet2 import (
     packet2_checkbox_unchecked,
     packet2_status_pending,
@@ -104,13 +101,12 @@ def test_old_api_smoke_freeze_still_matches_phase9() -> None:
 
 
 def test_wrapper_and_packet2_stay_pending_even_if_packet1_unchecked() -> None:
-    """Live Blocked Packet 2 must not complete the wrapper or require Packet 1."""
+    """Live Blocked Packet 2 must not complete the wrapper."""
 
     wrapper = (REPO_ROOT / WRAPPER_RELATIVE).read_text(encoding="utf-8")
     packet = (REPO_ROOT / PACKET2_RELATIVE).read_text(encoding="utf-8")
     assert wrapper_status_pending(wrapper) is True
     assert packet2_checkbox_unchecked(wrapper) is True
-    assert packet1_checkbox_unchecked(wrapper) is True
     assert packet2_status_pending(packet) is True
     packet1 = assert_committed_policy(REPO_ROOT)
     assert packet1.passed is True

@@ -24,4 +24,7 @@ audience: engineering
 `dev.ps1` fails closed when the pinned Supabase CLI is unavailable. `stop.ps1` preserves Compose and Supabase data; `reset.ps1 -ConfirmReset` is the explicit destructive route.
 
 See [CONFIGURATION.md](./CONFIGURATION.md), [TOOL_VERSIONS.md](./TOOL_VERSIONS.md),
-[LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md), [docs index](../README.md).
+[LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md),
+[demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md)
+(hosted-Supabase laptop ingest uses [`.env.hosted-ingest.example`](../../.env.hosted-ingest.example)),
+[docs index](../README.md).

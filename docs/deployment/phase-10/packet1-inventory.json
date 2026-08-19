@@ -88,7 +88,7 @@
       "NEXT_PUBLIC_SUPABASE_ANON_KEY"
     ]
   },
-  "live_provisioned": false,
+  "live_provisioned": true,
   "schema_version": "phase10-packet1-inventory-v1",
   "source": "infra/ec2/intended-topology.json"
 }

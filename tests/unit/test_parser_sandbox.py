@@ -199,6 +199,69 @@ def test_parser_sandbox_kill_timeout_returns_failed(
     assert any(len(cmd) > 1 and cmd[1] == "kill" for cmd in commands)
 
 
+def test_docker_run_decodes_sandbox_stdio_as_utf8(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windows cp1252 must not decode parser-sandbox stdout.
+
+    Args:
+        monkeypatch: Used to stub Docker CLI presence and ``subprocess.run``.
+    """
+
+    import subprocess
+
+    captured: dict[str, object] = {}
+
+    def _run(cmd: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        """Capture decode kwargs and return a failed docker run.
+
+        Args:
+            cmd: Subprocess argument list.
+            **kwargs: Forwarded ``subprocess.run`` keyword arguments.
+
+        Returns:
+            A failed completed process so the launcher does not read files.
+
+        Raises:
+            TypeError: When ``cmd`` is not a string sequence.
+        """
+
+        if not isinstance(cmd, (list, tuple)):
+            raise TypeError("expected docker argv")
+        argv = tuple(str(part) for part in cmd)
+        if len(argv) > 1 and argv[1] == "run":
+            captured.update(kwargs)
+        return subprocess.CompletedProcess(
+            args=list(argv),
+            returncode=1,
+            stdout="",
+            stderr="sandbox failed",
+        )
+
+    monkeypatch.setattr(subprocess, "run", _run)
+    monkeypatch.setattr(
+        "smart_rag_core.ingestion.parser.sandbox.launcher.shutil.which",
+        lambda _name: "/usr/bin/docker",
+    )
+    launcher = ParserSandboxLauncher(
+        config=SandboxLaunchConfig(
+            image="smart-rag-parser-sandbox:local",
+            use_docker=True,
+        )
+    )
+    payload = b"hello parser\n"
+    digest = hashlib.sha256(payload).hexdigest()
+    result = launcher.run(
+        payload=payload,
+        content_hash=digest,
+        filename="sample.txt",
+        format_key="text",
+    )
+    assert result.disposition is ParseDisposition.FAILED
+    assert captured.get("encoding") == "utf-8"
+    assert captured.get("errors") == "replace"
+
+
 def test_parser_package_init_is_sandbox_importable() -> None:
     """Parser package init must not import governance or JWKS into the sandbox."""
 

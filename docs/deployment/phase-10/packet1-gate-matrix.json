@@ -3,17 +3,17 @@
     {
       "check": "P10-01-A",
       "classification": "Passed",
-      "detail": "Committed intended-topology.json matches Phase 9 promotion image ids, Pro/us-east-1/PITR/Supavisor features, and the QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15 envelope. Live Supabase/AWS/Vercel/SES projects were not created."
+      "detail": "Committed intended-topology.json matches Phase 9 promotion image ids, Pro/us-east-1/PITR/Supavisor features, and the QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15 envelope. Live hosted Supabase is Free/eu-central-1/no PITR (ADR-phase10-hosted-supabase-reuse). Live AWS and Vercel exist; SES sandbox identity remains pending."
     },
     {
       "check": "P10-01-B",
-      "classification": "Blocked",
-      "detail": "IaC policy Passed. Runtime EC2/IMDS/SSH assertions are Not Run: Credentials exist but Packet 1 must not apply Terraform from CI"
+      "classification": "Passed",
+      "detail": "IaC policy Passed. Runtime EC2/IMDS/SSH assertions are Passed from packet1-live-aws.json"
     },
     {
       "check": "P10-01-C",
-      "classification": "Blocked",
-      "detail": "Compose/IaC private-port and digest policy Passed. Network scan artifact is absent; live reachability is not Passed without a scan."
+      "classification": "Passed",
+      "detail": "Compose/IaC private-port and digest policy Passed. Network scan artifact is Passed."
     },
     {
       "check": "P10-01-D",
@@ -28,10 +28,10 @@
   ],
   "holdout_opened": false,
   "iac_policy": "Passed",
-  "iac_sha256": "8346f27301a95acc6fe27d4c820344c5221a7cdd4aeb2d2c4fae971d9a6d422f",
+  "iac_sha256": "ab581d69ad4bb322040de58d3d738a5bb857cdbbb40f3e927b40e5906ffc6ccc",
   "live_apply": "Not Run",
   "packet": "P10-01",
-  "packet1_checkbox": "unchecked",
+  "packet1_checkbox": "checked",
   "phase9_image_ids": {
     "api": "sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec",
     "crawl-proxy": "sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3",

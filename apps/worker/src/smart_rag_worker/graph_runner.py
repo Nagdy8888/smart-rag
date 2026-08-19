@@ -11,7 +11,8 @@ import asyncio
 import logging
 import socket
 import threading
-from typing import Any
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 from uuid import UUID
 
 import psycopg
@@ -24,6 +25,11 @@ from smart_rag_core.jobs.graph_writer import (
 )
 from smart_rag_core.jobs.lightrag_repository import LightragIndexJobRepository
 from smart_rag_core.jobs.maintenance_pause import MaintenancePauseController
+from smart_rag_core.observability.ingest_progress import log_ingest_progress
+from smart_rag_core.observability.ingest_trace import (
+    INGEST_RUN_GRAPH,
+    invoke_traced_ingestion,
+)
 from smart_rag_core.retrieval.graph import DEFAULT_GRAPH_WORKSPACE, GraphIndexer
 from smart_rag_core.retrieval.lightrag_adapter import LightRagRuntimeAdapter
 from smart_rag_core.retrieval.lightrag_indexer import LightRagGraphIndexer
@@ -31,6 +37,37 @@ from smart_rag_core.schema.enums import JobErrorCategory
 from smart_rag_core.settings.worker import WorkerSettings
 
 LOGGER = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def run_lightrag_coroutine(
+    coro: Coroutine[Any, Any, T],
+    *,
+    loop: asyncio.AbstractEventLoop | None,
+) -> T:
+    """Await a LightRAG coroutine on the adapter's long-lived event loop.
+
+    Args:
+        coro: Adapter or index-service coroutine.
+        loop: Loop that created the asyncpg pool at worker startup. ``None``
+            uses ``asyncio.run`` only when the adapter was never attached.
+
+    Returns:
+        Coroutine result.
+
+    Raises:
+        BaseException: Propagates whatever the coroutine raises.
+
+    Side Effects:
+        ``asyncio.run`` closes its loop and destroys the LightRAG connection
+        pool. Bind and ``process_claimed_job`` must therefore share ``loop``.
+    """
+
+    if loop is None:
+        return asyncio.run(coro)
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
 
 
 class GraphWorkerLoop:
@@ -42,6 +79,7 @@ class GraphWorkerLoop:
         *,
         adapter: LightRagRuntimeAdapter | None,
         pause_controller: MaintenancePauseController | None = None,
+        async_loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
         """Capture worker settings and the optional attached adapter.
 
@@ -52,10 +90,13 @@ class GraphWorkerLoop:
             pause_controller: User-load pause for LightRAG rebuilds. Defaults
                 to unmeasured-allows so missing docker telemetry does not
                 dead-letter rebuilds. Inject fixtures to prove 70%.
+            async_loop: Event loop that opened the LightRAG asyncpg pool.
+                Must be the same loop used for ``process_claimed_job``.
         """
 
         self._settings = settings
         self._adapter = adapter
+        self._async_loop = async_loop
         self._pause_controller = (
             pause_controller or MaintenancePauseController.unmeasured_allows()
         )
@@ -95,12 +136,16 @@ class GraphWorkerLoop:
 
         job_id = UUID(str(job["id"]))
         lease_token = str(job["lease_token"])
+        version_id_raw = job.get("version_id")
+        document_id_raw = job.get("document_id")
         writer_token: str | None = None
         occupied_token = ""
         lock_connection: psycopg.Connection | None = None
         guard: GraphWriterGuard | None = None
         stop_heartbeat = threading.Event()
         heartbeat_thread: threading.Thread | None = None
+        log_ingest_progress("graph", "lightrag_index", job_id)
+        adapter.callbacks.ingest_job_id = str(job_id)
         try:
             with psycopg.connect(postgres_url) as occupy_conn:
                 occupy_conn.execute("SET ROLE app_worker")
@@ -127,6 +172,13 @@ class GraphWorkerLoop:
                             error_category=JobErrorCategory.TRANSIENT,
                             last_error="writer_lease_occupied",
                         )
+                        log_ingest_progress(
+                            "graph",
+                            "lightrag_index_failed",
+                            job_id,
+                            error_category=JobErrorCategory.TRANSIENT,
+                            reason_code="writer_lease_occupied",
+                        )
                         return True
                     raise
 
@@ -142,6 +194,13 @@ class GraphWorkerLoop:
                         lease_token,
                         error_category=JobErrorCategory.TRANSIENT,
                         last_error="advisory_lock_busy",
+                    )
+                    log_ingest_progress(
+                        "graph",
+                        "lightrag_index_failed",
+                        job_id,
+                        error_category=JobErrorCategory.TRANSIENT,
+                        reason_code="advisory_lock_busy",
                     )
                     return True
                 raise
@@ -227,11 +286,19 @@ class GraphWorkerLoop:
                     mapping_support=bind_mapping_support(work_conn, self._settings),
                     pause_controller=self._pause_controller,
                 )
-                outcome = asyncio.run(
-                    service.process_claimed_job(
-                        job,
-                        job_lease_token=lease_token,
-                    )
+                outcome = invoke_traced_ingestion(
+                    lambda: run_lightrag_coroutine(
+                        service.process_claimed_job(
+                            job,
+                            job_lease_token=lease_token,
+                        ),
+                        loop=self._async_loop,
+                    ),
+                    settings=self._settings,
+                    job_id=job_id,
+                    run_name=INGEST_RUN_GRAPH,
+                    document_id=str(document_id_raw) if document_id_raw else None,
+                    version_id=str(version_id_raw) if version_id_raw else None,
                 )
             self._finish_job(
                 postgres_url,
@@ -248,6 +315,7 @@ class GraphWorkerLoop:
                     "reservation_kind": outcome.reservation_kind,
                 },
             )
+            _log_graph_outcome(job_id, outcome.kind, outcome.error_category)
             return True
         except (GraphWriterLostError, JobLeaseError, psycopg.Error) as exc:
             LOGGER.exception("graph job %s failed: %s", job_id, exc)
@@ -273,8 +341,16 @@ class GraphWorkerLoop:
                 error_category=JobErrorCategory.TRANSIENT,
                 last_error=str(exc)[:4000],
             )
+            log_ingest_progress(
+                "graph",
+                "lightrag_index_failed",
+                job_id,
+                error_category=JobErrorCategory.TRANSIENT,
+                reason_code="job_failed",
+            )
             return True
         finally:
+            adapter.callbacks.ingest_job_id = None
             adapter.callbacks.pre_provider_hook = None
             stop_heartbeat.set()
             if heartbeat_thread is not None:
@@ -405,3 +481,33 @@ class GraphWorkerLoop:
 
         hostname = socket.gethostname()
         return f"{self._settings.worker_instance_id}@{hostname}"
+
+
+def _log_graph_outcome(
+    job_id: UUID,
+    outcome_kind: str,
+    error_category: JobErrorCategory | None,
+) -> None:
+    """Emit one ``[graph]`` completion or failure line.
+
+    Args:
+        job_id: LightRAG job identifier.
+        outcome_kind: Service outcome kind.
+        error_category: Failure category when not completed.
+
+    Side Effects:
+        One progress log. ``completed`` maps to ``graph_ready``.
+    """
+
+    if outcome_kind == "completed":
+        log_ingest_progress("graph", "graph_ready", job_id)
+        return
+    stage = "graph_ineligible" if outcome_kind == "graph_ineligible" else "lightrag_index_failed"
+    reason = outcome_kind if outcome_kind.replace("_", "").isalnum() else "job_failed"
+    log_ingest_progress(
+        "graph",
+        stage,
+        job_id,
+        error_category=error_category or JobErrorCategory.TRANSIENT,
+        reason_code=reason,
+    )

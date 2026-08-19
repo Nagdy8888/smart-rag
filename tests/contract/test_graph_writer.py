@@ -168,6 +168,34 @@ def test_advisory_lock_excludes_second_session(
     del worker_connection
 
 
+def test_session_holds_advisory_lock_after_try_lock(
+    worker_connection: psycopg.Connection,
+) -> None:
+    """``session_holds_advisory_lock`` must match ``pg_try_advisory_lock``.
+
+    Hosted Postgres 17 records two-int advisory locks as ``objsubid = 2``.
+    A verifier that only looks for ``objsubid = 1`` quarantines every graph
+    job with ``advisory_lock_lost``.
+    """
+
+    url = resolve_supabase_db_url()
+    lock_conn = psycopg.connect(url)
+    try:
+        lock_conn.autocommit = True
+        guard = GraphWriterGuard(
+            worker_connection,
+            lease_owner="writer-lock-visibility",
+            lease_seconds=120,
+        )
+        guard.acquire_session_lock(lock_conn)
+        assert guard.session_holds_advisory_lock() is True
+        guard.release_session_lock()
+        assert guard.session_holds_advisory_lock() is False
+    finally:
+        lock_conn.close()
+    del worker_connection
+
+
 def test_lease_loss_quarantines_workspace(
     worker_connection: psycopg.Connection,
 ) -> None:

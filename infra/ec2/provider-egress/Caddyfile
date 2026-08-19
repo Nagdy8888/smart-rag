@@ -4,8 +4,8 @@
 {
 	servers {
 		timeouts {
-			read_timeout 90s
-			write_timeout 90s
+			read_body 90s
+			write 90s
 		}
 	}
 }

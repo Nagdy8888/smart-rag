@@ -22,6 +22,7 @@ Related: [storage-db-reconciliation.md](./storage-db-reconciliation.md) ·
 [instance-rebuild.md](./instance-rebuild.md) ·
 [07-bm25-projection.md](../architecture/07-bm25-projection.md) ·
 [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) ·
+[demo-local-ingest-aws-ask.md](./demo-local-ingest-aws-ask.md) ·
 [phase-10 evidence](../development/phase-10-managed-staging-evidence.md)
 
 ```mermaid

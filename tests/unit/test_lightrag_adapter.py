@@ -22,6 +22,7 @@ from smart_rag_core.retrieval.lightrag_adapter import (
     bootstrap_server_settings,
     cosine_threshold_for_mode,
     load_reviewed_fingerprint_fixture,
+    pooler_safe_asyncpg_kwargs,
     reviewed_schema_manifest,
     runtime_server_settings,
     search_path_from_server_settings,
@@ -203,3 +204,15 @@ def test_cosine_threshold_uses_mock_floor_only_in_mock_mode() -> None:
         cosine_threshold_for_mode(mock_model_mode=False)
         == RUNTIME_COSINE_BETTER_THAN_THRESHOLD
     )
+
+
+def test_pooler_safe_asyncpg_kwargs_disable_statement_cache() -> None:
+    """Poolers must not use asyncpg prepared statements."""
+
+    remote = pooler_safe_asyncpg_kwargs(
+        {"host": "aws-0-eu-central-1.pooler.supabase.com"}
+    )
+    assert remote["statement_cache_size"] == 0
+    local = pooler_safe_asyncpg_kwargs({"host": "127.0.0.1"})
+    assert local["statement_cache_size"] == 0
+    assert "ssl" not in local

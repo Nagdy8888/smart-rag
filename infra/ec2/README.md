@@ -8,13 +8,16 @@ audience: engineering, ops
 
 # Managed staging IaC (`infra/ec2`)
 
-Reviewed Terraform, staging Compose, and Caddy for Phase 10 Packet 1. This
-directory is **not** live provision evidence. AWS CLI session expiry and
-missing Terraform/OpenTofu classify apply as **Blocked**. Do not run
-`aws login` or `terraform apply` from Packet 1 CI.
+Reviewed Terraform, staging Compose, and Caddy for Phase 10 Packet 1.
+Live inventory is
+[packet1-live-aws.json](../../docs/deployment/phase-10/packet1-live-aws.json).
+Do not run `terraform apply` from Packet 1 CI. `user_data_replace_on_change`
+is false and `lifecycle.ignore_changes` covers `ami` and `user_data` so AMI
+churn cannot replace the host.
 
 Related: [MANAGED_STAGING.md](../../docs/deployment/MANAGED_STAGING.md) ·
 [STREAMING_TIMEOUTS.md](../../docs/deployment/STREAMING_TIMEOUTS.md) ·
+[demo local ingest / AWS ask](../../docs/runbooks/demo-local-ingest-aws-ask.md) ·
 [intended topology](./intended-topology.json)
 
 ## Intended freeze (not a live project)

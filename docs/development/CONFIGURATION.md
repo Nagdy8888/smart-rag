@@ -101,15 +101,18 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |
 | `RATE_LIMIT_RETRY_AFTER_SECONDS` | 1–3600; `60` | public | `Retry-After` on limiter 429/503 |
 
-Host `.env` sets `SUPABASE_URL=http://127.0.0.1:54321`. Compose API sets
-`SUPABASE_URL=http://host.docker.internal:54321` so the container can fetch
-JWKS from local GoTrue. When `APP_ENV=local` and `SUPABASE_URL` is one of
-those two origins, FastAPI accepts `iss`
+Host `.env` sets `SUPABASE_URL=http://127.0.0.1:54321`. Compose API and worker
+interpolate `${SUPABASE_URL:-http://host.docker.internal:54321}` so a gitignored
+hosted-ingest env file can point JWKS at hosted Auth. The default remains
+local Docker GoTrue. When `APP_ENV=local` and `SUPABASE_URL` is one of
+those two local origins, FastAPI accepts `iss`
 `http://127.0.0.1:54321/auth/v1` or
 `http://host.docker.internal:54321/auth/v1`. Signature, `kid`, and `alg`
-still verify against the configured JWKS URL. Staging and production never
+still verify against the configured JWKS URL. Hosted demo ingest uses the
+hosted origin (no local `iss` alias). Staging and production never
 expand aliases. Do not mutate `GOTRUE_JWT_ISSUER` to paper over this split.
-See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
+See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md) and
+[demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md).
 
 `X-Client-Version` is a request header, not an environment variable. New paid
 `POST /conversations/{conversation_id}/messages` must send a semver-like value

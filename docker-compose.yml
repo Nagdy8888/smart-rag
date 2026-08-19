@@ -170,7 +170,7 @@ services:
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-smart-rag}
-      SUPABASE_URL: http://host.docker.internal:54321
+      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
       # app_api is NOLOGIN. Use LOGIN wrapper app_runtime (SET ROLE app_api).
       # Never postgresql://postgres:postgres. See docs/deployment/LOCAL_RUNTIME_ROLES.md.
       SUPABASE_DB_URL: "${API_SUPABASE_DB_URL:-postgresql://app_runtime:${APP_RUNTIME_DB_PASSWORD:?set APP_RUNTIME_DB_PASSWORD}@host.docker.internal:54322/postgres}"

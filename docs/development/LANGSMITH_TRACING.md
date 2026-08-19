@@ -2,7 +2,7 @@
 title: LangSmith tracing for model and embedding calls
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-08-19
 audience: engineering, operators, security
 ---
 
@@ -16,6 +16,7 @@ feedback loop.
 
 Related: [CONFIGURATION.md](./CONFIGURATION.md) ·
 [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md) ·
+[demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md) ·
 [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) ·
 [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) ·
 [docs index](../README.md)
@@ -30,10 +31,15 @@ Exported fields are limited to:
   counts, character counts
 - SHA-256 prefixes of query/prompt/excerpt/input text (16 hex chars)
 - Token usage, provider request id, mode, ranking count
+- LightRAG extract `input_tokens`, `cached_input_tokens`, `output_tokens`,
+  `total_tokens`, and `estimated_cost_usd`. The estimate uses the pinned
+  standard API list price and is not a replacement for the OpenAI invoice.
 - Correlation ids (`request_id`, `run_id`, `job_id`) when bound
+- Ingest parent names (`ingestion.scan`, `ingestion.parse`,
+  `ingestion.index`, `ingestion.graph`) with hashed document/version ids
 
 Never exported: raw prompts, user queries, canonical excerpts, embedding
-vectors, API keys, JWTs, emails, signed URLs, or file bytes.
+vectors, API keys, JWTs, emails, signed URLs, file bytes, or plot text.
 
 `LANGSMITH_HIDE_INPUTS` and `LANGSMITH_HIDE_OUTPUTS` are forced `true` at
 startup so `wrap_openai` child spans cannot send Responses `input` /
@@ -85,6 +91,12 @@ sequenceDiagram
    `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true` to fake that review.
    Staging/production still require it. Do not ingest real company files into
    a hosted environment on this waiver.
+5. Laptop **ingest** demo (Phase A): set `LANGSMITH_TRACING=true` on the
+   **worker** (not the EC2 API). After a plot-slice upload, open project
+   `LANGSMITH_PROJECT` and filter `ingestion.index` / `embedding.embed`.
+   The 200-line graph file must also show `ingestion.graph` and
+   `model.lightrag_llm`. Procedure:
+   [demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md).
 
 ## Failure modes
 
@@ -102,8 +114,8 @@ sequenceDiagram
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_openai_rerank.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
-uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py tests/unit/test_langsmith_tracing.py
+uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_openai_rerank.py tests/unit/test_openai_lightrag.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
+uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/openai_lightrag.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_openai_lightrag.py
 ```
 
 Live LangSmith project visibility is **unverified** until

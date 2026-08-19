@@ -211,9 +211,24 @@ def all_phase10_checkboxes_unchecked(text: str) -> bool:
         True when packets 1-7 remain ``[ ]``.
     """
 
+    return packet1_checkbox_unchecked(text) and later_phase10_checkboxes_unchecked(text)
+
+
+def later_phase10_checkboxes_unchecked(text: str) -> bool:
+    """Return whether packets 2-7 stay unchecked.
+
+    Packet 1 may be checked after P10-01-A through E Passed. Packets 2-7
+    remain unchecked until their own gates pass.
+
+    Args:
+        text: Wrapper markdown.
+
+    Returns:
+        True when packets 2-7 remain ``[ ]``.
+    """
+
     return (
-        packet1_checkbox_unchecked(text)
-        and packet2_checkbox_unchecked(text)
+        packet2_checkbox_unchecked(text)
         and packet3_checkbox_unchecked(text)
         and packet4_checkbox_unchecked(text)
         and packet5_checkbox_unchecked(text)
@@ -462,23 +477,21 @@ def assert_no_full_scale_claim(text: str, *, source: str) -> None:
 
 
 def assert_wrapper_pending_unchecked(wrapper: str, packet: str) -> None:
-    """Require wrapper pending and all seven checkboxes unchecked.
+    """Require wrapper pending and packets 2-7 unchecked.
 
     Args:
         wrapper: Phase 10 wrapper markdown.
         packet: Packet 7 markdown.
 
     Raises:
-        Phase10Packet7GateError: If the wrapper is complete or a checkbox
-            is checked.
+        Phase10Packet7GateError: If the wrapper is complete, Packet 7 is
+            complete, or packets 2-7 are checked.
     """
 
     if not wrapper_status_pending(wrapper):
         raise Phase10Packet7GateError("Phase 10 wrapper must remain status: pending")
-    if not all_phase10_checkboxes_unchecked(wrapper):
-        raise Phase10Packet7GateError(
-            "all seven Phase 10 checkboxes must stay unchecked"
-        )
+    if not later_phase10_checkboxes_unchecked(wrapper):
+        raise Phase10Packet7GateError("Phase 10 packets 2-7 must stay unchecked")
     if not packet7_status_pending(packet):
         raise Phase10Packet7GateError("Packet 7 file must remain status: pending")
 
@@ -879,7 +892,7 @@ def classify_p1007_e(
     Args:
         manifest_ok: Promotion manifest exists with freeze ids.
         wrapper_pending: Wrapper frontmatter is pending.
-        all_unchecked: All seven checkboxes remain ``[ ]``.
+        all_unchecked: Packets 2-7 remain ``[ ]``. Packet 1 may be checked.
         nogo: Recommendation is no-go for Phase 11.
         envelope_ok: Envelope stays 8/16/15.
         holdout_closed: Holdout remains denied.
@@ -936,7 +949,7 @@ def classify_packet7(
         freeze_match: Image ids match the freeze.
         manifest_ok: Promotion manifest exists.
         wrapper_pending: Wrapper is pending.
-        all_unchecked: All seven checkboxes unchecked.
+        all_unchecked: Packets 2-7 remain unchecked.
         nogo: Recommendation is no-go.
         envelope_ok: Envelope stays 8/16/15.
         holdout_closed: Holdout denied.
@@ -1030,8 +1043,8 @@ def classify_packet7(
             check="P10-07-E",
             classification=class_e,
             detail=(
-                "Promotion inputs recorded. Wrapper pending. All seven "
-                "checkboxes unchecked. Recommendation is no-go for Phase 11. "
+                "Promotion inputs recorded. Wrapper pending. Packets 2-7 "
+                "stay unchecked. Recommendation is no-go for Phase 11. "
                 f"Envelope QT-CAP-001-P9={ENVELOPE_HYBRID_VERSIONS} / "
                 f"QT-CAP-002-P9={ENVELOPE_CHUNKS} / "
                 f"QT-CAP-005-P8={ENVELOPE_GRAPH_VERSIONS}. Holdout closed. "
@@ -1273,11 +1286,13 @@ def write_packet7_artifacts(
     blocked = blocked_acceptance_rows(matrices)
     live_blocked = live_blocked_fields(matrices)
     promotion = build_promotion_manifest(rows=rows, matrices=matrices)
+    wrapper = (repo_root / WRAPPER_RELATIVE).read_text(encoding="utf-8")
+    packet1_box = "unchecked" if packet1_checkbox_unchecked(wrapper) else "checked"
     matrix: dict[str, object] = {
         "schema_version": PACKET7_MATRIX_SCHEMA_VERSION,
         "packet": "P10-07",
         "wrapper_status": "pending",
-        "packet1_checkbox": "unchecked",
+        "packet1_checkbox": packet1_box,
         "packet2_checkbox": "unchecked",
         "packet3_checkbox": "unchecked",
         "packet4_checkbox": "unchecked",
@@ -1413,8 +1428,8 @@ def evaluate_packet7(
 ]:
     """Run committed Packet 7 policy plus probes and classify P10-07.
 
-    Does not re-run Packets 1-6 pytest. Wrapper and all seven checkboxes
-    stay pending/unchecked. Independent assessment stays not run.
+    Does not re-run Packets 1-6 pytest. Wrapper stays pending. Packets 2-7
+    stay unchecked. Independent assessment stays not run.
 
     Args:
         repo_root: Repository root.
@@ -1425,7 +1440,7 @@ def evaluate_packet7(
 
     Raises:
         Phase10Packet7GateError: If policy fails, matrices are missing,
-            the wrapper was marked complete, a checkbox was checked, or
+            the wrapper was marked complete, packets 2-7 were checked, or
             a fake pentest Pass exists.
     """
 

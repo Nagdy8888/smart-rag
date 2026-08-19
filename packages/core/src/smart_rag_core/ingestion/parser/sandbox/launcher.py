@@ -201,6 +201,11 @@ class ParserSandboxLauncher:
 
         Raises:
             ParserSandboxError: When the Docker CLI is missing or cannot start.
+
+        Note:
+            ``docker run`` stdout/stderr are decoded as UTF-8 with replacement.
+            Windows locale encodings (cp1252) raise on CMU plot punctuation and
+            abort the hybrid index job before ``result.json`` is read.
         """
 
         if shutil.which("docker") is None:
@@ -270,6 +275,8 @@ class ParserSandboxLauncher:
                     command,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=self._config.timeout_seconds,
                     check=False,
                 )
@@ -334,6 +341,8 @@ def docker_sandbox_available() -> bool:
             ["docker", "info"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5,
             check=False,
         )
@@ -397,6 +406,8 @@ def kill_sandbox_container(container_name: str, *, grace_seconds: int) -> None:
                 command,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=timeout,
                 check=False,
             )

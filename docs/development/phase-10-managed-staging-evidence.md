@@ -1089,7 +1089,7 @@ Checkboxes were not checked. 10k/1M was not advertised.
 
 ### Request for user acceptance
 
-Request for user acceptance: Phase 10 remains status pending with all seven packet checkboxes unchecked. The honest recommendation is no-go for Phase 11 until live AWS/managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production.
+Request for user acceptance: Phase 10 remains status pending with packets 2-7 unchecked. The honest recommendation is no-go for Phase 11 until remaining managed staging proof and an independent external security assessment close. Please accept this pending/no-go state; do not promote production.
 
 ## Phase 10 live closeout (2026-08-18, profile `Nagdy-iam`)
 
@@ -1273,6 +1273,72 @@ CloudFront `https://dzm8yijuajwge.cloudfront.net`. Origin hostname is still
 | P10-01-E | Passed | Synthetic/redacted only. |
 
 No packet checkbox checked. Wrapper stays `pending`. Phase 11 stays **no-go**.
+
+### 2026-08-19 Packet 1 close-out (P10-01)
+
+Requirement **P10-01**. Acceptance: A intended freeze + Phase 9 artifacts ·
+B EC2 rebuildable/encrypted/IMDSv2/SSM-only · C private services no public
+path · D Vercel/SES no secrets · E synthetic/redacted.
+
+```mermaid
+flowchart TD
+  cf["CloudFront HTTPS viewer"] -->|"origin header 90s http-only"| caddy["Caddy http_port 443"]
+  caddy -->|"match"| api["api-blue freeze digest"]
+  caddy -->|"no header"| deny["403"]
+  api --> private["internal ParadeDB and Valkey"]
+  eip["EIP 22 5432 6379 8000 8080"] -->|"workstation probe"| closed["closed"]
+```
+
+Caddy 2.8.4 rejected `read_timeout` in the `servers` timeouts block and
+rejected `http://:443` until `http_port 443` was set. Provider-egress uses
+the same 2.8.4 names (`read_body` / `write`).
+
+`terraform apply` on 2026-08-19 replaced `i-0abe79350a3880e87` because
+`data.aws_ami.al2023` is `most_recent` and `user_data_replace_on_change`
+was true. EBS `delete_on_termination` wiped ParadeDB/Valkey data. Rebuild
+is `i-067ea167673dbc187` private `10.40.0.73`, same EIP
+`52.206.156.176`. `ec2.tf` now sets `user_data_replace_on_change = false`
+and `lifecycle.ignore_changes = [ami, user_data]`. Do not `terraform apply`
+the full stack without a plan.
+
+| Field | Value |
+| --- | --- |
+| Instance | `i-067ea167673dbc187` `t3.micro` running |
+| Volumes | `vol-076441c69ef845f18` 80Gi gp3 encrypted, `vol-0b34e1633002ffbdf` 50Gi gp3 encrypted |
+| IMDS | `HttpTokens=required`, hop 1 |
+| sshd | inactive; no SSH ingress |
+| Host listen | `0.0.0.0:443`, `[::]:443`, SSM `127.0.0.1:44397` |
+| CloudFront origin | `52.206.156.176.sslip.io`, `http-only`, 90/90 |
+| CloudFront `/health/live` | HTTP 200 |
+| Local origin without header | HTTP 403 |
+| EIP probe | 22/80/443/5432/6379/8000/8080/8443 closed |
+| Healthy | api-blue, paradedb, valkey-limits, valkey-cache, crawl-proxy |
+| Running, no healthcheck | caddy, provider-egress-proxy |
+| Not started | api-green, worker, clamav, parser-sandbox |
+| Vercel | three `NEXT_PUBLIC_*` keys; `live_values` stays `{}` |
+| SES | `staging-alerts@example.invalid` pending |
+| Seed | Phase 9 open-split identity; holdout closed |
+| Envelope | QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15 |
+| `STREAMING_TIMEOUTS.md` | still contains `does **not** claim` |
+
+Artifacts:
+[packet1-live-aws.json](../deployment/phase-10/packet1-live-aws.json) ·
+[packet1-live-network-scan.json](../deployment/phase-10/packet1-live-network-scan.json) ·
+[packet1-live-vercel.json](../deployment/phase-10/packet1-live-vercel.json).
+
+Not claimed: Packet 5 load, dual API slots, worker, ClamAV, parser, PITR,
+Pro Supabase, SES verified, 50s CDN SSE, Packet 2 OIDC assume, Phase 11.
+
+| Check | Classification | Why |
+| --- | --- | --- |
+| P10-01-A | Passed on freeze files; live drift honest | Intended Pro/us-east-1/PITR. Live hosted Free / eu-central-1 / no PITR. |
+| P10-01-B | Passed | Encrypted, IMDSv2 hop 1, SSM-only, `t3.micro`. |
+| P10-01-C | Passed | Private services running; no public 22/5432/6379/8000/8080. Workstation 443 closed (CloudFront SG). |
+| P10-01-D | Passed | Vercel public keys only. SES unverified. |
+| P10-01-E | Passed | Synthetic/redacted only. |
+
+Wrapper stays `pending`. Packet 1 checkbox is **checked**. Packets 2-7 stay
+unchecked. Phase 11 stays **no-go**.
 
 
 

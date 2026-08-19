@@ -21,19 +21,16 @@ from smart_rag_core.release.phase10_constants import (
     VALKEY_IMAGE,
     WRAPPER_RELATIVE,
 )
-from smart_rag_core.release.phase10_packet1 import (
-    packet1_checkbox_unchecked,
-    wrapper_status_pending,
-)
+from smart_rag_core.release.phase10_packet1 import wrapper_status_pending
 from smart_rag_core.release.phase10_packet2 import packet2_checkbox_unchecked
 from smart_rag_core.release.phase10_packet3 import packet3_checkbox_unchecked
 from smart_rag_core.release.phase10_packet4 import packet4_checkbox_unchecked
 from smart_rag_core.release.phase10_packet5 import packet5_checkbox_unchecked
 from smart_rag_core.release.phase10_packet6 import packet6_checkbox_unchecked
 from smart_rag_core.release.phase10_packet7 import (
-    all_phase10_checkboxes_unchecked,
     assert_scope_doc,
     evaluate_packet7,
+    later_phase10_checkboxes_unchecked,
     load_packet_matrices,
     packet7_checkbox_unchecked,
     packet7_status_pending,
@@ -53,13 +50,20 @@ def test_committed_packet_matrices_load_and_keep_freeze() -> None:
         assert matrix.image_ids == dict(PHASE09_IMAGE_IDS)
         assert matrix.holdout_opened is False
         assert matrix.wrapper_status == "pending"
+    passed = [
+        row.check
+        for matrix in matrices
+        for row in matrix.acceptance
+        if row.classification == "Passed"
+    ]
     blocked = [
         row.check
         for matrix in matrices
         for row in matrix.acceptance
         if row.classification == "Blocked"
     ]
-    assert "P10-01-B" in blocked
+    assert "P10-01-B" in passed
+    assert "P10-01-C" in passed
     assert "P10-04-C" in blocked
     assert "P10-06-A" in blocked
 
@@ -75,14 +79,13 @@ def test_scope_doc_is_not_run_and_not_a_report() -> None:
     assert "```mermaid" in text
 
 
-def test_wrapper_stays_pending_and_all_seven_checkboxes_unchecked() -> None:
-    """Packet 7 must not complete the wrapper or check any packet box."""
+def test_wrapper_stays_pending_and_packets_2_7_unchecked() -> None:
+    """Packet 7 must not complete the wrapper; packets 2-7 stay unchecked."""
 
     wrapper = (REPO_ROOT / WRAPPER_RELATIVE).read_text(encoding="utf-8")
     packet = (REPO_ROOT / PACKET7_RELATIVE).read_text(encoding="utf-8")
     assert wrapper_status_pending(wrapper) is True
-    assert all_phase10_checkboxes_unchecked(wrapper) is True
-    assert packet1_checkbox_unchecked(wrapper) is True
+    assert later_phase10_checkboxes_unchecked(wrapper) is True
     assert packet2_checkbox_unchecked(wrapper) is True
     assert packet3_checkbox_unchecked(wrapper) is True
     assert packet4_checkbox_unchecked(wrapper) is True

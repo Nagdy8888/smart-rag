@@ -1,17 +1,22 @@
 # t3.micro origin listener. ACME cannot complete because security-group 443
 # is CloudFront prefix-list only. CloudFront connects with origin_protocol_policy
-# http-only; viewers still use HTTPS. Dual origin-header values and 90s
-# timeouts stay identical to Caddyfile. Do not commit real header values.
+# http-only; viewers still use HTTPS. Caddy 2.8.4 needs the HTTP listener
+# port set to 443 so the http://:443 site address does not violate
+# scheme/port convention. Dual origin-header values and 90s timeouts stay
+# identical to Caddyfile. Do not commit real header values.
 
 {
 	auto_https off
+	http_port 443
+	https_port 8443
 	servers {
 		max_header_size 16KB
 		timeouts {
-			read_timeout 90s
-			read_header_timeout 15s
-			write_timeout 90s
-			idle_timeout 90s
+			# Caddy 2.8.4 names. Packet 3 still matches read_header_timeout 15s.
+			read_body 90s
+			read_header 15s
+			write 90s
+			idle 90s
 		}
 	}
 }

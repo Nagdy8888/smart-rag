@@ -54,6 +54,7 @@ _SENSITIVE_KEYS = frozenset(
         "prompt",
         "prompt_text",
         "query",
+        "system_prompt",
         "self",
         "text",
         "vectors",
@@ -201,6 +202,13 @@ def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(prompt, str):
         payload["prompt_sha256"] = short_content_hash(prompt)
         payload["prompt_chars"] = len(prompt)
+    role = getattr(request, "role", None)
+    if isinstance(role, str):
+        payload["role"] = role
+    system_prompt = getattr(request, "system_prompt", None)
+    if isinstance(system_prompt, str):
+        payload["system_prompt_sha256"] = short_content_hash(system_prompt)
+        payload["system_prompt_chars"] = len(system_prompt)
     prompt_text = getattr(request, "prompt_text", None)
     if isinstance(prompt_text, str):
         payload["prompt_text_sha256"] = short_content_hash(prompt_text)
@@ -249,15 +257,34 @@ def redact_gateway_outputs(outputs: object) -> dict[str, Any]:
     mode = getattr(raw, "mode", None)
     if mode is not None:
         payload["mode"] = mode
+    content = getattr(raw, "content", None)
+    if isinstance(content, str):
+        payload["content_chars"] = len(content)
+        payload["content_sha256"] = short_content_hash(content)
     request_id = getattr(raw, "request_id", None) or getattr(
         raw, "provider_request_id", None
     )
     if request_id is not None:
         payload["request_id"] = str(request_id)
-    for field in ("input_tokens", "output_tokens", "model_calls"):
+    for field in (
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "model_calls",
+    ):
         value = getattr(raw, field, None)
         if isinstance(value, int):
             payload[field] = value
+    estimated_cost_usd = getattr(raw, "estimated_cost_usd", None)
+    if estimated_cost_usd is not None:
+        payload["estimated_cost_usd"] = float(estimated_cost_usd)
+    model_id = getattr(raw, "model_id", None)
+    if isinstance(model_id, str) and model_id:
+        payload["model_id"] = model_id
+    pricing_version = getattr(raw, "pricing_version", None)
+    if isinstance(pricing_version, str) and pricing_version:
+        payload["pricing_version"] = pricing_version
     vectors = getattr(raw, "vectors", None)
     if vectors is not None:
         payload["vector_count"] = len(tuple(vectors))
@@ -308,6 +335,7 @@ def redact_openai_call_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
             "input_hash",
             "timeout_seconds",
             "max_retries",
+            "role",
         }:
             payload[key] = value
     return payload
@@ -345,6 +373,60 @@ def redact_rerank_call_outputs(outputs: Mapping[str, Any]) -> dict[str, Any]:
         "output_tokens": _as_int(output_tokens),
         "payload_keys": payload_keys,
     }
+
+
+def redact_lightrag_llm_call_outputs(outputs: object) -> dict[str, Any]:
+    """Export LightRAG extract usage without callback text.
+
+    Args:
+        outputs: Traceable return wrapper around ``(content, request_id,
+            input_tokens, cached_input_tokens, output_tokens,
+            estimated_cost_usd)``.
+
+    Returns:
+        Request id, token counts, estimated USD, and content length/hash.
+        Raw extract text is omitted.
+    """
+
+    if isinstance(outputs, Mapping):
+        typed_outputs = cast(Mapping[str, Any], outputs)
+        raw: object = typed_outputs.get("output", outputs)
+    else:
+        raw = outputs
+    if not isinstance(raw, tuple):
+        return {}
+    items = list(cast(Sequence[object], raw))
+    if len(items) < 6:
+        return {}
+    (
+        content,
+        request_id,
+        input_tokens,
+        cached_input_tokens,
+        output_tokens,
+        estimated_cost_usd,
+    ) = (
+        items[0],
+        items[1],
+        items[2],
+        items[3],
+        items[4],
+        items[5],
+    )
+    input_count = _as_int(input_tokens)
+    output_count = _as_int(output_tokens)
+    payload: dict[str, Any] = {
+        "request_id": str(request_id),
+        "input_tokens": input_count,
+        "cached_input_tokens": _as_int(cached_input_tokens),
+        "output_tokens": output_count,
+        "total_tokens": input_count + output_count,
+        "estimated_cost_usd": float(str(estimated_cost_usd)),
+    }
+    if isinstance(content, str):
+        payload["content_chars"] = len(content)
+        payload["content_sha256"] = short_content_hash(content)
+    return payload
 
 
 def redact_embedding_call_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
@@ -471,6 +553,24 @@ def rerank_responses_traceable(func: Any) -> Any:
         run_type="llm",
         process_inputs=redact_openai_call_inputs,
         process_outputs=redact_rerank_call_outputs,
+    )(func)
+
+
+def lightrag_llm_responses_traceable(func: Any) -> Any:
+    """Apply the redacted Responses LightRAG extract span decorator.
+
+    Args:
+        func: ``execute_openai_lightrag_llm`` implementation.
+
+    Returns:
+        Traceable wrapper that hashes prompts and omits extract bodies.
+    """
+
+    return traceable(
+        name="openai.responses.lightrag_llm",
+        run_type="llm",
+        process_inputs=redact_openai_call_inputs,
+        process_outputs=redact_lightrag_llm_call_outputs,
     )(func)
 
 

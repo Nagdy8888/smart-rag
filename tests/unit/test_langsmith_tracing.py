@@ -40,6 +40,7 @@ _ALLOWED_OPENAI_CTOR = {
 _ALLOWED_RESPONSES_CREATE = {
     Path("packages/core/src/smart_rag_core/gateways/openai_rerank.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_answer.py"),
+    Path("packages/core/src/smart_rag_core/gateways/openai_lightrag.py"),
 }
 _ALLOWED_EMBEDDINGS_CREATE = {
     Path("packages/core/src/smart_rag_core/observability/langsmith_tracing.py"),
@@ -362,6 +363,66 @@ def test_redact_gateway_outputs_accepts_embedding_response() -> None:
     assert payload["vector_count"] == 1
     assert payload["vector_dimensions"] == 2
     assert payload["request_id"] == "req-1"
+
+
+def test_lightrag_trace_exports_usage_cost_without_extract_text() -> None:
+    """LightRAG spans expose token/cost metadata but never extract content."""
+
+    from decimal import Decimal
+
+    from smart_rag_core.gateways.model import (
+        LightRagLlmRequest,
+        LightRagLlmResponse,
+    )
+    from smart_rag_core.observability.langsmith_tracing import (
+        redact_gateway_outputs,
+        redact_lightrag_llm_call_outputs,
+    )
+
+    request = LightRagLlmRequest(
+        role="extract",
+        prompt=CANARY_PASSAGE,
+        system_prompt=CANARY_TOKEN,
+    )
+    inputs = redact_gateway_inputs({"request": request})
+    response = LightRagLlmResponse(
+        mode="openai",
+        content=f"entity-row {CANARY_EMAIL}",
+        provider_request_id="resp_extract_1",
+        model_id="gpt-4o-mini",
+        input_tokens=100,
+        cached_input_tokens=20,
+        output_tokens=30,
+        total_tokens=130,
+        model_calls=1,
+        estimated_cost_usd=Decimal("0.0000524"),
+        pricing_version="openai-api-pricing-2026-08-19",
+    )
+    outputs = redact_gateway_outputs(response)
+    helper_outputs = redact_lightrag_llm_call_outputs(
+        {
+            "output": (
+                response.content,
+                response.provider_request_id,
+                response.input_tokens,
+                response.cached_input_tokens,
+                response.output_tokens,
+                response.estimated_cost_usd,
+            )
+        }
+    )
+    assert redact_lightrag_llm_call_outputs(None) == {}
+    assert inputs["role"] == "extract"
+    assert outputs["total_tokens"] == 130
+    assert outputs["estimated_cost_usd"] == pytest.approx(0.0000524)
+    assert helper_outputs["cached_input_tokens"] == 20
+    assert helper_outputs["total_tokens"] == 130
+    assert not payload_contains_forbidden_text(
+        (inputs, outputs, helper_outputs),
+        CANARY_TOKEN,
+        CANARY_EMAIL,
+        CANARY_PASSAGE,
+    )
 
 
 def test_query_run_trace_metadata_is_hashes_and_counts_only() -> None:

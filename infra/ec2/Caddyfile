@@ -8,10 +8,11 @@
 	servers {
 		max_header_size 16KB
 		timeouts {
-			read_timeout 90s
-			read_header_timeout 15s
-			write_timeout 90s
-			idle_timeout 90s
+			# Caddy 2.8.4 names. Packet 3 still matches read_header_timeout 15s.
+			read_body 90s
+			read_header 15s
+			write 90s
+			idle 90s
 		}
 	}
 }

@@ -19,7 +19,10 @@ from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL,
 )
-from smart_rag_core.retrieval.graph import LIGHTRAG_PINNED_VERSION
+from smart_rag_core.retrieval.graph import (
+    LIGHTRAG_LLM_TIMEOUT_SECONDS,
+    LIGHTRAG_PINNED_VERSION,
+)
 
 
 @dataclass
@@ -73,14 +76,17 @@ class CountedLightRagCallbacks:
         pre_provider_hook: Optional synchronous guard invoked before every
             embedding or LLM provider call so Packet 3 can verify lock and
             lease without holding a transaction.
+        ingest_job_id: Optional claimed LightRAG job id. When set, extract
+            callbacks emit ``[graph] extract_batch`` count lines.
     """
 
     embedding_gateway: EmbeddingGateway
     model_gateway: ModelGateway
     counts: CallbackCounts = field(default_factory=CallbackCounts)
-    timeout_seconds: float = 30.0
+    timeout_seconds: float = LIGHTRAG_LLM_TIMEOUT_SECONDS
     extract_gate: asyncio.Event | None = None
     pre_provider_hook: Callable[[], None] | None = None
+    ingest_job_id: str | None = None
 
     async def embedding_texts(self, texts: list[str]) -> np.ndarray:
         """Embed one batch through the shared gateway at the pinned dimension.
@@ -127,11 +133,14 @@ class CountedLightRagCallbacks:
             **_kwargs: Ignored vendor extras including priority.
 
         Returns:
-            Bounded synthetic extraction text from the model gateway.
+            Extract callback text from the model gateway. Live mode calls
+            OpenAI; mock mode returns a frozen fixture.
 
         Side Effects:
             May wait on ``extract_gate`` so cancellation tests can bound
-            ``ainsert`` without leaving an unbounded sleep.
+            ``ainsert`` without leaving an unbounded sleep. When
+            ``ingest_job_id`` is set, emits one ``[graph] extract_batch``
+            count line. Never logs prompt text.
         """
 
         del history_messages
@@ -140,11 +149,25 @@ class CountedLightRagCallbacks:
         if gate is not None:
             await gate.wait()
         self.counts.entity_extract += 1
+        job_id = self.ingest_job_id
+        if job_id is not None:
+            from smart_rag_core.observability.ingest_progress import log_ingest_progress
+
+            log_ingest_progress(
+                "graph",
+                "extract_batch",
+                job_id,
+                extract_calls=self.counts.entity_extract,
+            )
         response = await self.model_gateway.generate_lightrag_llm(
             LightRagLlmRequest(
                 role="extract",
                 prompt=prompt,
                 system_prompt=system_prompt or "",
+                timeout_seconds=max(
+                    1.0,
+                    min(self.timeout_seconds, LIGHTRAG_LLM_TIMEOUT_SECONDS),
+                ),
             )
         )
         return response.content

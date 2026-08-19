@@ -2,7 +2,7 @@
 title: Runbook backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: operations
 ---
 
@@ -33,6 +33,7 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 | Backup/restore DB+Storage | 9/10 | backups | draft | Packet 6 reconcile runbook; live PITR Blocked | eng-lead |
 | Incident response / rollback | 9–11 | staging | planned | tabletop | eng-lead |
 | Staging secrets collection (Free/t3.micro continue) | 10 | gitignored `.env.staging` | draft | names-only listing; no compose up on micro | eng-lead |
+| Demo laptop ingest / AWS ask later | 10 demo | hosted Supabase + laptop worker | draft | LangSmith + `[hybrid]`/`[graph]` after plot slices; no live AWS until instance up | eng-lead |
 
 [lightrag-schema-bootstrap.md](./lightrag-schema-bootstrap.md) ·
 [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](./GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) ·
@@ -44,4 +45,5 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 [bm25-rebuild.md](./bm25-rebuild.md) ·
 [instance-rebuild.md](./instance-rebuild.md) ·
 [phase10-staging-secrets.md](./phase10-staging-secrets.md) ·
+[demo-local-ingest-aws-ask.md](./demo-local-ingest-aws-ask.md) ·
 [docs index](../README.md)

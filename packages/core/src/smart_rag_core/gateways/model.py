@@ -5,6 +5,7 @@ from __future__ import annotations
 import socket
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
+from decimal import Decimal
 from typing import Literal, Protocol, cast
 from unittest.mock import patch
 
@@ -13,6 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from smart_rag_core.gateways.openai_answer import (
     execute_openai_answer,
     execute_openai_verifier,
+)
+from smart_rag_core.gateways.openai_lightrag import (
+    execute_openai_lightrag_llm,
 )
 from smart_rag_core.gateways.openai_rerank import (
     execute_openai_rerank,
@@ -35,6 +39,13 @@ from smart_rag_core.query_profile.models import ModelInferredProfile
 from smart_rag_core.query_profile.versions import (
     PROFILE_PROMPT_SHA256,
     PROFILE_PROMPT_VERSION,
+)
+from smart_rag_core.retrieval.graph import (
+    LIGHTRAG_LLM_MAX_INPUT_CHARS,
+    LIGHTRAG_LLM_MODEL_ID,
+    LIGHTRAG_LLM_PRICING_VERSION,
+    LIGHTRAG_LLM_TIMEOUT_SECONDS,
+    LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
 )
 from smart_rag_core.retrieval.profiles import RERANK_MODEL_ID
 from smart_rag_core.retrieval.rerank import rerank_input_hash
@@ -309,6 +320,8 @@ class LightRagLlmRequest(BaseModel):
             generation, ``vlm`` is multimodal, and ``other`` is unclassified.
         prompt: User/task prompt text from LightRAG.
         system_prompt: Optional system prompt. Empty when unused.
+        timeout_seconds: Provider client timeout in seconds. Must stay below
+            the vendor LightRAG ``wait_for`` bound.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -317,23 +330,48 @@ class LightRagLlmRequest(BaseModel):
     role: Literal["extract", "keyword", "query", "vlm", "other"]
     prompt: str = Field(default="", max_length=65_536)
     system_prompt: str = Field(default="", max_length=65_536)
+    timeout_seconds: float = Field(
+        default=LIGHTRAG_LLM_TIMEOUT_SECONDS,
+        gt=0,
+        le=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
+    )
 
 
 class LightRagLlmResponse(BaseModel):
-    """Mock LightRAG callback payload. Never a company-knowledge answer.
+    """LightRAG callback payload. Never a company-knowledge answer.
 
     Attributes:
-        mode: Adapter mode. Qualification uses ``mock`` only.
-        content: Bounded synthetic callback text.
-        fixture_provenance: Fixture URI.
+        mode: Adapter mode. ``mock`` for fixtures, ``local`` for a deliberately
+            provider-free callback, and ``openai`` for live extract.
+        content: Bounded callback text. Extract uses vendor tuple format.
+        fixture_provenance: Fixture URI. Empty for live OpenAI extract.
+        provider_request_id: Provider response id. Empty without a live call.
+        model_id: Provider model id. Empty without a live call.
+        input_tokens: Provider-reported total input tokens.
+        cached_input_tokens: Provider-reported cached subset of input tokens.
+        output_tokens: Provider-reported output tokens.
+        total_tokens: Input plus output tokens.
+        model_calls: One for live extract, otherwise zero.
+        estimated_cost_usd: Standard API list-price estimate. The provider
+            invoice remains canonical.
+        pricing_version: Published price source/version used by the estimate.
         retrieval_performed: Always false.
     """
 
     model_config = ConfigDict(frozen=True)
 
-    mode: Literal["mock"]
-    content: str = Field(max_length=8_192)
-    fixture_provenance: str = Field(max_length=256)
+    mode: Literal["mock", "local", "openai"]
+    content: str = Field(max_length=32_768)
+    fixture_provenance: str = Field(default="", max_length=256)
+    provider_request_id: str = Field(default="", max_length=128)
+    model_id: str = Field(default="", max_length=128)
+    input_tokens: int = Field(default=0, ge=0)
+    cached_input_tokens: int = Field(default=0, ge=0)
+    output_tokens: int = Field(default=0, ge=0)
+    total_tokens: int = Field(default=0, ge=0)
+    model_calls: int = Field(default=0, ge=0, le=1)
+    estimated_cost_usd: Decimal = Field(default=Decimal("0"), ge=0)
+    pricing_version: str = Field(default="", max_length=128)
     retrieval_performed: Literal[False] = False
 
 
@@ -755,7 +793,7 @@ class MockModelAdapter:
 
 
 class OpenAIRerankAdapter:
-    """Packet 5 OpenAI adapter. Chat and profile calls stay unavailable."""
+    """Live OpenAI adapter. Chat and query-profile calls stay unavailable."""
 
     def __init__(self, *, api_key: str, max_input_chars: int) -> None:
         """Store the credential for one-shot rerank calls.
@@ -932,16 +970,80 @@ class OpenAIRerankAdapter:
     async def generate_lightrag_llm(
         self, request: LightRagLlmRequest
     ) -> LightRagLlmResponse:
-        """Refuse live LightRAG callbacks. Qualification uses mock mode.
+        """Run one LightRAG extract call, or return local fixtures.
 
         Args:
             request: LightRAG callback request.
 
+        Returns:
+            Provider extract text for ``extract``. Keyword and query roles
+            return bounded local fixtures without a provider call so ingest
+            cannot silently generate LightRAG answers.
+
         Raises:
-            ModelGatewayUnavailableError: Always. Packet 1 never calls OpenAI.
+            ModelGatewayUnavailableError: For ``vlm`` and ``other`` roles.
+            OpenAILightragError: Provider timeout, auth, HTTP, or empty output.
+            ValueError: Combined extract input exceeds the bound.
+
+        Side Effects:
+            One HTTPS Responses call for ``extract`` with ``max_retries=0``.
+            Keyword and query roles do not call OpenAI.
         """
 
-        raise ModelGatewayUnavailableError("lightrag_llm_openai_not_configured")
+        if request.role == "keyword":
+            return LightRagLlmResponse(
+                mode="local",
+                content=_mock_lightrag_llm_content("keyword"),
+                fixture_provenance="",
+                retrieval_performed=False,
+            )
+        if request.role == "query":
+            return LightRagLlmResponse(
+                mode="local",
+                content=_mock_lightrag_llm_content("query"),
+                fixture_provenance="",
+                retrieval_performed=False,
+            )
+        if request.role != "extract":
+            raise ModelGatewayUnavailableError("lightrag_llm_role_not_configured")
+        combined = request.system_prompt + request.prompt
+        input_bound = min(self._max_input_chars, LIGHTRAG_LLM_MAX_INPUT_CHARS)
+        if len(combined) > input_bound:
+            raise ValueError(
+                "Model input exceeds configured "
+                f"{input_bound}-character bound"
+            )
+        (
+            content,
+            request_id,
+            input_tokens,
+            cached_input_tokens,
+            output_tokens,
+            estimated_cost_usd,
+        ) = (
+            execute_openai_lightrag_llm(
+                api_key=self._api_key,
+                model_id=LIGHTRAG_LLM_MODEL_ID,
+                prompt=request.prompt,
+                system_prompt=request.system_prompt,
+                timeout_seconds=request.timeout_seconds,
+            )
+        )
+        return LightRagLlmResponse(
+            mode="openai",
+            content=content,
+            fixture_provenance="",
+            provider_request_id=request_id,
+            model_id=LIGHTRAG_LLM_MODEL_ID,
+            input_tokens=input_tokens,
+            cached_input_tokens=cached_input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
+            model_calls=1,
+            estimated_cost_usd=estimated_cost_usd,
+            pricing_version=LIGHTRAG_LLM_PRICING_VERSION,
+            retrieval_performed=False,
+        )
 
 
 class ModelGateway:
@@ -1077,8 +1179,9 @@ def create_model_gateway(settings: SharedSettings) -> ModelGateway:
         settings: Validated deployable settings.
 
     Returns:
-        Mock adapter when ``MOCK_MODEL_MODE`` is true; otherwise the Packet 5
-        OpenAI rerank adapter (chat/profile remain unavailable).
+        Mock adapter when ``MOCK_MODEL_MODE`` is true; otherwise the live
+        OpenAI adapter (chat/profile remain unavailable; LightRAG extract
+        uses Responses).
 
     Raises:
         ModelGatewayUnavailableError: If real mode has no API key.
