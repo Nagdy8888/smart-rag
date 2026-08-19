@@ -32,6 +32,7 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 | User offboarding/export/deletion | 2/11 | identity | planned | retention | privacy |
 | Backup/restore DB+Storage | 9/10 | backups | draft | Packet 6 reconcile runbook; live PITR Blocked | eng-lead |
 | Incident response / rollback | 9–11 | staging | planned | tabletop | eng-lead |
+| Staging secrets collection (Free/t3.micro continue) | 10 | gitignored `.env.staging` | draft | names-only listing; no compose up on micro | eng-lead |
 
 [lightrag-schema-bootstrap.md](./lightrag-schema-bootstrap.md) ·
 [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](./GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md) ·
@@ -42,4 +43,5 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 [storage-db-reconciliation.md](./storage-db-reconciliation.md) ·
 [bm25-rebuild.md](./bm25-rebuild.md) ·
 [instance-rebuild.md](./instance-rebuild.md) ·
+[phase10-staging-secrets.md](./phase10-staging-secrets.md) ·
 [docs index](../README.md)

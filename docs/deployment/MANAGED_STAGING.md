@@ -30,6 +30,7 @@ Related: [infra/ec2](../../infra/ec2/README.md) ·
 [STREAMING_TIMEOUTS.md](./STREAMING_TIMEOUTS.md) ·
 [phase-10 evidence](../development/phase-10-managed-staging-evidence.md) ·
 [packet1-live-supabase.json](./phase-10/packet1-live-supabase.json) ·
+[staging secrets runbook](../runbooks/phase10-staging-secrets.md) ·
 [LOCAL_RELEASE_CANDIDATE.md](./LOCAL_RELEASE_CANDIDATE.md)
 
 ## Intended plan, features, and regions

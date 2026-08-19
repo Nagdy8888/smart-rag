@@ -49,9 +49,14 @@ flowchart TD
    [packet1-live-supabase.json](../deployment/phase-10/packet1-live-supabase.json).
    Live region/plan/PITR drift is an accepted topology deviation, not a silent
    freeze change.
-5. Never install `pg_search` on this hosted project. ParadeDB remains the
+5. User 2026-08-19: continue on AWS Free plan and hosted Supabase Free with
+   live `t3.micro`; expand the instance later. Do not rewrite freeze
+   constants. Collect remaining database URLs in gitignored
+   `infra/ec2/.env.staging`. Do not start the full Compose stack until RAM
+   is enough.
+6. Never install `pg_search` on this hosted project. ParadeDB remains the
    private BM25 engine on EC2.
-6. Do not commit `service_role`, database URLs, or Vercel `live_values`.
+7. Do not commit `service_role`, database URLs, or Vercel `live_values`.
    `vercel-public-env.json` stays an allow-list only.
 
 ## Consequences

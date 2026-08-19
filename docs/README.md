@@ -95,7 +95,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-alpine-application-bases-trivy.md](./adr/ADR-alpine-application-bases-trivy.md) | engineering-lead | accepted | 2026-08-18 | eng, security |
 | [adr/ADR-phase9-local-envelope-reduce.md](./adr/ADR-phase9-local-envelope-reduce.md) | product-owner | accepted | 2026-08-18 | client, engineering |
 | [adr/ADR-phase10-hosted-supabase-reuse.md](./adr/ADR-phase10-hosted-supabase-reuse.md) | product-owner | accepted | 2026-08-18 | client, engineering, ops |
-| [adr/ADR-phase10-free-tier-ec2.md](./adr/ADR-phase10-free-tier-ec2.md) | engineering-lead | accepted | 2026-08-18 | client, engineering, ops |
+| [runbooks/phase10-staging-secrets.md](./runbooks/phase10-staging-secrets.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [adr/ADR-paradedb-edition-availability.md](./adr/ADR-paradedb-edition-availability.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-private-service-tls.md](./adr/ADR-private-service-tls.md) | engineering-lead | accepted | 2026-08-18 | eng, security |
 | [adr/ADR-expand-contract-migrations.md](./adr/ADR-expand-contract-migrations.md) | engineering-lead | accepted | 2026-08-12 | eng |

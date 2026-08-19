@@ -1136,6 +1136,16 @@ To continue Packet 1 live: upgrade the AWS account off Free plan, apply
 start Compose, then re-scan. Supabase Pro/PITR and an independent
 assessment remain separate Packet 1-A / Packet 6 / Packet 7 blockers.
 
+### 2026-08-19 user continue on Free / t3.micro
+
+User accepted AWS Free, hosted Supabase Free, and `t3.micro` until they
+expand. ParadeDB/Valkey passwords were generated into gitignored
+`infra/ec2/.env.staging` (not chat, not git). Remaining operator step:
+paste transaction (6543) and session (5432) database URIs from the
+Supabase dashboard into that file. Do not paste them here. Do not
+`compose up` on 916Mi. Runbook:
+[phase10-staging-secrets.md](../runbooks/phase10-staging-secrets.md).
+
 
 
 
