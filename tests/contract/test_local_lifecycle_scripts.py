@@ -38,6 +38,17 @@ def test_lifecycle_scripts_share_compose_environment_precedence() -> None:
     assert "docker compose --env-file $EnvFile stop" in _script_text("stop.ps1")
     assert "docker compose --env-file $EnvFile down -v" in _script_text("reset.ps1")
 
+    for name in ("dev.ps1", "reset.ps1"):
+        source = _script_text(name)
+        ensure_index = source.index("ensure_app_runtime_role.py")
+        if name == "dev.ps1":
+            supabase_index = source.index("pnpm exec supabase start")
+            compose_index = source.index("docker compose --env-file $EnvFile up")
+            assert supabase_index < ensure_index < compose_index
+        else:
+            reset_index = source.index("pnpm exec supabase db reset")
+            assert reset_index < ensure_index
+
 
 def test_reset_requires_confirmation_before_destructive_compose_call() -> None:
     """The destructive reset must fail closed before removing local volumes."""
@@ -62,6 +73,7 @@ def test_local_verification_covers_private_service_invariants() -> None:
         "accepted an unauthenticated ping",
         '@("api", "worker", "frontend")',
         "MOCK_MODEL_MODE=true",
+        "OPENAI_API_KEY",
     )
     for fragment in required_fragments:
         assert fragment in source

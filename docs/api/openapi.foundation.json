@@ -264,7 +264,7 @@
         "type": "object"
       },
       "CreateInvitationResponse": {
-        "description": "Invitation identifiers. Raw token returned once.",
+        "description": "Invitation identifiers. The one-time token is delivered by mail only.",
         "properties": {
           "email": {
             "title": "Email",
@@ -278,10 +278,6 @@
           "invitation_id": {
             "format": "uuid",
             "title": "Invitation Id",
-            "type": "string"
-          },
-          "raw_token": {
-            "title": "Raw Token",
             "type": "string"
           },
           "role": {
@@ -298,8 +294,7 @@
           "email",
           "role",
           "upload_enabled",
-          "expires_at",
-          "raw_token"
+          "expires_at"
         ],
         "title": "CreateInvitationResponse",
         "type": "object"
@@ -362,6 +357,18 @@
       "DocumentResponse": {
         "description": "Visible document summary.",
         "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
           "current_version_id": {
             "anyOf": [
               {
@@ -2389,6 +2396,7 @@
                 "type": "null"
               }
             ],
+            "description": "Required on paid POST unless Idempotency-Key header is set.",
             "title": "Idempotency Key"
           },
           "message": {
@@ -4318,7 +4326,7 @@
     },
     "/admin/invitations": {
       "post": {
-        "description": "Create a 24-hour invitation. Owner/admin only.\n\nArgs:\n    request: Active request.\n    body: Invitee email, role, and upload flag.\n    caller: Authenticated caller.\n    service: Injected auth/team service.\n\nReturns:\n    Invitation identifiers including the one-time token.",
+        "description": "Create a 24-hour invitation. Owner/admin only.\n\nArgs:\n    request: Active request.\n    body: Invitee email, role, and upload flag.\n    caller: Authenticated caller.\n    service: Injected auth/team service.\n\nReturns:\n    Invitation identifiers. The one-time token is delivered by mail only.\n    ``APP_ENV=test`` also sets ``X-Test-Invitation-Token``.",
         "operationId": "create_invitation_route_admin_invitations_post",
         "parameters": [
           {
@@ -5058,9 +5066,38 @@
     },
     "/conversations": {
       "get": {
-        "description": "List conversations the caller may read.\n\nArgs:\n    request: Active request.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Conversation list.",
+        "description": "List conversations the caller may read.\n\nArgs:\n    request: Active request.\n    caller: Authenticated caller.\n    service: Injected service.\n    limit: Page size, default 50, max 200.\n    cursor: Optional ``created_at,id`` keyset cursor.\n\nReturns:\n    Conversation list, newest first.",
         "operationId": "list_conversations_route_conversations_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
           {
             "in": "header",
             "name": "Authorization",
@@ -5601,7 +5638,7 @@
     },
     "/conversations/{conversation_id}/messages": {
       "post": {
-        "description": "Admit Auto chat as Composite. Handshake runs before reservation.\n\nJSON Accept returns 202 ``{run_id, stream_path}``. ``text/event-stream``\nadmits then streams immediately. Duplicate idempotency keys reuse the\nexisting run and never reserve twice.\n\nArgs:\n    request: Active request.\n    conversation_id: Conversation the caller must own.\n    body: Message and optional idempotency key.\n    caller: Authenticated caller.\n    service: Injected query-run service.\n    sse: Persist-then-flush SSE service.\n    idempotency_key_header: Optional ``Idempotency-Key`` header UUID.\n    x_client_version: Required client version for new paid submission.\n\nReturns:\n    JSON admission result or an SSE stream.",
+        "description": "Admit Auto chat as Composite. Handshake runs before reservation.\n\nJSON Accept returns 202 ``{run_id, stream_path}``. ``text/event-stream``\nadmits then streams immediately. Duplicate idempotency keys reuse the\nexisting run and never reserve twice.\n\nArgs:\n    request: Active request.\n    conversation_id: Conversation the caller must own.\n    body: Message and optional idempotency key.\n    caller: Authenticated caller.\n    service: Injected query-run service.\n    sse: Persist-then-flush SSE service.\n    idempotency_key_header: ``Idempotency-Key`` header UUID when the body\n        omits the key.\n    x_client_version: Required client version for new paid submission.\n\nReturns:\n    JSON admission result or an SSE stream.\n\nRaises:\n    HTTPException: 400 when neither body nor header supplies a key.",
         "operationId": "submit_message_route_conversations__conversation_id__messages_post",
         "parameters": [
           {
@@ -5817,9 +5854,38 @@
     },
     "/documents": {
       "get": {
-        "description": "List ACL-visible non-deleted documents.\n\nArgs:\n    request: Active request.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Visible documents with escaped titles.",
+        "description": "List ACL-visible non-deleted documents.\n\nArgs:\n    request: Active request.\n    caller: Authenticated caller.\n    service: Injected service.\n    limit: Page size, default 50, max 200.\n    cursor: Optional ``created_at,id`` keyset cursor.\n\nReturns:\n    Visible documents with escaped titles, newest first.",
         "operationId": "list_documents_route_documents_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
           {
             "in": "header",
             "name": "Authorization",
@@ -6230,6 +6296,137 @@
       }
     },
     "/documents/{document_id}": {
+      "delete": {
+        "description": "Tombstone one document. Owner/admin only.\n\nArgs:\n    request: Active request for rate limits.\n    document_id: Document id.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Empty 204 body.\n\nRaises:\n    HTTPException: 404 when missing or unauthorized; 403 when a visible\n        document is not owner/admin-deletable.",
+        "operationId": "delete_document_route_documents__document_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Document Route",
+        "tags": [
+          "documents"
+        ]
+      },
       "get": {
         "description": "Return one ACL-visible document.\n\nArgs:\n    request: Active request.\n    document_id: Document id.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Document summary.",
         "operationId": "get_document_route_documents__document_id__get",
@@ -6528,7 +6725,7 @@
     },
     "/graph/inspect": {
       "post": {
-        "description": "Inspect authorized graph objects. Members and viewers are ACL-filtered.\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Seed entity keys and/or document id, depth at most 3.\n    caller: Authenticated caller context.\n\nReturns:\n    At most 200 rows and canonical locators. Native prose is omitted.\n\nRaises:\n    HTTPException: 401 via identity dependency, 400 for seed/deadline,\n        503 when the database URL is unset.",
+        "description": "Inspect authorized graph objects. Members and viewers are ACL-filtered.\n\nFastAPI applies ``COST_MUTATION`` rate limits here. Adding ``/graph`` to\npreauth ``_MUTATION_PREFIXES`` is owned by the API-hardening agent; this\nhandler still closes the unthrottled FastAPI gap if that prefix is absent.\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Seed entity keys and/or document id, depth at most 3.\n    caller: Authenticated caller context.\n\nReturns:\n    At most 200 rows and canonical locators. Native prose is omitted.\n\nRaises:\n    HTTPException: 401 via identity dependency, 400 for seed/deadline,\n        503 when the database URL is unset.",
         "operationId": "inspect_graph_route_graph_inspect_post",
         "parameters": [
           {
@@ -6694,7 +6891,7 @@
     },
     "/health/ready": {
       "get": {
-        "description": "Dependency-aware readiness. Mock/graph-unconfigured is never query-ready.\n\nArgs:\n    request: Request with lifespan state.\n\nReturns:\n    Honest readiness mapping.",
+        "description": "Unauthenticated readiness. Mock/graph-unconfigured is never query-ready.\n\nThe public body is ``status``, ``query_ready``, and a coarse ``detail``.\nNamed dependencies stay on ``GET /ops/ready``.\n\nArgs:\n    request: Request with lifespan state.\n\nReturns:\n    Public readiness mapping without internal dependency names.",
         "operationId": "ready_health_ready_get",
         "responses": {
           "200": {
@@ -6858,7 +7055,7 @@
     },
     "/ingestion/jobs/{job_id}/retry": {
       "post": {
-        "description": "Retry one failed, backoff, or dead-letter ingestion job when authorized.\n\nDead-letter replay creates a **new** job with a new idempotency key and\nretains the original dead-letter row. Failed-but-not-dead-letter jobs only\nclear ``next_attempt_at``; ``last_error`` and ``attempt_count`` stay.\n\nArgs:\n    request: FastAPI request with backend settings.\n    job_id: Source ingestion job identifier.\n    caller: Authenticated caller context.\n\nReturns:\n    The job that should run next (replay child for dead-letter).\n\nRaises:\n    HTTPException: 403 for members/viewers, 404 when missing, 409 when the\n        job is not retryable, 503 when the database URL is unset.",
+        "description": "Retry one failed, backoff, or dead-letter ingestion job when authorized.\n\nDead-letter replay creates a **new** job with a new idempotency key and\nretains the original dead-letter row. Failed-but-not-dead-letter jobs only\nclear ``next_attempt_at``; ``last_error`` and ``attempt_count`` stay.\n\nArgs:\n    request: FastAPI request for rate limits.\n    job_id: Source ingestion job identifier.\n    caller: Authenticated caller context.\n    service: Injected status service.\n\nReturns:\n    The job that should run next (replay child for dead-letter).\n\nRaises:\n    HTTPException: 403 for members/viewers, 404 when missing, 409 when the\n        job is not retryable.",
         "operationId": "retry_ingestion_job_ingestion_jobs__job_id__retry_post",
         "parameters": [
           {
@@ -6998,7 +7195,7 @@
     },
     "/ingestion/versions/{version_id}/status": {
       "get": {
-        "description": "Return public lifecycle and nested diagnostics for one document version.\n\nArgs:\n    request: FastAPI request with backend settings.\n    version_id: Canonical document version identifier.\n    caller: Authenticated caller; role controls ``retry_allowed`` only.\n\nReturns:\n    Version status plus recent job summaries.\n\nRaises:\n    HTTPException: 404 when the version is missing; 503 when the database\n        URL is unset.",
+        "description": "Return public lifecycle and nested diagnostics for one document version.\n\nArgs:\n    version_id: Canonical document version identifier.\n    caller: Authenticated caller. Unauthorized versions return 404.\n    service: Injected status service.\n\nReturns:\n    Version status plus recent job summaries.\n\nRaises:\n    HTTPException: 404 when the version is missing or unauthorized.",
         "operationId": "get_version_ingestion_status_ingestion_versions__version_id__status_get",
         "parameters": [
           {
@@ -7403,6 +7600,138 @@
         "summary": "Current User",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/ops/ready": {
+      "get": {
+        "description": "Authenticated operator readiness with named dependency probes.\n\nArgs:\n    request: Request with lifespan state.\n    caller: JWKS-verified caller. Owner or admin only.\n\nReturns:\n    Full readiness mapping including named dependencies.\n\nRaises:\n    HTTPException: 403 when the caller is not owner or admin.",
+        "operationId": "operator_ready_ops_ready_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Operator Ready Ops Ready Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Operator Ready",
+        "tags": [
+          "ops"
         ]
       }
     },

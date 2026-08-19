@@ -2,7 +2,7 @@
 title: EC2 / CloudFront / SES staging IaC
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: engineering, ops
 ---
 
@@ -22,6 +22,7 @@ Related: [MANAGED_STAGING.md](../../docs/deployment/MANAGED_STAGING.md) ·
 | Item | Value |
 | --- | --- |
 | AWS region | `us-east-1` |
+| EC2 type | `t3.micro` (accepted; never `m6i.xlarge`) |
 | Supabase region | `us-east-1` |
 | Supabase plan | Pro (PITR for signed RPO ≤24h) |
 | SES | sandbox only |

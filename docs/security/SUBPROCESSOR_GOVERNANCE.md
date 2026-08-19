@@ -43,10 +43,11 @@ Sources (2026-08-13): [Usage and billing / retention](https://docs.langchain.com
 | Incident / deletion | API delete by trace ID/metadata; retention purge | unverified contacts | unverified | product-owner |
 
 **Application rule:** Until org rows are `verified`, keep `LANGSMITH_TRACING`
-false for real company content. Gateway tracing may be enabled against
-synthetic fixtures; exported spans are hashes/counts/usage only. See
+false for real company content in **staging and production**. Local
+(`APP_ENV=local`, `MOCK_MODEL_MODE=false`) may enable tracing with operator
+keys; exported spans remain hashes/counts/usage only (hide I/O forced). See
 [LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md). Raw private source
-content is never copied into traces.
+content is never copied into traces. This local waiver is not org verification.
 
 ## 3. Supabase settings matrix
 

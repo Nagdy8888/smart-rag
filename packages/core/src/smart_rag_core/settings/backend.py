@@ -2,11 +2,37 @@
 
 from __future__ import annotations
 
+import ipaddress
 from typing import ClassVar, Literal, Self
+from urllib.parse import urlparse
 
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
 
-from smart_rag_core.settings.base import SharedSettings, load_settings
+from smart_rag_core.settings.base import Environment, SharedSettings, load_settings
+
+_HOSTED_ENVIRONMENTS = frozenset({Environment.STAGING, Environment.PRODUCTION})
+_LOOPBACK_HOST_NAMES = frozenset({"localhost", "localhost.localdomain"})
+
+
+def _is_loopback_origin_host(host: str) -> bool:
+    """Return whether a CORS origin hostname is loopback.
+
+    Args:
+        host: Hostname from ``urllib.parse.urlparse``.
+
+    Returns:
+        True for localhost labels and IPv4/IPv6 loopback addresses.
+    """
+
+    lowered = host.casefold().rstrip(".")
+    if not lowered:
+        return True
+    if lowered in _LOOPBACK_HOST_NAMES or lowered.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(lowered).is_loopback
+    except ValueError:
+        return False
 
 
 class BackendSettings(SharedSettings):
@@ -15,7 +41,10 @@ class BackendSettings(SharedSettings):
     Attributes:
         service_name: Stable structured-log service identifier.
         bind_host: HTTP bind address from ``API_BIND_HOST``. Public, default
-            ``0.0.0.0``.
+            ``0.0.0.0`` so Docker ``CMD`` and Caddy-fronted staging/production
+            listeners keep working. The host firewall must drop public access
+            to port 8000. Local non-container processes should bind
+            ``127.0.0.1``.
         bind_port: HTTP bind port from ``API_BIND_PORT``. Public, default
             ``8000``.
         supabase_url: Supabase project URL from ``SUPABASE_URL``. Public.
@@ -56,7 +85,12 @@ class BackendSettings(SharedSettings):
         validation_alias="API_BIND_HOST",
         min_length=1,
         max_length=255,
-        description="Backend HTTP bind address.",
+        description=(
+            "Backend HTTP bind address. Container and Caddy-fronted staging/"
+            "production listeners use 0.0.0.0; the host firewall must drop "
+            "public access to port 8000. Local non-container processes should "
+            "bind 127.0.0.1."
+        ),
         json_schema_extra={"security": "public"},
     )
     bind_port: int = Field(
@@ -237,6 +271,58 @@ class BackendSettings(SharedSettings):
                 or lowered.startswith("https://*")
             ):
                 raise ValueError("CORS wildcard origins are forbidden")
+        return self
+
+    @model_validator(mode="after")
+    def require_https_cors_in_hosted_environments(self) -> Self:
+        """Require HTTPS, non-loopback CORS origins in staging and production.
+
+        Returns:
+            This settings instance.
+
+        Raises:
+            ValueError: If hosted environments have no origins, a non-HTTPS
+                origin, or a loopback host.
+        """
+
+        if self.app_env not in _HOSTED_ENVIRONMENTS:
+            return self
+        origins = self.parsed_cors_origins()
+        if not origins:
+            raise ValueError(
+                "CORS_ALLOW_ORIGINS must list HTTPS origins in staging/production"
+            )
+        for origin in origins:
+            parsed = urlparse(origin)
+            host = parsed.hostname or ""
+            if parsed.scheme.casefold() != "https":
+                raise ValueError(
+                    "CORS_ALLOW_ORIGINS must be HTTPS in staging/production"
+                )
+            if _is_loopback_origin_host(host):
+                raise ValueError(
+                    "CORS_ALLOW_ORIGINS must not include loopback in staging/production"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def require_valkey_limits_in_hosted_environments(self) -> Self:
+        """Require the limits Valkey URL before hosting a public listener.
+
+        Unconfigured Valkey is acceptable for local/test. Staging and
+        production must not listen without ``VALKEY_LIMITS_URL``.
+
+        Returns:
+            This settings instance.
+
+        Raises:
+            ValueError: If staging or production omit ``VALKEY_LIMITS_URL``.
+        """
+
+        if self.app_env in _HOSTED_ENVIRONMENTS and self.valkey_limits_url is None:
+            raise ValueError(
+                "VALKEY_LIMITS_URL is required when APP_ENV is staging or production"
+            )
         return self
 
     def resolved_checkpoint_dsn(self) -> str | None:

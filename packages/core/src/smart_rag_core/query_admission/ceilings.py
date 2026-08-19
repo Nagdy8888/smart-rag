@@ -9,11 +9,15 @@ call/tool ceilings.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 
-from smart_rag_core.query_admission.exceptions import QueryCeilingError
+from smart_rag_core.query_admission.exceptions import (
+    QueryBudgetError,
+    QueryCeilingError,
+)
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 
 DEFAULT_MONTHLY_LLM_BUDGET_USD = Decimal("200.00")
@@ -49,6 +53,14 @@ FAMILY_MODEL_CALL_CEILING: dict[Phase6RouteFamily, int] = {
     Phase6RouteFamily.NO_RETRIEVAL: 7,
     Phase6RouteFamily.SCOPED_REFUSAL: 7,
 }
+"""Signed call ceilings already include retrieve-time work.
+
+Hybrid 7 is batched query embed + one rerank + answer-class headroom
+(profile/answer/verifier/correction). Combined 8 adds LightRAG consume.
+The defect is unpaid retrieve, not an undersized number. Envelope USD is
+``ceiling *`` the family max kind cap (answer 0.40 except inspection 0.25)
+and therefore already covers smaller embedding/rerank/lightrag kind caps.
+"""
 
 FAMILY_TOOL_CEILING: dict[Phase6RouteFamily, int] = {
     Phase6RouteFamily.HYBRID: 4,
@@ -125,6 +137,41 @@ USAGE_KIND_COMPLETION_TOKEN_CAPS: dict[str, int] = {
 
 ALLOWED_USAGE_KINDS: frozenset[str] = frozenset(USAGE_KIND_USD_CAPS)
 
+RETRIEVE_USAGE_KINDS: frozenset[str] = frozenset({"embedding", "rerank", "lightrag"})
+"""Gateway kinds that retrieve must debit against the run-local reservation."""
+
+
+@dataclass(slots=True)
+class QueryRetrieveBudget:
+    """Mutable remaining that retrieve-time gateway calls must consume.
+
+    LangGraph ``remaining_model_calls`` is the parallel call counter.
+    Pipeline retrieve nodes pass remaining after profile into this ledger
+    and write the post-retrieve value back. Binding this ledger on
+    Hybrid/LightRAG adapters is how retrieve decrements remaining
+    and reserved USD. Durable consume uses ``execute_counted_model_call``
+    when ``connection`` and reservation ids are present.
+
+    Attributes:
+        remaining_model_calls: Remaining counted gateway calls.
+        remaining_usd: Remaining reservation USD.
+        connection: Optional ``app_api`` connection for durable consume.
+        caller: Server-derived caller when ``connection`` is set.
+        run_id: Admitted query run when ``connection`` is set.
+        reservation_id: Run-local reservation when ``connection`` is set.
+        expected_version: Optimistic reservation version.
+        usage_kinds: Debited kinds in call order (tests and audit).
+    """
+
+    remaining_model_calls: int
+    remaining_usd: Decimal
+    connection: object | None = None
+    caller: object | None = None
+    run_id: UUID | None = None
+    reservation_id: UUID | None = None
+    expected_version: int = 1
+    usage_kinds: list[str] = field(default_factory=list)
+
 
 @dataclass(frozen=True, slots=True)
 class RouteCeiling:
@@ -137,14 +184,15 @@ class RouteCeiling:
         recursion_limit: LangGraph superstep cap (QT-DL-008).
         correction_ceiling: Maximum routing/retrieval corrections (QT-DL-006).
         subquestion_ceiling: Maximum subquestions (QT-DL-007).
-        model_call_ceiling: Maximum gateway calls including one batched
-            query embedding per retrieve (QT-MC-*).
+        model_call_ceiling: Maximum gateway calls including retrieve-time
+            query embedding, OpenAI rerank, and LightRAG consume (QT-MC-*).
         tool_ceiling: Maximum tool executions (QT-TL-001).
         discovery_ceiling: Optional discovery rounds (QT-TL-002).
         manifest_ceiling: Optional manifests (global contract: three).
         side_effect_ceiling: Side-effecting tools (QT-TL-003).
         per_call_usd_cap: Conservative per-call USD cap for this family.
-        envelope_usd: ``model_call_ceiling * per_call_usd_cap``.
+        envelope_usd: ``model_call_ceiling * per_call_usd_cap``. Retrieve
+            kinds debit this same hold; they do not enlarge it.
         envelope_prompt_tokens: Prompt-token hold for the reservation.
         envelope_completion_tokens: Completion-token hold for the reservation.
     """
@@ -201,6 +249,69 @@ def envelope_for_family(family: Phase6RouteFamily) -> RouteCeiling:
             FAMILY_COMPLETION_TOKENS_PER_CALL[family] * model_calls
         ),
     )
+
+
+def assert_retrieve_kind_available(
+    *,
+    remaining_model_calls: int,
+    remaining_usd: Decimal,
+    usage_kind: str,
+) -> tuple[Decimal, int, int]:
+    """Fail closed when remaining cannot cover one retrieve-time gateway kind.
+
+    Args:
+        remaining_model_calls: Remaining counted gateway calls.
+        remaining_usd: Remaining reservation USD.
+        usage_kind: Allow-listed kind. Retrieve uses embedding, rerank, or
+            lightrag.
+
+    Returns:
+        ``(usd_cap, prompt_token_cap, completion_token_cap)``.
+
+    Raises:
+        QueryCeilingError: When the call ceiling is exhausted or the kind
+            is unknown.
+        QueryBudgetError: When remaining USD cannot cover the kind cap.
+    """
+
+    usd_cap, prompt_cap, completion_cap = usage_kind_caps(usage_kind)
+    if remaining_model_calls < 1:
+        raise QueryCeilingError("model_call_exhausted")
+    if remaining_usd < usd_cap:
+        raise QueryBudgetError("reservation_exhausted")
+    return usd_cap, prompt_cap, completion_cap
+
+
+def debit_retrieve_budget(
+    budget: QueryRetrieveBudget,
+    usage_kind: str,
+    *,
+    remaining_usd: Decimal | None = None,
+) -> None:
+    """Record one retrieve-time kind against the in-memory remaining counters.
+
+    Args:
+        budget: Mutable retrieve ledger.
+        usage_kind: Allow-listed kind that was consumed.
+        remaining_usd: Durable remaining after ``execute_counted_model_call``.
+            When omitted, subtract the kind USD cap locally.
+
+    Raises:
+        QueryCeilingError: When remaining calls cannot cover this kind.
+        QueryBudgetError: When local remaining USD cannot cover the cap
+            and ``remaining_usd`` was omitted.
+    """
+
+    usd_cap, _, _ = assert_retrieve_kind_available(
+        remaining_model_calls=budget.remaining_model_calls,
+        remaining_usd=budget.remaining_usd,
+        usage_kind=usage_kind,
+    )
+    budget.remaining_model_calls = assert_call_available(budget.remaining_model_calls)
+    budget.remaining_usd = (
+        remaining_usd if remaining_usd is not None else budget.remaining_usd - usd_cap
+    )
+    budget.usage_kinds.append(usage_kind)
 
 
 def usage_kind_caps(usage_kind: str) -> tuple[Decimal, int, int]:

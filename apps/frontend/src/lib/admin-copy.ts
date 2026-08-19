@@ -36,6 +36,10 @@ export const COMPANY_SETTINGS_UNAVAILABLE =
 export const PROFILE_EDITOR_UNAVAILABLE =
   "Name and locale editors are unavailable (GAP-07-19). GET /me returns five fields only: user_id, role, authorization_version, upload_enabled, mfa_enrolled.";
 
+/** Invitation create JSON never includes the one-time token. */
+export const INVITE_TOKEN_MAIL_ONLY =
+  "The invitation token is delivered by mail only. It is not in this JSON response.";
+
 /** Re-export GAP-07-08 copy for the team surface. */
 export const TEAM_OWNER_BOOTSTRAP_UNAVAILABLE = OWNER_BOOTSTRAP_UNAVAILABLE;
 

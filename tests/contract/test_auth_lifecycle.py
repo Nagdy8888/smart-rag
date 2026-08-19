@@ -661,3 +661,45 @@ def test_last_active_owner_cannot_be_offboarded(
             actor_assurance_level="aal2",
         )
     assert provider_called is False
+
+
+def test_admin_cannot_invite_owner(
+    postgres_url: str,
+    privileged_settings: PrivilegedAuthSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only an owner may create an owner invitation."""
+
+    actor_id = uuid.uuid4()
+    allowed_domain = f"allowed-{uuid.uuid4().hex}.example"
+    _insert_profile(
+        postgres_url,
+        user_id=actor_id,
+        email=f"invite-admin-{actor_id}@example.com",
+        role="admin",
+        upload_enabled=False,
+        mfa_enrolled=True,
+    )
+    with psycopg.connect(postgres_url) as connection:
+        connection.execute(
+            "INSERT INTO app.allowed_email_domains (domain) VALUES (%s)",
+            (allowed_domain,),
+        )
+        connection.commit()
+
+    monkeypatch.setattr(
+        invitations,
+        "send_provider_invite_email",
+        lambda *_args, **_kwargs: None,
+    )
+    with pytest.raises(
+        invitations.InvitationServiceError,
+        match="only owner may invite owner",
+    ):
+        invitations.create_invitation(
+            privileged_settings,
+            postgres_url=postgres_url,
+            email=f"new-owner@{allowed_domain}",
+            role="owner",
+            invited_by=actor_id,
+        )

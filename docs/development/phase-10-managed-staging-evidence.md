@@ -2,7 +2,7 @@
 title: Phase 10 managed staging — packet evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: engineering, reviewers
 ---
 
@@ -1146,6 +1146,133 @@ Supabase dashboard into that file. Do not paste them here. Do not
 `compose up` on 916Mi. Runbook:
 [phase10-staging-secrets.md](../runbooks/phase10-staging-secrets.md).
 
+### 2026-08-19 operator: hosted pooler URLs present
+
+Packet 1 remains first unchecked. Requirement **P10-01**. Acceptance:
+A intended freeze + Phase 9 artifacts · B EC2 rebuildable/encrypted/IMDSv2/SSM-only
+· C private services no public path · D Vercel/SES no secrets · E synthetic/redacted.
+
+The operator filled transaction (6543) and session (5432) URIs in gitignored
+repo `.env`. Those two keys were copied into gitignored
+`infra/ec2/.env.staging` (not chat, not git). Shape: `postgresql`,
+`pooler.supabase.com`, username includes project ref `qsjivtwtmlmtksufqjik`,
+not `service_role`.
+
+Workstation probe (`SELECT 1`, `sslmode=require`):
+
+| Endpoint | Result |
+| --- | --- |
+| Transaction 6543 | OK, Postgres 17.6, `pg_search` absent |
+| Session 5432 | OK, Postgres 17.6, `pg_search` absent |
+
+EC2 `i-0abe79350a3880e87` stayed `t3.micro` / EIP `52.206.156.176`. SSM
+`AWS-RunShellScript` installed Docker Compose **v2.32.4** at
+`/usr/local/lib/docker/cli-plugins/docker-compose` (`dnf` had no
+`docker-compose-plugin` package). Host RAM still 916Mi / 0 swap. Compose
+was **not** started.
+
+Workstation Docker Desktop had the Phase 9 freeze images. They were tagged
+`p9-freeze` and pushed to ECR. Image ids match freeze constants:
+
+| Repository | Digest |
+| --- | --- |
+| `smart-rag-api` | `sha256:a65f1aa43fbf6fd353257a75fa9462e79a5bb187741d75e36a0429216e3633ec` |
+| `smart-rag-worker` | `sha256:e6259d06f129ec14158e90acf1807dbaed0baa040bef9781fac60d46a97fe96e` |
+| `smart-rag-crawl-proxy` | `sha256:7d78834e21cc87d2ba133d4d131f1aa6d05b2de808d80296bf6658a8e04e62d3` |
+| `smart-rag-parser-sandbox` | `sha256:f7717ab4ec1e06d8113a19c080a05c1db6050b3b70e3bcfd73d61dd013ed6e0a` |
+
+Frontend remains Vercel, not ECR. ParadeDB/Valkey images stay Docker Hub
+digest pins for a later pull. `.env.staging` was **not** copied onto the
+instance via `SendCommand` (that would log secret parameters).
+
+| Check | Classification | Why |
+| --- | --- | --- |
+| P10-01-A | Passed on freeze files; live drift honest | Intended Pro/us-east-1/PITR. Live hosted Free / eu-central-1 / no PITR. Pooler `SELECT 1` works. |
+| P10-01-B | Blocked | Runtime host is still `t3.micro`; intended `m6i.xlarge` rejected on Free plan. IMDSv2/SSM-only still observed. |
+| P10-01-C | Blocked | Private ParadeDB/Valkey/API not running; EIP all-closed does not qualify. |
+| P10-01-D | Passed on committed allow-list | `vercel-public-env.json` `live_values` stays `{}`. |
+| P10-01-E | Passed | Synthetic/redacted only; `app.documents` 0. |
+
+No packet checkbox checked. Wrapper stays `pending`. Phase 11 stays **no-go**.
+Do not `compose up` until the instance has enough RAM.
+
+### 2026-08-19 operator: t3.micro is the host
+
+User: never `m6i.xlarge`; ParadeDB and Valkey run on AWS, not the
+workstation; frontend is Vercel. Packet 1 still first unchecked.
+
+ADR [ADR-phase10-free-tier-ec2.md](../adr/ADR-phase10-free-tier-ec2.md)
+now accepts `t3.micro`. Overlay
+`infra/ec2/docker-compose.t3micro.yml` starts only ParadeDB and split
+Valkey by default. Secrets Manager `smart-rag/staging/compose-env` holds
+the gitignored dotenv. SSM copied the overlay and started three
+containers. Hosted Supabase `qsjivtwtmlmtksufqjik` remains
+`ACTIVE_HEALTHY` (eu-central-1, Postgres 17.6).
+
+Live on `i-0abe79350a3880e87`:
+
+| Service | Status | mem_limit |
+| --- | --- | --- |
+| paradedb | healthy | 280Mi |
+| valkey-limits | healthy | 48Mi |
+| valkey-cache | healthy | 80Mi |
+
+Host listen after sshd disable: `127.0.0.1:46521` (SSM). EIP
+`52.206.156.176` TCP 22/80/443/5432/6379/8000/8080/8443 closed.
+Scan: [packet1-live-network-scan.json](../deployment/phase-10/packet1-live-network-scan.json).
+
+MCP: Supabase `get_project` used. ParadeDB MCP is public docs only. AWS
+core MCP was unavailable (CLI used). No Vercel MCP; `vercel whoami` did
+not complete (unauthenticated). `vercel-public-env.json` `live_values`
+stays `{}`.
+
+| Check | Classification | Why |
+| --- | --- | --- |
+| P10-01-A | Passed on freeze files; live drift honest | Phase 9 digests unchanged. Hosted Free / eu-central-1 / no PITR still drift. |
+| P10-01-B | Runtime observed | Encrypted, IMDSv2 hop 1, SSM-only, `t3.micro` now the accepted type. sshd was re-enabled by the image pull window and disabled again. |
+| P10-01-C | Live scan qualifies for running ParadeDB/Valkey | No public 5432/6379. API/Caddy not started. CI matrix may still list C Blocked. |
+| P10-01-D | Passed on committed allow-list | Vercel live not applied. |
+| P10-01-E | Passed | Synthetic/redacted only. |
+
+No packet checkbox checked. Wrapper stays `pending`. Phase 11 stays **no-go**.
+
+### 2026-08-19 operator: Vercel Hobby login and CLI deploy
+
+Login is done: Vercel CLI 59.1.4 as `nagdy8888`, team
+`nagdy8888s-projects` (`team_mNIRHWuXIbJoytUU0QRJhJdW`). Hobby-as-Team
+does **not** require a paid Pro plan.
+
+GitHub-linked `create_git_project` failed: the Vercel GitHub App is not
+installed on `Nagdy8888/Demo_Project_3`. Workaround: `vercel project add`
+plus `vercel deploy --prod` from `apps/frontend` (file upload, not git).
+
+Live (no secrets):
+[packet1-live-vercel.json](../deployment/phase-10/packet1-live-vercel.json).
+
+| Field | Value |
+| --- | --- |
+| Project | `smart-rag-staging` `prj_iLnuVZIoTFg3Fen0v9cKcfNYTncZ` |
+| Production alias | `https://smart-rag-staging.vercel.app` (HTTP 404 at probe time) |
+| Working URLs | `https://smart-rag-staging-nagdy8888s-projects.vercel.app` and the unique deployment URL (HTTP 200) |
+| Deployment | `dpl_CJyrcHqA7nzhELsSvd2aEiaPZn6b` READY |
+| Env names | `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` only |
+| `service_role` | absent |
+| `vercel-public-env.json` `live_values` | stays `{}` |
+
+The frontend build succeeded (Next.js 16.3.0). API traffic still points at
+CloudFront `https://dzm8yijuajwge.cloudfront.net`. Origin hostname is still
+`origin.staging.example.invalid`; Caddy/API are **not** started on
+`t3.micro`. Chat/query from the staging UI will not reach a live API yet.
+
+| Check | Classification | Why |
+| --- | --- | --- |
+| P10-01-A | Passed on freeze files; live drift honest | Hosted Free / eu-central-1 / no PITR still drift. |
+| P10-01-B | Runtime observed | `t3.micro` accepted. IMDSv2/SSM-only. |
+| P10-01-C | Live scan qualifies for running ParadeDB/Valkey | API/Caddy not started. CI matrix may still list C Blocked. |
+| P10-01-D | Live Vercel public env applied; SES still unverified | Three allow-listed keys only. GitHub App still missing for git deploys. |
+| P10-01-E | Passed | Synthetic/redacted only. |
+
+No packet checkbox checked. Wrapper stays `pending`. Phase 11 stays **no-go**.
 
 
 

@@ -26,7 +26,10 @@ from smart_rag_core.ingestion.promotion import (
 from smart_rag_core.ingestion.scan import ObjectScanInput, scan_object_bytes
 from smart_rag_core.jobs.exceptions import JobLeaseError
 from smart_rag_core.jobs.hybrid_enqueue import enqueue_hybrid_index_job
-from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
+from smart_rag_core.jobs.ingestion_repository import (
+    IngestionJobRepository,
+    configurable_lease_lost,
+)
 from smart_rag_core.repositories.notifications import AdminNotificationRepository
 from smart_rag_core.repositories.scan_events import ScanEventRepository
 from smart_rag_core.schema.enums import ScanResult
@@ -89,8 +92,33 @@ def validate_scan_lease(
     state: IngestionScanState,
     config: RunnableConfig,
 ) -> IngestionScanState:
-    """Validate lease ownership before scan side effects."""
+    """Validate lease ownership before scan side effects.
 
+    State inputs:
+        ``job_id``, ``lease_token``.
+
+    State outputs:
+        ``status`` ``scan_pending`` or ``lease_invalid``.
+
+    Persistence writes:
+        None.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        ``configurable.lease_lost`` aborts before scanning.
+
+    Failure/fallback route:
+        Invalid/expired/lost leases skip ClamAV and promotion.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     configurable = cast(dict[str, object], config.get("configurable", {}))
     postgres_url = configurable.get("postgres_url")
     lease_owner = configurable.get("lease_owner")
@@ -130,8 +158,33 @@ def validate_scan_lease(
 def mark_scanning(
     state: IngestionScanState, config: RunnableConfig
 ) -> IngestionScanState:
-    """Transition version lifecycle to ``scanning``."""
+    """Transition version lifecycle to ``scanning``.
 
+    State inputs:
+        ``scan_pending`` status and ``version_id``.
+
+    State outputs:
+        ``status`` ``scanning`` or unchanged.
+
+    Persistence writes:
+        Version status ``uploaded`` → ``scanning``.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        Lease-lost aborts without a write.
+
+    Failure/fallback route:
+        Missing version id leaves state unchanged.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     if state["status"] != "scan_pending" or state["version_id"] is None:
         return state
     configurable = cast(dict[str, object], config.get("configurable", {}))
@@ -159,8 +212,33 @@ def mark_scanning(
 def scan_and_govern(
     state: IngestionScanState, config: RunnableConfig
 ) -> IngestionScanState:
-    """Download exact object bytes, scan with ClamAV, persist evidence, govern."""
+    """Download exact object bytes, scan with ClamAV, persist evidence, govern.
 
+    State inputs:
+        ``scanning`` status and durable Storage refs.
+
+    State outputs:
+        ``scan_result`` and ``status`` remaining ``scanning`` or ``scan_failed``.
+
+    Persistence writes:
+        Append-only ``document_scan_events``; admin notifications on failure.
+
+    External/model calls:
+        ClamAV INSTREAM on exact object bytes.
+
+    Budget/deadline behavior:
+        Lease-lost aborts before download.
+
+    Failure/fallback route:
+        Dirty/unscannable/stale scans fail closed. Never fake clean.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     if state["status"] != "scanning":
         return state
     required = (
@@ -290,8 +368,33 @@ def scan_and_govern(
 def promote_object(
     state: IngestionScanState, config: RunnableConfig
 ) -> IngestionScanState:
-    """Run the resumable Storage promotion saga when scan/governance passed."""
+    """Run the resumable Storage promotion saga when scan/governance passed.
 
+    State inputs:
+        Clean ``scan_result`` and promotion Storage refs.
+
+    State outputs:
+        ``promoted`` or ``promotion_failed``.
+
+    Persistence writes:
+        Promotion saga ledger, hybrid_index enqueue.
+
+    External/model calls:
+        Storage copy/verify/delete.
+
+    Budget/deadline behavior:
+        Lease-lost aborts before saga.
+
+    Failure/fallback route:
+        Saga errors alert and fail the job.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     if state["scan_result"] != ScanResult.CLEAN.value:
         return state
     required = (

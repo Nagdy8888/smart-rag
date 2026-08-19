@@ -2,7 +2,7 @@
 title: Answer verification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 3
 ---
@@ -45,13 +45,26 @@ passage. A chain whose every link is supported remains an inference.
    table-range alignment, inference-chain completeness.
 2. One separately budgeted small-model call covering at most **six**
    material atomic links. Lower-priority claims are omitted. A seventh
-   link does not trigger another call.
+   link does not trigger another call. When omitted IDs exist, answer
+   status is forced `partial` and SSE surfaces `verifier_omitted_links`.
+   Status must not remain `complete`.
 3. Deadline or step exhaustion emits terminal `verified_partial` or
    `insufficient_evidence`. It is not fake success.
+4. `verified` requires a non-null model gateway. Unbound gateway or
+   unbound Hybrid on a retrieval route is `verified_partial` or
+   `insufficient_evidence`, never `verified`. Citations with
+   `chunk_id is None` are dropped unless `table_id` is in allowed table
+   IDs.
 
 Counted usage kinds are `answer` and `verifier` via
-`execute_counted_model_call`. Keyword extract, catalog LLM, and LightRAG
-`answer_generate` stay 0.
+`execute_counted_model_call`, plus retrieve-time `embedding`, `rerank`,
+and LightRAG consume against the same reservation. Keyword extract,
+catalog LLM, and LightRAG `answer_generate` stay 0.
+
+Empty `citation_text` cannot pass deterministic `complete`. Graph locators
+load canonical `raw_text` through `fetch_authorized_chunk_context`; empty
+text is dropped. Empty spans are whole-passage only when canonical text
+is present.
 
 Prompt versions: `answer_v1` and `verifier_v1` under
 `apps/agents/src/smart_rag_agents/prompts/`. Hashes are LF-normalized
@@ -75,7 +88,7 @@ flowchart TD
   det[DeterministicAclSpanRangeChain]
   batch[Select at most 6 material links]
   verify[One verifier call]
-  omit[Omit extra links]
+  omit[Omit extra links force partial]
   fuse --> tables
   tables --> optional[disclose_optional_tools]
   optional --> answer

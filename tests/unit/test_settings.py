@@ -9,11 +9,32 @@ from smart_rag_core.settings import (
     Environment,
     JwksRolloverSettings,
     SettingsValidationError,
+    SharedSettings,
     WorkerSettings,
     load_backend_settings,
     load_jwks_rollover_settings,
     load_worker_settings,
 )
+
+
+def configure_hosted_backend_env(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    app_env: str = "production",
+) -> None:
+    """Set the minimum valid staging/production backend environment.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+        app_env: ``staging`` or ``production``.
+    """
+
+    monkeypatch.setenv("APP_ENV", app_env)
+    monkeypatch.setenv("MOCK_MODEL_MODE", "false")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-unit-fixture-not-real")
+    monkeypatch.setenv("VALKEY_LIMITS_URL", "redis://:unit@127.0.0.1:6379/0")
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "false")
 
 
 def test_deployable_settings_are_typed_and_share_secure_defaults() -> None:
@@ -25,6 +46,7 @@ def test_deployable_settings_are_typed_and_share_secure_defaults() -> None:
 
     assert backend.app_env is Environment.LOCAL
     assert backend.mock_model_mode is True
+    assert backend.allow_test_identity is False
     assert backend.service_name == "backend"
     assert worker.service_name == "worker"
     assert agents.service_name == "agents"
@@ -163,3 +185,112 @@ def test_jwks_operation_settings_validate_and_redact_secrets(
     assert settings.supabase_project_ref == "abcdefghijklmnopqrst"
     assert access_token not in repr(settings)
     assert anon_key not in repr(settings)
+
+
+def test_production_and_staging_reject_mock_mode_and_test_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Hosted environments fail closed on mock fixtures and test bypass."""
+
+    for app_env in ("staging", "production"):
+        configure_hosted_backend_env(monkeypatch, app_env=app_env)
+        monkeypatch.setenv("MOCK_MODEL_MODE", "true")
+        with pytest.raises(SettingsValidationError):
+            load_backend_settings()
+        configure_hosted_backend_env(monkeypatch, app_env=app_env)
+        monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+        with pytest.raises(SettingsValidationError):
+            load_backend_settings()
+
+
+def test_local_and_test_keep_mock_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local and test may keep ``MOCK_MODEL_MODE=true`` and omit Valkey."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
+    monkeypatch.delenv("VALKEY_LIMITS_URL", raising=False)
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "false")
+    local = load_backend_settings()
+    assert local.app_env is Environment.LOCAL
+    assert local.mock_model_mode is True
+    assert local.allow_test_identity is False
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    test_settings = load_backend_settings()
+    assert test_settings.app_env is Environment.TEST
+    assert test_settings.allow_test_identity is True
+
+
+def test_hosted_environments_require_https_non_loopback_cors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Staging and production reject loopback and non-HTTPS CORS origins."""
+
+    configure_hosted_backend_env(monkeypatch, app_env="production")
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "http://127.0.0.1:3000")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
+
+    configure_hosted_backend_env(monkeypatch, app_env="staging")
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://localhost:3000")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
+
+    configure_hosted_backend_env(monkeypatch, app_env="production")
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example")
+    settings = load_backend_settings()
+    assert settings.parsed_cors_origins() == ("https://app.example",)
+
+
+def test_hosted_environments_require_valkey_limits_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unconfigured Valkey cannot start a hosted public listener."""
+
+    configure_hosted_backend_env(monkeypatch, app_env="production")
+    monkeypatch.delenv("VALKEY_LIMITS_URL", raising=False)
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
+
+    configure_hosted_backend_env(monkeypatch, app_env="staging")
+    settings = load_backend_settings()
+    assert settings.valkey_limits_url is not None
+
+
+def test_local_live_providers_waive_org_matrix_without_marking_it_verified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local mock-off keys are an operator waiver, not org-matrix verification."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("MOCK_MODEL_MODE", "false")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-local-unsigned-not-an-org-row")
+    monkeypatch.delenv("SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED", raising=False)
+    local = SharedSettings()
+    assert local.allows_unsigned_local_live_providers() is True
+    assert local.subprocessor_matrix_verified is False
+
+    monkeypatch.setenv("APP_ENV", "staging")
+    staging = SharedSettings()
+    assert staging.allows_unsigned_local_live_providers() is False
+    assert staging.app_env is Environment.STAGING
+
+
+def test_allow_inprocess_parser_rejected_outside_test(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ALLOW_INPROCESS_PARSER is valid only when APP_ENV=test."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("ALLOW_INPROCESS_PARSER", "true")
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
+    with pytest.raises(SettingsValidationError):
+        load_worker_settings()
+
+    monkeypatch.setenv("APP_ENV", "test")
+    settings = load_worker_settings()
+    assert settings.allow_inprocess_parser is True
+    assert settings.app_env is Environment.TEST

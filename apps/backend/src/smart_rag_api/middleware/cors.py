@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
-from smart_rag_core.settings import BackendSettings
+from smart_rag_core.settings import BackendSettings, Environment
 from starlette.responses import Response as StarletteResponse
 
 _DEFAULT_ORIGINS = (
@@ -15,10 +15,14 @@ _DEFAULT_ORIGINS = (
     "http://localhost:3010",
 )
 _ALLOW_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-_ALLOW_HEADERS = (
+_PRODUCTION_ALLOW_HEADERS = (
     "Authorization, Content-Type, Idempotency-Key, Last-Event-ID, "
-    "X-Client-Version, X-Request-ID, "
-    "X-Test-User-Id, X-Test-Role, X-Test-Authorization-Version, X-Test-Email"
+    "X-Client-Version, X-Request-ID"
+)
+_TEST_ALLOW_HEADERS = (
+    f"{_PRODUCTION_ALLOW_HEADERS}, "
+    "X-Test-User-Id, X-Test-Role, X-Test-Authorization-Version, "
+    "X-Test-Email, X-Test-AAL"
 )
 _EXPOSE_HEADERS = "X-Request-ID, Retry-After"
 
@@ -39,6 +43,25 @@ def _allowed_origins(request: Request) -> tuple[str, ...]:
     return settings.parsed_cors_origins()
 
 
+def _allow_headers(request: Request) -> str:
+    """Return credentialed Allow-Headers for the active environment.
+
+    Test identity headers are advertised only when ``APP_ENV=test``.
+
+    Args:
+        request: Active request.
+
+    Returns:
+        Comma-separated header names. Never includes ``X-Test-*`` outside
+        the test environment.
+    """
+
+    settings: BackendSettings | None = getattr(request.app.state, "settings", None)
+    if settings is not None and settings.app_env is Environment.TEST:
+        return _TEST_ALLOW_HEADERS
+    return _PRODUCTION_ALLOW_HEADERS
+
+
 async def add_cors(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
@@ -57,26 +80,27 @@ async def add_cors(
     allowed = _allowed_origins(request)
     if request.method == "OPTIONS" and origin is not None and origin in allowed:
         preflight = StarletteResponse(status_code=204)
-        _apply_cors(preflight, origin)
+        _apply_cors(preflight, origin, request)
         return preflight
     response = await call_next(request)
     if origin is not None and origin in allowed:
-        _apply_cors(response, origin)
+        _apply_cors(response, origin, request)
     return response
 
 
-def _apply_cors(response: Response, origin: str) -> None:
+def _apply_cors(response: Response, origin: str, request: Request) -> None:
     """Set credentialed CORS headers for one exact origin.
 
     Args:
         response: Outgoing response.
         origin: Allow-listed Origin value.
+        request: Active request used to choose Allow-Headers.
     """
 
     response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Methods"] = _ALLOW_METHODS
-    response.headers["Access-Control-Allow-Headers"] = _ALLOW_HEADERS
+    response.headers["Access-Control-Allow-Headers"] = _allow_headers(request)
     response.headers["Access-Control-Expose-Headers"] = _EXPOSE_HEADERS
     response.headers["Access-Control-Max-Age"] = "600"
     response.headers["Vary"] = "Origin"

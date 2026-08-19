@@ -316,9 +316,15 @@ def test_crawl_complete_enqueues_hybrid_index(
             }
         },
     )
-    with patch(
-        "smart_rag_agents.ingestion.crawl_graph.BoundedCrawlAdapter.crawl",
-        _fake_crawl,
+    with (
+        patch(
+            "smart_rag_agents.ingestion.crawl_graph.BoundedCrawlAdapter.crawl",
+            _fake_crawl,
+        ),
+        patch(
+            "smart_rag_agents.ingestion.crawl_graph.scan_crawl_snapshots_before_index",
+            return_value=None,
+        ),
     ):
         result = execute_approved_crawl(state, config)
     assert result["status"] == "crawl_completed"
@@ -337,3 +343,132 @@ def test_crawl_complete_enqueues_hybrid_index(
     payload = hybrid[0]
     assert payload["crawl_run_id"]
     assert payload["snapshots"]
+
+
+def test_crawl_dirty_scan_does_not_enqueue_hybrid_index(
+    worker_connection: psycopg.Connection,
+) -> None:
+    """Missing/dirty snapshot scan fails the crawl job without hybrid_index."""
+
+    owner_id = uuid4()
+    postgres_url = resolve_supabase_db_url()
+    worker_connection.execute("SET ROLE postgres")
+    with worker_connection.cursor() as cursor:
+        insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
+        cursor.execute(
+            """
+            INSERT INTO app.profiles (user_id, role, upload_enabled, mfa_enrolled)
+            VALUES (%s, 'owner', true, true)
+            """,
+            (owner_id,),
+        )
+        auth_version = read_authorization_version(cursor)
+    worker_connection.commit()
+    worker_connection.execute("SET ROLE app_api")
+    with worker_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT document_id, version_id, source_id, job_id
+            FROM app.enqueue_approved_website_crawl(
+              %s, 'owner', %s,
+              'https://example.test/docs',
+              'example.test',
+              'Example docs',
+              %s,
+              1, 5, 'synthetic', true, 'phase3_v1'
+            )
+            """,
+            (owner_id, auth_version, f"crawl-enqueue-dirty:{uuid4()}"),
+        )
+        row = cursor.fetchone()
+    worker_connection.commit()
+    assert row is not None
+    _document_id, version_id, source_id, _job_id = row
+    snapshot = WebSnapshotRecord(
+        snapshot_id=uuid4(),
+        canonical_url="https://example.test/docs",
+        title="Example",
+        content_type="text/html",
+        content_hash="c" * 64,
+        storage_bucket="web-snapshots",
+        storage_path=f"{source_id}/page.html",
+        wire_bytes=24,
+        decoded_bytes=24,
+        redirect_chain=("https://example.test/docs",),
+        peer_ip="203.0.113.10",
+        pinned_ips=("203.0.113.10",),
+    )
+
+    def _fake_crawl(
+        _self: object,
+        scope: object,
+        *,
+        source_id: UUID,
+        crawl_version: int,
+    ) -> CrawlRunResult:
+        """Return one in-memory snapshot without contacting the live proxy."""
+
+        _ = source_id
+        return CrawlRunResult(
+            crawl_version=crawl_version,
+            policy_version=getattr(scope, "policy_version", "crawl_v1"),
+            start_url=getattr(scope, "start_url", "https://example.test/docs"),
+            pages_fetched=1,
+            wire_bytes_total=24,
+            decoded_bytes_total=24,
+            snapshots=[snapshot],
+            fetch_events=[],
+            failure_reason=None,
+        )
+
+    state: IngestionCrawlState = {
+        "job_id": str(_job_id),
+        "lease_token": "unused",
+        "source_id": str(source_id),
+        "version_id": str(version_id),
+        "operation_key": f"crawl:{version_id}",
+        "content_class": "synthetic",
+        "graph_eligible": True,
+        "attestation_policy_version": "phase3_v1",
+        "status": "crawl_pending",
+        "pages_fetched": 0,
+        "crawl_run_id": None,
+        "detail": "",
+    }
+    config = cast(
+        RunnableConfig,
+        {
+            "configurable": {
+                "postgres_url": postgres_url,
+                "crawl_proxy_url": "http://127.0.0.1:18080",
+                "storage_url": "http://127.0.0.1:54321",
+                "storage_admin_secret": "test-storage-secret",
+            }
+        },
+    )
+    with (
+        patch(
+            "smart_rag_agents.ingestion.crawl_graph.BoundedCrawlAdapter.crawl",
+            _fake_crawl,
+        ),
+        patch(
+            "smart_rag_agents.ingestion.crawl_graph.scan_crawl_snapshots_before_index",
+            return_value="snapshot_scan_infected:Eicar-Test-Signature",
+        ),
+    ):
+        result = execute_approved_crawl(state, config)
+    assert result["status"] == "crawl_failed"
+    assert "snapshot_scan_infected" in str(result["detail"])
+    worker_connection.execute("SET ROLE postgres")
+    with worker_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT count(*)
+            FROM app.ingestion_jobs
+            WHERE version_id = %s AND job_kind = 'hybrid_index'
+            """,
+            (version_id,),
+        )
+        hybrid = cursor.fetchone()
+    assert hybrid is not None
+    assert int(hybrid[0]) == 0

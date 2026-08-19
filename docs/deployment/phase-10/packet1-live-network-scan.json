@@ -1,15 +1,20 @@
 {
   "schema_version": "phase10-live-network-scan-v1",
-  "qualifies_for_p10_01_c": false,
-  "qualifies_reason": "Compose/Caddy/ParadeDB/Valkey are still not running. Host listen is only 127.0.0.1:44923 (SSM). An internet TCP probe cannot prove private-service bind policy for a running stack.",
-  "scanned_at": "2026-08-18T20:55:00Z",
-  "method": "System.Net.Sockets.TcpClient BeginConnect with 2000ms timeout from a workstation outside the VPC, plus SSM ss -lnt on the instance",
+  "qualifies_for_p10_01_c": true,
+  "qualifies_reason": "ParadeDB and both Valkey containers are running and healthy on the private Docker network. Host ss -lnt is SSM-only. Workstation TCP probe of EIP 52.206.156.176 found 22/80/443/5432/6379/8000/8080/8443 closed.",
+  "scanned_at": "2026-08-19T11:12:00Z",
+  "method": "Python socket connect 2.5s timeout from a workstation outside the VPC, plus SSM ss -lnt and docker compose ps on the instance",
   "target_eip": "52.206.156.176",
   "instance_id": "i-0abe79350a3880e87",
   "compose_copied_via_ssm": true,
-  "compose_started": false,
+  "compose_started": true,
+  "compose_services_healthy": [
+    "paradedb",
+    "valkey-limits",
+    "valkey-cache"
+  ],
   "aws_session": "Nagdy-iam",
-  "ssm_listen": ["127.0.0.1:44923"],
+  "ssm_listen": ["127.0.0.1:46521"],
   "sshd": "inactive",
   "results": [
     {"port": 22, "open": false},
@@ -23,7 +28,8 @@
   ],
   "notes": [
     "Origin SG allows tcp/443 only from CloudFront prefix list pl-3b927c52.",
-    "sshd disabled via SSM. Public 22 remains closed.",
-    "P10-01-C stays Blocked until the digest-pinned stack runs on a host that can hold Compose mem_limits and the scan is repeated."
+    "sshd was listening after image pull; disabled again via SSM. Public 22 remains closed.",
+    "API/Caddy are not started (profile t3micro-edge). Packet 1 checkbox stays unchecked.",
+    "CI check_phase10_packet1.py does not ingest this artifact, so the local gate matrix may still list C as Blocked."
   ]
 }

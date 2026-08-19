@@ -2,7 +2,7 @@
 title: Approved crawl policy
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-19
 audience: engineering, security, ops
 ---
 
@@ -10,7 +10,7 @@ audience: engineering, security, ops
 
 Phase 3 Packet 4 constrains website ingestion to **owner/admin-approved** origins fetched **only** through the restricted `crawl-proxy` service. API, worker, and future parser sandboxes must not open direct public HTTP(S) sockets.
 
-Related: [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [CRAWL_EGRESS_AND_PROXY.md](../runbooks/CRAWL_EGRESS_AND_PROXY.md)
+Related: [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [SCAN_BEFORE_INDEX.md](./SCAN_BEFORE_INDEX.md) · [CRAWL_EGRESS_AND_PROXY.md](../runbooks/CRAWL_EGRESS_AND_PROXY.md)
 
 ## Flow
 
@@ -33,6 +33,8 @@ sequenceDiagram
   Proxy-->>Core: peer_ip, bounded body, headers
   Core->>DB: web_crawl_runs, web_snapshots, crawl_fetch_events
   Core->>DB: Storage web-snapshots immutable objects
+  Worker->>Worker: ClamAV INSTREAM each snapshot
+  Worker->>DB: document_scan_events then hybrid_index
 ```
 
 ## Policy gates (fail closed)

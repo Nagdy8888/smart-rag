@@ -2,7 +2,7 @@
 title: Administration surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: engineering, frontend, security
 packet: P08-04
 ---
@@ -88,8 +88,8 @@ GET /me and audit when available". Identify offboard subjects from `GET
 ## Honest contracts
 
 - Invitation create body is `{ email, role, upload_enabled }`. Roles are
-  `owner` \| `admin` \| `member` \| `viewer`. `raw_token` is rendered as
-  text once.
+  `owner` \| `admin` \| `member` \| `viewer`. The one-time token is
+  mail-only; JSON never includes `raw_token`.
 - Offboard is irreversible. 403 `MFA required` shows the MFA banner.
 - Tool cards show `tool_key`, `version_label`, `short_name`, `purpose`,
   `required_role`, `risk_class`, and `active`. Unauthorized names are

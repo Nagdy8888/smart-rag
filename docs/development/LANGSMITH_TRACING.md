@@ -15,6 +15,7 @@ mode. This is gateway-level tracing, not the Phase 6 production query-graph
 feedback loop.
 
 Related: [CONFIGURATION.md](./CONFIGURATION.md) ·
+[LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md) ·
 [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) ·
 [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) ·
 [docs index](../README.md)
@@ -72,13 +73,18 @@ sequenceDiagram
    file. Startup fails if tracing is true without a key.
 2. Optional: `LANGSMITH_PROJECT` (default `smart-rag`) and
    `LANGSMITH_ENDPOINT` for a non-default API URL.
-3. Keep `MOCK_MODEL_MODE=true` for zero OpenAI cost. Mock gateway calls still
-   emit redacted spans when tracing is on, which is useful to confirm wiring
-   without sending company text to OpenAI.
-4. Real company content remains prohibited on LangSmith until org
-   retention/DPA/hide settings in
-   [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) are
-   `verified`. Use synthetic fixtures until then.
+3. Local default is still `MOCK_MODEL_MODE=true` (zero OpenAI cost). The
+   operator may set `MOCK_MODEL_MODE=false` in gitignored `.env` and
+   `.env.compose` to use a live OpenAI key **without org-matrix verification**.
+   That is a local unsigned waiver (`APP_ENV=local` only). Compose interpolates
+   `${MOCK_MODEL_MODE:-true}` and passes `OPENAI_API_KEY` into api/worker.
+4. Org rows in
+   [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) and
+   [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) stay
+   `unverified` until a console/DPA review. Do not set
+   `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true` to fake that review.
+   Staging/production still require it. Do not ingest real company files into
+   a hosted environment on this waiver.
 
 ## Failure modes
 

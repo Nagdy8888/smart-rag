@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: engineering, ops
 ---
 
@@ -10,7 +10,7 @@ audience: engineering, ops
 
 Single source of truth for Phase 3 durable job, worker, admission, and graph-handoff bounds. Values fixed by [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) or the global contract require ADR approval to change. Unspecified defaults are conservative placeholders with explicit review triggers.
 
-Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [MAPPING.md](../graph/MAPPING.md) · [06-database-workload-isolation.md](../architecture/06-database-workload-isolation.md)
+Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [SCAN_BEFORE_INDEX.md](./SCAN_BEFORE_INDEX.md) · [PARSER_SANDBOX.md](./PARSER_SANDBOX.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [MAPPING.md](../graph/MAPPING.md) · [06-database-workload-isolation.md](../architecture/06-database-workload-isolation.md)
 
 ## Limit registry
 
@@ -47,7 +47,7 @@ Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [Phase 3 evidence](..
 | Scan max recursion | levels | 16 | 32 | ClamAV default guidance | worker | `over_limit` | Archive bomb fixtures fail open |
 | Scan max files | count | 10000 | 10000 | ClamAV default guidance | worker | `over_limit` | Nested archive fixtures |
 | Scan max embedded PE | count | 40 | 40 | ClamAV default guidance | worker | `over_limit` | — |
-| Archive max expansion ratio | ratio | 250 | 250 | Plan Packet 3/8; parser ZIP inspect + ClamAV | parser/scan | `over_limit` / failed parse, zero elements | Zip bomb fixtures |
+| Archive max expansion ratio | ratio | 250 | 250 | Plan Packet 3/8; parser ZIP inspect + stream cap + ClamAV | parser/scan | `over_limit` / failed parse, zero elements | Zip bomb fixtures |
 | Scan concurrent streams | count | 2 | 4 | Worker concurrency /2 | worker | queue/backpressure | CPU saturation |
 | Signature reload memory | MiB | 512 | 1024 | ClamAV docs + local measure | ops | fail closed until reload completes | OOM during freshclam |
 | Quarantine TTL | hours | 24 | 168 | QT-RET-002 | cleanup | Storage API delete + quota release | Owner via company_settings |

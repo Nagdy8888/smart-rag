@@ -148,7 +148,7 @@ describe("prohibited production patterns", () => {
     expect(hits).toEqual([]);
   });
 
-  it("keeps production CSP without CDN hosts and without always-on unsafe-eval", () => {
+  it("keeps production CSP without CDN hosts, wildcard Auth, or always-on unsafe-eval", () => {
     const config = readFileSync(path.join(frontendRoot, "next.config.ts"), "utf8");
     expect(config).toContain("X-Content-Type-Options");
     expect(config).toContain("nosniff");
@@ -163,9 +163,12 @@ describe("prohibited production patterns", () => {
     expect(config).toContain("X-DNS-Prefetch-Control");
     expect(config).not.toMatch(/cdn\.tailwindcss\.com/);
     expect(config).not.toMatch(/fonts\.googleapis\.com/);
-    expect(config).toContain("NODE_ENV === \"development\"");
+    expect(config).toContain("nodeEnv === \"development\"");
     expect(config).toContain("'unsafe-eval'");
-    expect(config).toContain(": \"'self' 'unsafe-inline'\"");
+    expect(config).toContain("buildConnectSrcDirective");
+    expect(config).toContain("NEXT_PUBLIC_API_BASE_URL");
+    expect(config).toContain("NEXT_PUBLIC_SUPABASE_URL");
+    expect(config).not.toMatch(/connect-src 'self' http:\/\/127\.0\.0\.1:8000 http:\/\/localhost:8000/);
   });
 
   it("does not send X-Test headers from api.ts", () => {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -12,16 +13,20 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from smart_rag_api.auth_admin.invitations import CreatedInvitation
 from smart_rag_api.dependencies.services import get_postgres_url
 from smart_rag_api.main import create_app
+from smart_rag_api.routers.auth_team import get_auth_team_service
 from smart_rag_api.routers.conversations import (
     get_conversation_service,
     get_query_run_service,
 )
+from smart_rag_api.routers.documents import get_document_service
 from smart_rag_api.routers.query_runs import (
     get_query_run_service as get_run_fetch_service,
 )
 from smart_rag_api.routers.usage import get_usage_service
+from smart_rag_api.services.documents_http import DocumentRecord
 from smart_rag_core.conversations import ConversationRecord
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
@@ -66,6 +71,7 @@ _PACKET5_ROUTERS = (
     "auth_team.py",
     "conversations.py",
     "documents.py",
+    "ingestion_status.py",
     "ops.py",
     "query_runs.py",
     "tables.py",
@@ -161,17 +167,25 @@ class _FakeConversationService:
             created_at=datetime.now(tz=UTC),
         )
 
-    def list(self, caller: CallerContext) -> tuple[ConversationRecord, ...]:
+    def list(
+        self,
+        caller: CallerContext,
+        *,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> tuple[ConversationRecord, ...]:
         """Return no conversations.
 
         Args:
             caller: Authenticated caller.
+            limit: Unused page size.
+            cursor: Unused keyset cursor.
 
         Returns:
             Empty tuple.
         """
 
-        del caller
+        del caller, limit, cursor
         return ()
 
     def get(
@@ -307,6 +321,7 @@ def test_openapi_registers_packet5_paths() -> None:
         "/runs/{run_id}/events",
         "/tools",
         "/health/ready",
+        "/ops/ready",
     ):
         assert path in paths, path
 
@@ -323,6 +338,11 @@ def test_api_meta_and_ready_never_claim_query_ready() -> None:
     assert "min_client_version" in meta
     assert ready["query_ready"] is False
     assert ready["status"] in {"unconfigured", "not_ready", "degraded"}
+    assert "dependencies" not in ready
+    serialized = str(ready).casefold()
+    assert "paradedb" not in serialized
+    assert "valkey" not in serialized
+    assert "lightrag" not in serialized
 
 
 def test_current_user_and_conversation_delete(
@@ -331,6 +351,7 @@ def test_current_user_and_conversation_delete(
     """``GET /me`` returns server role; conversation delete is 204."""
 
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
     monkeypatch.setattr(
         "smart_rag_api.routers.conversations.enforce_rate_limit",
         _noop_rate_limit,
@@ -361,6 +382,7 @@ def test_html_in_conversation_title_is_escaped_json(
     """Untrusted HTML is escaped in JSON and never returned as text/html."""
 
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
     monkeypatch.setattr(
         "smart_rag_api.routers.conversations.enforce_rate_limit",
         _noop_rate_limit,
@@ -392,6 +414,7 @@ def test_schema_extra_fields_fail_closed(monkeypatch: pytest.MonkeyPatch) -> Non
     """Injection of extra JSON fields is rejected."""
 
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
     monkeypatch.setattr(
         "smart_rag_api.routers.conversations.enforce_rate_limit",
         _noop_rate_limit,
@@ -438,6 +461,9 @@ def test_cors_reflects_exact_origin_not_wildcard() -> None:
         )
     assert allowed.headers.get("access-control-allow-origin") == "http://127.0.0.1:3000"
     assert allowed.headers.get("access-control-allow-credentials") == "true"
+    allow_headers = allowed.headers.get("access-control-allow-headers", "")
+    assert "X-Test-" not in allow_headers
+    assert "Authorization" in allow_headers
     assert denied.headers.get("access-control-allow-origin") is None
     assert allowed.headers.get("x-content-type-options") == "nosniff"
 
@@ -458,6 +484,7 @@ def test_viewer_tool_catalog_omits_admin_keys(
     """Live role recheck omits unauthorized tool names."""
 
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
     monkeypatch.setattr(
         "smart_rag_api.routers.tools.enforce_rate_limit",
         _noop_rate_limit,
@@ -487,6 +514,7 @@ def test_member_company_usage_is_forbidden(
     """Members cannot read company usage."""
 
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
     monkeypatch.setattr(
         "smart_rag_api.routers.usage.enforce_rate_limit",
         _noop_rate_limit,
@@ -521,6 +549,7 @@ def test_foreign_run_fetch_is_not_found(
     """IDOR run fetch returns 404, not 403."""
 
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
     monkeypatch.setattr(
         "smart_rag_api.routers.query_runs.enforce_rate_limit",
         _noop_rate_limit,
@@ -548,6 +577,7 @@ def test_submit_message_returns_composite_stream_path(
     """Auto chat admits Composite and returns stream_path without SSE bodies."""
 
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
     monkeypatch.setattr(
         "smart_rag_api.routers.conversations.enforce_rate_limit",
         _noop_rate_limit,
@@ -583,6 +613,37 @@ def test_submit_message_returns_composite_stream_path(
     assert payload["stream_path"] == stream_path
     assert payload["route_family"] == "composite"
     assert "/events" in str(payload["stream_path"])
+
+
+def test_operator_ready_returns_named_dependencies_for_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Owner ``GET /ops/ready`` includes named probes; members are forbidden."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    with TestClient(create_app()) as raw:
+        client = as_openapi_client(raw)
+        owner = client.get("/ops/ready", headers=_identity(_OWNER, "owner"))
+        member = client.get("/ops/ready", headers=_identity(_MEMBER, "member"))
+    assert owner.status_code == 200
+    payload = json_object(owner.json())
+    assert payload["query_ready"] is False
+    dependencies = payload["dependencies"]
+    names = {str(item["name"]) for item in json_object_list(dependencies)}
+    assert "paradedb" in names
+    assert "valkey_limits" in names
+    assert "lightrag" in names
+    assert member.status_code == 403
+
+
+def test_lifespan_binds_offload_executor() -> None:
+    """Serving processes keep a bounded thread pool on app state."""
+
+    with TestClient(create_app()) as raw:
+        executor = raw.app.state.offload_executor
+        assert isinstance(executor, ThreadPoolExecutor)
+        assert executor._max_workers == 8
 
 
 def test_untrusted_text_helper_escapes_angle_brackets() -> None:
@@ -729,3 +790,211 @@ def test_cpu_slice_budget_and_offload_cancel() -> None:
             executor.close()
 
     asyncio.run(_run())
+
+
+class _FakeDocumentService:
+    """In-memory document service for HTTP isolation tests."""
+
+    def list(
+        self,
+        caller: CallerContext,
+        *,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> tuple[DocumentRecord, ...]:
+        """Return no documents.
+
+        Args:
+            caller: Authenticated caller.
+            limit: Unused page size.
+            cursor: Unused keyset cursor.
+
+        Returns:
+            Empty tuple.
+        """
+
+        del caller, limit, cursor
+        return ()
+
+    def get(self, caller: CallerContext, *, document_id: UUID) -> DocumentRecord:
+        """Return one visible document.
+
+        Args:
+            caller: Authenticated caller.
+            document_id: Document id.
+
+        Returns:
+            Record.
+        """
+
+        del caller
+        return DocumentRecord(
+            document_id=document_id,
+            title="visible",
+            visibility="company_visible",
+            current_version_id=None,
+            visibility_generation=1,
+            created_at=datetime.now(tz=UTC),
+        )
+
+    def delete(self, caller: CallerContext, *, document_id: UUID) -> None:
+        """Reject members; accept owner/admin.
+
+        Args:
+            caller: Authenticated caller.
+            document_id: Document id.
+
+        Raises:
+            QueryAdmissionError: ``forbidden`` for members/viewers.
+        """
+
+        del document_id
+        if caller.role not in {UserRole.OWNER, UserRole.ADMIN}:
+            raise QueryAdmissionError("forbidden")
+
+
+class _FakeAuthTeamService:
+    """Invitation create stand-in that never opens Postgres or mail."""
+
+    def create_invitation(
+        self,
+        caller: CallerContext,
+        *,
+        email: str,
+        role: str,
+        upload_enabled: bool,
+    ) -> CreatedInvitation:
+        """Return a canned invitation including a mail-only token.
+
+        Args:
+            caller: Authenticated caller.
+            email: Invitee email.
+            role: Assigned role.
+            upload_enabled: Upload flag.
+
+        Returns:
+            Created invitation.
+        """
+
+        del caller
+        return CreatedInvitation(
+            invitation_id=uuid4(),
+            email=email,
+            role=role,
+            upload_enabled=upload_enabled,
+            expires_at=datetime.now(tz=UTC),
+            raw_token="mail-only-secret",  # noqa: S106 - fixture token, never a live secret
+        )
+
+
+def test_submit_message_rejects_missing_idempotency_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Paid POST without body or header idempotency key is 400."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    monkeypatch.setattr(
+        "smart_rag_api.routers.conversations.enforce_rate_limit",
+        _noop_rate_limit,
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_query_run_service] = lambda: (
+        _FakeQueryRunService(
+            _composite_context(
+                run_id=uuid4(),
+                conversation_id=uuid4(),
+                reservation_id=uuid4(),
+            ),
+            "/runs/x/events",
+        )
+    )
+    with TestClient(application) as raw:
+        client = as_openapi_client(raw)
+        response = client.post(
+            f"/conversations/{uuid4()}/messages",
+            json={"message": "What is the policy?"},
+            headers={
+                **_identity(_OWNER, "owner"),
+                "X-Client-Version": "0.1.0",
+            },
+        )
+    assert response.status_code == 400
+    assert json_object(response.json())["detail"] == "idempotency_key_required"
+
+
+def test_create_invitation_json_omits_raw_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Invitation create JSON has identifiers only; token is a test header."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    monkeypatch.setattr(
+        "smart_rag_api.routers.auth_team.enforce_rate_limit",
+        _noop_rate_limit,
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_auth_team_service] = lambda: (
+        _FakeAuthTeamService()
+    )
+    with TestClient(application) as raw:
+        client = as_openapi_client(raw)
+        response = client.post(
+            "/admin/invitations",
+            json={
+                "email": "invitee@example.com",
+                "role": "member",
+                "upload_enabled": False,
+            },
+            headers=_identity(_OWNER, "owner"),
+        )
+    assert response.status_code == 201
+    payload = json_object(response.json())
+    assert "raw_token" not in payload
+    assert payload["email"] == "invitee@example.com"
+    assert response.headers.get("x-test-invitation-token") == "mail-only-secret"
+
+
+def test_document_delete_is_owner_admin_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Owner DELETE is 204; members receive 403 for a visible document."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    monkeypatch.setattr(
+        "smart_rag_api.routers.documents.enforce_rate_limit",
+        _noop_rate_limit,
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_document_service] = lambda: (
+        _FakeDocumentService()
+    )
+    document_id = uuid4()
+    with TestClient(application) as raw:
+        client = as_openapi_client(raw)
+        owner = client.delete(
+            f"/documents/{document_id}",
+            headers=_identity(_OWNER, "owner"),
+        )
+        member = client.delete(
+            f"/documents/{document_id}",
+            headers=_identity(_MEMBER, "member"),
+        )
+        schema = json_object(client.get("/openapi.json").json())
+    assert owner.status_code == 204
+    assert member.status_code == 403
+    paths = json_object(schema.get("paths", {}))
+    document_path = json_object(paths["/documents/{document_id}"])
+    assert "delete" in document_path
+    invite_schema = json_object(
+        json_object(json_object(schema.get("components", {})).get("schemas", {})).get(
+            "CreateInvitationResponse", {}
+        )
+    )
+    invite_props = json_object(invite_schema.get("properties", {}))
+    assert "raw_token" not in invite_props

@@ -8,6 +8,7 @@ from tests.unit.typed_openapi import (
     as_openapi_client,
     json_object,
     openapi_test_client,
+    permit_test_identity,
 )
 
 
@@ -26,7 +27,7 @@ def test_glossary_routes_are_registered() -> None:
 def test_member_cannot_import_glossary(monkeypatch: pytest.MonkeyPatch) -> None:
     """Members cannot seed the private glossary."""
 
-    monkeypatch.setenv("APP_ENV", "test")
+    permit_test_identity(monkeypatch)
     with openapi_test_client() as raw_client:
         client = as_openapi_client(raw_client)
         response = client.post(
@@ -57,7 +58,7 @@ def test_member_cannot_import_glossary(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_viewer_cannot_approve_glossary(monkeypatch: pytest.MonkeyPatch) -> None:
     """Viewers cannot approve glossary imports."""
 
-    monkeypatch.setenv("APP_ENV", "test")
+    permit_test_identity(monkeypatch)
     with openapi_test_client() as raw_client:
         client = as_openapi_client(raw_client)
         response = client.post(

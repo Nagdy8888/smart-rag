@@ -11,19 +11,25 @@ from smart_rag_core.query_admission.ceilings import (
     DEFAULT_MONTHLY_LLM_BUDGET_USD,
     MAX_CONCURRENT_QUERY_RUNS,
     RECURSION_LIMIT,
+    QueryRetrieveBudget,
     assert_call_available,
     assert_correction_available,
     assert_deadline_open,
     assert_discovery_available,
     assert_manifest_available,
     assert_recursion_available,
+    assert_retrieve_kind_available,
     assert_side_effect_available,
     assert_subquestion_available,
     assert_tool_available,
+    debit_retrieve_budget,
     envelope_for_family,
     usage_kind_caps,
 )
-from smart_rag_core.query_admission.exceptions import QueryCeilingError
+from smart_rag_core.query_admission.exceptions import (
+    QueryBudgetError,
+    QueryCeilingError,
+)
 from smart_rag_core.query_admission.payload import hash_query_admission_payload
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 
@@ -150,3 +156,42 @@ def test_query_admission_bucket_includes_user_id() -> None:
 
     user_id = "11111111-1111-1111-1111-111111111111"
     assert query_admission_bucket_key(user_id) == f"query-admission:{user_id}"
+
+
+def test_retrieve_kind_caps_fail_closed_when_remaining_cannot_cover() -> None:
+    """Embed/rerank/lightrag must not run when remaining USD or calls are gone."""
+
+    usd, prompt, completion = assert_retrieve_kind_available(
+        remaining_model_calls=2,
+        remaining_usd=Decimal("0.20"),
+        usage_kind="rerank",
+    )
+    assert usd == Decimal("0.20")
+    assert prompt == 12000
+    assert completion == 2000
+    with pytest.raises(QueryBudgetError, match="reservation_exhausted"):
+        assert_retrieve_kind_available(
+            remaining_model_calls=7,
+            remaining_usd=Decimal("0.10"),
+            usage_kind="rerank",
+        )
+    with pytest.raises(QueryCeilingError, match="model_call_exhausted"):
+        assert_retrieve_kind_available(
+            remaining_model_calls=0,
+            remaining_usd=Decimal("2.80"),
+            usage_kind="embedding",
+        )
+
+
+def test_debit_retrieve_budget_decrements_remaining() -> None:
+    """In-memory retrieve debit records usage kinds and remaining."""
+
+    budget = QueryRetrieveBudget(
+        remaining_model_calls=7,
+        remaining_usd=Decimal("2.80"),
+    )
+    debit_retrieve_budget(budget, "embedding")
+    debit_retrieve_budget(budget, "rerank")
+    assert budget.usage_kinds == ["embedding", "rerank"]
+    assert budget.remaining_model_calls == 5
+    assert budget.remaining_usd == Decimal("2.58")

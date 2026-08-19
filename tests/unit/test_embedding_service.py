@@ -26,7 +26,9 @@ from smart_rag_core.ingestion.embeddings.mock_vectors import mock_embedding_vect
 from smart_rag_core.ingestion.embeddings.policy import EMBEDDING_DIMENSIONS
 from smart_rag_core.ingestion.embeddings.service import (
     EmbeddingBatchInput,
+    EmbeddingGateError,
     EmbeddingService,
+    _chunk_set_hash,
 )
 from smart_rag_core.security.external_processing import (
     CategoryDisposition,
@@ -337,6 +339,328 @@ def test_openai_adapter_fail_closed_without_key() -> None:
 
     with pytest.raises(ModelGatewayUnavailableError, match="OPENAI_API_KEY"):
         OpenAIEmbeddingAdapter(api_key="   ")
+
+
+def _governance() -> ExternalProcessingDecisionInput:
+    """Return synthetic embedding governance that passes the deny-by-default gates.
+
+    Returns:
+        Decision input used by ledger skip / loop unit tests.
+    """
+
+    return ExternalProcessingDecisionInput(
+        attestation_present=True,
+        category=CategoryDisposition.ALLOWED,
+        review_approved=True,
+        scan_evidence_current=True,
+        provider_settings_verified=True,
+        policy_version_matches=True,
+        content_class=ContentClass.SYNTHETIC,
+    )
+
+
+def test_embedding_service_skips_provider_when_ledger_completed() -> None:
+    """A completed ledger row with vectors must not call the embedding provider."""
+
+    chunk = _chunk("annual leave policy")
+    chunk_set_hash = _chunk_set_hash((chunk,))
+    vector = list(mock_embedding_vector("annual leave policy"))
+    ledger_id = uuid4()
+    called = {"embed": 0}
+
+    class _Adapter:
+        """Provider that must not run when the ledger already completed."""
+
+        async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+            """Count unexpected provider calls.
+
+            Args:
+                request: Unused embedding request.
+
+            Returns:
+                Never returns; the test asserts this is not called.
+
+            Raises:
+                AssertionError: Provider was reached.
+            """
+
+            called["embed"] += 1
+            raise AssertionError(f"provider must not run: {request.operation_key}")
+
+    class _Cursor:
+        """Cursor that returns a completed ledger payload."""
+
+        def __init__(self) -> None:
+            """Start with an empty statement log."""
+
+            self.statements: list[str] = []
+
+        def __enter__(self) -> _Cursor:
+            """Return this cursor.
+
+            Returns:
+                The same cursor instance.
+            """
+
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            """Leave the context without suppressing exceptions."""
+
+            return None
+
+        def execute(self, sql: str, _params: object = None) -> None:
+            """Append one SQL string.
+
+            Args:
+                sql: Statement text.
+                _params: Unused bind parameters.
+            """
+
+            self.statements.append(sql)
+
+        def fetchone(self) -> tuple[object, ...]:
+            """Return completed ledger rows for skip-path queries.
+
+            Returns:
+                Ledger id/status/result_ref, or attempt count.
+            """
+
+            latest = self.statements[-1]
+            if "FROM app.embedding_operation_ledger" in latest and "status" in latest:
+                return (
+                    ledger_id,
+                    "completed",
+                    {"chunk_set_hash": chunk_set_hash, "vectors": [vector]},
+                )
+            if "attempt_count" in latest:
+                return (3,)
+            return (None,)
+
+    class _Connection:
+        """Connection double that reuses one in-memory cursor."""
+
+        def __init__(self) -> None:
+            """Create the shared cursor."""
+
+            self.cursor_obj = _Cursor()
+
+        def cursor(self) -> _Cursor:
+            """Return the shared cursor.
+
+            Returns:
+                The in-memory cursor.
+            """
+
+            return self.cursor_obj
+
+    gateway = EmbeddingGateway(_Adapter())
+    connection = _Connection()
+    service = EmbeddingService(connection, gateway=gateway)  # type: ignore[arg-type]
+    result = service.embed_version(
+        EmbeddingBatchInput(
+            version_id=uuid4(),
+            document_title="Policy",
+            chunks=(chunk,),
+            chunking_config_hash="cfg",
+            operation_key="embed:replay",
+            governance=_governance(),
+        )
+    )
+    assert called["embed"] == 0
+    assert result.ledger_id == ledger_id
+    assert result.provider_request_id == "ledger_replay"
+    assert result.embedded[0].embedding == vector
+
+
+def test_embedding_service_fails_closed_when_completed_vectors_missing() -> None:
+    """Completed ledger rows without vectors must not call the provider."""
+
+    chunk = _chunk("annual leave policy")
+    chunk_set_hash = _chunk_set_hash((chunk,))
+
+    class _Cursor:
+        """Cursor that returns a completed row with no vectors."""
+
+        def __init__(self) -> None:
+            """Start with an empty statement log."""
+
+            self.statements: list[str] = []
+
+        def __enter__(self) -> _Cursor:
+            """Return this cursor.
+
+            Returns:
+                The same cursor instance.
+            """
+
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            """Leave the context without suppressing exceptions."""
+
+            return None
+
+        def execute(self, sql: str, _params: object = None) -> None:
+            """Append one SQL string.
+
+            Args:
+                sql: Statement text.
+                _params: Unused bind parameters.
+            """
+
+            self.statements.append(sql)
+
+        def fetchone(self) -> tuple[object, ...]:
+            """Return a completed ledger row missing vectors.
+
+            Returns:
+                Ledger id, status, and result_ref without vectors.
+            """
+
+            return (
+                uuid4(),
+                "completed",
+                {"chunk_set_hash": chunk_set_hash},
+            )
+
+    class _Connection:
+        """Connection double that reuses one in-memory cursor."""
+
+        def __init__(self) -> None:
+            """Create the shared cursor."""
+
+            self.cursor_obj = _Cursor()
+
+        def cursor(self) -> _Cursor:
+            """Return the shared cursor.
+
+            Returns:
+                The in-memory cursor.
+            """
+
+            return self.cursor_obj
+
+    class _Adapter:
+        """Provider that must not run on a corrupt completed ledger."""
+
+        async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+            """Fail if the provider is reached.
+
+            Args:
+                request: Unused embedding request.
+
+            Returns:
+                Never returns.
+
+            Raises:
+                AssertionError: Provider was reached.
+            """
+
+            raise AssertionError(f"provider must not run: {request.operation_key}")
+
+    service = EmbeddingService(_Connection(), gateway=EmbeddingGateway(_Adapter()))  # type: ignore[arg-type]
+    with pytest.raises(EmbeddingGateError, match="embedding_ledger_vectors_missing"):
+        service.embed_version(
+            EmbeddingBatchInput(
+                version_id=uuid4(),
+                document_title="Policy",
+                chunks=(chunk,),
+                chunking_config_hash="cfg",
+                operation_key="embed:missing-vectors",
+                governance=_governance(),
+            )
+        )
+
+
+def test_embedding_service_nested_running_loop_does_not_crash() -> None:
+    """Embed from a running event loop uses a dedicated thread instead of asyncio.run."""
+
+    class _Cursor:
+        """Cursor that returns pending ledger rows then insert ids."""
+
+        def __init__(self) -> None:
+            """Start with an empty statement log."""
+
+            self.statements: list[str] = []
+
+        def __enter__(self) -> _Cursor:
+            """Return this cursor.
+
+            Returns:
+                The same cursor instance.
+            """
+
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            """Leave the context without suppressing exceptions."""
+
+            return None
+
+        def execute(self, sql: str, _params: object = None) -> None:
+            """Append one SQL string.
+
+            Args:
+                sql: Statement text.
+                _params: Unused bind parameters.
+            """
+
+            self.statements.append(sql)
+
+        def fetchone(self) -> tuple[object, ...]:
+            """Return pending ledger, insert id, or attempt count.
+
+            Returns:
+                Stub row matching the last statement.
+            """
+
+            latest = self.statements[-1]
+            if "record_embedding_ledger" in latest:
+                return (uuid4(),)
+            if "attempt_count" in latest:
+                return (1,)
+            if "FROM app.embedding_operation_ledger" in latest:
+                return (uuid4(), "pending", {})
+            return (None,)
+
+    class _Connection:
+        """Connection double that reuses one in-memory cursor."""
+
+        def __init__(self) -> None:
+            """Create the shared cursor."""
+
+            self.cursor_obj = _Cursor()
+
+        def cursor(self) -> _Cursor:
+            """Return the shared cursor.
+
+            Returns:
+                The in-memory cursor.
+            """
+
+            return self.cursor_obj
+
+    gateway = EmbeddingGateway(MockEmbeddingAdapter(fixture_id="test"))
+    connection = _Connection()
+    service = EmbeddingService(connection, gateway=gateway)  # type: ignore[arg-type]
+    service._admission.assert_can_enqueue_ingestion = lambda **_kwargs: None  # type: ignore[method-assign]
+    batch = EmbeddingBatchInput(
+        version_id=uuid4(),
+        document_title="Policy",
+        chunks=(_chunk("annual leave policy"),),
+        chunking_config_hash="cfg",
+        operation_key="embed:nested-loop",
+        governance=_governance(),
+    )
+
+    async def _inner() -> None:
+        """Invoke the sync embed wrapper while this loop is running."""
+
+        result = service.embed_version(batch)
+        assert len(result.embedded) == 1
+
+    asyncio.run(_inner())
 
 
 def test_openai_adapter_maps_data_by_index() -> None:

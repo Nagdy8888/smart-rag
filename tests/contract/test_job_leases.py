@@ -366,3 +366,68 @@ def test_graph_handoff_pause_blocks_index_claims(
     worker_connection.commit()
     assert claimed_remove is not None
     assert claimed_remove["operation"] == LightragJobOperation.REMOVE.value
+
+
+def test_dead_letter_rejects_stolen_lease(
+    worker_connection: psycopg.Connection,
+) -> None:
+    """Dead-letter UPDATE requires the current lease token and processing status."""
+
+    repo = _repository(worker_connection, "dl-stolen-owner")
+    repo.enqueue(
+        idempotency_key=f"dl-stolen:{uuid.uuid4()}",
+        job_kind="probe",
+        estimated_size_bytes=1,
+        estimated_cost_usd=Decimal("0.01"),
+        payload_ref={"operation_key": "probe"},
+    )
+    worker_connection.commit()
+    claimed = repo.claim()
+    assert claimed is not None and claimed.lease_token is not None
+    worker_connection.commit()
+    original_token = claimed.lease_token
+    worker_connection.execute("SET ROLE postgres")
+    with worker_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE app.ingestion_jobs
+            SET lease_token = %s, lease_owner = %s
+            WHERE id = %s
+            """,
+            ("stolen-lease-token", "other-owner", claimed.id),
+        )
+    worker_connection.execute("SET ROLE app_worker")
+    worker_connection.commit()
+    with pytest.raises(JobLeaseError, match="dead_letter_lease_rejected"):
+        repo._move_to_dead_letter(
+            claimed,
+            lease_token=original_token,
+            error_category=JobErrorCategory.PERMANENT,
+            last_error="stale-lease",
+        )
+    worker_connection.rollback()
+    worker_connection.execute("SET ROLE postgres")
+    with worker_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT status::text
+            FROM app.ingestion_jobs
+            WHERE id = %s
+            """,
+            (claimed.id,),
+        )
+        status_row = cursor.fetchone()
+        cursor.execute(
+            """
+            SELECT count(*)
+            FROM app.dead_letter_jobs
+            WHERE source_job_id = %s
+            """,
+            (claimed.id,),
+        )
+        dead_row = cursor.fetchone()
+    worker_connection.execute("SET ROLE app_worker")
+    assert status_row is not None
+    assert status_row[0] == "processing"
+    assert dead_row is not None
+    assert int(dead_row[0]) == 0

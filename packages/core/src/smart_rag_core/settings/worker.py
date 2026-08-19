@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Self
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 
 from smart_rag_core.jobs.limits import (
     DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
@@ -12,7 +12,7 @@ from smart_rag_core.jobs.limits import (
     DEFAULT_POLL_INTERVAL_SECONDS,
     DEFAULT_WORKER_CONCURRENCY,
 )
-from smart_rag_core.settings.base import SharedSettings, load_settings
+from smart_rag_core.settings.base import Environment, SharedSettings, load_settings
 
 
 class WorkerSettings(SharedSettings):
@@ -33,6 +33,9 @@ class WorkerSettings(SharedSettings):
         lightrag_db_url: Optional session/direct Postgres URL for the runtime
             LightRAG adapter as ``app_lightrag``. Secret. When unset, the
             graph adapter stays unconfigured. Never a schema-admin DSN.
+        allow_inprocess_parser: Test-only flag from ``ALLOW_INPROCESS_PARSER``.
+            Valid solely when ``APP_ENV=test``. Production workers must keep
+            the default ``false`` and require Docker/gVisor.
     """
 
     service_name: ClassVar[Literal["worker"]] = "worker"
@@ -127,6 +130,31 @@ class WorkerSettings(SharedSettings):
         ),
         json_schema_extra={"security": "secret"},
     )
+    allow_inprocess_parser: bool = Field(
+        default=False,
+        validation_alias="ALLOW_INPROCESS_PARSER",
+        description=(
+            "Permit in-process parsing only when APP_ENV=test. Default false; "
+            "worker jobs require Docker/gVisor."
+        ),
+        json_schema_extra={"security": "public"},
+    )
+
+    @model_validator(mode="after")
+    def reject_inprocess_parser_outside_test(self) -> Self:
+        """Refuse the in-process parser flag outside the test environment.
+
+        Returns:
+            The validated worker settings instance.
+
+        Raises:
+            ValueError: When ``ALLOW_INPROCESS_PARSER`` is true and
+                ``APP_ENV`` is not ``test``.
+        """
+
+        if self.allow_inprocess_parser and self.app_env is not Environment.TEST:
+            raise ValueError("ALLOW_INPROCESS_PARSER is only valid when APP_ENV=test")
+        return self
 
     def resolved_checkpoint_dsn(self) -> str | None:
         """Return the checkpointer DSN, falling back to the worker database URL.

@@ -2,7 +2,7 @@
 title: Accessibility and security implementation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: frontend, security, reviewers
 packet: P08-05
 ---
@@ -24,11 +24,12 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 
 ## Logical citation offsets
 
-`GET /runs/{id}/citations` has no offset fields (GAP-07-09). The UI does
-not invent them. `highlightLogicalRange` slices with `Array.from` /
-codepoint indexes. The reviewed fixture is canonical text
-`الشركة ACME وقعت العقد.` with offsets **7–11** selecting `ACME`. Render
-path is React text nodes; `<mark>` children are text only.
+`GET /runs/{id}/citations` has no offset fields (GAP-07-09). The production
+citation drawer shows ids and provenance only. `highlightLogicalRange`
+slices with `Array.from` / codepoint indexes. The reviewed fixture is
+canonical text `الشركة ACME وقعت العقد.` with offsets **7–11** selecting
+`ACME`, rendered in `ReviewedContentFixtures`, not in `CitationDrawer`.
+Render path is React text nodes; `<mark>` children are text only.
 
 ## Focus and drawer flow
 
@@ -54,13 +55,20 @@ lists use a roving tabindex (`ArrowUp` / `ArrowDown` / `Home` / `End`).
 `apps/frontend/next.config.ts` sends `nosniff`, `DENY`, `no-referrer`,
 `X-DNS-Prefetch-Control: off`, a restrictive `Permissions-Policy`, and
 CSP `default-src 'self'` with `font-src 'self'`, `img-src 'self' data:`,
-`style-src 'self' 'unsafe-inline'`, and `connect-src` limited to self,
-local FastAPI, local Auth, and `https://*.supabase.co`. No CDN hosts.
+and `style-src 'self' 'unsafe-inline'`. `connect-src` is `'self'` plus
+the exact origins of `NEXT_PUBLIC_API_BASE_URL` and
+`NEXT_PUBLIC_SUPABASE_URL`. Loopback FastAPI/Auth origins are added only
+when `NODE_ENV=development`. Production does not ship hardcoded
+localhost or `https://*.supabase.co`. Missing production public URLs
+fail closed (`connect-src 'self'` only). No CDN hosts.
 
 `'unsafe-eval'` is **development-only**. Next.js documents that React
 uses `eval` for debug info in development and that production React/Next
-do not require `'unsafe-eval'` by default. Production `script-src` is
-`'self' 'unsafe-inline'` because this app does not emit CSP nonces.
+do not require `'unsafe-eval'` by default. Production `script-src` still
+includes `'unsafe-inline'` because this app's CSP is a static
+`next.config.ts` header. Next.js 16 nonce CSP needs a per-request nonce
+from `proxy()` plus dynamic rendering; that rewrite is not implemented
+here. `style-src 'unsafe-inline'` remains (PRD-L-003).
 
 ## RTL, zoom, and mobile gap fills
 

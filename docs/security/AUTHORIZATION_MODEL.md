@@ -2,7 +2,7 @@
 title: Authorization model
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-12
+last-reviewed: 2026-08-19
 audience: engineering, security, reviewers
 ---
 
@@ -90,14 +90,23 @@ Packet 3 **revokes** all `app`/`private`/`langgraph`/`lightrag` grants from `ano
 
 | Function | Args | Behavior |
 | --- | --- | --- |
-| `app.list_visible_documents` | caller_user_id, caller_role, authorization_version | Zero rows when context invalid; ACL-aware listing |
-| `app.list_user_conversations` | caller_user_id, caller_role, authorization_version | Creator-private; owner/admin audit |
+| `app.list_visible_documents` | caller_user_id, caller_role, authorization_version | Zero rows when context invalid; ACL-aware listing; bounded to 50 |
+| `app.list_visible_documents_page` | caller context, limit, keyset cursor | Default 50, max 200, `created_at,id` cursor |
+| `app.list_user_conversations` | caller_user_id, caller_role, authorization_version | Creator-private; owner/admin audit; bounded to 50 |
+| `app.list_user_conversations_page` | caller context, limit, keyset cursor | Default 50, max 200, `created_at,id` cursor |
+| `app.get_version_ingestion_status` | caller context, version_id | DEFINER ACL status. Empty set when unauthorized (HTTP 404) |
+| `app.delete_visible_document` | caller context, document_id | Owner/admin tombstone wrapping `exclude_version_from_retrieval`. Unreadable ids return NULL |
+| `app.list_run_citations` | caller context, run_id | Creator-only. ACL + current-version recheck nulls `chunk_id` when unavailable |
+| `app.accept_invitation` | token_hash, user_id, email, assurance_level | Refuses demotion; privileged/upload upgrades require AAL2 and revoke sessions |
 | `app.validate_caller_context` | caller_user_id, caller_role, authorization_version | Boolean membership + snapshot check |
 | `private.set_document_acl` | caller context, document, grantee, grant/revoke | Idempotent owner/admin-only ACL mutation with audit |
 | `app.set_document_visibility` | caller context, document, visibility | Owner/admin-only flip; restricted downgrade clears graph eligibility |
 | `app.append_audit_event` | event metadata | **SECURITY DEFINER** single insert path for `app_audit_writer` (fixed `search_path`) |
 
-Read RPCs use `SECURITY INVOKER`. Mutating RPCs that must cross the deliberately
+Read RPCs that filter with caller context may be `SECURITY INVOKER`
+(Hybrid retrieval) or `SECURITY DEFINER` (status, citation GET, paginated
+lists, document delete) with a fixed search path. Mutating RPCs that must
+cross the deliberately
 minimal `app_api` table grants use `SECURITY DEFINER`, a fixed search path,
 schema-qualified objects, live typed-context validation, and explicit
 `REVOKE EXECUTE FROM PUBLIC, anon, authenticated`. The ACL mutation function
@@ -106,7 +115,9 @@ lives in the unexposed `private` schema.
 ## Negative guarantees
 
 - Forged caller role or stale `authorization_version` → zero protected rows.
-- Restricted document without ACL → hidden from members/viewers.
+- Restricted document without ACL → hidden from members/viewers, including ingestion status GET (404, not 403).
+- Only an owner may invite `owner`. Invitation accept refuses role/upload demotion.
+- Self-update on `app.profiles` cannot change `role`, `upload_enabled`, `mfa_enrolled`, or `disabled_at`.
 - Restricted / non-current / deleted documents cannot enqueue normal graph index jobs.
 - `app_audit_writer` cannot UPDATE or DELETE audit rows (trigger + grants).
 - `app_worker` cannot SELECT conversations.

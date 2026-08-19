@@ -2,7 +2,7 @@
 title: Phase 8 later live verification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: engineering, reviewers
 ---
 
@@ -30,8 +30,8 @@ Already proven that day (do not re-litigate unless the stack changed):
 flowchart TD
   start[WSL and Docker healthy]
   start --> compose["scripts/dev.ps1 Compose API on :8000"]
-  compose --> ready["GET /health/ready paradedb and valkey_limits are ok"]
-  ready --> lv01[P08-LV-01 compose stop visible]
+  compose --> ready["GET /health/ready omits named probes"]
+  ready --> lv01[P08-LV-01 public ready has no dependencies]
   ready --> lv05[P08-LV-05 signed-in mutations]
   start --> lv02[P08-LV-02 confirm no invented quarantine enums]
   start --> lv03[P08-LV-03 computed-style WCAG lab]
@@ -51,24 +51,23 @@ flowchart TD
 
 ## Items
 
-### P08-LV-01 — Compose ParadeDB/Valkey stop visible on ready
+### P08-LV-01 — Public ready omits named ParadeDB/Valkey probes
 
-**Why skipped:** Host uvicorn reported `paradedb=unconfigured` and
-`valkey_limits=unconfigured`. The test only stops a dependency that is
-already `ok`.
+**Why changed:** PRD-M-014 moved named probes to authenticated `GET /ops/ready`
+(owner/admin). Public `GET /health/ready` is `{status, query_ready, detail}`
+only. Compose-stop visibility on named names is unverified until an operator
+JWT hits `/ops/ready`.
 
 **Command:**
 
 ```powershell
-uv run python -m pytest tests/contract/test_thin_developer_ui_live.py::test_live_compose_outage_visible_on_ready -q -rs --tb=short
+uv run python -m pytest tests/contract/test_thin_developer_ui_live.py::test_live_public_ready_omits_named_dependencies -q -rs --tb=short
 ```
 
-**Pass:** Exit 0, not skipped. After Compose `stop paradedb` and/or
-`valkey-limits`, `GET /health/ready` shows that name as `down`. The test
-starts the service again in `finally`.
+**Pass:** Exit 0. Public body has no `dependencies`. CORS still allows
+`:3010`.
 
-**Fail/skip:** Still `unconfigured` means the process under test is not the
-Compose API. Fix the stack; do not mock `ok`.
+**Fail:** Public JSON still names `paradedb`, `valkey_limits`, or `lightrag`.
 
 ### P08-LV-02 — Abandoned / expired / oversize quarantine enums
 

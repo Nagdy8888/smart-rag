@@ -13,18 +13,18 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from jwt.algorithms import ECAlgorithm
-from smart_rag_core.release.packet4 import (
-    API_EXPECTED_JWT_ISSUER,
-    LOCAL_GOTRUE_JWT_ISSUER,
-)
 from smart_rag_core.security.jwks import (
+    FORBIDDEN_JWT_ROLES,
     LOCAL_DOCKER_INTERNAL_JWT_ISSUER,
     LOCAL_JWT_ISSUER_ALIASES,
     LOCAL_LOOPBACK_JWT_ISSUER,
+    REQUIRED_JWT_ROLE,
     JwksVerificationError,
     JwksVerifier,
     resolved_jwt_issuers,
 )
+
+from tests.unit.test_settings import configure_hosted_backend_env
 
 _KID = "unit-local-es256-kid"
 _DOCKER_SUPABASE_URL = "http://host.docker.internal:54321"
@@ -56,6 +56,7 @@ def _sign_es256(
     *,
     issuer: str,
     audience: str = "authenticated",
+    role: str = "authenticated",
 ) -> str:
     """Sign one ES256 access token with required claims.
 
@@ -63,21 +64,24 @@ def _sign_es256(
         private_key: Ephemeral P-256 signing key.
         issuer: JWT ``iss`` claim.
         audience: JWT ``aud`` claim.
+        role: JWT ``role`` claim. User tokens use ``authenticated``.
 
     Returns:
         Compact JWT string.
     """
 
     now = int(time.time())
+    claims: dict[str, str | int] = {
+        "sub": str(uuid.uuid4()),
+        "aud": audience,
+        "iss": issuer,
+        "exp": now + 3600,
+        "iat": now,
+    }
+    if role:
+        claims["role"] = role
     return jwt.encode(
-        {
-            "sub": str(uuid.uuid4()),
-            "aud": audience,
-            "iss": issuer,
-            "exp": now + 3600,
-            "iat": now,
-            "role": "authenticated",
-        },
+        claims,
         private_key,
         algorithm="ES256",
         headers={"kid": _KID, "typ": "JWT"},
@@ -144,6 +148,11 @@ def _require_jwks_verifier(application: object) -> JwksVerifier:
 
 def test_packet4_issuer_constants_match_jwks_aliases() -> None:
     """Phase 9 freeze constants must stay identical to the JWKS alias pair."""
+
+    from smart_rag_core.release.packet4 import (
+        API_EXPECTED_JWT_ISSUER,
+        LOCAL_GOTRUE_JWT_ISSUER,
+    )
 
     assert API_EXPECTED_JWT_ISSUER == LOCAL_DOCKER_INTERNAL_JWT_ISSUER
     assert LOCAL_GOTRUE_JWT_ISSUER == LOCAL_LOOPBACK_JWT_ISSUER
@@ -311,9 +320,8 @@ def test_backend_lifespan_production_keeps_single_issuer(
 ) -> None:
     """Production lifespan does not expand the local Docker iss pair."""
 
-    monkeypatch.setenv("APP_ENV", "production")
+    configure_hosted_backend_env(monkeypatch, app_env="production")
     monkeypatch.setenv("SUPABASE_URL", _DOCKER_SUPABASE_URL)
-    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
     from fastapi.testclient import TestClient
     from smart_rag_api.main import create_app
 
@@ -321,3 +329,67 @@ def test_backend_lifespan_production_keeps_single_issuer(
     with TestClient(application):
         verifier = _require_jwks_verifier(application)
         assert verifier.allowed_issuers == (LOCAL_DOCKER_INTERNAL_JWT_ISSUER,)
+
+
+@pytest.mark.parametrize("role", sorted(FORBIDDEN_JWT_ROLES))
+def test_jwks_rejects_service_role_and_anon(
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    """ES256 tokens with ``service_role`` or ``anon`` fail closed."""
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    _patch_jwks(monkeypatch, _public_jwk(private_key))
+    verifier = JwksVerifier(
+        supabase_url=_LOOPBACK_SUPABASE_URL,
+        audience="authenticated",
+        cache_seconds=600,
+        app_env="local",
+    )
+    token = _sign_es256(
+        private_key,
+        issuer=LOCAL_LOOPBACK_JWT_ISSUER,
+        role=role,
+    )
+    with pytest.raises(JwksVerificationError, match="forbidden role"):
+        verifier.verify_access_token(token)
+
+
+def test_jwks_rejects_missing_role_claim(monkeypatch: pytest.MonkeyPatch) -> None:
+    """User JWTs must carry ``role=authenticated``."""
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    _patch_jwks(monkeypatch, _public_jwk(private_key))
+    verifier = JwksVerifier(
+        supabase_url=_LOOPBACK_SUPABASE_URL,
+        audience="authenticated",
+        cache_seconds=600,
+        app_env="local",
+    )
+    token = _sign_es256(
+        private_key,
+        issuer=LOCAL_LOOPBACK_JWT_ISSUER,
+        role="",
+    )
+    with pytest.raises(JwksVerificationError, match="forbidden role"):
+        verifier.verify_access_token(token)
+
+
+def test_jwks_accepts_authenticated_role(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Local user JWTs with ``role=authenticated`` still verify."""
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    _patch_jwks(monkeypatch, _public_jwk(private_key))
+    verifier = JwksVerifier(
+        supabase_url=_LOOPBACK_SUPABASE_URL,
+        audience="authenticated",
+        cache_seconds=600,
+        app_env="local",
+    )
+    token = _sign_es256(
+        private_key,
+        issuer=LOCAL_LOOPBACK_JWT_ISSUER,
+        role=REQUIRED_JWT_ROLE,
+    )
+    verified = verifier.verify_access_token(token)
+    assert verified.raw_claims.get("role") == REQUIRED_JWT_ROLE

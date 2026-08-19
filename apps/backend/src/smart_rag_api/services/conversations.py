@@ -14,6 +14,8 @@ from smart_rag_core.conversations import (
 )
 from smart_rag_core.security.identity import CallerContext
 
+from smart_rag_api.services.keyset import parse_created_at_id_cursor
+
 
 class ConversationService:
     """Factory-injected conversation operations."""
@@ -47,19 +49,37 @@ class ConversationService:
             connection.commit()
         return record
 
-    def list(self, caller: CallerContext) -> tuple[ConversationRecord, ...]:
+    def list(
+        self,
+        caller: CallerContext,
+        *,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> tuple[ConversationRecord, ...]:
         """List conversations visible to the caller.
 
         Args:
             caller: Authenticated caller.
+            limit: Page size, default 50, max 200.
+            cursor: Optional ``created_at,id`` keyset cursor.
 
         Returns:
-            Conversation records.
+            Conversation records, newest first.
+
+        Raises:
+            QueryAdmissionError: Authorization or cursor failure.
         """
 
         with psycopg.connect(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
-            return list_conversations(connection, caller=caller)
+            cursor_created_at, cursor_id = parse_created_at_id_cursor(cursor)
+            return list_conversations(
+                connection,
+                caller=caller,
+                limit=max(1, min(limit, 200)),
+                cursor_created_at=cursor_created_at,
+                cursor_id=cursor_id,
+            )
 
     def get(
         self, caller: CallerContext, *, conversation_id: UUID

@@ -95,11 +95,16 @@ foreach ($service in @("api", "worker", "frontend")) {
   Write-Host "OK $service non-root uid 10001"
 }
 
-# Runtime profile must select the deterministic no-provider adapter.
-$mockMode = docker compose --env-file $EnvFile exec -T api sh -c 'test "$MOCK_MODEL_MODE" = "true" && printf true'
-if ($LASTEXITCODE -ne 0 -or $mockMode.Trim() -ne "true") {
-  throw "API container is not running with MOCK_MODEL_MODE=true."
+# Runtime profile: default is MOCK_MODEL_MODE=true. Live OpenAI is local opt-in
+# only; real company content stays prohibited until org matrices are verified.
+$mockMode = docker compose --env-file $EnvFile exec -T api sh -c 'printf %s "$MOCK_MODEL_MODE"'
+$openaiKeyLen = docker compose --env-file $EnvFile exec -T api sh -c 'printf %s "${#OPENAI_API_KEY}"'
+if ($mockMode.Trim() -eq "true") {
+  Write-Host "OK API mock-model profile"
+} elseif ($mockMode.Trim() -eq "false" -and [int]$openaiKeyLen.Trim() -gt 0) {
+  Write-Host "OK API live-model profile (synthetic corpus only; OpenAI key present)"
+} else {
+  throw "API MOCK_MODEL_MODE must be true, or false with OPENAI_API_KEY set in the container."
 }
-Write-Host "OK API mock-model profile"
 
 Write-Host "Local foundation verification passed; business readiness remains intentionally unconfigured."

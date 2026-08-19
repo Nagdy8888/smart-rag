@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Literal, TypeAlias, TypedDict, cast
@@ -26,13 +27,19 @@ from smart_rag_core.ingestion.embeddings.service import (
     EmbeddingService,
 )
 from smart_rag_core.ingestion.governance import ExtractionGovernanceInput
+from smart_rag_core.ingestion.limits import EXTERNAL_PROCESSING_POLICY_VERSION
+from smart_rag_core.ingestion.parser.exceptions import ParserSandboxError
 from smart_rag_core.ingestion.parser.service import ParserInvocation, ParserService
 from smart_rag_core.ingestion.parser.types import ParseDisposition, ParseResult
 from smart_rag_core.ingestion.parser.website import merge_website_parse_results
 from smart_rag_core.ingestion.tables.storage import upload_table_artifact
 from smart_rag_core.jobs.exceptions import JobLeaseError
-from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
+from smart_rag_core.jobs.ingestion_repository import (
+    IngestionJobRepository,
+    configurable_lease_lost,
+)
 from smart_rag_core.jobs.ledger import JobOperationLedger
+from smart_rag_core.repositories.scan_events import ScanEventRepository
 from smart_rag_core.security.external_processing import (
     CategoryDisposition,
     ContentClass,
@@ -94,8 +101,33 @@ def validate_index_lease(
     state: IngestionIndexState,
     config: RunnableConfig,
 ) -> IngestionIndexState:
-    """Validate lease ownership before indexing side effects."""
+    """Validate lease ownership before indexing side effects.
 
+    State inputs:
+        ``job_id``, ``lease_token``.
+
+    State outputs:
+        ``status`` ``index_pending`` or ``lease_invalid``.
+
+    Persistence writes:
+        None.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        ``configurable.lease_lost`` aborts before parsing.
+
+    Failure/fallback route:
+        Invalid/expired/lost leases skip mark_parsing and indexing.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     configurable = cast(dict[str, object], config.get("configurable", {}))
     postgres_url = configurable.get("postgres_url")
     lease_owner = configurable.get("lease_owner")
@@ -135,8 +167,35 @@ def validate_index_lease(
 def mark_parsing_for_index(
     state: IngestionIndexState, config: RunnableConfig
 ) -> IngestionIndexState:
-    """Transition version lifecycle to ``parsing`` before hybrid indexing."""
+    """Transition version lifecycle to ``parsing`` after a current clean scan.
 
+    State inputs:
+        ``version_id``, optional ``crawl_run_id`` / ``content_hash``.
+
+    State outputs:
+        ``status`` ``parsing`` or ``index_failed``.
+
+    Persistence writes:
+        ``app.transition_document_version_status`` to ``parsing``.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        Lease-lost aborts without a status write.
+
+    Failure/fallback route:
+        ``uploaded`` without a current clean scan fails closed (except
+        explicit ``APP_ENV=test`` fixtures that set
+        ``allow_index_without_scan``). Missing/dirty scans fail the job.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     if state["status"] != "index_pending" or state["version_id"] is None:
         return state
     configurable = cast(dict[str, object], config.get("configurable", {}))
@@ -173,6 +232,19 @@ def mark_parsing_for_index(
                 "status": "index_failed",
                 "detail": f"unexpected status {current_status} before parsing",
             }
+        if not index_scan_gate_allows(
+            connection,
+            version_id=UUID(state["version_id"]),
+            content_hash=state.get("content_hash"),
+            crawl_run_id=state.get("crawl_run_id"),
+            configurable=configurable,
+        ):
+            connection.rollback()
+            return {
+                **state,
+                "status": "index_failed",
+                "detail": "missing_or_stale_scan",
+            }
         connection.execute(
             """
             SELECT app.transition_document_version_status(
@@ -188,8 +260,35 @@ def mark_parsing_for_index(
 def index_hybrid_content(
     state: IngestionIndexState, config: RunnableConfig
 ) -> IngestionIndexState:
-    """Parse, chunk, embed, and persist canonical state plus BM25 outbox."""
+    """Parse, chunk, embed, and persist canonical state plus BM25 outbox.
 
+    State inputs:
+        ``parsing`` status, Storage refs or ``crawl_run_id``, attestation
+        fields, and version identity.
+
+    State outputs:
+        ``indexed`` or ``index_failed`` plus chunk/BM25 identifiers.
+
+    Persistence writes:
+        Canonical chunks/tables, embedding ledger, BM25 outbox, job ledger.
+
+    External/model calls:
+        Parser sandbox (Docker) and embedding gateway after governance.
+
+    Budget/deadline behavior:
+        Embedding reservation via ledger; lease-lost aborts without complete.
+
+    Failure/fallback route:
+        Missing/stale scan, unverified providers for real company content,
+        sandbox launch failure, or governance deny fail the job.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     if state["status"] != "parsing":
         return state
     identity = (
@@ -230,26 +329,51 @@ def index_hybrid_content(
 
     storage = StorageGateway(supabase_url=storage_url, admin_secret=storage_secret)
     parser = ParserService()
+    content_class = content_class_from_payload(state["content_class"])
+    scan_current = False
+    postgres_for_scan = postgres_url
+    with psycopg.connect(postgres_for_scan) as scan_connection:
+        scan_connection.execute("SET ROLE app_worker")
+        scan_current = index_scan_gate_allows(
+            scan_connection,
+            version_id=UUID(str(state["version_id"])),
+            content_hash=state.get("content_hash"),
+            crawl_run_id=state.get("crawl_run_id"),
+            configurable=configurable,
+        )
+        scan_connection.rollback()
+    if not scan_current:
+        return {
+            **state,
+            "status": "index_failed",
+            "detail": "missing_or_stale_scan",
+        }
     governance = ExtractionGovernanceInput(
         declared_category=state["declared_category"],
         attestation_present=state["attestation_policy_version"] is not None,
         attestation_policy_version=state["attestation_policy_version"],
         review_approved=state["review_approved"],
         filename=state["filename"],
-        content_class=(
-            ContentClass.SYNTHETIC
-            if state["content_class"] == "synthetic"
-            else ContentClass.REAL_COMPANY
-        ),
+        content_class=content_class,
     )
     if isinstance(crawl_run_id, str) and crawl_run_id:
-        parse_result, governance_detail, promotion_allowed = _parse_website_snapshots(
-            postgres_url=postgres_url,
-            storage=storage,
-            parser=parser,
-            crawl_run_id=UUID(crawl_run_id),
-            governance=governance,
-        )
+        try:
+            parse_result, governance_detail, promotion_allowed = (
+                _parse_website_snapshots(
+                    postgres_url=postgres_url,
+                    storage=storage,
+                    parser=parser,
+                    crawl_run_id=UUID(crawl_run_id),
+                    governance=governance,
+                    scan_evidence_current=scan_current,
+                )
+            )
+        except ParserSandboxError as exc:
+            return {
+                **state,
+                "status": "index_failed",
+                "detail": f"parser_sandbox:{exc.detail}"[:500],
+            }
         if parse_result is None:
             return {
                 **state,
@@ -271,16 +395,23 @@ def index_hybrid_content(
                 "status": "index_failed",
                 "detail": "content hash mismatch after download",
             }
-        outcome = parser.parse_and_govern(
-            ParserInvocation(
-                payload=payload,
-                content_hash=str(state["content_hash"]),
-                filename=str(state["filename"]),
-                media_type=state["media_type"],
-            ),
-            governance=governance,
-            scan_evidence_current=True,
-        )
+        try:
+            outcome = parser.parse_and_govern(
+                ParserInvocation(
+                    payload=payload,
+                    content_hash=str(state["content_hash"]),
+                    filename=str(state["filename"]),
+                    media_type=state["media_type"],
+                ),
+                governance=governance,
+                scan_evidence_current=scan_current,
+            )
+        except ParserSandboxError as exc:
+            return {
+                **state,
+                "status": "index_failed",
+                "detail": f"parser_sandbox:{exc.detail}"[:500],
+            }
         governed_parse = outcome.parse_result
         outcome_disposition = outcome.parse_result.disposition.value
         promotion_ok = outcome.promotion_allowed
@@ -308,18 +439,11 @@ def index_hybrid_content(
     )
     gateway = create_embedding_gateway(settings)
 
-    governance_input = ExternalProcessingDecisionInput(
-        attestation_present=state["attestation_policy_version"] is not None,
-        category=CategoryDisposition.ALLOWED,
-        review_approved=state["review_approved"],
-        scan_evidence_current=True,
-        provider_settings_verified=state["content_class"] == "synthetic",
-        policy_version_matches=True,
-        content_class=(
-            ContentClass.SYNTHETIC
-            if state["content_class"] == "synthetic"
-            else ContentClass.REAL_COMPANY
-        ),
+    governance_input = load_external_processing_input(
+        state=state,
+        scan_evidence_current=scan_current,
+        configurable=configurable,
+        content_class=content_class,
     )
     embed_operation_key = f"{state['operation_key']}:embed"
 
@@ -476,12 +600,12 @@ def table_only_embedding_result(
     chunk_set_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return EmbeddingBatchResult(
         version_id=version_id,
-        policy_hash=embedding_policy_hash(
-            chunking_config_hash=chunking.config_hash
-        ),
+        policy_hash=embedding_policy_hash(chunking_config_hash=chunking.config_hash),
         chunk_set_hash=chunk_set_hash,
         embedded=(),
-        ledger_id=uuid5(NAMESPACE_URL, f"table-only-embed:{version_id}:{chunk_set_hash}"),
+        ledger_id=uuid5(
+            NAMESPACE_URL, f"table-only-embed:{version_id}:{chunk_set_hash}"
+        ),
         provider_request_id="table_only",
         actual_cost_usd=Decimal("0"),
         attempt_count=1,
@@ -495,6 +619,7 @@ def _parse_website_snapshots(
     parser: ParserService,
     crawl_run_id: UUID,
     governance: ExtractionGovernanceInput,
+    scan_evidence_current: bool,
 ) -> tuple[ParseResult | None, str, bool]:
     """Parse every snapshot for one crawl run into a single element tree.
 
@@ -504,6 +629,8 @@ def _parse_website_snapshots(
         parser: Sandboxed parser service.
         crawl_run_id: Durable crawl run identifier.
         governance: Extraction governance input shared across pages.
+        scan_evidence_current: Whether DB scan evidence is current for this
+            version. Never defaulted to ``True``.
 
     Returns:
         Tuple of merged parse result (or ``None``), diagnostic detail, and
@@ -547,7 +674,7 @@ def _parse_website_snapshots(
                 media_type=str(content_type) if content_type else "text/html",
             ),
             governance=governance,
-            scan_evidence_current=True,
+            scan_evidence_current=scan_evidence_current,
         )
         if (
             outcome.parse_result.disposition is ParseDisposition.FAILED
@@ -619,3 +746,144 @@ def build_index_ingestion_graph(
         interrupt_after=interrupt_after,
     )
     return compiled  # pyright: ignore[reportReturnType]
+
+
+def content_class_from_payload(raw: str | None) -> ContentClass:
+    """Map payload text to a content class without defaulting to synthetic.
+
+    Args:
+        raw: Job payload ``content_class``. Missing/unknown values are
+            ``real_company``.
+
+    Returns:
+        ``SYNTHETIC`` only when the payload explicitly says ``synthetic``.
+    """
+
+    if raw == "synthetic":
+        return ContentClass.SYNTHETIC
+    return ContentClass.REAL_COMPANY
+
+
+def declared_category_disposition(declared_category: str | None) -> CategoryDisposition:
+    """Map stored declared category text to a governance disposition.
+
+    Args:
+        declared_category: Uploader or crawl category label.
+
+    Returns:
+        Category disposition. ``website`` and fixture ``synthetic`` labels map
+        to ``allowed``; unknown labels stay unknown.
+    """
+
+    if declared_category is None or not declared_category.strip():
+        return CategoryDisposition.UNKNOWN
+    normalized = declared_category.strip().lower()
+    if normalized in {"allowed", "public", "internal", "website", "synthetic"}:
+        return CategoryDisposition.ALLOWED
+    if normalized in {"prohibited", "restricted", "secret"}:
+        return CategoryDisposition.PROHIBITED
+    if normalized in {"review", "mandatory_review", "regulated"}:
+        return CategoryDisposition.MANDATORY_REVIEW
+    return CategoryDisposition.UNKNOWN
+
+
+def provider_matrix_verified(configurable: dict[str, object]) -> bool:
+    """Return signed subprocessor-matrix verification from worker config.
+
+    Args:
+        configurable: LangGraph configurable mapping.
+
+    Returns:
+        ``True`` only when ``subprocessor_matrix_verified`` is exactly true.
+    """
+
+    return configurable.get("subprocessor_matrix_verified") is True
+
+
+def allow_index_without_scan(configurable: dict[str, object]) -> bool:
+    """Return whether test fixtures may skip the scan gate.
+
+    Args:
+        configurable: LangGraph configurable mapping.
+
+    Returns:
+        ``True`` only when ``allow_index_without_scan`` is true and
+        ``APP_ENV=test``.
+    """
+
+    if configurable.get("allow_index_without_scan") is not True:
+        return False
+    return os.environ.get("APP_ENV", "").strip().lower() == "test"
+
+
+def index_scan_gate_allows(
+    connection: psycopg.Connection,
+    *,
+    version_id: UUID,
+    content_hash: str | None,
+    crawl_run_id: str | None,
+    configurable: dict[str, object],
+) -> bool:
+    """Return whether a current clean scan exists for this index job.
+
+    Args:
+        connection: Open ``app_worker`` connection.
+        version_id: Canonical version.
+        content_hash: File object hash when indexing a promoted upload.
+        crawl_run_id: Crawl run id when indexing website snapshots.
+        configurable: Graph configurable (test fixture override).
+
+    Returns:
+        ``True`` when scan evidence is current and covers every object hash.
+    """
+
+    if allow_index_without_scan(configurable):
+        return True
+    repo = ScanEventRepository(connection)
+    if isinstance(crawl_run_id, str) and crawl_run_id:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT content_hash
+                FROM app.web_snapshots
+                WHERE crawl_run_id = %s
+                """,
+                (UUID(crawl_run_id),),
+            )
+            rows = cursor.fetchall()
+        hashes = tuple(str(row[0]) for row in rows)
+        return repo.has_current_clean_hashes(version_id, hashes)
+    if isinstance(content_hash, str) and content_hash:
+        return repo.has_current_clean_hashes(version_id, (content_hash,))
+    return repo.has_current_clean_evidence(version_id)
+
+
+def load_external_processing_input(
+    *,
+    state: IngestionIndexState,
+    scan_evidence_current: bool,
+    configurable: dict[str, object],
+    content_class: ContentClass,
+) -> ExternalProcessingDecisionInput:
+    """Build embedding governance from DB-backed scan/attestation/provider flags.
+
+    Args:
+        state: Index graph state (attestation and declared category).
+        scan_evidence_current: Result of ``index_scan_gate_allows``.
+        configurable: Worker settings including subprocessor matrix.
+        content_class: Payload class; never inferred as synthetic.
+
+    Returns:
+        Decision input. Real company content requires a verified matrix.
+    """
+
+    attestation = state["attestation_policy_version"]
+    return ExternalProcessingDecisionInput(
+        attestation_present=attestation is not None,
+        category=declared_category_disposition(state["declared_category"]),
+        review_approved=state["review_approved"],
+        scan_evidence_current=scan_evidence_current,
+        provider_settings_verified=provider_matrix_verified(configurable),
+        policy_version_matches=(attestation == EXTERNAL_PROCESSING_POLICY_VERSION),
+        content_class=content_class,
+    )

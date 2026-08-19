@@ -35,4 +35,13 @@ docker compose --env-file $EnvFile down -v --remove-orphans
 Write-Host "Compose stack removed including volumes."
 
 & pnpm exec supabase db reset --yes
+if ($LASTEXITCODE -ne 0) {
+  throw "Supabase CLI failed to reset the local database."
+}
+
+Write-Host "Recreating LOGIN wrapper app_runtime after reset..."
+uv run python "$Root\scripts\ops\ensure_app_runtime_role.py"
+if ($LASTEXITCODE -ne 0) {
+  throw "app_runtime LOGIN wrapper is missing after db reset."
+}
 Write-Host "Supabase local DB reset requested."

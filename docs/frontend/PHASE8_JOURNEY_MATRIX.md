@@ -2,7 +2,7 @@
 title: Phase 8 journey matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: engineering, reviewers
 packet: P08-06
 ---
@@ -74,6 +74,7 @@ flowchart TD
 | Owner bootstrap GAP-07-08 | `src/components/auth/auth-screens.test.tsx` | has no owner-bootstrap form | vitest-component | proven |
 | Owner bootstrap GAP-07-08 | `src/components/administration-surfaces.test.tsx` | hides invite and offboard for a viewer | vitest-component | proven |
 | Invitation accept body | `src/lib/api.test.ts` | posts { token } only | vitest-unit | proven |
+| Invitation token mail-only | `src/components/administration-surfaces.test.tsx` | does not render an invitation token and keeps hostile email as text | vitest-component | proven |
 | Roles convenience vs server | `src/lib/roles.test.ts` | hides invite, offboard, and enable for viewer and member | vitest-unit | proven |
 | Forged role headers | `src/lib/client-authorization.test.ts` | does not treat a forged client role as request authorization | vitest-unit | proven |
 | session_revoked | `src/components/chat-app.test.tsx` | shows session_revoked banner and signs out | vitest-component | proven |

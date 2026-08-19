@@ -49,3 +49,4 @@ forbidden.
 - [phase-01-foundation-evidence.md](./phase-01-foundation-evidence.md)
 - [phase-04-hybrid-rag-evidence.md](./phase-04-hybrid-rag-evidence.md)
 - [phase-05-graphrag-evidence.md](./phase-05-graphrag-evidence.md)
+- [2026-08-19 production-readiness review](../reviews/2026-08-19-production-readiness/README.md)

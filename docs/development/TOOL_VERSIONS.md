@@ -59,7 +59,7 @@ Canonical copy: [`infra/paradedb/IMAGE_DIGESTS.md`](../../infra/paradedb/IMAGE_D
 | hatchling (build-system) | 1.32.0 |
 | langgraph | 1.2.11 |
 | langgraph-checkpoint-postgres | 3.1.2 |
-| langgraph-cli (dev) | 0.4.31 |
+| langgraph-cli (dev, `inmem` extra) | 0.4.31 |
 | fastapi | 0.141.1 |
 | uvicorn[standard] | 0.52.1 |
 | pydantic | 2.13.4 |

@@ -16,7 +16,6 @@ import { Drawer } from "./ui/drawer";
 import { Input } from "./ui/input";
 import { LimitationCallout } from "./ui/limitation-callout";
 import { LiveRegion } from "./ui/live-region";
-import { LogicalHighlight } from "./ui/logical-highlight";
 import { ReviewedContentFixtures } from "./ui/reviewed-content-fixtures";
 import { RovingList } from "./ui/roving-list";
 import { StatusBanner } from "./ui/status-banner";
@@ -28,7 +27,7 @@ import {
   deleteConversation,
   fetchMe,
   fetchMeta,
-  fetchReady,
+  loadConsoleReadiness,
   fetchUsageMe,
   listCitations,
   listConversations,
@@ -60,12 +59,7 @@ import {
 } from "../lib/limitations";
 import { publicQueryKeys, sessionQueryKeys } from "../lib/query-keys";
 import { displayText, formatProvenance } from "../lib/safe-text";
-import {
-  CITATION_LOGICAL_END,
-  CITATION_LOGICAL_FIXTURE_TEXT,
-  CITATION_LOGICAL_START,
-} from "../lib/highlight-logical-range";
-import { consumeSse } from "../lib/sse-consume";
+import { consumeSse, isAbortError } from "../lib/sse-consume";
 import { FEEDBACK_TAGS, type CitationResponse, type ConversationResponse, type FeedbackTag } from "../lib/types";
 import styles from "./developer-app.module.css";
 
@@ -74,7 +68,9 @@ function newIdempotencyKey(): string {
 }
 
 /**
- * Render citation ids and provenance in a drawer. No privileged href.
+ * Render citation ids and provenance in a drawer. No privileged href and
+ * no ACME logical-offset fixture. Offsets are GAP-07-09 until the citations
+ * API returns them. Logical highlight lives on `ReviewedContentFixtures`.
  *
  * @param props - Selected citation or null.
  * @returns Drawer region.
@@ -117,16 +113,6 @@ export function CitationDrawer({
         </LimitationCallout>
       ) : null}
       <p className={styles.muted}>{SOURCE_PREVIEW_UNAVAILABLE}</p>
-      <section aria-label="Reviewed logical highlight fixture">
-        <p className={styles.muted}>
-          Citations API has no offset fields. Reviewed logical-offset fixture:
-        </p>
-        <LogicalHighlight
-          text={CITATION_LOGICAL_FIXTURE_TEXT}
-          start={CITATION_LOGICAL_START}
-          end={CITATION_LOGICAL_END}
-        />
-      </section>
     </Drawer>
   );
 }
@@ -171,8 +157,8 @@ export function ChatApp() {
   );
 
   const readyQuery = useQuery({
-    queryKey: publicQueryKeys.ready,
-    queryFn: () => fetchReady(),
+    queryKey: auth === null ? publicQueryKeys.ready : keys.consoleReady,
+    queryFn: () => loadConsoleReadiness(auth),
     refetchInterval: 5000,
   });
 
@@ -244,38 +230,59 @@ export function ChatApp() {
       setChat(current);
       setFailure(null);
     }
-    const started = await startOrResumeMessageStream(
-      auth,
-      conversationId,
-      draft,
-      {
-        runId: current.runId,
-        terminal: current.terminal,
-        lastSequence: current.lastSequence,
-        idempotencyKey: current.idempotencyKey,
-      },
-    );
-    if (started.failure) {
-      setFailure(started.failure);
-      return;
-    }
-    if (started.admission !== null) {
-      current = applyAdmission(current, {
-        run_id: started.admission.run_id,
-        reservation_id: started.admission.reservation_id,
-        route_family: started.admission.route_family,
-        reconnect: started.admission.reconnect,
-      });
+    try {
+      const started = await startOrResumeMessageStream(
+        auth,
+        conversationId,
+        draft,
+        {
+          runId: current.runId,
+          terminal: current.terminal,
+          lastSequence: current.lastSequence,
+          idempotencyKey: current.idempotencyKey,
+        },
+        fetch,
+        controller.signal,
+      );
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (started.failure) {
+        setFailure(started.failure);
+        return;
+      }
+      if (started.admission !== null) {
+        current = applyAdmission(current, {
+          run_id: started.admission.run_id,
+          reservation_id: started.admission.reservation_id,
+          route_family: started.admission.route_family,
+          reconnect: started.admission.reconnect,
+        });
+        setChat(current);
+      }
+      current = await consumeSse(
+        started.response,
+        current,
+        controller.signal,
+        setChat,
+      );
+      if (controller.signal.aborted) {
+        setChat(current);
+        return;
+      }
       setChat(current);
-    }
-    current = await consumeSse(started.response, current, controller.signal, setChat);
-    setChat(current);
-    if (current.terminal !== null) {
-      idempotencyRef.current = newIdempotencyKey();
-      setChat((prev) => ({
-        ...prev,
-        idempotencyKey: idempotencyRef.current as string,
-      }));
+      if (current.terminal !== null) {
+        idempotencyRef.current = newIdempotencyKey();
+        setChat((prev) => ({
+          ...prev,
+          idempotencyKey: idempotencyRef.current as string,
+        }));
+      }
+    } catch (error) {
+      if (controller.signal.aborted || isAbortError(error)) {
+        return;
+      }
+      throw error;
     }
   }, [auth, chat, conversationId, draft, handshake]);
 
@@ -286,13 +293,34 @@ export function ChatApp() {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-    const response = await resumeEventStream(auth, chat.runId, chat.lastSequence);
-    if (response.status === 404) {
-      setFailure({ kind: "deleted" });
-      return;
+    try {
+      const response = await resumeEventStream(
+        auth,
+        chat.runId,
+        chat.lastSequence,
+        fetch,
+        controller.signal,
+      );
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (response.status === 404) {
+        setFailure({ kind: "deleted" });
+        return;
+      }
+      const current = await consumeSse(
+        response,
+        chat,
+        controller.signal,
+        setChat,
+      );
+      setChat(current);
+    } catch (error) {
+      if (controller.signal.aborted || isAbortError(error)) {
+        return;
+      }
+      throw error;
     }
-    const current = await consumeSse(response, chat, controller.signal, setChat);
-    setChat(current);
   }, [auth, chat]);
 
   const cancel = useCallback(async () => {
@@ -506,7 +534,7 @@ export function ChatApp() {
 
         <section className={styles.panel} aria-label="Auto chat">
           <p className={styles.muted}>
-            SubmitMessageRequest is message plus optional idempotency_key only.
+            SubmitMessageRequest is message plus required idempotency_key only.
             Hybrid/Combined/Table/Inspect send controls are not present
             (GAP-07-01).
           </p>

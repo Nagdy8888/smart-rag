@@ -128,6 +128,117 @@ def test_accept_invitation_idempotent_and_rejects_replay(
             )
 
 
+def test_accept_invitation_does_not_demote_owner(
+    db_connection: psycopg.Connection,
+) -> None:
+    """A member invitation cannot overwrite an existing owner profile."""
+
+    owner_id = uuid.uuid4()
+    email = f"owner-keep-{owner_id}@example.com"
+    digest = _token_hash("member-invite-would-demote")
+    expires_at = datetime.now(tz=UTC) + timedelta(hours=INVITATION_WINDOW_HOURS)
+
+    with db_connection.cursor() as cursor:
+        _insert_auth_user(cursor, owner_id, email)
+        cursor.execute(
+            """
+            INSERT INTO app.profiles (user_id, role, upload_enabled)
+            VALUES (%s, 'owner'::app.user_role, true)
+            """,
+            (owner_id,),
+        )
+        cursor.execute(
+            """
+            INSERT INTO app.team_invitations (
+              email, role, token_hash, expires_at, upload_enabled
+            )
+            VALUES (%s, 'member', %s, %s, false)
+            """,
+            (email, digest, expires_at),
+        )
+        cursor.execute("SET ROLE app_api")
+        cursor.execute("SAVEPOINT member_demote")
+        with pytest.raises(psycopg.errors.RaiseException, match="would demote"):
+            cursor.execute(
+                "SELECT app.accept_invitation(%s, %s, %s, %s)",
+                (digest, owner_id, email, "aal2"),
+            )
+        cursor.execute("ROLLBACK TO SAVEPOINT member_demote")
+        cursor.execute("RELEASE SAVEPOINT member_demote")
+        cursor.execute("RESET ROLE")
+        cursor.execute(
+            "SELECT role::text, upload_enabled FROM app.profiles WHERE user_id = %s",
+            (owner_id,),
+        )
+        row = cursor.fetchone()
+    assert row == ("owner", True)
+
+
+def test_accept_invitation_privileged_upgrade_requires_aal2(
+    db_connection: psycopg.Connection,
+) -> None:
+    """Member-to-admin upgrades require AAL2 and then revoke sessions."""
+
+    user_id = uuid.uuid4()
+    email = f"upgrade-{user_id}@example.com"
+    digest = _token_hash("admin-upgrade-token")
+    expires_at = datetime.now(tz=UTC) + timedelta(hours=INVITATION_WINDOW_HOURS)
+
+    with db_connection.cursor() as cursor:
+        _insert_auth_user(cursor, user_id, email)
+        cursor.execute(
+            """
+            INSERT INTO app.profiles (user_id, role, upload_enabled)
+            VALUES (%s, 'member'::app.user_role, false)
+            """,
+            (user_id,),
+        )
+        cursor.execute(
+            """
+            INSERT INTO app.team_invitations (
+              email, role, token_hash, expires_at, upload_enabled
+            )
+            VALUES (%s, 'admin', %s, %s, true)
+            RETURNING id
+            """,
+            (email, digest, expires_at),
+        )
+        invitation_row = cursor.fetchone()
+        assert invitation_row is not None
+        invitation_id = invitation_row[0]
+        cursor.execute("SET ROLE app_api")
+        cursor.execute("SAVEPOINT aal1_upgrade")
+        with pytest.raises(psycopg.errors.RaiseException, match="requires aal2"):
+            cursor.execute(
+                "SELECT app.accept_invitation(%s, %s, %s, %s)",
+                (digest, user_id, email, "aal1"),
+            )
+        cursor.execute("ROLLBACK TO SAVEPOINT aal1_upgrade")
+        cursor.execute("RELEASE SAVEPOINT aal1_upgrade")
+        cursor.execute(
+            "SELECT app.accept_invitation(%s, %s, %s, %s)",
+            (digest, user_id, email, "aal2"),
+        )
+        cursor.execute("RESET ROLE")
+        cursor.execute(
+            "SELECT role::text, upload_enabled FROM app.profiles WHERE user_id = %s",
+            (user_id,),
+        )
+        profile = cursor.fetchone()
+        cursor.execute(
+            """
+            SELECT session_id
+            FROM app.revoked_sessions
+            WHERE user_id = %s
+              AND session_id = %s
+            """,
+            (user_id, f"invitation-accept:{invitation_id}"),
+        )
+        revoked = cursor.fetchone()
+    assert profile == ("admin", True)
+    assert revoked is not None
+
+
 def test_expired_invitation_rejected(db_connection: psycopg.Connection) -> None:
     """Expired invitations fail closed."""
 

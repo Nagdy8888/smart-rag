@@ -14,7 +14,11 @@ from smart_rag_core.gateways.storage import StorageGateway
 from smart_rag_core.ingestion.governance import ExtractionGovernanceInput
 from smart_rag_core.ingestion.parser.service import ParserInvocation, ParserService
 from smart_rag_core.jobs.exceptions import JobLeaseError
-from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
+from smart_rag_core.jobs.ingestion_repository import (
+    IngestionJobRepository,
+    configurable_lease_lost,
+)
+from smart_rag_core.repositories.scan_events import ScanEventRepository
 from smart_rag_core.security.external_processing import ContentClass
 
 
@@ -66,8 +70,33 @@ def validate_parse_lease(
     state: IngestionParseState,
     config: RunnableConfig,
 ) -> IngestionParseState:
-    """Validate lease ownership before parser side effects."""
+    """Validate lease ownership before parser side effects.
 
+    State inputs:
+        ``job_id``, ``lease_token``.
+
+    State outputs:
+        ``status`` ``parse_pending`` or ``lease_invalid``.
+
+    Persistence writes:
+        None.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        ``configurable.lease_lost`` aborts.
+
+    Failure/fallback route:
+        Invalid leases skip parse.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     configurable = cast(dict[str, object], config.get("configurable", {}))
     postgres_url = configurable.get("postgres_url")
     lease_owner = configurable.get("lease_owner")
@@ -151,6 +180,7 @@ def parse_and_govern(
         return {**state, "status": "parse_failed", "detail": "missing parse payload"}
 
     configurable = cast(dict[str, object], config.get("configurable", {}))
+    postgres_url = configurable.get("postgres_url")
     storage_url = configurable.get("storage_url")
     storage_secret = configurable.get("storage_admin_secret")
     if not isinstance(storage_url, str) or not isinstance(storage_secret, str):
@@ -158,6 +188,26 @@ def parse_and_govern(
             **state,
             "status": "parse_failed",
             "detail": "missing storage configuration",
+        }
+    scan_current = False
+    if isinstance(postgres_url, str) and state["version_id"] is not None:
+        with psycopg.connect(postgres_url) as connection:
+            connection.execute("SET ROLE app_worker")
+            hashes = (
+                (str(state["content_hash"]),)
+                if isinstance(state["content_hash"], str)
+                else ()
+            )
+            scan_current = ScanEventRepository(connection).has_current_clean_hashes(
+                UUID(str(state["version_id"])),
+                hashes,
+            )
+            connection.rollback()
+    if not scan_current:
+        return {
+            **state,
+            "status": "parse_failed",
+            "detail": "missing_or_stale_scan",
         }
 
     storage = StorageGateway(supabase_url=storage_url, admin_secret=storage_secret)
@@ -197,7 +247,7 @@ def parse_and_govern(
                 else ContentClass.REAL_COMPANY
             ),
         ),
-        scan_evidence_current=True,
+        scan_evidence_current=scan_current,
     )
     if (
         outcome.parse_result.disposition.value == "failed"

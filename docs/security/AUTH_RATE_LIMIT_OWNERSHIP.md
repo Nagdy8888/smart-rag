@@ -2,7 +2,7 @@
 title: Auth rate-limit ownership
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering, security, ops
 ---
 
@@ -49,7 +49,9 @@ succeeding with both Valkey and Postgres unavailable is a failing defect.
 Pre-auth IP burst uses a hashed `preauth-ip:` bucket on mutation prefixes.
 When neither Valkey nor Postgres is configured the process is
 **unconfigured** (not a dual outage of bound backends) and the pre-auth
-middleware does not invent a silent allow of a bound limiter.
+middleware does not invent a silent allow of a bound limiter. Staging and
+production settings require `VALKEY_LIMITS_URL` so an unconfigured limiter
+cannot listen as a public API.
 
 ## Separate Valkey instances
 

@@ -45,7 +45,7 @@ class CreateInvitationRequest(BaseModel):
 
 
 class CreateInvitationResponse(BaseModel):
-    """Invitation identifiers. Raw token returned once."""
+    """Invitation identifiers. The one-time token is delivered by mail only."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -54,7 +54,6 @@ class CreateInvitationResponse(BaseModel):
     role: str
     upload_enabled: bool
     expires_at: datetime
-    raw_token: str
 
 
 class AcceptInvitationRequest(BaseModel):
@@ -90,7 +89,10 @@ class SubmitMessageRequest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     message: str = Field(min_length=1, max_length=16_384)
-    idempotency_key: UUID | None = None
+    idempotency_key: UUID | None = Field(
+        default=None,
+        description="Required on paid POST unless Idempotency-Key header is set.",
+    )
 
 
 class SubmitMessageResponse(BaseModel):
@@ -171,6 +173,7 @@ class DocumentResponse(BaseModel):
     visibility: str
     current_version_id: UUID | None
     visibility_generation: int
+    created_at: datetime | None = None
 
 
 class SignedUploadRequest(BaseModel):

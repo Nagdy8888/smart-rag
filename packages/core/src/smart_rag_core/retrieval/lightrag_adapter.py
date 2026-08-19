@@ -14,9 +14,11 @@ from __future__ import annotations
 import tempfile
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Protocol, cast
+from typing import Literal, Protocol, TypeVar, cast
+from uuid import UUID, uuid4
 
 import psycopg
 from pydantic import BaseModel, ConfigDict, SecretStr
@@ -26,6 +28,17 @@ from smart_rag_core.gateways.model import ModelGateway, create_model_gateway
 from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL,
+)
+from smart_rag_core.query_admission.ceilings import (
+    QueryRetrieveBudget,
+    assert_retrieve_kind_available,
+    debit_retrieve_budget,
+    usage_kind_caps,
+)
+from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
+from smart_rag_core.query_admission.service import (
+    consume_query_reservation,
+    record_query_llm_usage,
 )
 from smart_rag_core.retrieval.graph import (
     DEFAULT_GRAPH_WORKSPACE,
@@ -74,6 +87,7 @@ from smart_rag_core.retrieval.lightrag_structured import (
     parse_aquery_data_payload,
     to_graph_leads,
 )
+from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.settings.base import (
     SharedSettings,
     pop_process_environ,
@@ -438,6 +452,227 @@ class _AsyncpgPoolModule(Protocol):
     create_pool: Callable[..., Awaitable[object]]
 
 
+_QUERY_RETRIEVE_BUDGET: ContextVar[QueryRetrieveBudget | None] = ContextVar(
+    "lightrag_query_retrieve_budget",
+    default=None,
+)
+_TCallback = TypeVar("_TCallback")
+
+
+def install_query_budget_consume(callbacks: CountedLightRagCallbacks) -> None:
+    """Wrap LightRAG callbacks so query-time gateway calls debit remaining.
+
+    Index paths stay uncounted unless a retrieve budget ContextVar is bound.
+    ``aquery_data_structured`` sets that ContextVar for one consume window.
+
+    Args:
+        callbacks: Counted gateway callbacks constructed for this engine.
+
+    Side Effects:
+        Replaces embedding and LLM methods on ``callbacks`` with wrappers
+        that consume the run-local reservation or fail closed.
+    """
+
+    original_embed = callbacks.embedding_texts
+    original_extract = callbacks.extract_llm
+    original_keyword = callbacks.keyword_llm
+    original_query = callbacks.query_llm
+
+    async def embedding_texts(texts: list[str]) -> object:
+        """Counted query-time embedding callback.
+
+        Args:
+            texts: Vendor embedding inputs.
+
+        Returns:
+            Embedding matrix from the shared gateway.
+        """
+
+        return await _counted_query_callback(
+            usage_kind="embedding",
+            model_id=EMBEDDING_MODEL,
+            send=lambda: original_embed(texts),
+        )
+
+    async def extract_llm(
+        prompt: str,
+        system_prompt: str | None = None,
+        history_messages: list[dict[str, str]] | None = None,
+        **kwargs: object,
+    ) -> str:
+        """Counted extract-role LightRAG callback.
+
+        Args:
+            prompt: Vendor user prompt.
+            system_prompt: Optional vendor system prompt.
+            history_messages: Unused vendor history.
+            **kwargs: Ignored vendor extras.
+
+        Returns:
+            Gateway content.
+        """
+
+        return await _counted_query_callback(
+            usage_kind="lightrag",
+            model_id=f"lightrag-{LIGHTRAG_PINNED_VERSION}",
+            send=lambda: original_extract(
+                prompt, system_prompt, history_messages, **kwargs
+            ),
+        )
+
+    async def keyword_llm(
+        prompt: str,
+        system_prompt: str | None = None,
+        history_messages: list[dict[str, str]] | None = None,
+        **kwargs: object,
+    ) -> str:
+        """Counted keyword-role LightRAG callback.
+
+        Args:
+            prompt: Vendor user prompt.
+            system_prompt: Optional vendor system prompt.
+            history_messages: Unused vendor history.
+            **kwargs: Ignored vendor extras.
+
+        Returns:
+            Gateway content.
+        """
+
+        return await _counted_query_callback(
+            usage_kind="lightrag",
+            model_id=f"lightrag-{LIGHTRAG_PINNED_VERSION}",
+            send=lambda: original_keyword(
+                prompt, system_prompt, history_messages, **kwargs
+            ),
+        )
+
+    async def query_llm(
+        prompt: str,
+        system_prompt: str | None = None,
+        history_messages: list[dict[str, str]] | None = None,
+        **kwargs: object,
+    ) -> str:
+        """Counted query-role LightRAG callback.
+
+        Args:
+            prompt: Vendor user prompt.
+            system_prompt: Optional vendor system prompt.
+            history_messages: Unused vendor history.
+            **kwargs: Ignored vendor extras.
+
+        Returns:
+            Gateway content.
+        """
+
+        return await _counted_query_callback(
+            usage_kind="lightrag",
+            model_id=f"lightrag-{LIGHTRAG_PINNED_VERSION}",
+            send=lambda: original_query(
+                prompt, system_prompt, history_messages, **kwargs
+            ),
+        )
+
+    callbacks.embedding_texts = embedding_texts  # type: ignore[method-assign]
+    callbacks.extract_llm = extract_llm  # type: ignore[method-assign]
+    callbacks.keyword_llm = keyword_llm  # type: ignore[method-assign]
+    callbacks.query_llm = query_llm  # type: ignore[method-assign]
+
+
+async def _counted_query_callback(
+    *,
+    usage_kind: str,
+    model_id: str,
+    send: Callable[[], Awaitable[_TCallback]],
+) -> _TCallback:
+    """Consume remaining for one LightRAG callback or invoke it uncounted.
+
+    Same-loop form of ``execute_counted_model_call``: durable consume uses
+    the reservation RPCs, then the callback awaits on this event loop.
+
+    Args:
+        usage_kind: ``embedding`` or ``lightrag``.
+        model_id: Provider model identifier.
+        send: Async callback invocation.
+
+    Returns:
+        Callback result.
+
+    Raises:
+        QueryCeilingError: When remaining model calls cannot cover the kind.
+        QueryBudgetError: When remaining USD cannot cover the kind cap.
+
+    Side Effects:
+        Debits the ContextVar budget when bound. Unbound query/index
+        callbacks are not reservation-counted.
+    """
+
+    budget = _QUERY_RETRIEVE_BUDGET.get()
+    if budget is None:
+        return await send()
+    assert_retrieve_kind_available(
+        remaining_model_calls=budget.remaining_model_calls,
+        remaining_usd=budget.remaining_usd,
+        usage_kind=usage_kind,
+    )
+    connection = budget.connection
+    caller = budget.caller
+    run_id = budget.run_id
+    reservation_id = budget.reservation_id
+    if (
+        isinstance(connection, psycopg.Connection)
+        and isinstance(caller, CallerContext)
+        and isinstance(run_id, UUID)
+        and isinstance(reservation_id, UUID)
+    ):
+        usd_cap, prompt_cap, completion_cap = usage_kind_caps(usage_kind)
+        consumed = consume_query_reservation(
+            connection,
+            caller=caller,
+            reservation_id=reservation_id,
+            expected_version=budget.expected_version,
+            amount_usd=usd_cap,
+            prompt_tokens=prompt_cap,
+            completion_tokens=completion_cap,
+        )
+        budget.expected_version = consumed.optimistic_version
+        debit_retrieve_budget(budget, usage_kind, remaining_usd=consumed.remaining_usd)
+        try:
+            result = await send()
+        except TimeoutAfterSendError:
+            record_query_llm_usage(
+                connection,
+                caller=caller,
+                run_id=run_id,
+                reservation_id=reservation_id,
+                reservation_version=consumed.optimistic_version,
+                usage_kind=usage_kind,
+                model_id=model_id,
+                provider_attempt_id=str(uuid4()),
+                prompt_tokens=prompt_cap,
+                completion_tokens=completion_cap,
+                cost_usd=usd_cap,
+                timeout_after_send=True,
+            )
+            raise
+        record_query_llm_usage(
+            connection,
+            caller=caller,
+            run_id=run_id,
+            reservation_id=reservation_id,
+            reservation_version=consumed.optimistic_version,
+            usage_kind=usage_kind,
+            model_id=model_id,
+            provider_attempt_id=str(uuid4()),
+            prompt_tokens=prompt_cap,
+            completion_tokens=completion_cap,
+            cost_usd=usd_cap,
+            timeout_after_send=False,
+        )
+        return result
+    debit_retrieve_budget(budget, usage_kind)
+    return await send()
+
+
 async def construct_lightrag_engine(
     *,
     embedding_gateway: EmbeddingGateway,
@@ -480,6 +715,7 @@ async def construct_lightrag_engine(
         embedding_gateway=embedding_gateway,
         model_gateway=model_gateway,
     )
+    install_query_budget_consume(callbacks)
     embedding_func = EmbeddingFunc(
         embedding_dim=EMBEDDING_DIMENSIONS,
         func=callbacks.embedding_texts,
@@ -732,6 +968,8 @@ class LightRagRuntimeAdapter:
         working_dir: Vendor working directory.
         fingerprint: Private-schema fingerprint after attach.
         max_connections: Process-wide pool cap used for this attach.
+        query_budget: Optional retrieve ledger. Bound per query run so
+            ``aquery_data`` callbacks consume remaining.
     """
 
     rag: LightRagRuntime
@@ -740,6 +978,7 @@ class LightRagRuntimeAdapter:
     working_dir: Path
     fingerprint: SchemaFingerprint
     max_connections: int
+    query_budget: QueryRetrieveBudget | None = field(default=None, repr=False)
     _finalized: bool = field(default=False, init=False, repr=False)
 
     async def enqueue_insert(
@@ -1154,7 +1393,11 @@ class LightRagRuntimeAdapter:
             enable_rerank=False,
             include_references=False,
         )
-        raw = await self.rag.aquery_data(query, param)
+        token = _QUERY_RETRIEVE_BUDGET.set(self.query_budget)
+        try:
+            raw = await self.rag.aquery_data(query, param)
+        finally:
+            _QUERY_RETRIEVE_BUDGET.reset(token)
         leads = to_graph_leads(parse_aquery_data_payload(as_string_mapping(raw)))
         if mode == "global":
             return clamp_global_steering(leads)

@@ -11,7 +11,7 @@
     "instance_id": "i-0abe79350a3880e87",
     "state": "running",
     "instance_type": "t3.micro",
-    "intended_instance_type": "m6i.xlarge",
+    "intended_instance_type": "t3.micro",
     "public_ip": "52.206.156.176",
     "private_ip": "10.40.0.201",
     "imds_http_tokens": "required",
@@ -21,8 +21,9 @@
     "host_listen": ["127.0.0.1:44923"],
     "mem_total_mib": 916,
     "compose_files_present": true,
-    "compose_started": false,
-    "compose_start_blocked_reason": "t3.micro 916Mi vs Compose mem_limits >1Gi"
+    "compose_started": true,
+    "compose_start_blocked_reason": "",
+    "compose_services_healthy": ["paradedb", "valkey-limits", "valkey-cache"]
   },
   "cloudfront": {
     "id": "E2W9UNLLZ6I383",

@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 from typing import cast
+from uuid import UUID, uuid4
 
 import pytest
+from fastapi.testclient import TestClient
+from smart_rag_api.dependencies.services import get_postgres_url
+from smart_rag_api.main import create_app
+from smart_rag_api.routers.ingestion_status import get_ingestion_status_service
+from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.security.identity import CallerContext
 
 from tests.unit.typed_openapi import (
     as_openapi_client,
@@ -91,7 +98,10 @@ def test_member_retry_is_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     """Members cannot invoke ingestion job retry actions."""
 
     monkeypatch.setenv("APP_ENV", "test")
-    with openapi_test_client() as raw_client:
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    with TestClient(application) as raw_client:
         client = as_openapi_client(raw_client)
         response = client.post(
             "/ingestion/jobs/00000000-0000-4000-8000-000000000001/retry",
@@ -103,3 +113,51 @@ def test_member_retry_is_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     assert response.status_code == 403
     assert json_object(response.json())["detail"] == "forbidden"
+
+
+class _MissingStatusService:
+    """Status service that treats every version as missing."""
+
+    def get_version_status(
+        self,
+        caller: CallerContext,
+        *,
+        version_id: UUID,
+    ) -> None:
+        """Always hide existence.
+
+        Args:
+            caller: Authenticated caller.
+            version_id: Requested version.
+
+        Raises:
+            QueryAdmissionError: Always ``not_found``.
+        """
+
+        del caller, version_id
+        raise QueryAdmissionError("not_found")
+
+
+def test_ingestion_status_unauthorized_is_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unauthorized or missing versions are HTTP 404, not 403."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    application = create_app()
+    application.dependency_overrides[get_ingestion_status_service] = lambda: (
+        _MissingStatusService()
+    )
+    with TestClient(application) as raw_client:
+        client = as_openapi_client(raw_client)
+        response = client.get(
+            f"/ingestion/versions/{uuid4()}/status",
+            headers={
+                "X-Test-User-Id": "00000000-0000-4000-8000-000000000002",
+                "X-Test-Role": "member",
+                "X-Test-Authorization-Version": "1",
+            },
+        )
+    assert response.status_code == 404
+    assert json_object(response.json())["detail"] == "not_found"

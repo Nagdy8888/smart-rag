@@ -2,7 +2,7 @@
 title: Durable job state machine
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering
 ---
 
@@ -155,7 +155,10 @@ stateDiagram-v2
   uploaded --> failed: admission deny after bytes
 ```
 
-`GET /ingestion/versions/{version_id}/status` returns the public `status` plus nested diagnostics: scan evidence/age, review/governance, OCR pages, chunk/table counts, embedding ledger, BM25 index version/lag/retry/dead-letter, queue age, and graph-handoff counts. Owner/admin may retry; members receive 403.
+`GET /ingestion/versions/{version_id}/status` is ACL-gated through
+`app.get_version_ingestion_status`. Unauthorized or missing versions return
+HTTP **404** (no existence leak). `last_error` is sanitized (no stack traces
+or secret-like text). Owner/admin may retry; members receive 403 on retry.
 
 Retrieval RPCs (`retrieve_dense_candidates`, `retrieve_term_candidates`,
 `recheck_retrieval_candidates`) only read chunks whose version equals

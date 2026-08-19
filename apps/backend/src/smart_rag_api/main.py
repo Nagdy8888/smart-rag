@@ -1,25 +1,24 @@
 """FastAPI application entrypoint for the Smart RAG backend.
 
 Importing this module must not construct provider clients, database pools, or
-other networked dependencies. The app object exists so process startup and
-import smoke tests can load the transport boundary.
+other networked dependencies. ``create_app`` loads typed settings so docs URLs
+and ``version`` match the environment; sockets stay in lifespan.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import AsyncGenerator, Awaitable, Callable
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, Request, Response
 from pydantic import SecretStr
-from smart_rag_core.gateways import block_openai_network, create_model_gateway
 from smart_rag_core.observability import configure_json_logging, correlation_context
-from smart_rag_core.retrieval.lightrag_adapter import bind_process_runtime_adapter
-from smart_rag_core.runtime.valkey import SocketValkeyClient
-from smart_rag_core.security.jwks import JwksVerifier
-from smart_rag_core.settings import BackendSettings, load_backend_settings
+from smart_rag_core.settings import BackendSettings, Environment, load_backend_settings
 
+from smart_rag_api.dependencies.identity import reject_forbidden_test_identity_headers
 from smart_rag_api.middleware import (
     add_cors,
     add_security_headers,
@@ -28,10 +27,13 @@ from smart_rag_api.middleware import (
     limit_request_body,
     normalized_request_id,
 )
-from smart_rag_api.services.readiness import build_readiness, readiness_as_dict
-from smart_rag_api.services.sse_stream import QueryRunRegistry
+from smart_rag_api.services.readiness import build_readiness, public_readiness_as_dict
+
+if TYPE_CHECKING:
+    from smart_rag_core.runtime.valkey import SocketValkeyClient
 
 LOGGER = logging.getLogger(__name__)
+_OFFLOAD_MAX_WORKERS = 8
 
 
 def _bind_valkey_client(
@@ -46,6 +48,8 @@ def _bind_valkey_client(
     Returns:
         Client or None when the URL is unset.
     """
+
+    from smart_rag_core.runtime.valkey import SocketValkeyClient
 
     if url is None:
         return None
@@ -76,8 +80,18 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         gateway factory, and, in mock mode, denies OpenAI DNS access.
         When ``LIGHTRAG_DB_URL`` is set, attaches the runtime LightRAG adapter
         without calling schema-admin ``initialize_storages``. Constructs Valkey
-        clients without connecting. Finalizes the adapter on shutdown.
+        clients without connecting. Starts a bounded ``ThreadPoolExecutor`` on
+        ``application.state.offload_executor`` and shuts it down on exit.
+        Finalizes the adapter on shutdown. Gateway and retrieval adapters are
+        imported here so constructing ``create_app`` cannot form a retrieval
+        import cycle.
     """
+
+    from smart_rag_core.gateways import block_openai_network, create_model_gateway
+    from smart_rag_core.retrieval.lightrag_adapter import bind_process_runtime_adapter
+    from smart_rag_core.security.jwks import JwksVerifier
+
+    from smart_rag_api.services.sse_stream import QueryRunRegistry
 
     settings = load_backend_settings()
     configure_json_logging(
@@ -87,7 +101,11 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
     )
     application.state.settings = settings
     application.state.rate_limit_degraded = False
-    application.state.offload_executor = None
+    offload_executor = ThreadPoolExecutor(
+        max_workers=_OFFLOAD_MAX_WORKERS,
+        thread_name_prefix="api-offload",
+    )
+    application.state.offload_executor = offload_executor
     application.state.valkey_limits_client = _bind_valkey_client(
         settings.valkey_limits_url,
         timeout_seconds=settings.valkey_timeout_seconds,
@@ -121,6 +139,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                 extra={"event": "backend.shutdown"},
             )
     finally:
+        offload_executor.shutdown(wait=True, cancel_futures=True)
+        application.state.offload_executor = None
         if adapter is not None:
             await adapter.finalize()
             application.state.lightrag_adapter = None
@@ -159,25 +179,52 @@ async def add_correlation_context(
         return response
 
 
+def _openapi_docs_enabled(settings: BackendSettings) -> bool:
+    """Return whether unauthenticated OpenAPI/docs routes may be mounted.
+
+    Staging and production disable ``/docs``, ``/redoc``, and
+    ``/openapi.json``. Local and test keep them for developers.
+
+    Args:
+        settings: Validated backend settings.
+
+    Returns:
+        True only for ``local`` and ``test``.
+    """
+
+    return settings.app_env in {Environment.LOCAL, Environment.TEST}
+
+
 def create_app() -> FastAPI:
-    """Create the import-safe FastAPI transport application.
+    """Create the FastAPI transport application.
+
+    Settings load is the approved configuration boundary. Docs URLs and the
+    public ``version`` follow that snapshot. Lifecycle sockets still start
+    in ``lifespan``.
 
     Returns:
         FastAPI application with thin routers, security middleware, and
-        dependency-aware readiness. Settings and sockets stay in lifespan.
+        dependency-aware readiness.
+
+    Raises:
+        SettingsValidationError: If environment configuration is invalid.
 
     Side Effects:
-        Creates in-memory FastAPI routing objects only. Settings validation and
-        all lifecycle resources are deferred until application startup.
+        Reads process environment through ``load_backend_settings``.
     """
 
+    settings = load_backend_settings()
+    docs_enabled = _openapi_docs_enabled(settings)
     application = FastAPI(
         title="Smart RAG API",
-        version="0.1.0",
+        version=settings.api_version,
         description=(
             "Authenticated RAG API with Bearer fetch SSE. "
             "Readiness is dependency-aware and never query-ready in mock mode."
         ),
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
         lifespan=lifespan,
     )
     application.middleware("http")(add_correlation_context)
@@ -185,6 +232,7 @@ def create_app() -> FastAPI:
     application.middleware("http")(limit_request_body)
     application.middleware("http")(add_security_headers)
     application.middleware("http")(add_cors)
+    application.middleware("http")(reject_forbidden_test_identity_headers)
     install_error_handlers(application)
 
     from smart_rag_api.routers.auth_team import router as auth_team_router
@@ -236,7 +284,8 @@ def ready() -> dict[str, object]:
     honest for package-import tests that never start lifespan.
 
     Returns:
-        Readiness mapping with ``status=unconfigured`` and ``query_ready=false``.
+        Readiness mapping with ``status=unconfigured`` and ``query_ready=false``
+        in the public shape (no named dependencies).
     """
 
     payload = build_readiness(
@@ -246,7 +295,7 @@ def ready() -> dict[str, object]:
         lightrag_attached=False,
         rate_limit_degraded=False,
     )
-    return readiness_as_dict(payload)
+    return public_readiness_as_dict(payload)
 
 
 app = create_app()

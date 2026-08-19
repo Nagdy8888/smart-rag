@@ -2,7 +2,7 @@
 title: Stitch brief for the Smart RAG console
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: design, frontend, reviewers
 packet: P07-02
 ---
@@ -194,7 +194,7 @@ Screens: (1) MFA required gate matching FastAPI 403 detail "MFA required" for ow
 ### E. Invitation accept / owner setup / team
 
 ```text
-Invitation accept: authenticated user pastes token into POST /invitations/accept; email comes from the session, not the form. Create invitation (owner/admin): email, role owner/admin/member/viewer, upload_enabled checkbox; show raw_token once. Offboard: owner/admin AAL2, user_id, irreversible copy. Owner bootstrap: Unavailable GAP-07-08. Do not list other members unless an API exists — there is no member-list HTTP route, so team admin shows invitations + offboard by user id only, with empty-state copy "No member directory API; identify users from GET /me and audit when available".
+Invitation accept: authenticated user pastes token into POST /invitations/accept; email comes from the session, not the form. Create invitation (owner/admin): email, role owner/admin/member/viewer, upload_enabled checkbox; token is delivered by mail only (not in JSON). Offboard: owner/admin AAL2, user_id, irreversible copy. Owner bootstrap: Unavailable GAP-07-08. Do not list other members unless an API exists — there is no member-list HTTP route, so team admin shows invitations + offboard by user id only, with empty-state copy "No member directory API; identify users from GET /me and audit when available".
 ```
 
 ### F. Main chat (Auto)

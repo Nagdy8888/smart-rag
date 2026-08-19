@@ -32,7 +32,7 @@ resource "aws_instance" "staging" {
   vpc_security_group_ids = [aws_security_group.origin.id]
   iam_instance_profile   = aws_iam_instance_profile.staging.name
   user_data              = file("${path.module}/user-data.sh")
-  user_data_replace_on_change = true
+  user_data_replace_on_change = false
 
   metadata_options {
     http_endpoint               = "enabled"
@@ -54,6 +54,10 @@ resource "aws_instance" "staging" {
     volume_size           = 50
     encrypted             = true
     delete_on_termination = true
+  }
+
+  lifecycle {
+    ignore_changes = [ami, user_data]
   }
 
   tags = {

@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -181,7 +181,10 @@ Accuracy-first: rerank every non-trivial knowledge query with at least two
 authorized candidates. Skip only a trivial exact identifier/quoted-phrase
 lookup with complete terms/filters and two independent channel signals.
 Numeric score gaps never skip. Support is a ranking feature, not a
-probability. Live OpenAI is unused while `MOCK_MODEL_MODE=true`.
+probability. Live OpenAI is unused while `MOCK_MODEL_MODE=true`. The
+batched query embedding and the one rerank call consume the run-local
+reservation (`usage_kind=embedding` / `rerank`) or fail closed when
+remaining USD or model calls cannot cover the kind cap.
 
 ```mermaid
 flowchart TD

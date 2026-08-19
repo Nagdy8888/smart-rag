@@ -2,7 +2,7 @@
 title: Auth and streaming frontend
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: engineering, frontend, security
 packet: P08-02
 ---
@@ -121,7 +121,9 @@ terminal. An in-flight run reconnects with GET `/runs/{id}/events?after=`
 and omits `X-Client-Version`. The same `Idempotency-Key` is reused if POST
 must retry; the server reuses the run. Sequences are monotonic: duplicate
 or older `id` values are ignored. One terminal freezes later token deltas.
-Cancel posts `/runs/{id}/cancel`. Heartbeats increment diagnostics.
+Cancel posts `/runs/{id}/cancel` and aborts the in-flight admit POST and
+resume GET via `AbortSignal`. Heartbeats increment diagnostics. Frames
+whose `query_run_id` is not the current run are ignored.
 
 ## Frame 01/03 and gap decisions
 

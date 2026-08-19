@@ -11,17 +11,27 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from smart_rag_core.gateways.clamav import ClamAvClient
 from smart_rag_core.gateways.crawl_proxy import CrawlProxyGateway
 from smart_rag_core.gateways.storage import StorageGateway
-from smart_rag_core.ingestion.crawl.adapter import BoundedCrawlAdapter
+from smart_rag_core.ingestion.crawl.adapter import (
+    BoundedCrawlAdapter,
+    WebSnapshotRecord,
+)
 from smart_rag_core.ingestion.crawl.exceptions import (
     CrawlLimitExceeded,
     CrawlPolicyError,
 )
+from smart_rag_core.ingestion.scan import ObjectScanInput, scan_object_bytes
 from smart_rag_core.jobs.exceptions import JobLeaseError
 from smart_rag_core.jobs.hybrid_enqueue import enqueue_hybrid_index_job
-from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
+from smart_rag_core.jobs.ingestion_repository import (
+    IngestionJobRepository,
+    configurable_lease_lost,
+)
 from smart_rag_core.repositories.crawl import CrawlRepository
+from smart_rag_core.repositories.scan_events import ScanEventRepository
+from smart_rag_core.schema.enums import ScanResult
 
 from smart_rag_agents.ingestion.checkpointer import compile_ingestion_graph
 
@@ -61,8 +71,33 @@ def validate_crawl_lease(
     state: IngestionCrawlState,
     config: RunnableConfig,
 ) -> IngestionCrawlState:
-    """Validate lease ownership before crawl side effects."""
+    """Validate lease ownership before crawl side effects.
 
+    State inputs:
+        ``job_id``, ``lease_token``.
+
+    State outputs:
+        ``status`` becomes ``crawl_pending`` or ``lease_invalid``.
+
+    Persistence writes:
+        None.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        None. Heartbeat lease loss sets ``configurable.lease_lost``.
+
+    Failure/fallback route:
+        Invalid/expired/lost leases set ``status=lease_invalid`` and skip crawl.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     configurable = cast(dict[str, object], config.get("configurable", {}))
     postgres_url = configurable.get("postgres_url")
     lease_owner = configurable.get("lease_owner")
@@ -103,8 +138,37 @@ def execute_approved_crawl(
     state: IngestionCrawlState,
     config: RunnableConfig,
 ) -> IngestionCrawlState:
-    """Run bounded crawl through the restricted proxy and persist provenance."""
+    """Run bounded crawl, ClamAV-scan snapshots, then enqueue hybrid_index.
 
+    State inputs:
+        Validated ``source_id``, ``version_id``, crawl bounds from approval.
+
+    State outputs:
+        ``status`` ``crawl_completed`` or ``crawl_failed``; ``crawl_run_id``
+        and ``pages_fetched`` on completion.
+
+    Persistence writes:
+        Crawl run/snapshot rows, ``document_scan_events``, and one
+        ``hybrid_index`` job only after every snapshot has a current clean
+        scan.
+
+    External/model calls:
+        Crawl proxy fetches; ClamAV ``INSTREAM`` per snapshot. No embeddings.
+
+    Budget/deadline behavior:
+        Lease re-check and ``lease_lost`` abort before enqueue.
+
+    Failure/fallback route:
+        Missing/dirty scan fails the crawl job and does not enqueue
+        ``hybrid_index``. Fake clean scan success is forbidden.
+    """
+
+    if configurable_lease_lost(config):
+        return {
+            **state,
+            "status": "lease_invalid",
+            "detail": "lease lost",
+        }
     if state["status"] != "crawl_pending" or state["source_id"] is None:
         return state
     configurable = cast(dict[str, object], config.get("configurable", {}))
@@ -241,6 +305,30 @@ def execute_approved_crawl(
             }
             for snapshot in result.snapshots
         ]
+        scan_error = scan_crawl_snapshots_before_index(
+            connection,
+            configurable=configurable,
+            document_id=document_id,
+            version_id=version_id,
+            snapshots=result.snapshots,
+            declared_category="website",
+        )
+        if scan_error is not None:
+            connection.commit()
+            return {
+                **state,
+                "status": "crawl_failed",
+                "crawl_run_id": str(crawl_run_id),
+                "pages_fetched": result.pages_fetched,
+                "detail": scan_error,
+            }
+        if configurable_lease_lost(config):
+            connection.rollback()
+            return {
+                **state,
+                "status": "lease_invalid",
+                "detail": "lease lost",
+            }
         enqueue_hybrid_index_job(
             connection,
             document_id=document_id,
@@ -321,3 +409,107 @@ def build_crawl_ingestion_graph(
         interrupt_after=interrupt_after,
     )
     return compiled  # pyright: ignore[reportReturnType]
+
+
+def scan_crawl_snapshots_before_index(
+    connection: psycopg.Connection,
+    *,
+    configurable: dict[str, object],
+    document_id: UUID,
+    version_id: UUID,
+    snapshots: list[WebSnapshotRecord],
+    declared_category: str,
+) -> str | None:
+    """Scan every crawl snapshot with ClamAV before ``hybrid_index`` enqueue.
+
+    Reuses ``scan_object_bytes`` / ClamAV from the scan-promote path. Does not
+    invent a second scanner and never records a fake clean result.
+
+    Args:
+        connection: Open ``app_worker`` connection that already persisted
+            snapshots.
+        configurable: Graph configurable with Storage and ClamAV settings.
+        document_id: Canonical document id.
+        version_id: Canonical version id.
+        snapshots: Immutable snapshot records from the crawl run.
+        declared_category: Category stored on scan events (``website``).
+
+    Returns:
+        ``None`` when every snapshot is current-clean. Otherwise an operator
+        detail explaining missing/dirty scan.
+
+    Side Effects:
+        Transitions the version ``uploaded`` → ``scanning``, inserts
+        append-only ``document_scan_events``, and calls ClamAV INSTREAM.
+    """
+
+    if not snapshots:
+        return "no_snapshots"
+    storage_url = configurable.get("storage_url")
+    storage_secret = configurable.get("storage_admin_secret")
+    clamav_host = configurable.get("clamav_host", "clamav")
+    clamav_port_raw = configurable.get("clamav_port", 3310)
+    clamav_port = int(clamav_port_raw) if isinstance(clamav_port_raw, int) else 3310
+    if not isinstance(storage_url, str) or not isinstance(storage_secret, str):
+        return "missing storage admin secret for snapshot scan"
+    storage = StorageGateway(supabase_url=storage_url, admin_secret=storage_secret)
+    clamav = ClamAvClient(host=str(clamav_host), port=clamav_port)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT status FROM app.document_versions WHERE id = %s",
+            (version_id,),
+        )
+        status_row = cursor.fetchone()
+    if status_row is None:
+        return "version not found for snapshot scan"
+    current_status = str(status_row[0])
+    if current_status == "uploaded":
+        try:
+            connection.execute(
+                """
+                SELECT app.transition_document_version_status(
+                  %s, 'uploaded'::app.document_status, 'scanning'::app.document_status
+                )
+                """,
+                (version_id,),
+            )
+        except psycopg.Error as exc:
+            return f"scanning_transition_failed:{exc}"[:400]
+    elif current_status != "scanning":
+        return f"unexpected status {current_status} before snapshot scan"
+    scan_repo = ScanEventRepository(connection)
+    hashes: list[str] = []
+    for snapshot in snapshots:
+        if configurable_lease_lost({"configurable": configurable}):
+            return "lease lost"
+        expected_bytes = int(snapshot.decoded_bytes)
+        try:
+            scan = scan_object_bytes(
+                storage,
+                clamav,
+                ObjectScanInput(
+                    bucket=snapshot.storage_bucket,
+                    path=snapshot.storage_path,
+                    expected_hash=snapshot.content_hash,
+                    expected_bytes=expected_bytes,
+                ),
+            )
+        except Exception as exc:
+            return f"snapshot_scan_failed:{exc}"[:400]
+        scan_repo.insert_scan_event(
+            document_id=document_id,
+            version_id=version_id,
+            uploader_user_id=None,
+            session_id=None,
+            declared_category=declared_category,
+            scan=scan,
+        )
+        if scan.result is not ScanResult.CLEAN:
+            return (
+                f"snapshot_scan_{scan.result.value}:"
+                f"{scan.details.get('detail', scan.result.value)}"
+            )[:400]
+        hashes.append(snapshot.content_hash)
+    if not scan_repo.has_current_clean_hashes(version_id, tuple(hashes)):
+        return "missing_or_stale_snapshot_scan"
+    return None

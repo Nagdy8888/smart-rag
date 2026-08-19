@@ -21,6 +21,8 @@ describe("limitationCopy", () => {
     expect(limitationCopy("graph_empty")).toContain("No authorized");
     expect(limitationCopy("graph_deadline")).toContain("deadline");
     expect(limitationCopy("graph_cancelled")).toContain("cancelled");
+    expect(limitationCopy("retrievers_unbound")).toContain("not attached");
+    expect(limitationCopy("retrievers_unbound")).toContain("not grounded");
   });
 
   it("keeps BM25 degrade and Graph Pending as warning, not danger", () => {

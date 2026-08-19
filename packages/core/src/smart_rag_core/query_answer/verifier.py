@@ -111,12 +111,31 @@ def run_verifier_batch(
         raise AnswerError("verifier_loop")
     selected, omitted = select_material_links(payload.atomic_links)
     if not selected or caller is None:
-        return payload, 0, omitted
+        return _force_partial_if_omitted(payload, omitted), 0, omitted
     verdicts = caller(selected)
     if len(verdicts.link_verdicts) > MAX_VERIFIER_LINKS:
         raise AnswerError("verifier_batch_cap")
     updated = apply_verifier_payload(payload, verdicts)
-    return updated, 1, omitted
+    return _force_partial_if_omitted(updated, omitted), 1, omitted
+
+
+def _force_partial_if_omitted(
+    payload: AnswerPayload, omitted: tuple[str, ...]
+) -> AnswerPayload:
+    """Force answer status ``partial`` when verifier omitted material links.
+
+    Args:
+        payload: Answer after deterministic checks and optional verdicts.
+        omitted: Link IDs excluded from the six-link batch.
+
+    Returns:
+        Payload whose ``complete`` status becomes ``partial`` when omitted
+        IDs exist. Already partial/refused statuses are unchanged.
+    """
+
+    if omitted and payload.status == "complete":
+        return payload.model_copy(update={"status": "partial"})
+    return payload
 
 
 def mock_verifier_payload(links: tuple[AtomicLink, ...]) -> VerifierPayload:

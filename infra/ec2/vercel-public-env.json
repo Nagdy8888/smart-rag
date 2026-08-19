@@ -5,6 +5,6 @@
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY"
   ],
-  "live_applied": false,
+  "live_applied": true,
   "live_values": {}
 }

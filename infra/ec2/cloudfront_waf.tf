@@ -127,7 +127,7 @@ resource "aws_cloudfront_distribution" "api" {
     custom_origin_config {
       http_port                = 443
       https_port               = 443
-      origin_protocol_policy   = "https-only"
+      origin_protocol_policy   = var.origin_protocol_policy
       origin_ssl_protocols     = ["TLSv1.2"]
       origin_read_timeout      = 90
       origin_keepalive_timeout = 90

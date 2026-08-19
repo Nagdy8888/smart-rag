@@ -33,11 +33,13 @@ stitch*/
 htmlcov/
 .tox/
 .nox/
+**/.langgraph_api/
 
 # Node
 node_modules/
 apps/frontend/.next/
 apps/frontend/out/
+apps/frontend/.vercel/
 *.tsbuildinfo
 next-env.d.ts
 
@@ -78,6 +80,7 @@ override.tf.json
 terraform.tfvars
 !terraform.tfvars.example
 tfplan
+tfplan.*
 *.tfplan
 !**/*.tfvars.example
 supabase/.temp/

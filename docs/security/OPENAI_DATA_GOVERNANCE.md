@@ -12,7 +12,13 @@ real_company_content_external_processing: prohibited
 
 # OpenAI data governance
 
-**Status: accepted (framework).** Real company corpus remains **prohibited** from OpenAI until org-specific contracted settings in the verification matrix are marked `verified` by the verification owner. Synthetic fixtures and `MOCK_MODEL_MODE=true` paths are out of this prohibition.
+**Status: accepted (framework).** Org-contracted OpenAI settings remain
+`unverified`. Staging and production still must not send **real company**
+corpus until those rows are `verified`. **Local unsigned live keys**
+(`APP_ENV=local` and `MOCK_MODEL_MODE=false`) are an operator waiver so the
+gitignored OpenAI key can run against synthetic fixtures and local chat.
+That waiver does **not** flip this matrix to `verified` and does **not**
+authorize production traffic.
 
 Related: [SUBPROCESSOR_GOVERNANCE.md](./SUBPROCESSOR_GOVERNANCE.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [docs index](../README.md)
 

@@ -132,3 +132,14 @@ def test_sandbox_escape_fixture_rejected_inprocess(tmp_path: Path) -> None:
     )
     assert result.disposition is ParseDisposition.SUPPORTED
     assert result.elements
+
+
+def test_default_sandbox_config_requires_docker() -> None:
+    """Production default launcher config always requests Docker."""
+
+    launcher = ParserSandboxLauncher()
+    assert launcher.config.use_docker is True
+    explicit = ParserSandboxLauncher(
+        config=SandboxLaunchConfig(image="unused", use_docker=False)
+    )
+    assert explicit.config.use_docker is False

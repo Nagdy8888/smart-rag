@@ -39,6 +39,7 @@
     "/ingestion/versions/{version_id}/status",
     "/invitations/accept",
     "/me",
+    "/ops/ready",
     "/runs/{run_id}",
     "/runs/{run_id}/cancel",
     "/runs/{run_id}/citations",

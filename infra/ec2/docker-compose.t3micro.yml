@@ -1,0 +1,70 @@
+# t3.micro overlay. User 2026-08-19: this instance type is the accepted
+# staging host; m6i.xlarge is not used. Default `up -d` starts only
+# ParadeDB and split Valkey. Edge/API stay behind profile t3micro-edge.
+# Worker, api-green, ClamAV, and parser stay behind not-on-t3micro.
+# Do not publish private host ports. Phase 9 image digests stay in the
+# base file. Packet 5 load is not claimed on 1Gi RAM.
+#
+# ParadeDB Docker auto-tunes shared_buffers from the container cgroup
+# (docs.paradedb.com performance-tuning). Keep mem_limit so that tune
+# stays inside 1Gi.
+
+services:
+  paradedb:
+    mem_limit: 280m
+    environment:
+      PDB_TUNE: "true"
+
+  valkey-limits:
+    mem_limit: 48m
+    command:
+      [
+        "valkey-server",
+        "--requirepass",
+        "${VALKEY_LIMITS_PASSWORD:?set VALKEY_LIMITS_PASSWORD}",
+        "--maxmemory",
+        "24mb",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+
+  valkey-cache:
+    mem_limit: 80m
+    command:
+      [
+        "valkey-server",
+        "--requirepass",
+        "${VALKEY_CACHE_PASSWORD:?set VALKEY_CACHE_PASSWORD}",
+        "--maxmemory",
+        "48mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+
+  caddy:
+    profiles: ["t3micro-edge"]
+    mem_limit: 64m
+
+  api-blue:
+    profiles: ["t3micro-edge"]
+    mem_limit: 200m
+
+  crawl-proxy:
+    profiles: ["t3micro-edge"]
+    mem_limit: 64m
+
+  provider-egress-proxy:
+    profiles: ["t3micro-edge"]
+    mem_limit: 48m
+
+  api-green:
+    profiles: ["not-on-t3micro"]
+
+  worker:
+    profiles: ["not-on-t3micro"]
+
+  clamav:
+    profiles: ["not-on-t3micro"]
+
+  parser-sandbox:
+    profiles: ["not-on-t3micro"]

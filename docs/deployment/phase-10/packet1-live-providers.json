@@ -11,5 +11,5 @@
   "supabase_provision": "Blocked",
   "terraform_installed": true,
   "tofu_installed": false,
-  "vercel_provision": "Blocked"
+  "vercel_provision": "Applied"
 }

@@ -12,9 +12,15 @@ from uuid import UUID
 
 import psycopg
 from fastapi.responses import StreamingResponse
+
+# isort: off
+# hybrid_run must finish before query_admission package init (ceilings cycle).
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
+
+# isort: on
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.sse.catalog import (
     HEARTBEAT_INTERVAL_SECONDS,
@@ -126,58 +132,84 @@ class LangGraphQueryRunExecutor:
         """Create an executor that opens checkpointer/store lazily.
 
         Side Effects:
-            None at construction. First ``execute`` may open a Postgres pool.
+            None at construction. First ``execute`` may open a Postgres pool
+            and construct process Hybrid/gateway bindings.
             ``PostgresSaver.setup()`` and ``PostgresStore.setup()`` are never
             called.
         """
 
-        self._compiled = None
         self._holder = None
         self._store = None
+        self._bindings = None
 
-    def _runtime_graph(self, conversation_id: object):
-        """Compile the query graph with a checkpointer when a DSN is configured.
+    def _process_bindings(self, settings: object):
+        """Return process-reusable Hybrid/gateway bindings.
 
         Args:
-            conversation_id: Unused; thread id is applied per invoke.
+            settings: Backend settings used when lifespan state is absent.
 
         Returns:
-            Compiled graph. Module-level Studio ``graph`` stays checkpointer-free.
+            ``QueryGraphProcessBindings`` with non-null Hybrid and gateway.
+
+        Raises:
+            QueryGraphRuntimeError: When required adapters cannot be built.
+
+        Side Effects:
+            Caches process Hybrid/gateway bindings on this executor.
         """
 
-        del conversation_id
-        if self._compiled is not None:
-            return self._compiled
-        from smart_rag_agents.query.checkpointer import open_query_checkpointer
-        from smart_rag_agents.query.deps import QueryGraphDeps
-        from smart_rag_agents.query.graph import compile_query_graph, graph
-        from smart_rag_agents.query.store import open_query_memory_store
-        from smart_rag_core.settings import load_backend_settings
+        from smart_rag_api.services.query_graph_runtime import (
+            build_query_process_bindings,
+        )
 
-        settings = load_backend_settings()
-        dsn = settings.resolved_checkpoint_dsn()
-        deps = QueryGraphDeps()
-        if dsn is not None:
+        if self._bindings is not None:
+            return self._bindings
+        self._bindings = build_query_process_bindings(settings=settings)
+        return self._bindings
+
+    def _bind_memory_store(self, settings: object):
+        """Open the compact memory store and checkpointer once per process.
+
+        Args:
+            settings: Backend settings with the checkpoint DSN.
+
+        Returns:
+            ``(store_get, store_put)`` callables, or ``(None, None)``.
+
+        Side Effects:
+            Opens a checkpointer pool and memory store on first use.
+        """
+
+        resolved = getattr(settings, "resolved_checkpoint_dsn", None)
+        dsn = resolved() if callable(resolved) else None
+        if dsn is None:
+            return None, None
+        if self._holder is None:
+            from smart_rag_agents.query.checkpointer import open_query_checkpointer
+            from smart_rag_agents.query.store import open_query_memory_store
+
             self._holder = open_query_checkpointer(dsn)
-            memory_store = open_query_memory_store(dsn)
-            self._store = memory_store
+            self._store = open_query_memory_store(dsn)
+        memory_store = self._store
+        if memory_store is None:
+            return None, None
 
-            def _bind_put(
-                namespace: tuple[str, str, str],
-                key: str,
-                payload: dict[str, object],
-            ) -> None:
-                memory_store.put_compact(namespace, key, payload)
+        def _bind_put(
+            namespace: tuple[str, str, str],
+            key: str,
+            payload: dict[str, object],
+        ) -> None:
+            """Write one compact store item.
 
-            deps.store_get = memory_store.get_compact
-            deps.store_put = _bind_put
-            self._compiled = compile_query_graph(
-                deps,
-                checkpointer=self._holder.saver,
-            )
-            return self._compiled
-        self._compiled = graph
-        return self._compiled
+            Args:
+                namespace: Store namespace tuple.
+                key: Item key.
+                payload: Compact JSON mapping.
+            """
+
+            memory_store.put_compact(namespace, key, payload)
+
+        return memory_store.get_compact, _bind_put
 
     async def execute(
         self,
@@ -217,10 +249,14 @@ class LangGraphQueryRunExecutor:
             tracing_enabled=settings.langsmith_tracing,
             content_class=(
                 ContentClass.SYNTHETIC
-                if settings.mock_model_mode
+                if (
+                    settings.mock_model_mode
+                    or settings.allows_unsigned_local_live_providers()
+                )
                 else ContentClass.REAL_COMPANY
             ),
             provider_settings_verified=settings.subprocessor_matrix_verified,
+            local_unsigned_waiver=settings.allows_unsigned_local_live_providers(),
         )
         trace_extra = query_run_trace_metadata(
             run_id=context.run_id,
@@ -238,22 +274,47 @@ class LangGraphQueryRunExecutor:
             yield ("partial", {"reason": "deadline_exhausted"})
             return
 
-        from smart_rag_agents.query.graph import pending_query_state
-
-        compiled = self._runtime_graph(context.conversation_id)
-        state = pending_query_state(
-            authorized_runtime=context.model_dump(mode="json"),
-            user_query=message,
+        from smart_rag_agents.query.graph import (
+            compile_query_graph,
+            pending_query_state,
         )
-        config: dict[str, object] = {
-            "recursion_limit": context.recursion_limit,
-            "configurable": {"thread_id": str(context.conversation_id)},
-        }
-        stream_method: Callable[..., AsyncIterator[object]] = compiled.astream  # type: ignore[reportUnknownMemberType]
-        stream_iter = stream_method(state, cast(Any, config), stream_mode="updates")
-        last_remaining_calls = context.model_call_ceiling
-        last_status = "running"
+        from smart_rag_core.query_routing.constants import (
+            LIMITATION_VERIFIER_OMITTED_LINKS,
+        )
+
+        from smart_rag_api.services.query_graph_runtime import (
+            QueryGraphRuntimeError,
+            build_query_graph_deps,
+            open_run_app_api_connection,
+        )
+
+        connection = None
+        stream_iter: object | None = None
         try:
+            bindings = self._process_bindings(settings)
+            connection = open_run_app_api_connection(bindings.supabase_dsn)
+            store_get, store_put = self._bind_memory_store(settings)
+            deps = build_query_graph_deps(
+                bindings=bindings,
+                connection=connection,
+                cancel_check=cancel_event.is_set,
+                store_get=store_get,
+                store_put=store_put,
+            )
+            checkpointer = self._holder.saver if self._holder is not None else None
+            compiled = compile_query_graph(deps, checkpointer=checkpointer)
+            state = pending_query_state(
+                authorized_runtime=context.model_dump(mode="json"),
+                user_query=message,
+            )
+            config: dict[str, object] = {
+                "recursion_limit": context.recursion_limit,
+                "configurable": {"thread_id": str(context.conversation_id)},
+            }
+            stream_method: Callable[..., AsyncIterator[object]] = compiled.astream  # type: ignore[reportUnknownMemberType]
+            stream_iter = stream_method(state, cast(Any, config), stream_mode="updates")
+            last_remaining_calls = context.model_call_ceiling
+            last_status = "running"
             async for raw_chunk in stream_iter:
                 if cancel_event.is_set():
                     return
@@ -283,6 +344,14 @@ class LangGraphQueryRunExecutor:
                         "status",
                         {"stage": node_name[:64], "status": status},
                     )
+                    verification = update_map.get("verification")
+                    if isinstance(verification, dict) and verification.get(
+                        "omitted_link_ids"
+                    ):
+                        yield (
+                            "limitation",
+                            {"code": LIMITATION_VERIFIER_OMITTED_LINKS},
+                        )
                     if update_map and raw_status_is_partial(update_map):
                         yield (
                             "deadline",
@@ -297,7 +366,11 @@ class LangGraphQueryRunExecutor:
                     terminal_status=last_status,
                 )
                 yield ("completed", {})
+        except QueryGraphRuntimeError as exc:
+            yield ("error", {"code": exc.reason})
         finally:
+            if connection is not None:
+                connection.close()
             close = getattr(stream_iter, "aclose", None)
             if callable(close):
                 closed = close()
@@ -638,7 +711,6 @@ class SseStreamService:
         record = self.assert_readable(caller, run_id=run_id)
         live = self._registry.get(run_id)
         if live is None and record.status in _NON_STARTABLE_STATUSES:
-            self._emit_worker_unavailable(caller, run_id)
             async for frame, sequence, terminal in self._replay(caller, run_id, cursor):
                 cursor = sequence
                 yield frame
@@ -845,11 +917,21 @@ class SseStreamService:
     def _emit_worker_unavailable(self, caller: CallerContext, run_id: UUID) -> None:
         """Persist schema then a sanitized terminal when this process cannot run.
 
+        Allowed only for true orphans: ``pending`` with no startable input on
+        this process. Never persist ``worker_unavailable`` while status is
+        ``running`` (another replica may still complete the run).
+
         Args:
             caller: Owner.
             run_id: Run id.
         """
 
+        try:
+            record = self._store.get_authorized_run(caller, run_id=run_id)
+        except QueryAdmissionError:
+            return
+        if record.status in _NON_STARTABLE_STATUSES:
+            return
         self._ensure_schema(caller, run_id)
         if not self._has_terminal(caller, run_id):
             self._append(caller, run_id, "error", {"code": "worker_unavailable"})

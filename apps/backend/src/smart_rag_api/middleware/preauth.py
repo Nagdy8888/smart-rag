@@ -1,10 +1,11 @@
 """Burst-tolerant pre-auth IP limits for FastAPI-owned mutations.
 
-Skips health, meta, and OpenAPI. When neither Valkey nor Postgres is
-configured the process is unconfigured (not a dual outage) and this
-middleware does not fail-open a bound limiter — it skips until backends
-exist. Dual outage of bound backends is fail-closed inside
-``check_auth_rate_limit``.
+Skips health and meta. OpenAPI and docs routes are not skipped; when local
+docs stay enabled they are still subject to mutation-method limits. When
+neither Valkey nor Postgres is configured the process is unconfigured (not a
+dual outage) and this middleware does not fail-open a bound limiter — it
+skips until backends exist. Dual outage of bound backends is fail-closed
+inside ``check_auth_rate_limit``.
 """
 
 from __future__ import annotations
@@ -19,9 +20,6 @@ from smart_rag_api.services.auth_rate_limits import RateLimitKind, hashed_ip_buc
 _SKIP_PREFIXES = (
     "/health",
     "/api/meta",
-    "/openapi.json",
-    "/docs",
-    "/redoc",
 )
 _MUTATION_PREFIXES = (
     "/admin/",
@@ -32,6 +30,7 @@ _MUTATION_PREFIXES = (
     "/ingestion/jobs/",
     "/runs/",
     "/tables/analyze",
+    "/graph/",
 )
 
 

@@ -12,6 +12,7 @@ from smart_rag_core.ingestion.governance import (
 from smart_rag_core.ingestion.parser.sandbox.launcher import (
     ParserSandboxLauncher,
     SandboxLaunchConfig,
+    inprocess_parser_permitted,
 )
 from smart_rag_core.ingestion.parser.types import ParseDisposition, ParseResult
 
@@ -41,9 +42,25 @@ class ParserService:
     """Coordinate sandbox parsing and post-extraction governance."""
 
     def __init__(self, launcher: ParserSandboxLauncher | None = None) -> None:
-        """Initialize with optional sandbox launcher override."""
+        """Initialize with optional sandbox launcher override.
 
-        self._launcher = launcher or ParserSandboxLauncher()
+        Args:
+            launcher: Explicit launcher. ``None`` uses Docker by default.
+                In-process parsing is selected only when
+                ``ALLOW_INPROCESS_PARSER`` is set and ``APP_ENV=test``.
+        """
+
+        if launcher is not None:
+            self._launcher = launcher
+        elif inprocess_parser_permitted():
+            self._launcher = ParserSandboxLauncher(
+                config=SandboxLaunchConfig(
+                    image="smart-rag-parser-sandbox:local",
+                    use_docker=False,
+                )
+            )
+        else:
+            self._launcher = ParserSandboxLauncher()
 
     def parse_and_govern(
         self,

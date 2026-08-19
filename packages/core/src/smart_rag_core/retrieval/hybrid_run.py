@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import time
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Protocol, TypedDict, TypeGuard, cast
-from uuid import UUID
+from typing import TYPE_CHECKING, Protocol, TypedDict, TypeGuard, cast
+from uuid import UUID, uuid4
 
 import psycopg
 
@@ -23,6 +22,10 @@ from smart_rag_core.gateways.embedding import (
 from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL,
+)
+from smart_rag_core.query_admission.exceptions import (
+    QueryBudgetError,
+    QueryCeilingError,
 )
 from smart_rag_core.retrieval.context import ContextFn, RerankFn, select_hybrid_context
 from smart_rag_core.retrieval.context_loader import (
@@ -39,6 +42,7 @@ from smart_rag_core.retrieval.hybrid import (
 from smart_rag_core.retrieval.profiles import (
     FINAL_EVIDENCE_MAX,
     MAX_NORMALIZED_QUERY_CHARS,
+    RERANK_MODEL_ID,
     RETRIEVAL_SLICE_SECONDS,
     RetrievalFallbackReason,
 )
@@ -46,6 +50,7 @@ from smart_rag_core.retrieval.rerank import (
     RerankFallbackReason,
     RerankPassage,
     RerankRanking,
+    RerankUsage,
 )
 from smart_rag_core.retrieval.temporal import TemporalDocument, TemporalIntent
 from smart_rag_core.retrieval.types import (
@@ -54,8 +59,12 @@ from smart_rag_core.retrieval.types import (
     RetrievalCandidate,
     TermRetrievalResult,
 )
+from smart_rag_core.runtime.async_bridge import run_coro_blocking
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
+
+if TYPE_CHECKING:
+    from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 
 # Fusion rejects a fourth per-channel list. Embeddings still batch original
 # plus at most three variants (at most four unique strings) as one call.
@@ -68,6 +77,152 @@ _DenseRetrieveCall = Callable[..., DenseRetrievalResult | _CandidateList]
 _TermRetrieveCall = Callable[..., TermRetrievalResult | _CandidateList]
 _Bm25RetrieveCall = Callable[..., object]
 _ChannelJob = Callable[[], object]
+
+
+def _counted_retrieve_send(
+    budget: QueryRetrieveBudget | None,
+    *,
+    usage_kind: str,
+    model_id: str,
+    send: Callable[[], object],
+) -> object:
+    """Consume the run-local reservation for one retrieve-time gateway call.
+
+    Args:
+        budget: Retrieve ledger. ``None`` leaves the call uncounted so
+            existing unit tests without a reservation keep working.
+        usage_kind: ``embedding`` or ``rerank``.
+        model_id: Provider model identifier recorded on usage.
+        send: Provider invocation.
+
+    Returns:
+        ``send`` result.
+
+    Raises:
+        QueryCeilingError: When remaining model calls cannot cover the kind.
+        QueryBudgetError: When remaining USD cannot cover the kind cap, or
+            durable consume is rejected.
+
+    Side Effects:
+        Debits ``budget`` remaining. When connection and reservation ids are
+        present, consumes via ``execute_counted_model_call`` so reserved USD
+        cannot be silently exceeded.
+    """
+
+    if budget is None:
+        return send()
+    from smart_rag_core.query_admission.ceilings import (
+        assert_retrieve_kind_available,
+        debit_retrieve_budget,
+    )
+    from smart_rag_core.query_admission.usage import execute_counted_model_call
+
+    connection = budget.connection
+    caller = budget.caller
+    run_id = budget.run_id
+    reservation_id = budget.reservation_id
+    if (
+        isinstance(connection, psycopg.Connection)
+        and isinstance(caller, CallerContext)
+        and isinstance(run_id, UUID)
+        and isinstance(reservation_id, UUID)
+    ):
+        assert_retrieve_kind_available(
+            remaining_model_calls=budget.remaining_model_calls,
+            remaining_usd=budget.remaining_usd,
+            usage_kind=usage_kind,
+        )
+        result, consumed, _usage_id = execute_counted_model_call(
+            connection,
+            caller=caller,
+            run_id=run_id,
+            reservation_id=reservation_id,
+            expected_version=budget.expected_version,
+            usage_kind=usage_kind,
+            model_id=model_id,
+            provider_attempt_id=str(uuid4()),
+            send=send,
+        )
+        budget.expected_version = consumed.optimistic_version
+        debit_retrieve_budget(budget, usage_kind, remaining_usd=consumed.remaining_usd)
+        return result
+    debit_retrieve_budget(budget, usage_kind)
+    return send()
+
+
+def _counted_rerank(
+    inner: RerankFn,
+    budget: QueryRetrieveBudget | None,
+    *,
+    count_gateway: bool,
+) -> RerankFn:
+    """Wrap one rerank callback so it consumes remaining before the provider.
+
+    Args:
+        inner: Injected rerank callback or identity fallback.
+        budget: Retrieve ledger.
+        count_gateway: True when ``inner`` is a real gateway callback.
+
+    Returns:
+        Rerank callback. Identity rerank is not a counted gateway call.
+        Insufficient remaining returns ``rerank_budget_denied`` without
+        calling the provider.
+    """
+
+    if not count_gateway or budget is None:
+        return inner
+
+    def _wrapped(
+        query: str,
+        pool: tuple[RerankPassage, ...],
+        remaining_deadline_seconds: float,
+    ) -> tuple[tuple[RerankRanking, ...], RerankUsage | None, RerankFallbackReason]:
+        """Fail closed when remaining cannot cover rerank, else debit and call.
+
+        Args:
+            query: Original user query.
+            pool: Authorized rerank pool.
+            remaining_deadline_seconds: Remaining Hybrid deadline share.
+
+        Returns:
+            Rankings, usage, and fallback reason from ``inner``, or empty
+            rankings with ``rerank_budget_denied``.
+        """
+
+        from smart_rag_core.query_admission.ceilings import (
+            assert_retrieve_kind_available,
+        )
+
+        try:
+            assert_retrieve_kind_available(
+                remaining_model_calls=budget.remaining_model_calls,
+                remaining_usd=budget.remaining_usd,
+                usage_kind="rerank",
+            )
+        except (QueryBudgetError, QueryCeilingError):
+            return (), None, RerankFallbackReason.BUDGET_DENIED
+
+        def _send() -> object:
+            """Invoke the inner reranker.
+
+            Returns:
+                Inner rerank triple.
+            """
+
+            return inner(query, pool, remaining_deadline_seconds)
+
+        counted = _counted_retrieve_send(
+            budget,
+            usage_kind="rerank",
+            model_id=RERANK_MODEL_ID,
+            send=_send,
+        )
+        return cast(
+            tuple[tuple[RerankRanking, ...], RerankUsage | None, RerankFallbackReason],
+            counted,
+        )
+
+    return _wrapped
 
 
 class _DenseRetrieverLike(Protocol):
@@ -277,6 +432,7 @@ class HybridRetriever:
         self._load_context = load_context
         self._rerank = rerank
         self._channel_jobs = channel_jobs
+        self.query_budget: QueryRetrieveBudget | None = None
 
     def retrieve(
         self,
@@ -309,7 +465,9 @@ class HybridRetriever:
             ``first_evidence_ms``, and call counts.
 
         Side Effects:
-            At most one embedding batch and one rerank call. Channel jobs may
+            At most one embedding batch and one rerank call. When
+            ``query_budget`` is bound, each gateway call consumes the
+            run-local reservation or fails closed. Channel jobs may
             read ParadeDB and Supabase. No holdout access. No answer tokens.
         """
 
@@ -328,7 +486,9 @@ class HybridRetriever:
             return _closed_result(query_check, started=started)
 
         texts = _query_texts(query, profile)
-        embed_response, embed_error = self._embed_query_texts(texts)
+        embed_response, embed_error = self._embed_query_texts(
+            texts, budget=self.query_budget
+        )
         if embed_error is not None or embed_response is None:
             return _closed_result(
                 embed_error or RetrievalFallbackReason.DENSE_UNAVAILABLE,
@@ -436,7 +596,11 @@ class HybridRetriever:
             kwargs=assemble_kwargs,
         )
         remaining = max(0.0, slice_seconds - (time.perf_counter() - started))
-        rerank_fn: RerankFn = self._rerank or _identity_rerank
+        rerank_fn: RerankFn = _counted_rerank(
+            self._rerank or _identity_rerank,
+            self.query_budget,
+            count_gateway=self._rerank is not None,
+        )
         rerank_calls = 0
         evidence: tuple[EvidenceUnit, ...] = ()
         if assembled.fused and resolved_profile is not None:
@@ -474,17 +638,40 @@ class HybridRetriever:
             cache_key=assembled.cache_key,
         )
 
+    def authorized_chunk_loader(self, caller: CallerContext) -> ContextFn:
+        """Return the ACL-rechecking context loader for canonical citation text.
+
+        Args:
+            caller: Server-derived identity.
+
+        Returns:
+            Loader that fetches authorized ``ChunkContext`` rows, including
+            parents. Empty raw_text rows stay in the result so callers can
+            drop them.
+
+        Side Effects:
+            May issue ``fetch_authorized_chunk_context`` RPCs when no
+            injected loader is bound.
+        """
+
+        cache: dict[UUID, ChunkContext] = {}
+        return self._bound_loader(caller, cache)
+
     def _embed_query_texts(
         self,
         texts: tuple[str, ...],
+        budget: QueryRetrieveBudget | None = None,
     ) -> tuple[EmbeddingResponse | None, RetrievalFallbackReason | None]:
         """Issue one batched gateway embedding call.
 
         Args:
             texts: Unique original plus variants, already bounded.
+            budget: Optional retrieve ledger. When set, the batch consumes
+                the run-local reservation before the provider call.
 
         Returns:
-            Response and optional fallback when the gateway fails.
+            Response and optional fallback when the gateway fails or
+            remaining cannot cover the embedding kind cap.
         """
 
         request = EmbeddingRequest(
@@ -493,8 +680,33 @@ class HybridRetriever:
             model=EMBEDDING_MODEL,
             dimensions=EMBEDDING_DIMENSIONS,
         )
+
+        def _send() -> EmbeddingResponse:
+            """Await the embedding gateway from this sync retrieve.
+
+            Returns:
+                Embedding response.
+
+            Raises:
+                Exception: Provider or loop failures. Mapped to dense
+                    unavailable by the caller.
+            """
+
+            result = run_coro_blocking(self._embedding_gateway.embed(request))
+            return cast(EmbeddingResponse, result)
+
         try:
-            response = asyncio.run(self._embedding_gateway.embed(request))
+            response = cast(
+                EmbeddingResponse,
+                _counted_retrieve_send(
+                    budget,
+                    usage_kind="embedding",
+                    model_id=EMBEDDING_MODEL,
+                    send=_send,
+                ),
+            )
+        except (QueryBudgetError, QueryCeilingError):
+            return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
         except Exception:
             return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
         if len(response.vectors) != len(texts):

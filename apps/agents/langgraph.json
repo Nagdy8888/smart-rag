@@ -1,7 +1,9 @@
 {
+  "python_version": "3.11",
   "dependencies": ["."],
   "graphs": {
     "query": "./src/smart_rag_agents/query/graph.py:graph",
+    "query_studio": "./src/smart_rag_agents/query/studio.py:graph",
     "ingestion": "./src/smart_rag_agents/ingestion/graph.py:graph"
   }
 }

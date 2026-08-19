@@ -22,7 +22,7 @@ from tests.contract.sse_http_support import (
     require_str,
     sse_headers,
 )
-from tests.unit.typed_openapi import json_object
+from tests.unit.typed_openapi import json_object, permit_test_identity
 
 _HELD_STREAMS = 5
 _WAIT_SECONDS = 16.0
@@ -61,7 +61,7 @@ def test_five_held_streams_meet_lag_and_heartbeat_gates(
     remains packet 8.
     """
 
-    monkeypatch.setenv("APP_ENV", "test")
+    permit_test_identity(monkeypatch)
     patch_sse_rate_limits(monkeypatch)
     store = MemoryRunEventStore()
     executor = FixtureQueryRunExecutor(hold_seconds=30, emit_completed=False)

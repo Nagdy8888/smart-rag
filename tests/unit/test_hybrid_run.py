@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from decimal import Decimal
 from typing import Protocol, cast, runtime_checkable
 from uuid import UUID, uuid4
 
@@ -15,6 +16,7 @@ from smart_rag_core.gateways.embedding import (
     EmbeddingRequest,
     MockEmbeddingAdapter,
 )
+from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 from smart_rag_core.query_profile.profiler import profile_query_sync
 from smart_rag_core.retrieval import hybrid_run as hybrid_run_mod
 from smart_rag_core.retrieval.context_loader import (
@@ -796,3 +798,65 @@ def test_restrict_version_id_drops_other_versions() -> None:
     )
     assert kept.chunk_id in result.ranked_ids
     assert dropped.chunk_id not in result.ranked_ids
+
+
+def test_retrieve_embed_and_rerank_debit_remaining() -> None:
+    """A retrieve that embeds and reranks decrements remaining and records kinds."""
+
+    one = _candidate(rank=1)
+    two = _candidate(rank=2)
+    contexts = {
+        one.chunk_id: _context(one, text="canonical leave one"),
+        two.chunk_id: _context(two, text="canonical leave two"),
+    }
+    rerank_calls: list[int] = []
+    retriever = _retriever(contexts=contexts, rerank_calls=rerank_calls)
+    budget = QueryRetrieveBudget(
+        remaining_model_calls=7,
+        remaining_usd=Decimal("2.80"),
+    )
+    retriever.query_budget = budget
+    profile = profile_query_sync("annual leave policy").profile
+    result = retriever.retrieve(
+        query="annual leave policy",
+        caller=_caller(),
+        profile=profile,
+        channel_jobs={"dense": lambda: (one, two)},
+    )
+    assert result.embedding_call_count == 1
+    assert result.rerank_call_count == 1
+    assert rerank_calls == [1]
+    assert budget.usage_kinds == ["embedding", "rerank"]
+    assert budget.remaining_model_calls == 5
+    assert budget.remaining_usd == Decimal("2.58")
+
+
+def test_retrieve_rerank_fails_closed_when_reservation_short() -> None:
+    """Rerank is not invoked when remaining USD cannot cover the kind cap."""
+
+    one = _candidate(rank=1)
+    two = _candidate(rank=2)
+    contexts = {
+        one.chunk_id: _context(one, text="canonical leave one"),
+        two.chunk_id: _context(two, text="canonical leave two"),
+    }
+    rerank_calls: list[int] = []
+    retriever = _retriever(contexts=contexts, rerank_calls=rerank_calls)
+    budget = QueryRetrieveBudget(
+        remaining_model_calls=7,
+        remaining_usd=Decimal("0.10"),
+    )
+    retriever.query_budget = budget
+    profile = profile_query_sync("annual leave policy").profile
+    result = retriever.retrieve(
+        query="annual leave policy",
+        caller=_caller(),
+        profile=profile,
+        channel_jobs={"dense": lambda: (one, two)},
+    )
+    assert result.embedding_call_count == 1
+    assert "embedding" in budget.usage_kinds
+    assert "rerank" not in budget.usage_kinds
+    assert rerank_calls == []
+    assert budget.remaining_usd == Decimal("0.08")
+    assert result.rerank_call_count == 0

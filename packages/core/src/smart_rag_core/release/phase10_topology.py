@@ -47,10 +47,12 @@ from smart_rag_core.release.phase10_constants import (
     SIGNED_FULL_CHUNKS,
     SIGNED_FULL_HYBRID_VERSIONS,
     STAGING_CADDY_FILE,
+    STAGING_CADDY_HTTP443_FILE,
     STAGING_COMPOSE_FILE,
     STAGING_ORIGIN_SERVICES,
     STAGING_PRIVATE_NO_HOST_PORT_SERVICES,
     STAGING_REQUIRED_SERVICES,
+    STAGING_T3MICRO_COMPOSE_FILE,
     SUPABASE_FEATURES,
     TOPOLOGY_SCHEMA_VERSION,
     VALKEY_DIGEST,
@@ -661,6 +663,70 @@ def assert_compose_policy(compose_text: str) -> None:
         raise Phase10TopologyError("parser-sandbox must use network_mode none")
 
 
+def _mem_limit_mebibytes(block: str, service: str) -> int:
+    """Return the Compose mem_limit for a service in MiB.
+
+    Args:
+        block: Compose service body.
+        service: Service name for error text.
+
+    Returns:
+        Memory limit in MiB.
+
+    Raises:
+        Phase10TopologyError: If mem_limit is missing or not ``Nm``/``Ng``.
+    """
+
+    match = re.search(r"mem_limit:\s*(\d+)(m|g)\b", block, flags=re.I)
+    if match is None:
+        raise Phase10TopologyError(f"{service} overlay missing mem_limit")
+    value = int(match.group(1))
+    unit = match.group(2).lower()
+    if unit == "g":
+        return value * 1024
+    return value
+
+
+def assert_t3micro_overlay(overlay_text: str) -> None:
+    """Require the t3.micro overlay to fit 1Gi and keep private services private.
+
+    Args:
+        overlay_text: ``docker-compose.t3micro.yml`` source.
+
+    Raises:
+        Phase10TopologyError: If heavy services would start by default, private
+            services publish ports, or memory limits exceed the 1Gi host.
+    """
+
+    if "ports:" in overlay_text:
+        raise Phase10TopologyError("t3.micro overlay must not add host ports")
+    paradedb = _compose_service_block(overlay_text, "paradedb")
+    if _mem_limit_mebibytes(paradedb, "paradedb") > 320:
+        raise Phase10TopologyError("t3.micro ParadeDB mem_limit must be <= 320m")
+    limits = _compose_service_block(overlay_text, "valkey-limits")
+    cache = _compose_service_block(overlay_text, "valkey-cache")
+    if _mem_limit_mebibytes(limits, "valkey-limits") > 64:
+        raise Phase10TopologyError("t3.micro valkey-limits mem_limit must be <= 64m")
+    if _mem_limit_mebibytes(cache, "valkey-cache") > 96:
+        raise Phase10TopologyError("t3.micro valkey-cache mem_limit must be <= 96m")
+    if "noeviction" not in limits:
+        raise Phase10TopologyError("t3.micro valkey-limits must keep noeviction")
+    if "allkeys-lru" not in cache:
+        raise Phase10TopologyError("t3.micro valkey-cache must keep allkeys-lru")
+    if "VALKEY_LIMITS_PASSWORD" not in limits:
+        raise Phase10TopologyError("t3.micro valkey-limits credentials are missing")
+    if "VALKEY_CACHE_PASSWORD" not in cache:
+        raise Phase10TopologyError("t3.micro valkey-cache credentials are missing")
+    for name in ("caddy", "api-blue", "crawl-proxy", "provider-egress-proxy"):
+        block = _compose_service_block(overlay_text, name)
+        if "t3micro-edge" not in block:
+            raise Phase10TopologyError(f"{name} must use profile t3micro-edge")
+    for name in ("api-green", "worker", "clamav", "parser-sandbox"):
+        block = _compose_service_block(overlay_text, name)
+        if "not-on-t3micro" not in block:
+            raise Phase10TopologyError(f"{name} must stay off t3.micro by default")
+
+
 def assert_caddy_policy(caddy_text: str) -> None:
     """Require 90s timeouts, SSE flush, and dual origin-header acceptance.
 
@@ -691,6 +757,23 @@ def assert_caddy_policy(caddy_text: str) -> None:
         raise Phase10TopologyError("Caddy must deny unmatched origin headers")
 
 
+def assert_caddy_http443_policy(caddy_text: str) -> None:
+    """Require the t3.micro HTTP-on-443 Caddyfile to keep Packet 1 origin rules.
+
+    Args:
+        caddy_text: ``Caddyfile.http443`` source.
+
+    Raises:
+        Phase10TopologyError: If HTTP-on-443, dual headers, 90s, or 403 drift.
+    """
+
+    assert_caddy_policy(caddy_text)
+    if "auto_https off" not in caddy_text:
+        raise Phase10TopologyError("t3.micro Caddy must disable ACME auto_https")
+    if "http://:443" not in caddy_text:
+        raise Phase10TopologyError("t3.micro Caddy must listen HTTP on 443")
+
+
 def assert_user_data_policy(user_data: str) -> None:
     """Require SSM-friendly bootstrap, metadata deny, and no embedded secrets.
 
@@ -709,6 +792,8 @@ def assert_user_data_policy(user_data: str) -> None:
     lowered = user_data.lower()
     if "docker compose" not in lowered and "docker-compose" not in user_data:
         raise Phase10TopologyError("user-data must start Compose")
+    if "docker-compose.t3micro.yml" not in user_data:
+        raise Phase10TopologyError("user-data must use the t3.micro overlay")
     if "ssm" not in lowered:
         raise Phase10TopologyError("user-data must stay SSM-friendly")
     if re.search(r"(AKIA[0-9A-Z]{16}|sk-live-|service_role)", user_data):
@@ -920,7 +1005,9 @@ def assert_committed_policy(repo_root: Path) -> PolicyReport:
     hcl = strip_hcl_comments(tf_bundle)
     variables = (infra / "variables.tf").read_text(encoding="utf-8")
     compose = (repo_root / STAGING_COMPOSE_FILE).read_text(encoding="utf-8")
+    t3micro = (repo_root / STAGING_T3MICRO_COMPOSE_FILE).read_text(encoding="utf-8")
     caddy = (repo_root / STAGING_CADDY_FILE).read_text(encoding="utf-8")
+    caddy_http443 = (repo_root / STAGING_CADDY_HTTP443_FILE).read_text(encoding="utf-8")
     user_data = (infra / "user-data.sh").read_text(encoding="utf-8")
     inventory = load_json_object(repo_root / INTENDED_TOPOLOGY_FILE)
     vercel = load_json_object(repo_root / VERCEL_PUBLIC_ENV_FILE)
@@ -936,7 +1023,9 @@ def assert_committed_policy(repo_root: Path) -> PolicyReport:
         ("iam_provider", lambda: assert_iam_and_provider(hcl)),
         ("sensitive_variables", lambda: assert_sensitive_variables(variables)),
         ("compose", lambda: assert_compose_policy(compose)),
+        ("t3micro_overlay", lambda: assert_t3micro_overlay(t3micro)),
         ("caddy", lambda: assert_caddy_policy(caddy)),
+        ("caddy_http443", lambda: assert_caddy_http443_policy(caddy_http443)),
         ("user_data", lambda: assert_user_data_policy(user_data)),
         ("inventory", lambda: assert_inventory(inventory)),
         ("vercel_env", lambda: assert_vercel_public_env(vercel)),
@@ -947,7 +1036,9 @@ def assert_committed_policy(repo_root: Path) -> PolicyReport:
     reviewed = (
         *sorted(infra.glob("*.tf")),
         repo_root / STAGING_COMPOSE_FILE,
+        repo_root / STAGING_T3MICRO_COMPOSE_FILE,
         repo_root / STAGING_CADDY_FILE,
+        repo_root / STAGING_CADDY_HTTP443_FILE,
         infra / "user-data.sh",
         repo_root / INTENDED_TOPOLOGY_FILE,
         repo_root / VERCEL_PUBLIC_ENV_FILE,

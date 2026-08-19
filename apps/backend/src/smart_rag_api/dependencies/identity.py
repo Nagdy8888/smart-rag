@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.security.jwks import JwksVerificationError, JwksVerifier
 from smart_rag_core.settings import BackendSettings, Environment
@@ -21,10 +23,76 @@ _TEST_ROLE_HEADER = "X-Test-Role"
 _TEST_AUTHZ_VERSION_HEADER = "X-Test-Authorization-Version"
 _TEST_EMAIL_HEADER = "X-Test-Email"
 _TEST_AAL_HEADER = "X-Test-AAL"
+_TEST_HEADER_PREFIX = "x-test-"
+
+
+def test_identity_headers_present(request: Request) -> bool:
+    """Return whether the request carries any ``X-Test-*`` header.
+
+    Args:
+        request: Incoming HTTP request.
+
+    Returns:
+        True when at least one header name starts with ``X-Test-``.
+    """
+
+    return any(name.lower().startswith(_TEST_HEADER_PREFIX) for name in request.headers)
+
+
+def test_identity_bypass_permitted(settings: BackendSettings) -> bool:
+    """Return whether test identity headers may mint a caller.
+
+    Bypass requires ``APP_ENV=test`` and ``ALLOW_TEST_IDENTITY=true``.
+    Staging and production cannot enable the flag at settings load.
+
+    Args:
+        settings: Validated backend settings.
+
+    Returns:
+        True only for the signed test-identity pair.
+    """
+
+    return settings.app_env is Environment.TEST and settings.allow_test_identity
+
+
+async def reject_forbidden_test_identity_headers(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Reject ``X-Test-*`` headers unless the signed test-identity pair is set.
+
+    Production and staging images omit ``ALLOW_TEST_IDENTITY``. Even a
+    mis-set ``APP_ENV=test`` without that flag cannot honor the bypass.
+
+    Args:
+        request: Incoming HTTP request.
+        call_next: FastAPI middleware continuation.
+
+    Returns:
+        HTTP 400 when test headers are present but not permitted, otherwise
+        the downstream response.
+    """
+
+    if not test_identity_headers_present(request):
+        return await call_next(request)
+    settings: BackendSettings | None = getattr(request.app.state, "settings", None)
+    if settings is None or not test_identity_bypass_permitted(settings):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": "test_identity_forbidden"},
+        )
+    return await call_next(request)
 
 
 def _extract_bearer_token(authorization: str | None) -> str | None:
-    """Parse ``Authorization: Bearer`` value."""
+    """Parse ``Authorization: Bearer`` value.
+
+    Args:
+        authorization: Raw Authorization header, if present.
+
+    Returns:
+        The bearer token, or ``None`` when the scheme is missing or invalid.
+    """
 
     if authorization is None:
         return None
@@ -41,9 +109,20 @@ def _resolve_test_bypass(
     x_test_role: str | None,
     x_test_authorization_version: int | None,
 ) -> CallerContext | None:
-    """Return a test-only caller context when explicitly gated."""
+    """Return a test-only caller context when explicitly gated.
 
-    if settings.app_env is not Environment.TEST:
+    Args:
+        settings: Validated backend settings.
+        x_test_user_id: Test subject UUID.
+        x_test_role: Test role label.
+        x_test_authorization_version: Test authorization snapshot.
+
+    Returns:
+        A ``CallerContext`` when ``APP_ENV=test``, ``ALLOW_TEST_IDENTITY=true``,
+        and the required headers are present. Otherwise ``None``.
+    """
+
+    if not test_identity_bypass_permitted(settings):
         return None
     if (
         x_test_user_id is None
@@ -74,8 +153,8 @@ def resolve_caller_context(
     Args:
         request: Active FastAPI request with startup-bound settings and JWKS.
         authorization: Bearer access token header.
-        x_test_user_id: Test-only subject bypass when ``APP_ENV=test``.
-        x_test_role: Test-only role bypass when ``APP_ENV=test``.
+        x_test_user_id: Test-only subject bypass when test identity is permitted.
+        x_test_role: Test-only role bypass when test identity is permitted.
         x_test_authorization_version: Test-only authorization snapshot bypass.
         x_test_email: Test-only email used by invitation accept.
         x_test_aal: Test-only assurance level for offboarding (``aal1``/``aal2``).

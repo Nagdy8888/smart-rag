@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal, Protocol
+from uuid import UUID
 
-from smart_rag_core.query_admission.ceilings import assert_deadline_open
+from smart_rag_core.query_admission.ceilings import (
+    QueryRetrieveBudget,
+    assert_deadline_open,
+)
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryCeilingError
 from smart_rag_core.query_fusion.models import (
@@ -37,11 +40,16 @@ from smart_rag_core.query_routing.models import (
     TableEvidenceRecord,
 )
 from smart_rag_core.query_routing.preparation import caller_from_runtime
+from smart_rag_core.retrieval.context import ContextFn
+from smart_rag_core.retrieval.context_loader import ChunkContext
+from smart_rag_core.runtime.async_bridge import run_coro_blocking
 from smart_rag_core.security.identity import CallerContext, UserRole
 
 
 class HybridRetrieveLike(Protocol):
     """Minimal Hybrid retrieve surface used by packet 2 tests and runtime."""
+
+    query_budget: QueryRetrieveBudget | None
 
     def retrieve(
         self,
@@ -66,6 +74,8 @@ class HybridRetrieveLike(Protocol):
 
 class GraphRetrieveLike(Protocol):
     """Minimal async GraphRetriever used by packet 2 tests and runtime."""
+
+    query_budget: QueryRetrieveBudget | None
 
     async def retrieve_local(
         self,
@@ -191,6 +201,52 @@ def suppress_unauthorized_blindness(
     return count
 
 
+def _attach_retrieve_budget(
+    *,
+    runtime: AuthorizedRuntimeContext,
+    caller: CallerContext,
+    hybrid_retriever: HybridRetrieveLike | None,
+    graph_retriever: GraphRetrieveLike | None,
+    query_budget: QueryRetrieveBudget | None,
+) -> QueryRetrieveBudget:
+    """Bind the retrieve-time remaining ledger onto Hybrid and graph adapters.
+
+    Args:
+        runtime: Packet 1 context. Used when ``query_budget`` is omitted.
+        caller: Server-derived caller copied onto a newly created ledger.
+        hybrid_retriever: Optional Hybrid adapter.
+        graph_retriever: Optional graph adapter.
+        query_budget: Remaining after earlier counted calls. ``None`` starts
+            at ``runtime.model_call_ceiling`` (standalone branch tests).
+
+    Returns:
+        The ledger bound onto adapters. Retrieve mutates it in place.
+    """
+
+    retrieve_budget = query_budget or QueryRetrieveBudget(
+        remaining_model_calls=runtime.model_call_ceiling,
+        remaining_usd=runtime.remaining_usd,
+        caller=caller,
+        run_id=runtime.run_id,
+        reservation_id=runtime.reservation_id,
+        expected_version=runtime.optimistic_version,
+    )
+    if retrieve_budget.caller is None:
+        retrieve_budget.caller = caller
+    if retrieve_budget.run_id is None:
+        retrieve_budget.run_id = runtime.run_id
+    if retrieve_budget.reservation_id is None:
+        retrieve_budget.reservation_id = runtime.reservation_id
+    if hybrid_retriever is not None:
+        supabase = getattr(hybrid_retriever, "_supabase", None)
+        if supabase is not None:
+            retrieve_budget.connection = supabase
+        hybrid_retriever.query_budget = retrieve_budget
+    if graph_retriever is not None:
+        graph_retriever.query_budget = retrieve_budget
+    return retrieve_budget
+
+
 def execute_branches(
     plan: RetrievalPlan,
     prep: QueryPreparation,
@@ -199,6 +255,7 @@ def execute_branches(
     hybrid_retriever: HybridRetrieveLike | None = None,
     graph_retriever: GraphRetrieveLike | None = None,
     table_executor: TableExecuteLike | None = None,
+    query_budget: QueryRetrieveBudget | None = None,
     now: datetime | None = None,
     branch_concurrency: int = BRANCH_CONCURRENCY,
     cancel_check: Callable[[], bool] | None = None,
@@ -207,6 +264,8 @@ def execute_branches(
 
     Hybrid, LightRAG, StructuredTable, and citation lookup are invoked
     directly. There is no catalog LLM and no LightRAG keyword extraction.
+    Retrieve-time embed, rerank, and LightRAG callbacks debit
+    ``QueryRetrieveBudget`` on bound adapters.
 
     Args:
         plan: Compiled retrieval plan.
@@ -215,12 +274,15 @@ def execute_branches(
         hybrid_retriever: Optional Hybrid retriever. Unbound Hybrid degrades.
         graph_retriever: Optional GraphRetriever. Missing Combined degrades.
         table_executor: Optional table executor.
+        query_budget: Remaining after profile (or other prior consumes).
+            Omit only in standalone tests that start at the family ceiling.
         now: Clock for deadline checks. Defaults to UTC now.
         branch_concurrency: Must be 1 or 2. Larger values are fan-out.
         cancel_check: Optional cancellation probe.
 
     Returns:
         One result per executed spec. Fusion/answer/verifier are not run.
+        ``query_budget.remaining_model_calls`` reflects retrieve consumes.
 
     Raises:
         QueryRoutingError: Fan-out, historical graph path, empty-keyword
@@ -236,6 +298,14 @@ def execute_branches(
         raise QueryRoutingError("deadline_exhausted") from exc
     caller = caller_from_runtime(runtime)
     remaining = max(0.1, (runtime.deadline_at - clock).total_seconds())
+    _attach_retrieve_budget(
+        runtime=runtime,
+        caller=caller,
+        hybrid_retriever=hybrid_retriever,
+        graph_retriever=graph_retriever,
+        query_budget=query_budget,
+    )
+    chunk_loader = _chunk_loader(hybrid_retriever, caller)
     results: list[BranchResult] = []
     independent = [
         spec for spec in plan.branches if spec.kind is not BranchKind.CITATION_LOOKUP
@@ -262,6 +332,7 @@ def execute_branches(
                         hybrid_retriever=hybrid_retriever,
                         graph_retriever=graph_retriever,
                         table_executor=table_executor,
+                        chunk_loader=chunk_loader,
                     )
                 )
             continue
@@ -278,6 +349,7 @@ def execute_branches(
                     hybrid_retriever=hybrid_retriever,
                     graph_retriever=graph_retriever,
                     table_executor=table_executor,
+                    chunk_loader=chunk_loader,
                 )
                 for spec in group_specs
             ]
@@ -317,6 +389,7 @@ def _run_spec(
     hybrid_retriever: HybridRetrieveLike | None,
     graph_retriever: GraphRetrieveLike | None,
     table_executor: TableExecuteLike | None,
+    chunk_loader: ContextFn | None,
 ) -> BranchResult:
     """Execute one spec and inherit packet 1 run/reservation ids.
 
@@ -330,6 +403,8 @@ def _run_spec(
         hybrid_retriever: Optional Hybrid retriever.
         graph_retriever: Optional graph retriever.
         table_executor: Optional table executor.
+        chunk_loader: Authorized canonical-text loader for graph locators
+            and Hybrid ranked-ID fallbacks.
 
     Returns:
         Branch result. Never an answer.
@@ -366,6 +441,7 @@ def _run_spec(
             remaining=remaining,
             hybrid_retriever=hybrid_retriever,
             whole_document=plan.whole_document_summary,
+            chunk_loader=chunk_loader,
         )
     if spec.kind in {
         BranchKind.GRAPH_LOCAL,
@@ -379,6 +455,7 @@ def _run_spec(
             remaining=remaining,
             graph_retriever=graph_retriever,
             caller=caller,
+            chunk_loader=chunk_loader,
         )
     if spec.kind is BranchKind.STRUCTURED_TABLE:
         if spec.table_plan is None and table_executor is None:
@@ -449,6 +526,7 @@ def _run_hybrid(
     remaining: float,
     hybrid_retriever: HybridRetrieveLike | None,
     whole_document: bool,
+    chunk_loader: ContextFn | None,
 ) -> BranchResult:
     """Invoke HybridRetriever when bound.
 
@@ -460,6 +538,7 @@ def _run_hybrid(
         remaining: Remaining seconds.
         hybrid_retriever: Optional retriever.
         whole_document: Whether section coverage must be 1.0.
+        chunk_loader: Canonical text loader for ranked-ID fallbacks.
 
     Returns:
         Hybrid branch result. BM25 snippets are never marked as evidence.
@@ -504,7 +583,7 @@ def _run_hybrid(
         status=status,
         bm25_snippets_used=False,
         graph_prose_used=False,
-        hybrid_evidence=_hybrid_evidence(outcome),
+        hybrid_evidence=_hybrid_evidence(outcome, chunk_loader=chunk_loader),
     )
 
 
@@ -515,6 +594,7 @@ def _run_graph(
     remaining: float,
     graph_retriever: GraphRetrieveLike | None,
     caller: CallerContext,
+    chunk_loader: ContextFn | None,
 ) -> BranchResult:
     """Invoke GraphRetriever with precomputed keywords only.
 
@@ -524,6 +604,7 @@ def _run_graph(
         remaining: Remaining seconds.
         graph_retriever: Optional retriever.
         caller: Caller snapshot.
+        chunk_loader: Canonical text loader. Empty raw_text locators drop.
 
     Returns:
         Graph branch result. Graph prose is never evidence.
@@ -566,11 +647,12 @@ def _run_graph(
     if not spec.hl_keywords or not spec.ll_keywords:
         raise QueryRoutingError(FALLBACK_EMPTY_KEYWORDS)
     bounds = _graph_bounds(remaining)
-    method = {
-        BranchKind.GRAPH_LOCAL: graph_retriever.retrieve_local,
-        BranchKind.GRAPH_HYBRID: graph_retriever.retrieve_hybrid,
-        BranchKind.GRAPH_GLOBAL_STEERING: graph_retriever.retrieve_global_steering,
+    method_name = {
+        BranchKind.GRAPH_LOCAL: "retrieve_local",
+        BranchKind.GRAPH_HYBRID: "retrieve_hybrid",
+        BranchKind.GRAPH_GLOBAL_STEERING: "retrieve_global_steering",
     }[spec.kind]
+    method = getattr(graph_retriever, method_name)
     lead_set = _run_async(
         method(
             query=spec.query_text,
@@ -608,7 +690,7 @@ def _run_graph(
     fallback_reason = None
     if timeout:
         fallback_reason = "graph_deadline"
-    paths, passages = _graph_snapshots(lead_set)
+    paths, passages = _graph_snapshots(lead_set, chunk_loader=chunk_loader)
     if spec.kind is BranchKind.GRAPH_GLOBAL_STEERING:
         paths = tuple(
             item.model_copy(update={"steering_only": True, "fully_mapped": False})
@@ -635,6 +717,60 @@ def _run_graph(
         graph_timeout=timeout,
         fallback_reason=fallback_reason,
     )
+
+
+def _chunk_loader(
+    hybrid_retriever: HybridRetrieveLike | None,
+    caller: CallerContext,
+) -> ContextFn | None:
+    """Bind the Hybrid canonical-text loader when the retriever exposes it.
+
+    Args:
+        hybrid_retriever: Optional Hybrid retriever.
+        caller: Server-derived caller.
+
+    Returns:
+        ``ContextFn`` or None when unbound.
+    """
+
+    if hybrid_retriever is None:
+        return None
+    factory = getattr(hybrid_retriever, "authorized_chunk_loader", None)
+    if not callable(factory):
+        return None
+    loader = factory(caller)
+    if not callable(loader):
+        return None
+    return loader
+
+
+def _load_chunk_contexts(
+    chunk_ids: tuple[str, ...],
+    chunk_loader: ContextFn | None,
+) -> dict[str, ChunkContext]:
+    """Load authorized canonical rows for one ID list.
+
+    Args:
+        chunk_ids: Canonical chunk UUID strings.
+        chunk_loader: Optional ACL-rechecking loader.
+
+    Returns:
+        Mapping of chunk id string to authorized context. Missing,
+        unauthorized, and unparsable IDs are omitted.
+    """
+
+    if chunk_loader is None or not chunk_ids:
+        return {}
+    parsed: list[UUID] = []
+    for item in chunk_ids:
+        try:
+            parsed.append(UUID(str(item)))
+        except ValueError:
+            continue
+    if not parsed:
+        return {}
+    loaded = chunk_loader(tuple(parsed))
+    return {str(row.chunk_id): row for row in loaded}
 
 
 def _graph_bounds(remaining: float) -> object:
@@ -667,21 +803,30 @@ def _run_async(coro: object) -> object:
 
     Returns:
         Retrieve result.
+
+    Side Effects:
+        Uses ``run_coro_blocking`` so SSE ``astream`` (live loop) does not
+        crash with nested ``asyncio.run``.
     """
 
-    if asyncio.iscoroutine(coro):
-        return asyncio.run(coro)
-    return coro
+    return run_coro_blocking(coro)
 
 
-def _hybrid_evidence(outcome: object) -> tuple[HybridPassage, ...]:
+def _hybrid_evidence(
+    outcome: object,
+    *,
+    chunk_loader: ContextFn | None,
+) -> tuple[HybridPassage, ...]:
     """Snapshot Hybrid evidence units with 1-based post-rerank ranks.
 
     When evidence units are absent, RRF ``ranked_ids`` supply the allowed
-    skip/fallback ranks without citation text.
+    skip/fallback ranks. Canonical ``raw_text`` is loaded when a chunk
+    loader is bound. Empty text is dropped and is never treated as a
+    whole-passage citation.
 
     Args:
         outcome: Hybrid retrieve result.
+        chunk_loader: Authorized canonical-text loader.
 
     Returns:
         Canonical Hybrid passages. BM25 snippets are never copied.
@@ -690,31 +835,77 @@ def _hybrid_evidence(outcome: object) -> tuple[HybridPassage, ...]:
     units = getattr(outcome, "evidence", ())
     records: list[HybridPassage] = []
     if units:
+        unit_ids = tuple(str(unit.chunk_id) for unit in units)
+        by_id = _load_chunk_contexts(unit_ids, chunk_loader)
         for index, unit in enumerate(units, start=1):
             locator = getattr(unit, "locator", None)
+            record = by_id.get(str(unit.chunk_id))
+            if record is not None:
+                text = record.raw_text
+            elif chunk_loader is None:
+                text = str(getattr(unit, "citation_text", "") or "")
+            else:
+                continue
+            if not text.strip():
+                continue
             records.append(
                 HybridPassage(
                     chunk_id=str(unit.chunk_id),
-                    document_id=str(unit.document_id),
-                    version_id=str(unit.version_id),
-                    citation_text=str(getattr(unit, "citation_text", "") or ""),
+                    document_id=str(
+                        record.document_id if record is not None else unit.document_id
+                    ),
+                    version_id=str(
+                        record.version_id if record is not None else unit.version_id
+                    ),
+                    citation_text=text,
                     hybrid_rank=index,
-                    section_path=tuple(getattr(locator, "section_path", ()) or ()),
-                    page_number=getattr(locator, "page_number", None),
-                    sheet_name=getattr(locator, "sheet_name", None),
-                    range_ref=getattr(locator, "range_ref", None),
-                    source_url=getattr(locator, "source_url", None),
+                    section_path=tuple(
+                        record.section_path
+                        if record is not None
+                        else getattr(locator, "section_path", ()) or ()
+                    ),
+                    page_number=(
+                        record.page_number
+                        if record is not None
+                        else getattr(locator, "page_number", None)
+                    ),
+                    sheet_name=(
+                        record.sheet_name
+                        if record is not None
+                        else getattr(locator, "sheet_name", None)
+                    ),
+                    range_ref=(
+                        record.range_ref
+                        if record is not None
+                        else getattr(locator, "range_ref", None)
+                    ),
+                    source_url=(
+                        record.source_url
+                        if record is not None
+                        else getattr(locator, "source_url", None)
+                    ),
                 )
             )
         return tuple(records)
-    for index, chunk_id in enumerate(getattr(outcome, "ranked_ids", ()), start=1):
+    ranked = tuple(str(item) for item in getattr(outcome, "ranked_ids", ()) or ())
+    by_id = _load_chunk_contexts(ranked, chunk_loader)
+    for index, chunk_id in enumerate(ranked, start=1):
+        record = by_id.get(chunk_id)
+        text = record.raw_text if record is not None else ""
+        if not text.strip():
+            continue
         records.append(
             HybridPassage(
-                chunk_id=str(chunk_id),
-                document_id=str(chunk_id),
-                version_id=str(chunk_id),
-                citation_text="",
+                chunk_id=chunk_id,
+                document_id=str(record.document_id),
+                version_id=str(record.version_id),
+                citation_text=text,
                 hybrid_rank=index,
+                section_path=record.section_path,
+                page_number=record.page_number,
+                sheet_name=record.sheet_name,
+                range_ref=record.range_ref,
+                source_url=record.source_url,
             )
         )
     return tuple(records)
@@ -741,14 +932,17 @@ def _limitation_codes(outcome: object) -> tuple[str, ...]:
 
 def _graph_snapshots(
     outcome: object,
+    *,
+    chunk_loader: ContextFn | None,
 ) -> tuple[tuple[GraphPathInput, ...], tuple[GraphPassage, ...]]:
     """Capture resolved paths and canonical locators. Never vendor prose.
 
     Args:
         outcome: GraphRetrievalResult-like object, or a lead set without paths.
+        chunk_loader: Authorized canonical-text loader. Empty raw_text drops.
 
     Returns:
-        Path inputs and canonical locators.
+        Path inputs and canonical locators with loaded ``raw_text``.
     """
 
     candidates = getattr(outcome, "candidates", ())
@@ -801,18 +995,50 @@ def _graph_snapshots(
             )
         )
     locators: list[GraphPassage] = []
-    for locator in getattr(outcome, "locators", ()) or ():
+    raw_locators = tuple(getattr(outcome, "locators", ()) or ())
+    locator_ids = tuple(str(item.chunk_id) for item in raw_locators)
+    by_id = _load_chunk_contexts(locator_ids, chunk_loader)
+    for locator in raw_locators:
+        chunk_id = str(locator.chunk_id)
+        record = by_id.get(chunk_id)
+        text = record.raw_text if record is not None else ""
+        if not text.strip():
+            continue
         locators.append(
             GraphPassage(
-                chunk_id=str(locator.chunk_id),
-                document_id=str(locator.document_id),
-                version_id=str(locator.version_id),
-                citation_text="",
-                section_path=tuple(getattr(locator, "section_path", ()) or ()),
-                page_number=getattr(locator, "page_number", None),
-                sheet_name=getattr(locator, "sheet_name", None),
-                range_ref=getattr(locator, "range_ref", None),
-                source_url=getattr(locator, "source_url", None),
+                chunk_id=chunk_id,
+                document_id=str(
+                    record.document_id if record is not None else locator.document_id
+                ),
+                version_id=str(
+                    record.version_id if record is not None else locator.version_id
+                ),
+                citation_text=text,
+                section_path=tuple(
+                    record.section_path
+                    if record is not None
+                    else getattr(locator, "section_path", ()) or ()
+                ),
+                page_number=(
+                    record.page_number
+                    if record is not None
+                    else getattr(locator, "page_number", None)
+                ),
+                sheet_name=(
+                    record.sheet_name
+                    if record is not None
+                    else getattr(locator, "sheet_name", None)
+                ),
+                range_ref=(
+                    record.range_ref
+                    if record is not None
+                    else getattr(locator, "range_ref", None)
+                ),
+                source_url=(
+                    record.source_url
+                    if record is not None
+                    else getattr(locator, "source_url", None)
+                ),
             )
         )
     return tuple(paths), tuple(locators)

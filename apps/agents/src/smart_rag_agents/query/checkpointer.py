@@ -87,12 +87,19 @@ class CompactPostgresSaver(PostgresSaver):
         super().put_writes(config, compacted, task_id, task_path)
 
 
-def open_query_checkpointer(dsn: str, *, max_size: int = 4) -> IngestionCheckpointer:
+QUERY_CHECKPOINTER_POOL_MAX_SIZE = 8
+"""Default pool size. Signed envelope allows five concurrent query runs."""
+
+
+def open_query_checkpointer(
+    dsn: str, *, max_size: int = QUERY_CHECKPOINTER_POOL_MAX_SIZE
+) -> IngestionCheckpointer:
     """Open a compacting PostgresSaver on the migrated ``langgraph`` schema.
 
     Args:
         dsn: Session/direct Postgres URL.
-        max_size: Pool ceiling.
+        max_size: Pool ceiling. Default 8 covers the signed five concurrent
+            query runs with headroom. No dedicated settings field exists.
 
     Returns:
         Wrapper whose ``saver`` hashes source fields on write.

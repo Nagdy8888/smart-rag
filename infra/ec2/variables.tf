@@ -14,14 +14,25 @@ variable "project_name" {
 
 variable "instance_type" {
   type        = string
-  description = "Intended EC2 type. Not a proven envelope; Packet 5 measures load."
-  default     = "m6i.xlarge"
+  description = "Accepted staging EC2 type (t3.micro). Packet 5 load is not claimed."
+  default     = "t3.micro"
 }
 
 variable "origin_hostname" {
   type        = string
   description = "Public hostname CloudFront uses to reach Caddy. Placeholder until DNS exists."
   default     = "origin.staging.example.invalid"
+}
+
+variable "origin_protocol_policy" {
+  type        = string
+  description = "CloudFront-to-origin protocol. https-only is intended. http-only is the t3.micro path when ACME cannot reach prefix-list-only 443."
+  default     = "https-only"
+
+  validation {
+    condition     = contains(["https-only", "http-only"], var.origin_protocol_policy)
+    error_message = "origin_protocol_policy must be https-only or http-only."
+  }
 }
 
 variable "ses_from_email" {

@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import base64
 import json
-import shutil
-import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -28,7 +25,6 @@ _FASTAPI_URL = "http://127.0.0.1:8000"
 _PASSWORD = "Phase6Ui9x"  # noqa: S105 - disposable local Auth user
 _CLIENT_VERSION = "0.1.0"
 _XSS_MESSAGE = "<script>alert(1)</script>"
-_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _fastapi_live() -> bool:
@@ -281,37 +277,17 @@ def _enroll_and_verify_totp(
         pytest.fail(f"TOTP verify rejected codes in the skew window ({last_error})")
 
 
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    """Run ``docker compose`` against the repository compose file.
-
-    Args:
-        args: Compose subcommand arguments.
-
-    Returns:
-        Completed process with captured text output.
-    """
-
-    docker = shutil.which("docker")
-    if docker is None:
-        pytest.skip("docker CLI not found")
-    return subprocess.run(  # noqa: S603 - resolved docker executable
-        [docker, "compose", "-f", "docker-compose.yml", *args],
-        cwd=_REPO_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-
-
 def _ready_dependencies(api: str) -> dict[str, str]:
-    """Return ``GET /health/ready`` dependency name→status.
+    """Return named probes from public ``GET /health/ready``.
+
+    After PRD-M-014 the public body omits ``dependencies``, so this map is
+    empty unless the API regresses and leaks names.
 
     Args:
         api: FastAPI origin.
 
     Returns:
-        Status map. Empty when the payload is malformed.
+        Status map. Empty when the payload has no ``dependencies`` list.
     """
 
     response = httpx.get(f"{api}/health/ready", timeout=5.0)
@@ -691,12 +667,11 @@ def test_mfa_aal2_upload_reserve_signed_url_is_null(
         assert uploaded.status_code in {200, 201}, uploaded.text
 
 
-def test_live_compose_outage_visible_on_ready(live_stack: dict[str, str]) -> None:
-    """Stopped ParadeDB or Valkey is visible on GET /health/ready for the UI.
+def test_live_public_ready_omits_named_dependencies(live_stack: dict[str, str]) -> None:
+    """Public GET /health/ready must not leak ParadeDB/Valkey/LightRAG names.
 
-    Host uvicorn without those URLs reports unconfigured. That is honest, not
-    a mock success. Compose stop is asserted only when the running API already
-    probes the dependency as ok.
+    Named probes are owner/admin ``GET /ops/ready``. Host uvicorn without
+    those URLs reports unconfigured. That is honest, not a mock success.
     """
 
     api = live_stack["fastapi_url"]
@@ -711,42 +686,5 @@ def test_live_compose_outage_visible_on_ready(live_stack: dict[str, str]) -> Non
     )
     payload = _json_object(origin.json())
     assert payload.get("query_ready") is False
-    deps = _ready_dependencies(api)
-    assert "paradedb" in deps
-    assert "valkey_limits" in deps
-    assert "lightrag" in deps
-    if deps.get("paradedb") != "ok" and deps.get("valkey_limits") != "ok":
-        pytest.skip(
-            "running API does not probe ParadeDB or Valkey as ok; "
-            f"paradedb={deps.get('paradedb')} valkey_limits={deps.get('valkey_limits')}"
-        )
-    if deps.get("paradedb") == "ok":
-        stopped = _compose("stop", "paradedb")
-        if stopped.returncode != 0:
-            pytest.skip("docker compose stop paradedb failed")
-        try:
-            deadline = time.monotonic() + 30
-            status = deps["paradedb"]
-            while time.monotonic() < deadline:
-                status = _ready_dependencies(api).get("paradedb", "")
-                if status == "down":
-                    break
-                time.sleep(1)
-            assert status == "down"
-        finally:
-            _compose("start", "paradedb")
-    if deps.get("valkey_limits") == "ok":
-        stopped = _compose("stop", "valkey-limits")
-        if stopped.returncode != 0:
-            pytest.skip("docker compose stop valkey-limits failed")
-        try:
-            deadline = time.monotonic() + 30
-            status = deps["valkey_limits"]
-            while time.monotonic() < deadline:
-                status = _ready_dependencies(api).get("valkey_limits", "")
-                if status == "down":
-                    break
-                time.sleep(1)
-            assert status == "down"
-        finally:
-            _compose("start", "valkey-limits")
+    assert "dependencies" not in payload
+    assert _ready_dependencies(api) == {}

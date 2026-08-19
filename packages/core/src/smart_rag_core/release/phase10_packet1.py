@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -24,8 +24,12 @@ from smart_rag_core.release.phase10_constants import (
     PACKET1_IAC_SCHEMA_VERSION,
     PACKET1_INVENTORY_NAME,
     PACKET1_INVENTORY_SCHEMA_VERSION,
+    PACKET1_LIVE_AWS_FILE,
     PACKET1_LIVE_NAME,
+    PACKET1_LIVE_SCAN_FILE,
     PACKET1_LIVE_SCHEMA_VERSION,
+    PACKET1_LIVE_SUPABASE_FILE,
+    PACKET1_LIVE_VERCEL_FILE,
     PACKET1_MATRIX_NAME,
     PACKET1_MATRIX_SCHEMA_VERSION,
     PACKET1_NEGATIVES_NAME,
@@ -48,6 +52,7 @@ from smart_rag_core.release.phase10_topology import (
 )
 
 LiveApplyState = Literal["Blocked", "Not Run", "Failed"]
+_PRIVATE_SCAN_PORTS = frozenset({22, 5432, 6379, 8000, 8080})
 
 
 class Phase10Packet1GateError(RuntimeError):
@@ -207,6 +212,130 @@ def classify_p1001_e(
     if production_data or holdout_opened or not manifest_synthetic:
         return "Failed"
     return "Passed"
+
+
+def live_runtime_assertions_passed(payload: Mapping[str, object]) -> bool:
+    """Return whether committed live-AWS JSON proves P10-01-B runtime.
+
+    Args:
+        payload: ``packet1-live-aws.json`` object. Must not contain secrets.
+
+    Returns:
+        True when IMDSv2 hop 1, encrypted volumes, running instance, and
+        SSM-only SSH posture are recorded.
+    """
+
+    if payload.get("imds_http_tokens") != "required":
+        return False
+    if payload.get("imds_hop_limit") != 1:
+        return False
+    if payload.get("ssh_ingress") is not False:
+        return False
+    if payload.get("sshd_disabled") is not True:
+        return False
+    if payload.get("instance_state") != "running":
+        return False
+    volumes = payload.get("volumes")
+    if not isinstance(volumes, list) or not volumes:
+        return False
+    for item in volumes:
+        if not isinstance(item, dict) or item.get("encrypted") is not True:
+            return False
+    return True
+
+
+def live_network_scan_passed(payload: Mapping[str, object]) -> bool:
+    """Return whether a live EIP scan proves no public private-service path.
+
+    Args:
+        payload: ``packet1-live-network-scan.json`` object.
+
+    Returns:
+        True when the artifact qualifies and SSH/ParadeDB/Valkey/API/proxy
+        ports are closed from outside the VPC.
+    """
+
+    if payload.get("qualifies_for_p10_01_c") is not True:
+        return False
+    results = payload.get("results")
+    if not isinstance(results, list) or not results:
+        return False
+    seen: set[int] = set()
+    for item in results:
+        if not isinstance(item, dict):
+            return False
+        port = item.get("port")
+        opened = item.get("open")
+        if not isinstance(port, int):
+            return False
+        seen.add(port)
+        if port in _PRIVATE_SCAN_PORTS and opened is True:
+            return False
+    return _PRIVATE_SCAN_PORTS.issubset(seen)
+
+
+def live_vercel_secret_found(payload: Mapping[str, object]) -> bool:
+    """Return whether the live Vercel inventory recorded a forbidden secret.
+
+    Args:
+        payload: ``packet1-live-vercel.json`` object.
+
+    Returns:
+        True when ``service_role`` or committed live values are present.
+    """
+
+    if payload.get("service_role_present") is True:
+        return True
+    if payload.get("live_values_committed") is True:
+        return True
+    keys = payload.get("env_keys_only")
+    if isinstance(keys, list):
+        dumped = " ".join(str(item) for item in keys).upper()
+        if "SERVICE_ROLE" in dumped or "DATABASE_URL" in dumped:
+            return True
+    return False
+
+
+def packet1_rows_all_passed(rows: Sequence[AcceptanceRow]) -> bool:
+    """Return whether every P10-01 acceptance row is Passed.
+
+    Args:
+        rows: Classification rows.
+
+    Returns:
+        True when A-E are all ``Passed``.
+    """
+
+    return bool(rows) and all(row.classification == "Passed" for row in rows)
+
+
+def load_packet1_live_evidence(
+    repo_root: Path,
+) -> tuple[bool, bool, bool, bool]:
+    """Load committed live AWS/scan/Vercel artifacts without secrets.
+
+    Args:
+        repo_root: Repository root.
+
+    Returns:
+        ``(runtime_ok, scan_present, scan_passed, live_secret_found)``.
+    """
+
+    runtime_ok = False
+    aws_path = repo_root / PACKET1_LIVE_AWS_FILE
+    if aws_path.is_file():
+        runtime_ok = live_runtime_assertions_passed(load_json_object(aws_path))
+    scan_present = False
+    scan_passed = False
+    scan_path = repo_root / PACKET1_LIVE_SCAN_FILE
+    if scan_path.is_file():
+        scan_present = True
+        scan_passed = live_network_scan_passed(load_json_object(scan_path))
+    live_secret_found = False
+    vercel_path = repo_root / PACKET1_LIVE_VERCEL_FILE
+    if vercel_path.is_file():
+        live_secret_found = live_vercel_secret_found(load_json_object(vercel_path))
+    return runtime_ok, scan_present, scan_passed, live_secret_found
 
 
 def probe_live_providers() -> LiveProviderProbe:
@@ -379,9 +508,11 @@ def classify_packet1(
                 "IaC policy "
                 + ("Passed" if iac_ok else "Failed")
                 + ". Runtime EC2/IMDS/SSH assertions are "
-                + live.apply_state
-                + ": "
-                + live.apply_reason
+                + (
+                    "Passed from packet1-live-aws.json"
+                    if runtime_assertions_passed
+                    else live.apply_state + ": " + live.apply_reason
+                )
             ),
         ),
         AcceptanceRow(
@@ -395,8 +526,14 @@ def classify_packet1(
                 "Compose/IaC private-port and digest policy "
                 + ("Passed" if iac_ok else "Failed")
                 + ". Network scan artifact is "
-                + ("present" if network_scan_present else "absent")
-                + "; live reachability is not Passed without a scan."
+                + (
+                    "Passed"
+                    if network_scan_present and network_scan_passed
+                    else "present but failed"
+                    if network_scan_present
+                    else "absent"
+                )
+                + "."
             ),
         ),
         AcceptanceRow(
@@ -408,7 +545,11 @@ def classify_packet1(
             detail=(
                 "Committed Vercel allow-list is API URL, Supabase URL, and "
                 "publishable key only. Live Vercel/SES environment apply is "
-                + live.apply_state
+                + (
+                    "Failed: live secret found"
+                    if live_secret_found
+                    else live.apply_state
+                )
                 + "."
             ),
         ),
@@ -493,11 +634,26 @@ def write_packet1_artifacts(
 
     artifact_dir = repo_root / PHASE10_ARTIFACT_DIR
     inventory = load_json_object(repo_root / INTENDED_TOPOLOGY_FILE)
+    wrapper = (repo_root / WRAPPER_RELATIVE).read_text(encoding="utf-8")
+    checkbox = "unchecked" if packet1_checkbox_unchecked(wrapper) else "checked"
+    runtime_ok, scan_present, scan_passed, live_secret_found = (
+        load_packet1_live_evidence(repo_root)
+    )
+    vercel_path = repo_root / PACKET1_LIVE_VERCEL_FILE
+    supabase_path = repo_root / PACKET1_LIVE_SUPABASE_FILE
+    if live_secret_found:
+        vercel_provision = "Failed"
+    elif vercel_path.is_file():
+        vercel_provision = "Applied"
+    else:
+        vercel_provision = "Blocked"
+    supabase_provision = "Reused" if supabase_path.is_file() else "Blocked"
+    ses_provision = "Pending"
     matrix: dict[str, object] = {
         "schema_version": PACKET1_MATRIX_SCHEMA_VERSION,
         "packet": "P10-01",
         "wrapper_status": "pending",
-        "packet1_checkbox": "unchecked",
+        "packet1_checkbox": checkbox,
         "holdout_opened": False,
         "phase9_image_ids": dict(PHASE09_IMAGE_IDS),
         "iac_policy": "Passed" if policy.passed else "Failed",
@@ -516,7 +672,7 @@ def write_packet1_artifacts(
         "schema_version": PACKET1_INVENTORY_SCHEMA_VERSION,
         "source": INTENDED_TOPOLOGY_FILE,
         "intended": inventory,
-        "live_provisioned": False,
+        "live_provisioned": runtime_ok,
     }
     iac_out: dict[str, object] = {
         "schema_version": PACKET1_IAC_SCHEMA_VERSION,
@@ -540,11 +696,13 @@ def write_packet1_artifacts(
         "sts_detail": live.sts_detail,
         "apply_state": live.apply_state,
         "apply_reason": live.apply_reason,
-        "supabase_provision": "Blocked",
-        "vercel_provision": "Blocked",
-        "ses_provision": "Blocked",
-        "network_scan_artifact": None,
-        "runtime_ec2_assertions": "Blocked",
+        "supabase_provision": supabase_provision,
+        "vercel_provision": vercel_provision,
+        "ses_provision": ses_provision,
+        "network_scan_artifact": PACKET1_LIVE_SCAN_FILE if scan_present else None,
+        "network_scan_passed": scan_passed if scan_present else False,
+        "runtime_ec2_assertions": "Passed" if runtime_ok else "Blocked",
+        "live_secret_found": live_secret_found,
     }
     negatives_out: dict[str, object] = {
         "schema_version": PACKET1_NEGATIVES_SCHEMA_VERSION,
@@ -584,14 +742,25 @@ def evaluate_packet1(
     wrapper = (repo_root / WRAPPER_RELATIVE).read_text(encoding="utf-8")
     if not wrapper_status_pending(wrapper):
         raise Phase10Packet1GateError("Phase 10 wrapper must remain status: pending")
-    if not packet1_checkbox_unchecked(wrapper):
-        raise Phase10Packet1GateError(
-            "Packet 1 checkbox must stay unchecked while live apply is Blocked"
-        )
     try:
         policy = assert_committed_policy(repo_root)
     except Phase10TopologyError as exc:
         raise Phase10Packet1GateError(str(exc)) from exc
     live = probe_live_providers()
-    rows = classify_packet1(repo_root, policy=policy, live=live)
+    runtime_ok, scan_present, scan_passed, live_secret_found = (
+        load_packet1_live_evidence(repo_root)
+    )
+    rows = classify_packet1(
+        repo_root,
+        policy=policy,
+        live=live,
+        network_scan_present=scan_present,
+        network_scan_passed=scan_passed,
+        runtime_assertions_passed=runtime_ok,
+        live_secret_found=live_secret_found,
+    )
+    if not packet1_checkbox_unchecked(wrapper) and not packet1_rows_all_passed(rows):
+        raise Phase10Packet1GateError(
+            "Packet 1 checkbox requires P10-01-A through E Passed"
+        )
     return policy, live, rows

@@ -7,7 +7,7 @@ import logging
 import socket
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from decimal import Decimal
 from typing import Any, cast
@@ -34,6 +34,10 @@ from smart_rag_agents.ingestion.scan_graph import (
     IngestionScanState,
     build_scan_promote_ingestion_graph,
 )
+from smart_rag_core.ingestion.parser.sandbox.launcher import (
+    docker_sandbox_available,
+    inprocess_parser_permitted,
+)
 from smart_rag_core.jobs.exceptions import JobLeaseError, JobRepositoryError
 from smart_rag_core.jobs.ingestion_repository import IngestionJobRepository
 from smart_rag_core.retrieval.lightrag_adapter import (
@@ -42,6 +46,7 @@ from smart_rag_core.retrieval.lightrag_adapter import (
 )
 from smart_rag_core.schema.enums import JobErrorCategory
 from smart_rag_core.schema.tables import IngestionJobRecord
+from smart_rag_core.settings.base import Environment
 from smart_rag_core.settings.worker import WorkerSettings
 
 from smart_rag_worker.bm25_runner import Bm25WorkerLoop
@@ -67,6 +72,7 @@ class WorkerLifecycle:
             adapter without schema-admin ``initialize_storages``.
         """
 
+        assert_worker_parser_sandbox(settings)
         self._settings = settings
         self._stop_event = threading.Event()
         self._checkpointer: IngestionCheckpointer | None = None
@@ -132,6 +138,7 @@ class WorkerLifecycle:
                     continue
                 job = self._claim_one()
                 if job is None:
+                    self._enqueue_query_maintenance()
                     self._bm25_loop.process_once()
                     if self._settings.worker_once:
                         break
@@ -205,6 +212,9 @@ class WorkerLifecycle:
             "clamav_port": self._settings.clamav_port,
             "crawl_proxy_url": crawl_proxy,
             "mock_model_mode": self._settings.mock_model_mode,
+            "subprocessor_matrix_verified": (
+                self._settings.subprocessor_matrix_verified
+            ),
         }
 
     def _run_config(self, job: IngestionJobRecord) -> dict[str, object]:
@@ -308,35 +318,25 @@ class WorkerLifecycle:
             LOGGER.error("claimed job %s missing lease token", job.id)
             return
         stop_heartbeat = threading.Event()
-
-        def heartbeat_loop() -> None:
-            """Renew the ingestion job lease until the worker signals stop."""
-
-            while not stop_heartbeat.wait(
-                timeout=self._settings.job_heartbeat_interval_seconds
-            ):
-                try:
-                    with psycopg.connect(postgres_url) as connection:
-                        connection.execute("SET ROLE app_worker")
-                        repository = IngestionJobRepository(
-                            connection,
-                            lease_owner=self._lease_owner(),
-                            lease_seconds=self._settings.job_lease_seconds,
-                        )
-                        repository.heartbeat(job.id, lease_token)
-                        connection.commit()
-                except JobLeaseError:
-                    LOGGER.warning("heartbeat lost for job %s", job.id)
-                    return
+        lease_lost = threading.Event()
 
         heartbeat_thread = threading.Thread(
-            target=heartbeat_loop,
+            target=heartbeat_until_stopped,
+            kwargs={
+                "stop": stop_heartbeat,
+                "lease_lost": lease_lost,
+                "interval_seconds": self._settings.job_heartbeat_interval_seconds,
+                "beat": lambda: self._heartbeat_once(job.id, lease_token),
+                "job_id": job.id,
+            },
             name=f"heartbeat-{job.id}",
             daemon=True,
         )
         heartbeat_thread.start()
         try:
             config = self._run_config(job)
+            configurable = cast(dict[str, object], config["configurable"])
+            configurable["lease_lost"] = lease_lost
             if job.job_kind == "scan_promote":
                 graph_input = _scan_graph_input_from_job(job)
                 result = self._invoke_graph(
@@ -367,7 +367,11 @@ class WorkerLifecycle:
                 )
                 success = result.get("status") == "indexed"
                 detail = str(result.get("detail", "hybrid_index_failed"))
-            elif job.job_kind in {"query_memory_reaper", "langsmith_trace_deletion"}:
+            elif job.job_kind in {
+                "query_memory_reaper",
+                "langsmith_trace_deletion",
+                "query_reservation_true_up",
+            }:
                 success, detail = self._process_query_maintenance(job)
             else:
                 graph_input = _probe_graph_input_from_job(job)
@@ -387,11 +391,28 @@ class WorkerLifecycle:
                     lease_owner=self._lease_owner(),
                     lease_seconds=self._settings.job_lease_seconds,
                 )
-                if success:
+                if lease_lost.is_set():
+                    LOGGER.warning("lease lost for job %s; refusing complete()", job.id)
+                    try:
+                        repository.fail(
+                            job.id,
+                            lease_token,
+                            error_category=JobErrorCategory.TRANSIENT,
+                            last_error="lease_lost",
+                        )
+                        connection.commit()
+                    except JobLeaseError:
+                        connection.rollback()
+                        LOGGER.warning(
+                            "lease-lost fail skipped for job %s; token no longer owns row",
+                            job.id,
+                        )
+                elif success:
                     completed = repository.complete(job.id, lease_token)
                     if job.job_kind not in {
                         "query_memory_reaper",
                         "langsmith_trace_deletion",
+                        "query_reservation_true_up",
                     }:
                         self._true_up_budget(connection, completed)
                 else:
@@ -416,17 +437,22 @@ class WorkerLifecycle:
         """Enqueue daily reaper and LangSmith-deletion jobs without a budget.
 
         Side Effects:
-            Inserts ``query_memory_reaper`` and ``langsmith_trace_deletion``
-            jobs when missing for the UTC day. Never reserves ingestion budget.
+            Inserts ``query_memory_reaper``, ``langsmith_trace_deletion``, and
+            hourly ``query_reservation_true_up`` jobs when missing. Never
+            reserves ingestion budget.
         """
 
         postgres_url = self._require_postgres_url()
         try:
             from smart_rag_core.memory.reaper import enqueue_query_maintenance_jobs
+            from smart_rag_core.query_admission.service import (
+                enqueue_query_reservation_true_up_job,
+            )
 
             with psycopg.connect(postgres_url) as connection:
                 connection.execute("SET ROLE app_worker")
                 enqueue_query_maintenance_jobs(connection)
+                enqueue_query_reservation_true_up_job(connection)
                 connection.commit()
         except psycopg.Error:
             LOGGER.exception("unable to enqueue query maintenance jobs")
@@ -448,6 +474,16 @@ class WorkerLifecycle:
         postgres_url = self._require_postgres_url()
         with psycopg.connect(postgres_url) as connection:
             connection.execute("SET ROLE app_worker")
+            if job.job_kind == "query_reservation_true_up":
+                from smart_rag_core.query_admission.service import (
+                    enqueue_query_reservation_true_up_job,
+                    reconcile_expired_query_runs,
+                )
+
+                enqueue_query_reservation_true_up_job(connection)
+                settled = reconcile_expired_query_runs(connection)
+                connection.commit()
+                return True, f"query_reservation_true_up:{settled}"
             if job.job_kind == "query_memory_reaper":
                 from smart_rag_core.memory.reaper import (
                     enqueue_query_maintenance_jobs,
@@ -508,7 +544,7 @@ class WorkerLifecycle:
                     last_error=message[:4000],
                 )
                 connection.commit()
-        except psycopg.Error:
+        except (psycopg.Error, JobLeaseError):
             LOGGER.exception("unable to persist failure for job %s", job_id)
 
     def _true_up_budget(
@@ -547,6 +583,86 @@ class WorkerLifecycle:
 
         hostname = socket.gethostname()
         return f"{self._settings.worker_instance_id}@{hostname}"
+
+    def _heartbeat_once(self, job_id: UUID, lease_token: str) -> None:
+        """Renew one ingestion lease on a dedicated connection.
+
+        Args:
+            job_id: Claimed job identifier.
+            lease_token: Active lease token.
+
+        Raises:
+            JobLeaseError: When heartbeat is rejected.
+        """
+
+        postgres_url = self._require_postgres_url()
+        with psycopg.connect(postgres_url) as connection:
+            connection.execute("SET ROLE app_worker")
+            repository = IngestionJobRepository(
+                connection,
+                lease_owner=self._lease_owner(),
+                lease_seconds=self._settings.job_lease_seconds,
+            )
+            repository.heartbeat(job_id, lease_token)
+            connection.commit()
+
+
+def assert_worker_parser_sandbox(settings: WorkerSettings) -> None:
+    """Fail worker start when the parser sandbox would share Storage Admin.
+
+    Args:
+        settings: Validated worker settings.
+
+    Raises:
+        JobRepositoryError: When Docker is required and missing, or when
+            in-process parsing would run in the same process as
+            ``SUPABASE_STORAGE_ADMIN_SECRET``.
+    """
+
+    storage_secret = load_worker_privileged_storage_secret()
+    inprocess = bool(settings.allow_inprocess_parser) or inprocess_parser_permitted()
+    if inprocess:
+        if settings.app_env is not Environment.TEST:
+            raise JobRepositoryError("inprocess_parser_requires_app_env_test")
+        if storage_secret:
+            raise JobRepositoryError(
+                "inprocess_parser_forbidden_with_storage_admin_secret"
+            )
+        return
+    if not docker_sandbox_available():
+        raise JobRepositoryError("parser_sandbox_docker_required")
+
+
+def heartbeat_until_stopped(
+    *,
+    stop: threading.Event,
+    lease_lost: threading.Event,
+    interval_seconds: float,
+    beat: Callable[[], None],
+    job_id: UUID,
+) -> None:
+    """Renew a job lease until stop or ``JobLeaseError``.
+
+    Args:
+        stop: Set by the worker when the job thread finishes.
+        lease_lost: Set when heartbeat is rejected so graph invoke must not
+            ``complete()``.
+        interval_seconds: Sleep between heartbeats.
+        beat: Zero-argument callable that raises ``JobLeaseError`` on loss.
+        job_id: Job id for logs.
+
+    Side Effects:
+        Sets ``lease_lost`` and returns on ``JobLeaseError``. Does not stop
+        the graph by itself; nodes observe the event / re-validate the lease.
+    """
+
+    while not stop.wait(timeout=interval_seconds):
+        try:
+            beat()
+        except JobLeaseError:
+            LOGGER.warning("heartbeat lost for job %s", job_id)
+            lease_lost.set()
+            return
 
 
 def _graph_result_mapping(payload: object) -> dict[str, object]:
@@ -684,7 +800,7 @@ def _crawl_graph_input_from_job(job: IngestionJobRecord) -> IngestionCrawlState:
         ),
         "version_id": str(job.version_id) if job.version_id else None,
         "operation_key": str(payload.get("operation_key", job.job_kind)),
-        "content_class": str(payload.get("content_class", "synthetic")),
+        "content_class": str(payload.get("content_class", "real_company")),
         "graph_eligible": bool(payload.get("graph_eligible", False)),
         "attestation_policy_version": (
             str(payload["attestation_policy_version"])
@@ -754,7 +870,7 @@ def _index_graph_input_from_job(job: IngestionJobRecord) -> IngestionIndexState:
             else None
         ),
         "review_approved": bool(payload.get("review_approved", False)),
-        "content_class": str(payload.get("content_class", "synthetic")),
+        "content_class": str(payload.get("content_class", "real_company")),
         "graph_eligible": bool(payload.get("graph_eligible", False)),
         "crawl_run_id": (
             str(payload["crawl_run_id"])

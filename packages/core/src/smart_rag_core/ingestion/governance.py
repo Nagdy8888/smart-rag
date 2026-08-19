@@ -23,6 +23,18 @@ _HEALTH_MARKER_PATTERN = re.compile(
 )
 
 
+def _provider_settings_verified_for_process() -> bool:
+    """Return the local-unsigned live-key waiver, not org-matrix verification.
+
+    Returns:
+        True when ``APP_ENV=local`` and ``MOCK_MODEL_MODE=false``.
+    """
+
+    from smart_rag_core.settings import SharedSettings
+
+    return SharedSettings().allows_unsigned_local_live_providers()
+
+
 @dataclass(frozen=True, slots=True)
 class MetadataGovernanceInput:
     """Uploader attestation and metadata available before parser extraction."""
@@ -97,7 +109,7 @@ def evaluate_metadata_governance(
             review_approved=decision_input.review_approved,
             detector_results=list(detectors),
             scan_evidence_current=scan_evidence_current,
-            provider_settings_verified=False,
+            provider_settings_verified=_provider_settings_verified_for_process(),
             policy_version_matches=(
                 decision_input.attestation_policy_version
                 == EXTERNAL_PROCESSING_POLICY_VERSION
@@ -166,7 +178,7 @@ def evaluate_extraction_governance(
             review_approved=decision_input.review_approved,
             detector_results=list(detectors),
             scan_evidence_current=scan_evidence_current,
-            provider_settings_verified=False,
+            provider_settings_verified=_provider_settings_verified_for_process(),
             policy_version_matches=(
                 decision_input.attestation_policy_version
                 == EXTERNAL_PROCESSING_POLICY_VERSION

@@ -20,6 +20,7 @@ import {
   type ApiAuth,
 } from "../lib/api";
 import {
+  INVITE_TOKEN_MAIL_ONLY,
   NO_MEMBER_DIRECTORY_COPY,
   OFFBOARD_IRREVERSIBLE_COPY,
   TEAM_OWNER_BOOTSTRAP_UNAVAILABLE,
@@ -186,10 +187,8 @@ export function TeamApp() {
               <dd>
                 <UserText value={created.role} />
               </dd>
-              <dt>raw_token (once)</dt>
-              <dd data-testid="raw-token">
-                <CodeText value={created.raw_token} />
-              </dd>
+              <dt>token delivery</dt>
+              <dd data-testid="invite-mail-only">{INVITE_TOKEN_MAIL_ONLY}</dd>
             </dl>
           ) : null}
         </section>

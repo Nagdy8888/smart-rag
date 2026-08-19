@@ -165,12 +165,15 @@ services:
     restart: unless-stopped
     environment:
       APP_ENV: local
-      MOCK_MODEL_MODE: "true"
+      MOCK_MODEL_MODE: ${MOCK_MODEL_MODE:-true}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-smart-rag}
       SUPABASE_URL: http://host.docker.internal:54321
-      SUPABASE_DB_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      # app_api is NOLOGIN. Use LOGIN wrapper app_runtime (SET ROLE app_api).
+      # Never postgresql://postgres:postgres. See docs/deployment/LOCAL_RUNTIME_ROLES.md.
+      SUPABASE_DB_URL: "${API_SUPABASE_DB_URL:-postgresql://app_runtime:${APP_RUNTIME_DB_PASSWORD:?set APP_RUNTIME_DB_PASSWORD}@host.docker.internal:54322/postgres}"
       CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010
       VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
       VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
@@ -215,11 +218,14 @@ services:
     restart: unless-stopped
     environment:
       APP_ENV: local
-      MOCK_MODEL_MODE: "true"
+      MOCK_MODEL_MODE: ${MOCK_MODEL_MODE:-true}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-smart-rag}
-      SUPABASE_DB_URL: ${SUPABASE_DB_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}
+      # app_worker is NOLOGIN. Same LOGIN wrapper; runtime SET ROLE app_worker.
+      # Do not reuse host pytest SUPABASE_DB_URL when that DSN is postgres superuser.
+      SUPABASE_DB_URL: "${WORKER_SUPABASE_DB_URL:-postgresql://app_runtime:${APP_RUNTIME_DB_PASSWORD:?set APP_RUNTIME_DB_PASSWORD}@host.docker.internal:54322/postgres}"
       WORKER_INSTANCE_ID: ${WORKER_INSTANCE_ID:-worker-local}
       JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-300}
       JOB_HEARTBEAT_INTERVAL_SECONDS: ${JOB_HEARTBEAT_INTERVAL_SECONDS:-60}
@@ -231,7 +237,9 @@ services:
       PARADEDB_URL: postgresql://${PARADEDB_WRITER_USER:-paradedb_writer}:${PARADEDB_WRITER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
       CRAWL_PROXY_URL: http://crawl-proxy:8080
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
-      SUPABASE_STORAGE_ADMIN_SECRET: ${SUPABASE_STORAGE_ADMIN_SECRET:-}
+      # Storage Admin must not live on this PID. Local scan/promote uses
+      # scripts/ops/_run_scan_node.py with SUPABASE_STORAGE_ADMIN_SECRET in
+      # that process only (no scan-promote sidecar in this Compose file).
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
     networks:

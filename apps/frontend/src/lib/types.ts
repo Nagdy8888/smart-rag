@@ -26,13 +26,13 @@ export type CurrentUserResponse = {
   mfa_enrolled: boolean;
 };
 
-/** One named probe from `GET /health/ready`. */
+/** One named probe from authenticated `GET /ops/ready`. */
 export type DependencyStatus = {
   name: string;
   status: string;
 };
 
-/** Public `GET /health/ready` body. ParadeDB down does not fake BM25 success. */
+/** Console readiness: public `/health/ready` plus optional operator probes. */
 export type ReadinessResponse = {
   status: string;
   query_ready: boolean;
@@ -452,14 +452,13 @@ export type CreateInvitationRequest = {
   upload_enabled: boolean;
 };
 
-/** Invitation identifiers. `raw_token` is returned once. */
+/** Invitation identifiers. The one-time token is mail-only, not JSON. */
 export type CreateInvitationResponse = {
   invitation_id: string;
   email: string;
   role: string;
   upload_enabled: boolean;
   expires_at: string;
-  raw_token: string;
 };
 
 /** `POST /admin/users/{user_id}/offboard` identifiers. */

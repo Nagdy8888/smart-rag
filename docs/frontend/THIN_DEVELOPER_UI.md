@@ -2,7 +2,7 @@
 title: Thin authenticated developer UI
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: engineering, frontend
 ---
 
@@ -29,8 +29,8 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 Sign-in, conversation list/create/delete, Auto Composite chat with fetch SSE,
 reconnect/cancel, diagnostics from the accepted event catalog, citations,
 unmerged feedback tags, upload reservation, version status including BM25
-index/lag, live `GET /health/ready` (ParadeDB/Valkey/LightRAG), MFA-required
-upload, and usage totals.
+index/lag, public `GET /health/ready` plus owner/admin `GET /ops/ready`
+named ParadeDB/Valkey/LightRAG probes, MFA-required upload, and usage totals.
 
 ```mermaid
 flowchart TD
@@ -61,7 +61,7 @@ flowchart TD
 | Citations | `GET /runs/{id}/citations` (no snippets) |
 | Upload reserve | `POST /documents/uploads`; local `signed_url` is null |
 | Version status | `GET /ingestion/versions/{id}/status` for Hybrid/BM25/graph-handoff |
-| Readiness | `GET /health/ready`; ParadeDB `down` is visible and is not BM25 success |
+| Readiness | public `GET /health/ready`; named ParadeDB/Valkey/LightRAG probes on `GET /ops/ready` (owner/admin) |
 | MFA | `403 MFA required` for owner/admin/`upload_enabled` until TOTP aal2 |
 
 Paid chat uses JSON 202 so `run_id` is in the body, then the same GET EventSource
@@ -83,11 +83,13 @@ from an upload reservation. Graph-not-ready copy is
 “N relevant recent documents are not yet represented in the graph” and never
 includes restricted or ineligible counts.
 
-`GET /health/ready` is public. The console polls it so a stopped ParadeDB,
-Valkey limits, or unattached LightRAG process is visible in the browser. Signed
-`bm25_unavailable` and `graph_outage` copy is always on the console; live SSE
-still owns per-run codes. Host uvicorn without `PARADEDB_URL` /
-`VALKEY_LIMITS_URL` reports `unconfigured`, which is not a fake-healthy probe.
+Public `GET /health/ready` is `{status, query_ready, coarse detail}` only.
+The login page polls it so query-not-ready is visible without naming ParadeDB,
+Valkey, or LightRAG. Signed-in owner/admin consoles merge named probes from
+`GET /ops/ready`. Signed `bm25_unavailable` and `graph_outage` copy is always
+on the console; live SSE still owns per-run codes. Host uvicorn without
+`PARADEDB_URL` / `VALKEY_LIMITS_URL` reports public `detail=not_query_ready`,
+which is not a fake-healthy probe.
 
 Owner/admin and `upload_enabled` callers need MFA. A password JWT is `aal1`;
 the UI shows **MFA required** instead of a successful upload. After TOTP
@@ -119,11 +121,12 @@ pnpm --filter smart-rag-frontend exec playwright test tests/e2e/login.spec.ts
 
 Playwright `tests/e2e/login.spec.ts` checks the `/login` heading, signup/forgot
 links, callback failure copy, MFA-required banner, handshake stub, signed
-outage copy, and (when FastAPI is up) that the readiness panel matches
-`GET /health/ready`. The frontend quality tier installs Chromium and runs
-those tests; it no longer stops at `playwright --version`. Live JWT chat,
+outage copy, and (when FastAPI is up) that the login readiness panel matches
+public `GET /health/ready` without named dependency pills. The frontend quality
+tier installs Chromium and runs those tests; it no longer stops at
+`playwright --version`. Live JWT chat,
 aal2 upload `signed_url=null`, lingering-ID search after DELETE, five Composite
-EventSource connections, and compose outage-on-ready are
+EventSource connections, and public ready omitting named probes are
 `tests/contract/test_thin_developer_ui_live.py` against local FastAPI + Auth.
 Five-run heartbeat/lag remains
 `tests/contract/test_sse_heartbeat.py` because live mock Composite often

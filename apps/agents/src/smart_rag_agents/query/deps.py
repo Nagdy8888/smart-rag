@@ -6,11 +6,17 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import psycopg
+
+# isort: off
+# hybrid_run must finish before query_admission package init (ceilings cycle).
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_core.query_routing.branches import (
     GraphRetrieveLike,
     HybridRetrieveLike,
     TableExecuteLike,
 )
+
+# isort: on
 from smart_rag_core.query_routing.preparation import PrepModelCaller
 from smart_rag_core.security.identity import UserRole
 from smart_rag_core.tools.compare import RUNTIME_SELECTION_POLICY
@@ -21,8 +27,11 @@ from smart_rag_core.tools.models import SelectionPolicy
 class QueryGraphDeps:
     """Injectable adapters for memory, prep, retrieve, and optional tools.
 
-    All fields default so ``graph.py`` can compile without sockets or
-    OpenAI clients. Tests and later packets bind real adapters.
+    All fields default so Studio ``graph.py`` can compile without sockets
+    or OpenAI clients. Live FastAPI SSE binds Hybrid, gateway, prompts,
+    and a per-run ``app_api`` connection via
+    ``smart_rag_api.services.query_graph_runtime``. Do not share
+    ``cancel_check`` or ``connection`` across concurrent compiled graphs.
 
     Attributes:
         connection: ``app_api`` connection for memory load and counted prep.

@@ -372,6 +372,7 @@ def test_seventh_verifier_link_does_not_trigger_another_call() -> None:
     assert call_count == 1
     assert calls == [6]
     assert omitted_ids == ("link-7",)
+    assert updated.status == "partial"
     with pytest.raises(AnswerError, match="verifier_loop"):
         run_verifier_batch(updated, caller=_caller, already_called=1)
     with pytest.raises(ValidationError):
@@ -451,6 +452,40 @@ def test_citation_span_and_table_range_mismatch_fail() -> None:
     assert "table_range_mismatch" in failures
     assert checked.citations == ()
     assert checked.table_citations == ()
+
+
+def test_empty_graph_citation_text_cannot_pass_complete() -> None:
+    """Graph-derived empty citation_text cannot stay deterministic complete."""
+
+    fusion = FusionResult(
+        algorithm=FusionAlgorithm.RESOLVED_PATH_FUSION,
+        config_hash=fusion_config_hash(FusionAlgorithm.RESOLVED_PATH_FUSION),
+        requested_route="combined",
+        effective_route="combined",
+        evidence=(
+            ScoredPassage(
+                chunk_id=_uid(1),
+                document_id=_uid(10_001),
+                version_id=_uid(20_001),
+                citation_text="",
+                hybrid_rank=None,
+                graph_rank=1,
+                combined_score=1.0 / 61,
+                origin=PassageOrigin.GRAPH_RESOLVED,
+                graph_discovered_only=True,
+            ),
+        ),
+        graph_discovered_only_ratio=1.0,
+    )
+    payload = AnswerPayload(
+        answer_text="Atlas is a product.",
+        citations=(AnswerCitation(chunk_id=_uid(1), span=""),),
+        status="complete",
+    )
+    checked, failures = deterministic_check_answer(payload, fusion=fusion, tables=())
+    assert "empty_citation_text" in failures
+    assert checked.citations == ()
+    assert checked.status != "complete"
 
 
 def test_graph_inspection_and_noretrieval_refuse_company_claims() -> None:

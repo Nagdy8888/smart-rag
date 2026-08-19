@@ -10,16 +10,20 @@ from smart_rag_core.query_routing.models import TableEvidenceRecord
 def citation_span_aligns(span: str | None, citation_text: str) -> bool:
     """Return whether a citation span is a substring of canonical text.
 
-    Empty spans are treated as whole-passage citations.
+    Empty citation text cannot be a whole-passage citation. Empty spans are
+    whole-passage only when canonical ``raw_text`` is present.
 
     Args:
         span: Claimed excerpt.
         citation_text: Canonical passage text.
 
     Returns:
-        True when the span is empty or occurs in the passage.
+        True when canonical text is non-empty and the span is empty or
+        occurs in the passage.
     """
 
+    if not citation_text.strip():
+        return False
     if span is None or span == "":
         return True
     return span in citation_text
@@ -122,6 +126,8 @@ def deterministic_check_answer(
     if not fusion.evidence and not tables:
         status = "refused"
         failures.append("insufficient_evidence")
+    elif "empty_citation_text" in failures and status == "complete":
+        status = "partial"
     elif refused and status == "complete":
         status = "partial"
     return (
@@ -161,6 +167,8 @@ def _citation_ok(
         passage = passages.get(chunk_id)
         if passage is None:
             return False, "unauthorized_or_missing_passage"
+        if not passage.citation_text.strip():
+            return False, "empty_citation_text"
         if not citation_span_aligns(citation.span, passage.citation_text):
             return False, "citation_span_mismatch"
         return True, "ok"

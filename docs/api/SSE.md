@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering, frontend
 ---
 
@@ -88,6 +88,17 @@ tracebacks, secrets, source HTML, or passages.
 
 Exactly one terminal among `completed`, `cancelled`, `error`, `partial`.
 
+Live `LangGraphQueryRunExecutor` compiles **per execute** with
+`build_query_graph_deps`: Hybrid (DSN-based, ParadeDB optional), counted
+`model_gateway` (mock gateway is still a gateway), pinned `answer_v1` /
+`verified_v1` bodies, optional process LightRAG adapter, structured-table
+`structured_table_query`, per-run `app_api` connection, and per-run
+`cancel_check`. Missing Hybrid or gateway fails closed. A failed per-run
+`app_api` connect is `error.code=app_api_connection_unbound`; the executor
+does not continue with `connection=None`. Concurrent Combined retrieves
+serialize `query_budget` onto the shared LightRAG adapter. Studio's
+module-level `graph` stays unbound.
+
 ## Sanitization and reconnect
 
 - Exception messages are discarded. Retrieved source text is never stored
@@ -95,8 +106,12 @@ Exactly one terminal among `completed`, `cancelled`, `error`, `partial`.
   names are stripped or rejected in `app.append_run_event`.
 - Disconnect without cancel keeps already-paid usage. Reconnect resumes
   from `after` and does not invoke LangGraph again when status is already
-  running/completed/cancelled/partial or this process has no live executor
-  (replay plus a sanitized terminal if the worker died).
+  running/completed/cancelled/partial or this process has no live executor.
+  While status is `running`, a replica with an empty local registry
+  **replays only** and must not persist `error` `{code: worker_unavailable}`
+  (that unique terminal would block the owning replica from appending
+  `completed`). `worker_unavailable` is only for a true orphan: `pending`
+  with no startable input on this process.
 
 ## Retention (packet 7)
 

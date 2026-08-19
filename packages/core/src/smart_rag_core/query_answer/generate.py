@@ -92,7 +92,8 @@ def filter_invented_ids(
         tables: Table snapshots.
 
     Returns:
-        Payload citing only supplied IDs.
+        Payload citing only supplied IDs. Citations with ``chunk_id is None``
+        are dropped unless ``table_id`` is in allowed table IDs.
     """
 
     chunks = allowed_chunk_ids(fusion)
@@ -100,12 +101,12 @@ def filter_invented_ids(
     citations = tuple(
         item
         for item in payload.citations
-        if item.chunk_id is None or item.chunk_id in chunks
+        if _citation_has_allowed_source(item, chunks, table_ids)
     )
     table_citations = tuple(
         item
         for item in payload.table_citations
-        if item.table_id is None or item.table_id in table_ids
+        if item.table_id is not None and item.table_id in table_ids
     )
     links = tuple(
         item.model_copy(
@@ -128,6 +129,30 @@ def filter_invented_ids(
             "atomic_links": links,
         }
     )
+
+
+def _citation_has_allowed_source(
+    item: AnswerCitation,
+    chunks: frozenset[str],
+    table_ids: frozenset[str],
+) -> bool:
+    """Return whether a citation names an allowed passage or table.
+
+    Citations with ``chunk_id is None`` survive only when ``table_id`` is in
+    supplied table IDs.
+
+    Args:
+        item: Candidate citation.
+        chunks: Canonical chunk IDs from fusion.
+        table_ids: Canonical table IDs from sandbox composition.
+
+    Returns:
+        True when the citation is grounded in supplied evidence.
+    """
+
+    if item.chunk_id is not None:
+        return item.chunk_id in chunks
+    return item.table_id is not None and item.table_id in table_ids
 
 
 def mock_answer_payload(

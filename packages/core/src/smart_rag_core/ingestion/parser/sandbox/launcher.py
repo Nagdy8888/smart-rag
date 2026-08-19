@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
 from smart_rag_core.ingestion.parser.adapters import infer_format, parse_file
 from smart_rag_core.ingestion.parser.archive import reject_archive_bomb
@@ -16,9 +18,11 @@ from smart_rag_core.ingestion.parser.exceptions import (
     ParserError,
     ParserLimitExceeded,
     ParserSandboxError,
+    ParserUnsupportedFormat,
 )
 from smart_rag_core.ingestion.parser.limits import (
     PARSER_SANDBOX_CPUS,
+    PARSER_SANDBOX_INPUT_FILENAME,
     PARSER_SANDBOX_KILL_GRACE_SECONDS,
     PARSER_SANDBOX_KILL_TIMEOUT_SECONDS,
     PARSER_SANDBOX_MAX_INPUT_BYTES,
@@ -45,11 +49,21 @@ class ParserSandboxLauncher:
     """Launch parser work in a no-network, no-secret Docker sandbox."""
 
     def __init__(self, config: SandboxLaunchConfig | None = None) -> None:
-        """Initialize launcher with optional override config."""
+        """Initialize launcher with optional override config.
+
+        The default config always sets ``use_docker=True``. Missing Docker does
+        not flip the launcher to in-process parsing. Callers that need
+        in-process parsing (unit tests) must pass
+        ``SandboxLaunchConfig(use_docker=False)`` explicitly.
+
+        Args:
+            config: Optional sandbox runtime override. ``None`` uses the
+                production default (Docker required).
+        """
 
         self._config = config or SandboxLaunchConfig(
             image="smart-rag-parser-sandbox:local",
-            use_docker=_docker_available(),
+            use_docker=True,
         )
 
     @property
@@ -72,7 +86,9 @@ class ParserSandboxLauncher:
         Args:
             payload: Exact object bytes.
             content_hash: Expected SHA-256 hex digest.
-            filename: Original filename for format inference.
+            filename: Original filename for format inference only. Bytes are
+                always written as ``input.bin``; the name is never used as a
+                host path.
             media_type: Optional MIME hint.
             format_key: Optional explicit format override.
 
@@ -80,7 +96,8 @@ class ParserSandboxLauncher:
             Closed parse result or failed disposition on bounded errors.
 
         Raises:
-            ParserSandboxError: When sandbox cannot be launched.
+            ParserSandboxError: When Docker sandbox cannot be launched and
+                in-process parsing was not explicitly configured.
         """
 
         if len(payload) > PARSER_SANDBOX_MAX_INPUT_BYTES:
@@ -124,12 +141,33 @@ class ParserSandboxLauncher:
         media_type: str | None,
         format_key: str | None,
     ) -> ParseResult:
-        """Direct adapter invocation for unit tests when Docker is unavailable."""
+        """Direct adapter invocation when callers explicitly disable Docker.
+
+        Args:
+            payload: Exact object bytes.
+            content_hash: Expected SHA-256 hex digest.
+            filename: Original filename used only as a format hint.
+            media_type: Optional MIME hint.
+            format_key: Optional explicit format override.
+
+        Returns:
+            Closed parse result or failed disposition on adapter errors.
+        """
 
         with tempfile.TemporaryDirectory(prefix="parser-local-") as temp_dir:
-            input_path = Path(temp_dir) / filename
+            input_path = Path(temp_dir) / PARSER_SANDBOX_INPUT_FILENAME
             input_path.write_bytes(payload)
-            resolved = format_key or infer_format(input_path, media_type)
+            try:
+                resolved = format_key or infer_format(
+                    format_hint_path(filename), media_type
+                )
+            except ParserUnsupportedFormat as exc:
+                return _failed_result(
+                    content_hash=content_hash,
+                    format_key=format_key or "unknown",
+                    code=exc.code,
+                    detail=exc.detail,
+                )
             try:
                 return parse_file(input_path, content_hash, resolved)
             except ParserError as exc:
@@ -149,26 +187,54 @@ class ParserSandboxLauncher:
         media_type: str | None,
         format_key: str | None,
     ) -> ParseResult:
-        """Run parser runner inside ``docker run --network none``."""
+        """Run parser runner inside ``docker run --network none``.
+
+        Args:
+            payload: Exact object bytes.
+            content_hash: Expected SHA-256 hex digest.
+            filename: Original filename used only as a format hint.
+            media_type: Optional MIME hint.
+            format_key: Optional explicit format override.
+
+        Returns:
+            Closed parse result or failed disposition on sandbox errors.
+
+        Raises:
+            ParserSandboxError: When the Docker CLI is missing or cannot start.
+        """
 
         if shutil.which("docker") is None:
             raise ParserSandboxError("docker executable not found")
+        try:
+            resolved = format_key or infer_format(
+                format_hint_path(filename), media_type
+            )
+        except ParserUnsupportedFormat as exc:
+            return _failed_result(
+                content_hash=content_hash,
+                format_key=format_key or "unknown",
+                code=exc.code,
+                detail=exc.detail,
+            )
+        container_name = f"smart-rag-parser-{uuid4().hex}"
         with tempfile.TemporaryDirectory(prefix="parser-sandbox-") as temp_dir:
-            input_path = Path(temp_dir) / "input" / filename
+            input_path = Path(temp_dir) / "input" / PARSER_SANDBOX_INPUT_FILENAME
             output_path = Path(temp_dir) / "output" / "result.json"
             input_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             input_path.write_bytes(payload)
             request = {
-                "input_path": "/input/" + filename,
+                "input_path": f"/input/{PARSER_SANDBOX_INPUT_FILENAME}",
                 "output_path": "/output/result.json",
                 "content_hash": content_hash,
-                "format_key": format_key,
+                "format_key": resolved,
                 "media_type": media_type,
             }
             command = [
                 "docker",
                 "run",
+                "--name",
+                container_name,
                 "--rm",
                 "--network",
                 "none",
@@ -207,21 +273,25 @@ class ParserSandboxLauncher:
                     timeout=self._config.timeout_seconds,
                     check=False,
                 )
-            except subprocess.TimeoutExpired as exc:
-                _kill_container_gracefully(exc)
+            except subprocess.TimeoutExpired:
+                kill_sandbox_container(
+                    container_name, grace_seconds=self._config.kill_grace_seconds
+                )
                 return _failed_result(
                     content_hash=content_hash,
-                    format_key=format_key or "unknown",
+                    format_key=resolved,
                     code="timeout",
                     detail="parser sandbox exceeded kill timeout",
                 )
+            except OSError as exc:
+                raise ParserSandboxError("docker run failed to start") from exc
             if completed.returncode != 0:
                 detail = (
                     completed.stderr or completed.stdout or "sandbox failed"
                 ).strip()
                 return _failed_result(
                     content_hash=content_hash,
-                    format_key=format_key or "unknown",
+                    format_key=resolved,
                     code="sandbox_nonzero",
                     detail=detail[:500],
                 )
@@ -231,7 +301,7 @@ class ParserSandboxLauncher:
                     return ParseResult.model_validate_json(stdout_payload)
                 return _failed_result(
                     content_hash=content_hash,
-                    format_key=format_key or "unknown",
+                    format_key=resolved,
                     code="missing_output",
                     detail="sandbox produced no result.json",
                 )
@@ -245,7 +315,17 @@ class ParserSandboxLauncher:
 
 
 def _docker_available() -> bool:
-    """Return whether Docker CLI responds to ``docker info``."""
+    """Compatibility alias for contract tests that probe Docker presence."""
+
+    return docker_sandbox_available()
+
+
+def docker_sandbox_available() -> bool:
+    """Return whether Docker CLI responds to ``docker info``.
+
+    Returns:
+        ``True`` when ``docker`` is on PATH and ``docker info`` exits 0.
+    """
 
     if shutil.which("docker") is None:
         return False
@@ -262,10 +342,66 @@ def _docker_available() -> bool:
     return completed.returncode == 0
 
 
-def _kill_container_gracefully(exc: subprocess.TimeoutExpired) -> None:
-    """Best-effort kill for timed-out sandbox containers."""
+def inprocess_parser_permitted() -> bool:
+    """Return whether env explicitly allows in-process parsing for tests.
 
-    _ = exc
+    Returns:
+        ``True`` only when ``ALLOW_INPROCESS_PARSER`` is truthy and
+        ``APP_ENV`` is ``test``. Production and local workers must not
+        rely on this path.
+    """
+
+    flag = os.environ.get("ALLOW_INPROCESS_PARSER", "").strip().lower()
+    env = os.environ.get("APP_ENV", "").strip().lower()
+    return flag in {"1", "true", "yes"} and env == "test"
+
+
+def format_hint_path(filename: str) -> Path:
+    """Return a basename-only path used for format inference.
+
+    Args:
+        filename: Caller-supplied original filename. Path components and
+            parent traversal are discarded.
+
+    Returns:
+        A single-component ``Path`` suitable for suffix/MIME inference.
+    """
+
+    name = Path(str(filename).replace("\\", "/")).name
+    if not name or name in {".", ".."}:
+        return Path(PARSER_SANDBOX_INPUT_FILENAME)
+    return Path(name)
+
+
+def kill_sandbox_container(container_name: str, *, grace_seconds: int) -> None:
+    """Send ``docker kill`` then ``docker rm -f`` for a timed-out sandbox.
+
+    Args:
+        container_name: Unique ``docker run --name`` assigned to the attempt.
+        grace_seconds: Kill/rm subprocess timeout.
+
+    Side Effects:
+        Best-effort Docker CLI calls. Failures are swallowed so the caller
+        can still return a failed parse disposition.
+    """
+
+    if shutil.which("docker") is None:
+        return
+    timeout = max(int(grace_seconds), 1)
+    for command in (
+        ["docker", "kill", container_name],
+        ["docker", "rm", "-f", container_name],
+    ):
+        try:
+            subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            continue
 
 
 def _failed_result(

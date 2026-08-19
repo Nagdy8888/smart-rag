@@ -20,6 +20,8 @@ Related: [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
 [QUALITY_COMMANDS.md](../development/QUALITY_COMMANDS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [LOCAL_SETUP.md](../development/LOCAL_SETUP.md) ·
+[LOCAL_RUNTIME_ROLES.md](./LOCAL_RUNTIME_ROLES.md) ·
+[STAGING_COMPOSE.md](./STAGING_COMPOSE.md) ·
 [deployment C4](../architecture/04-deployment.md)
 
 ## Candidate identity

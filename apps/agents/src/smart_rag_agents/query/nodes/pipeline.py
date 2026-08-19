@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
+import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from smart_rag_core.memory.payload import memory_store_namespace
+
+# isort: off
+# hybrid_run must finish before query_admission package init (ceilings cycle).
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_core.query_admission.ceilings import (
+    QueryRetrieveBudget,
     assert_call_available,
     assert_deadline_open,
 )
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryCeilingError
 from smart_rag_core.query_admission.usage import execute_counted_model_call
+
+# isort: on
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import generate_answer
@@ -37,7 +48,11 @@ from smart_rag_core.query_fusion.assemble import fusion_input_from_branches
 from smart_rag_core.query_fusion.exceptions import FusionError
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.branches import execute_branches
-from smart_rag_core.query_routing.constants import FALLBACK_MEMORY_UNAVAILABLE
+from smart_rag_core.query_routing.constants import (
+    FALLBACK_MEMORY_UNAVAILABLE,
+    FALLBACK_RETRIEVERS_UNBOUND,
+    LIMITATION_VERIFIER_OMITTED_LINKS,
+)
 from smart_rag_core.query_routing.correction import (
     apply_correction_to_plan,
     decide_correction,
@@ -45,7 +60,11 @@ from smart_rag_core.query_routing.correction import (
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.memory import load_authorized_memory
-from smart_rag_core.query_routing.models import BranchResult, RoutingSurface
+from smart_rag_core.query_routing.models import (
+    BranchResult,
+    RetrievalPlan,
+    RoutingSurface,
+)
 from smart_rag_core.query_routing.preparation import caller_from_runtime, prepare_query
 from smart_rag_core.query_routing.safety import delimit_memory_record
 from smart_rag_core.query_routing.serde import (
@@ -76,6 +95,31 @@ def _runtime(state: QueryGraphState) -> AuthorizedRuntimeContext | None:
         return None
 
 
+def _retrieve_budget(
+    state: QueryGraphState, context: AuthorizedRuntimeContext
+) -> QueryRetrieveBudget:
+    """Start retrieve remaining from graph state, not the original ceiling.
+
+    Args:
+        state: Graph state after profile (or other prior counted calls).
+        context: Frozen admit context. USD remaining here is the admit
+            snapshot; durable consume still fail-closes on the reservation.
+
+    Returns:
+        Mutable ledger whose ``remaining_model_calls`` the retrieve node
+        writes back onto graph state.
+    """
+
+    return QueryRetrieveBudget(
+        remaining_model_calls=int(state["remaining_model_calls"]),
+        remaining_usd=context.remaining_usd,
+        caller=caller_from_runtime(context),
+        run_id=context.run_id,
+        reservation_id=context.reservation_id,
+        expected_version=context.optimistic_version,
+    )
+
+
 def _skip_if_closed(state: QueryGraphState) -> bool:
     """Return whether later nodes must pass through without work.
 
@@ -83,10 +127,15 @@ def _skip_if_closed(state: QueryGraphState) -> bool:
         state: Query graph state.
 
     Returns:
-        True when admission or routing already failed closed.
+        True when admission, routing, or exhausted retrieval already
+        failed closed.
     """
 
-    return state["status"] in {"admission_rejected", "routing_rejected"}
+    return state["status"] in {
+        "admission_rejected",
+        "routing_rejected",
+        "insufficient_evidence",
+    }
 
 
 def runtime_from_state(state: QueryGraphState) -> AuthorizedRuntimeContext | None:
@@ -109,7 +158,8 @@ def skip_closed_nodes(state: QueryGraphState) -> bool:
         state: Query graph state.
 
     Returns:
-        True when admission or routing already failed closed.
+        True when admission, routing, or exhausted retrieval already
+        failed closed.
     """
 
     return _skip_if_closed(state)
@@ -350,10 +400,12 @@ def execute_branches_node(
     """Run bounded parallel retrieval branches without fusion or answering.
 
     State inputs:
-        ``retrieval_plan``, ``preparation``, ``authorized_runtime``.
+        ``retrieval_plan``, ``preparation``, ``authorized_runtime``,
+        ``remaining_model_calls``.
 
     State outputs:
-        ``branch_results`` and keyword/catalog counters (must stay 0).
+        ``branch_results``, keyword/catalog counters (must stay 0), and
+        ``remaining_model_calls`` after retrieve-time embed/rerank/LightRAG.
 
     Persistence writes:
         None besides retriever-side RPCs owned by Hybrid/graph/table.
@@ -396,6 +448,7 @@ def execute_branches_node(
             "status": "routing_rejected",
             "detail": str(exc) or "invalid_plan",
         }
+    retrieve_budget = _retrieve_budget(state, context)
     try:
         results = execute_branches(
             plan,
@@ -404,6 +457,7 @@ def execute_branches_node(
             hybrid_retriever=deps.hybrid_retriever,
             graph_retriever=deps.graph_retriever,
             table_executor=deps.table_executor,
+            query_budget=retrieve_budget,
             cancel_check=deps.cancel_check,
         )
     except QueryRoutingError as exc:
@@ -421,6 +475,7 @@ def execute_branches_node(
         "branch_results": [item.model_dump(mode="json") for item in results],
         "keyword_extract_count": extract_total,
         "catalog_llm_call_count": 0,
+        "remaining_model_calls": retrieve_budget.remaining_model_calls,
         "detail": "branches executed; fusion and answering are not implemented",
     }
 
@@ -436,7 +491,8 @@ def apply_correction_node(
 
     State outputs:
         ``correction``, possibly extra branch results, ``corrected_route``,
-        and ``insufficient_evidence`` when exhausted.
+        ``remaining_model_calls`` after any extra retrieve, and
+        ``insufficient_evidence`` when exhausted.
 
     Persistence writes:
         None. ``routing_correction`` is stored on graph state for packet 3.
@@ -496,6 +552,7 @@ def apply_correction_node(
         }
     extra: list[BranchResult] = []
     updated = plan
+    retrieve_budget = _retrieve_budget(state, context)
     if decision.applied:
         updated = apply_correction_to_plan(plan, prep, decision, results)
         new_specs = updated.branches[len(plan.branches) :]
@@ -510,6 +567,7 @@ def apply_correction_node(
                         hybrid_retriever=deps.hybrid_retriever,
                         graph_retriever=deps.graph_retriever,
                         table_executor=deps.table_executor,
+                        query_budget=retrieve_budget,
                         cancel_check=deps.cancel_check,
                     )
                 )
@@ -521,6 +579,7 @@ def apply_correction_node(
                     "correction": decision.model_dump(mode="json"),
                     "remaining_corrections": decision.remaining_corrections,
                     "correction_applied": True,
+                    "remaining_model_calls": retrieve_budget.remaining_model_calls,
                 }
     combined = (*results, *extra)
     terminal = "correction_applied"
@@ -551,6 +610,7 @@ def apply_correction_node(
         "correction_applied": decision.applied or already,
         "keyword_extract_count": sum(item.keyword_extract_count for item in combined),
         "catalog_llm_call_count": 0,
+        "remaining_model_calls": retrieve_budget.remaining_model_calls,
     }
 
 
@@ -701,11 +761,12 @@ def generate_answer_node(
 
     Failure/fallback route:
         Empty evidence, NoRetrieval, and graph inspection refuse without a
-        fake success. Unbound adapters use the extractive mock.
+        fake success. Missing ``model_gateway`` or unbound Hybrid when the
+        route needs retrieval never terminates ``verified``.
 
     Args:
         state: State after table composition.
-        deps: Optional gateway, prompt text, and connection.
+        deps: Optional gateway, prompt text, Hybrid retriever, and connection.
 
     Returns:
         State with an ``AnswerPayload`` mapping.
@@ -724,6 +785,16 @@ def generate_answer_node(
             plan = None
     company_forbidden = plan.company_claim_forbidden if plan is not None else False
     graph_forbidden = plan.graph_as_answer_forbidden if plan is not None else False
+    if _route_needs_retrieval(plan) and deps.hybrid_retriever is None:
+        return {
+            **state,
+            "status": "insufficient_evidence",
+            "detail": FALLBACK_RETRIEVERS_UNBOUND,
+            "answer": AnswerPayload(
+                answer_text="Insufficient authorized evidence.",
+                status="refused",
+            ).model_dump(mode="json"),
+        }
     remaining = state["remaining_model_calls"]
     answer_calls = state.get("answer_call_count") or 0
     needs_model = bool(fusion.evidence or tables.records) and not (
@@ -758,6 +829,16 @@ def generate_answer_node(
                     ).model_dump(mode="json"),
                 }
     caller = None
+    if needs_model and (deps.model_gateway is None or not deps.answer_prompt_text):
+        return {
+            **state,
+            "status": "verified_partial",
+            "detail": "model_gateway_unbound",
+            "answer": AnswerPayload(
+                answer_text="Verified partial: model gateway is unbound.",
+                status="partial",
+            ).model_dump(mode="json"),
+        }
     if needs_model and deps.model_gateway is not None and deps.answer_prompt_text:
 
         def _send() -> AnswerPayload:
@@ -775,21 +856,32 @@ def generate_answer_node(
                 remaining=remaining,
             )
 
-        if deps.connection is not None and context is not None:
-            payload, _consumed, _usage_id = execute_counted_model_call(
-                deps.connection,
-                caller=caller_from_runtime(context),
-                run_id=context.run_id,
-                reservation_id=context.reservation_id,
-                expected_version=context.optimistic_version,
-                usage_kind="answer",
-                model_id=ANSWER_MODEL_ID,
-                provider_attempt_id=str(uuid4()),
-                send=_send,
-            )
-            answer = payload
-        else:
-            answer = _send()
+        try:
+            if deps.connection is not None and context is not None:
+                payload, _consumed, _usage_id = execute_counted_model_call(
+                    deps.connection,
+                    caller=caller_from_runtime(context),
+                    run_id=context.run_id,
+                    reservation_id=context.reservation_id,
+                    expected_version=context.optimistic_version,
+                    usage_kind="answer",
+                    model_id=ANSWER_MODEL_ID,
+                    provider_attempt_id=str(uuid4()),
+                    send=_send,
+                )
+                answer = payload
+            else:
+                answer = _send()
+        except AnswerError as exc:
+            return {
+                **state,
+                "status": "verified_partial",
+                "detail": exc.reason,
+                "answer": AnswerPayload(
+                    answer_text="Verified partial: answer generation stopped.",
+                    status="partial",
+                ).model_dump(mode="json"),
+            }
         answer_calls = 1
     else:
         try:
@@ -849,6 +941,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     Failure/fallback route:
         Unsupported links are removed or refused. Unsupported chains drop
         the composed conclusion. Inspection/NoRetrieval stay refused.
+        Missing gateway or omitted verifier links never terminate
+        ``verified``. Omitted IDs force ``verified_partial`` and
+        ``verifier_omitted_links``.
 
     Args:
         state: State after answer generation.
@@ -870,6 +965,12 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "detail": "missing_answer",
         }
     payload = AnswerPayload.model_validate(raw_answer)
+    plan = None
+    if state.get("retrieval_plan") is not None:
+        try:
+            plan = plan_from_state(state["retrieval_plan"])
+        except ValueError:
+            plan = None
     checked, failures = deterministic_check_answer(
         payload, fusion=fusion, tables=tables.records
     )
@@ -931,10 +1032,24 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         detail = "answer refused after verification"
     elif checked.status == "partial" or failures or omitted:
         terminal = "verified_partial"
-        detail = "verified partial after citation checks"
+        detail = (
+            LIMITATION_VERIFIER_OMITTED_LINKS
+            if omitted
+            else "verified partial after citation checks"
+        )
     else:
         terminal = "verified"
         detail = "answer verified"
+    if terminal == "verified" and deps.model_gateway is None:
+        terminal = "verified_partial"
+        detail = "model_gateway_unbound"
+    if (
+        terminal == "verified"
+        and _route_needs_retrieval(plan)
+        and deps.hybrid_retriever is None
+    ):
+        terminal = "insufficient_evidence"
+        detail = FALLBACK_RETRIEVERS_UNBOUND
     result = VerificationResult(
         answer=checked,
         deterministic_failures=failures,
@@ -956,6 +1071,24 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
         "keyword_extract_count": 0,
     }
+
+
+def _route_needs_retrieval(plan: RetrievalPlan | None) -> bool:
+    """Return whether the compiled plan requires Hybrid or table evidence.
+
+    Args:
+        plan: Compiled retrieval plan, or None when missing.
+
+    Returns:
+        False for NoRetrieval and graph-only inspection. True otherwise,
+        including when the plan is missing (fail closed).
+    """
+
+    if plan is None:
+        return True
+    if plan.company_claim_forbidden or plan.graph_as_answer_forbidden:
+        return False
+    return True
 
 
 def _fusion_from_state(raw: object) -> FusionResult:
@@ -1046,7 +1179,14 @@ def _gateway_answer(
     gateway = deps.model_gateway
     if gateway is None:
         raise AnswerError("model_gateway_unbound")
-    response = cast(Any, _run_coro(cast(Any, gateway).generate_answer(request)))
+    response = cast(
+        Any,
+        _run_coro(
+            lambda: cast(Any, gateway).generate_answer(request),
+            cancel_check=deps.cancel_check,
+            timeout_seconds=request.remaining_deadline_seconds,
+        ),
+    )
     payload = AnswerPayload.model_validate(response.payload)
     return filter_invented_ids(payload, fusion, typed_tables)
 
@@ -1102,22 +1242,84 @@ def _gateway_verifier(
     gateway = deps.model_gateway
     if gateway is None:
         raise AnswerError("model_gateway_unbound")
-    response = cast(Any, _run_coro(cast(Any, gateway).generate_verifier(request)))
+    response = cast(
+        Any,
+        _run_coro(
+            lambda: cast(Any, gateway).generate_verifier(request),
+            cancel_check=deps.cancel_check,
+            timeout_seconds=request.remaining_deadline_seconds,
+        ),
+    )
     return VerifierPayload.model_validate(response.payload)
 
 
-def _run_coro(coro: object) -> object:
+def _run_coro(
+    factory: Callable[[], object],
+    *,
+    cancel_check: Callable[[], bool] | None = None,
+    timeout_seconds: float = 45.0,
+) -> object:
     """Run one async gateway call from the sync query graph.
 
+    Never nests ``asyncio.run`` on the live SSE event loop. When a loop is
+    already running, the awaitable is created and completed on a dedicated
+    thread with its own loop.
+
     Args:
-        coro: Awaitable from ``ModelGateway``.
+        factory: Zero-arg callable that returns an awaitable or a value.
+            Invoked on the thread that owns the loop so the coroutine is
+            not bound to the SSE loop.
+        cancel_check: Cooperative cancellation probe from the SSE cancel
+            event. Polled while waiting on the worker thread.
+        timeout_seconds: Join deadline for the dedicated-thread path.
 
     Returns:
-        Result.
+        Gateway result.
+
+    Raises:
+        AnswerError: On cancel or timeout while a loop is already running.
+            Nested ``asyncio.run`` on the SSE loop is never used.
     """
 
-    import asyncio
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        produced = factory()
+        if asyncio.iscoroutine(produced):
+            return asyncio.run(produced)
+        return produced
 
-    if asyncio.iscoroutine(coro):
-        return asyncio.run(coro)
-    return coro
+    if cancel_check is not None and cancel_check():
+        raise AnswerError("cancelled")
+
+    box: dict[str, object] = {}
+    errors: dict[str, BaseException] = {}
+
+    def _worker() -> None:
+        """Create and complete the awaitable on this thread's event loop."""
+
+        try:
+            produced = factory()
+            if asyncio.iscoroutine(produced):
+                box["value"] = asyncio.run(produced)
+            else:
+                box["value"] = produced
+        except BaseException as exc:
+            errors["exc"] = exc
+
+    thread = threading.Thread(target=_worker, name="query-gateway-loop", daemon=True)
+    thread.start()
+    deadline = time.monotonic() + max(0.1, timeout_seconds)
+    while thread.is_alive():
+        if cancel_check is not None and cancel_check():
+            raise AnswerError("cancelled")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise AnswerError("deadline_exhausted")
+        thread.join(timeout=min(0.05, remaining))
+    if "exc" in errors:
+        raised = errors["exc"]
+        if isinstance(raised, AnswerError):
+            raise raised
+        raise AnswerError("gateway_failed") from raised
+    return box.get("value")

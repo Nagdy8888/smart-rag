@@ -156,6 +156,57 @@ def test_isolated_privileged_module_names_do_not_fail_the_scan() -> None:
         assert_settings_omit_privileged_secret_names(settings_cls)
 
 
+def test_worker_refuses_inprocess_parser_when_storage_admin_secret_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """In-process parser plus Storage Admin in the same process must not start."""
+
+    from smart_rag_core.jobs.exceptions import JobRepositoryError
+    from smart_rag_worker.lifecycle import assert_worker_parser_sandbox
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_INPROCESS_PARSER", "true")
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
+    settings = WorkerSettings()
+    monkeypatch.setattr(
+        "smart_rag_worker.lifecycle.load_worker_privileged_storage_secret",
+        lambda: "storage-admin-present",
+    )
+    with pytest.raises(
+        JobRepositoryError,
+        match="inprocess_parser_forbidden_with_storage_admin_secret",
+    ):
+        assert_worker_parser_sandbox(settings)
+
+
+def test_worker_requires_docker_when_inprocess_parser_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default workers fail closed when the parser sandbox Docker CLI is missing."""
+
+    from smart_rag_core.jobs.exceptions import JobRepositoryError
+    from smart_rag_worker.lifecycle import assert_worker_parser_sandbox
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.delenv("ALLOW_INPROCESS_PARSER", raising=False)
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
+    settings = WorkerSettings()
+    monkeypatch.setattr(
+        "smart_rag_worker.lifecycle.inprocess_parser_permitted",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        "smart_rag_worker.lifecycle.docker_sandbox_available",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        "smart_rag_worker.lifecycle.load_worker_privileged_storage_secret",
+        lambda: None,
+    )
+    with pytest.raises(JobRepositoryError, match="parser_sandbox_docker_required"):
+        assert_worker_parser_sandbox(settings)
+
+
 def test_settings_field_storage_admin_fragment_is_still_forbidden() -> None:
     """A runtime settings **field** containing ``storage_admin`` must still fail."""
 

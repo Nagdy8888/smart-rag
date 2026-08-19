@@ -10,6 +10,9 @@ from psycopg.rows import dict_row
 from smart_rag_core.ingestion.crawl.exceptions import CrawlPolicyError
 from smart_rag_core.ingestion.crawl.policy import normalize_url
 
+CRAWL_SERVER_CONTENT_CLASS = "real_company"
+CRAWL_SERVER_GRAPH_ELIGIBLE = False
+
 
 class CrawlEnqueueError(Exception):
     """Raised when approved crawl enqueue fails closed."""
@@ -44,6 +47,11 @@ def enqueue_approved_website_crawl(
 ) -> CrawlEnqueueOutcome:
     """Validate URL scope and insert source, approval, and crawl job.
 
+    Client ``content_class`` and ``graph_eligible`` are ignored even for
+    owner/admin. Server policy forces ``real_company`` and
+    ``graph_eligible=false``. Owner/admin is still required to enqueue.
+    ``source_approval_requests`` records the approval in the same RPC.
+
     Args:
         postgres_url: Database URL used with ``SET ROLE app_api``.
         caller_user_id: Server-derived subject.
@@ -55,8 +63,8 @@ def enqueue_approved_website_crawl(
         document_title: Optional document title; defaults to the start URL.
         max_depth: Crawl depth bound (1-5).
         max_pages: Page bound (1-200).
-        content_class: ``synthetic`` or ``real_company``.
-        graph_eligible: Whether the version may later receive Graph Pending.
+        content_class: Ignored client hint; not used as authority.
+        graph_eligible: Ignored client hint; server forces false.
         attestation_policy_version: Optional attestation policy identifier.
 
     Returns:
@@ -70,6 +78,8 @@ def enqueue_approved_website_crawl(
         job rows through ``app.enqueue_approved_website_crawl``.
     """
 
+    _ = content_class
+    _ = graph_eligible
     try:
         normalized = normalize_url(start_url)
     except CrawlPolicyError as exc:
@@ -98,8 +108,8 @@ def enqueue_approved_website_crawl(
                         idempotency_key,
                         max_depth,
                         max_pages,
-                        content_class,
-                        graph_eligible,
+                        CRAWL_SERVER_CONTENT_CLASS,
+                        CRAWL_SERVER_GRAPH_ELIGIBLE,
                         attestation_policy_version,
                     ),
                 )

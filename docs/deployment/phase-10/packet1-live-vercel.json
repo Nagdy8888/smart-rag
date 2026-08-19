@@ -1,0 +1,32 @@
+{
+  "schema_version": "phase10-live-vercel-v1",
+  "team_slug": "nagdy8888s-projects",
+  "team_id": "team_mNIRHWuXIbJoytUU0QRJhJdW",
+  "project_name": "smart-rag-staging",
+  "project_id": "prj_iLnuVZIoTFg3Fen0v9cKcfNYTncZ",
+  "framework_auto_detect": "nextjs_via_cli_upload",
+  "git_linked": false,
+  "github_app_install_required_for_git_deploys": true,
+  "github_app_url": "https://github.com/apps/vercel",
+  "root_directory_used": "apps/frontend",
+  "production_alias": "https://smart-rag-staging.vercel.app",
+  "production_alias_http_status": 404,
+  "team_url": "https://smart-rag-staging-nagdy8888s-projects.vercel.app",
+  "team_url_http_status": 200,
+  "deployment_url": "https://smart-rag-staging-4tvfv51fj-nagdy8888s-projects.vercel.app",
+  "deployment_url_http_status": 200,
+  "deployment_id": "dpl_CJyrcHqA7nzhELsSvd2aEiaPZn6b",
+  "deployment_ready_state": "READY",
+  "env_keys_only": [
+    "NEXT_PUBLIC_API_BASE_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  ],
+  "env_keys_match_allow_list": true,
+  "service_role_present": false,
+  "live_values_committed": false,
+  "api_base_is_cloudfront": true,
+  "cloudfront_hostname": "dzm8yijuajwge.cloudfront.net",
+  "api_origin_placeholder_still": true,
+  "notes": "CLI file deploy after Hobby-as-Team login. GitHub App not installed on Demo_Project_3. CloudFront origin hostname remains origin.staging.example.invalid; API/Caddy not started."
+}

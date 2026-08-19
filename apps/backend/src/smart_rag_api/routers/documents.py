@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 
 from smart_rag_api.dependencies.identity import CallerContextDep
@@ -49,6 +49,8 @@ def list_documents_route(
     request: Request,
     caller: CallerContextDep,
     service: Annotated[DocumentService, Depends(get_document_service)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    cursor: Annotated[str | None, Query(max_length=80)] = None,
 ) -> list[DocumentResponse]:
     """List ACL-visible non-deleted documents.
 
@@ -56,9 +58,11 @@ def list_documents_route(
         request: Active request.
         caller: Authenticated caller.
         service: Injected service.
+        limit: Page size, default 50, max 200.
+        cursor: Optional ``created_at,id`` keyset cursor.
 
     Returns:
-        Visible documents with escaped titles.
+        Visible documents with escaped titles, newest first.
     """
 
     enforce_rate_limit(
@@ -67,7 +71,10 @@ def list_documents_route(
         kind=RateLimitKind.LOW_RISK_READ,
         max_attempts=120,
     )
-    records = service.list(caller)
+    try:
+        records = service.list(caller, limit=limit, cursor=cursor)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
     return [
         DocumentResponse(
             document_id=item.document_id,
@@ -75,6 +82,7 @@ def list_documents_route(
             visibility=item.visibility,
             current_version_id=item.current_version_id,
             visibility_generation=item.visibility_generation,
+            created_at=item.created_at,
         )
         for item in records
     ]
@@ -216,4 +224,45 @@ def get_document_route(
         visibility=record.visibility,
         current_version_id=record.current_version_id,
         visibility_generation=record.visibility_generation,
+        created_at=record.created_at,
     )
+
+
+@router.delete(
+    "/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+def delete_document_route(
+    request: Request,
+    document_id: UUID,
+    caller: CallerContextDep,
+    service: Annotated[DocumentService, Depends(get_document_service)],
+) -> Response:
+    """Tombstone one document. Owner/admin only.
+
+    Args:
+        request: Active request for rate limits.
+        document_id: Document id.
+        caller: Authenticated caller.
+        service: Injected service.
+
+    Returns:
+        Empty 204 body.
+
+    Raises:
+        HTTPException: 404 when missing or unauthorized; 403 when a visible
+            document is not owner/admin-deletable.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"doc-delete:{caller.user_id}",
+        kind=RateLimitKind.COST_MUTATION,
+        max_attempts=20,
+    )
+    try:
+        service.delete(caller, document_id=document_id)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

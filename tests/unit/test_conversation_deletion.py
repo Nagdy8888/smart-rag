@@ -17,7 +17,11 @@ from smart_rag_core.memory.summary import compact_query_state
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.security.identity import CallerContext
 
-from tests.unit.typed_openapi import as_openapi_client, json_object
+from tests.unit.typed_openapi import (
+    as_openapi_client,
+    json_object,
+    permit_test_identity,
+)
 
 _OWNER = "00000000-0000-4000-8000-000000000001"
 _MEMBER = "00000000-0000-4000-8000-000000000002"
@@ -74,7 +78,7 @@ class _OwnerDeleteService:
 def test_owner_delete_returns_204(monkeypatch: pytest.MonkeyPatch) -> None:
     """Owner DELETE returns 204 with an empty body."""
 
-    monkeypatch.setenv("APP_ENV", "test")
+    permit_test_identity(monkeypatch)
     monkeypatch.setattr(
         "smart_rag_api.routers.conversations.enforce_rate_limit",
         _noop_rate_limit,
@@ -97,7 +101,7 @@ def test_owner_delete_returns_204(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_foreign_delete_returns_404(monkeypatch: pytest.MonkeyPatch) -> None:
     """Foreign DELETE is 404, not 403, matching tombstone denial."""
 
-    monkeypatch.setenv("APP_ENV", "test")
+    permit_test_identity(monkeypatch)
     monkeypatch.setattr(
         "smart_rag_api.routers.conversations.enforce_rate_limit",
         _noop_rate_limit,

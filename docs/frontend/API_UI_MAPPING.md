@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -141,7 +141,7 @@ Production UI shows these codes, never exception text.
 
 ## FastAPI path inventory
 
-Authoritative snapshot: `docs/api/openapi.foundation.json` (43 paths).
+Authoritative snapshot: `docs/api/openapi.foundation.json` (44 paths).
 Roles: `owner` \| `admin` \| `member` \| `viewer` from `GET /me`.
 
 ### Public
@@ -149,7 +149,8 @@ Roles: `owner` \| `admin` \| `member` \| `viewer` from `GET /me`.
 | Method | Path | Response | Authz |
 | --- | --- | --- | --- |
 | GET | `/health/live` | `{status}` | public |
-| GET | `/health/ready` | `status`, `query_ready`, `detail`, `rate_limit_degraded`, `dependencies[{name,status}]` | public |
+| GET | `/health/ready` | `status`, `query_ready`, coarse `detail` (no named probes) | public |
+| GET | `/ops/ready` | named dependency probes plus `query_ready` | owner/admin |
 | GET | `/api/meta` | `MetaResponse` | public |
 
 ParadeDB `down` on ready is Hybrid degrade, not BM25-snippet success.
@@ -159,7 +160,7 @@ ParadeDB `down` on ready is Hybrid degrade, not BM25-snippet success.
 | Method | Path | Fields | Authz |
 | --- | --- | --- | --- |
 | GET | `/me` | `user_id`, `role`, `authorization_version`, `upload_enabled`, `mfa_enrolled` | any active member |
-| POST | `/admin/invitations` | req `email`, `role`, `upload_enabled`; resp `invitation_id`, `email`, `role`, `upload_enabled`, `expires_at`, `raw_token` | owner/admin |
+| POST | `/admin/invitations` | req `email`, `role`, `upload_enabled`; resp `invitation_id`, `email`, `role`, `upload_enabled`, `expires_at` (token by mail only; `APP_ENV=test` may set `X-Test-Invitation-Token`) | owner/admin; only owner may invite owner |
 | POST | `/invitations/accept` | req `token`; resp `invitation_id` | authenticated; email from JWT |
 | POST | `/admin/users/{user_id}/offboard` | resp `request_id`, `subject_user_id`, `completed_at` | owner/admin **AAL2** |
 
@@ -170,28 +171,31 @@ No HTTP for owner bootstrap (`bootstrap_owner` service), MFA recovery
 
 | Method | Path | Fields | Authz |
 | --- | --- | --- | --- |
-| GET | `/documents` | `document_id`, `title?`, `visibility`, `current_version_id?`, `visibility_generation` | ACL |
+| GET | `/documents` | `document_id`, `title?`, `visibility`, `current_version_id?`, `visibility_generation`, `created_at?`; query `limit` (default 50, max 200), `cursor` | ACL |
 | GET | `/documents/{document_id}` | same | ACL else 404 |
+| DELETE | `/documents/{document_id}` | **204**; unseen **404**; visible non-owner/admin **403** | owner/admin; COST_MUTATION |
 | POST | `/documents/uploads` | req `declared_bytes` ≤ 104857600, `idempotency_key`; resp `reservation_id`, `storage_bucket`, `storage_path`, `expires_at`, `signed_url?`, `upload_method` | not viewer; `upload_enabled`; MFA when privileged. Local `signed_url` is **null** |
 | POST | `/documents/uploads/finalize` | req `reservation_id`, `object_name`, `content_hash`, `actual_bytes`, `media_type?`, `declared_category`, `attestation_policy_version`, `idempotency_key`, `document_title?`; resp `reservation_id`, `document_id`, `version_id`, `job_id` | same upload gate |
-| GET | `/ingestion/versions/{version_id}/status` | lifecycle `status` plus nested `scan`, `review`, `ocr`, `chunks_tables`, `embedding`, `bm25`, `queue_age`, `graph_handoff`, `retry_allowed` | authenticated; `retry_allowed` owner/admin only |
+| GET | `/ingestion/versions/{version_id}/status` | lifecycle `status` plus nested `scan`, `review`, `ocr`, `chunks_tables`, `embedding`, `bm25`, `queue_age`, `graph_handoff`, `retry_allowed` | authenticated; unauthorized **404**; `retry_allowed` owner/admin only |
 | POST | `/ingestion/jobs/{job_id}/retry` | `job_id`, `status`, `detail` | owner/admin |
 | POST | `/ingestion/crawls` | req `start_url`, `approved_domain`, `idempotency_key`, optional title/depth/pages/class/graph/attestation; resp ids | owner/admin |
 
 Version `status` enum: `uploading`, `uploaded`, `scanning`, `parsing`,
 `hybrid_ready`, `graph_pending`, `graph_ready`, `graph_ineligible`,
-`deletion_pending`, `failed`. There is **no** `DELETE /documents/{id}` and
-**no** signed source-preview/download HTTP route.
+`deletion_pending`, `failed`. `DELETE /documents/{id}` is owner/admin HTTP
+(tombstone + `exclude_version_from_retrieval`). There is **no** signed
+source-preview/download HTTP route. The Stitch library delete control may
+still be unwired (GAP-07-14 UI).
 
 ### Chat and runs
 
 | Method | Path | Notes |
 | --- | --- | --- |
 | POST | `/conversations` | body `title?`; 201 `conversation_id`, `creator_user_id`, `title`, `created_at` |
-| GET | `/conversations` | creator list |
+| GET | `/conversations` | creator list; `limit` default 50 max 200; `cursor` |
 | GET | `/conversations/{conversation_id}` | creator or owner/admin; else 404 |
 | DELETE | `/conversations/{conversation_id}` | **204**; foreign/tombstone **404**; immediate purge |
-| POST | `/conversations/{conversation_id}/messages` | handshake + admit |
+| POST | `/conversations/{conversation_id}/messages` | handshake + admit; **requires** Idempotency-Key or body key |
 | GET | `/runs/{run_id}` | creator only; IDOR 404 |
 | POST | `/runs/{run_id}/cancel` | creator |
 | GET | `/runs/{run_id}/events` | Bearer SSE resume |
@@ -207,7 +211,7 @@ Feedback tags (byte-for-byte): `chunk/cleaning loss`, `profile field wrong`,
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| POST | `/graph/inspect` | req `entity_keys` ≤12 and/or `document_id`, `depth` 1–3; resp `nodes`, `locators`, `limitations[{code,count?}]`, `row_count` ≤200, `depth`. No vendor prose |
+| POST | `/graph/inspect` | req `entity_keys` ≤12 and/or `document_id`, `depth` 1–3; resp `nodes`, `locators`, `limitations[{code,count?}]`, `row_count` ≤200, `depth`. FastAPI COST_MUTATION. No vendor prose |
 | GET | `/graph/entities/search` | `q`, `limit` ≤25; hits `object_id`, `object_type`, `chunk_id`, `document_id`, `version_id`, `support` |
 | GET | `/tables` | manifests without storage paths |
 | POST | `/tables/analyze` | body `plan` (`TableQueryPlan`); resp `table_id`, `version_id`, `document_id`, `rows`, `source_ranges` |
@@ -326,7 +330,7 @@ mocks. Stitch may show an honest unavailable/blocked state.
 | GAP-07-11 | Budget policy read/write HTTP | Phase 6 | Show 402 `budget_exhausted`; no budget editor |
 | GAP-07-12 | Audit list/export HTTP | Phase 2/6 | Chain exists; no viewer API; do not mock events |
 | GAP-07-13 | Company settings HTTP | Phase 6 | Singleton loaded for `authorization_version`; no CRUD |
-| GAP-07-14 | Document delete HTTP | Phase 3/6 | Status `deletion_pending` exists; no DELETE documents route |
+| GAP-07-14 | Document delete UI | Phase 3/6 | HTTP `DELETE /documents/{id}` exists for owner/admin; Stitch library control may still be unwired |
 | GAP-07-15 | Upload finalize / crawl / retry UI | Phase 7/8 UI | APIs exist |
 | GAP-07-16 | Graph/table/tools/glossary/entity-rule UI | Phase 7/8 UI | APIs exist |
 | GAP-07-17 | Company usage dashboard | Phase 7/8 UI | `GET /usage/company` exists |
@@ -352,7 +356,7 @@ where listed.
 | Screen | Control | Contract | Authz | Terminal / fallback |
 | --- | --- | --- | --- | --- |
 | A Sign in | email, password, Sign in | `signInWithPassword` | Auth | generic fail; FastAPI does not throttle |
-| A Sign in | ready pills | `GET /health/ready` | public | informational |
+| A Sign in | ready pills | public `GET /health/ready` (`query_ready` only) | public | informational; no named probes |
 | B Sign up | email, password | `signUp` | Auth | membership still needs invite/profile |
 | C Forgot | email | `resetPasswordForEmail` | Auth | Inbucket locally |
 | C Reset | new password | Auth update | Auth | |
@@ -369,7 +373,7 @@ where listed.
 | --- | --- | --- | --- | --- |
 | Shell | role, user_id, upload, mfa | `GET /me` | live profile | n/a |
 | E Invite create | email, role, upload_enabled | `POST /admin/invitations` | owner/admin | AUTH_ADJACENT |
-| E Invite token | `raw_token` once | response field | owner/admin | n/a |
+| E Invite token | delivered by mail | not in JSON | owner/admin | n/a |
 | E Accept | token | `POST /invitations/accept` | JWT email, not body email | AUTH_ADJACENT |
 | E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin AAL2 | AUTH_ADJACENT |
 | E Owner setup | bootstrap | GAP-07-08 | none | Unavailable |
@@ -418,7 +422,7 @@ Unknown additive SSE types: log and ignore. One terminal among
 | H Status | pills + BM25 + handoff | `GET /ingestion/versions/{id}/status` | authenticated | n/a |
 | H Retry | retry | `POST /ingestion/jobs/{id}/retry` | owner/admin when `retry_allowed` | n/a |
 | H Graph not-ready copy | sentence | `graphNotReadyCopy(n)` from authorized counts only | never restricted | n/a |
-| H Delete document | — | GAP-07-14 | — | Unavailable |
+| H Delete document | owner/admin | `DELETE /documents/{id}` | owner/admin; 204/404 | COST_MUTATION |
 | I Restricted preview | — | GAP-07-09 | — | Unavailable |
 | I Graph tab | inspect | `POST /graph/inspect` `document_id` | ACL | n/a |
 | I Tables tab | list | `GET /tables` | ACL | n/a |

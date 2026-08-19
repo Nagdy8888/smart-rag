@@ -142,6 +142,14 @@ def test_graph_inspect_route_is_registered() -> None:
         assert field in properties, field
 
 
+def test_graph_inspect_is_a_preauth_mutation_prefix() -> None:
+    """``POST /graph/inspect`` is covered by hashed-IP pre-auth limits."""
+
+    from smart_rag_api.middleware.preauth import _MUTATION_PREFIXES
+
+    assert "/graph/" in _MUTATION_PREFIXES
+
+
 def test_unauthenticated_inspect_is_unauthorized() -> None:
     """Inspection requires a bearer token or test identity."""
 
@@ -158,6 +166,7 @@ def test_member_may_call_inspect(monkeypatch: pytest.MonkeyPatch) -> None:
     """Members are allowed; ACL filtering happens in the resolver."""
 
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
     monkeypatch.setattr(
         "smart_rag_api.routers.graph_inspect._postgres_url",
         _unused_postgres_url,
@@ -165,6 +174,10 @@ def test_member_may_call_inspect(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "smart_rag_api.routers.graph_inspect.inspect_graph_for_caller",
         _empty_inspect,
+    )
+    monkeypatch.setattr(
+        "smart_rag_api.routers.graph_inspect.enforce_rate_limit",
+        lambda *args, **kwargs: None,
     )
     with TestClient(create_app()) as raw:
         client = _http_client(raw)

@@ -76,7 +76,12 @@ class AuthTeamService:
         )
 
     def accept_invitation(
-        self, caller: CallerContext, *, raw_token: str, email: str
+        self,
+        caller: CallerContext,
+        *,
+        raw_token: str,
+        email: str,
+        assurance_level: str = "aal1",
     ) -> UUID:
         """Accept a single-use invitation for the authenticated subject.
 
@@ -84,6 +89,8 @@ class AuthTeamService:
             caller: Authenticated caller.
             raw_token: One-time invitation secret.
             email: Verified JWT/test email, never a client-trusted identity.
+            assurance_level: JWT ``aal`` claim. Privileged/upload upgrades
+                require AAL2.
 
         Returns:
             Invitation id.
@@ -100,8 +107,13 @@ class AuthTeamService:
                 connection.execute("SET ROLE app_api")
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        "SELECT app.accept_invitation(%s, %s, %s)",
-                        (digest, caller.user_id, email.strip().lower()),
+                        "SELECT app.accept_invitation(%s, %s, %s, %s)",
+                        (
+                            digest,
+                            caller.user_id,
+                            email.strip().lower(),
+                            assurance_level,
+                        ),
                     )
                     row = cursor.fetchone()
                 connection.commit()

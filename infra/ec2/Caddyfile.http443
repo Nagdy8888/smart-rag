@@ -1,0 +1,70 @@
+# t3.micro origin listener. ACME cannot complete because security-group 443
+# is CloudFront prefix-list only. CloudFront connects with origin_protocol_policy
+# http-only; viewers still use HTTPS. Dual origin-header values and 90s
+# timeouts stay identical to Caddyfile. Do not commit real header values.
+
+{
+	auto_https off
+	servers {
+		max_header_size 16KB
+		timeouts {
+			read_timeout 90s
+			read_header_timeout 15s
+			write_timeout 90s
+			idle_timeout 90s
+		}
+	}
+}
+
+http://:443 {
+	request_body {
+		max_size 16MB
+	}
+
+	@origin_current {
+		header {$ORIGIN_HEADER_NAME} {$ORIGIN_HEADER_VALUE_CURRENT}
+	}
+	@origin_previous {
+		header {$ORIGIN_HEADER_NAME} {$ORIGIN_HEADER_VALUE_PREVIOUS}
+	}
+	@origin_pending_name {
+		header {$ORIGIN_HEADER_NAME_PENDING} {$ORIGIN_HEADER_VALUE_PENDING}
+	}
+
+	handle @origin_current {
+		reverse_proxy {$ACTIVE_API_UPSTREAM} {
+			flush_interval -1
+			transport http {
+				read_timeout 90s
+				write_timeout 90s
+				max_conns_per_host 32
+			}
+		}
+	}
+
+	handle @origin_previous {
+		reverse_proxy {$ACTIVE_API_UPSTREAM} {
+			flush_interval -1
+			transport http {
+				read_timeout 90s
+				write_timeout 90s
+				max_conns_per_host 32
+			}
+		}
+	}
+
+	handle @origin_pending_name {
+		reverse_proxy {$ACTIVE_API_UPSTREAM} {
+			flush_interval -1
+			transport http {
+				read_timeout 90s
+				write_timeout 90s
+				max_conns_per_host 32
+			}
+		}
+	}
+
+	handle {
+		respond "direct origin denied" 403
+	}
+}

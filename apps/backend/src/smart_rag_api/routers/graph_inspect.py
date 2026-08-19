@@ -56,6 +56,10 @@ def inspect_graph_route(
 ) -> GraphInspectResponse:
     """Inspect authorized graph objects. Members and viewers are ACL-filtered.
 
+    FastAPI applies ``COST_MUTATION`` rate limits here. Pre-auth IP limits
+    also cover ``POST /graph/*`` via ``_MUTATION_PREFIXES`` (GET search is
+    skipped because this middleware ignores GET/HEAD/OPTIONS).
+
     Args:
         request: FastAPI request with backend settings.
         body: Seed entity keys and/or document id, depth at most 3.
@@ -70,6 +74,12 @@ def inspect_graph_route(
     """
 
     started = time.monotonic()
+    enforce_rate_limit(
+        request,
+        bucket_key=f"graph-inspect:{caller.user_id}",
+        kind=RateLimitKind.COST_MUTATION,
+        max_attempts=20,
+    )
     remaining = INSPECTION_DEADLINE_SECONDS - (time.monotonic() - started)
     try:
         return inspect_graph_for_caller(

@@ -2,7 +2,7 @@
 title: Query routing matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 2
 ---
@@ -136,12 +136,13 @@ sequenceDiagram
   else coverage below 0.65 no relationship
     Corr->>Corr: one same-route retry
   else exhausted
-    Corr->>Corr: insufficient evidence not an answer
+    Corr->>Corr: insufficient_evidence END
+  else continue
+    Corr->>Fuse: Hybrid ranks and resolved paths
+    Fuse->>Tables: canonical evidence
+    Tables->>Ans: one counted answer call
+    Ans->>Ver: deterministic checks then one six-link verifier
   end
-  Corr->>Fuse: Hybrid ranks and resolved paths
-  Fuse->>Tables: canonical evidence
-  Tables->>Ans: one counted answer call
-  Ans->>Ver: deterministic checks then one six-link verifier
 ```
 
 Independent required branches run with `BRANCH_CONCURRENCY=2`. A fourth
@@ -154,8 +155,14 @@ blindness counts are disclosed only on the authorized visibility path.
 ## LangGraph
 
 `enforce_admission` → `load_memory` → `prepare_query` → `compile_plan` →
-`execute_branches` → `apply_correction` → `fuse_evidence` →
-`compose_tables` → `disclose_optional_tools` → `generate_answer` →
-`verify_answer` → END.
-Health/ready stays unconfigured. SSE and the public chat UI remain later
-packets.
+`execute_branches` → `apply_correction` → (`insufficient_evidence` END) or
+`fuse_evidence` → `compose_tables` → `disclose_optional_tools` →
+`generate_answer` → `verify_answer` → END.
+
+Studio's module-level `graph` stays checkpointer-free and unbound. Local
+LangGraph Studio uses a separate `query_studio` graph that seeds synthetic
+`status=studio_local` context so you can step nodes without FastAPI admit
+([LANGGRAPH_STUDIO.md](../development/LANGGRAPH_STUDIO.md)). Live FastAPI SSE
+compiles per run via `query_graph_runtime.build_query_graph_deps` with Hybrid,
+counted gateway, prompts, optional LightRAG, and a per-run `app_api`
+connection. Missing Hybrid or gateway fails closed.

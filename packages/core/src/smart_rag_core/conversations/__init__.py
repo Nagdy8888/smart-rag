@@ -131,31 +131,40 @@ def list_conversations(
     connection: psycopg.Connection,
     *,
     caller: CallerContext,
+    limit: int = 50,
+    cursor_created_at: datetime | None = None,
+    cursor_id: UUID | None = None,
 ) -> tuple[ConversationRecord, ...]:
     """List non-deleted conversations the caller may see.
 
     Args:
         connection: Open ``app_api`` connection.
         caller: Server-derived identity.
+        limit: Page size, default 50, max 200.
+        cursor_created_at: Optional keyset timestamp.
+        cursor_id: Optional keyset id. Must be paired with ``cursor_created_at``.
 
     Returns:
-        Creator-owned rows, plus owner/admin audit visibility.
+        Creator-owned rows, plus owner/admin audit visibility, newest first.
 
     Raises:
-        QueryAdmissionError: Authorization failure.
+        QueryAdmissionError: Authorization or cursor failure.
     """
 
     try:
         with connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
-                SELECT id, creator_user_id, title
-                FROM app.list_user_conversations(%s, %s, %s)
+                SELECT id, creator_user_id, title, created_at
+                FROM app.list_user_conversations_page(%s, %s, %s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,
                     caller.rpc_role(),
                     caller.rpc_authorization_version(),
+                    limit,
+                    cursor_created_at,
+                    cursor_id,
                 ),
             )
             rows = cursor.fetchall()

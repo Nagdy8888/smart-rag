@@ -266,7 +266,10 @@ def test_invitation_and_admin_alert_reach_local_mailpit(
         ).fetchone()
     assert metadata_row is not None
     metadata = _string_object(metadata_row[0], label="invite user metadata")
-    assert metadata["invitation_token"] == created.raw_token
+    assert "invitation_token" not in metadata
+    assert str(metadata.get("invite_url", "")).endswith(
+        "/auth/v1/verify?token=" + created.raw_token + "&type=invite"
+    )
 
     _send_local_admin_alert(admin_recipient)
     await_mail(mailpit_url, admin_recipient)

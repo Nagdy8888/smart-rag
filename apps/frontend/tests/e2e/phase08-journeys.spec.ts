@@ -102,7 +102,9 @@ test("unauthenticated document 404 still redirects to login", async ({ page }) =
   await expect(page.getByText("SECRET TITLE")).toHaveCount(0);
 });
 
-test("login response includes CSP without Tailwind CDN", async ({ page }) => {
+test("login response includes CSP without Tailwind CDN and with API origin", async ({
+  page,
+}) => {
   const response = await page.goto("/login");
   expect(response).not.toBeNull();
   const csp = response?.headers()["content-security-policy"] ?? "";
@@ -110,4 +112,7 @@ test("login response includes CSP without Tailwind CDN", async ({ page }) => {
   expect(csp).toContain("object-src 'none'");
   expect(csp).not.toContain("cdn.tailwindcss.com");
   expect(csp).not.toContain("fonts.googleapis.com");
+  expect(csp).not.toContain("https://*.supabase.co");
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+  expect(csp).toContain(new URL(apiBase).origin);
 });

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -253,6 +254,7 @@ class IngestionJobRepository:
         if move_to_dead_letter or job.attempt_count >= job.max_attempts:
             return self._move_to_dead_letter(
                 job,
+                lease_token=lease_token,
                 error_category=error_category,
                 last_error=last_error,
             )
@@ -327,22 +329,51 @@ class IngestionJobRepository:
         self,
         job: IngestionJobRecord,
         *,
+        lease_token: str,
         error_category: JobErrorCategory,
         last_error: str,
     ) -> IngestionJobRecord:
         """Copy an exhausted ingestion job into dead-letter storage.
 
+        The status update is lease-conditional so a late dead-letter write
+        cannot tombstone a row another worker has already claimed.
+
         Args:
             job: Job that has exhausted retries.
+            lease_token: Lease token that must still own ``processing``.
             error_category: Classified failure category.
             last_error: Operator-visible error detail.
 
         Returns:
             The job record after the dead-letter insert and status update.
+
+        Raises:
+            JobLeaseError: When zero rows match the lease/status predicate.
         """
 
         dead_letter_key = f"dead-letter:{job.id}:{job.attempt_count}"
         with self._connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                UPDATE app.ingestion_jobs
+                SET
+                  status = 'dead_letter'::app.job_status,
+                  lease_owner = NULL,
+                  lease_token = NULL,
+                  lease_expires_at = NULL,
+                  error_category = %s,
+                  last_error = %s,
+                  updated_at = timezone('utc', now())
+                WHERE id = %s
+                  AND lease_token = %s
+                  AND status = 'processing'::app.job_status
+                RETURNING *
+                """,
+                (error_category.value, last_error[:4000], job.id, lease_token),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise JobLeaseError("dead_letter_lease_rejected")
             cursor.execute(
                 """
                 INSERT INTO app.dead_letter_jobs (
@@ -381,29 +412,50 @@ class IngestionJobRepository:
                     error_category.value,
                 ),
             )
-            cursor.execute(
-                """
-                UPDATE app.ingestion_jobs
-                SET
-                  status = 'dead_letter'::app.job_status,
-                  lease_owner = NULL,
-                  lease_token = NULL,
-                  lease_expires_at = NULL,
-                  error_category = %s,
-                  last_error = %s,
-                  updated_at = timezone('utc', now())
-                WHERE id = %s
-                RETURNING *
-                """,
-                (error_category.value, last_error[:4000], job.id),
-            )
-            row = cursor.fetchone()
-            if row is None:
-                raise JobRepositoryError("dead_letter_update_failed")
             reservation_raw = job.payload_ref.get("budget_reservation_id")
             if isinstance(reservation_raw, str):
                 self._admission.release_ingestion_reservation(UUID(reservation_raw))
             return _row_to_ingestion_job(row)
+
+
+def configurable_lease_lost(config: Mapping[str, object] | object) -> bool:
+    """Return whether a worker heartbeat marked the graph lease lost.
+
+    Args:
+        config: LangGraph ``RunnableConfig`` or a mapping with
+            ``configurable.lease_lost`` set to a ``threading.Event``.
+
+    Returns:
+        ``True`` when the event exists and is set.
+    """
+
+    mapping = _as_mapping(config)
+    configurable = mapping.get("configurable", mapping)
+    if not isinstance(configurable, dict):
+        return False
+    event = configurable.get("lease_lost")
+    is_set = getattr(event, "is_set", None)
+    return bool(callable(is_set) and is_set())
+
+
+def _as_mapping(config: Mapping[str, object] | object) -> Mapping[str, object]:
+    """Return ``config`` as a mapping when possible.
+
+    Args:
+        config: Runnable config or other object.
+
+    Returns:
+        A string-keyed mapping, or an empty dict.
+    """
+
+    if isinstance(config, Mapping):
+        return config
+    getter = getattr(config, "get", None)
+    if callable(getter):
+        configurable = getter("configurable", {})
+        if isinstance(configurable, dict):
+            return {"configurable": configurable}
+    return {}
 
 
 def _row_to_ingestion_job(row: dict[str, Any]) -> IngestionJobRecord:

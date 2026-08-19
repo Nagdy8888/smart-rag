@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Protocol, cast, runtime_checkable
 
+import pytest
 from fastapi.testclient import TestClient
 from smart_rag_api.main import create_app
 
@@ -137,3 +138,17 @@ def openapi_test_client() -> TestClient:
     """
 
     return TestClient(create_app())
+
+
+def permit_test_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Permit ``X-Test-*`` headers for OpenAPI unit tests.
+
+    Bypass is ``APP_ENV=test`` and ``ALLOW_TEST_IDENTITY=true``. Staging
+    and production cannot enable the flag.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    """
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")

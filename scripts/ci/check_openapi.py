@@ -67,6 +67,7 @@ def main() -> int:
         "/admin/tools/{tool_key}/permissions",
         "/usage/me",
         "/usage/company",
+        "/ops/ready",
     }
     unexpected = [path for path in paths if path not in allowed]
     if unexpected:

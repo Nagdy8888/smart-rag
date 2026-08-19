@@ -12,8 +12,8 @@ import type { ReadinessResponse } from "../lib/types";
 import styles from "./developer-app.module.css";
 
 /**
- * Render live `GET /health/ready` so ParadeDB/Valkey/LightRAG outages are
- * visible without treating unconfigured as healthy.
+ * Render public `GET /health/ready`. Owner/admin named probes from
+ * `GET /ops/ready` are merged by the caller when the Bearer is allowed.
  *
  * @param props - Readiness payload, or null when FastAPI is unreachable.
  * @returns Readiness panel.

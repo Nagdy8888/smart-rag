@@ -2,7 +2,7 @@
 title: Identity propagation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: engineering, security, reviewers
 ---
 
@@ -21,7 +21,7 @@ sequenceDiagram
   participant RPC as app.list_visible_documents
 
   Browser->>FastAPI: Authorization Bearer JWT
-  FastAPI->>JWKS: Verify iss/aud/alg/exp/sub/kid (ES256/RS256 only)
+  FastAPI->>JWKS: Verify iss/aud/alg/exp/sub/kid/role (ES256/RS256; role=authenticated)
   JWKS-->>FastAPI: Valid subject + session claims
   FastAPI->>DB: SELECT profiles + company_settings (app_api)
   DB-->>FastAPI: role, disabled, MFA, authorization_version
@@ -56,12 +56,16 @@ FastAPI dependency: `apps/backend/src/smart_rag_api/dependencies/identity.py`.
   `http://127.0.0.1:54321/auth/v1` or
   `http://host.docker.internal:54321/auth/v1`. Other environments require
   `iss` to equal `{SUPABASE_URL}/auth/v1`. HS256 remains forbidden. Arbitrary
-  issuers are rejected.
+  issuers are rejected. The JWT `role` claim must be `authenticated`;
+  `service_role` and `anon` fail closed.
 - Loads profile + company settings via `app_api` Postgres reads.
 - Rejects disabled users, revoked sessions, and missing MFA for
   owner/admin/upload-capable members.
-- `APP_ENV=test` may use `X-Test-*` headers; production never trusts client role
-  metadata.
+- `X-Test-*` headers mint a caller only when `APP_ENV=test` and
+  `ALLOW_TEST_IDENTITY=true`. Staging and production reject that flag at
+  startup and return HTTP 400 when the headers are present. Local without
+  the signed pair also rejects the headers. Production images omit
+  `ALLOW_TEST_IDENTITY`.
 
 Privileged Auth Admin (`service_role`) lives only in
 `apps/backend/src/smart_rag_api/auth_admin/` per

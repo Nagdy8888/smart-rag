@@ -29,6 +29,7 @@ const listTools = vi.fn();
 const fetchUsageMe = vi.fn();
 const fetchUsageCompany = vi.fn();
 const fetchReady = vi.fn();
+const loadConsoleReadiness = vi.fn();
 const fetchMeta = vi.fn();
 const approveEntityRule = vi.fn();
 const listEntityRules = vi.fn();
@@ -79,6 +80,7 @@ vi.mock("../lib/api", async () => {
     fetchMe: (...args: unknown[]) => fetchMe(...args),
     fetchMeta: (...args: unknown[]) => fetchMeta(...args),
     fetchReady: (...args: unknown[]) => fetchReady(...args),
+    loadConsoleReadiness: (...args: unknown[]) => loadConsoleReadiness(...args),
     createInvitation: (...args: unknown[]) => createInvitation(...args),
     offboardUser: (...args: unknown[]) => offboardUser(...args),
     enableTool: (...args: unknown[]) => enableTool(...args),
@@ -101,6 +103,13 @@ beforeEach(() => {
     min_client_version: "0.1.0",
   });
   fetchReady.mockResolvedValue({
+    status: "ok",
+    query_ready: true,
+    detail: "ok",
+    rate_limit_degraded: false,
+    dependencies: [],
+  });
+  loadConsoleReadiness.mockResolvedValue({
     status: "ok",
     query_ready: true,
     detail: "ok",
@@ -150,7 +159,6 @@ beforeEach(() => {
     role: "member",
     upload_enabled: false,
     expires_at: "2026-08-18T00:00:00Z",
-    raw_token: "once-secret",
   });
   offboardUser.mockResolvedValue({
     request_id: "req-1",
@@ -197,16 +205,19 @@ describe("TeamApp", () => {
     expect(screen.queryByRole("link", { name: /unavailable GAP-07-08/i })).toBeNull();
   });
 
-  it("renders raw_token once and hostile email as text", async () => {
+  it("does not render an invitation token and keeps hostile email as text", async () => {
     renderSurface(<TeamApp />);
     const create = await screen.findByRole("button", { name: "Create invitation" });
     fireEvent.click(create);
-    expect(await screen.findByTestId("raw-token")).toHaveTextContent("once-secret");
+    expect(await screen.findByTestId("invite-mail-only")).toHaveTextContent(
+      "The invitation token is delivered by mail only",
+    );
+    expect(screen.queryByTestId("raw-token")).toBeNull();
+    expect(screen.queryByText("once-secret")).toBeNull();
     expect(
       screen.getByText("<img src=x onerror=alert(1)>@evil.test"),
     ).toBeInTheDocument();
     expect(document.querySelector("img")).toBeNull();
-    expect(screen.getAllByTestId("raw-token")).toHaveLength(1);
   });
 });
 
@@ -317,7 +328,7 @@ describe("UsageApp member 403 and rate degradation", () => {
       mfa_enrolled: true,
     });
     fetchUsageCompany.mockRejectedValue(new Error("forbidden"));
-    fetchReady.mockResolvedValue({
+    loadConsoleReadiness.mockResolvedValue({
       status: "degraded",
       query_ready: true,
       detail: "ok",
@@ -330,7 +341,9 @@ describe("UsageApp member 403 and rate degradation", () => {
     expect(screen.getByTestId("audit-unavailable")).toHaveTextContent(
       AUDIT_HISTORY_UNAVAILABLE,
     );
-    expect(screen.getByText(/Rate limiter is degraded/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Rate limiter is degraded/),
+    ).toBeInTheDocument();
     expect(screen.getByText(RATE_LIMIT_COPY, { exact: false })).toBeInTheDocument();
     expect(screen.queryByText("SECRET_PASSAGE")).toBeNull();
     expect(document.querySelector("input[type='range']")).toBeNull();

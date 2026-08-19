@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: engineering, security
 ---
 
@@ -38,7 +38,11 @@ flowchart TD
 ```
 
 Routers receive services through `Depends`. Services receive DSNs and optional
-Valkey clients from `smart_rag_api.dependencies.services`. Identity is JWKS-verified `CallerContext` (test bypass only when `APP_ENV=test`).
+Valkey clients from `smart_rag_api.dependencies.services`. Identity is
+JWKS-verified `CallerContext`. `X-Test-*` bypass requires `APP_ENV=test` and
+`ALLOW_TEST_IDENTITY=true`. Staging and production reject that flag and
+return HTTP 400 when those headers are present. JWKS requires JWT
+`role=authenticated` and rejects `service_role` / `anon`.
 Local Docker (`APP_ENV=local`) accepts the documented GoTrue `iss` pair
 `http://127.0.0.1:54321/auth/v1` and
 `http://host.docker.internal:54321/auth/v1` when `SUPABASE_URL` is one of
@@ -50,27 +54,30 @@ keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGA
 | Method | Path | Caller | Authorization | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/health/live` | public | process up | No dependency probe |
-| GET | `/health/ready` | public | probes DB/Valkey/ParadeDB/model/graph | `query_ready` only when real models, LightRAG attached, DB+Valkey ok. ParadeDB `down` degrades Hybrid to dense+term |
+| GET | `/health/ready` | public | `{status, query_ready, detail}` only | Coarse `detail` (`ok` / `not_query_ready`). Never names ParadeDB/Valkey/LightRAG. Mock mode keeps `query_ready=false` |
+| GET | `/ops/ready` | owner/admin | named dependency probes | Full operator payload |
 | GET | `/api/meta` | public | handshake fields | Packet 6 enforces `min_client_version` |
 | GET | `/me` | authenticated | live profile role | Client role claims ignored |
-| POST | `/admin/invitations` | owner/admin | live role + privileged Auth settings | FastAPI AUTH_ADJACENT limiter |
+| POST | `/admin/invitations` | owner/admin | live role + privileged Auth settings | AUTH_ADJACENT. JSON omits `raw_token` (mail only). Only **owner** may invite `owner`. `APP_ENV=test` may set `X-Test-Invitation-Token` |
 | POST | `/invitations/accept` | authenticated | JWT/test email, not body email | AUTH_ADJACENT |
 | POST | `/admin/users/{user_id}/offboard` | owner/admin AAL2 | `apply_offboarding_security` | AUTH_ADJACENT |
-| GET | `/documents` | authenticated | `list_visible_documents` ACL | LOW_RISK_READ |
+| GET | `/documents` | authenticated | `list_visible_documents_page` ACL | LOW_RISK_READ; `limit` default 50 max 200; keyset `cursor=created_at,id` |
 | GET | `/documents/{id}` | authenticated | ACL + current version | 404 if missing/unauthorized |
+| DELETE | `/documents/{id}` | owner/admin | `delete_visible_document` wraps `exclude_version_from_retrieval` | COST_MUTATION; unseen **404**; visible member **403**; **204** |
 | POST | `/documents/uploads` | member+ `upload_enabled` | quota reserve | COST_MUTATION; `signed_url` is null locally (Phase 10 CloudFront) |
 | POST | `/documents/uploads/finalize` | member+ upload | finalize RPC | COST_MUTATION |
-| POST/GET | `/conversations` | authenticated | creator insert / list RPC | COST_MUTATION on create |
+| POST/GET | `/conversations` | authenticated | creator insert / `list_user_conversations_page` | COST_MUTATION on create; GET `limit` default 50 max 200; keyset `cursor` |
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
 | DELETE | `/conversations/{id}` | creator or owner/admin | **204**; foreign/tombstoned **404** | Immediate purge; see [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) |
-| POST | `/conversations/{id}/messages` | creator | handshake then idempotent Auto admit **composite** | JSON Accept → 202 `{run_id, stream_path}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) |
+| POST | `/conversations/{id}/messages` | creator | handshake then idempotent Auto admit **composite** | **Requires** `Idempotency-Key` header or body `idempotency_key` (400 if missing). JSON Accept → 202 `{run_id, stream_path}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) |
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
 | POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |
 | GET | `/runs/{run_id}/events` | creator only | Bearer resume; no handshake | `after` / `Last-Event-ID`; tombstone → 404 |
-| GET | `/runs/{run_id}/citations` | creator | IDs/provenance escaped | No snippet/passage |
+| GET | `/runs/{run_id}/citations` | creator | IDs/provenance escaped | No snippet/passage. ACL + current-version recheck; failed recheck → `source_unavailable` and `chunk_id` null |
 | POST | `/runs/{run_id}/feedback` | creator | thumbs 1 or 5 | Comment escaped |
-| GET | `/graph/entities/search` | authenticated | ACL SQL, 3s timeout | No vendor prose |
-| POST | `/graph/inspect` | authenticated | existing inspect | Unchanged seed/depth caps |
+| GET | `/graph/entities/search` | authenticated | ACL SQL, 3s timeout | LOW_RISK_READ. No vendor prose |
+| POST | `/graph/inspect` | authenticated | existing inspect | FastAPI `COST_MUTATION`. Preauth `/graph` prefix is owned by the API-hardening agent |
+| GET | `/ingestion/versions/{version_id}/status` | authenticated | `get_version_ingestion_status` ACL | **404** if missing or unauthorized (no existence leak). `last_error` sanitized |
 | GET | `/tables` | authenticated | current-version manifests | No storage paths |
 | POST | `/tables/analyze` | authenticated | `TableQueryPlan` extra=forbid | 404 missing parquet |
 | GET | `/tools` | authenticated | in-code registry + live role | Unauthorized names omitted |
@@ -87,11 +94,24 @@ now consume FastAPI-owned rate limits after the role gate.
 
 - Exact origins from `CORS_ALLOW_ORIGINS`. Defaults include local frontend
   `:3000` and Playwright `:3010`. Wildcards fail settings validation.
+  Staging and production require HTTPS origins and reject loopback.
   Credentialed responses never send `Access-Control-Allow-Origin: *`.
+- CORS Allow-Headers in staging/production/local:
+  `Authorization, Content-Type, Idempotency-Key, Last-Event-ID,
+  X-Client-Version, X-Request-ID`. `X-Test-*` is injected only when
+  `APP_ENV=test`.
+- `/docs`, `/redoc`, and `/openapi.json` are mounted only for `local` and
+  `test`. Staging and production set those URLs to `None`. FastAPI `version`
+  matches settings `API_VERSION` (default `0.1.0`).
+- Staging and production require `VALKEY_LIMITS_URL` at settings load.
+- `API_BIND_HOST` defaults to `0.0.0.0` for Docker/Caddy. The host firewall
+  must drop public access to port 8000.
 - Security headers: `nosniff`, `DENY` framing, `no-store`, empty CSP default-src.
 - Generic JSON errors. Untrusted content is never `text/html`.
 - `REQUEST_MAX_BODY_BYTES` (default 1 MiB) rejects oversized `Content-Length`
-  with HTTP 413.
+  with HTTP 413. POST/PUT/PATCH without a numeric `Content-Length` fail
+  closed with HTTP 411. GET/HEAD/OPTIONS/DELETE without a body skip the
+  gate so SSE resume is unchanged.
 - Schema `extra=forbid` on mutation bodies. Extra fields → 422
   `validation_failed`.
 
@@ -110,6 +130,9 @@ delete, or current-version mismatch drops the entry, emits
 
 ## CPU offload
 
+Lifespan starts a bounded `ThreadPoolExecutor` (`max_workers=8`) on
+`application.state.offload_executor` and shuts it down on exit. It is never
+left `None` while the process is serving.
 `smart_rag_core.runtime.offload.OffloadExecutor` owns a bounded process pool
 (CPU slices with p95 > 10 ms) and a thread pool (blocking I/O).
 `sample_event_loop_lag` measures loop delay. Packet 6 proves 15s persisted

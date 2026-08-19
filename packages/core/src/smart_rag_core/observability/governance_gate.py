@@ -22,6 +22,7 @@ def assert_langsmith_export_permitted(
     tracing_enabled: bool,
     content_class: ContentClass,
     provider_settings_verified: bool,
+    local_unsigned_waiver: bool = False,
 ) -> None:
     """Block LangSmith export of real company payloads until the matrix is verified.
 
@@ -29,21 +30,26 @@ def assert_langsmith_export_permitted(
         tracing_enabled: Process ``LANGSMITH_TRACING`` flag.
         content_class: Real company versus synthetic fixtures.
         provider_settings_verified: Signed org matrix row for LangSmith hide I/O.
+        local_unsigned_waiver: True when ``APP_ENV=local`` and mock mode is
+            off. Allows redacted tracing with operator keys without claiming
+            org-matrix verification.
 
     Raises:
         ExternalFlowBlockedError: When tracing is on for real company content
-            without a verified hide-I/O matrix, or when the content class is
-            unknown.
+            without a verified hide-I/O matrix or local waiver, or when the
+            content class is unknown.
 
     Side Effects:
-        None. Callers must keep ``LANGSMITH_TRACING=false`` for real content
-        until verification.
+        None. Staging and production must keep ``LANGSMITH_TRACING=false`` for
+        real content until verification.
     """
 
     if content_class is ContentClass.SYNTHETIC:
         return
     if content_class is not ContentClass.REAL_COMPANY:
         raise ExternalFlowBlockedError("unknown_content_class")
+    if local_unsigned_waiver:
+        return
     if tracing_enabled and not provider_settings_verified:
         raise ExternalFlowBlockedError("langsmith_real_content_unverified")
 

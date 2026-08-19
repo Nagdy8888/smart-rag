@@ -31,6 +31,7 @@ _ADMISSION_STATUS: dict[str, int] = {
     "tag_required": status.HTTP_422_UNPROCESSABLE_ENTITY,
     "invalid_query": status.HTTP_400_BAD_REQUEST,
     "invalid_key": status.HTTP_400_BAD_REQUEST,
+    "invalid_cursor": status.HTTP_400_BAD_REQUEST,
     "database_rejected": status.HTTP_503_SERVICE_UNAVAILABLE,
     "conversation_create_failed": status.HTTP_503_SERVICE_UNAVAILABLE,
 }

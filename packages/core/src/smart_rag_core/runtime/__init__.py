@@ -1,5 +1,6 @@
 """Process/thread offload, event-loop lag, and Valkey protocol helpers."""
 
+from smart_rag_core.runtime.async_bridge import run_coro_blocking
 from smart_rag_core.runtime.offload import (
     CPU_SLICE_BUDGET_MS,
     EventLoopLagSample,
@@ -27,5 +28,6 @@ __all__ = [
     "ValkeyProtocolError",
     "ValkeyTimeoutError",
     "blocking_sleep_seconds",
+    "run_coro_blocking",
     "sample_event_loop_lag",
 ]

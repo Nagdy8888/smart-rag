@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from smart_rag_core.release.phase10_constants import (
     CACHING_DISABLED_POLICY_ID,
@@ -17,9 +19,13 @@ from smart_rag_core.release.phase10_packet1 import (
     classify_p1001_c,
     classify_p1001_d,
     classify_p1001_e,
+    live_network_scan_passed,
+    live_runtime_assertions_passed,
+    live_vercel_secret_found,
 )
 from smart_rag_core.release.phase10_topology import (
     Phase10TopologyError,
+    assert_caddy_http443_policy,
     assert_caddy_policy,
     assert_cloudfront_timeouts,
     assert_compose_policy,
@@ -29,6 +35,7 @@ from smart_rag_core.release.phase10_topology import (
     assert_no_ssh,
     assert_no_vercel_secrets,
     assert_synthetic_corpus,
+    assert_t3micro_overlay,
     strip_hcl_comments,
 )
 
@@ -208,6 +215,33 @@ def test_lightrag_compose_service_is_rejected() -> None:
         assert_compose_policy(compose)
 
 
+def test_t3micro_overlay_rejects_host_ports() -> None:
+    """The t3.micro overlay must not publish ParadeDB or Valkey."""
+
+    with pytest.raises(Phase10TopologyError, match="host ports"):
+        assert_t3micro_overlay(
+            """
+services:
+  paradedb:
+    ports:
+      - "5432:5432"
+    mem_limit: 280m
+"""
+        )
+
+
+def test_committed_t3micro_overlay_fits_one_gib() -> None:
+    """Accepted t3.micro overlay keeps ParadeDB/Valkey private and small."""
+
+    overlay = (
+        Path(__file__).resolve().parents[2]
+        / "infra"
+        / "ec2"
+        / "docker-compose.t3micro.yml"
+    )
+    assert_t3micro_overlay(overlay.read_text(encoding="utf-8"))
+
+
 def test_vercel_service_role_is_rejected() -> None:
     """Vercel inventories cannot carry service_role or DB URLs."""
 
@@ -340,3 +374,62 @@ def test_classifications_fail_closed_and_do_not_pass_missing_runtime() -> None:
     assert CACHING_DISABLED_POLICY_ID.startswith("4135ea2d")
     assert CLOUDFRONT_PREFIX_LIST_NAME.endswith("origin-facing")
     assert _API and _WORKER and _CRAWL and _PARSER and _PARADE and _VALKEY
+
+
+def test_live_runtime_and_scan_helpers_fail_closed() -> None:
+    """Missing IMDS/SSH/encryption or an open private port cannot Pass."""
+
+    assert live_runtime_assertions_passed({"imds_http_tokens": "required"}) is False
+    assert (
+        live_runtime_assertions_passed(
+            {
+                "imds_http_tokens": "required",
+                "imds_hop_limit": 1,
+                "ssh_ingress": False,
+                "sshd_disabled": True,
+                "instance_state": "running",
+                "volumes": [{"encrypted": True}],
+            }
+        )
+        is True
+    )
+    assert live_network_scan_passed({"qualifies_for_p10_01_c": True}) is False
+    assert (
+        live_network_scan_passed(
+            {
+                "qualifies_for_p10_01_c": True,
+                "results": [
+                    {"port": 22, "open": False},
+                    {"port": 5432, "open": False},
+                    {"port": 6379, "open": False},
+                    {"port": 8000, "open": False},
+                    {"port": 8080, "open": False},
+                ],
+            }
+        )
+        is True
+    )
+    assert (
+        live_network_scan_passed(
+            {
+                "qualifies_for_p10_01_c": True,
+                "results": [
+                    {"port": 22, "open": True},
+                    {"port": 5432, "open": False},
+                    {"port": 6379, "open": False},
+                    {"port": 8000, "open": False},
+                    {"port": 8080, "open": False},
+                ],
+            }
+        )
+        is False
+    )
+    assert live_vercel_secret_found({"service_role_present": True}) is True
+    assert live_vercel_secret_found({"service_role_present": False}) is False
+
+
+def test_committed_http443_caddy_keeps_origin_rules() -> None:
+    """The t3.micro HTTP-on-443 Caddyfile still denies unmatched origins."""
+
+    path = Path(__file__).resolve().parents[2] / "infra" / "ec2" / "Caddyfile.http443"
+    assert_caddy_http443_policy(path.read_text(encoding="utf-8"))

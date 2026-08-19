@@ -11,6 +11,7 @@ import httpx
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
+from smart_rag_api.dependencies.services import get_postgres_url
 from smart_rag_api.main import create_app
 from smart_rag_core.jobs.dead_letter import DeadLetterService
 from smart_rag_core.jobs.exceptions import JobRetryNotAllowedError
@@ -206,7 +207,10 @@ def test_member_retry_route_remains_forbidden(monkeypatch: pytest.MonkeyPatch) -
     """Members cannot invoke the retry HTTP action."""
 
     monkeypatch.setenv("APP_ENV", "test")
-    with TestClient(create_app()) as client:
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    with TestClient(application) as client:
         post = typed_module_attr(
             client,
             "post",

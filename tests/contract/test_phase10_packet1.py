@@ -16,6 +16,7 @@ from smart_rag_core.release.phase10_constants import (
     PHASE09_IMAGE_IDS,
     PHASE09_PROMOTION_MANIFEST,
     STAGING_CADDY_FILE,
+    STAGING_CADDY_HTTP443_FILE,
     STAGING_COMPOSE_FILE,
     WRAPPER_RELATIVE,
 )
@@ -37,6 +38,7 @@ def test_committed_iac_compose_caddy_and_inventory_pass_policy() -> None:
     names = {item.check for item in report.findings}
     assert "cloudfront_timeouts" in names
     assert "no_ssh" in names
+    assert "caddy_http443" in names
     assert all(item.passed for item in report.findings)
 
 
@@ -85,6 +87,7 @@ def test_wrapper_and_packet_stay_pending() -> None:
     assert "status: pending" in packet.split("---", 2)[1]
     assert (REPO_ROOT / STAGING_COMPOSE_FILE).is_file()
     assert (REPO_ROOT / STAGING_CADDY_FILE).is_file()
+    assert (REPO_ROOT / STAGING_CADDY_HTTP443_FILE).is_file()
     compose = (REPO_ROOT / STAGING_COMPOSE_FILE).read_text(encoding="utf-8")
     assert "docker-compose.packet8.yml" not in compose
     assert "lightrag:" not in compose

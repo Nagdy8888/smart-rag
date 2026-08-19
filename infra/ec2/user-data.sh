@@ -44,12 +44,12 @@ if [[ -f /opt/smart-rag/provider-egress/allowlist.txt ]]; then
     iptables -A DOCKER-USER -j SMART_RAG_EGRESS
 fi
 
-if [[ -f /opt/smart-rag/docker-compose.staging.yml ]]; then
-  log "starting docker compose from /opt/smart-rag"
+if [[ -f /opt/smart-rag/docker-compose.staging.yml && -f /opt/smart-rag/docker-compose.t3micro.yml && -f /opt/smart-rag/.env ]]; then
+  log "starting t3.micro ParadeDB and Valkey from /opt/smart-rag"
   cd /opt/smart-rag
-  docker compose -f docker-compose.staging.yml up -d
+  docker compose -f docker-compose.staging.yml -f docker-compose.t3micro.yml --env-file /opt/smart-rag/.env up -d
 else
-  log "compose file not yet copied by SSM; instance is rebuildable once files exist"
+  log "compose overlay or .env not yet on host; instance is rebuildable once SSM copies them"
 fi
 
 log "bootstrap finished"

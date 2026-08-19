@@ -11,12 +11,17 @@ LANGGRAPH_JSON = REPO_ROOT / "apps" / "agents" / "langgraph.json"
 
 
 def test_langgraph_json_matches_verified_schema_contract() -> None:
-    """``langgraph.json`` must declare dependencies and both graph IDs."""
+    """``langgraph.json`` must declare dependencies and graph IDs."""
 
     payload = json.loads(LANGGRAPH_JSON.read_text(encoding="utf-8"))
     assert payload["dependencies"] == ["."]
-    assert set(payload["graphs"]) == {"query", "ingestion"}
+    assert payload["python_version"] == "3.11"
+    assert set(payload["graphs"]) == {"query", "query_studio", "ingestion"}
     assert payload["graphs"]["query"] == "./src/smart_rag_agents/query/graph.py:graph"
+    assert (
+        payload["graphs"]["query_studio"]
+        == "./src/smart_rag_agents/query/studio.py:graph"
+    )
     assert (
         payload["graphs"]["ingestion"]
         == "./src/smart_rag_agents/ingestion/graph.py:graph"
@@ -33,7 +38,7 @@ def test_langgraph_cli_validate_config_file() -> None:
     graphs = validated.get("graphs")
     assert dependencies == ["."]
     assert graphs is not None
-    assert set(graphs) == {"query", "ingestion"}
+    assert set(graphs) == {"query", "query_studio", "ingestion"}
 
 
 def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
@@ -123,6 +128,55 @@ def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
     assert routed["verifier_call_count"] == 0
     assert routed["preparation"] is not None
     assert routed["retrieval_plan"] is not None
+
+
+def test_query_studio_graph_runs_from_user_query_without_fastapi_admit() -> None:
+    """Studio seed injects synthetic context and still does not claim paid admit."""
+
+    from smart_rag_agents.query.studio import graph as studio_graph
+
+    empty = studio_graph.invoke({"user_query": ""})  # pyright: ignore[reportUnknownMemberType]
+    assert empty["status"] == "routing_rejected"
+    assert empty["detail"] == "empty_query"
+    runtime = empty["authorized_runtime"]
+    assert isinstance(runtime, dict)
+    assert runtime["status"] == "studio_local"
+
+    bad_family = studio_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+        {"user_query": "status of INV-SR-1001", "route_family": "owner"}
+    )
+    assert bad_family["status"] == "admission_rejected"
+    assert "allow-listed" in bad_family["detail"]
+
+    from_messages = studio_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+        {
+            "messages": [
+                {"role": "human", "content": "What is the status of INV-SR-1001?"}
+            ]
+        }
+    )
+    assert from_messages["user_query"] == "What is the status of INV-SR-1001?"
+    assert from_messages["status"] in {
+        "verified",
+        "verified_partial",
+        "insufficient_evidence",
+        "refused",
+    }
+    assert from_messages["answer_call_count"] == 0
+    seeded = from_messages["authorized_runtime"]
+    assert isinstance(seeded, dict)
+    assert seeded["status"] == "studio_local"
+
+    typed_query = studio_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
+        {"user_query": "What is the status of INV-SR-1001?"}
+    )
+    assert typed_query["user_query"] == "What is the status of INV-SR-1001?"
+    assert typed_query["status"] in {
+        "verified",
+        "verified_partial",
+        "insufficient_evidence",
+        "refused",
+    }
 
 
 def test_ingestion_graph_marks_invalid_lease_without_postgres_config() -> None:

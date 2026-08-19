@@ -2,7 +2,7 @@
 title: Visible UI state matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-19
 audience: design, frontend, reviewers
 packet: P07-03
 ---
@@ -80,7 +80,7 @@ challenge. Those failures are Auth-provider generic copy only.
 | State | Signal | Copy / UI | Recovery |
 | --- | --- | --- | --- |
 | Invite form | owner/admin | email, role, upload_enabled | POST invitations |
-| Invite success | 201 + `raw_token` | show token once | copy then dismiss |
+| Invite success | 201 without `raw_token` | show `invitation_id` + mail-only copy | check mail / Mailpit |
 | Invite forbidden | 403 | You cannot invite | none |
 | Accept loading | POST accept | Accepting | none |
 | Accept success | invitation_id | Continue to chat | none |

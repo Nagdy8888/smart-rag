@@ -28,7 +28,7 @@ class CreatedInvitation:
         role: Role assigned on acceptance.
         upload_enabled: Capability assigned on acceptance.
         expires_at: Absolute 24-hour expiry.
-        raw_token: One-time secret returned only by this call.
+        raw_token: One-time secret used for mail delivery. Never returned over HTTP.
     """
 
     invitation_id: uuid.UUID
@@ -116,6 +116,8 @@ def create_invitation(
             if actor_row is None or str(actor_row[0]) not in {"owner", "admin"}:
                 raise InvitationServiceError("invitation actor authorization rejected")
             actor_role = str(actor_row[0])
+            if role == "owner" and actor_role != "owner":
+                raise InvitationServiceError("only owner may invite owner")
 
             cursor.execute(
                 """
@@ -290,7 +292,7 @@ def send_provider_invite_email(
                 },
                 json={
                     "email": email,
-                    "data": {"invitation_token": raw_token, "invite_url": invite_url},
+                    "data": {"invite_url": invite_url},
                 },
             )
             response.raise_for_status()

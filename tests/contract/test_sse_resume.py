@@ -10,11 +10,12 @@ from uuid import UUID, uuid4
 import httpx
 import psycopg
 import pytest
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_api.services.sse_stream import FixtureQueryRunExecutor, QueryRunRegistry
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryAdmissionResult
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
-from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.sse.framing import iter_known_sse_events
 from smart_rag_core.sse.store import MemoryRunEventStore, PostgresRunEventStore
 
@@ -22,6 +23,7 @@ from tests.contract import test_query_run_admission as admission_mod
 from tests.contract.integration_support import typed_module_attr
 from tests.contract.sse_http_support import (
     MEMBER_ID,
+    OWNER_ID,
     RecordingAdmitService,
     bind_sse_state,
     client_headers,
@@ -33,6 +35,17 @@ from tests.contract.sse_http_support import (
     sse_test_client,
 )
 from tests.unit.typed_openapi import as_openapi_client, json_object
+
+
+@pytest.fixture(autouse=True)
+def _permit_test_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allow ``X-Test-*`` headers for SSE HTTP contract tests.
+
+    Bypass requires ``APP_ENV=test`` and ``ALLOW_TEST_IDENTITY=true``.
+    """
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
 
 
 def _sequences(raw: str) -> list[int]:
@@ -218,7 +231,61 @@ def test_resume_does_not_require_handshake(
 def test_process_restart_does_not_start_graph_again(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A pending run with no live executor replays a sanitized worker error."""
+    """Resume on a replica while status is ``running`` replays only.
+
+    It must not persist terminal ``error`` ``worker_unavailable``, which would
+    block the owning replica from appending ``completed``.
+    """
+
+    monkeypatch.setenv("APP_ENV", "test")
+    patch_sse_rate_limits(monkeypatch)
+    store = MemoryRunEventStore()
+    executor = FixtureQueryRunExecutor()
+    admit = RecordingAdmitService()
+    with sse_test_client(store=store, executor=executor, admit=admit) as raw:
+        client = as_openapi_client(raw)
+        submitted = client.post(
+            f"/conversations/{uuid4()}/messages",
+            json={"message": "hello", "idempotency_key": str(uuid4())},
+            headers=client_headers(),
+        )
+        run_id = require_str(json_object(submitted.json())["run_id"])
+        caller = CallerContext(
+            user_id=OWNER_ID,
+            role=UserRole.OWNER,
+            authorization_version=1,
+        )
+        store.append(
+            caller,
+            run_id=UUID(run_id),
+            event_type="schema",
+            payload={"sse_schema_version": "1"},
+        )
+        store.append(
+            caller,
+            run_id=UUID(run_id),
+            event_type="status",
+            payload={"stage": "admitted", "status": "running"},
+        )
+        store.mark_running(caller, run_id=UUID(run_id))
+        bind_sse_state(
+            raw.app,
+            store=store,
+            executor=executor,
+            registry=QueryRunRegistry(),
+        )
+        restarted = client.get(f"/runs/{run_id}/events", headers=sse_headers())
+    assert restarted.status_code == 200
+    types = [item.event_type for item in iter_known_sse_events(restarted.text)]
+    assert types == ["schema", "status"]
+    assert "error" not in types
+    assert executor.start_count == 0
+
+
+def test_pending_orphan_without_input_emits_worker_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A pending run with no live executor or POST body is a true orphan."""
 
     monkeypatch.setenv("APP_ENV", "test")
     patch_sse_rate_limits(monkeypatch)

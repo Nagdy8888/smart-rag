@@ -45,7 +45,11 @@ class SharedSettings(BaseSettings):
         app_env: Deployment environment from ``APP_ENV``. Public, default
             ``local``.
         mock_model_mode: Whether model work uses frozen fixtures from
-            ``MOCK_MODEL_MODE``. Public, secure default ``true``.
+            ``MOCK_MODEL_MODE``. Public, secure default ``true``. Staging and
+            production reject ``true``.
+        allow_test_identity: Whether ``X-Test-*`` identity headers may mint a
+            caller from ``ALLOW_TEST_IDENTITY``. Public, secure default
+            ``false``. Staging and production reject ``true``.
         log_level: Structured logging threshold from ``LOG_LEVEL``. Public,
             default ``INFO``.
         openai_api_key: Provider credential from ``OPENAI_API_KEY``. Secret and
@@ -92,7 +96,20 @@ class SharedSettings(BaseSettings):
     mock_model_mode: bool = Field(
         default=True,
         validation_alias="MOCK_MODEL_MODE",
-        description="Use deterministic model fixtures and deny OpenAI network access.",
+        description=(
+            "Use deterministic model fixtures and deny OpenAI network access. "
+            "Forbidden when APP_ENV is staging or production."
+        ),
+        json_schema_extra={"security": "public"},
+    )
+    allow_test_identity: bool = Field(
+        default=False,
+        validation_alias="ALLOW_TEST_IDENTITY",
+        description=(
+            "Permit X-Test-* identity headers together with APP_ENV=test. "
+            "Production images omit this variable. Forbidden when APP_ENV is "
+            "staging or production."
+        ),
         json_schema_extra={"security": "public"},
     )
     log_level: LogLevel = Field(
@@ -201,6 +218,34 @@ class SharedSettings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def reject_unsafe_hosted_environment_flags(self) -> Self:
+        """Fail closed when staging or production enable mock or test identity.
+
+        ``APP_ENV=test`` is a distinct environment, not a production label.
+        Hosted environments must not start with mock fixtures or the HTTP
+        identity bypass.
+
+        Returns:
+            The validated settings instance.
+
+        Raises:
+            ValueError: If mock mode or test identity is enabled in staging
+                or production.
+        """
+
+        if self.app_env not in {Environment.STAGING, Environment.PRODUCTION}:
+            return self
+        if self.mock_model_mode:
+            raise ValueError(
+                "MOCK_MODEL_MODE must be false when APP_ENV is staging or production"
+            )
+        if self.allow_test_identity:
+            raise ValueError(
+                "ALLOW_TEST_IDENTITY is forbidden when APP_ENV is staging or production"
+            )
+        return self
+
+    @model_validator(mode="after")
     def require_langsmith_key_when_tracing(self) -> Self:
         """Require a LangSmith credential when trace export is enabled.
 
@@ -216,6 +261,20 @@ class SharedSettings(BaseSettings):
                 "LANGSMITH_API_KEY is required when LANGSMITH_TRACING=true"
             )
         return self
+
+    def allows_unsigned_local_live_providers(self) -> bool:
+        """Return whether local live OpenAI/LangSmith keys may run without org rows.
+
+        ``APP_ENV=local`` plus ``MOCK_MODEL_MODE=false`` is an operator waiver
+        for gitignored keys. It does **not** mark the OpenAI or LangSmith org
+        matrices verified. Staging and production still require
+        ``SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED``.
+
+        Returns:
+            True only for local non-mock processes.
+        """
+
+        return self.app_env is Environment.LOCAL and not self.mock_model_mode
 
     def apply_langsmith_sdk_flags(self) -> dict[str, str]:
         """Write LangSmith SDK process flags from already-validated settings.

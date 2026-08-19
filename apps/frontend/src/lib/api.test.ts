@@ -10,6 +10,8 @@ import {
   enqueueWebsiteCrawl,
   fetchDocument,
   fetchReady,
+  fetchOperatorReady,
+  loadConsoleReadiness,
   fetchUsageCompany,
   finalizeUpload,
   importGlossary,
@@ -194,6 +196,43 @@ describe("startMessageStream", () => {
     expect(calls[0]?.startsWith("POST")).toBe(true);
     expect(calls[1]?.startsWith("GET")).toBe(true);
   });
+
+  it("forwards AbortSignal to admit POST and resume GET", async () => {
+    const controller = new AbortController();
+    const signals: Array<AbortSignal | null | undefined> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      signals.push(init?.signal);
+      const url = String(input);
+      if (url.includes("/messages")) {
+        return new Response(
+          JSON.stringify({
+            run_id: "44444444-4444-4444-8444-444444444444",
+            stream_path: "/runs/44444444-4444-4444-8444-444444444444/events",
+            reconnect: false,
+            reservation_id: "55555555-5555-4555-8555-555555555555",
+            route_family: "composite",
+            status: "pending",
+          }),
+          { status: 202, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response("event: schema\ndata: {}\n\n", {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    };
+    await startMessageStream(
+      { accessToken: "jwt-token" },
+      "66666666-6666-4666-8666-666666666666",
+      "hello",
+      "33333333-3333-4333-8333-333333333333",
+      fetchImpl,
+      controller.signal,
+    );
+    expect(signals).toHaveLength(2);
+    expect(signals[0]).toBe(controller.signal);
+    expect(signals[1]).toBe(controller.signal);
+  });
 });
 
 describe("startOrResumeMessageStream", () => {
@@ -227,6 +266,32 @@ describe("startOrResumeMessageStream", () => {
     expect(started.failure).toBeNull();
     expect(calls).toEqual(["GET http://127.0.0.1:8000/runs/run-1/events?after=4"]);
     expect(calls.some((call) => call.startsWith("POST"))).toBe(false);
+  });
+
+  it("forwards AbortSignal on resume GET", async () => {
+    const controller = new AbortController();
+    let seen: unknown;
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      seen = init?.signal;
+      return new Response("event: heartbeat\ndata: {}\n\n", {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    };
+    await startOrResumeMessageStream(
+      { accessToken: "jwt-token" },
+      "conv-1",
+      "retry",
+      {
+        runId: "run-1",
+        terminal: null,
+        lastSequence: 4,
+        idempotencyKey: "33333333-3333-4333-8333-333333333333",
+      },
+      fetchImpl,
+      controller.signal,
+    );
+    expect(seen).toBe(controller.signal);
   });
 
   it("posts once when no run exists yet", async () => {
@@ -716,7 +781,7 @@ describe("administration clients", () => {
     expect(Array.isArray(parsed.entries)).toBe(true);
   });
 
-  it("createInvitation returns raw_token once on 201", async () => {
+  it("createInvitation omits raw_token even when the JSON leaks it", async () => {
     const fetchImpl: typeof fetch = async () =>
       new Response(
         JSON.stringify({
@@ -734,20 +799,20 @@ describe("administration clients", () => {
       { email: "a@b.test", role: "member", upload_enabled: false },
       fetchImpl,
     );
-    expect(created.raw_token).toBe("once-secret");
+    expect(created).not.toHaveProperty("raw_token");
+    expect(created.invitation_id).toBe("inv-1");
     expect(created.email).toContain("<img");
   });
 });
 
 describe("fetchReady", () => {
-  it("maps GET /health/ready including paradedb", async () => {
+  it("maps public GET /health/ready without named dependencies", async () => {
     const fetchImpl: typeof fetch = async () =>
       new Response(
         JSON.stringify({
           status: "degraded",
           query_ready: false,
-          detail: "mock",
-          rate_limit_degraded: false,
+          detail: "not_query_ready",
           dependencies: [
             { name: "paradedb", status: "down" },
             { name: "lightrag", status: "unconfigured" },
@@ -757,10 +822,70 @@ describe("fetchReady", () => {
       );
     const ready = await fetchReady(fetchImpl);
     expect(ready?.query_ready).toBe(false);
-    expect(ready?.dependencies).toEqual([
-      { name: "paradedb", status: "down" },
-      { name: "lightrag", status: "unconfigured" },
-    ]);
+    expect(ready?.detail).toBe("not_query_ready");
+    expect(ready?.dependencies).toEqual([]);
+  });
+});
+
+describe("fetchOperatorReady", () => {
+  it("maps GET /ops/ready named probes for owner/admin", async () => {
+    const fetchImpl: typeof fetch = async (input, init) => {
+      expect(String(input)).toContain("/ops/ready");
+      expect((init?.headers as Record<string, string>).Authorization).toBe(
+        "Bearer jwt-token",
+      );
+      return new Response(
+        JSON.stringify({
+          status: "degraded",
+          query_ready: false,
+          detail: "mock",
+          rate_limit_degraded: false,
+          dependencies: [{ name: "paradedb", status: "down" }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const ready = await fetchOperatorReady({ accessToken: "jwt-token" }, fetchImpl);
+    expect(ready?.dependencies).toEqual([{ name: "paradedb", status: "down" }]);
+  });
+
+  it("returns null on 403", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), { status: 403 });
+    await expect(
+      fetchOperatorReady({ accessToken: "jwt-token" }, fetchImpl),
+    ).resolves.toBeNull();
+  });
+});
+
+describe("loadConsoleReadiness", () => {
+  it("merges operator probes onto the public body", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/ops/ready")) {
+        return new Response(
+          JSON.stringify({
+            status: "degraded",
+            query_ready: false,
+            detail: "mock",
+            rate_limit_degraded: true,
+            dependencies: [{ name: "paradedb", status: "down" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          status: "degraded",
+          query_ready: false,
+          detail: "not_query_ready",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const ready = await loadConsoleReadiness({ accessToken: "jwt-token" }, fetchImpl);
+    expect(ready?.dependencies).toEqual([{ name: "paradedb", status: "down" }]);
+    expect(ready?.rate_limit_degraded).toBe(true);
   });
 });
 

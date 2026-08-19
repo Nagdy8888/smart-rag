@@ -62,6 +62,13 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260816200000_query_run_events_v1.sql",
     "20260816210000_query_memory_store_reaper_v1.sql",
     "20260818140000_document_scan_events_worker_rls_v1.sql",
+    "20260819100000_ingestion_status_acl_v1.sql",
+    "20260819101000_citation_read_recheck_v1.sql",
+    "20260819102000_list_pagination_v1.sql",
+    "20260819103000_invitation_accept_guard_v1.sql",
+    "20260819104000_profiles_update_self_freeze_v1.sql",
+    "20260819105000_document_delete_rpc_v1.sql",
+    "20260819110000_crawl_enqueue_server_policy_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

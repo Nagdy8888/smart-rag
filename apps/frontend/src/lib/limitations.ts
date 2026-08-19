@@ -36,6 +36,8 @@ const LIMITATION_COPY: Record<string, string> = {
   graph_cancelled: "Graph inspection was cancelled.",
   graph_pending:
     "The graph is not ready for these documents yet. Hybrid remains usable. Graph-only is not an answering mode.",
+  retrievers_unbound:
+    "Retrieval was not attached to this run. Answers are not grounded in Hybrid or graph evidence.",
 };
 
 /**

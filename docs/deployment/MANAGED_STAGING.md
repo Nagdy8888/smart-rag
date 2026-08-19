@@ -2,7 +2,7 @@
 title: Managed staging topology
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: engineering, ops, reviewers
 ---
 
@@ -13,16 +13,25 @@ asserted in-repo.** Hosted Supabase is the existing online project
 `qsjivtwtmlmtksufqjik` (not local Docker); that reuse does **not** match
 the Pro/us-east-1/PITR freeze
 ([ADR-phase10-hosted-supabase-reuse.md](../adr/ADR-phase10-hosted-supabase-reuse.md)).
-Live AWS/Vercel apply: Terraform apply created the staging VPC, CloudFront,
+Live AWS apply: Terraform apply created the staging VPC, CloudFront,
 WAF, SES identity, OIDC, KMS/S3 Object Lock, and EC2. Live inventory:
 [packet1-live-aws.json](./phase-10/packet1-live-aws.json).
+Vercel Hobby team `nagdy8888s-projects` hosts project `smart-rag-staging`.
+The team URL `https://smart-rag-staging-nagdy8888s-projects.vercel.app`
+returned HTTP 200. The short alias `https://smart-rag-staging.vercel.app`
+returned HTTP 404 at probe time. Deploy was CLI file upload, not GitHub
+linked. Live inventory (no secrets):
+[packet1-live-vercel.json](./phase-10/packet1-live-vercel.json).
 Live inventory (profile `Nagdy-iam`, no secrets):
 [phase10-live-aws-inventory.json](./phase-10/phase10-live-aws-inventory.json).
-Compose/Caddy files are on `/opt/smart-rag`; the stack was **not** started
-(`t3.micro` has 916Mi RAM). CloudFront origin timeouts are live 90/90 with
-placeholder origin hostname. An internet EIP probe closed
-22/80/443/5432/6379/8000/8080/8443 but does **not** qualify as P10-01-C
-because ParadeDB/Valkey are not running
+Compose/Caddy files are on `/opt/smart-rag`; Docker Compose **v2.32.4** is
+installed. **ParadeDB and both Valkey services are healthy** on the private
+Docker network (`docker-compose.t3micro.yml`). API/Caddy are not started
+(`t3micro-edge` profile). Phase 9 API/worker/crawl-proxy/parser-sandbox
+freeze digests are in ECR as tag `p9-freeze`. CloudFront origin timeouts
+are live 90/90 with placeholder origin hostname. An internet EIP probe
+closed 22/80/443/5432/6379/8000/8080/8443 with those private services
+running
 ([packet1-live-network-scan.json](./phase-10/packet1-live-network-scan.json)).
 Packet 1 checkbox stays unchecked.
 
@@ -30,6 +39,7 @@ Related: [infra/ec2](../../infra/ec2/README.md) ·
 [STREAMING_TIMEOUTS.md](./STREAMING_TIMEOUTS.md) ·
 [phase-10 evidence](../development/phase-10-managed-staging-evidence.md) ·
 [packet1-live-supabase.json](./phase-10/packet1-live-supabase.json) ·
+[packet1-live-vercel.json](./phase-10/packet1-live-vercel.json) ·
 [staging secrets runbook](../runbooks/phase10-staging-secrets.md) ·
 [LOCAL_RELEASE_CANDIDATE.md](./LOCAL_RELEASE_CANDIDATE.md)
 
@@ -40,15 +50,15 @@ Packet 1 freeze (not a prior client-signed region):
 | Item | Intended value | Live |
 | --- | --- | --- |
 | AWS region | `us-east-1` | Applied. VPC `vpc-009cb395d9beda961` |
-| EC2 type | intended `m6i.xlarge` | Live **t3.micro** — [ADR-phase10-free-tier-ec2.md](../adr/ADR-phase10-free-tier-ec2.md) |
+| EC2 type | **t3.micro** (accepted; never `m6i.xlarge`) | Live **t3.micro** — [ADR-phase10-free-tier-ec2.md](../adr/ADR-phase10-free-tier-ec2.md) |
 | Supabase region | `us-east-1` | **eu-central-1** hosted reuse — see [ADR-phase10-hosted-supabase-reuse.md](../adr/ADR-phase10-hosted-supabase-reuse.md) |
 | Supabase plan | Pro (PITR required for QT-AVL-003 RPO ≤24h) | **Free**, no PITR. Project `qsjivtwtmlmtksufqjik` (`smart-rag`) |
 | Auth | Asymmetric JWT/JWKS, no HS256 fallback | Hosted legacy anon is HS256; FastAPI still forbids HS256. JWKS unproven |
 | Storage buckets | documents-quarantine, documents-originals, web-snapshots, table-artifacts | Present (plus `exports`). Object count 0 |
-| Pooling | Supavisor transaction 6543 (API/RPC), session 5432 (LangGraph/LightRAG) | Not measured on Free |
+| Pooling | Supavisor transaction 6543 (API/RPC), session 5432 (LangGraph/LightRAG) | Workstation `SELECT 1` on 6543 and 5432 succeeded (Postgres 17.6). URLs stay in gitignored `.env.staging` |
 | `pg_search` on managed Supabase | never | Confirmed absent on hosted |
 | SES | sandbox only | Identity `staging-alerts@example.invalid` created; not verified |
-| Vercel | public keys only | Allow-list committed; `live_values` empty |
+| Vercel | public keys only | Project `smart-rag-staging` READY. Allow-list only; `live_values` stays `{}` |
 
 Envelope stays the Phase 9 reduce: QT-CAP-001-P9=8 Hybrid versions,
 QT-CAP-002-P9=16 chunks, QT-CAP-005-P8=15 graph versions. Do not claim
@@ -99,7 +109,7 @@ flowchart LR
 | `docker-compose.staging.yml` | Blue/green API, digest-pinned ParadeDB/Valkey, no private host ports | Not started |
 | Staging `Caddyfile` | 90s, `flush_interval -1`, current+previous origin headers | Not started |
 | Network scan | Policy only | Blocked (no scan artifact) |
-| Vercel/SES env | Public-key allow-list | Apply Blocked |
+| Vercel/SES env | Public-key allow-list | Vercel public env applied; SES identity still unverified |
 | GitHub OIDC / SSM migrate | Reviewed IaC and protected workflows | Live assume/SendCommand Blocked |
 
 CloudFront `OriginReadTimeout` / `OriginKeepaliveTimeout` are **90** in

@@ -176,6 +176,35 @@ def test_crawl_proxy_denies_by_default() -> None:
     assert handler.status == 403
 
 
+def test_api_and_worker_use_app_runtime_not_superuser() -> None:
+    """Compose API/worker DSN must be the LOGIN wrapper, not postgres."""
+
+    api_env = _mapping(_service("api")["environment"])
+    worker_env = _mapping(_service("worker")["environment"])
+    api_dsn = api_env["SUPABASE_DB_URL"]
+    worker_dsn = worker_env["SUPABASE_DB_URL"]
+    assert isinstance(api_dsn, str)
+    assert isinstance(worker_dsn, str)
+    for dsn in (api_dsn, worker_dsn):
+        assert "app_runtime" in dsn
+        assert "APP_RUNTIME_DB_PASSWORD" in dsn
+        assert "postgres:postgres" not in dsn
+        assert "postgresql://postgres:" not in dsn
+    assert "SUPABASE_STORAGE_ADMIN_SECRET" not in worker_env
+
+
+def test_staging_api_green_requires_blue_green_profile() -> None:
+    """Default staging Compose must start api-blue only."""
+
+    path = REPO_ROOT / "infra" / "ec2" / "docker-compose.staging.yml"
+    loaded = _mapping(yaml.safe_load(path.read_text(encoding="utf-8")))
+    services = _mapping(loaded["services"])
+    green = _mapping(services["api-green"])
+    blue = _mapping(services["api-blue"])
+    assert _string_list(green["profiles"]) == ["blue-green"]
+    assert "profiles" not in blue
+
+
 def test_application_images_run_as_non_root() -> None:
     """Compose pins non-root users for api and worker."""
 

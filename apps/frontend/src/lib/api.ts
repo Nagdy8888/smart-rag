@@ -392,6 +392,9 @@ async function readJsonObject(response: Response): Promise<Record<string, unknow
 /**
  * GET `/health/ready` without authentication.
  *
+ * Public bodies are `status`, `query_ready`, and coarse `detail` only.
+ * Named ParadeDB/Valkey/LightRAG probes stay on `GET /ops/ready`.
+ *
  * @param fetchImpl - Injected fetch.
  * @returns Readiness payload, or null when the API is unreachable.
  */
@@ -404,6 +407,45 @@ export async function fetchReady(
     const response = await fetchImpl(apiUrl("/health/ready"), {
       signal: controller.signal,
     });
+    const body = await readJsonObject(response);
+    if (!response.ok) {
+      return null;
+    }
+    return {
+      status: String(body.status ?? ""),
+      query_ready: Boolean(body.query_ready),
+      detail: String(body.detail ?? ""),
+      rate_limit_degraded: false,
+      dependencies: [],
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * GET `/ops/ready` as owner/admin. Members receive 403 and this returns null.
+ *
+ * @param auth - Bearer token.
+ * @param fetchImpl - Injected fetch.
+ * @returns Named dependency probes, or null when forbidden or unreachable.
+ */
+export async function fetchOperatorReady(
+  auth: ApiAuth,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ReadinessResponse | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3000);
+  try {
+    const response = await fetchImpl(apiUrl("/ops/ready"), {
+      signal: controller.signal,
+      headers: resumeHeaders(auth),
+    });
+    if (response.status === 401 || response.status === 403) {
+      return null;
+    }
     const body = await readJsonObject(response);
     if (!response.ok) {
       return null;
@@ -432,6 +474,49 @@ export async function fetchReady(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Overlay operator named probes onto the public ready body.
+ *
+ * @param publicReady - `GET /health/ready` mapping, or null.
+ * @param operatorReady - `GET /ops/ready` mapping, or null when forbidden.
+ * @returns Merged console payload, or null when public ready is unreachable.
+ */
+export function mergeReadiness(
+  publicReady: ReadinessResponse | null,
+  operatorReady: ReadinessResponse | null,
+): ReadinessResponse | null {
+  if (publicReady === null) {
+    return null;
+  }
+  if (operatorReady === null) {
+    return publicReady;
+  }
+  return {
+    ...publicReady,
+    ...operatorReady,
+    dependencies: operatorReady.dependencies,
+  };
+}
+
+/**
+ * Public ready plus owner/admin named probes when the Bearer is allowed.
+ *
+ * @param auth - Access token, or null on the signed-out login page.
+ * @param fetchImpl - Injected fetch.
+ * @returns Merged console readiness, or null when FastAPI is unreachable.
+ */
+export async function loadConsoleReadiness(
+  auth: ApiAuth | null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ReadinessResponse | null> {
+  const publicReady = await fetchReady(fetchImpl);
+  if (publicReady === null || auth === null) {
+    return publicReady;
+  }
+  const operatorReady = await fetchOperatorReady(auth, fetchImpl);
+  return mergeReadiness(publicReady, operatorReady);
 }
 
 /**
@@ -1257,13 +1342,14 @@ export async function acceptInvitation(
 /**
  * Create a 24-hour invitation. Owner/admin on the server.
  *
- * Body is `{ email, role, upload_enabled }` only. `raw_token` is returned
- * once. Production never sends `X-Test-*` or a role header.
+ * Body is `{ email, role, upload_enabled }` only. The one-time token is
+ * mail-only; JSON never includes `raw_token`. Production never sends
+ * `X-Test-*` or a role header.
  *
  * @param auth - Access token.
  * @param input - Invitee email, role, and upload flag.
  * @param fetchImpl - Injected fetch.
- * @returns Invitation identifiers including the one-time token.
+ * @returns Invitation identifiers without the mail token.
  * @throws Error `forbidden`, `mfa_required`, `budget_exhausted`, or `rate_limited`.
  */
 export async function createInvitation(
@@ -1287,7 +1373,6 @@ export async function createInvitation(
     role: String(body.role ?? ""),
     upload_enabled: Boolean(body.upload_enabled),
     expires_at: String(body.expires_at ?? ""),
-    raw_token: String(body.raw_token ?? ""),
   };
 }
 
@@ -1759,12 +1844,14 @@ export function shouldResumeExistingRun(state: PaidRunPointer): boolean {
  * Handshake runs before admit. The EventSource body is `GET /runs/{id}/events`.
  *
  * Reconnect uses the same run and never starts a second paid reservation.
+ * Cancel and a new send pass `signal` so admit POST and resume GET abort.
  *
  * @param auth - Access token.
  * @param conversationId - Conversation UUID.
  * @param message - Untrusted user text.
  * @param idempotencyKey - Stable UUID reused on retry.
  * @param fetchImpl - Injected fetch.
+ * @param signal - Abort from Cancel or a replacement send.
  * @returns Streaming GET response plus admission JSON, or a typed failure.
  */
 export async function startMessageStream(
@@ -1773,6 +1860,7 @@ export async function startMessageStream(
   message: string,
   idempotencyKey: string,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<StreamStart> {
   const admitHeaders = {
     ...paidMutationHeaders(auth, idempotencyKey),
@@ -1784,6 +1872,7 @@ export async function startMessageStream(
       method: "POST",
       headers: admitHeaders,
       body: JSON.stringify(submitMessageBody(message, idempotencyKey)),
+      signal,
     },
   );
   if (!admitResponse.ok) {
@@ -1800,7 +1889,13 @@ export async function startMessageStream(
     };
   }
   const admission = (await admitResponse.json()) as SubmitMessageResponse;
-  const stream = await resumeEventStream(auth, admission.run_id, 0, fetchImpl);
+  const stream = await resumeEventStream(
+    auth,
+    admission.run_id,
+    0,
+    fetchImpl,
+    signal,
+  );
   if (!stream.ok) {
     const body = await readJsonObject(stream);
     return {
@@ -1825,6 +1920,7 @@ export async function startMessageStream(
  * @param message - Untrusted user text. Ignored on resume.
  * @param state - Current run pointer.
  * @param fetchImpl - Injected fetch.
+ * @param signal - Abort from Cancel or a replacement send.
  * @returns Stream start. `resumed` is true when POST was skipped.
  */
 export async function startOrResumeMessageStream(
@@ -1833,6 +1929,7 @@ export async function startOrResumeMessageStream(
   message: string,
   state: PaidRunPointer,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<StreamStart> {
   if (shouldResumeExistingRun(state) && state.runId !== null) {
     const stream = await resumeEventStream(
@@ -1840,6 +1937,7 @@ export async function startOrResumeMessageStream(
       state.runId,
       state.lastSequence,
       fetchImpl,
+      signal,
     );
     if (!stream.ok) {
       const body = await readJsonObject(stream);
@@ -1863,6 +1961,7 @@ export async function startOrResumeMessageStream(
     message,
     state.idempotencyKey,
     fetchImpl,
+    signal,
   );
 }
 
@@ -1873,6 +1972,7 @@ export async function startOrResumeMessageStream(
  * @param runId - Run UUID.
  * @param after - Last applied sequence.
  * @param fetchImpl - Injected fetch.
+ * @param signal - Abort from Cancel or a replacement send.
  * @returns SSE response.
  */
 export async function resumeEventStream(
@@ -1880,6 +1980,7 @@ export async function resumeEventStream(
   runId: string,
   after: number,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<Response> {
   const url = apiUrl(`/runs/${runId}/events?after=${encodeURIComponent(String(after))}`);
   return fetchImpl(url, {
@@ -1887,5 +1988,6 @@ export async function resumeEventStream(
       ...resumeHeaders(auth),
       Accept: "text/event-stream",
     },
+    signal,
   });
 }

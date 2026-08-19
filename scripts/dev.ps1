@@ -31,6 +31,12 @@ if ($LASTEXITCODE -ne 0) {
   throw "Supabase CLI failed to start the local stack."
 }
 
+Write-Host "Ensuring LOGIN wrapper app_runtime (app_api is NOLOGIN)..."
+uv run python "$Root\scripts\ops\ensure_app_runtime_role.py"
+if ($LASTEXITCODE -ne 0) {
+  throw "app_runtime LOGIN wrapper is missing. Compose API/worker cannot use the postgres superuser."
+}
+
 Write-Host "Starting Docker Compose foundation stack with $EnvFile ..."
 docker compose --env-file $EnvFile up --build -d
 

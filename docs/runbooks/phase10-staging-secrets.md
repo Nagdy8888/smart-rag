@@ -31,22 +31,29 @@ flowchart LR
 | Hosted project URL | `https://qsjivtwtmlmtksufqjik.supabase.co` | public |
 | `SUPABASE_ANON_KEY`, `SUPABASE_ACCESS_TOKEN`, OpenAI, LangSmith | repo `.env` (gitignored) | never |
 
-## You still add (Dashboard → gitignored file)
+## Database URLs (operator completed 2026-08-19)
 
-Open [Supabase project settings](https://supabase.com/dashboard/project/qsjivtwtmlmtksufqjik/settings/database).
+Transaction (6543) and session (5432) pooler URIs are in gitignored
+`infra/ec2/.env.staging`. They were copied from the repo `.env` after
+the dashboard paste. A workstation `SELECT 1` probe on both ports
+succeeded (Postgres 17.6; `pg_search` absent). Do not paste the URIs
+into chat or git.
 
-1. Copy **Transaction pooler** URI (port **6543**) into
-   `STAGING_SUPABASE_TRANSACTION_URL` in `infra/ec2/.env.staging`.
-2. Copy **Session** URI (port **5432**) into
-   `STAGING_SUPABASE_SESSION_URL`.
-3. Use the `postgres` or pooler user from the dashboard. Do not put
-   `service_role` in Compose or Vercel.
+If you must replace them, open
+[Supabase project settings](https://supabase.com/dashboard/project/qsjivtwtmlmtksufqjik/settings/database)
+and overwrite the two keys in `.env.staging` only. Use the `postgres`
+or pooler user. Do not put `service_role` in Compose or Vercel.
+
+Vercel public env (operator completed 2026-08-19): project
+`smart-rag-staging` on team `nagdy8888s-projects`. Only
+`NEXT_PUBLIC_API_BASE_URL` (CloudFront
+`https://dzm8yijuajwge.cloudfront.net`), `NEXT_PUBLIC_SUPABASE_URL`,
+and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never `service_role`. Working URL:
+`https://smart-rag-staging-nagdy8888s-projects.vercel.app`. GitHub App is still
+not installed on `Nagdy8888/Demo_Project_3`, so later git-linked
+deploys need [Vercel GitHub App](https://github.com/apps/vercel).
 
 Optional later:
-
-- Vercel: only `NEXT_PUBLIC_API_BASE_URL` (CloudFront
-  `https://dzm8yijuajwge.cloudfront.net`), `NEXT_PUBLIC_SUPABASE_URL`,
-  `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never `service_role`.
 - Google OAuth client id/secret only if Packet 5 live Auth is in scope.
 - `OPENAI_API_KEY` is already local. Keep `MOCK_MODEL_MODE=true` until
   you explicitly turn mocks off.
@@ -57,11 +64,19 @@ These are **not** cloud API keys. Generate long random passwords into
 `.env.staging`. They stay on the private Docker network. Do not publish
 host ports.
 
-## t3.micro limit
+## t3.micro host
 
-Do not `docker compose up` the full staging file on 916Mi RAM. After you
-expand the instance, copy `.env.staging` with SSM and start the stack.
-Freeze images must be in ECR first.
+ParadeDB and both Valkey services run on EC2 `t3.micro`, not the
+workstation. Default Compose is the staging file plus
+`docker-compose.t3micro.yml`. After you place `.env` via Secrets Manager
+`smart-rag/staging/compose-env`, start with:
+
+```bash
+docker compose -f docker-compose.staging.yml -f docker-compose.t3micro.yml --env-file /opt/smart-rag/.env up -d
+```
+
+Do not put the env file body in `ssm:SendCommand` parameters. API/Caddy
+need `--profile t3micro-edge`. Worker/ClamAV/parser stay off.
 
 ## Verification
 
@@ -71,8 +86,7 @@ Select-String -Path infra/ec2/.env.staging -Pattern '^[A-Z0-9_]+=' | ForEach-Obj
 ```
 
 Missing `STAGING_SUPABASE_TRANSACTION_URL` or
-`STAGING_SUPABASE_SESSION_URL` blocks API/worker start even on a larger
-host.
+`STAGING_SUPABASE_SESSION_URL` blocks API/worker start.
 
 ## Rollback / escalation
 

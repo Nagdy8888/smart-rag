@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import JSONResponse, StreamingResponse
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 
@@ -117,6 +126,8 @@ def list_conversations_route(
     request: Request,
     caller: CallerContextDep,
     service: Annotated[ConversationService, Depends(get_conversation_service)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    cursor: Annotated[str | None, Query(max_length=80)] = None,
 ) -> list[ConversationResponse]:
     """List conversations the caller may read.
 
@@ -124,9 +135,11 @@ def list_conversations_route(
         request: Active request.
         caller: Authenticated caller.
         service: Injected service.
+        limit: Page size, default 50, max 200.
+        cursor: Optional ``created_at,id`` keyset cursor.
 
     Returns:
-        Conversation list.
+        Conversation list, newest first.
     """
 
     enforce_rate_limit(
@@ -135,7 +148,10 @@ def list_conversations_route(
         kind=RateLimitKind.LOW_RISK_READ,
         max_attempts=120,
     )
-    records = service.list(caller)
+    try:
+        records = service.list(caller, limit=limit, cursor=cursor)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
     return [
         ConversationResponse(
             conversation_id=item.conversation_id,
@@ -274,11 +290,15 @@ def submit_message_route(
         caller: Authenticated caller.
         service: Injected query-run service.
         sse: Persist-then-flush SSE service.
-        idempotency_key_header: Optional ``Idempotency-Key`` header UUID.
+        idempotency_key_header: ``Idempotency-Key`` header UUID when the body
+            omits the key.
         x_client_version: Required client version for new paid submission.
 
     Returns:
         JSON admission result or an SSE stream.
+
+    Raises:
+        HTTPException: 400 when neither body nor header supplies a key.
     """
 
     enforce_client_handshake(request, x_client_version)
@@ -298,7 +318,10 @@ def submit_message_route(
                 detail="validation_failed",
             ) from exc
     if key is None:
-        key = uuid4()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="idempotency_key_required",
+        )
     try:
         context, stream_path = service.submit_auto_message(
             caller,

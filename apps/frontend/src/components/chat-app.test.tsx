@@ -68,6 +68,13 @@ vi.mock("../lib/api", async () => {
       query_ready: false,
       detail: "mock",
       rate_limit_degraded: false,
+      dependencies: [],
+    })),
+    loadConsoleReadiness: vi.fn(async () => ({
+      status: "degraded",
+      query_ready: false,
+      detail: "mock",
+      rate_limit_degraded: false,
       dependencies: [{ name: "paradedb", status: "down" }],
     })),
     fetchMe: vi.fn(async () => ({

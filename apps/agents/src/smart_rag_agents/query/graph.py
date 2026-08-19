@@ -9,7 +9,12 @@ from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+
+# isort: off
+# hybrid_run must finish before query_admission package init (ceilings cycle).
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+# isort: on
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.nodes import (
@@ -119,6 +124,21 @@ def enforce_admission(state: QueryGraphState) -> QueryGraphState:
     }
 
 
+def _route_after_studio_seed(state: QueryGraphState) -> str:
+    """Continue to admission only when Studio seeding produced a context.
+
+    Args:
+        state: State after ``seed_studio_runtime``.
+
+    Returns:
+        ``enforce_admission`` or ``end``.
+    """
+
+    if state["status"] == "admission_rejected":
+        return "end"
+    return "enforce_admission"
+
+
 def _route_after_admission(state: QueryGraphState) -> str:
     """Continue past admission only when context was valid.
 
@@ -150,34 +170,47 @@ def _route_after_prepare(state: QueryGraphState) -> str:
 
 
 def _route_after_correction(state: QueryGraphState) -> str:
-    """Continue to fusion unless admission or routing already failed closed.
+    """Continue to fusion unless admission, routing, or evidence already failed.
 
     Args:
         state: State after ``apply_correction``.
 
     Returns:
-        ``fuse_evidence`` or ``end``.
+        ``fuse_evidence`` or ``end``. Exhausted retrieval
+        (``insufficient_evidence``) ends without fusion, answer, or verifier.
     """
 
-    if state["status"] in {"admission_rejected", "routing_rejected"}:
+    if state["status"] in {
+        "admission_rejected",
+        "routing_rejected",
+        "insufficient_evidence",
+    }:
         return "end"
     return "fuse_evidence"
 
 
-def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
+def build_query_graph(
+    deps: QueryGraphDeps | None = None,
+    *,
+    studio_local: bool = False,
+) -> QueryStateGraph:
     """Construct the packet 2 query ``StateGraph`` (not yet compiled).
 
     Args:
         deps: Optional retrieve/memory bindings. Default compiles without
             sockets or OpenAI clients.
+        studio_local: When true, prepend ``seed_studio_runtime`` and accept
+            ``StudioQueryInput``. FastAPI must not set this. The seed does
+            not admit a paid run or open Postgres.
 
     Returns:
         An uncompiled graph: admission → memory → prepare → plan →
         branches → one correction → fuse → tables → optional tools →
-        answer → verify → END.
+        answer → verify → END. Studio adds a local seed before admission.
 
     Notes:
-        State inputs: ``QueryGraphState``.
+        State inputs: ``QueryGraphState``, or ``StudioQueryInput`` when
+            ``studio_local``.
         State outputs: fused evidence, one answer, and layered verification.
         Persistence writes: counted prep/answer/verifier consume when used.
         External/model calls: at most one prep, one answer, one verifier.
@@ -187,9 +220,14 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
     """
 
     bound = deps or QueryGraphDeps()
-    builder: QueryStateGraph = StateGraph(
+    input_schema: type[QueryGraphState] | type[object] = QueryGraphState
+    if studio_local:
+        from smart_rag_agents.query.studio import StudioQueryInput
+
+        input_schema = StudioQueryInput
+    builder: QueryStateGraph = StateGraph(  # pyright: ignore[reportAssignmentType]
         QueryGraphState,
-        input_schema=QueryGraphState,
+        input_schema=input_schema,  # pyright: ignore[reportArgumentType]
         output_schema=QueryGraphState,
     )
 
@@ -317,6 +355,21 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
         "enforce_admission",
         enforce_admission,
     )
+    if studio_local:
+        from smart_rag_agents.query.studio import seed_studio_runtime
+
+        builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+            "seed_studio_runtime",
+            seed_studio_runtime,
+        )
+        builder.add_edge(START, "seed_studio_runtime")
+        builder.add_conditional_edges(
+            "seed_studio_runtime",
+            _route_after_studio_seed,
+            {"enforce_admission": "enforce_admission", "end": END},
+        )
+    else:
+        builder.add_edge(START, "enforce_admission")
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "load_memory",
         load_memory,
@@ -357,7 +410,6 @@ def build_query_graph(deps: QueryGraphDeps | None = None) -> QueryStateGraph:
         "verify_answer",
         verify_answer,
     )
-    builder.add_edge(START, "enforce_admission")
     builder.add_conditional_edges(
         "enforce_admission",
         _route_after_admission,

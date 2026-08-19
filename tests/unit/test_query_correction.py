@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.branches import execute_branches
@@ -351,3 +352,16 @@ def test_execute_then_one_correction_reuses_hybrid_ids() -> None:
     assert combined[0].reuse_hybrid_ranked_ids == (
         "00000000-0000-0000-0000-000000000001",
     )
+
+
+def test_insufficient_evidence_after_correction_ends() -> None:
+    """Exhausted retrieval after correction routes to END, not fusion."""
+
+    from smart_rag_agents.query.graph import _route_after_correction
+    from smart_rag_agents.query.state import pending_query_state
+
+    state = pending_query_state()
+    state["status"] = "insufficient_evidence"
+    assert _route_after_correction(state) == "end"
+    state["status"] = "correction_applied"
+    assert _route_after_correction(state) == "fuse_evidence"

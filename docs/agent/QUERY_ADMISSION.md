@@ -2,7 +2,7 @@
 title: Query run admission
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering, security
 phase_packet: Phase 6 Packet 1
 ---
@@ -78,7 +78,12 @@ They are not the packet 7 idempotency/event reaper.
 
 `enforce_admission` requires `AuthorizedRuntimeContext`. Missing or invalid
 context sets `status=admission_rejected` and ends. Present context copies
-ceilings into state and ends. The node does not retrieve or answer.
+ceilings into state and continues. The node does not retrieve or answer.
+
+LangGraph Studio `query_studio` seeds a synthetic context with
+`status=studio_local` from `envelope_for_family`. That seed is not
+`admit_query_run`, writes no reservation, and must not be used as a
+production bypass. See [LANGGRAPH_STUDIO.md](../development/LANGGRAPH_STUDIO.md).
 
 ## FastAPI slice
 
@@ -92,8 +97,9 @@ not throttle hosted Supabase Auth.
 `Phase6RouteFamily.COMPOSITE` after the `X-Client-Version` handshake.
 JSON Accept returns `{run_id, stream_path}` where `stream_path` is
 `/runs/{run_id}/events`. `Accept: text/event-stream` streams immediately.
-See [SSE.md](../api/SSE.md). `GET /health/ready` is dependency-aware and
-never sets `query_ready` in mock mode or when LightRAG is unattached.
+See [SSE.md](../api/SSE.md). Public `GET /health/ready` never sets
+`query_ready` in mock mode. Named ParadeDB/Valkey/LightRAG probes stay on
+authenticated `GET /ops/ready`.
 
 See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 
@@ -101,6 +107,7 @@ See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 
 - [QUERY_BUDGETS.md](./QUERY_BUDGETS.md)
 - [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
+- [LANGGRAPH_STUDIO.md](../development/LANGGRAPH_STUDIO.md)
 - [AUDIT_CHAIN.md](../security/AUDIT_CHAIN.md)
 - [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md)
 - [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md)

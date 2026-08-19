@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: engineering, reviewers, client-approver
 ---
 
@@ -13,36 +13,38 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | Document | Owner | Status | Last reviewed | Audience |
 | --- | --- | --- | --- | --- |
 | [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-18 | client, engineering |
-| [agent/QUERY_ADMISSION.md](./agent/QUERY_ADMISSION.md) | engineering-lead | draft | 2026-08-16 | eng, security |
-| [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-08-16 | eng |
-| [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
-| [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
-| [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
+| [agent/QUERY_ADMISSION.md](./agent/QUERY_ADMISSION.md) | engineering-lead | draft | 2026-08-19 | eng, security |
+| [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-08-19 | eng |
+| [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
+| [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
+| [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-16 | eng, security |
-| [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-08-17 | eng, frontend |
+| [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-08-19 | eng, frontend |
 | [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-08-17 | frontend, reviewers |
-| [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-08-17 | eng, frontend, security |
-| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-08-17 | eng, frontend |
-| [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-08-17 | eng, frontend, security |
-| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-08-17 | eng, frontend |
-| [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-17 | design, frontend |
-| [frontend/STITCH_STATES.md](./frontend/STITCH_STATES.md) | engineering-lead | draft | 2026-08-17 | design, frontend |
+| [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-08-19 | eng, frontend, security |
+| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-08-19 | eng, frontend |
+| [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-08-19 | eng, frontend, security |
+| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-08-19 | eng, frontend |
+| [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-19 | design, frontend |
+| [frontend/STITCH_STATES.md](./frontend/STITCH_STATES.md) | engineering-lead | draft | 2026-08-19 | design, frontend |
 | [frontend/STITCH_A11Y_SECURITY.md](./frontend/STITCH_A11Y_SECURITY.md) | engineering-lead | draft | 2026-08-17 | frontend, security |
-| [frontend/A11Y_SECURITY_IMPLEMENTATION.md](./frontend/A11Y_SECURITY_IMPLEMENTATION.md) | engineering-lead | draft | 2026-08-17 | frontend, security |
-| [frontend/PHASE8_JOURNEY_MATRIX.md](./frontend/PHASE8_JOURNEY_MATRIX.md) | engineering-lead | draft | 2026-08-17 | eng, frontend, reviewers |
+| [frontend/A11Y_SECURITY_IMPLEMENTATION.md](./frontend/A11Y_SECURITY_IMPLEMENTATION.md) | engineering-lead | draft | 2026-08-19 | frontend, security |
+| [frontend/PHASE8_JOURNEY_MATRIX.md](./frontend/PHASE8_JOURNEY_MATRIX.md) | engineering-lead | draft | 2026-08-19 | eng, frontend, reviewers |
 | [frontend/STITCH_REVIEW.md](./frontend/STITCH_REVIEW.md) | engineering-lead | draft | 2026-08-17 | frontend, reviewers |
 | [development/phase-07-stitch-specification-evidence.md](./development/phase-07-stitch-specification-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
 | [development/phase-08-frontend-integration-evidence.md](./development/phase-08-frontend-integration-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
-| [development/phase-08-later-live-verification.md](./development/phase-08-later-live-verification.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
+| [development/phase-08-later-live-verification.md](./development/phase-08-later-live-verification.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [evaluation/PHASE6_EVAL_REGISTRY.md](./evaluation/PHASE6_EVAL_REGISTRY.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
-| [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-08-18 | eng, security |
-| [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-08-16 | eng, frontend |
+| [api/FASTAPI_SECURITY.md](./api/FASTAPI_SECURITY.md) | engineering-lead | draft | 2026-08-19 | eng, security |
+| [api/SSE.md](./api/SSE.md) | engineering-lead | draft | 2026-08-19 | eng, frontend |
 | [deployment/STREAMING_TIMEOUTS.md](./deployment/STREAMING_TIMEOUTS.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [deployment/LOCAL_RELEASE_CANDIDATE.md](./deployment/LOCAL_RELEASE_CANDIDATE.md) | engineering-lead | draft | 2026-08-18 | eng, ops, reviewers |
-| [deployment/MANAGED_STAGING.md](./deployment/MANAGED_STAGING.md) | engineering-lead | draft | 2026-08-18 | eng, ops, reviewers |
+| [deployment/LOCAL_RUNTIME_ROLES.md](./deployment/LOCAL_RUNTIME_ROLES.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
+| [deployment/STAGING_COMPOSE.md](./deployment/STAGING_COMPOSE.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
+| [deployment/MANAGED_STAGING.md](./deployment/MANAGED_STAGING.md) | engineering-lead | draft | 2026-08-19 | eng, ops, reviewers |
 | [development/phase-09-local-release-candidate-evidence.md](./development/phase-09-local-release-candidate-evidence.md) | engineering-lead | accepted | 2026-08-18 | eng, reviewers |
-| [development/phase-10-managed-staging-evidence.md](./development/phase-10-managed-staging-evidence.md) | engineering-lead | draft | 2026-08-18 | eng, reviewers |
+| [development/phase-10-managed-staging-evidence.md](./development/phase-10-managed-staging-evidence.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-08-16 | eng, reviewers |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
@@ -76,10 +78,11 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [evaluation/DATASET_SPEC.md](./evaluation/DATASET_SPEC.md) | engineering-lead | draft | 2026-08-15 | eng, SME, reviewers |
 | [evaluation/QUERY_PROFILE_LABELING.md](./evaluation/QUERY_PROFILE_LABELING.md) | engineering-lead | draft | 2026-08-14 | eng, SME |
 | [development/TOOL_VERSIONS.md](./development/TOOL_VERSIONS.md) | engineering-lead | draft | 2026-08-18 | eng |
-| [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-08-18 | eng |
+| [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-08-19 | eng |
 | [development/LANGSMITH_TRACING.md](./development/LANGSMITH_TRACING.md) | engineering-lead | draft | 2026-08-14 | eng, ops, security |
+| [development/LANGGRAPH_STUDIO.md](./development/LANGGRAPH_STUDIO.md) | engineering-lead | draft | 2026-08-19 | eng |
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
-| [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-08-12 | eng |
+| [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-08-19 | eng |
 | [development/WORKSPACE_BOUNDARIES.md](./development/WORKSPACE_BOUNDARIES.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/QUALITY_COMMANDS.md](./development/QUALITY_COMMANDS.md) | engineering-lead | draft | 2026-08-18 | eng |
 | [development/PYRIGHT_BASELINE.md](./development/PYRIGHT_BASELINE.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
@@ -95,6 +98,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-alpine-application-bases-trivy.md](./adr/ADR-alpine-application-bases-trivy.md) | engineering-lead | accepted | 2026-08-18 | eng, security |
 | [adr/ADR-phase9-local-envelope-reduce.md](./adr/ADR-phase9-local-envelope-reduce.md) | product-owner | accepted | 2026-08-18 | client, engineering |
 | [adr/ADR-phase10-hosted-supabase-reuse.md](./adr/ADR-phase10-hosted-supabase-reuse.md) | product-owner | accepted | 2026-08-18 | client, engineering, ops |
+| [adr/ADR-phase10-free-tier-ec2.md](./adr/ADR-phase10-free-tier-ec2.md) | engineering-lead | accepted | 2026-08-19 | engineering, ops |
 | [runbooks/phase10-staging-secrets.md](./runbooks/phase10-staging-secrets.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [adr/ADR-paradedb-edition-availability.md](./adr/ADR-paradedb-edition-availability.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-private-service-tls.md](./adr/ADR-private-service-tls.md) | engineering-lead | accepted | 2026-08-18 | eng, security |
@@ -103,15 +107,17 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-vision-captioning.md](./adr/ADR-vision-captioning.md) | product-owner | proposed | 2026-08-12 | client, eng |
 | [adr/ADR-embedding-model-dimension.md](./adr/ADR-embedding-model-dimension.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [retrieval/ARABIC_NORMALIZATION.md](./retrieval/ARABIC_NORMALIZATION.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-08-15 | eng, reviewers |
+| [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [retrieval/STRUCTURED_TABLE.md](./retrieval/STRUCTURED_TABLE.md) | engineering-lead | draft | 2026-08-14 | eng, security, reviewers |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-08-18 | eng |
-| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
-| [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-08-14 | eng |
+| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
+| [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-08-19 | eng |
+| [ingestion/SCAN_BEFORE_INDEX.md](./ingestion/SCAN_BEFORE_INDEX.md) | engineering-lead | draft | 2026-08-19 | eng, security |
+| [ingestion/PARSER_SANDBOX.md](./ingestion/PARSER_SANDBOX.md) | engineering-lead | draft | 2026-08-19 | eng, security, ops |
 | [runbooks/CLAMAV_SCAN_AND_PROMOTION.md](./runbooks/CLAMAV_SCAN_AND_PROMOTION.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
-| [ingestion/CRAWL_POLICY.md](./ingestion/CRAWL_POLICY.md) | engineering-lead | draft | 2026-08-13 | eng, security |
+| [ingestion/CRAWL_POLICY.md](./ingestion/CRAWL_POLICY.md) | engineering-lead | draft | 2026-08-19 | eng, security |
 | [runbooks/CRAWL_EGRESS_AND_PROXY.md](./runbooks/CRAWL_EGRESS_AND_PROXY.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [evaluation/QUERY_PROFILE_EVAL.md](./evaluation/QUERY_PROFILE_EVAL.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [evaluation/RERANK_COUNTERFACTUAL.md](./evaluation/RERANK_COUNTERFACTUAL.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
@@ -122,9 +128,9 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [evaluation/PHASE4_HOLDOUT.md](./evaluation/PHASE4_HOLDOUT.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers, client-approver |
 | [evaluation/PHASE4_RANKED_IDS.md](./evaluation/PHASE4_RANKED_IDS.md) | engineering-lead | draft | 2026-08-15 | eng, reviewers |
 | [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, ops |
-| [security/AUTHORIZATION_MODEL.md](./security/AUTHORIZATION_MODEL.md) | engineering-lead | draft | 2026-08-12 | eng, security |
-| [security/IDENTITY_PROPAGATION.md](./security/IDENTITY_PROPAGATION.md) | engineering-lead | draft | 2026-08-18 | eng, security |
-| [security/AUTH_RATE_LIMIT_OWNERSHIP.md](./security/AUTH_RATE_LIMIT_OWNERSHIP.md) | engineering-lead | draft | 2026-08-16 | eng, security |
+| [security/AUTHORIZATION_MODEL.md](./security/AUTHORIZATION_MODEL.md) | engineering-lead | draft | 2026-08-19 | eng, security |
+| [security/IDENTITY_PROPAGATION.md](./security/IDENTITY_PROPAGATION.md) | engineering-lead | draft | 2026-08-19 | eng, security |
+| [security/AUTH_RATE_LIMIT_OWNERSHIP.md](./security/AUTH_RATE_LIMIT_OWNERSHIP.md) | engineering-lead | draft | 2026-08-19 | eng, security |
 | [adr/ADR-privileged-auth-administration-boundary.md](./adr/ADR-privileged-auth-administration-boundary.md) | engineering-lead | accepted | 2026-08-13 | eng, security |
 | [adr/ADR-upload-capability-and-storage-privilege.md](./adr/ADR-upload-capability-and-storage-privilege.md) | engineering-lead | accepted | 2026-08-13 | eng, security |
 | [adr/ADR-parser-isolation.md](./adr/ADR-parser-isolation.md) | engineering-lead | accepted | 2026-08-18 | eng, security, ops |
@@ -145,5 +151,6 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [reviews/2026-08-12-hybrid-graph-rag-plan-review.md](./reviews/2026-08-12-hybrid-graph-rag-plan-review.md) | engineering-lead | verified | 2026-08-12 | eng |
 | [reviews/2026-08-16-phases-01-05-implementation-review.md](./reviews/2026-08-16-phases-01-05-implementation-review.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
 | [reviews/2026-08-16-phases-01-05-closeout.md](./reviews/2026-08-16-phases-01-05-closeout.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers, client-approver |
+| [reviews/2026-08-19-production-readiness/README.md](./reviews/2026-08-19-production-readiness/README.md) | independent-reviewer | draft | 2026-08-19 | eng, security, ops, client-approver |
 
 Back to [root README](../README.md).

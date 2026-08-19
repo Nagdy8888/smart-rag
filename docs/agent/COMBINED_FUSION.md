@@ -2,7 +2,7 @@
 title: Combined fusion
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 3
 ---
@@ -63,7 +63,9 @@ the `1.10` agreement multiplier, frozen document/section quotas, and the
 
 A graph-only answer is forbidden. If every remaining unit would be
 graph-discovered-only, fusion fails closed rather than answering from
-graph leads alone.
+graph leads alone. Graph locators are not evidence until
+`fetch_authorized_chunk_context` supplies non-empty canonical `raw_text`.
+Empty citation text is dropped and cannot pass deterministic complete.
 
 ## Degrade
 

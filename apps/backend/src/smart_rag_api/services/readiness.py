@@ -210,7 +210,7 @@ def readiness_as_dict(payload: ReadinessResponse) -> dict[str, Any]:
         payload: Readiness model.
 
     Returns:
-        Dictionary for the HTTP response.
+        Dictionary for the authenticated operator HTTP response.
     """
 
     return {
@@ -221,4 +221,30 @@ def readiness_as_dict(payload: ReadinessResponse) -> dict[str, Any]:
         "dependencies": [
             {"name": item.name, "status": item.status} for item in payload.dependencies
         ],
+    }
+
+
+_PUBLIC_READY_DETAIL = {
+    True: "ok",
+    False: "not_query_ready",
+}
+
+
+def public_readiness_as_dict(payload: ReadinessResponse) -> dict[str, Any]:
+    """Convert readiness to the unauthenticated probe mapping.
+
+    The public body never names ParadeDB, Valkey, LightRAG, or other
+    internals. Mock mode still reports ``query_ready=false``.
+
+    Args:
+        payload: Readiness model.
+
+    Returns:
+        ``status``, ``query_ready``, and a coarse ``detail`` only.
+    """
+
+    return {
+        "status": payload.status,
+        "query_ready": payload.query_ready,
+        "detail": _PUBLIC_READY_DETAIL[payload.query_ready],
     }

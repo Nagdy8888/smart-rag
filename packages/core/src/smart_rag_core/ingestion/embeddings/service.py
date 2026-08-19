@@ -5,6 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import queue
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -119,6 +122,38 @@ class EmbeddingService:
             raise EmbeddingGateError("embedding_batch_over_limit")
 
         chunk_set_hash = _chunk_set_hash(representatives)
+        completed = self._completed_ledger_vectors(
+            version_id=batch.version_id,
+            operation_key=batch.operation_key,
+            chunk_set_hash=chunk_set_hash,
+            expected_count=len(representatives),
+        )
+        if completed is not None:
+            ledger_id, stored_vectors = completed
+            contextual_inputs = [
+                build_contextual_embedding_text(
+                    document_title=batch.document_title,
+                    chunk=chunk,
+                )
+                for chunk in representatives
+            ]
+            embedded = _embedded_from_stored_vectors(
+                representatives, contextual_inputs, stored_vectors
+            )
+            attempt_count = self._ledger_attempt_count(
+                batch.version_id, batch.operation_key
+            )
+            return EmbeddingBatchResult(
+                version_id=batch.version_id,
+                policy_hash=policy_hash,
+                chunk_set_hash=chunk_set_hash,
+                embedded=tuple(embedded),
+                ledger_id=ledger_id,
+                provider_request_id="ledger_replay",
+                actual_cost_usd=Decimal("0"),
+                attempt_count=attempt_count,
+            )
+
         ledger_id = self._record_ledger(
             version_id=batch.version_id,
             operation_key=batch.operation_key,
@@ -126,6 +161,7 @@ class EmbeddingService:
             input_count=len(representatives),
             status="pending",
             reserved_usd=batch.estimated_cost_usd,
+            result_ref={"chunk_set_hash": chunk_set_hash},
         )
 
         contextual_inputs = [
@@ -142,8 +178,8 @@ class EmbeddingService:
         )
 
         try:
-            response = asyncio.run(
-                self._gateway.embed(
+            response = _run_embed_coroutine(
+                lambda: self._gateway.embed(
                     EmbeddingRequest(
                         operation_key=batch.operation_key,
                         inputs=tuple(contextual_inputs),
@@ -206,6 +242,8 @@ class EmbeddingService:
             result_ref={
                 "mode": response.mode,
                 "fixture_provenance": response.fixture_provenance,
+                "chunk_set_hash": chunk_set_hash,
+                "vectors": [list(vector) for vector in response.vectors],
             },
         )
 
@@ -304,6 +342,155 @@ class EmbeddingService:
             )
             row = cursor.fetchone()
             return int(row[0]) if row else 1
+
+    def _completed_ledger_vectors(
+        self,
+        *,
+        version_id: UUID,
+        operation_key: str,
+        chunk_set_hash: str,
+        expected_count: int,
+    ) -> tuple[UUID, tuple[tuple[float, ...], ...]] | None:
+        """Return stored vectors for a completed matching ledger row.
+
+        Args:
+            version_id: Canonical document version.
+            operation_key: Idempotent embedding operation key.
+            chunk_set_hash: Hash of the current representative set.
+            expected_count: Number of representative chunks.
+
+        Returns:
+            Ledger id and vectors when a completed row matches the hash, or
+            ``None`` when no completed matching row exists (caller embeds).
+
+        Raises:
+            EmbeddingGateError: When the ledger is ``completed`` for this
+                operation and hash but vectors are missing or the wrong size.
+        """
+
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, status, result_ref
+                FROM app.embedding_operation_ledger
+                WHERE version_id = %s AND operation_key = %s
+                """,
+                (version_id, operation_key),
+            )
+            row = cursor.fetchone()
+        if row is None or len(row) < 3 or row[0] is None:
+            return None
+        ledger_id = UUID(str(row[0]))
+        status = str(row[1])
+        raw_ref: object = row[2]
+        if isinstance(raw_ref, str):
+            try:
+                raw_ref = json.loads(raw_ref)
+            except json.JSONDecodeError:
+                raw_ref = {}
+        result_ref = raw_ref if isinstance(raw_ref, dict) else {}
+        stored_hash = result_ref.get("chunk_set_hash")
+        if status != "completed" or stored_hash != chunk_set_hash:
+            return None
+        raw_vectors = result_ref.get("vectors")
+        if not isinstance(raw_vectors, list) or not raw_vectors:
+            raise EmbeddingGateError("embedding_ledger_vectors_missing")
+        if len(raw_vectors) != expected_count:
+            raise EmbeddingGateError("embedding_ledger_vectors_missing")
+        parsed: list[tuple[float, ...]] = []
+        for vector in raw_vectors:
+            if not isinstance(vector, list) or not vector:
+                raise EmbeddingGateError("embedding_ledger_vectors_missing")
+            parsed.append(tuple(float(value) for value in vector))
+        return ledger_id, tuple(parsed)
+
+
+def _run_embed_coroutine(factory: Callable[[], Any]) -> Any:
+    """Run one embedding coroutine off a running event loop when needed.
+
+    ``asyncio.run`` cannot be called from a running loop. Worker threads that
+    already have a loop execute the provider call on a dedicated thread with
+    its own loop. The coroutine is created on that thread via ``factory``.
+
+    Args:
+        factory: Zero-argument callable that returns the embed coroutine.
+
+    Returns:
+        Gateway embed response.
+
+    Raises:
+        TimeoutError: When the provider client times out.
+        Exception: Provider or gateway failures are propagated.
+    """
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(factory())
+    outcome: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
+
+    def _worker() -> None:
+        """Create and run the embed coroutine on this thread's loop."""
+
+        try:
+            outcome.put(("ok", asyncio.run(factory())))
+        except BaseException as exc:
+            outcome.put(("err", exc))
+
+    thread = threading.Thread(
+        target=_worker,
+        name="embedding-gateway-loop",
+        daemon=True,
+    )
+    thread.start()
+    thread.join()
+    kind, payload = outcome.get()
+    if kind == "err":
+        if isinstance(payload, BaseException):
+            raise payload
+        raise RuntimeError(str(payload))
+    return payload
+
+
+def _embedded_from_stored_vectors(
+    representatives: tuple[CanonicalChunk, ...],
+    contextual_inputs: list[str],
+    stored_vectors: tuple[tuple[float, ...], ...],
+) -> list[EmbeddedChunk]:
+    """Rebuild embedded chunks from a completed ledger payload.
+
+    Args:
+        representatives: Search-representative chunks in embed order.
+        contextual_inputs: Contextual texts aligned with ``representatives``.
+        stored_vectors: Vectors persisted on the completed ledger row.
+
+    Returns:
+        Embedded chunk list.
+
+    Raises:
+        EmbeddingGateError: When a stored vector is the wrong size or
+            non-finite.
+    """
+
+    embedded: list[EmbeddedChunk] = []
+    for chunk, contextual_text, vector in zip(
+        representatives,
+        contextual_inputs,
+        stored_vectors,
+        strict=True,
+    ):
+        if len(vector) != EMBEDDING_DIMENSIONS:
+            raise EmbeddingGateError("embedding_ledger_vectors_missing")
+        if not all(math.isfinite(value) for value in vector):
+            raise EmbeddingGateError("embedding_ledger_vectors_missing")
+        embedded.append(
+            EmbeddedChunk(
+                chunk=chunk,
+                contextual_text=contextual_text,
+                embedding=list(vector),
+            )
+        )
+    return embedded
 
 
 def _chunk_set_hash(chunks: tuple[CanonicalChunk, ...]) -> str:

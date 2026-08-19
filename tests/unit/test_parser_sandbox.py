@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import hashlib
+import io
+import zipfile
 
 import pytest
+from smart_rag_core.ingestion.parser.archive import reject_archive_bomb
+from smart_rag_core.ingestion.parser.exceptions import (
+    ParserLimitExceeded,
+    ParserSandboxError,
+)
 from smart_rag_core.ingestion.parser.limits import PARSER_SANDBOX_MAX_INPUT_BYTES
 from smart_rag_core.ingestion.parser.sandbox.launcher import (
     ParserSandboxLauncher,
     SandboxLaunchConfig,
 )
+from smart_rag_core.ingestion.parser.service import ParserService
 from smart_rag_core.ingestion.parser.types import ParseDisposition
 
 from tests.fixtures.parser import build_archive_bomb
@@ -29,6 +37,54 @@ def test_oversize_input_fails_without_partial_elements() -> None:
     )
     assert result.disposition is ParseDisposition.FAILED
     assert result.coverage.total_elements == 0
+
+
+def test_default_launcher_requires_docker_when_cli_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default launcher must not silently parse in-process when Docker is absent."""
+
+    monkeypatch.setattr(
+        "smart_rag_core.ingestion.parser.sandbox.launcher.shutil.which",
+        lambda _name: None,
+    )
+    launcher = ParserSandboxLauncher()
+    assert launcher.config.use_docker is True
+    payload = b"hello parser\n"
+    digest = hashlib.sha256(payload).hexdigest()
+    with pytest.raises(ParserSandboxError, match="docker executable not found"):
+        launcher.run(
+            payload=payload,
+            content_hash=digest,
+            filename="sample.txt",
+            format_key="text",
+        )
+
+
+def test_parser_service_inprocess_only_when_test_env_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ParserService uses Docker unless ALLOW_INPROCESS_PARSER and APP_ENV=test."""
+
+    monkeypatch.delenv("ALLOW_INPROCESS_PARSER", raising=False)
+    monkeypatch.setenv("APP_ENV", "local")
+    docker_service = ParserService()
+    assert docker_service._launcher.config.use_docker is True
+
+    monkeypatch.setenv("ALLOW_INPROCESS_PARSER", "true")
+    monkeypatch.setenv("APP_ENV", "test")
+    test_service = ParserService()
+    assert test_service._launcher.config.use_docker is False
+
+
+def test_archive_parent_path_is_rejected() -> None:
+    """ZIP members that traverse parent directories fail closed."""
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("../escape.txt", "stolen")
+    with pytest.raises(ParserLimitExceeded, match="parent-traversing"):
+        reject_archive_bomb(buffer.getvalue())
 
 
 def test_inprocess_parse_text_fixture() -> None:
@@ -75,21 +131,35 @@ def test_parser_sandbox_kill_timeout_returns_failed(
 
     import subprocess
 
-    def _timeout(*_args: object, **_kwargs: object) -> object:
-        """Raise TimeoutExpired to simulate a hung Docker sandbox.
+    commands: list[tuple[str, ...]] = []
+
+    def _run(cmd: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        """Timeout on ``docker run``; succeed on ``docker kill`` / ``rm``.
 
         Args:
-            *_args: Unused subprocess.run positional arguments.
+            cmd: Subprocess argument list.
             **_kwargs: Unused subprocess.run keyword arguments.
 
         Returns:
-            Never returns; always raises.
+            A successful completed process for kill/rm.
 
         Raises:
-            TimeoutExpired: Simulated Docker kill-timeout.
+            TimeoutExpired: Simulated hung ``docker run``.
+            TypeError: When ``cmd`` is not a string sequence.
         """
 
-        raise subprocess.TimeoutExpired(cmd="docker", timeout=1)
+        if not isinstance(cmd, (list, tuple)):
+            raise TypeError("expected docker argv")
+        argv = tuple(str(part) for part in cmd)
+        commands.append(argv)
+        if len(argv) > 1 and argv[1] == "run":
+            raise subprocess.TimeoutExpired(cmd="docker", timeout=1)
+        return subprocess.CompletedProcess(
+            args=list(argv),
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
 
     def _which(_name: str) -> str:
         """Return a fake Docker path so the launcher attempts a container run.
@@ -103,7 +173,7 @@ def test_parser_sandbox_kill_timeout_returns_failed(
 
         return "/usr/bin/docker"
 
-    monkeypatch.setattr(subprocess, "run", _timeout)
+    monkeypatch.setattr(subprocess, "run", _run)
     monkeypatch.setattr(
         "smart_rag_core.ingestion.parser.sandbox.launcher.shutil.which",
         _which,
@@ -126,6 +196,7 @@ def test_parser_sandbox_kill_timeout_returns_failed(
     assert result.disposition is ParseDisposition.FAILED
     assert result.coverage.total_elements == 0
     assert "timeout" in (result.detail or "")
+    assert any(len(cmd) > 1 and cmd[1] == "kill" for cmd in commands)
 
 
 def test_parser_package_init_is_sandbox_importable() -> None:

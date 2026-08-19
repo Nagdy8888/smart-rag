@@ -40,22 +40,10 @@ test("browser readiness panel matches live GET /health/ready", async ({
   await expect(page.getByTestId("query-ready")).toHaveText(
     String(ready.query_ready),
   );
-  const dependencies = Array.isArray(ready.dependencies)
-    ? ready.dependencies
-    : [];
-  for (const item of dependencies) {
-    if (
-      item === null ||
-      typeof item !== "object" ||
-      !("name" in item) ||
-      !("status" in item)
-    ) {
-      continue;
-    }
-    const name = String(item.name);
-    const status = String(item.status);
-    await expect(page.getByTestId(`dep-${name}`)).toHaveText(status);
-  }
+  expect(ready.dependencies).toBeUndefined();
+  await expect(page.getByTestId("dep-paradedb")).toHaveCount(0);
+  await expect(page.getByTestId("dep-valkey_limits")).toHaveCount(0);
+  await expect(page.getByTestId("dep-lightrag")).toHaveCount(0);
 });
 
 test("signup and forgot-password links are visible from login", async ({

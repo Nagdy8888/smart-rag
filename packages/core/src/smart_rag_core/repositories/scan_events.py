@@ -128,7 +128,15 @@ class ScanEventRepository:
         *,
         max_age_hours: int = 24,
     ) -> bool:
-        """Return whether a clean scan exists within the freshness window."""
+        """Return whether a clean scan exists within the freshness window.
+
+        Args:
+            version_id: Canonical version whose scan events are inspected.
+            max_age_hours: Maximum age of a qualifying clean event.
+
+        Returns:
+            ``True`` when at least one clean scan is inside the window.
+        """
 
         row = self.connection.execute(
             """
@@ -143,3 +151,40 @@ class ScanEventRepository:
             (version_id, max_age_hours),
         ).fetchone()
         return bool(row and row[0])
+
+    def has_current_clean_hashes(
+        self,
+        version_id: UUID,
+        object_hashes: tuple[str, ...],
+        *,
+        max_age_hours: int = 24,
+    ) -> bool:
+        """Return whether every object hash has a current clean scan event.
+
+        Empty ``object_hashes`` fails closed.
+
+        Args:
+            version_id: Canonical version scanned.
+            object_hashes: SHA-256 hex digests that must each have a clean
+                current ``document_scan_events`` row.
+            max_age_hours: Maximum age of a qualifying clean event.
+
+        Returns:
+            ``True`` only when every hash has a matching current clean event.
+        """
+
+        if not object_hashes:
+            return False
+        normalized = tuple(digest.lower() for digest in object_hashes)
+        row = self.connection.execute(
+            """
+            SELECT COUNT(DISTINCT lower(e.object_hash))
+            FROM app.document_scan_events AS e
+            WHERE e.version_id = %s
+              AND e.result = 'clean'::app.scan_result
+              AND e.scanned_at >= timezone('utc', now()) - make_interval(hours => %s)
+              AND lower(e.object_hash) = ANY(%s)
+            """,
+            (version_id, max_age_hours, list(normalized)),
+        ).fetchone()
+        return bool(row and int(row[0]) == len(set(normalized)))

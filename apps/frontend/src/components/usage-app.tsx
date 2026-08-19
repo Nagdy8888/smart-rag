@@ -13,7 +13,7 @@ import { StatusBanner } from "./ui/status-banner";
 import { UserText } from "./ui/user-text";
 import {
   fetchMe,
-  fetchReady,
+  loadConsoleReadiness,
   fetchUsageCompany,
   fetchUsageMe,
   type ApiAuth,
@@ -119,8 +119,8 @@ export function UsageApp() {
     enabled: auth !== null && showCompany,
   });
   const readyQuery = useQuery({
-    queryKey: publicQueryKeys.ready,
-    queryFn: () => fetchReady(),
+    queryKey: auth === null ? publicQueryKeys.ready : keys.consoleReady,
+    queryFn: () => loadConsoleReadiness(auth),
   });
 
   const companyError =

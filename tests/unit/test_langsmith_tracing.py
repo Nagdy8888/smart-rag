@@ -418,6 +418,12 @@ def test_langsmith_real_content_is_blocked_until_matrix_verified() -> None:
         content_class=ContentClass.SYNTHETIC,
         provider_settings_verified=False,
     )
+    assert_langsmith_export_permitted(
+        tracing_enabled=True,
+        content_class=ContentClass.REAL_COMPANY,
+        provider_settings_verified=False,
+        local_unsigned_waiver=True,
+    )
     with pytest.raises(
         ExternalFlowBlockedError, match="langsmith_real_content_unverified"
     ):

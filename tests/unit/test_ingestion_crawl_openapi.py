@@ -8,6 +8,7 @@ from tests.unit.typed_openapi import (
     as_openapi_client,
     json_object,
     openapi_test_client,
+    permit_test_identity,
 )
 
 
@@ -23,7 +24,7 @@ def test_ingestion_crawl_route_is_registered() -> None:
 def test_member_cannot_enqueue_website_crawl(monkeypatch: pytest.MonkeyPatch) -> None:
     """Members cannot broaden crawl scope."""
 
-    monkeypatch.setenv("APP_ENV", "test")
+    permit_test_identity(monkeypatch)
     with openapi_test_client() as raw_client:
         client = as_openapi_client(raw_client)
         response = client.post(

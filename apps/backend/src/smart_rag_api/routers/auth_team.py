@@ -6,7 +6,9 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.settings import Environment
 
 from smart_rag_api.auth_admin.invitations import InvitationServiceError
 from smart_rag_api.auth_admin.offboarding import OffboardingError
@@ -72,7 +74,7 @@ def create_invitation_route(
     body: CreateInvitationRequest,
     caller: CallerContextDep,
     service: Annotated[AuthTeamService, Depends(get_auth_team_service)],
-) -> CreateInvitationResponse:
+) -> JSONResponse:
     """Create a 24-hour invitation. Owner/admin only.
 
     Args:
@@ -82,7 +84,8 @@ def create_invitation_route(
         service: Injected auth/team service.
 
     Returns:
-        Invitation identifiers including the one-time token.
+        Invitation identifiers. The one-time token is delivered by mail only.
+        ``APP_ENV=test`` also sets ``X-Test-Invitation-Token``.
     """
 
     enforce_rate_limit(
@@ -105,13 +108,21 @@ def create_invitation_route(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="invitation_rejected",
         ) from exc
-    return CreateInvitationResponse(
-        invitation_id=created.invitation_id,
-        email=created.email,
-        role=created.role,
-        upload_enabled=created.upload_enabled,
-        expires_at=created.expires_at,
-        raw_token=created.raw_token,
+    headers: dict[str, str] = {}
+    settings = getattr(request.app.state, "settings", None)
+    app_env = getattr(settings, "app_env", None)
+    if app_env is Environment.TEST:
+        headers["X-Test-Invitation-Token"] = created.raw_token
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content=CreateInvitationResponse(
+            invitation_id=created.invitation_id,
+            email=created.email,
+            role=created.role,
+            upload_enabled=created.upload_enabled,
+            expires_at=created.expires_at,
+        ).model_dump(mode="json"),
+        headers=headers,
     )
 
 
@@ -141,11 +152,13 @@ def accept_invitation_route(
         max_attempts=5,
     )
     email = getattr(request.state, "caller_email", None)
+    assurance = getattr(request.state, "assurance_level", "aal1")
     try:
         invitation_id = service.accept_invitation(
             caller,
             raw_token=body.token,
             email=email if isinstance(email, str) else "",
+            assurance_level=assurance if isinstance(assurance, str) else "aal1",
         )
     except QueryAdmissionError as exc:
         raise_admission_http(exc)

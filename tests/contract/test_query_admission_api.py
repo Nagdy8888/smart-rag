@@ -15,7 +15,11 @@ from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import CallerContext, UserRole
 
-from tests.unit.typed_openapi import as_openapi_client, json_object
+from tests.unit.typed_openapi import (
+    as_openapi_client,
+    json_object,
+    permit_test_identity,
+)
 
 _OWNER = "00000000-0000-4000-8000-000000000001"
 
@@ -112,7 +116,7 @@ def test_auto_submit_admits_composite_and_returns_stream_path(
 ) -> None:
     """Auto chat uses the Composite envelope and does not invent SSE events."""
 
-    monkeypatch.setenv("APP_ENV", "test")
+    permit_test_identity(monkeypatch)
     monkeypatch.setattr(
         "smart_rag_api.routers.conversations.enforce_rate_limit",
         _noop_rate_limit,

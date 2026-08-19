@@ -6,6 +6,7 @@ import logging
 from uuid import uuid4
 
 import pytest
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_api.main import create_app
 from smart_rag_api.services.sse_stream import FixtureQueryRunExecutor
 from smart_rag_core.sse.catalog import HEARTBEAT_INTERVAL_SECONDS
@@ -27,6 +28,17 @@ from tests.contract.sse_http_support import (
     sse_test_client,
 )
 from tests.unit.typed_openapi import as_openapi_client, json_object
+
+
+@pytest.fixture(autouse=True)
+def _permit_test_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allow ``X-Test-*`` headers for SSE HTTP protocol tests.
+
+    Bypass requires ``APP_ENV=test`` and ``ALLOW_TEST_IDENTITY=true``.
+    """
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
 
 
 def test_heartbeat_interval_is_fifteen_seconds() -> None:

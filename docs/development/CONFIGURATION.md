@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 audience: developers, operators
 ---
 
@@ -19,11 +19,12 @@ Validation errors list field paths and categories but omit source values.
 | Variable | Type / default | Security | Contract |
 | --- | --- | --- | --- |
 | `APP_ENV` | `local`, `test`, `staging`, or `production`; `local` | public | Deployment label added to every structured log. `local` also enables the documented JWT `iss` hostname pair under backend `SUPABASE_URL` |
-| `MOCK_MODEL_MODE` | boolean; `true` | public | Secure default; selects frozen fixtures and denies DNS access to `api.openai.com` |
+| `ALLOW_TEST_IDENTITY` | boolean; `false` | public | `X-Test-*` headers mint a caller only together with `APP_ENV=test`. Staging and production reject the flag at settings load |
+| `MOCK_MODEL_MODE` | boolean; `true` | public | Secure default; selects frozen fixtures and denies DNS access to `api.openai.com`. Local live OpenAI is opt-in via gitignored env (`false` plus `OPENAI_API_KEY`). Real company content stays prohibited until the OpenAI org matrix is `verified` |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; `INFO` | public | Root JSON log threshold |
 | `OPENAI_API_KEY` | optional secret in mock mode | secret | Required when `MOCK_MODEL_MODE=false`; never logged or represented in plaintext |
 | `LANGSMITH_TRACING` | boolean; `false` | public | Off by default. When true, every gateway model/embedding call emits a redacted LangSmith span. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) |
-| `LANGSMITH_API_KEY` | optional secret | secret | Required when `LANGSMITH_TRACING=true`; never logged or represented in plaintext |
+| `LANGSMITH_API_KEY` | optional secret | secret | Required when `LANGSMITH_TRACING=true`. Local LangGraph Studio UI also needs this key to attach at `smith.langchain.com/studio` even when tracing stays false. Never logged or represented in plaintext |
 | `LANGSMITH_PROJECT` | safe identifier; `smart-rag` | public | LangSmith project that receives redacted traces |
 | `LANGSMITH_ENDPOINT` | optional HTTP URL | internal | Override for a non-default LangSmith API; unset uses the hosted default |
 | `MOCK_MODEL_FIXTURE_ID` | safe identifier; `phase-1-foundation-v1` | internal | Included in fixture provenance; does not imply retrieval |
@@ -85,7 +86,10 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `SUPABASE_URL` | HTTP origin; `http://127.0.0.1:54321` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. See local `iss` aliases below. |
 | `SUPABASE_JWT_AUDIENCE` | non-empty string; `authenticated` | public | Required JWT `aud` claim |
 | `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
-| `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api` |
+| `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api`. Compose API/worker must not use the postgres superuser DSN; see `APP_RUNTIME_DB_PASSWORD` |
+| `APP_RUNTIME_DB_PASSWORD` | secret; required for local Compose | secret | Password for LOGIN wrapper `app_runtime`. `app_api` is NOLOGIN. See [LOCAL_RUNTIME_ROLES.md](../deployment/LOCAL_RUNTIME_ROLES.md) |
+| `API_SUPABASE_DB_URL` | optional secret URL | secret | Compose API DSN override. Must be non-superuser |
+| `WORKER_SUPABASE_DB_URL` | optional secret URL | secret | Compose worker DSN override. Must be non-superuser |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. |
 | `CORS_ALLOW_ORIGINS` | comma-separated exact origins; `http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010` | public | Wildcards forbidden. Never pair `*` with credentials. `:3010` is the Playwright developer-console origin so tests do not reuse Compose `:3000` |
 | `API_VERSION` | `major.minor.patch`; `0.1.0` | public | Published by `GET /api/meta` |
@@ -141,6 +145,7 @@ listed in `additional_redirect_urls`. Local upload reserve still returns
 | Variable | Type / default | Security | Contract |
 | --- | --- | --- | --- |
 | `WORKER_ONCE` | boolean; `false` | public | Exit after one poll/claim cycle |
+| `ALLOW_INPROCESS_PARSER` | boolean; `false` | public | Test-only in-process parser. Requires `APP_ENV=test`. Worker start still refuses this flag when Storage Admin is in the process |
 | `SUPABASE_DB_URL` | optional secret URL | secret | Worker-role session/direct Postgres DSN for claim/heartbeat |
 | `WORKER_INSTANCE_ID` | string; `worker-local` | internal | Lease owner identifier for this process |
 | `JOB_LEASE_SECONDS` | integer 30–3600; `300` | public | Claim and heartbeat lease duration |
@@ -191,7 +196,9 @@ These placeholders are consumed by Docker Compose rather than Python settings:
 
 `SUPABASE_URL` and `SUPABASE_ANON_KEY` remain commented Compose placeholders.
 `LANGSMITH_API_KEY` is a typed SharedSettings secret, still optional while
-tracing is off. Backend Packet 4+ reads `SUPABASE_URL` /
+tracing is off. Local [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md) uses the
+same key only to attach the hosted Studio UI; it does not enable tracing.
+Backend Packet 4+ reads `SUPABASE_URL` /
 JWKS settings through `BackendSettings`. Privileged secrets
 `SUPABASE_AUTH_ADMIN_SECRET` and `SUPABASE_STORAGE_ADMIN_SECRET` are never
 declared on `SharedSettings`, `BackendSettings`, `WorkerSettings`, or
@@ -229,5 +236,7 @@ uv run python scripts/check.py --tier contract
 uv run python scripts/check.py --tier types
 ```
 
-See [Phase 1 foundation evidence](./phase-01-foundation-evidence.md) for recorded
-exit codes.
+See [QUALITY_TARGETS.md](../QUALITY_TARGETS.md), [LOCAL_SETUP.md](./LOCAL_SETUP.md),
+[LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md),
+[Phase 1 foundation evidence](./phase-01-foundation-evidence.md),
+[docs index](../README.md).

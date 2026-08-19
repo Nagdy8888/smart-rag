@@ -16,6 +16,8 @@ LOGGER = logging.getLogger(__name__)
 
 ALLOWED_ALGORITHMS = frozenset({"ES256", "RS256"})
 FORBIDDEN_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
+REQUIRED_JWT_ROLE = "authenticated"
+FORBIDDEN_JWT_ROLES = frozenset({"service_role", "anon"})
 LOCAL_LOOPBACK_JWT_ISSUER = "http://127.0.0.1:54321/auth/v1"
 LOCAL_DOCKER_INTERNAL_JWT_ISSUER = "http://host.docker.internal:54321/auth/v1"
 LOCAL_JWT_ISSUER_ALIASES: frozenset[str] = frozenset(
@@ -230,7 +232,8 @@ class JwksVerifier:
 
         Signature, ``kid``, and ``alg`` always verify against ``jwks_url``.
         ``iss`` must match ``allowed_issuers``. Symmetric algorithms stay
-        forbidden.
+        forbidden. The JWT ``role`` claim must be ``authenticated``;
+        ``service_role`` and ``anon`` are rejected.
 
         Args:
             token: Raw JWT string without the ``Bearer`` prefix.
@@ -240,7 +243,7 @@ class JwksVerifier:
 
         Raises:
             JwksVerificationError: On malformed tokens, forbidden algorithms,
-                issuer/audience/exp/kid failures, or JWKS fetch errors.
+                issuer/audience/exp/kid/role failures, or JWKS fetch errors.
         """
 
         if not token or not token.strip():
@@ -288,6 +291,10 @@ class JwksVerifier:
         subject = str(claims.get("sub", ""))
         if not subject:
             raise JwksVerificationError("missing sub")
+
+        role_claim = claims.get("role")
+        if role_claim in FORBIDDEN_JWT_ROLES or role_claim != REQUIRED_JWT_ROLE:
+            raise JwksVerificationError("forbidden role")
 
         session_id = claims.get("session_id")
         session_text = str(session_id) if session_id is not None else None
