@@ -1114,6 +1114,28 @@ checkbox was checked. Wrapper stays `pending`. Phase 11 stays **no-go**.
 Envelope remains QT-CAP-001-P9=8 / QT-CAP-002-P9=16 / QT-CAP-005-P8=15.
 Holdout stays closed. `MOCK_MODEL_MODE=true`. HS256 stays forbidden.
 
+### 2026-08-19 attempt to finish Packet 1 stack
+
+User asked to finish Phase 10. Packet 1 still first unchecked. Tried to raise
+`i-0abe79350a3880e87` from `t3.micro` to intended `m6i.xlarge` so Compose
+`mem_limit`s could fit.
+
+| Command | Result |
+| --- | --- |
+| `aws ec2 stop-instances` / `wait instance-stopped` | 0 |
+| `modify-instance-attribute --instance-type Value=m6i.xlarge` | 254 `FreeTierRestrictionError`: operation not available for free plan accounts |
+| `start-instances` / `wait instance-running` | 0 — still `t3.micro`, EIP `52.206.156.176` |
+
+Workstation Docker daemon was down. ECR freeze-image digests are absent.
+Starting the digest-pinned API/worker/ParadeDB stack was **not** done.
+No packet checkbox checked. Wrapper remains `pending`. Phase 11 remains
+**no-go**.
+
+To continue Packet 1 live: upgrade the AWS account off Free plan, apply
+`m6i.xlarge` (committed default), load Phase 9 freeze images into ECR,
+start Compose, then re-scan. Supabase Pro/PITR and an independent
+assessment remain separate Packet 1-A / Packet 6 / Packet 7 blockers.
+
 
 
 

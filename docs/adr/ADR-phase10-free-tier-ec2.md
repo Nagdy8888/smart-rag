@@ -3,7 +3,7 @@ title: ADR — Phase 10 live EC2 Free Tier instance type
 adr_id: ADR-phase10-free-tier-ec2
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-19
 approver: "user (Cursor chat; finish live Packet 1 apply)"
 approval_date: "2026-08-18"
 audience: engineering, ops, client-approver
@@ -47,7 +47,9 @@ flowchart TD
   `i-0abe79350a3880e87`. Compose files are not yet on the host, so health and
   private-port scans stay unproven.
 - Raising to `m6i.xlarge` later needs a paid/non-Free-Tier-restricted
-  account path and a new apply.
+  account path and a new apply. 2026-08-19: `ModifyInstanceAttribute` to
+  `m6i.xlarge` returned `FreeTierRestrictionError` (free plan accounts).
+  The instance was restarted as `t3.micro`.
 
 ## Related
 
