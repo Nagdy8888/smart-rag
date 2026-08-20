@@ -44,6 +44,7 @@ from smart_rag_core.retrieval.graph import (
     DEFAULT_GRAPH_WORKSPACE,
     LIGHTRAG_CHUNK_OVERLAP_TOKEN_SIZE,
     LIGHTRAG_CHUNK_TOKEN_SIZE,
+    LIGHTRAG_EMBEDDING_VENDOR_TIMEOUT_SECONDS,
     LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
     LIGHTRAG_PINNED_VERSION,
     LIGHTRAG_RUNTIME_ROLE,
@@ -786,7 +787,7 @@ async def construct_lightrag_engine(
         max_parallel_insert=1,
         auto_manage_storages_states=False,
         default_llm_timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
-        default_embedding_timeout=30,
+        default_embedding_timeout=LIGHTRAG_EMBEDDING_VENDOR_TIMEOUT_SECONDS,
         cosine_better_than_threshold=cosine_better_than_threshold,
     )
     return cast(LightRagRuntime, rag), callbacks
@@ -1061,6 +1062,124 @@ class LightRagRuntimeAdapter:
             status=status_label,
         )
 
+    async def enqueue_insert_sources(
+        self,
+        *,
+        texts: tuple[str, ...],
+        document_ids: tuple[str, ...],
+        source_tokens: tuple[str, ...],
+        track_id: str,
+    ) -> GraphIndexEnqueueResult:
+        """Insert envelope-bound canonical-passage sources in one ``ainsert``.
+
+        Args:
+            texts: Already envelope-bound passage texts, 1:1 with IDs.
+            document_ids: Deterministic ``{version_id}:{chunk_id}`` source IDs.
+            source_tokens: Unique opaque basenames, 1:1 with ``document_ids``.
+            track_id: Fresh monitoring token. Never an idempotency key.
+
+        Returns:
+            Monitoring metadata. ``document_id`` is the first source ID.
+
+        Raises:
+            LightRagAdapterError: If list lengths do not match, or LightRAG
+                ``pipeline_status`` is missing for the bound workspace.
+
+        Side Effects:
+            Calls vendor ``ainsert`` with list ``input``, ``ids``, and
+            ``file_paths``. ``track_id`` is monitoring only.
+        """
+
+        if not (len(texts) == len(document_ids) == len(source_tokens) and texts):
+            raise LightRagAdapterError("ainsert_source_arity")
+        from lightrag.exceptions import PipelineNotInitializedError
+
+        try:
+            returned = await self.rag.ainsert(
+                list(texts),
+                ids=list(document_ids),
+                file_paths=list(source_tokens),
+                track_id=track_id,
+            )
+        except PipelineNotInitializedError as exc:
+            raise LightRagAdapterError("pipeline_status_uninitialized") from exc
+        status_view = await self.vendor_document_status(document_ids[0])
+        status_label = status_view.status if status_view is not None else "pending"
+        return GraphIndexEnqueueResult(
+            document_id=document_ids[0],
+            track_id=str(returned or track_id),
+            status=status_label,
+        )
+
+    def bind_workspace(self, workspace: str) -> None:
+        """Point this attached engine at one LightRAG constructor workspace.
+
+        Query and index must name the pointer workspace. Candidate rebuilds
+        bind ``{live}__rebuild`` until the atomic switch, then bind the
+        new live key. ``POSTGRES_WORKSPACE`` stays unset.
+
+        Args:
+            workspace: Application/LightRAG workspace key.
+
+        Raises:
+            LightRagAdapterError: If ``workspace`` is blank.
+
+        Side Effects:
+            Updates ``self.workspace`` and vendor storage ``workspace``
+            attributes when present. Does not reopen the process pool.
+            Callers that then ``ainsert`` must ``await
+            ensure_pipeline_status()`` because LightRAG 1.5.6 keeps
+            ``pipeline_status`` per workspace in process memory.
+        """
+
+        stripped = workspace.strip()
+        if not stripped:
+            raise LightRagAdapterError("workspace_empty")
+        self.workspace = stripped
+        rag = self.rag
+        rag.workspace = stripped
+        for attr in (
+            "full_docs",
+            "text_chunks",
+            "llm_response_cache",
+            "doc_status",
+            "entities_vdb",
+            "relationships_vdb",
+            "chunks_vdb",
+            "chunk_entity_relation_graph",
+            "full_entities",
+            "full_relations",
+            "entity_chunks",
+            "relation_chunks",
+        ):
+            storage = getattr(rag, attr, None)
+            if storage is not None and hasattr(storage, "workspace"):
+                storage.workspace = stripped
+
+    async def ensure_pipeline_status(self) -> None:
+        """Initialize in-memory ``pipeline_status`` for the bound workspace.
+
+        ``initialize_storages`` creates that namespace only for the
+        constructor workspace. Isolated rebuilds bind ``{live}__rebuild``
+        and must initialize this shared dict before ``ainsert``. This is
+        not vendor DDL and does not CREATE or ALTER tables.
+
+        Raises:
+            LightRagAdapterError: If the bound workspace is blank.
+
+        Side Effects:
+            Calls LightRAG ``initialize_pipeline_status`` for
+            ``self.workspace``. Idempotent when the namespace already has
+            ``busy``.
+        """
+
+        stripped = self.workspace.strip()
+        if not stripped:
+            raise LightRagAdapterError("workspace_empty")
+        from lightrag.kg.shared_storage import initialize_pipeline_status
+
+        await initialize_pipeline_status(workspace=stripped)
+
     async def vendor_document_status(
         self,
         document_id: str,
@@ -1272,6 +1391,38 @@ class LightRagRuntimeAdapter:
             LIMIT $3
             """,
             [workspace, document_id, limit],
+        )
+
+    async def list_vendor_doc_chunks_for_ids(
+        self,
+        *,
+        workspace: str,
+        document_ids: tuple[str, ...],
+        limit: int,
+    ) -> list[dict[str, object]]:
+        """Return vendor document chunks for an exact source-ID set.
+
+        Args:
+            workspace: Constructor workspace.
+            document_ids: LightRAG ``full_doc_id`` values, including
+                ``{version_id}:{chunk_id}`` passage sources.
+            limit: Inclusive cap plus one so callers can detect overflow.
+
+        Returns:
+            Chunk rows with ``id``, ``content``, ``full_doc_id``, ``file_path``.
+        """
+
+        if not document_ids:
+            return []
+        return await self._vendor_query(
+            """
+            SELECT id, workspace, full_doc_id, content, file_path, chunk_order_index
+            FROM lightrag_doc_chunks
+            WHERE workspace = $1 AND full_doc_id = ANY($2::text[])
+            ORDER BY full_doc_id, chunk_order_index
+            LIMIT $3
+            """,
+            [workspace, list(document_ids), limit],
         )
 
     async def list_vendor_entity_joins(

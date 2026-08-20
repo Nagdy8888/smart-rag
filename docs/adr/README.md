@@ -2,7 +2,7 @@
 title: ADR index and backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-20
 audience: engineering
 ---
 
@@ -28,6 +28,8 @@ audience: engineering
 | Demo local ingest / AWS ask later | accepted | 10 demo | [ADR-demo-local-ingest-aws-ask.md](./ADR-demo-local-ingest-aws-ask.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
+| Canonical-passage LightRAG sources | accepted | 5 | [ADR-canonical-passage-lightrag-sources.md](./ADR-canonical-passage-lightrag-sources.md) |
+| Async LightRAG embeddings / batched isolated sources | accepted | 5 | [ADR-lightrag-async-embed-batched-sources.md](./ADR-lightrag-async-embed-batched-sources.md) |
 | LightRAG runtime attach without DDL | accepted | 5 | [ADR-lightrag-runtime-attach-without-ddl.md](./ADR-lightrag-runtime-attach-without-ddl.md) |
 | Graph eligibility / ACL isolation | documented (canonical) | 2/5 | [AUTHORIZATION_MODEL.md](../security/AUTHORIZATION_MODEL.md) · [WORKSPACE_LIFECYCLE.md](../graph/WORKSPACE_LIFECYCLE.md) — restricted never `graph_eligible`; resolver rechecks ACL/current/deletion. No separate ADR unless the CHECK or ACL contract changes. |
 | PGTableGraphStorage | accepted with identity envelope | 5 | [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) · [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |

@@ -15,7 +15,12 @@ from smart_rag_core.jobs.graph_mapping_service import (
 )
 from smart_rag_core.jobs.graph_writer import GraphWriterGuard
 from smart_rag_core.release.errors import RestrictedGraphIndexError
-from smart_rag_core.retrieval.graph import bind_graph_source_text
+from smart_rag_core.retrieval.graph import (
+    bind_graph_source_text,
+    canonical_passage_source_id,
+    opaque_passage_source_basename,
+    parse_canonical_passage_source_id,
+)
 from smart_rag_core.retrieval.graph_mapping import expected_vendor_basename
 from smart_rag_core.retrieval.lightrag_qualification import DocumentStatusView
 
@@ -63,28 +68,36 @@ class ProcessedVendorCatalog:
         self,
         *,
         version_id: UUID,
+        chunk_id: UUID,
         chunk_text: str,
         vendor_chunk_id: str = "phase09-vendor-chunk",
     ) -> None:
         """Bind one processed vendor document.
 
         Args:
-            version_id: Canonical version used as the vendor document id.
+            version_id: Canonical version.
+            chunk_id: Canonical chunk used as the passage source ID.
             chunk_text: Canonical raw text already persisted.
             vendor_chunk_id: Stable vendor chunk identifier.
         """
 
+        source_id = canonical_passage_source_id(
+            version_id=version_id,
+            chunk_id=chunk_id,
+        )
         enveloped = bind_graph_source_text(
-            document_version_id=str(version_id),
+            document_version_id=source_id,
             normalized_text=chunk_text,
         )
         self._version_id = version_id
+        self._chunk_id = chunk_id
         self._chunk_text = chunk_text
+        self._source_id = source_id
         self._vendor_chunk_id = vendor_chunk_id
         self._chunks: list[dict[str, object]] = [
             {
                 "id": vendor_chunk_id,
-                "full_doc_id": str(version_id),
+                "full_doc_id": source_id,
                 "content": enveloped,
             }
         ]
@@ -118,19 +131,27 @@ class ProcessedVendorCatalog:
         ]
 
     async def vendor_document_status(self, document_id: str) -> DocumentStatusView:
-        """Return processed vendor status for the canonical version id.
+        """Return processed vendor status for one passage or version ID.
 
         Args:
-            document_id: Vendor document id (canonical version).
+            document_id: Vendor document id.
 
         Returns:
-            Processed status view.
+            Processed status view with the matching opaque basename.
         """
 
+        if ":" in document_id:
+            version_id, chunk_id = parse_canonical_passage_source_id(document_id)
+            file_path = opaque_passage_source_basename(
+                version_id=version_id,
+                chunk_id=chunk_id,
+            )
+        else:
+            file_path = expected_vendor_basename(UUID(document_id))
         return DocumentStatusView(
             document_id=document_id,
             status="processed",
-            file_path=expected_vendor_basename(UUID(document_id)),
+            file_path=file_path,
         )
 
     async def list_vendor_doc_chunks(
@@ -139,6 +160,21 @@ class ProcessedVendorCatalog:
         """Return configured vendor chunks."""
 
         return [dict(row) for row in self._chunks]
+
+    async def list_vendor_doc_chunks_for_ids(
+        self,
+        *,
+        document_ids: tuple[str, ...],
+        **_kwargs: object,
+    ) -> list[dict[str, object]]:
+        """Return vendor chunks whose ``full_doc_id`` is in ``document_ids``."""
+
+        wanted = set(document_ids)
+        return [
+            dict(row)
+            for row in self._chunks
+            if str(row.get("full_doc_id") or "") in wanted
+        ]
 
     async def list_vendor_entity_joins(
         self, **_kwargs: object
@@ -271,6 +307,40 @@ def point_current_version(
         )
 
 
+def load_first_chunk(
+    connection: psycopg.Connection, version_id: UUID
+) -> tuple[UUID, str]:
+    """Return the first canonical chunk id and raw text for mapping.
+
+    Args:
+        connection: Postgres connection.
+        version_id: Canonical version.
+
+    Returns:
+        Chunk UUID and raw text.
+
+    Raises:
+        RuntimeError: If the version has no chunks.
+    """
+
+    connection.execute("SET ROLE postgres")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, raw_text
+            FROM app.document_chunks
+            WHERE version_id = %s
+            ORDER BY chunk_index ASC
+            LIMIT 1
+            """,
+            (version_id,),
+        )
+        row = cursor.fetchone()
+    if row is None or row[1] is None:
+        raise RuntimeError(f"no chunks for version {version_id}")
+    return UUID(str(row[0])), str(row[1])
+
+
 def load_first_chunk_text(connection: psycopg.Connection, version_id: UUID) -> str:
     """Return the first canonical chunk raw text for mapping.
 
@@ -285,22 +355,8 @@ def load_first_chunk_text(connection: psycopg.Connection, version_id: UUID) -> s
         RuntimeError: If the version has no chunks.
     """
 
-    connection.execute("SET ROLE postgres")
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT raw_text
-            FROM app.document_chunks
-            WHERE version_id = %s
-            ORDER BY chunk_index ASC
-            LIMIT 1
-            """,
-            (version_id,),
-        )
-        row = cursor.fetchone()
-    if row is None or row[0] is None:
-        raise RuntimeError(f"no chunks for version {version_id}")
-    return str(row[0])
+    _chunk_id, text = load_first_chunk(connection, version_id)
+    return text
 
 
 def drive_graph_ready(
@@ -332,7 +388,7 @@ def drive_graph_ready(
         visibility=visibility,
         graph_eligible=graph_eligible,
     )
-    chunk_text = load_first_chunk_text(connection, version_id)
+    chunk_id, chunk_text = load_first_chunk(connection, version_id)
     _ = content_hash(chunk_text)
     point_current_version(
         connection,
@@ -343,6 +399,7 @@ def drive_graph_ready(
     connection.execute("SET ROLE app_worker")
     vendor: GraphVendorReader = ProcessedVendorCatalog(
         version_id=version_id,
+        chunk_id=chunk_id,
         chunk_text=chunk_text,
     )
     service = GraphMappingService(

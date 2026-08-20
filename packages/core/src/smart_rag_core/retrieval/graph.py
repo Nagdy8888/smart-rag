@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from enum import StrEnum
 from typing import Literal, Protocol
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -43,6 +44,15 @@ LIGHTRAG_LLM_MAX_INPUT_CHARS = 65_536
 LIGHTRAG_LLM_MAX_OUTPUT_CHARS = 32_768
 LIGHTRAG_LLM_TIMEOUT_SECONDS = 90.0
 LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS = 120
+# LightRAG 1.5.6 watchdog: func=timeout, worker=timeout*2, health=timeout*2+15.
+# Keep this at the vendor default. Do not raise it to hide blocked embedding calls.
+LIGHTRAG_EMBEDDING_VENDOR_TIMEOUT_SECONDS = 30
+# OpenAI HTTP timeout for LightRAG embeddings. Must stay below the watchdog
+# func timeout so the SDK fails closed before LightRAG force-kills the batch.
+# The OpenAI Python SDK default is 600 seconds when timeout is omitted.
+LIGHTRAG_EMBEDDING_PROVIDER_TIMEOUT_SECONDS = 20.0
+# Hybrid ingestion embedding HTTP timeout. Independent of the LightRAG watchdog.
+OPENAI_EMBEDDING_TIMEOUT_SECONDS = 120.0
 # Standard API list prices from https://openai.com/api/pricing/, verified
 # 2026-08-19. These produce an estimate; the provider invoice remains canonical.
 LIGHTRAG_LLM_INPUT_USD_PER_MILLION = "0.20"
@@ -299,6 +309,29 @@ class GraphIndexer(Protocol):
 
         Returns:
             Monitoring metadata. ``track_id`` is never idempotency.
+        """
+
+        ...
+
+    async def enqueue_insert_sources(
+        self,
+        *,
+        texts: tuple[str, ...],
+        document_ids: tuple[str, ...],
+        source_tokens: tuple[str, ...],
+        track_id: str | None = None,
+    ) -> GraphIndexEnqueueResult:
+        """Enqueue one bounded list of canonical-passage sources.
+
+        Args:
+            texts: Envelope-bound passage texts, already 1:1 with IDs.
+            document_ids: Deterministic ``{version_id}:{chunk_id}`` source IDs.
+            source_tokens: Unique opaque basenames, 1:1 with ``document_ids``.
+            track_id: Optional monitoring token. Never idempotency.
+
+        Returns:
+            Monitoring metadata for the version job. ``document_id`` is the
+            canonical version ID, not a passage source ID.
         """
 
         ...
@@ -574,11 +607,11 @@ def parse_source_id_list(raw: str | None, *, limit: int) -> tuple[str, ...]:
     return unique
 
 
-_DOCUMENT_VERSION_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+_DOCUMENT_VERSION_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _ENVELOPE_RE = re.compile(
     r"^<<smart-rag-graph-source:"
     + re.escape(GRAPH_SOURCE_ENVELOPE_VERSION)
-    + r":([A-Za-z0-9._-]{1,128})>>\n",
+    + r":([A-Za-z0-9._:-]{1,128})>>\n",
 )
 
 
@@ -596,8 +629,9 @@ def bind_graph_source_text(*, document_version_id: str, normalized_text: str) ->
     a random salt and does not alter canonical Hybrid chunks.
 
     Args:
-        document_version_id: Canonical document version ID used as vendor
-            ``ids`` and as the envelope token.
+        document_version_id: Canonical version ID or passage source ID
+            (``{version_id}:{chunk_id}``) used as vendor ``ids`` and as the
+            envelope token.
         normalized_text: Version text that would otherwise be inserted raw.
 
     Returns:
@@ -653,6 +687,90 @@ def opaque_graph_source_basename(document_version_id: str) -> str:
     if not _DOCUMENT_VERSION_ID_RE.fullmatch(document_version_id):
         raise GraphSourceEnvelopeError("graph_source_basename_invalid_document_id")
     return f"g-{document_version_id}.txt"
+
+
+def canonical_passage_source_id(*, version_id: UUID, chunk_id: UUID) -> str:
+    """Return the deterministic LightRAG source ID for one canonical passage.
+
+    Args:
+        version_id: Canonical document version ID.
+        chunk_id: Canonical chunk UUID.
+
+    Returns:
+        ``{version_id}:{chunk_id}``. Safe for the identity envelope.
+
+    Raises:
+        GraphSourceEnvelopeError: If the composed token is not envelope-safe.
+    """
+
+    token = f"{version_id}:{chunk_id}"
+    if not _DOCUMENT_VERSION_ID_RE.fullmatch(token):
+        raise GraphSourceEnvelopeError("graph_source_passage_id_invalid")
+    return token
+
+
+def parse_canonical_passage_source_id(source_id: str) -> tuple[UUID, UUID]:
+    """Parse a deterministic passage source ID into version and chunk UUIDs.
+
+    Args:
+        source_id: ``{version_id}:{chunk_id}`` token.
+
+    Returns:
+        Canonical version ID and chunk ID.
+
+    Raises:
+        GraphSourceEnvelopeError: If the token is not two UUIDs.
+    """
+
+    version_raw, separator, chunk_raw = source_id.partition(":")
+    if separator != ":" or not version_raw or not chunk_raw:
+        raise GraphSourceEnvelopeError("graph_source_passage_id_invalid")
+    try:
+        return UUID(version_raw), UUID(chunk_raw)
+    except ValueError as exc:
+        raise GraphSourceEnvelopeError("graph_source_passage_id_invalid") from exc
+
+
+def opaque_passage_source_basename(*, version_id: UUID, chunk_id: UUID) -> str:
+    """Return the opaque basename for one canonical-passage LightRAG source.
+
+    Args:
+        version_id: Canonical document version ID.
+        chunk_id: Canonical chunk UUID.
+
+    Returns:
+        Basename such as ``g-{version_id}-{chunk_id}.txt``.
+
+    Raises:
+        GraphSourceEnvelopeError: If the composed token is not envelope-safe.
+    """
+
+    token = f"{version_id}-{chunk_id}"
+    if not _DOCUMENT_VERSION_ID_RE.fullmatch(token):
+        raise GraphSourceEnvelopeError("graph_source_basename_invalid_document_id")
+    return f"g-{token}.txt"
+
+
+def version_vendor_source_ids(
+    version_id: UUID, chunk_ids: tuple[UUID, ...]
+) -> tuple[str, ...]:
+    """Return legacy whole-version plus per-passage vendor IDs.
+
+    Args:
+        version_id: Canonical version used as the historical vendor ID.
+        chunk_ids: Canonical chunk IDs for the version, in chunk order.
+
+    Returns:
+        Unique IDs to insert or delete for this version. The legacy
+        ``str(version_id)`` entry is first so old whole-document sources are
+        always included in cleanup.
+    """
+
+    passage_ids = tuple(
+        canonical_passage_source_id(version_id=version_id, chunk_id=chunk_id)
+        for chunk_id in chunk_ids
+    )
+    return tuple(dict.fromkeys((str(version_id), *passage_ids)))
 
 
 def graph_chunker_config_snapshot() -> dict[str, object]:

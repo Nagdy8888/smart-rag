@@ -327,28 +327,33 @@ async def verify_vendor_removed(
     *,
     version_id: UUID,
     workspace_key: str,
+    document_ids: tuple[str, ...] | None = None,
 ) -> CleanupVerifyResult:
     """Verify vendor full-doc/chunk/status removal.
 
     Args:
         adapter: Runtime adapter or test double.
-        version_id: Vendor document id (canonical version).
+        version_id: Canonical version. Used when ``document_ids`` is omitted.
         workspace_key: LightRAG constructor workspace.
+        document_ids: Explicit vendor IDs including legacy whole-version and
+            per-passage sources. Defaults to ``(str(version_id),)``.
 
     Returns:
         Residue diagnostic. Missing status is clean.
     """
 
-    status = await adapter.vendor_document_status(str(version_id))
-    if status is not None:
-        return CleanupVerifyResult(clean=False, residue="vendor_status_residue")
-    chunks = await adapter.list_vendor_doc_chunks(
-        workspace=workspace_key,
-        document_id=str(version_id),
-        limit=2,
-    )
-    if chunks:
-        return CleanupVerifyResult(clean=False, residue="vendor_chunk_residue")
+    vendor_ids = document_ids if document_ids is not None else (str(version_id),)
+    for vendor_id in vendor_ids:
+        status = await adapter.vendor_document_status(vendor_id)
+        if status is not None:
+            return CleanupVerifyResult(clean=False, residue="vendor_status_residue")
+        chunks = await adapter.list_vendor_doc_chunks(
+            workspace=workspace_key,
+            document_id=vendor_id,
+            limit=2,
+        )
+        if chunks:
+            return CleanupVerifyResult(clean=False, residue="vendor_chunk_residue")
     return CleanupVerifyResult(clean=True, residue="")
 
 

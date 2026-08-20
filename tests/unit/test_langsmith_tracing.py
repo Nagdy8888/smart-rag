@@ -260,6 +260,22 @@ def test_mock_embed_is_traced_without_input_text() -> None:
     assert CANARY_PASSAGE not in serialized
 
 
+def test_redact_embedding_request_exports_timeout_not_text() -> None:
+    """Embedding traces may export the HTTP bound, never input text."""
+
+    request = EmbeddingRequest(
+        operation_key="trace-timeout",
+        inputs=(CANARY_PASSAGE,),
+        model="text-embedding-3-large",
+        dimensions=8,
+        timeout_seconds=20.0,
+    )
+    payload = redact_gateway_inputs({"request": request})
+    assert payload["timeout_seconds"] == 20.0
+    assert payload["input_count"] == 1
+    assert not payload_contains_forbidden_text(payload, CANARY_PASSAGE)
+
+
 def _call_name(node: ast.AST) -> str | None:
     """Return a dotted call name when the callee is a Name or Attribute.
 
@@ -363,6 +379,61 @@ def test_redact_gateway_outputs_accepts_embedding_response() -> None:
     assert payload["vector_count"] == 1
     assert payload["vector_dimensions"] == 2
     assert payload["request_id"] == "req-1"
+
+
+def test_usage_metadata_is_attached_without_model_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Recognized LangSmith usage fields carry counts and cost only."""
+
+    from decimal import Decimal
+
+    from smart_rag_core.observability import langsmith_tracing as tracing
+
+    class _Run:
+        """Minimal current-run stub that records usage metadata."""
+
+        def __init__(self) -> None:
+            """Initialize mutable metadata and an empty usage payload."""
+
+            self.metadata: dict[str, object] = {}
+            self.usage_metadata: dict[str, object] = {}
+
+        def set(self, *, usage_metadata: dict[str, object]) -> None:
+            """Record the usage payload passed by the tracing helper.
+
+            Args:
+                usage_metadata: LangSmith-recognized counts and costs.
+            """
+
+            self.usage_metadata = usage_metadata
+
+    run = _Run()
+    monkeypatch.setattr(tracing, "tracing_is_enabled", lambda: True)
+    monkeypatch.setattr(tracing, "get_current_run_tree", lambda: run)
+    tracing.record_current_usage_metadata(
+        provider="openai",
+        model="text-embedding-3-large",
+        input_tokens=123,
+        output_tokens=0,
+        total_cost_usd=Decimal("0.00001599"),
+    )
+    assert run.metadata == {
+        "ls_provider": "openai",
+        "ls_model_name": "text-embedding-3-large",
+    }
+    assert run.usage_metadata == {
+        "input_tokens": 123,
+        "output_tokens": 0,
+        "total_tokens": 123,
+        "total_cost": pytest.approx(0.00001599),
+    }
+    assert not payload_contains_forbidden_text(
+        (run.metadata, run.usage_metadata),
+        CANARY_TOKEN,
+        CANARY_EMAIL,
+        CANARY_PASSAGE,
+    )
 
 
 def test_lightrag_trace_exports_usage_cost_without_extract_text() -> None:

@@ -2,17 +2,17 @@
 title: LangSmith tracing for model and embedding calls
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-20
 audience: engineering, operators, security
 ---
 
 # LangSmith tracing for model and embedding calls
 
 Every application OpenAI call goes through `ModelGateway`, `EmbeddingGateway`,
-or `traced_embeddings_create`. Those boundaries emit a LangSmith span when
-`LANGSMITH_TRACING=true`. Tracing is **off by default**, including mock-model
-mode. This is gateway-level tracing, not the Phase 6 production query-graph
-feedback loop.
+`traced_embeddings_create`, or `traced_embeddings_create_async`. Those
+boundaries emit a LangSmith span when `LANGSMITH_TRACING=true`. Tracing is
+**off by default**, including mock-model mode. This is gateway-level tracing,
+not the Phase 6 production query-graph feedback loop.
 
 Related: [CONFIGURATION.md](./CONFIGURATION.md) ·
 [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md) ·
@@ -34,7 +34,12 @@ Exported fields are limited to:
 - LightRAG extract `input_tokens`, `cached_input_tokens`, `output_tokens`,
   `total_tokens`, and `estimated_cost_usd`. The estimate uses the pinned
   standard API list price and is not a replacement for the OpenAI invoice.
+- Live `openai.embeddings` spans attach LangSmith-recognized
+  `usage_metadata` with input/total tokens and the pinned estimated USD cost.
+  Usage metadata remains visible and aggregatable while raw span I/O stays
+  hidden.
 - Correlation ids (`request_id`, `run_id`, `job_id`) when bound
+- Embedding `timeout_seconds` (numeric bound only; never input text)
 - Ingest parent names (`ingestion.scan`, `ingestion.parse`,
   `ingestion.index`, `ingestion.graph`) with hashed document/version ids
 
@@ -95,7 +100,13 @@ sequenceDiagram
    **worker** (not the EC2 API). After a plot-slice upload, open project
    `LANGSMITH_PROJECT` and filter `ingestion.index` / `embedding.embed`.
    The 200-line graph file must also show `ingestion.graph` and
-   `model.lightrag_llm`. Procedure:
+   `model.lightrag_llm`. After a canonical-passage Graph-200 rebuild, run
+   `uv run python scripts/ops/report_demo_langsmith_usage.py` (or use the
+   totals printed by `rebuild_demo_graph_canonical_passages.py`). The
+   2026-08-20 bounded attempt recorded one `ingestion.graph` trace
+   (179,216 tokens, estimated USD 0.04261959) with 40 successful
+   `model.lightrag_llm` spans; Graph Ready did not flip
+   (`vendor_status_failed`). Procedure:
    [demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md).
 
 ## Failure modes

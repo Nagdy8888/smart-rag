@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from smart_rag_core.gateways.embedding import (
     EmbeddingGateway,
+    EmbeddingProviderError,
     EmbeddingRequest,
     EmbeddingResponse,
     MockEmbeddingAdapter,
@@ -716,15 +717,28 @@ def test_openai_adapter_maps_data_by_index() -> None:
         assert kwargs["input"] == ["First text", "Second text"]
         return _Response()
 
+    async def _acreate(_client: object, **kwargs: object) -> _Response:
+        """Async wrapper for the reversed-index stub.
+
+        Args:
+            _client: Unused traced client.
+            **kwargs: embeddings.create keyword arguments.
+
+        Returns:
+            Stub OpenAI embeddings response.
+        """
+
+        return _create(_client, **kwargs)
+
     adapter = OpenAIEmbeddingAdapter(api_key="sk-test")
     with (
         patch(
-            "smart_rag_core.gateways.embedding.traced_openai_client",
+            "smart_rag_core.gateways.embedding.traced_async_openai_client",
             return_value=object(),
         ),
         patch(
-            "smart_rag_core.gateways.embedding.traced_embeddings_create",
-            _create,
+            "smart_rag_core.gateways.embedding.traced_embeddings_create_async",
+            _acreate,
         ),
     ):
         response = asyncio.run(
@@ -786,14 +800,27 @@ def test_openai_adapter_rejects_wrong_dimension() -> None:
 
         return _Response()
 
+    async def _acreate(_client: object, **kwargs: object) -> _Response:
+        """Async wrapper for the mismatched payload.
+
+        Args:
+            _client: Unused traced client.
+            **kwargs: Unused embeddings.create kwargs.
+
+        Returns:
+            Stub OpenAI embeddings response.
+        """
+
+        return _create(_client, **kwargs)
+
     with (
         patch(
-            "smart_rag_core.gateways.embedding.traced_openai_client",
+            "smart_rag_core.gateways.embedding.traced_async_openai_client",
             return_value=object(),
         ),
         patch(
-            "smart_rag_core.gateways.embedding.traced_embeddings_create",
-            _create,
+            "smart_rag_core.gateways.embedding.traced_embeddings_create_async",
+            _acreate,
         ),
     ):
         with pytest.raises(ValueError, match="embedding_dimension_mismatch"):
@@ -849,3 +876,117 @@ def test_embed_inputs_in_batches_emits_count_only_progress() -> None:
     assert seen[1][1]["batch_index"] == 2
     assert seen[1][1]["chunks"] == 1
     assert canary not in str(seen)
+
+
+def test_openai_adapter_maps_timeout_to_embedding_timeout() -> None:
+    """Provider HTTP timeout is a typed embedding failure, not a silent hang."""
+
+    import httpx
+    from openai import APITimeoutError
+
+    async def _timeout(_client: object, **_kwargs: object) -> object:
+        """Raise the OpenAI timeout the adapter must map.
+
+        Args:
+            _client: Unused traced client.
+            **_kwargs: Unused embeddings.create kwargs.
+
+        Returns:
+            Never. Always raises.
+
+        Raises:
+            APITimeoutError: Simulated provider timeout.
+        """
+
+        request = httpx.Request("POST", "https://api.openai.com/v1/embeddings")
+        raise APITimeoutError(request=request)
+
+    adapter = OpenAIEmbeddingAdapter(api_key="sk-test")
+    with (
+        patch(
+            "smart_rag_core.gateways.embedding.traced_async_openai_client",
+            return_value=object(),
+        ),
+        patch(
+            "smart_rag_core.gateways.embedding.traced_embeddings_create_async",
+            _timeout,
+        ),
+    ):
+        with pytest.raises(EmbeddingProviderError, match="embedding_timeout"):
+            asyncio.run(
+                adapter.embed(
+                    EmbeddingRequest(
+                        operation_key="index",
+                        inputs=("timeout-canary",),
+                        model="text-embedding-3-large",
+                        dimensions=4,
+                        timeout_seconds=20.0,
+                    )
+                )
+            )
+
+
+def test_openai_adapter_maps_http_429_to_rate_limited() -> None:
+    """HTTP 429 is typed ``embedding_rate_limited`` with SDK retries at zero."""
+
+    import httpx
+    from openai import APIStatusError
+
+    async def _limited(_client: object, **_kwargs: object) -> object:
+        """Raise an HTTP 429 the adapter must map.
+
+        Args:
+            _client: Unused traced client.
+            **_kwargs: Unused embeddings.create kwargs.
+
+        Returns:
+            Never. Always raises.
+
+        Raises:
+            APIStatusError: Simulated rate limit.
+        """
+
+        request = httpx.Request("POST", "https://api.openai.com/v1/embeddings")
+        response = httpx.Response(429, request=request)
+        raise APIStatusError("rate limited", response=response, body={"error": "429"})
+
+    captured: dict[str, object] = {}
+
+    def _client(**kwargs: object) -> object:
+        """Capture AsyncOpenAI factory kwargs.
+
+        Args:
+            **kwargs: Client constructor kwargs.
+
+        Returns:
+            Unused client sentinel.
+        """
+
+        captured.update(kwargs)
+        return object()
+
+    adapter = OpenAIEmbeddingAdapter(api_key="sk-test")
+    with (
+        patch(
+            "smart_rag_core.gateways.embedding.traced_async_openai_client",
+            _client,
+        ),
+        patch(
+            "smart_rag_core.gateways.embedding.traced_embeddings_create_async",
+            _limited,
+        ),
+    ):
+        with pytest.raises(EmbeddingProviderError, match="embedding_rate_limited"):
+            asyncio.run(
+                adapter.embed(
+                    EmbeddingRequest(
+                        operation_key="index",
+                        inputs=("rate-canary",),
+                        model="text-embedding-3-large",
+                        dimensions=4,
+                        timeout_seconds=20.0,
+                    )
+                )
+            )
+    assert captured["timeout"] == 20.0
+    assert captured["max_retries"] == 0

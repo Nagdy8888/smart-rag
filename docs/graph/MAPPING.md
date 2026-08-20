@@ -2,7 +2,7 @@
 title: Canonical graph evidence mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-20
 audience: engineering, reviewers
 phase_packet: Phase 5 Packet 4
 ---
@@ -16,6 +16,8 @@ marks a document version Graph Ready in one application transaction. Vendor
 Related: [GRAPH_MAPPING_CONTRACT.md](./GRAPH_MAPPING_CONTRACT.md) ·
 [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md) ·
+[ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md) ·
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md) ·
 [RETRIEVAL.md](./RETRIEVAL.md) ·
 [ENTITY_RULES.md](./ENTITY_RULES.md) ·
 [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md) ·
@@ -37,69 +39,64 @@ prose, or a native predicate id.
 | Statement | pipeline + subject key + object key + normalized **keywords** label |
 | Path-edge | ordered statement IDs + direction + version |
 
-Envelope `strip_graph_source_envelope` runs **before** hash, span, or overlap
+Envelope `strip_graph_source_envelope` runs **before** hash matching
 against `app.document_chunks.content_hash` (ingest `content_hash()` /
-`normalize_for_dedup`). Duplicate raw text stays independently attributable.
+`normalize_for_dedup`). Duplicate raw text stays independently attributable
+because each passage is envelope-bound to `{version_id}:{chunk_id}`.
 
 ## Mapping flow
 
 ```mermaid
 flowchart TD
-  processed[VendorProcessed] --> enumerate[EnumerateVendorChunksAndJoins]
-  enumerate --> parseIds[ParseSourceIdLists]
-  parseIds --> hashMatch[HashThenSpanThenOverlap]
-  hashMatch --> unresolved{UnresolvedChunks}
-  unresolved -->|yes| hybrid[OneScopedHybridRetrieve]
-  hybrid --> rerank[OneSupportRerankBatch]
-  unresolved -->|no| deriveIds[DeriveEntityStatementPathIds]
-  rerank --> deriveIds
-  deriveIds --> gates[CoverageAndLanguageGates]
-  gates -->|pass| txn[OneAppTxnUpsertMaps]
+  processed[AllPassageSourcesProcessed] --> enumerate[EnumerateExactSourceIds]
+  enumerate --> bijection[OneVendorChunkPerPassageHash]
+  bijection --> drift{HashOrCountDrift}
+  drift -->|yes| mismatch[TerminalSnapshotMismatch]
+  mismatch --> pending[KeepGraphPendingPlusRepair]
+  drift -->|no| deriveIds[DeriveEntityStatementPathIds]
+  deriveIds --> multi[PersistAllReferencedPassages]
+  multi --> gates[CoverageAndLanguageGates]
+  gates -->|pass| requery[RequeryPersistedMaps]
+  requery -->|agree| txn[OneAppTxnUpsertMaps]
   txn --> ready[VersionGraphReady]
   ready --> pointer{PointerNamesThisWorkspace}
   pointer -->|yes| active[WorkspaceActive]
   pointer -->|null or other| stay[WorkspaceUpdating]
-  gates -->|fail| pending[KeepGraphPendingPlusRepair]
+  gates -->|fail| pending
+  requery -->|disagree| pending
 ```
 
-One document causes at most **one** Hybrid retrieve scoped to that
-`version_id` and **one** OpenAI support rerank batch (pool ≤ 20, returned IDs
-must equal the supplied set). Mapping never calls Hybrid per relation.
+Hybrid retrieve and support rerank remain in the worker for compatibility
+but are **not** invoked on this exact path. Snapshot drift never retries
+mapping through Hybrid.
 
 ## Production Hybrid wiring
 
-The worker loop calls `bind_mapping_support` on the `app_worker` connection
-and passes the callbacks into `GraphIndexService`. `apps/` never constructs
-`HybridRetriever` and never names map tables. Repair still refuses attached
-Hybrid/rerank callbacks.
+The worker still calls `bind_mapping_support` and passes callbacks into
+`GraphIndexService`. Exact bijection mapping does **not** call those
+callbacks. `apps/` never constructs `HybridRetriever` and never names map
+tables. Repair still refuses attached Hybrid/rerank callbacks.
 
 ```mermaid
 sequenceDiagram
   participant Worker as GraphWorkerLoop
   participant Bind as bind_mapping_support
   participant Mapper as GraphMappingService
-  participant Hybrid as HybridRetriever
-  participant Rerank as rerank_pool
   Worker->>Bind: work connection plus WorkerSettings
   Bind-->>Worker: callbacks or None
   Worker->>Mapper: GraphIndexService mapping_support
-  Mapper->>Mapper: hash then span then overlap
-  alt unresolved vendor chunks
-    Mapper->>Hybrid: one version-scoped retrieve
-    Hybrid-->>Mapper: ranked_ids
-    alt ranked_ids at least 2
-      Mapper->>Rerank: one support batch pool 20
-      Rerank-->>Mapper: support scores
-    else empty or single ranked_id
-      Mapper->>Mapper: skip rerank fail closed
-    end
-  end
+  Mapper->>Mapper: exact passage hash bijection
+  Note over Mapper: Hybrid retrieve and rerank unused
 ```
 
 Production mapping Hybrid:
 
 - Loads the document owner's `CallerContext` plus company
-  `authorization_version`. Disabled owners fail closed.
+  `authorization_version` through
+  `app.load_graph_mapping_caller(version_id)`. The security-definer RPC
+  returns only the six required authorization fields to `app_worker`;
+  `app_worker` has no direct `app.profiles` `SELECT`. Disabled owners fail
+  closed.
 - Builds dense/BM25/term channel jobs from **in-memory** version canonicals
   (cap 100). It does **not** pass `supabase_dsn` (that would `SET ROLE
   postgres` during Hybrid temporal loads) and does not require ParadeDB.
@@ -141,8 +138,10 @@ the Phase 3 scope guard) commits one transaction that:
 2. Deletes prior chunk/evidence rows for this version/workspace, then upserts
    `lightrag_source_map`, `lightrag_chunk_map`, and `graph_evidence_map`.
 3. Inserts `graph_mapping_telemetry` and keyed `graph_map_repair_jobs`.
-4. Sets `document_versions.status = graph_ready` only when every gate passes.
-5. Transitions workspace `updating` → `active` only when the singleton pointer
+4. Requeries persisted source/vendor/chunk counts against the frozen manifest.
+5. Sets `document_versions.status = graph_ready` only when every gate passes
+   and the requery agrees.
+6. Transitions workspace `updating` → `active` only when the singleton pointer
    already names this workspace. A null pointer still allows Graph Ready on
    the version and does not invent Packet 7 switch.
 
@@ -158,7 +157,9 @@ contribute to Graph Ready or later query.
 | Symptom | Cause | Route |
 | --- | --- | --- |
 | `vendor_not_processed` | Status is not terminal `processed` | repair; stay pending |
-| `vendor_basename_mismatch` | Basename is not `g-{version_id}.txt` | repair |
+| `vendor_basename_mismatch` | Basename is not `g-{version_id}-{chunk_id}.txt` | repair |
+| `graph_source_snapshot_mismatch` | Passage/vendor hash or 1:1 counts disagree | terminal; no Hybrid retry |
+| `chunk_map_collision` | Canonical chunk already maps to another vendor id | repair |
 | `source_truncated` / `source_ambiguous` | `<SEP>` list at cap, blank, or duplicate | object unavailable |
 | `unsupported_relation` | Empty structured `keywords` | statement unavailable |
 | `ambiguous_entity` | Alias/do-not-merge collision | entity unavailable |
@@ -180,6 +181,6 @@ names.
 
 ```powershell
 uv run python scripts/ci/check_migrations.py
-uv run python -m pytest tests/unit/test_graph_mapping.py tests/unit/test_graph_mapping_hybrid.py tests/contract/test_graph_mapping.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_hybrid_run.py -q
+uv run python -m pytest tests/unit/test_graph_mapping.py tests/unit/test_graph_mapping_hybrid.py tests/unit/test_graph_source_text.py tests/contract/test_graph_mapping.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_hybrid_run.py tests/unit/test_graph_resolver.py -q
 uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json
 ```

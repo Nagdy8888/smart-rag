@@ -8,6 +8,7 @@ from typing import cast
 from uuid import UUID
 
 import psycopg
+from psycopg.errors import UniqueViolation
 
 from smart_rag_core.ingestion.chunking.normalize import content_hash
 from smart_rag_core.jobs.exceptions import GraphMappingError
@@ -166,6 +167,7 @@ def insert_chunk_map(
     workspace_key: str,
     language: str,
     config_generation: str,
+    vendor_doc_id: str,
     vendor_chunk_id: str,
     internal_key: str,
     match: ChunkMatch,
@@ -173,72 +175,94 @@ def insert_chunk_map(
 ) -> None:
     """Insert or replace one canonical chunk map row.
 
+    Replay of the same vendor document and chunk is allowed. A different
+    vendor mapping for the same canonical chunk fails closed.
+
     Args:
         connection: ``app_worker`` connection.
         version_id: Canonical version.
         workspace_key: Application workspace.
         language: Version language.
         config_generation: Mapping config digest.
+        vendor_doc_id: Per-passage LightRAG document ID.
         vendor_chunk_id: Internal LightRAG chunk token.
         internal_key: Workspace-qualified chunk key.
         match: ``ChunkMatch`` with canonical passage and scores.
         retrieval_eligible: False until Packet 7 switch commits.
+
+    Raises:
+        GraphMappingError: If the canonical chunk already maps to a different
+            vendor document or chunk.
     """
 
     match_checked = _require_chunk_match(match)
     canonical = match_checked.canonical
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO app.lightrag_chunk_map (
-              chunk_id, lightrag_doc_id, lightrag_chunk_id, version_id,
-              workspace_key, pipeline_version, config_generation, language,
-              method, score, support, source_hash, target_hash,
-              source_span, target_span, provenance, retrieval_eligible
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO app.lightrag_chunk_map (
+                  chunk_id, lightrag_doc_id, lightrag_chunk_id, version_id,
+                  workspace_key, pipeline_version, config_generation, language,
+                  method, score, support, source_hash, target_hash,
+                  source_span, target_span, provenance, retrieval_eligible
+                )
+                VALUES (
+                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                  %s::jsonb, %s::jsonb, %s::jsonb, %s
+                )
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                  lightrag_doc_id = EXCLUDED.lightrag_doc_id,
+                  lightrag_chunk_id = EXCLUDED.lightrag_chunk_id,
+                  version_id = EXCLUDED.version_id,
+                  workspace_key = EXCLUDED.workspace_key,
+                  pipeline_version = EXCLUDED.pipeline_version,
+                  config_generation = EXCLUDED.config_generation,
+                  language = EXCLUDED.language,
+                  method = EXCLUDED.method,
+                  score = EXCLUDED.score,
+                  support = EXCLUDED.support,
+                  source_hash = EXCLUDED.source_hash,
+                  target_hash = EXCLUDED.target_hash,
+                  source_span = EXCLUDED.source_span,
+                  target_span = EXCLUDED.target_span,
+                  provenance = EXCLUDED.provenance,
+                  retrieval_eligible = EXCLUDED.retrieval_eligible,
+                  mapped_at = timezone('utc', now())
+                WHERE app.lightrag_chunk_map.lightrag_doc_id
+                        IS NOT DISTINCT FROM EXCLUDED.lightrag_doc_id
+                  AND app.lightrag_chunk_map.lightrag_chunk_id
+                        IS NOT DISTINCT FROM EXCLUDED.lightrag_chunk_id
+                """,
+                (
+                    canonical.chunk_id,
+                    vendor_doc_id,
+                    vendor_chunk_id,
+                    version_id,
+                    workspace_key,
+                    GRAPH_PIPELINE_VERSION,
+                    config_generation,
+                    language,
+                    match.method,
+                    match.score,
+                    match.score,
+                    match.source_hash,
+                    match.target_hash,
+                    json.dumps(match.source_span),
+                    json.dumps(match.target_span),
+                    json.dumps(
+                        {
+                            "internal_chunk_key": internal_key,
+                            "lightrag_doc_id": vendor_doc_id,
+                        }
+                    ),
+                    retrieval_eligible,
+                ),
             )
-            VALUES (
-              %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-              %s::jsonb, %s::jsonb, %s::jsonb, %s
-            )
-            ON CONFLICT (chunk_id) DO UPDATE SET
-              lightrag_doc_id = EXCLUDED.lightrag_doc_id,
-              lightrag_chunk_id = EXCLUDED.lightrag_chunk_id,
-              version_id = EXCLUDED.version_id,
-              workspace_key = EXCLUDED.workspace_key,
-              pipeline_version = EXCLUDED.pipeline_version,
-              config_generation = EXCLUDED.config_generation,
-              language = EXCLUDED.language,
-              method = EXCLUDED.method,
-              score = EXCLUDED.score,
-              support = EXCLUDED.support,
-              source_hash = EXCLUDED.source_hash,
-              target_hash = EXCLUDED.target_hash,
-              source_span = EXCLUDED.source_span,
-              target_span = EXCLUDED.target_span,
-              provenance = EXCLUDED.provenance,
-              retrieval_eligible = EXCLUDED.retrieval_eligible,
-              mapped_at = timezone('utc', now())
-            """,
-            (
-                canonical.chunk_id,
-                str(version_id),
-                vendor_chunk_id,
-                version_id,
-                workspace_key,
-                GRAPH_PIPELINE_VERSION,
-                config_generation,
-                language,
-                match.method,
-                match.score,
-                match.score,
-                match.source_hash,
-                match.target_hash,
-                json.dumps(match.source_span),
-                json.dumps(match.target_span),
-                json.dumps({"internal_chunk_key": internal_key}),
-                retrieval_eligible,
-            ),
-        )
+            if cursor.rowcount == 0:
+                raise GraphMappingError("chunk_map_collision")
+    except UniqueViolation as exc:
+        raise GraphMappingError("chunk_map_collision") from exc
 
 
 def insert_evidence_row(
@@ -251,7 +275,7 @@ def insert_evidence_row(
     item: ObjectMapping,
     retrieval_eligible: bool = True,
 ) -> None:
-    """Insert one accepted evidence map row.
+    """Insert accepted evidence map rows for every supporting passage.
 
     Args:
         connection: ``app_worker`` connection.
@@ -265,59 +289,65 @@ def insert_evidence_row(
 
     if not item.available or item.chunk_id is None or item.match is None:
         return
-    match = item.match
+    rows: list[tuple[UUID, ChunkMatch]] = [(item.chunk_id, item.match)]
+    for extra in item.support_matches:
+        extra_id = extra.canonical.chunk_id
+        if extra_id in {chunk_id for chunk_id, _match in rows}:
+            continue
+        rows.append((extra_id, extra))
     with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO app.graph_evidence_map (
-              graph_object_type, graph_object_id, chunk_id, confidence,
-              version_id, workspace_key, pipeline_version, config_generation,
-              language, method, score, support, source_hash, target_hash,
-              source_span, target_span, provenance, retrieval_eligible
+        for chunk_id, match in rows:
+            cursor.execute(
+                """
+                INSERT INTO app.graph_evidence_map (
+                  graph_object_type, graph_object_id, chunk_id, confidence,
+                  version_id, workspace_key, pipeline_version, config_generation,
+                  language, method, score, support, source_hash, target_hash,
+                  source_span, target_span, provenance, retrieval_eligible
+                )
+                VALUES (
+                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                  %s::jsonb, %s::jsonb, %s::jsonb, %s
+                )
+                ON CONFLICT (graph_object_type, graph_object_id, chunk_id) DO UPDATE SET
+                  confidence = EXCLUDED.confidence,
+                  version_id = EXCLUDED.version_id,
+                  workspace_key = EXCLUDED.workspace_key,
+                  pipeline_version = EXCLUDED.pipeline_version,
+                  config_generation = EXCLUDED.config_generation,
+                  language = EXCLUDED.language,
+                  method = EXCLUDED.method,
+                  score = EXCLUDED.score,
+                  support = EXCLUDED.support,
+                  source_hash = EXCLUDED.source_hash,
+                  target_hash = EXCLUDED.target_hash,
+                  source_span = EXCLUDED.source_span,
+                  target_span = EXCLUDED.target_span,
+                  provenance = EXCLUDED.provenance,
+                  retrieval_eligible = EXCLUDED.retrieval_eligible,
+                  mapped_at = timezone('utc', now())
+                """,
+                (
+                    item.object_type,
+                    item.object_id,
+                    chunk_id,
+                    match.score,
+                    version_id,
+                    workspace_key,
+                    GRAPH_PIPELINE_VERSION,
+                    config_generation,
+                    language,
+                    match.method,
+                    match.score,
+                    match.score,
+                    match.source_hash,
+                    match.target_hash,
+                    json.dumps(match.source_span),
+                    json.dumps(match.target_span),
+                    json.dumps(item.provenance),
+                    retrieval_eligible,
+                ),
             )
-            VALUES (
-              %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-              %s::jsonb, %s::jsonb, %s::jsonb, %s
-            )
-            ON CONFLICT (graph_object_type, graph_object_id, chunk_id) DO UPDATE SET
-              confidence = EXCLUDED.confidence,
-              version_id = EXCLUDED.version_id,
-              workspace_key = EXCLUDED.workspace_key,
-              pipeline_version = EXCLUDED.pipeline_version,
-              config_generation = EXCLUDED.config_generation,
-              language = EXCLUDED.language,
-              method = EXCLUDED.method,
-              score = EXCLUDED.score,
-              support = EXCLUDED.support,
-              source_hash = EXCLUDED.source_hash,
-              target_hash = EXCLUDED.target_hash,
-              source_span = EXCLUDED.source_span,
-              target_span = EXCLUDED.target_span,
-              provenance = EXCLUDED.provenance,
-              retrieval_eligible = EXCLUDED.retrieval_eligible,
-              mapped_at = timezone('utc', now())
-            """,
-            (
-                item.object_type,
-                item.object_id,
-                item.chunk_id,
-                match.score,
-                version_id,
-                workspace_key,
-                GRAPH_PIPELINE_VERSION,
-                config_generation,
-                language,
-                match.method,
-                match.score,
-                match.score,
-                match.source_hash,
-                match.target_hash,
-                json.dumps(match.source_span),
-                json.dumps(match.target_span),
-                json.dumps(item.provenance),
-                retrieval_eligible,
-            ),
-        )
 
 
 def insert_telemetry(
@@ -697,3 +727,83 @@ def load_workspace_uuid(
     if row is None:
         raise GraphMappingError("workspace_missing")
     return UUID(str(row[0]))
+
+
+def assert_persisted_readiness(
+    connection: psycopg.Connection,
+    *,
+    version_id: UUID,
+    workspace_key: str,
+    expected_source_ids: tuple[str, ...],
+    expected_vendor_chunk_ids: tuple[str, ...],
+) -> None:
+    """Requery persisted maps and require exact source/chunk bijection.
+
+    Args:
+        connection: ``app_worker`` connection inside the mapping txn.
+        version_id: Canonical version.
+        workspace_key: Application workspace.
+        expected_source_ids: Passage source IDs that must each have one map.
+        expected_vendor_chunk_ids: Vendor chunk tokens that must each have
+            one map.
+
+    Raises:
+        GraphMappingError: If persisted counts disagree with the vendor
+            bijection. Reason is ``graph_source_snapshot_mismatch``.
+    """
+
+    expected_sources = set(expected_source_ids)
+    expected_chunks = set(expected_vendor_chunk_ids)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT
+              count(*),
+              count(DISTINCT lightrag_doc_id),
+              count(DISTINCT lightrag_chunk_id)
+            FROM app.lightrag_chunk_map
+            WHERE version_id = %s
+              AND workspace_key = %s
+            """,
+            (version_id, workspace_key),
+        )
+        counts = cursor.fetchone()
+        cursor.execute(
+            """
+            SELECT lightrag_doc_id, lightrag_chunk_id
+            FROM app.lightrag_chunk_map
+            WHERE version_id = %s
+              AND workspace_key = %s
+            """,
+            (version_id, workspace_key),
+        )
+        mapped_rows = cursor.fetchall()
+        cursor.execute(
+            """
+            SELECT count(*)
+            FROM app.document_chunks
+            WHERE version_id = %s
+              AND deleted_at IS NULL
+            """,
+            (version_id,),
+        )
+        canonical_count = cursor.fetchone()
+    if counts is None or canonical_count is None:
+        raise GraphMappingError("graph_source_snapshot_mismatch")
+    map_count, distinct_docs, distinct_chunks = (
+        int(counts[0]),
+        int(counts[1]),
+        int(counts[2]),
+    )
+    mapped_docs = {str(row[0]) for row in mapped_rows if row[0]}
+    mapped_chunks = {str(row[1]) for row in mapped_rows if row[1]}
+    if (
+        map_count != len(expected_source_ids)
+        or map_count != int(canonical_count[0])
+        or distinct_docs != len(expected_sources)
+        or distinct_chunks != len(expected_chunks)
+        or mapped_docs != expected_sources
+        or mapped_chunks != expected_chunks
+        or expected_sources - mapped_docs
+    ):
+        raise GraphMappingError("graph_source_snapshot_mismatch")

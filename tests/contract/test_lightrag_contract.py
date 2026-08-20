@@ -39,6 +39,7 @@ from smart_rag_core.retrieval.lightrag_qualification import (
     evaluate_identical_content_independence,
     fingerprint_drift,
     insert_synthetic_document,
+    insert_synthetic_sources,
     observed_path_normalization,
     open_qualification_session,
     parse_postgres_url,
@@ -642,6 +643,88 @@ async def _query_callbacks_bounds_delete_status_and_cancel(
             await session.finalize()
         if cancel_session is not None:
             await cancel_session.finalize()
+        await reset_process_client_manager()
+        drop_disposable_schema(connection, schema_name)
+        connection.close()
+
+
+def test_batch_ainsert_ids_delete_independently(
+    postgres_params: LightRagPostgresParams,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """List ainsert IDs stay independent; deleting one must not remove the other."""
+
+    asyncio.run(
+        _batch_ainsert_ids_delete_independently(postgres_params, monkeypatch, tmp_path)
+    )
+
+
+async def _batch_ainsert_ids_delete_independently(
+    params: LightRagPostgresParams,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Async body for list insert, status, and independent delete.
+
+    Args:
+        params: Parsed Postgres fields.
+        monkeypatch: Environment helper.
+        tmp_path: Per-test working directory.
+    """
+
+    first_id = (
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    )
+    second_id = (
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:cccccccc-cccc-cccc-cccc-cccccccccccc"
+    )
+    schema_name = _schema_name()
+    url = resolve_supabase_db_url()
+    connection = psycopg.connect(url)
+    embedding_gateway, model_gateway = _gateways()
+    session = None
+    try:
+        create_disposable_schema(connection, schema_name)
+        _apply_vendor_env(monkeypatch, params, schema_name)
+        await reset_process_client_manager()
+        session = await open_qualification_session(
+            embedding_gateway=embedding_gateway,
+            model_gateway=model_gateway,
+            working_dir=tmp_path / "batch",
+            workspace="ws_batch",
+            schema_name=schema_name,
+            connection=connection,
+        )
+        await insert_synthetic_sources(
+            session,
+            document_ids=(first_id, second_id),
+            source_basenames=("g-first.txt", "g-second.txt"),
+            texts=("first passage body", "second passage body"),
+            track_id="batch-monitor",
+        )
+        first = await document_status(session, first_id)
+        second = await document_status(session, second_id)
+        assert first is not None
+        assert second is not None
+        assert first.status.lower() == "processed"
+        assert second.status.lower() == "processed"
+        assert first.is_duplicate is False
+        assert second.is_duplicate is False
+        deleted = await delete_document(
+            session,
+            document_id=first_id,
+            delete_llm_cache=True,
+        )
+        assert deleted.status in {"success", "not_found"}
+        remaining = await document_status(session, second_id)
+        assert remaining is not None
+        assert remaining.status.lower() == "processed"
+        gone = await document_status(session, first_id)
+        assert gone is None
+    finally:
+        if session is not None:
+            await session.finalize()
         await reset_process_client_manager()
         drop_disposable_schema(connection, schema_name)
         connection.close()

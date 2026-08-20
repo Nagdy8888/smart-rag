@@ -85,6 +85,13 @@ flowchart LR
 7. Freeze constants in `phase10_constants.py` / intended topology stay
    Pro/us-east-1. This ADR is an accepted **demo** deviation, not a freeze
    rewrite.
+8. **Graph mapping:** the observed 200-line extract contains 1,416 entities
+   and 993 relations, above the production 200/200 mapping bounds. The
+   operator approved fixed 1,600/1,200 enumeration limits only for a durable
+   job marked `local_demo_mapping_override=true`, `content_class=synthetic`,
+   and `review_approved=true` while `APP_ENV=local`. Production and staging
+   keep 200/200. Vendor-chunk, Hybrid-call, rerank-call, support, and coverage
+   gates do not change.
 
 ## Consequences
 
@@ -101,6 +108,10 @@ flowchart LR
   `graph_eligible=false` yields `graph_ineligible`.
 - Approximate OpenAI ingest: Hybrid embeddings for 1000 plots plus mini
   extract for 200 Graph plots, about **$0.10–$0.30**, not dollars per plot.
+- The local mapping override permits bounded application-map construction
+  from the already-processed vendor graph. It does not authorize another
+  extraction, a production cap raise, lower support thresholds, or Graph
+  Ready without coverage verification.
 
 ## Alternatives considered
 

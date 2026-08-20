@@ -69,6 +69,8 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260819104000_profiles_update_self_freeze_v1.sql",
     "20260819105000_document_delete_rpc_v1.sql",
     "20260819110000_crawl_enqueue_server_policy_v1.sql",
+    "20260819111000_graph_mapping_caller_rpc_v1.sql",
+    "20260819120000_lightrag_chunk_map_vendor_chunk_uq_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

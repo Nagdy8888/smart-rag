@@ -221,6 +221,50 @@ class LightragIndexJobRepository:
             raise JobLeaseError("complete_rejected")
         return self.get(job_id)
 
+    def merge_payload(
+        self,
+        job_id: UUID,
+        lease_token: str,
+        patch: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Merge JSON into ``payload_ref`` while the job lease is valid.
+
+        Args:
+            job_id: Claimed job identifier.
+            lease_token: Lease token from claim.
+            patch: JSON object merged into ``payload_ref``. Must not claim
+                Graph Ready or mapping-verified completion.
+
+        Returns:
+            Updated job row.
+
+        Raises:
+            JobLeaseError: When the lease cannot be validated or the row is
+                no longer ``processing``.
+
+        Side Effects:
+            Updates ``payload_ref`` in a short transaction. Caller commits.
+        """
+
+        self.validate_active_lease(job_id, lease_token)
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE app.lightrag_index_jobs
+                SET payload_ref = COALESCE(payload_ref, '{}'::jsonb) || %s::jsonb
+                WHERE id = %s
+                  AND lease_token = %s
+                  AND lease_owner = %s
+                  AND status = 'processing'::app.job_status
+                RETURNING id
+                """,
+                (json.dumps(patch), job_id, lease_token, self._lease_owner),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            raise JobLeaseError("payload_checkpoint_rejected")
+        return self.get(job_id)
+
     def validate_active_lease(self, job_id: UUID, lease_token: str) -> dict[str, Any]:
         """Return the job when the lease token is currently valid.
 

@@ -146,6 +146,9 @@ async def retrieve_graph(
             partial_readiness_count=counts.partial_readiness_count,
             acl_blindness_count=counts.acl_blindness_count,
         )
+    bind_workspace = getattr(retriever, "bind_workspace", None)
+    if callable(bind_workspace) and snapshot.workspace_key:
+        bind_workspace(snapshot.workspace_key)
     if _temporal_graph_blocked(profile):
         counts = visibility_counts(
             connection,

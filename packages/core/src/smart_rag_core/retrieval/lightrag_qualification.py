@@ -34,6 +34,7 @@ from smart_rag_core.retrieval.graph import (
     GRAPH_FIELD_SEP,
     LIGHTRAG_CHUNK_OVERLAP_TOKEN_SIZE,
     LIGHTRAG_CHUNK_TOKEN_SIZE,
+    LIGHTRAG_EMBEDDING_VENDOR_TIMEOUT_SECONDS,
     LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
     LIGHTRAG_TIKTOKEN_MODEL,
     QUALIFICATION_POSTGRES_CONNECTION_RETRIES,
@@ -102,14 +103,14 @@ class LightRagRuntime(Protocol):
 
     async def ainsert(
         self,
-        input: str,
+        input: str | list[str],
         split_by_character: str | None = None,
         split_by_character_only: bool = False,
-        ids: list[str] | None = None,
-        file_paths: list[str] | None = None,
+        ids: str | list[str] | None = None,
+        file_paths: str | list[str] | None = None,
         track_id: str | None = None,
     ) -> str:
-        """Enqueue and process one document. ``track_id`` is monitoring only."""
+        """Enqueue and process documents. ``track_id`` is monitoring only."""
         ...
 
     async def aget_docs_by_ids(self, ids: str | list[str]) -> Mapping[str, object]:
@@ -666,7 +667,7 @@ async def open_qualification_session(
         max_parallel_insert=1,
         auto_manage_storages_states=False,
         default_llm_timeout=LIGHTRAG_LLM_VENDOR_TIMEOUT_SECONDS,
-        default_embedding_timeout=30,
+        default_embedding_timeout=LIGHTRAG_EMBEDDING_VENDOR_TIMEOUT_SECONDS,
         cosine_better_than_threshold=QUALIFICATION_COSINE_BETTER_THAN_THRESHOLD,
     )
     runtime = cast(LightRagRuntime, rag)
@@ -696,6 +697,84 @@ async def open_qualification_session(
             python_warnings=python_warnings,
             log_warnings=log_warnings,
         ),
+    )
+
+
+def inspect_ainsert_list_contract() -> dict[str, bool]:
+    """Prove pinned LightRAG ``ainsert`` accepts list input and IDs.
+
+    Inspects the installed ``lightrag-hku==1.5.6`` method annotations. Does
+    not construct a runtime or call Postgres.
+
+    Returns:
+        Flags for list ``input``, list ``ids``, and ``adelete_by_doc_id``.
+
+    Raises:
+        LightRagQualificationError: If the pin is missing the list contract.
+    """
+
+    from lightrag import LightRAG
+
+    signature = inspect.signature(LightRAG.ainsert)
+    input_ann = str(signature.parameters["input"].annotation).replace(" ", "")
+    ids_ann = str(signature.parameters["ids"].annotation).replace(" ", "")
+    input_ok = "list[str]" in input_ann
+    ids_ok = "list[str]" in ids_ann
+    delete_ok = callable(getattr(LightRAG, "adelete_by_doc_id", None))
+    if not (input_ok and ids_ok and delete_ok):
+        raise LightRagQualificationError("ainsert_list_contract_missing")
+    return {
+        "input_accepts_list": input_ok,
+        "ids_accepts_list": ids_ok,
+        "has_adelete_by_doc_id": delete_ok,
+    }
+
+
+async def insert_synthetic_sources(
+    session: QualificationSession,
+    *,
+    document_ids: Sequence[str],
+    source_basenames: Sequence[str],
+    texts: Sequence[str] | None = None,
+    track_id: str | None = None,
+) -> str:
+    """Insert a bounded list of identity-bound sources through ``ainsert``.
+
+    Args:
+        session: Initialized qualification session.
+        document_ids: Vendor ``ids`` in source order.
+        source_basenames: Matching opaque ``file_paths`` tokens.
+        texts: Optional per-source bodies. Defaults to the synthetic fixture.
+        track_id: Optional monitoring token. Not idempotency.
+
+    Returns:
+        Vendor track ID for the batch.
+
+    Raises:
+        LightRagQualificationError: If list lengths do not match.
+    """
+
+    if len(document_ids) != len(source_basenames):
+        raise LightRagQualificationError("ainsert_source_arity")
+    bodies = (
+        list(texts)
+        if texts is not None
+        else [SYNTHETIC_QUALIFICATION_TEXT] * len(document_ids)
+    )
+    if len(bodies) != len(document_ids):
+        raise LightRagQualificationError("ainsert_source_arity")
+    enveloped = [
+        bind_graph_source_text(
+            document_version_id=document_id,
+            normalized_text=body,
+        )
+        for document_id, body in zip(document_ids, bodies, strict=True)
+    ]
+    return await session.rag.ainsert(
+        enveloped,
+        ids=list(document_ids),
+        file_paths=list(source_basenames),
+        track_id=track_id,
     )
 
 

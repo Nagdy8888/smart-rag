@@ -2,7 +2,7 @@
 title: Demo local ingest and AWS ask later
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-20
 audience: engineering, ops
 ---
 
@@ -15,6 +15,7 @@ production-ready claim.
 Canonical decision:
 [ADR-demo-local-ingest-aws-ask.md](../adr/ADR-demo-local-ingest-aws-ask.md).
 Related: [LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md) ·
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [bm25-rebuild.md](./bm25-rebuild.md) ·
 [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) ·
@@ -117,9 +118,61 @@ Open project `LANGSMITH_PROJECT` (default `smart-rag`). Filter
 also show parent `ingestion.graph` and child `model.lightrag_llm` extract
 spans. Each successful extract span exposes input/cached/output/total token
 counts and `estimated_cost_usd`; LangSmith can aggregate its wrapped OpenAI
-child spans at trace level. The USD value is a standard-list-price estimate,
-not the canonical provider invoice. Hide I/O stays forced. No plot text in
-traces.
+child spans at trace level. Live `openai.embeddings` spans attach recognized
+input/total-token and estimated-USD usage metadata so Hybrid trace totals are
+also visible. USD values are standard-list-price estimates, not the canonical
+provider invoice. Hide I/O stays forced. No plot text in traces.
+
+Graph-200 may use the accepted local synthetic mapping override when its
+processed vendor graph exceeds the production 200/200 entity/relation
+enumeration limits. The durable LightRAG job must carry
+`local_demo_mapping_override=true`, `content_class=synthetic`, and
+`review_approved=true`; the worker ignores the override outside
+`APP_ENV=local`. The fixed local ceilings are 1,600 entities and 1,200
+relations. All mapping coverage/support and model-call gates remain unchanged.
+
+The original Graph-200 whole-version extract measured **87/95** persisted
+chunk maps and **2,832/3,314 (85.46%)** coverage. Rebuilds must index each
+current canonical Hybrid passage as its own LightRAG source. Do **not**
+ingest `docs/datasets/MovieSummaries/plot_summaries.txt`. Do **not** alter
+completed Hybrid-800/Graph-200 Hybrid indexes. If Graph Ready is still
+`graph_pending`, stop the looping worker and run **one** bounded rebuild:
+
+```powershell
+uv run python scripts/ops/rebuild_demo_graph_canonical_passages.py
+```
+
+The command preflights 164 current passages, deletes the legacy
+whole-version vendor ID plus leftover passage IDs, requeues job
+`542628df-2c38-4b15-a180-893d7fd74998`, processes that job once, and
+exits. It does not auto-requeue and does not call `run_forever`. On
+success it prints Graph Ready plus LangSmith token/USD totals. On failure
+it prints the first failed invariant and stops.
+
+The 2026-08-20 attempt failed closed:
+`failed_invariant=version_status:graph_pending`,
+`job_last_error=vendor_status_failed`, workspace `quarantined`. LightRAG
+aborted at extract 37/164 after an embedding health-check timeout (75s
+limit, 131.3s actual). LangSmith project `smart-rag-demo-3` recorded one
+`ingestion.graph` trace (179,216 tokens, estimated USD 0.04261959) and 40
+successful `model.lightrag_llm` spans. Do not retry in a loop.
+
+The operator-requested 2026-08-20 retry deleted leftover vendor sources,
+then failed at the first isolated `ainsert` with
+`PipelineNotInitializedError` for `company_default__rebuild:pipeline_status`.
+`bind_workspace` now calls in-memory `initialize_pipeline_status` (no DDL)
+before insert. After that fix, run **one** bounded rebuild when the operator
+asks. Do not loop.
+
+The long-term fix is in
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md):
+canonical passage sources, `AsyncOpenAI` with a 20s provider timeout, batches
+of eight, candidate isolation, 90% / 0.80 gates unchanged. Do **not** raise
+the LightRAG watchdog. Do not start another live Graph-200 rebuild unless the
+operator explicitly asks.
+
+See
+[ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md).
 
 ### Ingest order
 
@@ -193,6 +246,10 @@ for ingest (there is no ingest worker there).
 | Empty `[hybrid]` / `[graph]` windows | Tracing/progress not on the laptop worker; restart worker with the hosted-ingest env |
 | LangSmith has no `ingestion.*` trees | `LANGSMITH_TRACING` was false on the worker, or mock mode hid live gateway spans |
 | `lightrag_llm_openai_not_configured` | Worker is stale. Stop it, update the live adapter, run `uv run python scripts/ops/reset_demo_graph_extract.py`, then start exactly one worker. |
+| Graph Ready stays `graph_pending` after extract | Snapshot mismatch or coverage below 90%. Do not retry Hybrid mapping. Do not lower the gate. |
+| Rebuild reports `graph_source_snapshot_mismatch` | A canonical passage split or drifted. Stop. Do not lower the 90% gate. |
+| Isolated rebuild fails with `PipelineNotInitializedError` / `pipeline_status_uninitialized` | Candidate workspace lacked in-memory `pipeline_status`. Stop. Do not raise the watchdog. Update the adapter, then run **one** rebuild. |
+| Rebuild reports `version_status:graph_pending` with `vendor_status_failed` | Prior 164-source `ainsert` was force-killed (75s health-check vs 131.3s embed). Code now batches eight sources with `AsyncOpenAI`. Stop. Do not auto-requeue. Do not raise the watchdog. Operator must request any new live rebuild. |
 | Graph extract on the 800-line file | File was marked graph-eligible; do not upload a combined 1000-line eligible file |
 | HS256 login failure | Fix hosted JWKS; do not enable HS256 in FastAPI |
 | `postgres` DSN on API/worker | Switch to `app_runtime` |
@@ -201,7 +258,7 @@ for ingest (there is no ingest worker there).
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_ingest_progress.py tests/unit/test_ingest_trace.py tests/unit/test_demo_plot_slices.py tests/contract/test_demo_plot_slices.py tests/contract/test_staging_deploy_t3micro.py tests/contract/test_demo_reproject_profile.py tests/unit/test_langsmith_tracing.py tests/unit/test_openai_lightrag.py -q
+uv run pytest tests/unit/test_ingest_progress.py tests/unit/test_ingest_trace.py tests/unit/test_demo_plot_slices.py tests/contract/test_demo_plot_slices.py tests/contract/test_staging_deploy_t3micro.py tests/contract/test_demo_reproject_profile.py tests/unit/test_langsmith_tracing.py tests/unit/test_openai_lightrag.py tests/unit/test_graph_source_batches.py tests/unit/test_graph_index_isolate.py tests/unit/test_embedding_service.py -q
 ```
 
 Live LangSmith trees and TTY prefixes after a real upload remain **unverified**

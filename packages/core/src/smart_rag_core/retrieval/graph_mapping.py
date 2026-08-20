@@ -38,6 +38,7 @@ from smart_rag_core.retrieval.graph import (
     DEFAULT_MAX_SOURCE_IDS_PER_RELATION,
     GRAPH_FIELD_SEP,
     opaque_graph_source_basename,
+    opaque_passage_source_basename,
     parse_source_id_list,
     strip_graph_source_envelope,
 )
@@ -584,6 +585,8 @@ def assert_mapping_budget(
     relations: int,
     hybrid_calls: int,
     rerank_calls: int,
+    max_entities: int = MAX_MAPPING_ENTITIES,
+    max_relations: int = MAX_MAPPING_RELATIONS,
 ) -> None:
     """Fail closed when mapping exceeds Packet 4 bounds.
 
@@ -593,6 +596,8 @@ def assert_mapping_budget(
         relations: Enumerated relation count.
         hybrid_calls: Hybrid retrieve calls for this document.
         rerank_calls: Support rerank calls for this document.
+        max_entities: Effective entity cap. Defaults to the production bound.
+        max_relations: Effective relation cap. Defaults to the production bound.
 
     Raises:
         MappingBudgetError: If any bound is exceeded.
@@ -600,9 +605,9 @@ def assert_mapping_budget(
 
     if vendor_chunks > MAX_MAPPING_VENDOR_CHUNKS:
         raise MappingBudgetError("mapping_budget_chunks")
-    if entities > MAX_MAPPING_ENTITIES:
+    if entities > max_entities:
         raise MappingBudgetError("mapping_budget_entities")
-    if relations > MAX_MAPPING_RELATIONS:
+    if relations > max_relations:
         raise MappingBudgetError("mapping_budget_relations")
     if hybrid_calls > MAX_MAPPING_HYBRID_CALLS:
         raise MappingBudgetError("mapping_budget_hybrid")
@@ -718,7 +723,7 @@ def _merge_slices(slices: Sequence[CoverageSlice]) -> CoverageSlice:
 
 
 def expected_vendor_basename(version_id: UUID) -> str:
-    """Return the opaque basename required for this version.
+    """Return the legacy opaque basename for a whole-version vendor source.
 
     Args:
         version_id: Canonical document version ID.
@@ -728,6 +733,20 @@ def expected_vendor_basename(version_id: UUID) -> str:
     """
 
     return opaque_graph_source_basename(str(version_id))
+
+
+def expected_passage_basename(*, version_id: UUID, chunk_id: UUID) -> str:
+    """Return the opaque basename required for one canonical-passage source.
+
+    Args:
+        version_id: Canonical document version ID.
+        chunk_id: Canonical chunk UUID.
+
+    Returns:
+        ``g-{version_id}-{chunk_id}.txt``.
+    """
+
+    return opaque_passage_source_basename(version_id=version_id, chunk_id=chunk_id)
 
 
 def scoped_hybrid_retrieve(
@@ -886,6 +905,9 @@ class ObjectMapping:
         reason: Failure reason when unavailable.
         method: Mapping method or empty.
         provenance: Config/source diagnostics. Never native prose IDs.
+        support_matches: Additional accepted passage matches for the same
+            object, unique by canonical chunk ID. Empty when only one
+            supporting passage is accepted.
     """
 
     object_type: GraphObjectType
@@ -897,3 +919,4 @@ class ObjectMapping:
     reason: str = ""
     method: str = ""
     provenance: dict[str, object] = field(default_factory=dict[str, object])
+    support_matches: tuple[ChunkMatch, ...] = ()

@@ -20,6 +20,7 @@ from smart_rag_core.gateways import (
     create_embedding_gateway,
     create_model_gateway,
 )
+from smart_rag_core.ingestion.chunking.normalize import normalize_for_dedup
 from smart_rag_core.jobs import graph_mapping_persist as persist
 from smart_rag_core.jobs.limits import (
     MAPPING_HYBRID_CANDIDATE_CAP,
@@ -27,7 +28,7 @@ from smart_rag_core.jobs.limits import (
 )
 from smart_rag_core.retrieval.context_loader import ChunkContext
 from smart_rag_core.retrieval.coverage import CoverageSignal, HybridCoverage
-from smart_rag_core.retrieval.graph_mapping import SupportRerankFn
+from smart_rag_core.retrieval.graph_mapping import CanonicalPassage, SupportRerankFn
 from smart_rag_core.retrieval.hybrid_run import HybridRetriever, HybridRunResult
 from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.retrieval.rerank import RerankFallbackReason, RerankRanking
@@ -102,7 +103,11 @@ def bind_mapping_support(
         if caller is None or not caller.is_active():
             return _empty_hybrid_result(RetrievalFallbackReason.AUTH_CONTEXT_INVALID)
         canonicals = persist.load_canonical_passages(connection, version_id=version_id)
-        capped = canonicals[:MAPPING_HYBRID_CANDIDATE_CAP]
+        capped = select_mapping_candidates(
+            query,
+            canonicals,
+            cap=MAPPING_HYBRID_CANDIDATE_CAP,
+        )
         if not capped:
             return _empty_hybrid_result(RetrievalFallbackReason.RETRIEVAL_EMPTY)
         candidates = tuple(
@@ -225,6 +230,50 @@ def bind_mapping_support(
     )
 
 
+def select_mapping_candidates(
+    query: str,
+    canonicals: tuple[CanonicalPassage, ...],
+    *,
+    cap: int,
+) -> tuple[CanonicalPassage, ...]:
+    """Select bounded version passages by deterministic query token overlap.
+
+    Args:
+        query: Balanced text sampled from every unresolved vendor chunk.
+        canonicals: All canonical passages for the version.
+        cap: Maximum passages exposed to the one Hybrid support call.
+
+    Returns:
+        Passages ordered by descending token overlap, then canonical chunk
+        order. Zero-overlap rows fill remaining capacity deterministically.
+
+    Raises:
+        ValueError: If ``cap`` is not positive.
+    """
+
+    if cap <= 0:
+        raise ValueError("mapping_candidate_cap_invalid")
+    query_tokens = set(normalize_for_dedup(query).split())
+
+    def _score(item: CanonicalPassage) -> tuple[int, float, int]:
+        """Return overlap count, Jaccard score, and inverse chunk order.
+
+        Args:
+            item: Canonical passage to score.
+
+        Returns:
+            Sort tuple ordered toward stronger overlap and earlier chunks.
+        """
+
+        passage_tokens = set(normalize_for_dedup(item.raw_text).split())
+        overlap = len(query_tokens & passage_tokens)
+        union = len(query_tokens | passage_tokens)
+        ratio = overlap / union if union else 0.0
+        return overlap, ratio, -item.chunk_index
+
+    return tuple(sorted(canonicals, key=_score, reverse=True)[:cap])
+
+
 def load_mapping_caller(
     connection: psycopg.Connection,
     *,
@@ -248,20 +297,13 @@ def load_mapping_caller(
         cursor.execute(
             """
             SELECT
-              p.user_id::text,
-              p.role::text,
-              cs.authorization_version,
-              p.disabled_at,
-              p.upload_enabled,
-              p.mfa_enrolled
-            FROM app.document_versions AS dv
-            JOIN app.documents AS d ON d.id = dv.document_id
-            JOIN app.profiles AS p ON p.user_id = d.created_by
-            JOIN app.company_settings AS cs
-              ON cs.id = '00000000-0000-0000-0000-000000000001'::uuid
-            WHERE dv.id = %s
-              AND d.deleted_at IS NULL
-              AND dv.deleted_at IS NULL
+              user_id::text,
+              role::text,
+              authorization_version,
+              disabled_at,
+              upload_enabled,
+              mfa_enrolled
+            FROM app.load_graph_mapping_caller(%s)
             """,
             (version_id,),
         )

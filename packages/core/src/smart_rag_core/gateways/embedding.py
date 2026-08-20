@@ -16,10 +16,14 @@ from smart_rag_core.ingestion.embeddings.policy import (
 from smart_rag_core.observability.langsmith_tracing import (
     configure_langsmith,
     model_call_traceable,
-    traced_embeddings_create,
-    traced_openai_client,
+    traced_async_openai_client,
+    traced_embeddings_create_async,
 )
 from smart_rag_core.settings import SharedSettings
+
+# Hybrid ingest HTTP timeout. LightRAG callbacks pass 20s instead.
+# Keep equal to ``retrieval.graph.OPENAI_EMBEDDING_TIMEOUT_SECONDS``.
+OPENAI_EMBEDDING_TIMEOUT_SECONDS = 120.0
 
 # Published list price USD per 1M input tokens for text-embedding-3-large,
 # same pin used by scripts/embedding_qualification_bakeoff.py (2026-08-12).
@@ -35,6 +39,9 @@ class EmbeddingRequest(BaseModel):
     inputs: tuple[str, ...] = Field(min_length=1)
     model: str = Field(min_length=1, max_length=128)
     dimensions: int = Field(ge=1, le=3072)
+    timeout_seconds: float = Field(
+        default=OPENAI_EMBEDDING_TIMEOUT_SECONDS, gt=0, le=600
+    )
 
 
 class EmbeddingResponse(BaseModel):
@@ -56,6 +63,21 @@ class EmbeddingAdapter(Protocol):
         """Embed one bounded batch."""
 
         ...
+
+
+class EmbeddingProviderError(RuntimeError):
+    """Typed OpenAI embedding failure. Vendor SDK retries stay at zero."""
+
+    def __init__(self, reason: str) -> None:
+        """Store a machine-readable reason.
+
+        Args:
+            reason: Short code such as ``embedding_timeout`` or
+                ``embedding_rate_limited``.
+        """
+
+        super().__init__(reason)
+        self.reason = reason
 
 
 class MockEmbeddingAdapter:
@@ -118,30 +140,51 @@ class OpenAIEmbeddingAdapter:
         self._api_key = api_key
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
-        """Embed one batch through the traced OpenAI client.
+        """Embed one batch through the traced async OpenAI client.
 
         Args:
             request: Bounded embedding batch. Model and dimensions should match
                 the pinned ingestion policy; response length is still checked.
+                ``timeout_seconds`` is the provider HTTP bound. LightRAG
+                callers must pass a value below the vendor embedding watchdog.
 
         Returns:
             Vectors ordered by ``data.index``, never by list order alone.
 
         Raises:
             ValueError: If a vector is missing, duplicated, or the wrong size.
+            EmbeddingProviderError: Timeout, HTTP 429, auth, or other provider
+                failures. SDK retries stay at zero.
 
         Side Effects:
-            One HTTPS ``embeddings.create`` call via ``traced_embeddings_create``.
+            One HTTPS ``embeddings.create`` call via
+            ``traced_embeddings_create_async``.
         """
 
-        client = traced_openai_client(api_key=self._api_key, max_retries=0)
-        response = traced_embeddings_create(
-            client,
-            model=request.model,
-            input=list(request.inputs),
-            dimensions=request.dimensions,
-            encoding_format="float",
+        from openai import APIStatusError, APITimeoutError, AuthenticationError
+
+        client = traced_async_openai_client(
+            api_key=self._api_key,
+            max_retries=0,
+            timeout=request.timeout_seconds,
         )
+        try:
+            response = await traced_embeddings_create_async(
+                client,
+                input_usd_per_million=_OPENAI_LARGE_USD_PER_MILLION,
+                model=request.model,
+                input=list(request.inputs),
+                dimensions=request.dimensions,
+                encoding_format="float",
+            )
+        except APITimeoutError as error:
+            raise EmbeddingProviderError("embedding_timeout") from error
+        except AuthenticationError as error:
+            raise EmbeddingProviderError("embedding_provider_error") from error
+        except APIStatusError as error:
+            if error.status_code == 429:
+                raise EmbeddingProviderError("embedding_rate_limited") from error
+            raise EmbeddingProviderError("embedding_provider_error") from error
         by_index: dict[int, tuple[float, ...]] = {}
         for item in response.data:
             index = int(item.index)

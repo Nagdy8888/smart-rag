@@ -132,3 +132,73 @@ def test_failed_vendor_status_raises() -> None:
     indexer = LightRagGraphIndexer(adapter, deadline_seconds=1)
     with pytest.raises(GraphIndexerError, match="vendor_status_failed"):
         asyncio.run(indexer.enqueue_insert(document_id=VERSION_ID, text="chunk one"))
+
+
+CHUNK_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+SOURCE_ID = f"{VERSION_ID}:{CHUNK_ID}"
+
+
+def test_enqueue_insert_sources_skips_processed_replay() -> None:
+    """Replay of processed passage sources must not call ainsert again."""
+
+    adapter = MagicMock()
+    adapter.vendor_document_status = AsyncMock(
+        return_value=DocumentStatusView(
+            document_id=SOURCE_ID,
+            status="processed",
+            track_id="monitor-1",
+        )
+    )
+    adapter.enqueue_insert_sources = AsyncMock()
+    indexer = LightRagGraphIndexer(adapter, deadline_seconds=1)
+    result = asyncio.run(
+        indexer.enqueue_insert_sources(
+            texts=("enveloped-one",),
+            document_ids=(SOURCE_ID,),
+            source_tokens=(f"g-{VERSION_ID}-{CHUNK_ID}.txt",),
+        )
+    )
+    assert result.status == "processed"
+    adapter.enqueue_insert_sources.assert_not_called()
+
+
+def test_enqueue_insert_sources_inserts_missing_and_polls() -> None:
+    """Missing sources are batch-inserted once, then polled to processed."""
+
+    adapter = MagicMock()
+    adapter.vendor_document_status = AsyncMock(
+        side_effect=[
+            None,
+            DocumentStatusView(document_id=SOURCE_ID, status="processed"),
+        ]
+    )
+    captured: dict[str, object] = {}
+
+    async def _insert(**kwargs: object) -> GraphIndexEnqueueResult:
+        """Capture batch insert kwargs."""
+
+        captured.update(kwargs)
+        return GraphIndexEnqueueResult(
+            document_id=SOURCE_ID,
+            track_id=str(kwargs["track_id"]),
+            status="pending",
+        )
+
+    adapter.enqueue_insert_sources = AsyncMock(side_effect=_insert)
+    indexer = LightRagGraphIndexer(
+        adapter,
+        deadline_seconds=1,
+        poll_interval_seconds=0.01,
+    )
+    result = asyncio.run(
+        indexer.enqueue_insert_sources(
+            texts=("enveloped-one",),
+            document_ids=(SOURCE_ID,),
+            source_tokens=(f"g-{VERSION_ID}-{CHUNK_ID}.txt",),
+            track_id="fresh-batch-token",
+        )
+    )
+    assert result.status == "processed"
+    assert captured["document_ids"] == (SOURCE_ID,)
+    assert captured["texts"] == ("enveloped-one",)
+    assert captured["track_id"] == "fresh-batch-token"

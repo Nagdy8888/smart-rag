@@ -3,7 +3,7 @@ title: ADR — Identity-bound LightRAG source envelope
 adr_id: ADR-graph-source-identity-envelope
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-19
 approver: "user (Cursor chat; expert-continue Phase 5)"
 approval_date: "2026-08-16"
 audience: engineering, reviewers
@@ -71,10 +71,14 @@ flowchart TD
   strip it. Middle chunks of identical documents may still share text.
 - Shared graph entities after both documents exist are allowed; deletion of one
   ID must not remove the other ID's source support (Packet 7).
+- Production envelope tokens are `{version_id}:{chunk_id}` so identical
+  canonical passages stay independent. See
+  [ADR-canonical-passage-lightrag-sources.md](./ADR-canonical-passage-lightrag-sources.md).
 
 ## Links
 
 - [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md)
 - [phase-05-graphrag-evidence.md](../development/phase-05-graphrag-evidence.md)
 - [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md)
+- [ADR-canonical-passage-lightrag-sources.md](./ADR-canonical-passage-lightrag-sources.md)
 - [docs index](../README.md)

@@ -19,8 +19,10 @@ from smart_rag_core.jobs.graph_mapping_service import (
 )
 from smart_rag_core.ingestion.chunking.normalize import content_hash
 from smart_rag_core.jobs.graph_writer import GraphWriterGuard
-from smart_rag_core.retrieval.graph import bind_graph_source_text
-from smart_rag_core.retrieval.graph_mapping import expected_vendor_basename
+from smart_rag_core.retrieval.graph import (
+    bind_graph_source_text,
+    canonical_passage_source_id,
+)
 
 from tests.contract.integration_support import (
     read_process_env,
@@ -116,7 +118,7 @@ def _seed_graph_pending_document(
     *,
     language: str = "en",
     chunk_text: str = "canonical mapping passage",
-) -> tuple[UUID, UUID, UUID]:
+) -> tuple[UUID, UUID, UUID, UUID]:
     """Insert one Hybrid-ready graph-pending document with a canonical chunk.
 
     Args:
@@ -125,7 +127,7 @@ def _seed_graph_pending_document(
         chunk_text: Canonical raw_text.
 
     Returns:
-        ``(user_id, document_id, version_id)``.
+        ``(user_id, document_id, version_id, chunk_id)``.
     """
 
     admin = uuid4()
@@ -186,7 +188,7 @@ def _seed_graph_pending_document(
             ),
         )
     connection.execute("SET ROLE app_worker")
-    return admin, document_id, version_id
+    return admin, document_id, version_id, chunk_id
 
 
 def test_expand_columns_exist(db_connection: psycopg.Connection) -> None:
@@ -229,6 +231,51 @@ def test_expand_columns_exist(db_connection: psycopg.Connection) -> None:
         )
         tables = {str(row[0]) for row in cursor.fetchall()}
     assert tables == {"graph_map_repair_jobs", "graph_mapping_telemetry"}
+    with db_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT indexname
+            FROM pg_indexes
+            WHERE schemaname = 'app'
+              AND indexname = 'lightrag_chunk_map_vendor_chunk_uq'
+            """
+        )
+        index_row = cursor.fetchone()
+    assert index_row is not None
+
+
+def test_mapping_caller_rpc_avoids_worker_profile_table_grant(
+    db_connection: psycopg.Connection,
+) -> None:
+    """Worker resolves one uploader through the RPC without profile SELECT."""
+
+    user_id, _document_id, version_id, _chunk_id = _seed_graph_pending_document(
+        db_connection
+    )
+    row = db_connection.execute(
+        """
+        SELECT user_id::text, role::text, authorization_version
+        FROM app.load_graph_mapping_caller(%s)
+        """,
+        (version_id,),
+    ).fetchone()
+    assert row is not None
+    assert row[0] == str(user_id)
+    assert row[1] == "admin"
+    assert int(row[2]) >= 1
+    db_connection.execute("SET ROLE postgres")
+    privileges = db_connection.execute(
+        """
+        SELECT
+          has_function_privilege(
+            'app_worker',
+            'app.load_graph_mapping_caller(uuid)',
+            'EXECUTE'
+          ),
+          has_table_privilege('app_worker', 'app.profiles', 'SELECT')
+        """
+    ).fetchone()
+    assert privileges == (True, False)
 
 
 def _disable_commit(connection: psycopg.Connection) -> None:
@@ -247,21 +294,25 @@ def test_worker_can_write_maps_and_replay(
     """Worker RLS accepts map upserts and replay does not duplicate rows."""
 
     chunk_text = "canonical mapping passage"
-    _admin, document_id, version_id = _seed_graph_pending_document(
+    _admin, document_id, version_id, chunk_id = _seed_graph_pending_document(
         db_connection,
         chunk_text=chunk_text,
     )
     _disable_commit(db_connection)
     vendor_chunk_id = "vendor-chunk-1"
+    source_id = canonical_passage_source_id(
+        version_id=version_id,
+        chunk_id=chunk_id,
+    )
     enveloped = bind_graph_source_text(
-        document_version_id=str(version_id),
+        document_version_id=source_id,
         normalized_text=chunk_text,
     )
     vendor = _FakeVendor(
         chunks=[
             {
                 "id": vendor_chunk_id,
-                "full_doc_id": str(version_id),
+                "full_doc_id": source_id,
                 "content": enveloped,
             }
         ],
@@ -293,7 +344,6 @@ def test_worker_can_write_maps_and_replay(
                 },
             }
         ],
-        file_path=expected_vendor_basename(version_id),
     )
     service = GraphMappingService(
         db_connection,
@@ -372,11 +422,12 @@ def test_processed_without_maps_stays_pending(
 ) -> None:
     """Vendor PROCESSED alone cannot contribute to Graph Ready."""
 
-    _admin, document_id, version_id = _seed_graph_pending_document(db_connection)
+    _admin, document_id, version_id, _chunk_id = _seed_graph_pending_document(
+        db_connection
+    )
     _disable_commit(db_connection)
     vendor = _FakeVendor(
         chunks=[],
-        file_path=expected_vendor_basename(version_id),
     )
     service = GraphMappingService(
         db_connection,

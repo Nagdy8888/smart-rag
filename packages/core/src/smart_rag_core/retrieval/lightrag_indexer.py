@@ -22,7 +22,10 @@ from smart_rag_core.retrieval.graph import (
     GraphIndexer,
     opaque_graph_source_basename,
 )
-from smart_rag_core.retrieval.lightrag_adapter import LightRagRuntimeAdapter
+from smart_rag_core.retrieval.lightrag_adapter import (
+    LightRagAdapterError,
+    LightRagRuntimeAdapter,
+)
 from smart_rag_core.retrieval.lightrag_qualification import DocumentStatusView
 
 VENDOR_TERMINAL_SUCCESS = "processed"
@@ -189,6 +192,98 @@ class LightRagGraphIndexer:
             status=terminal.status,
         )
 
+    async def enqueue_insert_sources(
+        self,
+        *,
+        texts: tuple[str, ...],
+        document_ids: tuple[str, ...],
+        source_tokens: tuple[str, ...],
+        track_id: str | None = None,
+    ) -> GraphIndexEnqueueResult:
+        """Enqueue bounded passage sources, then poll until every ID is terminal.
+
+        Replay skips IDs already ``processed``. A vendor ``failed`` row fails
+        closed. Timeout after send polls existing rows instead of inserting
+        again.
+
+        Args:
+            texts: Envelope-bound passage texts, already 1:1 with IDs.
+            document_ids: Deterministic ``{version_id}:{chunk_id}`` source IDs.
+            source_tokens: Unique opaque basenames, 1:1 with ``document_ids``.
+            track_id: Optional monitoring token. A fresh UUID is used when
+                omitted. Never treated as idempotency.
+
+        Returns:
+            Monitoring metadata. ``document_id`` is the first source ID.
+
+        Raises:
+            GraphIndexerError: On arity errors, vendor ``failed``, adapter
+                ``pipeline_status_uninitialized``, unverifiable status, or
+                poll deadline without every ID processed.
+        """
+
+        if not (len(texts) == len(document_ids) == len(source_tokens) and texts):
+            raise GraphIndexerError("ainsert_source_arity")
+        monitor_token = track_id or str(uuid4())
+        missing_indexes: list[int] = []
+        in_flight = {
+            "pending",
+            "parsing",
+            "analyzing",
+            "processing",
+            "preprocessed",
+        }
+        for index, document_id in enumerate(document_ids):
+            existing = await self._adapter.vendor_document_status(document_id)
+            if existing is None:
+                missing_indexes.append(index)
+                continue
+            lowered = existing.status.lower()
+            if lowered == VENDOR_TERMINAL_SUCCESS:
+                continue
+            if lowered == VENDOR_TERMINAL_FAILURE:
+                raise GraphIndexerError("vendor_status_failed")
+            if lowered not in in_flight:
+                raise GraphIndexerError(f"vendor_status_unverified:{existing.status}")
+        if missing_indexes:
+            try:
+                enqueued = await self._adapter.enqueue_insert_sources(
+                    texts=tuple(texts[index] for index in missing_indexes),
+                    document_ids=tuple(
+                        document_ids[index] for index in missing_indexes
+                    ),
+                    source_tokens=tuple(
+                        source_tokens[index] for index in missing_indexes
+                    ),
+                    track_id=monitor_token,
+                )
+                monitor_token = enqueued.track_id
+            except LightRagAdapterError as exc:
+                reason = str(exc).strip() or "lightrag_adapter_error"
+                raise GraphIndexerError(reason[:128]) from exc
+            except (TimeoutError, OSError):
+                after_timeout = await self._adapter.vendor_document_status(
+                    document_ids[missing_indexes[0]]
+                )
+                if after_timeout is None:
+                    enqueued = await self._adapter.enqueue_insert_sources(
+                        texts=tuple(texts[index] for index in missing_indexes),
+                        document_ids=tuple(
+                            document_ids[index] for index in missing_indexes
+                        ),
+                        source_tokens=tuple(
+                            source_tokens[index] for index in missing_indexes
+                        ),
+                        track_id=str(uuid4()),
+                    )
+                    monitor_token = enqueued.track_id
+        terminals = await self.poll_until_all_terminal(document_ids)
+        return GraphIndexEnqueueResult(
+            document_id=document_ids[0],
+            track_id=monitor_token,
+            status=terminals[-1].status,
+        )
+
     async def delete_document(
         self,
         *,
@@ -253,6 +348,46 @@ class LightRagGraphIndexer:
         raise GraphIndexerError(
             f"vendor_status_deadline:{last.status if last else 'missing'}"
         )
+
+    async def poll_until_all_terminal(
+        self,
+        document_ids: tuple[str, ...],
+    ) -> list[DocumentStatusView]:
+        """Poll every source ID until processed, failed, or the shared deadline.
+
+        Args:
+            document_ids: Vendor source IDs inserted for one version job.
+
+        Returns:
+            Terminal status views in the same order as ``document_ids``.
+
+        Raises:
+            GraphIndexerError: On missing status, ``failed``, or deadline.
+        """
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._deadline_seconds
+        remaining = set(document_ids)
+        done: dict[str, DocumentStatusView] = {}
+        last_label = "missing"
+        while loop.time() < deadline and remaining:
+            for document_id in tuple(remaining):
+                view = await self._adapter.vendor_document_status(document_id)
+                if view is None:
+                    last_label = "missing"
+                    continue
+                lowered = view.status.lower()
+                last_label = view.status
+                if lowered == VENDOR_TERMINAL_SUCCESS:
+                    done[document_id] = view
+                    remaining.discard(document_id)
+                elif lowered == VENDOR_TERMINAL_FAILURE:
+                    raise GraphIndexerError("vendor_status_failed")
+            if remaining:
+                await asyncio.sleep(self._poll_interval_seconds)
+        if remaining:
+            raise GraphIndexerError(f"vendor_status_deadline:{last_label}")
+        return [done[item] for item in document_ids]
 
 
 def as_graph_indexer(indexer: LightRagGraphIndexer) -> GraphIndexer:

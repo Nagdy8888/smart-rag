@@ -11,8 +11,8 @@ import asyncio
 import logging
 import socket
 import threading
-from collections.abc import Coroutine
-from typing import Any, TypeVar
+from collections.abc import Coroutine, Mapping
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 import psycopg
@@ -24,6 +24,13 @@ from smart_rag_core.jobs.graph_writer import (
     heartbeat_graph_writer_lease,
 )
 from smart_rag_core.jobs.lightrag_repository import LightragIndexJobRepository
+from smart_rag_core.jobs.limits import (
+    DEFAULT_GRAPH_SOURCE_BATCH_DEADLINE_SECONDS,
+    LOCAL_DEMO_MAX_MAPPING_ENTITIES,
+    LOCAL_DEMO_MAX_MAPPING_RELATIONS,
+    MAX_MAPPING_ENTITIES,
+    MAX_MAPPING_RELATIONS,
+)
 from smart_rag_core.jobs.maintenance_pause import MaintenancePauseController
 from smart_rag_core.observability.ingest_progress import log_ingest_progress
 from smart_rag_core.observability.ingest_trace import (
@@ -34,11 +41,52 @@ from smart_rag_core.retrieval.graph import DEFAULT_GRAPH_WORKSPACE, GraphIndexer
 from smart_rag_core.retrieval.lightrag_adapter import LightRagRuntimeAdapter
 from smart_rag_core.retrieval.lightrag_indexer import LightRagGraphIndexer
 from smart_rag_core.schema.enums import JobErrorCategory
+from smart_rag_core.settings.base import Environment
 from smart_rag_core.settings.worker import WorkerSettings
 
 LOGGER = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+def effective_graph_mapping_limits(
+    settings: WorkerSettings,
+    job: dict[str, Any],
+) -> tuple[int, int]:
+    """Return production limits or the approved local synthetic-demo limits.
+
+    Args:
+        settings: Validated worker settings.
+        job: Claimed LightRAG job including its payload.
+
+    Returns:
+        Entity and relation limits. The larger fixed pair is returned only
+        when ``APP_ENV=local`` and the payload explicitly records synthetic,
+        reviewed demo content plus ``local_demo_mapping_override=true``.
+
+    Security:
+        Staging/production and unreviewed/non-synthetic jobs always retain the
+        production 200/200 caps, even if a payload requests the override.
+    """
+
+    payload_raw = job.get("payload_ref")
+    payload: Mapping[str, object]
+    if isinstance(payload_raw, Mapping):
+        payload = cast(Mapping[str, object], payload_raw)
+    else:
+        payload = {}
+    local_demo = (
+        settings.app_env is Environment.LOCAL
+        and payload.get("local_demo_mapping_override") is True
+        and payload.get("content_class") == "synthetic"
+        and payload.get("review_approved") is True
+    )
+    if local_demo:
+        return (
+            LOCAL_DEMO_MAX_MAPPING_ENTITIES,
+            LOCAL_DEMO_MAX_MAPPING_RELATIONS,
+        )
+    return MAX_MAPPING_ENTITIES, MAX_MAPPING_RELATIONS
 
 
 def run_lightrag_coroutine(
@@ -101,7 +149,12 @@ class GraphWorkerLoop:
             pause_controller or MaintenancePauseController.unmeasured_allows()
         )
         self._indexer: GraphIndexer | None = (
-            LightRagGraphIndexer(adapter) if adapter is not None else None
+            LightRagGraphIndexer(
+                adapter,
+                deadline_seconds=DEFAULT_GRAPH_SOURCE_BATCH_DEADLINE_SECONDS,
+            )
+            if adapter is not None
+            else None
         )
 
     def process_once(self) -> bool:
@@ -114,6 +167,8 @@ class GraphWorkerLoop:
         Side Effects:
             Commits claim, occupies the writer lease, holds a session
             advisory lock during mutation, then completes or fails the job.
+            Unhandled exceptions fail the job. Isolated candidate jobs do
+            not quarantine the live workspace.
         """
 
         adapter = self._adapter
@@ -274,6 +329,9 @@ class GraphWorkerLoop:
                     writer_token=writer_token or "",
                     lock_connection=lock_connection,
                 )
+                mapping_max_entities, mapping_max_relations = (
+                    effective_graph_mapping_limits(self._settings, job)
+                )
                 service = GraphIndexService(
                     work_conn,
                     indexer=indexer,
@@ -285,6 +343,8 @@ class GraphWorkerLoop:
                     ),
                     mapping_support=bind_mapping_support(work_conn, self._settings),
                     pause_controller=self._pause_controller,
+                    mapping_max_entities=mapping_max_entities,
+                    mapping_max_relations=mapping_max_relations,
                 )
                 outcome = invoke_traced_ingestion(
                     lambda: run_lightrag_coroutine(
@@ -347,6 +407,47 @@ class GraphWorkerLoop:
                 job_id,
                 error_category=JobErrorCategory.TRANSIENT,
                 reason_code="job_failed",
+            )
+            return True
+        except Exception as exc:
+            reason = type(exc).__name__[:128]
+            LOGGER.exception("graph job %s unhandled: %s", job_id, reason)
+            payload_raw = job.get("payload_ref")
+            isolate = (
+                isinstance(payload_raw, Mapping)
+                and payload_raw.get("isolate_candidate") is True
+            )
+            if not isolate:
+                try:
+                    with psycopg.connect(postgres_url) as connection:
+                        connection.execute("SET ROLE app_worker")
+                        qguard = GraphWriterGuard(
+                            connection,
+                            lease_owner=self._lease_owner(),
+                            lease_seconds=self._settings.job_lease_seconds,
+                        )
+                        qguard.quarantine(
+                            reason=reason,
+                            source_job_id=job_id,
+                        )
+                        connection.commit()
+                except psycopg.Error:
+                    LOGGER.exception(
+                        "unable to quarantine after graph job %s", job_id
+                    )
+            self._fail_job(
+                postgres_url,
+                job_id,
+                lease_token,
+                error_category=JobErrorCategory.TRANSIENT,
+                last_error=reason,
+            )
+            log_ingest_progress(
+                "graph",
+                "lightrag_index_failed",
+                job_id,
+                error_category=JobErrorCategory.TRANSIENT,
+                reason_code="unhandled_exception",
             )
             return True
         finally:

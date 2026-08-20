@@ -17,11 +17,14 @@ from uuid import UUID
 
 import psycopg
 
+from smart_rag_core.ingestion.chunking.normalize import content_hash
 from smart_rag_core.jobs import graph_mapping_persist as persist
 from smart_rag_core.jobs.entity_rule_service import load_extraction_policy
 from smart_rag_core.jobs.exceptions import GraphMappingError
-from smart_rag_core.jobs.graph_writer import GraphWriterGuard
+from smart_rag_core.jobs.graph_writer import GraphWriterGuard, load_workspace_row
 from smart_rag_core.jobs.limits import (
+    LOCAL_DEMO_MAX_MAPPING_ENTITIES,
+    LOCAL_DEMO_MAX_MAPPING_RELATIONS,
     MAPPING_SUPPORT_MIN,
     MAX_MAPPING_ENTITIES,
     MAX_MAPPING_RELATIONS,
@@ -31,7 +34,9 @@ from smart_rag_core.jobs.limits import (
 from smart_rag_core.retrieval.graph import (
     GRAPH_FIELD_SEP,
     SourceIdContractError,
+    canonical_passage_source_id,
     graph_chunker_config_snapshot,
+    parse_canonical_passage_source_id,
     strip_graph_source_envelope,
 )
 from smart_rag_core.retrieval.graph_mapping import (
@@ -49,11 +54,10 @@ from smart_rag_core.retrieval.graph_mapping import (
     canonical_entity_key,
     canonical_source_identity,
     evaluate_coverage_gates,
-    expected_vendor_basename,
+    expected_passage_basename,
     graph_path_edge_id,
     graph_statement_id,
     internal_chunk_key,
-    map_vendor_chunk,
     mapping_config_generation,
     normalize_relation_label,
     ordered_statement_endpoints,
@@ -83,6 +87,17 @@ class GraphVendorReader(Protocol):
         limit: int,
     ) -> list[dict[str, object]]:
         """Return vendor document chunks for one source id."""
+
+        ...
+
+    async def list_vendor_doc_chunks_for_ids(
+        self,
+        *,
+        workspace: str,
+        document_ids: tuple[str, ...],
+        limit: int,
+    ) -> list[dict[str, object]]:
+        """Return vendor document chunks for an exact source-ID set."""
 
         ...
 
@@ -157,6 +172,7 @@ class _ChunkMapRow:
     """Internal vendor-chunk mapping row used before persistence."""
 
     vendor_chunk_id: str
+    vendor_doc_id: str
     match: ChunkMatch | None
     internal_key: str
 
@@ -172,6 +188,8 @@ class GraphMappingService:
         writer: GraphWriterGuard,
         hybrid_retrieve: Any | None = None,
         support_rerank: SupportRerankFn | None = None,
+        max_entities: int = MAX_MAPPING_ENTITIES,
+        max_relations: int = MAX_MAPPING_RELATIONS,
     ) -> None:
         """Bind application connection, vendor reader, and optional retrievers.
 
@@ -181,14 +199,49 @@ class GraphMappingService:
             writer: Occupied writer guard on the same connection.
             hybrid_retrieve: Optional ``(query, version_id) -> HybridRunResult``.
             support_rerank: Optional OpenAI-only support rerank batch.
+            max_entities: Effective entity enumeration cap. Production default
+                is 200; the fixed local synthetic-demo ceiling is 1,600.
+            max_relations: Effective relation enumeration cap. Production
+                default is 200; the fixed local synthetic-demo ceiling is 1,200.
+
+        Raises:
+            ValueError: If an injected cap is non-positive or exceeds the
+                approved local synthetic-demo ceiling.
         """
 
+        if not 1 <= max_entities <= LOCAL_DEMO_MAX_MAPPING_ENTITIES:
+            raise ValueError("invalid_mapping_entity_limit")
+        if not 1 <= max_relations <= LOCAL_DEMO_MAX_MAPPING_RELATIONS:
+            raise ValueError("invalid_mapping_relation_limit")
         self._connection = connection
         self._vendor = vendor_reader
         self._writer = writer
         self._hybrid_retrieve = hybrid_retrieve
         self._support_rerank = support_rerank
+        self._max_entities = max_entities
+        self._max_relations = max_relations
         self.counts = MappingCallCounts()
+        self._map_workspace_key: str | None = None
+
+    def set_map_workspace_key(self, workspace_key: str | None) -> None:
+        """Bind maps and vendor reads to a candidate or live workspace.
+
+        Args:
+            workspace_key: Isolated rebuild key, or ``None`` to use the
+                writer lock workspace.
+        """
+
+        stripped = workspace_key.strip() if workspace_key else None
+        self._map_workspace_key = stripped or None
+
+    def _mapping_workspace_key(self) -> str:
+        """Return the workspace maps and vendor reads use for this job.
+
+        Returns:
+            Candidate rebuild key when isolating, otherwise the writer key.
+        """
+
+        return self._map_workspace_key or self._writer.workspace_key
 
     async def map_after_vendor_success(
         self,
@@ -302,7 +355,7 @@ class GraphMappingService:
             Mapping outcome after one application transaction.
         """
 
-        workspace_key = self._writer.workspace_key
+        workspace_key = self._mapping_workspace_key()
         policy = load_extraction_policy(self._connection)
         config_generation = mapping_config_generation(
             workspace_key=workspace_key,
@@ -315,27 +368,40 @@ class GraphMappingService:
             version_id=version_id,
             config_generation=config_generation,
         )
-        await self._assert_vendor_processed(version_id)
-        vendor_chunks = await self._vendor.list_vendor_doc_chunks(
+        canonicals = persist.load_canonical_passages(
+            self._connection,
+            version_id=version_id,
+        )
+        if not canonicals:
+            raise GraphMappingError("graph_source_snapshot_mismatch")
+        expected_source_ids = tuple(
+            canonical_passage_source_id(
+                version_id=version_id,
+                chunk_id=item.chunk_id,
+            )
+            for item in canonicals
+        )
+        await self._assert_sources_processed(expected_source_ids)
+        vendor_chunks = await self._vendor.list_vendor_doc_chunks_for_ids(
             workspace=workspace_key,
-            document_id=str(version_id),
+            document_ids=expected_source_ids,
             limit=MAX_MAPPING_VENDOR_CHUNKS + 1,
         )
         nodes = await self._vendor.list_vendor_graph_nodes(
             workspace=workspace_key,
-            limit=MAX_MAPPING_ENTITIES + 1,
+            limit=self._max_entities + 1,
         )
         edges = await self._vendor.list_vendor_graph_edges(
             workspace=workspace_key,
-            limit=MAX_MAPPING_RELATIONS + 1,
+            limit=self._max_relations + 1,
         )
         entity_joins = await self._vendor.list_vendor_entity_joins(
             workspace=workspace_key,
-            limit=MAX_MAPPING_ENTITIES + 1,
+            limit=self._max_entities + 1,
         )
         relation_joins = await self._vendor.list_vendor_relation_joins(
             workspace=workspace_key,
-            limit=MAX_MAPPING_RELATIONS + 1,
+            limit=self._max_relations + 1,
         )
         assert_mapping_budget(
             vendor_chunks=len(vendor_chunks),
@@ -343,39 +409,37 @@ class GraphMappingService:
             relations=len(edges),
             hybrid_calls=0,
             rerank_calls=0,
+            max_entities=self._max_entities,
+            max_relations=self._max_relations,
         )
         in_version_chunks = [
             row
             for row in vendor_chunks
-            if str(row.get("full_doc_id") or "") == str(version_id)
+            if str(row.get("full_doc_id") or "") in expected_source_ids
         ]
-        known_chunk_ids = {
-            str(row.get("id") or "") for row in in_version_chunks if row.get("id")
+        extra_sources = {
+            str(row.get("full_doc_id") or "")
+            for row in vendor_chunks
+            if str(row.get("full_doc_id") or "") not in expected_source_ids
         }
-        canonicals = persist.load_canonical_passages(
-            self._connection,
-            version_id=version_id,
-        )
+        if extra_sources:
+            raise GraphMappingError("graph_source_snapshot_mismatch")
         language = canonicals[0].language if canonicals else ""
         if not language:
             language = self._load_version_language(version_id)
-        chunk_rows = self._map_vendor_chunks(
+        chunk_rows = self._map_exact_passages(
             in_version_chunks,
             canonicals,
+            expected_source_ids=expected_source_ids,
             version_id=version_id,
             workspace_key=workspace_key,
             config_generation=config_generation,
         )
-        unresolved = [
-            row
-            for row, mapped in zip(in_version_chunks, chunk_rows, strict=True)
-            if mapped.match is None
-        ]
-        await self._assign_unresolved_support(
-            unresolved,
-            chunk_rows,
-            canonicals,
-            version_id=version_id,
+        known_chunk_ids = {
+            row.vendor_chunk_id for row in chunk_rows if row.match is not None
+        }
+        known_chunk_ids.update(
+            row.vendor_doc_id for row in chunk_rows if row.match is not None
         )
         assert_mapping_budget(
             vendor_chunks=len(vendor_chunks),
@@ -383,11 +447,17 @@ class GraphMappingService:
             relations=len(edges),
             hybrid_calls=self.counts.hybrid_retrieve,
             rerank_calls=self.counts.support_rerank,
+            max_entities=self._max_entities,
+            max_relations=self._max_relations,
         )
         rules = persist.load_entity_rules(self._connection)
         chunk_by_vendor = {
             row.vendor_chunk_id: row for row in chunk_rows if row.match is not None
         }
+        for row in chunk_rows:
+            if row.match is None:
+                continue
+            chunk_by_vendor.setdefault(row.vendor_doc_id, row)
         objects: list[ObjectMapping] = []
         objects.extend(
             self._map_entities(
@@ -433,6 +503,7 @@ class GraphMappingService:
                 repairs=repairs,
                 ready=False,
                 reason=gate_reason,
+                expected_source_ids=expected_source_ids,
             )
         return self._persist(
             document_id=document_id,
@@ -447,29 +518,41 @@ class GraphMappingService:
             repairs=repairs,
             ready=True,
             reason="",
+            expected_source_ids=expected_source_ids,
         )
 
-    async def _assert_vendor_processed(self, version_id: UUID) -> None:
-        """Require vendor terminal processed and the opaque basename.
+    async def _assert_sources_processed(
+        self,
+        source_ids: tuple[str, ...],
+    ) -> None:
+        """Require every passage source to be processed with its basename.
 
         Args:
-            version_id: Canonical version used as the vendor document id.
+            source_ids: Deterministic ``{version_id}:{chunk_id}`` vendor IDs.
 
         Raises:
-            GraphMappingError: If the vendor row is not processed or the
-                basename does not match ``g-{version_id}.txt``.
+            GraphMappingError: If any source is missing, not processed, or
+                uses the wrong opaque basename.
         """
 
-        status = await self._vendor.vendor_document_status(str(version_id))
-        if status is None or str(getattr(status, "status", "")).lower() != "processed":
-            raise GraphMappingError("vendor_not_processed")
-        expected = expected_vendor_basename(version_id)
-        raw_path = getattr(status, "file_path", None)
-        if raw_path is None or not str(raw_path).strip():
-            raise GraphMappingError("vendor_basename_missing")
-        basename = str(raw_path).replace("\\", "/").rsplit("/", 1)[-1]
-        if basename != expected:
-            raise GraphMappingError("vendor_basename_mismatch")
+        for source_id in source_ids:
+            status = await self._vendor.vendor_document_status(source_id)
+            if (
+                status is None
+                or str(getattr(status, "status", "")).lower() != "processed"
+            ):
+                raise GraphMappingError("vendor_not_processed")
+            version_id, chunk_id = parse_canonical_passage_source_id(source_id)
+            expected = expected_passage_basename(
+                version_id=version_id,
+                chunk_id=chunk_id,
+            )
+            raw_path = getattr(status, "file_path", None)
+            if raw_path is None or not str(raw_path).strip():
+                raise GraphMappingError("vendor_basename_missing")
+            basename = str(raw_path).replace("\\", "/").rsplit("/", 1)[-1]
+            if basename != expected:
+                raise GraphMappingError("vendor_basename_mismatch")
 
     def _load_version_language(self, version_id: UUID) -> str:
         """Return the version language column.
@@ -495,44 +578,82 @@ class GraphMappingService:
             return ""
         return str(row[0])
 
-    def _map_vendor_chunks(
+    def _map_exact_passages(
         self,
         vendor_chunks: Sequence[Mapping[str, object]],
         canonicals: Sequence[CanonicalPassage],
         *,
+        expected_source_ids: tuple[str, ...],
         version_id: UUID,
         workspace_key: str,
         config_generation: str,
     ) -> list[_ChunkMapRow]:
-        """Hash/span/overlap map each in-version vendor chunk.
+        """Require a 1:1 hash bijection between passages and vendor chunks.
 
         Args:
-            vendor_chunks: Vendor rows for this ``full_doc_id``.
-            canonicals: Canonical passages.
+            vendor_chunks: Vendor rows whose ``full_doc_id`` is a passage
+                source ID.
+            canonicals: Canonical passages in chunk order.
+            expected_source_ids: Ordered source IDs matching ``canonicals``.
             version_id: Mapping version.
             workspace_key: Application workspace.
             config_generation: Mapping config digest.
 
         Returns:
-            Per-chunk mapping rows, including unresolved ones.
+            One mapped row per canonical passage.
+
+        Raises:
+            GraphMappingError: If any source is missing, split, duplicated, or
+                the stripped vendor hash does not match the passage.
         """
 
-        rows: list[_ChunkMapRow] = []
+        by_source: dict[str, list[Mapping[str, object]]] = {}
         for raw in vendor_chunks:
-            vendor_id = str(raw.get("id") or "")
-            text = str(raw.get("content") or "")
-            match = map_vendor_chunk(text, canonicals, version_id=version_id)
+            source_id = str(raw.get("full_doc_id") or "")
+            by_source.setdefault(source_id, []).append(raw)
+        by_chunk = {item.chunk_id: item for item in canonicals}
+        rows: list[_ChunkMapRow] = []
+        for source_id, canonical in zip(expected_source_ids, canonicals, strict=True):
+            vendor_rows = by_source.get(source_id, [])
+            if len(vendor_rows) != 1:
+                raise GraphMappingError("graph_source_snapshot_mismatch")
+            raw = vendor_rows[0]
+            vendor_chunk_id = str(raw.get("id") or "")
+            if not vendor_chunk_id:
+                raise GraphMappingError("graph_source_snapshot_mismatch")
+            stripped = strip_graph_source_envelope(str(raw.get("content") or ""))
+            source_hash = content_hash(stripped)
+            if source_hash != canonical.content_hash:
+                raise GraphMappingError("graph_source_snapshot_mismatch")
+            parsed_version, parsed_chunk = parse_canonical_passage_source_id(source_id)
+            if parsed_version != version_id or parsed_chunk != canonical.chunk_id:
+                raise GraphMappingError("graph_source_snapshot_mismatch")
+            if parsed_chunk not in by_chunk:
+                raise GraphMappingError("graph_source_snapshot_mismatch")
+            match = ChunkMatch(
+                canonical=canonical,
+                method="hash",
+                score=1.0,
+                source_hash=source_hash,
+                target_hash=canonical.content_hash,
+                source_span={"start": 0, "end": len(stripped)},
+                target_span={"start": 0, "end": len(canonical.raw_text)},
+            )
             rows.append(
                 _ChunkMapRow(
-                    vendor_chunk_id=vendor_id,
+                    vendor_chunk_id=vendor_chunk_id,
+                    vendor_doc_id=source_id,
                     match=match,
                     internal_key=internal_chunk_key(
                         workspace_key=workspace_key,
                         config_generation=config_generation,
-                        vendor_chunk_id=vendor_id,
+                        vendor_chunk_id=vendor_chunk_id,
                     ),
                 )
             )
+        vendor_chunk_ids = [row.vendor_chunk_id for row in rows]
+        if len(set(vendor_chunk_ids)) != len(vendor_chunk_ids):
+            raise GraphMappingError("graph_source_snapshot_mismatch")
         return rows
 
     async def _assign_unresolved_support(
@@ -565,10 +686,7 @@ class GraphMappingService:
             return
         if self._hybrid_retrieve is None:
             return
-        query = " ".join(
-            strip_graph_source_envelope(str(row.get("content") or ""))
-            for row in unresolved
-        )[:MAX_NORMALIZED_QUERY_CHARS]
+        query = build_unresolved_support_query(unresolved)
         if not query.strip():
             return
         self.counts.hybrid_retrieve += 1
@@ -620,6 +738,7 @@ class GraphMappingService:
             chosen = unused.pop(0)
             chunk_rows[index] = _ChunkMapRow(
                 vendor_chunk_id=row.vendor_chunk_id,
+                vendor_doc_id=row.vendor_doc_id,
                 match=chosen,
                 internal_key=row.internal_key,
             )
@@ -792,6 +911,7 @@ class GraphMappingService:
                         match=statement.match,
                         available=True,
                         method=statement.method,
+                        support_matches=statement.support_matches,
                         provenance={
                             "statement_id": statement_id,
                             "direction": "src_to_tgt",
@@ -826,6 +946,7 @@ class GraphMappingService:
         repairs: Sequence[Mapping[str, str]],
         ready: bool,
         reason: str,
+        expected_source_ids: tuple[str, ...] = (),
     ) -> MappingOutcome:
         """Commit maps, repairs, telemetry, and optional Graph Ready.
 
@@ -842,6 +963,8 @@ class GraphMappingService:
             repairs: Unavailable-object diagnostics.
             ready: True when every gate passed before the txn.
             reason: Failure reason when not ready.
+            expected_source_ids: Passage source IDs that must persist 1:1
+                before Graph Ready.
 
         Returns:
             Mapping outcome after commit.
@@ -862,6 +985,24 @@ class GraphMappingService:
         if drift is not None:
             ready = False
             reason = drift
+        pointer = persist.load_pointer_workspace_id(self._connection)
+        this_workspace: UUID | None = None
+        try:
+            this_workspace = persist.load_workspace_uuid(
+                self._connection,
+                workspace_key=workspace_key,
+            )
+        except GraphMappingError:
+            this_workspace = None
+        if (
+            pointer is not None
+            and this_workspace is not None
+            and pointer != this_workspace
+        ):
+            pending_switch = True
+            if coverage_passed:
+                ready = False
+                reason = "pending_switch"
         retrieval_eligible = ready
         persist.delete_version_maps(
             self._connection,
@@ -887,6 +1028,7 @@ class GraphMappingService:
                 workspace_key=workspace_key,
                 language=language,
                 config_generation=config_generation,
+                vendor_doc_id=row.vendor_doc_id,
                 vendor_chunk_id=row.vendor_chunk_id,
                 internal_key=row.internal_key,
                 match=row.match,
@@ -910,6 +1052,23 @@ class GraphMappingService:
             config_generation=config_generation,
             coverage=coverage,
         )
+        if ready:
+            try:
+                persist.assert_persisted_readiness(
+                    self._connection,
+                    version_id=version_id,
+                    workspace_key=workspace_key,
+                    expected_source_ids=expected_source_ids,
+                    expected_vendor_chunk_ids=tuple(
+                        row.vendor_chunk_id
+                        for row in chunk_rows
+                        if row.match is not None
+                    ),
+                )
+            except GraphMappingError as exc:
+                ready = False
+                reason = exc.reason
+                coverage_passed = False
         repair_rows = list(repairs)
         if not ready and not repair_rows:
             repair_rows.append(
@@ -941,18 +1100,25 @@ class GraphMappingService:
                     workspace_key=workspace_key,
                 )
                 if pointer is not None and pointer == this_workspace:
-                    self._writer.transition_state(
-                        from_states=(GraphWorkspaceState.UPDATING,),
-                        to_state=GraphWorkspaceState.ACTIVE,
-                        snapshot={"maps_verified": True},
+                    current = str(
+                        load_workspace_row(
+                            self._connection, workspace_key=workspace_key
+                        ).get("state")
+                        or ""
                     )
-                    workspace_state = GraphWorkspaceState.ACTIVE.value
-                else:
-                    self._writer.transition_state(
-                        from_states=(GraphWorkspaceState.UPDATING,),
-                        to_state=GraphWorkspaceState.UPDATING,
-                        snapshot={"maps_verified": True},
-                    )
+                    if current == GraphWorkspaceState.ACTIVE.value:
+                        workspace_state = GraphWorkspaceState.ACTIVE.value
+                    else:
+                        self._writer.transition_state(
+                            from_states=(
+                                GraphWorkspaceState.BUILDING,
+                                GraphWorkspaceState.UPDATING,
+                            ),
+                            to_state=GraphWorkspaceState.ACTIVE,
+                            snapshot={"maps_verified": True},
+                            workspace_key=workspace_key,
+                        )
+                        workspace_state = GraphWorkspaceState.ACTIVE.value
             except GraphMappingError:
                 self._connection.rollback()
                 raise
@@ -991,7 +1157,7 @@ class GraphMappingService:
             self._connection,
             document_id=document_id,
             version_id=version_id,
-            workspace_key=self._writer.workspace_key,
+            workspace_key=self._mapping_workspace_key(),
             config_generation="unverified",
             repairs=(
                 {
@@ -1139,18 +1305,21 @@ def _object_from_sources(
             available=False,
             reason="cross_version_source",
         )
-    best_match: ChunkMatch | None = None
-    vendor_chunk_id = ""
+    accepted: list[tuple[str, ChunkMatch]] = []
+    seen_chunks: set[UUID] = set()
     for token in source_ids:
         row = chunk_by_vendor.get(token)
         if row is None or row.match is None:
             continue
         if row.match.score < MAPPING_SUPPORT_MIN:
             continue
-        if best_match is None or row.match.score > best_match.score:
-            best_match = row.match
-            vendor_chunk_id = row.vendor_chunk_id
-    if best_match is None:
+        chunk_id = row.match.canonical.chunk_id
+        if chunk_id in seen_chunks:
+            continue
+        seen_chunks.add(chunk_id)
+        accepted.append((row.vendor_chunk_id, row.match))
+    accepted.sort(key=lambda item: (-item[1].score, str(item[1].canonical.chunk_id)))
+    if not accepted:
         return ObjectMapping(
             object_type=object_type,
             object_id=object_id,
@@ -1158,6 +1327,7 @@ def _object_from_sources(
             available=False,
             reason="below_threshold",
         )
+    best_vendor, best_match = accepted[0]
     return ObjectMapping(
         object_type=object_type,
         object_id=object_id,
@@ -1166,8 +1336,46 @@ def _object_from_sources(
         match=best_match,
         available=True,
         method=best_match.method,
-        provenance={"vendor_chunk_id": vendor_chunk_id},
+        provenance={"vendor_chunk_id": best_vendor},
+        support_matches=tuple(match for _vendor, match in accepted[1:]),
     )
+
+
+def build_unresolved_support_query(
+    unresolved: Sequence[Mapping[str, object]],
+) -> str:
+    """Build one bounded query that samples every unresolved vendor chunk.
+
+    Args:
+        unresolved: Vendor chunk rows still unmatched deterministically.
+
+    Returns:
+        At most ``MAX_NORMALIZED_QUERY_CHARS`` characters. Each non-empty
+        chunk contributes balanced head/tail text, preventing early chunks
+        from consuming the entire one-call support budget.
+    """
+
+    texts = tuple(
+        text
+        for row in unresolved
+        if (text := strip_graph_source_envelope(str(row.get("content") or "")).strip())
+    )
+    if not texts:
+        return ""
+    separator_chars = max(len(texts) - 1, 0)
+    per_chunk = max(
+        1,
+        (MAX_NORMALIZED_QUERY_CHARS - separator_chars) // len(texts),
+    )
+    snippets: list[str] = []
+    for text in texts:
+        if len(text) <= per_chunk:
+            snippets.append(text)
+            continue
+        head_chars = (per_chunk + 1) // 2
+        tail_chars = per_chunk - head_chars
+        snippets.append(text[:head_chars] + (text[-tail_chars:] if tail_chars else ""))
+    return " ".join(snippets)[:MAX_NORMALIZED_QUERY_CHARS]
 
 
 def _coverage_slices(

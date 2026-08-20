@@ -8,18 +8,24 @@ added here; ``max_retries`` stays zero on provider adapters.
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
 
-from smart_rag_core.gateways.embedding import EmbeddingGateway, EmbeddingRequest
+from smart_rag_core.gateways.embedding import (
+    EmbeddingGateway,
+    EmbeddingProviderError,
+    EmbeddingRequest,
+)
 from smart_rag_core.gateways.model import LightRagLlmRequest, ModelGateway
 from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL,
 )
 from smart_rag_core.retrieval.graph import (
+    LIGHTRAG_EMBEDDING_PROVIDER_TIMEOUT_SECONDS,
     LIGHTRAG_LLM_TIMEOUT_SECONDS,
     LIGHTRAG_PINNED_VERSION,
 )
@@ -78,6 +84,8 @@ class CountedLightRagCallbacks:
             lease without holding a transaction.
         ingest_job_id: Optional claimed LightRAG job id. When set, extract
             callbacks emit ``[graph] extract_batch`` count lines.
+        last_embed_latency_ms: Wall time of the most recent embedding call.
+        last_embed_batch_size: Input count of the most recent embedding call.
     """
 
     embedding_gateway: EmbeddingGateway
@@ -87,9 +95,11 @@ class CountedLightRagCallbacks:
     extract_gate: asyncio.Event | None = None
     pre_provider_hook: Callable[[], None] | None = None
     ingest_job_id: str | None = None
+    last_embed_latency_ms: int = 0
+    last_embed_batch_size: int = 0
 
     async def embedding_texts(self, texts: list[str]) -> np.ndarray:
-        """Embed one batch through the shared gateway at the pinned dimension.
+        """Embed one batch through the shared async gateway.
 
         Args:
             texts: Vendor embedding inputs.
@@ -99,9 +109,13 @@ class CountedLightRagCallbacks:
 
         Raises:
             ValueError: If ``texts`` is empty.
+            EmbeddingProviderError: Provider timeout, HTTP 429, or other
+                OpenAI failure. Propagates so LightRAG aborts only this
+                insert batch.
 
         Side Effects:
             Increments ``embed`` and performs one gateway embedding call.
+            Records latency and batch size for operator alerts.
         """
 
         if not texts:
@@ -112,8 +126,17 @@ class CountedLightRagCallbacks:
             inputs=tuple(texts),
             model=EMBEDDING_MODEL,
             dimensions=EMBEDDING_DIMENSIONS,
+            timeout_seconds=LIGHTRAG_EMBEDDING_PROVIDER_TIMEOUT_SECONDS,
         )
-        response = await self.embedding_gateway.embed(request)
+        started = time.monotonic()
+        try:
+            response = await self.embedding_gateway.embed(request)
+        except EmbeddingProviderError:
+            self.last_embed_batch_size = len(texts)
+            self.last_embed_latency_ms = int((time.monotonic() - started) * 1000)
+            raise
+        self.last_embed_batch_size = len(texts)
+        self.last_embed_latency_ms = int((time.monotonic() - started) * 1000)
         self.counts.embed += 1
         return np.asarray(response.vectors, dtype=np.float32)
 

@@ -15,10 +15,12 @@ from uuid import UUID
 import psycopg
 from pydantic import BaseModel, ConfigDict
 
+from smart_rag_core.gateways.embedding import EmbeddingProviderError
 from smart_rag_core.ingestion.embeddings.policy import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL,
 )
+from smart_rag_core.jobs.entity_rule_invalidation import rebuild_workspace_key
 from smart_rag_core.jobs.exceptions import (
     GraphLifecycleError,
     GraphMappingError,
@@ -45,9 +47,14 @@ from smart_rag_core.jobs.graph_pointer_switch import (
     switch_active_workspace,
     switch_document_version,
 )
+from smart_rag_core.jobs.graph_source_batches import (
+    insert_passage_batches,
+    parse_processed_source_ids,
+)
 from smart_rag_core.jobs.graph_source_text import (
     GraphSourceTextError,
-    load_version_graph_text,
+    load_version_passage_manifest,
+    load_version_vendor_deletion_ids,
 )
 from smart_rag_core.jobs.graph_writer import (
     GraphWriterGuard,
@@ -59,15 +66,23 @@ from smart_rag_core.jobs.limits import (
     DEFAULT_GRAPH_INDEX_ESTIMATE_USD,
     DEFAULT_GRAPH_MAINTENANCE_ESTIMATE_USD,
     GRAPH_PIPELINE_VERSION,
+    GRAPH_SOURCE_INSERT_BATCH_SIZE,
     LIGHTRAG_HANDOFF_VERSION,
+    MAX_MAPPING_ENTITIES,
+    MAX_MAPPING_RELATIONS,
 )
 from smart_rag_core.jobs.maintenance_pause import (
     MaintenancePauseController,
     pause_error_code,
 )
+from smart_rag_core.observability.ingest_progress import log_ingest_progress
+from smart_rag_core.repositories.notifications import (
+    AdminNotificationError,
+    AdminNotificationRepository,
+)
 from smart_rag_core.retrieval.graph import (
     LIGHTRAG_PINNED_VERSION,
-    opaque_graph_source_basename,
+    GraphIndexDeleteResult,
 )
 from smart_rag_core.retrieval.lightrag_indexer import (
     GraphIndexerError,
@@ -94,12 +109,29 @@ GRAPH_VALIDATION_REASONS = {
     "version_missing",
     "job_missing_version",
     "version_text_empty",
+    "graph_source_too_many_passages",
+    "graph_source_empty_passage",
+    "graph_source_passage_too_large",
+    "graph_source_duplicate_chunk",
+    "graph_source_snapshot_mismatch",
+    "chunk_map_collision",
+    "ainsert_source_arity",
+    "graph_source_batch_too_large",
     "graph_budget_exhausted",
     "invalid_estimated_cost",
     "canonical_not_excluded",
     "stale_generation",
     "current_version_mismatch",
 }
+
+ISOLATE_TRANSIENT_REASONS = frozenset(
+    {
+        "embedding_timeout",
+        "embedding_rate_limited",
+        "vendor_status_failed",
+        "pipeline_status_uninitialized",
+    }
+)
 
 
 class GraphJobOutcome(BaseModel):
@@ -143,6 +175,8 @@ class GraphIndexService:
         mapper: GraphMappingService | None = None,
         mapping_support: MappingSupportCallbacks | None = None,
         pause_controller: MaintenancePauseController | None = None,
+        mapping_max_entities: int = MAX_MAPPING_ENTITIES,
+        mapping_max_relations: int = MAX_MAPPING_RELATIONS,
     ) -> None:
         """Bind application connection, indexer, and writer guard.
 
@@ -160,6 +194,10 @@ class GraphIndexService:
                 callbacks.
             pause_controller: User-load pause for clean rebuilds. Defaults
                 to fail-closed missing telemetry.
+            mapping_max_entities: Effective entity mapping cap passed to the
+                default mapper.
+            mapping_max_relations: Effective relation mapping cap passed to
+                the default mapper.
         """
 
         self._connection = connection
@@ -184,6 +222,8 @@ class GraphIndexService:
                 writer=writer,
                 hybrid_retrieve=hybrid,
                 support_rerank=rerank,
+                max_entities=mapping_max_entities,
+                max_relations=mapping_max_relations,
             )
 
     async def process_claimed_job(
@@ -209,6 +249,7 @@ class GraphIndexService:
         job_id = UUID(str(job["id"]))
         operation = LightragJobOperation(str(job["operation"]))
         payload = dict(job.get("payload_ref") or {})
+        isolate_candidate = payload.get("isolate_candidate") is True
         reservation_kind = (
             "graph_index"
             if operation is LightragJobOperation.INDEX
@@ -258,6 +299,12 @@ class GraphIndexService:
                 )
             return outcome
         except GraphWriterLostError as exc:
+            if isolate_candidate:
+                return self._fail_isolated_job(
+                    reason=exc.reason,
+                    reservation_id=reservation_id,
+                    reservation_kind=reservation_kind,
+                )
             return self._quarantine_outcome(
                 job_id=job_id,
                 reason=exc.reason,
@@ -278,8 +325,14 @@ class GraphIndexService:
                 reservation_id=reservation_id,
                 reservation_kind=reservation_kind,
             )
-        except (GraphIndexerError, GraphSourceTextError) as exc:
+        except (GraphIndexerError, GraphSourceTextError, EmbeddingProviderError) as exc:
             reason = getattr(exc, "reason", str(exc))
+            if isolate_candidate and reason in ISOLATE_TRANSIENT_REASONS:
+                return self._fail_isolated_job(
+                    reason=reason[:4000],
+                    reservation_id=reservation_id,
+                    reservation_kind=reservation_kind,
+                )
             if reason in GRAPH_VALIDATION_REASONS or reason.startswith("graph_budget"):
                 if reservation_id is not None:
                     self._repository.admission.release_graph_reservation(
@@ -332,9 +385,16 @@ class GraphIndexService:
                 reservation_kind=reservation_kind,
             )
         except (JobLeaseError, TimeoutError) as exc:
+            reason = str(exc)[:512]
+            if isolate_candidate:
+                return self._fail_isolated_job(
+                    reason=reason,
+                    reservation_id=reservation_id,
+                    reservation_kind=reservation_kind,
+                )
             return self._quarantine_outcome(
                 job_id=job_id,
-                reason=str(exc)[:512],
+                reason=reason,
                 reservation_id=reservation_id,
                 reservation_kind=reservation_kind,
             )
@@ -354,6 +414,36 @@ class GraphIndexService:
             reservation_kind=reservation_kind,
             estimated_cost_usd=estimate,
         )
+
+    async def _bind_index_workspace(
+        self,
+        adapter: object,
+        workspace: str,
+    ) -> None:
+        """Retarget vendor storage and initialize in-memory pipeline status.
+
+        LightRAG 1.5.6 keeps ``{workspace}:pipeline_status`` in process
+        memory. Binding ``{live}__rebuild`` without this init makes the
+        first ``ainsert`` raise ``PipelineNotInitializedError``. This is
+        not vendor DDL.
+
+        Args:
+            adapter: Attached LightRAG adapter, or ``None``.
+            workspace: Constructor workspace to bind.
+
+        Side Effects:
+            Updates storage ``workspace`` attributes and calls
+            ``ensure_pipeline_status`` when present.
+        """
+
+        if adapter is None:
+            return
+        bind = getattr(adapter, "bind_workspace", None)
+        if callable(bind):
+            bind(workspace)
+        ensure = getattr(adapter, "ensure_pipeline_status", None)
+        if callable(ensure):
+            await ensure()
 
     async def _index(
         self,
@@ -378,30 +468,73 @@ class GraphIndexService:
         """
 
         document_id, version_id = _require_ids(job)
+        isolate_candidate = payload.get("isolate_candidate") is True
+        candidate_key = str(
+            payload.get("rebuild_workspace_key")
+            or rebuild_workspace_key(self._writer.workspace_key)
+        )
         self._revalidate_index_eligibility(
             document_id=document_id,
             version_id=version_id,
             payload=payload,
         )
         self._writer.attach_default_pointer_if_null()
-        self._writer.transition_state(
-            from_states=allowed_index_from_states(),
-            to_state=GraphWorkspaceState.UPDATING,
-        )
+        if isolate_candidate:
+            self._writer.ensure_building_rebuild_workspace()
+        else:
+            self._writer.transition_state(
+                from_states=allowed_index_from_states(),
+                to_state=GraphWorkspaceState.UPDATING,
+            )
         self._connection.commit()
         self._writer.verify_lock_and_lease(
             job_id=job_id,
             job_lease_token=job_lease_token,
         )
         self._connection.commit()
-        text = load_version_graph_text(self._connection, version_id=version_id)
-        self._connection.commit()
-        identity = str(version_id)
-        result = await self._indexer.enqueue_insert(
-            document_id=identity,
-            text=text,
-            source_token=opaque_graph_source_basename(identity),
+        manifest = load_version_passage_manifest(
+            self._connection,
+            version_id=version_id,
         )
+        self._connection.commit()
+        adapter = getattr(self._indexer, "adapter", None)
+        live_workspace = self._writer.workspace_key
+        try:
+            if isolate_candidate:
+                await self._bind_index_workspace(adapter, candidate_key)
+            if hasattr(self._mapper, "set_map_workspace_key"):
+                self._mapper.set_map_workspace_key(
+                    candidate_key if isolate_candidate else None
+                )
+            processed_ids = parse_processed_source_ids(payload)
+            result = await insert_passage_batches(
+                self._indexer,
+                texts=tuple(item.enveloped_text() for item in manifest.sources),
+                document_ids=manifest.source_ids,
+                source_tokens=tuple(item.source_token for item in manifest.sources),
+                processed_ids=processed_ids,
+                batch_size=GRAPH_SOURCE_INSERT_BATCH_SIZE,
+                isolate_workspace_key=candidate_key if isolate_candidate else None,
+                on_lease_check=lambda: self._verify_index_lease(
+                    job_id=job_id, job_lease_token=job_lease_token
+                ),
+                on_checkpoint=lambda patch: self._checkpoint_index_payload(
+                    job_id=job_id,
+                    job_lease_token=job_lease_token,
+                    patch=patch,
+                ),
+                on_alert=lambda kind, size, latency_ms: self._emit_index_alert(
+                    kind=kind,
+                    batch_size=size,
+                    latency_ms=latency_ms,
+                    job_id=job_id,
+                ),
+            )
+        finally:
+            if hasattr(self._mapper, "set_map_workspace_key") and not isolate_candidate:
+                self._mapper.set_map_workspace_key(None)
+            if isolate_candidate is False:
+                await self._bind_index_workspace(adapter, live_workspace)
         self._writer.verify_lock_and_lease(
             job_id=job_id,
             job_lease_token=job_lease_token,
@@ -409,8 +542,14 @@ class GraphIndexService:
         self._assert_version_still_pending(version_id)
         maps_verified = False
         mapping_reason = ""
-        workspace_state = GraphWorkspaceState.UPDATING.value
+        workspace_state = (
+            GraphWorkspaceState.BUILDING.value
+            if isolate_candidate
+            else GraphWorkspaceState.UPDATING.value
+        )
         try:
+            if isolate_candidate and hasattr(self._mapper, "set_map_workspace_key"):
+                self._mapper.set_map_workspace_key(candidate_key)
             mapping = await self._mapper.map_after_vendor_success(
                 document_id=document_id,
                 version_id=version_id,
@@ -418,7 +557,22 @@ class GraphIndexService:
             maps_verified = mapping.maps_verified
             mapping_reason = mapping.reason
             workspace_state = mapping.workspace_state
-            if (
+            if isolate_candidate and mapping.maps_verified and mapping.pending_switch:
+                self._switch_rebuild_workspace(
+                    payload={
+                        **payload,
+                        "workspace_key": live_workspace,
+                        "rebuild_workspace_key": candidate_key,
+                    }
+                )
+                mapping = await self._mapper.map_after_vendor_success(
+                    document_id=document_id,
+                    version_id=version_id,
+                )
+                maps_verified = mapping.maps_verified
+                mapping_reason = mapping.reason
+                workspace_state = mapping.workspace_state
+            elif (
                 mapping.pending_switch
                 and mapping.maps_verified
                 and payload.get("switch_after_verify") is True
@@ -432,14 +586,30 @@ class GraphIndexService:
         except GraphMappingError as exc:
             maps_verified = False
             mapping_reason = exc.reason
-            workspace_state = GraphWorkspaceState.UPDATING.value
-        if workspace_state != GraphWorkspaceState.ACTIVE.value:
+            workspace_state = (
+                GraphWorkspaceState.BUILDING.value
+                if isolate_candidate
+                else GraphWorkspaceState.UPDATING.value
+            )
+        finally:
+            if hasattr(self._mapper, "set_map_workspace_key"):
+                self._mapper.set_map_workspace_key(None)
+            bind_key = (
+                candidate_key
+                if isolate_candidate and maps_verified
+                else live_workspace
+            )
+            await self._bind_index_workspace(adapter, bind_key)
+        if (
+            not isolate_candidate
+            and workspace_state != GraphWorkspaceState.ACTIVE.value
+        ):
             self._writer.transition_state(
                 from_states=(GraphWorkspaceState.UPDATING,),
                 to_state=GraphWorkspaceState.UPDATING,
                 snapshot={
                     "last_vendor_status": result.status,
-                    "last_indexed_version_id": identity,
+                    "last_indexed_version_id": str(version_id),
                     "maps_verified": maps_verified,
                     "mapping_reason": mapping_reason,
                 },
@@ -531,7 +701,17 @@ class GraphIndexService:
         )
         self._connection.commit()
         try:
-            result = await self._indexer.delete_document(document_id=str(version_id))
+            deletion_ids = load_version_vendor_deletion_ids(
+                self._connection,
+                version_id=version_id,
+            )
+            result = GraphIndexDeleteResult(
+                document_id=str(version_id),
+                status="not_found",
+                message="",
+            )
+            for vendor_id in deletion_ids:
+                result = await self._indexer.delete_document(document_id=vendor_id)
         except (TimeoutError, OSError, GraphIndexerError) as exc:
             return self._cleanup_failed(
                 job_id=job_id,
@@ -566,6 +746,7 @@ class GraphIndexService:
             self._indexer.adapter,
             version_id=version_id,
             workspace_key=workspace_key,
+            document_ids=deletion_ids,
         )
         if not vendor_check.clean and result.status != "not_found":
             return self._cleanup_failed(
@@ -1046,6 +1227,131 @@ class GraphIndexService:
             raise GraphIndexerError("version_missing")
         if str(row[0]) != DocumentStatus.GRAPH_PENDING.value:
             raise GraphIndexerError("version_status_drift")
+
+    def _verify_index_lease(self, *, job_id: UUID, job_lease_token: str) -> None:
+        """Fail closed when the writer lock or job lease was cancelled.
+
+        Args:
+            job_id: Claimed job id.
+            job_lease_token: Job lease token.
+
+        Raises:
+            GraphWriterLostError: Lock or lease loss. Stops further batches.
+
+        Side Effects:
+            Short lease-validation transaction. Caller must not hold a
+            transaction across vendor work.
+        """
+
+        self._writer.verify_lock_and_lease(
+            job_id=job_id,
+            job_lease_token=job_lease_token,
+        )
+        self._connection.commit()
+
+    def _checkpoint_index_payload(
+        self,
+        *,
+        job_id: UUID,
+        job_lease_token: str,
+        patch: dict[str, object],
+    ) -> None:
+        """Persist processed source IDs after a successful insert batch.
+
+        Args:
+            job_id: Claimed job id.
+            job_lease_token: Job lease token.
+            patch: JSON merged into ``payload_ref``.
+
+        Raises:
+            JobLeaseError: If the lease cannot be validated.
+
+        Side Effects:
+            Updates ``payload_ref`` and commits.
+        """
+
+        self._repository.merge_payload(job_id, job_lease_token, dict(patch))
+        self._connection.commit()
+
+    def _emit_index_alert(
+        self,
+        *,
+        kind: str,
+        batch_size: int,
+        latency_ms: int,
+        job_id: UUID,
+    ) -> None:
+        """Record a batch-size or embedding-latency operator alert.
+
+        Args:
+            kind: ``graph_source_batch_size`` or ``graph_embedding_latency``.
+            batch_size: Sources or embed inputs in the batch.
+            latency_ms: Last embedding wall time.
+            job_id: Claimed job id.
+
+        Side Effects:
+            One ingest-progress line and one admin notification. Notification
+            failure is swallowed so indexing continues.
+        """
+
+        log_ingest_progress(
+            "graph",
+            kind,
+            job_id,
+            batch_size=batch_size,
+            latency_ms=latency_ms,
+        )
+        try:
+            AdminNotificationRepository(self._connection).emit(
+                kind=kind,
+                severity="warning",
+                title=f"Graph index {kind}",
+                body="Bounded graph insert exceeded latency or batch-size alert.",
+                metadata={
+                    "job_id": str(job_id),
+                    "batch_size": batch_size,
+                    "latency_ms": latency_ms,
+                },
+            )
+            self._connection.commit()
+        except AdminNotificationError:
+            self._connection.rollback()
+
+    def _fail_isolated_job(
+        self,
+        *,
+        reason: str,
+        reservation_id: UUID | None,
+        reservation_kind: str | None,
+    ) -> GraphJobOutcome:
+        """Fail a candidate rebuild without quarantining the live workspace.
+
+        Args:
+            reason: Machine-readable failure.
+            reservation_id: Optional reservation to release.
+            reservation_kind: Reservation kind when releasing.
+
+        Returns:
+            Transient ``failed`` outcome. Live pointer and live workspace
+            state are unchanged.
+
+        Side Effects:
+            Releases an unused reservation when present.
+        """
+
+        if reservation_id is not None and reservation_kind is not None:
+            self._repository.admission.release_graph_reservation(
+                reservation_id,
+                reservation_kind=reservation_kind,
+            )
+            self._connection.commit()
+        return GraphJobOutcome(
+            kind="failed",
+            error_category=JobErrorCategory.TRANSIENT,
+            last_error=reason[:4000],
+            reservation_id=reservation_id,
+            reservation_kind=reservation_kind,
+        )
 
     def _quarantine_outcome(
         self,

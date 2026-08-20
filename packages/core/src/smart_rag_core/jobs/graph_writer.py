@@ -420,6 +420,7 @@ class GraphWriterGuard:
         from_states: Sequence[GraphWorkspaceState],
         to_state: GraphWorkspaceState,
         snapshot: dict[str, object] | None = None,
+        workspace_key: str | None = None,
     ) -> UUID:
         """Transition the workspace when the current state is allowed.
 
@@ -427,6 +428,8 @@ class GraphWriterGuard:
             from_states: Permitted source states.
             to_state: Target application state.
             snapshot: Optional JSON merged into ``config_snapshot``.
+            workspace_key: Workspace to update. Defaults to the lock
+                workspace. Candidate rebuilds pass ``{live}__rebuild``.
 
         Returns:
             Workspace row id.
@@ -441,13 +444,14 @@ class GraphWriterGuard:
         payload = dict(graph_chunker_config_snapshot())
         if snapshot:
             payload.update(snapshot)
+        key = (workspace_key or self._workspace_key).strip()
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT app.transition_graph_workspace_state(%s, %s::app.graph_workspace_state[], %s, %s::jsonb)
                 """,
                 (
-                    self._workspace_key,
+                    key,
                     [state.value for state in from_states],
                     to_state.value,
                     json.dumps(payload),

@@ -30,6 +30,7 @@ from smart_rag_core.retrieval.lightrag_pin import (
 )
 from smart_rag_core.retrieval.lightrag_qualification import (
     coerce_deletion_status,
+    inspect_ainsert_list_contract,
     status_record_mapping,
 )
 from smart_rag_core.retrieval.lightrag_structured import (
@@ -131,6 +132,16 @@ def test_graph_retriever_and_indexer_are_protocols() -> None:
     assert issubclass(GraphIndexer, Protocol)
     assert "retrieve_local" in GraphRetriever.__dict__
     assert "enqueue_insert" in GraphIndexer.__dict__
+    assert "enqueue_insert_sources" in GraphIndexer.__dict__
+
+
+def test_pinned_ainsert_accepts_list_input_and_ids() -> None:
+    """Installed LightRAG 1.5.6 ainsert must accept list input and IDs."""
+
+    flags = inspect_ainsert_list_contract()
+    assert flags["input_accepts_list"] is True
+    assert flags["ids_accepts_list"] is True
+    assert flags["has_adelete_by_doc_id"] is True
 
 
 def test_graph_module_does_not_import_lightrag() -> None:
@@ -230,6 +241,15 @@ def test_graph_source_envelope_binds_and_strips_identity() -> None:
     assert strip_graph_source_envelope("no envelope") == "no envelope"
     with pytest.raises(GraphSourceEnvelopeError):
         bind_graph_source_text(document_version_id="bad id", normalized_text="x")
+    passage_id = (
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    )
+    bound_passage = bind_graph_source_text(
+        document_version_id=passage_id,
+        normalized_text="same body",
+    )
+    assert passage_id in bound_passage
+    assert strip_graph_source_envelope(bound_passage) == "same body"
 
 
 def test_source_id_parser_rejects_empty_ambiguous_and_truncated() -> None:

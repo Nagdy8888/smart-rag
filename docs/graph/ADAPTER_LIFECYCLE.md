@@ -2,7 +2,7 @@
 title: LightRAG adapter lifecycle
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-20
 audience: engineering, reviewers
 phase_packet: Phase 5 Packet 2
 ---
@@ -60,6 +60,12 @@ Runtime patches:
 
 Pool cap is 4 per API process and 4 per worker process. Qualification tests
 may keep `POSTGRES_MAX_CONNECTIONS=2`. `POSTGRES_CONNECTION_RETRIES=0`.
+
+Candidate rebuilds retarget the attached engine with `bind_workspace` and
+then `ensure_pipeline_status`. LightRAG 1.5.6 keeps
+`{workspace}:pipeline_status` in process memory; `initialize_storages`
+creates it only for the constructor workspace. The in-memory
+`initialize_pipeline_status` call is not vendor DDL.
 
 ## Workspace rows
 

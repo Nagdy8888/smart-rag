@@ -2,7 +2,7 @@
 title: LightRAG pin and qualification contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-20
 audience: engineering, reviewers
 phase_packet: Phase 5 Packets 1–2
 ---
@@ -22,6 +22,8 @@ Related: [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
 [TOOL_VERSIONS.md](../development/TOOL_VERSIONS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·
+[ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md) ·
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md) ·
 [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md) ·
 [ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md) ·
 [lightrag-schema-bootstrap.md](../runbooks/lightrag-schema-bootstrap.md) ·
@@ -95,7 +97,7 @@ classes. The ops script calls core bootstrap and does not import `lightrag`.
 | `PGKVStorage`, `PGVectorStorage`, `PGDocStatusStorage` | Selected companions |
 | `PGGraphStorage` | Exists; forbidden as selected engine |
 | `initialize_storages` / `finalize_storages` | Mandatory; always finalize |
-| `ainsert(..., ids, file_paths, track_id) -> str` | `track_id` is monitoring only |
+| `ainsert(..., ids, file_paths, track_id) -> str` | `input` may be `str` or `list[str]`; `track_id` is monitoring only |
 | `aquery_data(query, param) -> dict` | Forces `only_need_context=True` |
 | `adelete_by_doc_id(doc_id, delete_llm_cache=False) -> DeletionResult` | `success` / `not_found` / `not_allowed` / `fail` |
 | `aget_docs_by_ids` | Status including `processed` / `failed` |
@@ -136,7 +138,7 @@ Rendered `only_need_context` prose is rejected; there is no context parser.
 
 | Token | Role | Not allowed as |
 | --- | --- | --- |
-| Caller `ids` | Canonical document-version ID | — |
+| Caller `ids` | Per-passage `{version_id}:{chunk_id}` (legacy whole-version `str(version_id)` still deleted) | — |
 | `file_paths` | Unique opaque basename token | Citation, integrity ID |
 | `track_id` | Monitoring | Idempotency key |
 | `source_id` | Vendor chunk tokens joined by `<SEP>` | Silent complete provenance |
@@ -152,9 +154,13 @@ at-cap lists fail closed (possible truncation).
 basenames are required. Duplicate basename and duplicate **raw** content-hash
 are vendor behaviors. Live 1.5.6 qualification proved raw identical text
 collapses. Application inserts therefore prefix
-`bind_graph_source_text` so vendor hashes include `document_version_id`.
-Raw `bind_identity=false` inserts remain the negative fixture. See
-[ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md).
+`bind_graph_source_text` so vendor hashes include the source ID. Production
+inserts envelope-bind each canonical passage to `{version_id}:{chunk_id}`;
+the token regex therefore allows `:`. Raw `bind_identity=false` inserts
+remain the negative fixture. See
+[ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md)
+and
+[ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md).
 
 ## Schema and bootstrap
 
@@ -205,7 +211,12 @@ Every LLM/embedding/rerank call is counted and routed through
 | `rerank` | 0 (`enable_rerank=False`; native rerank is not qualified) |
 
 One retry layer only (`max_retries=0` on provider adapters). Timeouts are
-required on role LLM configs.
+required on role LLM configs. LightRAG embeddings use `AsyncOpenAI` with an
+explicit **20s** HTTP timeout. `default_embedding_timeout` stays **30s**
+(vendor watchdog). Omitting the SDK timeout inherits 600s and is forbidden
+on this path. Production `ainsert` is sliced to at most eight canonical
+passage sources; see
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md).
 
 ## Deletion and status
 
@@ -252,11 +263,15 @@ See [WORKSPACE_LIFECYCLE.md](./WORKSPACE_LIFECYCLE.md).
 - Vendor tables in `public`
 - `POSTGRES_WORKSPACE` in runtime
 - Weakening the identical-content independence gate
+- Raising `default_embedding_timeout` to hide a blocked embedding callback
+- One unbounded multi-source `ainsert` for a whole version
+- Binding `{live}__rebuild` without initializing in-memory
+  `pipeline_status` (that is not a reason to call runtime DDL)
 
 ## Verification
 
 ```powershell
-uv run python -m pytest tests/unit/test_lightrag_pin.py tests/unit/test_lightrag_adapter.py tests/contract/test_lightrag_contract.py tests/contract/test_lightrag_bootstrap.py -q
+uv run python -m pytest tests/unit/test_lightrag_pin.py tests/unit/test_lightrag_adapter.py tests/unit/test_lightrag_indexer.py tests/unit/test_graph_source_text.py tests/unit/test_graph_source_batches.py tests/unit/test_graph_index_isolate.py tests/contract/test_lightrag_contract.py tests/contract/test_lightrag_bootstrap.py -q
 ```
 
 Contract tests skip when local Supabase Postgres is down unless

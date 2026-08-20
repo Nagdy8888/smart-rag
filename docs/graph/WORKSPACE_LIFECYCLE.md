@@ -2,7 +2,7 @@
 title: Graph workspace lifecycle
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-20
 audience: engineering, reviewers
 phase_packet: Phase 5 Packet 7
 ---
@@ -17,6 +17,8 @@ Packet 4.
 Related: [ADAPTER_LIFECYCLE.md](./ADAPTER_LIFECYCLE.md) ·
 [LIGHTRAG_CONTRACT.md](./LIGHTRAG_CONTRACT.md) ·
 [MAPPING.md](./MAPPING.md) ·
+[ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md) ·
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md) ·
 [RETRIEVAL.md](./RETRIEVAL.md) ·
 [JOB_STATE_MACHINE.md](../ingestion/JOB_STATE_MACHINE.md) ·
 [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) ·
@@ -144,17 +146,46 @@ Before `ainsert`:
 - embedding pin `text-embedding-3-large` at 1024
 - expected pointer generation when present on the payload
 
-Text is ordered `app.document_chunks.raw_text` (`chunk_index` ascending).
-Identity is `str(version_id)`. Basename is `g-{version_id}.txt`. Envelope
-`bind_graph_source_text` then `ainsert(..., ids=[version_id], file_paths=[basename], track_id=fresh)`.
-Chunker overlay 1200/100 `gpt-4o-mini` is stored on `config_snapshot`.
+Text is current undeleted `app.document_chunks.raw_text` (`chunk_index`
+ascending). One version job inserts each canonical passage as its own
+LightRAG source. Identity is `{version_id}:{chunk_id}`. Basename is
+`g-{version_id}-{chunk_id}.txt`. Envelope `bind_graph_source_text` then
+resumable `ainsert` batches of at most eight sources
+(`ids=source_ids`, `file_paths=basenames`, `track_id=fresh`). Checkpoints
+record processed IDs on `payload_ref`. The legacy whole-version id
+`str(version_id)` is still deleted on cleanup. Chunker overlay 1200/100
+`gpt-4o-mini` is stored on `config_snapshot`.
+See [ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md)
+and
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md).
+
+Jobs with `isolate_candidate=true` bind `{live}__rebuild`, initialize
+in-memory LightRAG `pipeline_status` for that workspace (no DDL), and do
+**not** move live to `updating`. Maps stay on the candidate until coverage
+0.90 and support 0.80 pass, then the singleton pointer switches atomically.
+
+```mermaid
+flowchart TD
+  liveWs[LiveWorkspaceUnchanged]
+  candidateWs[CandidateRebuildWorkspace]
+  batchInsert[ResumableAinsertBatch]
+  checkpoint[JobPayloadCheckpoint]
+  candidateMaps[CandidateMaps]
+  pointerSwitch[AtomicPointerSwitch]
+  liveWs --> candidateWs
+  candidateWs --> batchInsert
+  batchInsert --> checkpoint
+  checkpoint --> batchInsert
+  checkpoint --> candidateMaps
+  candidateMaps --> pointerSwitch
+```
 
 Vendor statuses `processed` and `failed` are terminal. `processed` does not
 by itself change `document_versions.status`. Packet 4 mapping may set
-`graph_ready` in the same job after maps verify. The worker injects
-version-scoped Hybrid retrieve and one support rerank through
-`bind_mapping_support`; see [MAPPING.md](./MAPPING.md). Replay that finds
-an existing `processed` row skips a second insert.
+`graph_ready` in the same job after the exact hash bijection and persisted
+readiness requery verify. Hybrid/rerank mapping callbacks are not used on
+that path. Replay that finds existing `processed` passage sources skips a
+second insert for those IDs only.
 
 ## Budgets
 
@@ -180,8 +211,10 @@ row exists; a duplicate insert is not issued.
 | After claim, before writer occupy | job lease expires; reclaim |
 | Writer occupy lost to peer | fail transient; no quarantine |
 | Advisory lock busy | fail transient; release writer |
-| Lock or lease loss during mutation | cancel new writes; `quarantined`; reconciliation job |
-| `ainsert` timeout after send | poll existing vendor row; ledger possible bill |
+| Lock or lease loss during mutation | cancel new writes; `quarantined` unless `isolate_candidate` |
+| Isolated timeout / 429 / vendor `failed` / missing `pipeline_status` | job `failed` transient; live pointer unchanged; candidate stays `building` |
+| Isolated lock or lease loss | cancel remaining batches; job `failed`; live not quarantined |
+| `ainsert` timeout after send | poll existing vendor row; ledger possible bill; retry batch only after verified delete |
 | Vendor `failed` or unverifiable status | `quarantined`; no public ready |
 | Vendor `processed` | job completed; Packet 4 maps; Graph Ready only if gates pass |
 | Worker shutdown | session lock drops; reclaim plus quarantine if partial |
@@ -276,7 +309,7 @@ See [GRAPH_SNAPSHOT_RESTORE_ROLLBACK.md](../runbooks/GRAPH_SNAPSHOT_RESTORE_ROLL
 ## Verification
 
 ```powershell
-uv run python -m pytest tests/unit/test_graph_lifecycle.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_graph_resolver.py -q
+uv run python -m pytest tests/unit/test_graph_lifecycle.py tests/unit/test_phase3_graph_scope_guard.py tests/unit/test_lightrag_pin.py tests/unit/test_graph_resolver.py tests/unit/test_graph_source_text.py tests/unit/test_lightrag_indexer.py -q
 uv run python -m pytest tests/contract/test_graph_lifecycle.py -q
 ```
 

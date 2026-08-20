@@ -2,7 +2,7 @@
 title: Phase 5 GraphRAG evidence
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-20
 audience: engineering, reviewers
 phase: 5
 ---
@@ -17,6 +17,8 @@ Combined answer quality remains Phase 6.
 
 Related: [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md) ·
 [ADR-graph-source-identity-envelope.md](../adr/ADR-graph-source-identity-envelope.md) ·
+[ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md) ·
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md) ·
 [ADR-lightrag-runtime-attach-without-ddl.md](../adr/ADR-lightrag-runtime-attach-without-ddl.md) ·
 [ADAPTER_LIFECYCLE.md](../graph/ADAPTER_LIFECYCLE.md) ·
 [ADR-lightrag-identical-content-collapse.md](../adr/ADR-lightrag-identical-content-collapse.md) ·
@@ -1426,6 +1428,116 @@ No push until user acceptance (recorded below). Holdout remains sealed. No
 
 This closed the Packet 4 worker Hybrid hole. Combined fusion, SSE, and
 query-agent remain Phase 6.
+
+## Canonical-passage Graph-200 rebuild (2026-08-19)
+
+Post-acceptance follow-up. Phase 5 stays `complete`. This records the
+user-approved deviation from Packet 3's single `ids=[document_version_id]`
+insert. See
+[ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md).
+
+### Original whole-version failure (keep)
+
+| Metric | Measured |
+| --- | --- |
+| Canonical current passages | 164 |
+| Vendor chunks after LightRAG 1200/100 chunker | 95 |
+| Persisted `lightrag_chunk_map` rows | 87 of 95 |
+| Mapping coverage | 2,832 / 3,314 (85.46%) |
+| Graph Ready gate | 90% overall; not met |
+| Vendor snapshot chars | 474,506 vs 474,674 current canonical |
+
+Retrying Hybrid selection or lowering coverage/support was forbidden. Hybrid
+indexes for Hybrid-800 and Graph-200 stay untouched. `plot_summaries.txt` is
+not ingested.
+
+### Acceptance checks restated
+
+- Pinned `lightrag-hku==1.5.6` list `ainsert` / status / independent delete
+  qualify, or GraphRAG stays blocked.
+- One version job batch-inserts 164 envelope-bound passage sources with
+  IDs `{version_id}:{chunk_id}`.
+- Mapping is a strict hash bijection. Snapshot drift is terminal
+  `graph_source_snapshot_mismatch`.
+- Persisted readiness requeries source, vendor-document, vendor-chunk, and
+  distinct chunk-map counts before Graph Ready.
+- One-shot rebuild script processes one job and exits. No forever worker.
+
+### Verification commands
+
+```powershell
+uv run python -m pytest tests/unit/test_graph_source_text.py tests/unit/test_lightrag_indexer.py tests/unit/test_lightrag_pin.py tests/unit/test_graph_mapping.py tests/unit/test_graph_mapping_hybrid.py tests/unit/test_graph_resolver.py tests/contract/test_graph_mapping.py tests/contract/test_lightrag_contract.py -q
+uv run python scripts/ci/check_migrations.py
+uv run python scripts/ops/rebuild_demo_graph_canonical_passages.py
+uv run python scripts/ops/report_demo_langsmith_usage.py
+```
+
+### Live rebuild (2026-08-20)
+
+One bounded command:
+
+```powershell
+uv run python scripts/ops/rebuild_demo_graph_canonical_passages.py
+```
+
+Preflight: 164 current passages, digest
+`29dbdfb0d0f2a440e9eedb2965ebbab2a9b49b20d32437387edc62174564d3a1`, 165
+vendor deletion IDs, version still `graph_pending`. Hybrid indexes were
+not modified. `plot_summaries.txt` was not ingested.
+
+LightRAG processed extracts **1–36**, then aborted at **37/164** during
+relation VDB flush:
+
+`Embedding func: Task forcefully terminated due to execution timeout (>75s, actual: 131.3s)`
+
+Pinned `lightrag-hku==1.5.6` cancelled the remaining pipeline. Affected
+sources stayed `PENDING`/`FAILED`. The worker recorded
+`vendor_status_failed` and quarantined the workspace. Mapping never ran,
+so the previous whole-version **87** chunk maps remained.
+
+| Field | Result |
+| --- | --- |
+| Failed invariant | `version_status:graph_pending` |
+| Job last error | `vendor_status_failed` |
+| Workspace | `quarantined` |
+| Chunk maps | 87 (unchanged) |
+| Vendor docs / chunks | 1 / 87 |
+| LangSmith project | `smart-rag-demo-3` |
+| `ingestion.graph` traces | 1 |
+| `model.lightrag_llm` spans | 40 successful |
+| `embedding.embed` spans | 146 successful |
+| Trace total tokens | 179,216 |
+| Estimated USD | 0.04261959 |
+
+Do **not** retry this job in a loop. Do not lower the 90% Graph Ready or
+0.80 support gates. Do not fall back to Hybrid mapping.
+
+### Long-term fix (2026-08-20, not a live rebuild)
+
+Raising LightRAG `default_embedding_timeout` is rejected. Canonical-passage
+sources stay. Implementation now uses `AsyncOpenAI` with a 20s provider
+timeout, resumable batches of eight, verified cleanup before a transient
+retry, and `isolate_candidate` until maps pass. See
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md).
+
+Unit coverage: timeout / HTTP 429 / worker-crash / cooperative lease
+cancellation / isolate-without-quarantine / candidate `pipeline_status`.
+A live Graph-200 rebuild remains **unverified** until the operator
+explicitly requests it. The 2026-08-20 operator retry failed at the first
+isolated `ainsert` (`PipelineNotInitializedError` for
+`company_default__rebuild`). Binding the rebuild workspace now initializes
+in-memory `pipeline_status` without vendor DDL.
+
+```powershell
+uv run python -m pytest tests/unit/test_graph_source_batches.py tests/unit/test_graph_index_isolate.py tests/unit/test_embedding_service.py tests/unit/test_langsmith_tracing.py -q
+```
+
+### Rollback
+
+- Keep Hybrid indexes. Do not copy ParadeDB.
+- Restore Graph-200 to `graph_pending` and delete passage plus legacy vendor
+  IDs through the qualified adapter.
+- Do not re-enable whole-version concatenated insert or Hybrid mapping retries.
 
 ## Phase close
 

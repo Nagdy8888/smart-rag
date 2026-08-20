@@ -154,9 +154,12 @@ def test_mapping_rerank_prompt_matches_frozen_hash() -> None:
     assert _RERANK_PROMPT.is_file()
 
 
-def test_bind_mapping_support_in_mock_mode() -> None:
+def test_bind_mapping_support_in_mock_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Mock-mode settings produce mapping callbacks without a provider key."""
 
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
     settings = WorkerSettings()
     assert settings.mock_model_mode is True
     callbacks = bind_mapping_support(_unused_connection(), settings)

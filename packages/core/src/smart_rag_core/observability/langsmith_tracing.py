@@ -11,15 +11,17 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from langsmith import get_current_run_tree as _get_current_run_tree
 from langsmith import (
     traceable as _langsmith_traceable,  # pyright: ignore[reportUnknownVariableType]
 )
 from langsmith.utils import (
     tracing_is_enabled as _langsmith_tracing_is_enabled,  # pyright: ignore[reportUnknownVariableType]
 )
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 
 from smart_rag_core.observability.logging import current_correlation_ids
 from smart_rag_core.settings import SharedSettings
@@ -27,6 +29,7 @@ from smart_rag_core.settings import SharedSettings
 if TYPE_CHECKING:
     from openai.types.create_embedding_response import CreateEmbeddingResponse
 
+get_current_run_tree = cast(Any, _get_current_run_tree)
 traceable = cast(Any, _langsmith_traceable)
 tracing_is_enabled = cast(Any, _langsmith_tracing_is_enabled)
 
@@ -174,6 +177,39 @@ def traced_openai_client(
     return wrap_openai(client)
 
 
+def traced_async_openai_client(
+    *,
+    api_key: str,
+    max_retries: int = 0,
+    timeout: float | None = None,
+) -> AsyncOpenAI:
+    """Construct the only production async OpenAI client.
+
+    Embeddings from async LightRAG/Hybrid paths must use this factory.
+    Omitting ``timeout`` inherits the SDK 600-second default, which is
+    longer than the LightRAG embedding watchdog and is forbidden there.
+
+    Args:
+        api_key: Provider credential. Never logged.
+        max_retries: SDK retry count. Production embeddings use ``0``.
+        timeout: Client timeout in seconds. Callers must pass an explicit
+            bound; ``None`` still constructs the client for tests.
+
+    Returns:
+        An ``AsyncOpenAI`` client, optionally wrapped for LangSmith.
+
+    Side Effects:
+        May wrap the SDK client with LangSmith instrumentation.
+    """
+
+    client = AsyncOpenAI(api_key=api_key, max_retries=max_retries, timeout=timeout)
+    if not tracing_is_enabled():
+        return client
+    from langsmith.wrappers import wrap_openai
+
+    return wrap_openai(client)
+
+
 def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     """Replace gateway arguments with hashes, counts, and correlation IDs.
 
@@ -238,6 +274,9 @@ def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     model = getattr(request, "model", None)
     if isinstance(model, str):
         payload["model"] = model
+    timeout_seconds = getattr(request, "timeout_seconds", None)
+    if isinstance(timeout_seconds, (int, float)):
+        payload["timeout_seconds"] = float(timeout_seconds)
     return payload
 
 
@@ -495,6 +534,45 @@ def redact_embedding_call_outputs(outputs: object) -> dict[str, Any]:
     return payload
 
 
+def record_current_usage_metadata(
+    *,
+    provider: str,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    total_cost_usd: Decimal,
+) -> None:
+    """Attach recognized token and cost metadata to the current model span.
+
+    Args:
+        provider: Provider slug shown by LangSmith, such as ``openai``.
+        model: Provider model id used by the call.
+        input_tokens: Provider-reported input token count.
+        output_tokens: Provider-reported output token count.
+        total_cost_usd: Application estimate in USD.
+
+    Side Effects:
+        Updates only the active LangSmith run tree. No-op when tracing is off
+        or no current run exists. Raw model inputs and outputs are never added.
+    """
+
+    if not tracing_is_enabled():
+        return
+    run = get_current_run_tree()
+    if run is None:
+        return
+    run.metadata["ls_provider"] = provider
+    run.metadata["ls_model_name"] = model
+    run.set(
+        usage_metadata={
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+            "total_cost": float(total_cost_usd),
+        }
+    )
+
+
 def payload_contains_forbidden_text(payload: object, *needles: str) -> bool:
     """Return whether serialized payload text contains any needle.
 
@@ -518,12 +596,16 @@ def payload_contains_forbidden_text(payload: object, *needles: str) -> bool:
 )
 def traced_embeddings_create(
     client: OpenAI,
+    *,
+    input_usd_per_million: Decimal = Decimal("0"),
     **kwargs: Any,
 ) -> CreateEmbeddingResponse:
     """Issue one embeddings request through the traced factory client.
 
     Args:
         client: Client from :func:`traced_openai_client`.
+        input_usd_per_million: Pinned input-token price used for the displayed
+            LangSmith estimate. Zero leaves cost at zero.
         **kwargs: Forwarded to ``client.embeddings.create``. ``input`` text
             is hashed in the exported span and never copied.
 
@@ -535,7 +617,69 @@ def traced_embeddings_create(
         is enabled.
     """
 
-    return client.embeddings.create(**kwargs)
+    response = client.embeddings.create(**kwargs)
+    usage = getattr(response, "usage", None)
+    input_tokens = (
+        int(getattr(usage, "prompt_tokens", 0) or 0) if usage is not None else 0
+    )
+    cost = (
+        Decimal(input_tokens) * input_usd_per_million / Decimal(1_000_000)
+    )
+    record_current_usage_metadata(
+        provider="openai",
+        model=str(kwargs.get("model", "") or ""),
+        input_tokens=input_tokens,
+        output_tokens=0,
+        total_cost_usd=cost,
+    )
+    return response
+
+
+@traceable(
+    name="openai.embeddings",
+    run_type="embedding",
+    process_inputs=redact_embedding_call_inputs,
+    process_outputs=redact_embedding_call_outputs,
+)
+async def traced_embeddings_create_async(
+    client: AsyncOpenAI,
+    *,
+    input_usd_per_million: Decimal = Decimal("0"),
+    **kwargs: Any,
+) -> CreateEmbeddingResponse:
+    """Issue one async embeddings request through the traced factory client.
+
+    Args:
+        client: Client from :func:`traced_async_openai_client`.
+        input_usd_per_million: Pinned input-token price used for the displayed
+            LangSmith estimate. Zero leaves cost at zero.
+        **kwargs: Forwarded to ``client.embeddings.create``. ``input`` text
+            is hashed in the exported span and never copied.
+
+    Returns:
+        Provider embedding response.
+
+    Side Effects:
+        One HTTPS embeddings request. Creates a LangSmith span when tracing
+        is enabled. Does not block the event loop on the HTTP wait.
+    """
+
+    response = await client.embeddings.create(**kwargs)
+    usage = getattr(response, "usage", None)
+    input_tokens = (
+        int(getattr(usage, "prompt_tokens", 0) or 0) if usage is not None else 0
+    )
+    cost = (
+        Decimal(input_tokens) * input_usd_per_million / Decimal(1_000_000)
+    )
+    record_current_usage_metadata(
+        provider="openai",
+        model=str(kwargs.get("model", "") or ""),
+        input_tokens=input_tokens,
+        output_tokens=0,
+        total_cost_usd=cost,
+    )
+    return response
 
 
 def rerank_responses_traceable(func: Any) -> Any:

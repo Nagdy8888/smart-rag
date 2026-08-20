@@ -2,7 +2,7 @@
 title: Graph scaling options
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-20
 audience: engineering, reviewers, client-approver
 phase_packet: Phase 5 Packet 8
 ---
@@ -21,6 +21,7 @@ Related: [FROZEN_GRAPH_MANIFEST.md](./FROZEN_GRAPH_MANIFEST.md) ·
 [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
 [AVAILABILITY_AND_ISOLATION_TRIGGERS.md](../architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) ·
 [phase-05 evidence](../development/phase-05-graphrag-evidence.md) ·
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md) ·
 [docs index](../README.md)
 
 ## Why this document exists
@@ -135,3 +136,15 @@ tombstone age, reserve remaining, and whether Combined is even enabled
 - Claiming the 2,000 / 200,000 envelope is proven
 - Advertising more than 15 labeled `graph_mapping` documents as current GraphRAG capacity
 - Raising Combined relationship/multi-hop quality by 10 percentage points
+- Raising `MAX_GRAPH_PASSAGE_SOURCES`, insert batch size, or the LightRAG
+  embedding watchdog without a signed load-test of the async batched path
+
+## Single-writer throughput
+
+Graph mutations remain one PostgreSQL advisory-lock writer. Batched
+`AsyncOpenAI` inserts raise the chance that Graph-200 can finish without a
+watchdog kill; they do **not** add a second writer. Load-test documents/hour
+through mapping-verified Graph Ready before increasing the advertised
+envelope. When that measured rate cannot drain the envelope inside seven
+days, open a scaling ADR from the options above instead of raising batch
+size or `default_embedding_timeout`.

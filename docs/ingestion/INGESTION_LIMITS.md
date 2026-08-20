@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-20
 audience: engineering, ops
 ---
 
@@ -10,7 +10,7 @@ audience: engineering, ops
 
 Single source of truth for Phase 3 durable job, worker, admission, and graph-handoff bounds. Values fixed by [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) or the global contract require ADR approval to change. Unspecified defaults are conservative placeholders with explicit review triggers.
 
-Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [SCAN_BEFORE_INDEX.md](./SCAN_BEFORE_INDEX.md) · [PARSER_SANDBOX.md](./PARSER_SANDBOX.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [MAPPING.md](../graph/MAPPING.md) · [06-database-workload-isolation.md](../architecture/06-database-workload-isolation.md)
+Related: [JOB_STATE_MACHINE.md](./JOB_STATE_MACHINE.md) · [SCAN_BEFORE_INDEX.md](./SCAN_BEFORE_INDEX.md) · [PARSER_SANDBOX.md](./PARSER_SANDBOX.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [MAPPING.md](../graph/MAPPING.md) · [06-database-workload-isolation.md](../architecture/06-database-workload-isolation.md) · [ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md)
 
 ## Limit registry
 
@@ -204,7 +204,9 @@ Primary references: [tiktoken](https://github.com/openai/tiktoken), [Apache Arro
 | Embedding dimensions | count | 1024 | 1024 | ADR-embedding-model-dimension | gateway | reject batch | Dimension mismatch |
 | Contextual policy version | text | `contextual_v1` | — | Packet 7 sign-off | worker | reject stale replay | Policy drift |
 | Batch size | inputs/request | 64 | 2048 | OpenAI documented tier + measured dev | gateway | split/reject | Provider 413/limit errors |
-| Request timeout | seconds | 120 | 300 | OpenAI guidance + measured dev | gateway | retry once | p95 timeout breaches |
+| Request timeout | seconds | 120 | 300 | Hybrid ingest only. LightRAG uses 20s below. | gateway | retry once | p95 timeout breaches |
+| LightRAG embedding provider timeout | seconds | 20 | 20 | Must stay below LightRAG watchdog (30s). SDK default 600s is forbidden there. | gateway | `embedding_timeout` | Watchdog health-check kill |
+| LightRAG embedding watchdog | seconds | 30 | 30 | Vendor `default_embedding_timeout`; do not raise | adapter | vendor force-kill | Health-check 75s misses |
 | Gateway retries | count | 2 | 2 | Packet 7 bounded repair | gateway | fail batch | Retry storm |
 | Gateway concurrency | workers | 1 | 2 | Worker concurrency /2 | gateway | queue | Provider 429 sustained |
 | Ledger idempotency | key | `(version_id, operation_key)` UNIQUE | — | Packet 7 | worker | replay no-op | Duplicate canonical rows |
@@ -236,6 +238,13 @@ ParadeDB writer credentials: `PARADEDB_URL` on worker only (Compose `paradedb_wr
 | Arabic/mixed coverage | ratio | 0.85 | 0.85 | Phase 5 Packet 4 per-language | mapper | `language_gate` repair | Arabic fixture miss |
 | Overlap accept | Jaccard | 0.50 | 0.50 | Packet 4 hash/span/overlap | mapper | fall through to Hybrid batch | Near-dup false merge |
 | Vendor chunks per document | count | 500 | 500 | Packet 4 budget | mapper | `mapping_budget_chunks` | Large-doc split policy |
+| Canonical passage sources per version | count | 500 | 500 | ADR-canonical-passage-lightrag-sources | indexer | `graph_source_too_many_passages` | Corpus larger than Graph-200 |
+| Canonical passage source chars | chars | 24000 | 24000 | ADR-canonical-passage-lightrag-sources | indexer | `graph_source_passage_too_large` | Passage exceeds envelope+chunker |
+| Graph source insert batch size | sources | 8 | 8 | ADR-lightrag-async-embed-batched-sources | indexer | split remaining batches | Load-test before raising |
+| Graph source batch transient attempts | count | 2 | 2 | First try plus cleanup retry | indexer | fail job; no live quarantine when isolated | Retry storm |
+| Graph embedding latency alert | milliseconds | 15000 | 15000 | Operator signal; 131.3s Graph-200 miss | worker | admin notification `graph_embedding_latency` | p95 embed > 15s |
+| Graph source batch size alert | sources | 8 | 8 | Fires when an insert batch exceeds the signed cap | worker | admin notification `graph_source_batch_size` | Unsigned batch increase |
+| Graph source batch poll deadline | seconds | 14400 | 14400 | Graph-200 ~164 extract sources | indexer | `vendor_status_deadline` | Extract p95 exceeds 4h |
 | Entities per document | count | 200 | 200 | Packet 4 budget | mapper | `mapping_budget_entities` | Extraction flood |
 | Relations per document | count | 200 | 200 | Packet 4 budget | mapper | `mapping_budget_relations` | Extraction flood |
 | Hybrid mapping retrieve | calls/doc | 1 | 1 | Packet 4 one-shot | mapper | `mapping_budget_hybrid` | Per-relation retrieve regression |
@@ -246,7 +255,20 @@ ParadeDB writer credentials: `PARADEDB_URL` on worker only (Compose `paradedb_wr
 | Source ids per entity | count | 200 | 200 | Packet 1 `GRAPH_FIELD_SEP` | mapper | truncated unavailable | Silent provenance |
 | Source ids per relation | count | 200 | 200 | Packet 1 `GRAPH_FIELD_SEP` | mapper | truncated unavailable | Silent provenance |
 
-Repair jobs are keyed by workspace/object/map_kind/config generation. Repair must not query Hybrid and must not lower these thresholds. See [MAPPING.md](../graph/MAPPING.md).
+The accepted synthetic Graph-200 demo may raise only the entity/relation
+enumeration limits to 1,600/1,200. The worker applies that pair only when
+`APP_ENV=local` and the durable job payload contains
+`local_demo_mapping_override=true`, `content_class=synthetic`, and
+`review_approved=true`. Staging, production, and every other job retain the
+200/200 bounds. Vendor chunks and model-call limits are unchanged.
+
+Canonical-passage indexing is the Graph Ready path:
+[ADR-canonical-passage-lightrag-sources.md](../adr/ADR-canonical-passage-lightrag-sources.md)
+and
+[ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md).
+Hybrid/rerank mapping callbacks stay unused on that exact bijection. Repair
+jobs are keyed by workspace/object/map_kind/config generation. Repair must
+not query Hybrid and must not lower these thresholds. See [MAPPING.md](../graph/MAPPING.md).
 
 ## Graph query and inspection bounds (Packet 5)
 
