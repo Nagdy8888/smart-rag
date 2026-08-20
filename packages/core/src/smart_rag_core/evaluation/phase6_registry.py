@@ -185,10 +185,10 @@ PHASE6_EVAL_REGISTRY: dict[str, EvalCategoryMapping] = {
     ),
     "online_eval_bounded": EvalCategoryMapping(
         category_id="online_eval_bounded",
-        command="uv run python -m pytest tests/unit/test_phase6_eval_registry.py -q",
+        command="uv run python -m pytest tests/unit/test_agent_eval.py tests/unit/test_langsmith_agent_runner.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_phase6_eval_registry.py -q",
         evidence_doc="docs/evaluation/PHASE6_EVAL_REGISTRY.md",
         status="mapped",
-        notes="Mock-mode default; sample ≤20; USD ≤2.00; no unlimited OpenAI.",
+        notes="Mock-mode default; sample ≤20; USD ≤2.00; no unlimited OpenAI. scripts/eval_query_agent_langsmith.py --dry-run --limit 3. Holdout stays sealed. QT-EVAL-009 remains unverified.",
     ),
     "qt_eval_009_combined_plus_10pp": EvalCategoryMapping(
         category_id="qt_eval_009_combined_plus_10pp",

@@ -23,7 +23,10 @@ Related: [DATASET_SPEC.md](./DATASET_SPEC.md) ·
 
 - `HoldoutAccess.denied()` in CI and nightly. No holdout labels for tuning.
 - Online eval mock-mode default is true. Sample ≤ 20 cases. Cost ≤ USD 2.00.
-  Unlimited real OpenAI jobs fail closed.
+  Unlimited real OpenAI jobs fail closed. The bounded LangSmith agent-eval
+  CLI (`scripts/eval_query_agent_langsmith.py`) loads synthetic **development**
+  cases only, keeps `holdout_opened=false`, and is an evaluation **tool**, not
+  a Combined +10pp quality claim. QT-EVAL-009 stays `unverified`.
 - Versioned evaluation is required before router/prompt/profile/normalizer/
   chunking/threshold release. Few-shots may use only approved redacted
   profile failures that stay disjoint from holdout.
@@ -54,7 +57,7 @@ CI: `uv run python scripts/ci/check_phase6_eval_registry.py` (unit tier).
 | Reaper 7/30-day + one-paid-run | `test_query_memory_reaper.py` | mapped |
 | SSE handshake / unknown events | SSE protocol/resume/heartbeat | mapped |
 | Holdout isolation | Phase 4 freeze/materialize | mapped |
-| Bounded online eval | `test_phase6_eval_registry.py` | mapped |
+| Bounded online eval | `test_agent_eval.py`, `test_langsmith_agent_runner.py`, `test_query_agent_eval_trace.py`, `scripts/eval_query_agent_langsmith.py --dry-run` | mapped |
 | QT-EVAL-009 Combined +10pp live | Synthetic fusion fixture only | **unverified** |
 | Rewrite/correction/mapping/idempotency | Correction, admit, graph mapping | mapped |
 | Conversation deletion | HTTP 204/404 + lingering-ID search | mapped |
@@ -74,5 +77,6 @@ Live retrieval evals and unbounded OpenAI remain future nightly work.
 
 ```text
 uv run python scripts/ci/check_phase6_eval_registry.py
-uv run python -m pytest tests/unit/test_phase6_eval_registry.py -q
+uv run python -m pytest tests/unit/test_agent_eval.py tests/unit/test_langsmith_agent_runner.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_phase6_eval_registry.py -q
+uv run python scripts/eval_query_agent_langsmith.py --dry-run --limit 3
 ```

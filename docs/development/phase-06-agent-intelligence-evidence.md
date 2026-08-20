@@ -1295,7 +1295,10 @@ no further HTTP is sent for that expired claim
 every packet-7 category to an existing Phase 4/5/6 command. CI:
 `scripts/ci/check_phase6_eval_registry.py` (unit tier via
 `scripts/check.py`). Online eval: mock default, max 20 cases, USD 2.00,
-`HoldoutAccess.denied()`. `qt_eval_009_combined_plus_10pp` status is
+`HoldoutAccess.denied()`. Bounded LangSmith agent eval
+(`scripts/eval_query_agent_langsmith.py`) is a **follow-up tool** on the
+synthetic development split; it does not complete Phase 6, retune Hybrid,
+or open holdout. `qt_eval_009_combined_plus_10pp` status is
 **`unverified`**. Frontend XSS of entity/relation/crawl HTML is packet 8.
 
 Curation schedule (weekly through pilot + first eight production weeks,
@@ -1312,7 +1315,8 @@ Post-launch regression sets are not the immutable holdout.
 | `uv run python scripts/ci/check_migrations.py` | 0 (51 reviewed files) |
 | `uv run python scripts/ci/check_openapi.py` | 0 (snapshot matches after DELETE 204 regenerate) |
 | `uv run python scripts/ci/check_phase6_eval_registry.py` | 0 |
-| `uv run python -m pytest tests/unit/test_conversation_deletion.py tests/contract/test_query_memory_reaper.py tests/unit/test_phase6_eval_registry.py tests/unit/test_prompt_registry.py tests/unit/test_langsmith_tracing.py tests/unit/test_fastapi_security.py tests/unit/test_package_imports.py tests/contract/test_import_boundaries.py -q` | 0 |
+| `uv run python -m pytest tests/unit/test_conversation_deletion.py tests/contract/test_query_memory_reaper.py tests/unit/test_phase6_eval_registry.py tests/unit/test_agent_eval.py tests/unit/test_langsmith_agent_runner.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_prompt_registry.py tests/unit/test_langsmith_tracing.py tests/unit/test_fastapi_security.py tests/unit/test_package_imports.py tests/contract/test_import_boundaries.py -q` | 0 |
+| `uv run python scripts/eval_query_agent_langsmith.py --dry-run --limit 3` | 0 |
 
 ### Deviations
 

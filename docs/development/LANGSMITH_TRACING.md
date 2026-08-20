@@ -122,12 +122,57 @@ sequenceDiagram
 `block_openai_network` still denies only `api.openai.com`. It does not block
 `api.smith.langchain.com`.
 
+## Bounded query-agent evaluation
+
+`scripts/eval_query_agent_langsmith.py` syncs a versioned **development-only**
+LangSmith dataset and runs `Client.evaluate` against the admitted production
+query graph in-process. It is an evaluation tool. It does not retune Hybrid,
+open holdout, or claim Combined +10pp.
+
+Parent run name: `query.agent.eval`. Exported fields are case id, hashed
+user/conversation ids, routes, versions, counts, latency, and cost.
+Never exported: raw query, answer, passages, prompts, email, JWT, DSN, or
+keys. Dataset example `outputs` may retain synthetic query/answer because
+`redaction_class=synthetic`.
+
+```mermaid
+sequenceDiagram
+  participant CLI as eval_query_agent_langsmith
+  participant LS as LangSmith
+  participant Graph as AdmittedQueryGraph
+  CLI->>CLI: select development cases
+  CLI->>LS: sync versioned dataset
+  loop each case max_concurrency 1
+    CLI->>Graph: admit invoke persist settle
+    Graph->>LS: query.agent.eval parent
+  end
+  CLI->>LS: deterministic evaluators
+  CLI->>CLI: local JSON summary
+```
+
+Hard bounds: development split only, `HoldoutAccess.denied()`, ≤20 cases,
+`max_concurrency=1`, one repetition, max USD 2.00, at most one judge call
+per case, mock default. Different `--limit` values produce different
+dataset names (selected-set manifest hash). Remote metadata drift fails
+closed.
+
+```powershell
+uv run python scripts/eval_query_agent_langsmith.py --dry-run --limit 3
+uv run python -m pytest tests/unit/test_agent_eval.py tests/unit/test_langsmith_agent_runner.py tests/unit/test_query_agent_eval_trace.py -q
+```
+
+Live mock/live-agent runs need `LANGSMITH_TRACING=true`, a key, a project,
+local Supabase, an active synthetic member, and ingested synthetic corpus.
+`--llm-judge` requires `--live-agent`. ParadeDB absence fails unless
+`--allow-bm25-degraded`.
+
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_openai_rerank.py tests/unit/test_openai_lightrag.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
+uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_openai_rerank.py tests/unit/test_openai_lightrag.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
 uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/openai_lightrag.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_openai_lightrag.py
 ```
+
 
 Live LangSmith project visibility is **unverified** until
 `LANGSMITH_TRACING=true` is used with a real key.

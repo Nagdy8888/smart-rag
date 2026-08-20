@@ -135,3 +135,29 @@ def verifier_json_schema(link_ids: tuple[str, ...]) -> dict[str, object]:
             }
         },
     }
+
+
+def eval_judge_json_schema() -> dict[str, object]:
+    """Return the strict synthetic-eval judge schema.
+
+    Returns:
+        OpenAI ``json_schema`` document.
+    """
+
+    unit = {"type": "number", "minimum": 0, "maximum": 1}
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "correctness",
+            "groundedness",
+            "refusal_quality",
+            "rationale",
+        ],
+        "properties": {
+            "correctness": unit,
+            "groundedness": unit,
+            "refusal_quality": unit,
+            "rationale": {"type": "string", "maxLength": 240},
+        },
+    }

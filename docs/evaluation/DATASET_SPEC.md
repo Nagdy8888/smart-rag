@@ -108,6 +108,18 @@ Phase 4 Recall@10 / code Recall@5 / alias Recall@10 population is `runtime_owner
 
 Holdout-blind Recall@K, locator correctness, ACL, table dispatch, and first-evidence p95 are defined in [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md). Gold `p4-chk-*` ids join through the Wave 1B sidecar; occupancy in `coverage_eval` is not Recall@K. Packet 1 schema, manifests, and class matrix above are unchanged.
 
+## Bounded LangSmith agent eval (development only)
+
+`scripts/eval_query_agent_langsmith.py` publishes a LangSmith dataset named
+`smart-rag-agent-eval-{schema}-{labels}-development-{manifest12}` from the
+selected synthetic development subset. Qualification and holdout ids fail
+closed. Dataset identity includes the selected-set manifest hash, so a
+different `--limit` is a different dataset. Example metadata carries
+`case_content_hash`; remote drift or extra example ids fail closed. This
+does not change Packet 1 labels, does not open holdout, and is not a
+Combined +10pp claim. See [LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md)
+and [PHASE6_EVAL_REGISTRY.md](./PHASE6_EVAL_REGISTRY.md).
+
 ## QueryType to Phase 6 family
 
 Frozen Phase 4 `QueryType` members do not change. Packet 9 records the Phase 6 route family each member selects so later routing can consume a typed contract. Implementation: `packages/core/src/smart_rag_core/query_profile/phase6_map.py`. Field meanings live in [QUERY_PROFILE_LABELING.md](./QUERY_PROFILE_LABELING.md). QT-QP still requires `model_calls == 0` on the deterministic extract path; see [QUERY_PROFILE_EVAL.md](./QUERY_PROFILE_EVAL.md).

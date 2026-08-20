@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from smart_rag_core.gateways.openai_answer import (
     execute_openai_answer,
+    execute_openai_eval_judge,
     execute_openai_verifier,
 )
 from smart_rag_core.gateways.openai_lightrag import (
@@ -31,6 +32,9 @@ from smart_rag_core.query_answer.versions import (
     ANSWER_MODEL_ID,
     ANSWER_PROMPT_SHA256,
     ANSWER_PROMPT_VERSION,
+    EVAL_JUDGE_MODEL_ID,
+    EVAL_JUDGE_PROMPT_SHA256,
+    EVAL_JUDGE_PROMPT_VERSION,
     VERIFIER_MODEL_ID,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
@@ -310,6 +314,62 @@ class VerifierModelResponse(BaseModel):
     retrieval_performed: Literal[False] = False
 
 
+class EvalJudgeModelRequest(BaseModel):
+    """Bounded synthetic-eval judge request. No tools or retrieval.
+
+    Attributes:
+        operation: Must be ``eval_judge``.
+        prompt_version: Pinned judge prompt version.
+        prompt_sha256: Hash of that prompt file.
+        prompt_text: Prompt body used as Responses instructions.
+        model_id: Allow-listed small model.
+        question: Synthetic evaluation question.
+        acceptable_answers: Frozen acceptable answers, possibly empty.
+        answer_text: Agent answer text.
+        answer_status: ``complete``, ``partial``, or ``refused``.
+        evidence_ids: Bounded selected synthetic evidence identifiers.
+        remaining_deadline_seconds: Client timeout bound.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: Literal["eval_judge"] = "eval_judge"
+    prompt_version: str = EVAL_JUDGE_PROMPT_VERSION
+    prompt_sha256: str = EVAL_JUDGE_PROMPT_SHA256
+    prompt_text: str = Field(min_length=1, max_length=16_384)
+    model_id: str = EVAL_JUDGE_MODEL_ID
+    question: str = Field(min_length=1, max_length=2000)
+    acceptable_answers: tuple[str, ...] = ()
+    answer_text: str = Field(max_length=16_384)
+    answer_status: str = Field(max_length=32)
+    evidence_ids: tuple[str, ...] = Field(default=(), max_length=24)
+    remaining_deadline_seconds: float = Field(gt=0, le=50)
+
+
+class EvalJudgeModelResponse(BaseModel):
+    """Structured eval-judge payload plus usage for one operation.
+
+    Attributes:
+        mode: Adapter mode.
+        payload: JSON object with unit-interval scores and a short rationale.
+        request_id: Provider or fixture id.
+        input_tokens: Usage input tokens.
+        output_tokens: Usage output tokens.
+        model_calls: Always 1 when this response is returned.
+        retrieval_performed: Always false.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["mock", "openai"]
+    payload: dict[str, object]
+    request_id: str = Field(min_length=1, max_length=128)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    model_calls: Literal[1] = 1
+    retrieval_performed: Literal[False] = False
+
+
 class LightRagLlmRequest(BaseModel):
     """Bounded LightRAG callback request. Never a user-facing answer.
 
@@ -470,6 +530,20 @@ class ModelAdapter(Protocol):
 
         Returns:
             Structured verifier response.
+        """
+
+        ...
+
+    async def generate_eval_judge(
+        self, request: EvalJudgeModelRequest
+    ) -> EvalJudgeModelResponse:
+        """Generate at most one structured synthetic-eval judge payload.
+
+        Args:
+            request: Validated judge request.
+
+        Returns:
+            Structured judge response.
         """
 
         ...
@@ -757,6 +831,48 @@ class MockModelAdapter:
             output_tokens=0,
         )
 
+    async def generate_eval_judge(
+        self, request: EvalJudgeModelRequest
+    ) -> EvalJudgeModelResponse:
+        """Return a fixture judge payload without a network call.
+
+        Args:
+            request: Structured judge request.
+
+        Returns:
+            Mock payload with unit scores and a short rationale.
+
+        Raises:
+            ValueError: If versions or the input bound fail.
+
+        Side Effects:
+            None. No network, retrieval, or tool calls.
+        """
+
+        if (
+            request.prompt_version != EVAL_JUDGE_PROMPT_VERSION
+            or request.prompt_sha256 != EVAL_JUDGE_PROMPT_SHA256
+        ):
+            raise ValueError("eval_judge_prompt_version_mismatch")
+        joined = request.question + request.answer_text + "".join(request.acceptable_answers)
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        payload: dict[str, object] = {
+            "correctness": 1.0,
+            "groundedness": 1.0,
+            "refusal_quality": 1.0,
+            "rationale": "Mock judge fixture for synthetic development cases.",
+        }
+        return EvalJudgeModelResponse(
+            mode="mock",
+            payload=payload,
+            request_id=f"mock-eval-judge-{self._fixture_id}",
+            input_tokens=0,
+            output_tokens=0,
+        )
+
     async def generate_lightrag_llm(
         self, request: LightRagLlmRequest
     ) -> LightRagLlmResponse:
@@ -967,6 +1083,54 @@ class OpenAIRerankAdapter:
             output_tokens=output_tokens,
         )
 
+    async def generate_eval_judge(
+        self, request: EvalJudgeModelRequest
+    ) -> EvalJudgeModelResponse:
+        """Execute one Responses synthetic-eval judge operation.
+
+        Args:
+            request: Bounded judge request.
+
+        Returns:
+            Provider JSON payload plus usage.
+
+        Raises:
+            OpenAIAnswerError: Typed provider failure.
+            ValueError: Input bound errors.
+
+        Side Effects:
+            One HTTPS call with ``max_retries=0``.
+        """
+
+        joined = request.question + request.answer_text + "".join(request.acceptable_answers)
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        user_payload: dict[str, object] = {
+            "question": request.question,
+            "acceptable_answers": list(request.acceptable_answers),
+            "answer_text": request.answer_text,
+            "answer_status": request.answer_status,
+            "evidence_ids": list(request.evidence_ids),
+        }
+        payload, request_id, input_tokens, output_tokens = execute_openai_eval_judge(
+            api_key=self._api_key,
+            prompt_text=request.prompt_text,
+            prompt_sha256=request.prompt_sha256,
+            prompt_version=request.prompt_version,
+            model_id=request.model_id,
+            user_payload=user_payload,
+            timeout_seconds=request.remaining_deadline_seconds,
+        )
+        return EvalJudgeModelResponse(
+            mode="openai",
+            payload=payload,
+            request_id=request_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
     async def generate_lightrag_llm(
         self, request: LightRagLlmRequest
     ) -> LightRagLlmResponse:
@@ -1147,6 +1311,25 @@ class ModelGateway:
         """
 
         return await self._adapter.generate_verifier(request)
+
+    @model_call_traceable(name="model.eval_judge")
+    async def generate_eval_judge(
+        self, request: EvalJudgeModelRequest
+    ) -> EvalJudgeModelResponse:
+        """Delegate one structured eval-judge request. Never a hidden retry.
+
+        Args:
+            request: Bounded judge request.
+
+        Returns:
+            Structured judge response plus usage.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            ValueError: If a deployable bound is exceeded.
+        """
+
+        return await self._adapter.generate_eval_judge(request)
 
     @model_call_traceable(name="model.lightrag_llm")
     async def generate_lightrag_llm(
