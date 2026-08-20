@@ -7,7 +7,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { HandshakeBanner } from "./auth/auth-screens";
-import { ReadinessPanel } from "./readiness-panel";
 import { LimitationCallout } from "./ui/limitation-callout";
 import { StatusBanner } from "./ui/status-banner";
 import { UserText } from "./ui/user-text";
@@ -32,22 +31,6 @@ import type { UsageResponse } from "../lib/types";
 import styles from "./developer-app.module.css";
 
 /**
- * Render one usage total row. This is a meter, not a slider.
- *
- * @param props - Field name and value.
- * @returns Read-only row.
- */
-function UsageMeterRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.meterRow}>
-      <span>{label}</span>
-      <span className={styles.meterTrack} aria-hidden="true" />
-      <UserText value={value} />
-    </div>
-  );
-}
-
-/**
  * Render usage totals without prompt text.
  *
  * @param props - Usage payload and heading.
@@ -66,20 +49,31 @@ function UsageMeters({
     <section className={styles.panel} aria-label={title} data-testid={testId}>
       <h2>{title}</h2>
       <p className={styles.muted}>scope {usage?.scope ?? "—"}</p>
-      <div className={styles.meterList}>
-        <UsageMeterRow label="cost_usd" value={String(usage?.cost_usd ?? "—")} />
-        <UsageMeterRow
-          label="prompt_tokens"
-          value={String(usage?.prompt_tokens ?? "—")}
-        />
-        <UsageMeterRow
-          label="completion_tokens"
-          value={String(usage?.completion_tokens ?? "—")}
-        />
-        <UsageMeterRow
-          label="usage_rows"
-          value={String(usage?.usage_rows ?? "—")}
-        />
+      <div className={styles.metricGrid}>
+        <div className={styles.card}>
+          <p className={styles.muted}>Cost (USD)</p>
+          <p>
+            <UserText value={String(usage?.cost_usd ?? "—")} />
+          </p>
+        </div>
+        <div className={styles.card}>
+          <p className={styles.muted}>Prompt tokens</p>
+          <p>
+            <UserText value={String(usage?.prompt_tokens ?? "—")} />
+          </p>
+        </div>
+        <div className={styles.card}>
+          <p className={styles.muted}>Completion tokens</p>
+          <p>
+            <UserText value={String(usage?.completion_tokens ?? "—")} />
+          </p>
+        </div>
+        <div className={styles.card}>
+          <p className={styles.muted}>Usage rows</p>
+          <p>
+            <UserText value={String(usage?.usage_rows ?? "—")} />
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -135,12 +129,14 @@ export function UsageApp() {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.row}>
-        <h1>Usage</h1>
-        <p className={styles.muted}>
-          Token and cost meters from GET /usage. No budget sliders. Totals
-          never include prompt text.
-        </p>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1>Usage and budgets</h1>
+          <p className={styles.pageLead}>
+            Token and cost totals for your account. Budget editors are not
+            available.
+          </p>
+        </div>
       </header>
       <HandshakeBanner />
       {meError ? (
@@ -161,8 +157,8 @@ export function UsageApp() {
         />
       ) : (
         <p className={styles.muted}>
-          Company usage is hidden for this role. `fetchUsageCompany` still
-          exists and FastAPI still 403s for members and viewers.
+          Company totals are hidden for this role. The server still denies the
+          request.
         </p>
       )}
       {companyError ? (
@@ -172,7 +168,7 @@ export function UsageApp() {
       ) : null}
       {rateDegraded ? (
         <StatusBanner kind="warning" role="status">
-          Rate limiter is degraded (`ready.rate_limit_degraded`). {RATE_LIMIT_COPY}
+          Rate limiter is degraded. {RATE_LIMIT_COPY}
         </StatusBanner>
       ) : (
         <LimitationCallout tone="neutral">{RATE_LIMIT_COPY}</LimitationCallout>
@@ -183,7 +179,11 @@ export function UsageApp() {
         data-testid="budget-editor-unavailable"
         aria-label="Budget policies"
       >
-        <h2>Budget policies and critical reserve</h2>
+        <h2>Budget policies</h2>
+        <p className={styles.muted}>
+          Policy sliders from the design are not connected. Spend limits stay
+          server-enforced.
+        </p>
         <LimitationCallout tone="warning">{BUDGET_EDITOR_UNAVAILABLE}</LimitationCallout>
       </section>
       <section
@@ -194,7 +194,6 @@ export function UsageApp() {
         <h2>Restricted read and download audit</h2>
         <LimitationCallout tone="warning">{AUDIT_HISTORY_UNAVAILABLE}</LimitationCallout>
       </section>
-      <ReadinessPanel ready={readyQuery.data} />
     </div>
   );
 }

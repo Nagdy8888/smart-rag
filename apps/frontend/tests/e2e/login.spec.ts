@@ -1,8 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { limitationCopy } from "../../src/lib/limitations";
 import { handshakeBelowMinCopy } from "../../src/lib/handshake";
 import { CALLBACK_FAILED, MFA_REQUIRED_BANNER } from "../../src/lib/auth/copy";
-import { fetchLocalReady } from "./live-auth";
 
 test("unauthenticated console shows sign-in", async ({ page }) => {
   await page.goto("/");
@@ -12,38 +10,25 @@ test("unauthenticated console shows sign-in", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Sign up" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Forgot password" })).toBeVisible();
   await expect(page.getByText("Stitch")).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "API readiness" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Signed outage copy" }),
-  ).toBeVisible();
-  await expect(page.getByText(limitationCopy("bm25_unavailable"))).toBeVisible();
-  await expect(page.getByText(limitationCopy("graph_outage"))).toBeVisible();
+  await expect(page.getByRole("heading", { name: "API readiness" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Signed outage copy" })).toHaveCount(0);
+  await expect(page.getByTestId("app-shell-nav")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Continue with Google (when enabled)" }),
   ).toBeDisabled();
 });
 
-test("browser readiness panel matches live GET /health/ready", async ({
-  page,
-  request,
-}) => {
-  const ready = await fetchLocalReady(request);
-  if (ready === null) {
-    test.skip(true, "local FastAPI is unreachable at 127.0.0.1:8000");
-    return;
-  }
+test("login form is fully visible in the first mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/login");
-  const panel = page.getByTestId("api-readiness");
-  await expect(panel).toBeVisible();
-  await expect(page.getByTestId("query-ready")).toHaveText(
-    String(ready.query_ready),
-  );
-  expect(ready.dependencies).toBeUndefined();
-  await expect(page.getByTestId("dep-paradedb")).toHaveCount(0);
-  await expect(page.getByTestId("dep-valkey_limits")).toHaveCount(0);
-  await expect(page.getByTestId("dep-lightrag")).toHaveCount(0);
+  const heading = page.getByRole("heading", { name: "Sign in" });
+  const submit = page.getByRole("button", { name: "Sign in" });
+  await expect(heading).toBeVisible();
+  await expect(submit).toBeVisible();
+  const box = await submit.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThan(844);
+  await expect(page.getByTestId("app-shell-nav")).toHaveCount(0);
 });
 
 test("signup and forgot-password links are visible from login", async ({

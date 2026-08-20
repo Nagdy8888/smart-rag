@@ -143,11 +143,11 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
       </h1>
       <StatusPill status={document.visibility} />
       <dl>
-        <dt>document_id</dt>
+        <dt>Document</dt>
         <dd>
           <UserText value={document.document_id} />
         </dd>
-        <dt>current_version_id</dt>
+        <dt>Current version</dt>
         <dd>
           <UserText value={document.current_version_id ?? "none"} />
         </dd>

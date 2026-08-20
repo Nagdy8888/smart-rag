@@ -1,5 +1,6 @@
 /**
- * Auth-direct forms using P08-01 primitives. English chrome. No Stitch frames.
+ * Auth-direct forms using Stitch card composition. English chrome.
+ * Reconstructs frame_01; does not paste Stitch HTML.
  */
 
 "use client";
@@ -8,10 +9,11 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Button } from "../ui/button";
+import { Icon } from "../ui/icon";
 import { Input } from "../ui/input";
 import { StatusBanner } from "../ui/status-banner";
 import { CodeText, UserText } from "../ui/user-text";
-import { fetchReady, fetchMeta, acceptInvitation } from "../../lib/api";
+import { fetchMeta, acceptInvitation } from "../../lib/api";
 import { createBrowserSupabase } from "../../lib/auth/browser";
 import {
   CALLBACK_FAILED,
@@ -31,9 +33,7 @@ import { publicSupabaseConfig } from "../../lib/env";
 import { evaluatePaidHandshake, handshakeBelowMinCopy } from "../../lib/handshake";
 import { mutationFailureBanner } from "../../lib/failure-copy";
 import { publicQueryKeys } from "../../lib/query-keys";
-import { ReadinessPanel, SignedOutageCopy } from "../readiness-panel";
-import { ReviewedContentFixtures } from "../ui/reviewed-content-fixtures";
-import styles from "../developer-app.module.css";
+import authStyles from "./auth.module.css";
 
 /**
  * Env-missing banner for Auth screens.
@@ -75,15 +75,15 @@ export function HandshakeBanner() {
   if (decision.kind === "unreachable") {
     return (
       <StatusBanner kind="warning" role="status">
-        Compatibility handshake is unreachable. New paid questions are blocked
-        until GET /api/meta succeeds.
+        Compatibility could not be confirmed. New questions stay paused until
+        the service responds.
       </StatusBanner>
     );
   }
   if (decision.kind === "schema_newer") {
     return (
       <StatusBanner kind="info" role="status">
-        API SSE schema is newer than this client catalog. Unknown events are
+        This console is slightly behind the API. Unknown stream events are
         ignored.
       </StatusBanner>
     );
@@ -107,11 +107,12 @@ export function GoogleOAuthButton() {
     });
   }, [supabase]);
   return (
-    <div className={styles.panel}>
+    <div className={authStyles.googleWrap}>
       <Button type="button" disabled onClick={onClick}>
+        <Icon name="google" />
         {GOOGLE_OAUTH_BUTTON_LABEL}
       </Button>
-      <p className={styles.muted}>{GOOGLE_OAUTH_HELPER}</p>
+      <p className={authStyles.lead}>{GOOGLE_OAUTH_HELPER}</p>
     </div>
   );
 }
@@ -120,42 +121,40 @@ export function GoogleOAuthButton() {
  * Email/password sign-in. Generic failure only. FastAPI does not throttle this form.
  *
  * @param props - `callbackError` when `/auth/callback` redirected here.
- * @returns Sign-in form.
+ * @returns Sign-in card.
  */
 export function SignInForm({ callbackError = false }: { callbackError?: boolean }) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [failed, setFailed] = useState(false);
-  const readyQuery = useQuery({
-    queryKey: publicQueryKeys.ready,
-    queryFn: () => fetchReady(),
-    refetchInterval: 5000,
-  });
+  const [pending, setPending] = useState(false);
 
   const onSubmit = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
       setFailed(false);
-      if (supabase === null) {
-        setFailed(true);
-        return;
-      }
-      const result = await supabase.auth.signInWithPassword({ email, password });
-      if (result.error || !result.data.session?.access_token) {
-        setFailed(true);
+      setPending(true);
+      try {
+        if (supabase === null) {
+          setFailed(true);
+          return;
+        }
+        const result = await supabase.auth.signInWithPassword({ email, password });
+        if (result.error || !result.data.session?.access_token) {
+          setFailed(true);
+        }
+      } finally {
+        setPending(false);
       }
     },
     [email, password, supabase],
   );
 
   return (
-    <div className={styles.shell}>
+    <div className={authStyles.card}>
       <h1>Sign in</h1>
-      <p className={styles.muted}>
-        Browser-direct Supabase Auth. FastAPI does not rate-limit this form
-        (GAP-07-20). Membership still requires an accepted invitation.
-      </p>
+      <p className={authStyles.lead}>Access your workspace and knowledge bases.</p>
       <EnvMissingBanner />
       {callbackError ? (
         <StatusBanner kind="error" role="alert">
@@ -168,17 +167,13 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
         </StatusBanner>
       ) : null}
       <HandshakeBanner />
-      <StatusBanner kind="info" role="status">
-        {OWNER_BOOTSTRAP_UNAVAILABLE}
-      </StatusBanner>
-      <ReadinessPanel ready={readyQuery.data} />
-      <SignedOutageCopy />
-      <ReviewedContentFixtures />
-      <form className={styles.panel} onSubmit={(event) => void onSubmit(event)}>
+      <form className={authStyles.form} onSubmit={(event) => void onSubmit(event)}>
         <Input
           label="Email"
           type="email"
           autoComplete="username"
+          placeholder="name@enterprise.com"
+          leadingIcon="mail"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
@@ -187,21 +182,30 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
           label="Password"
           type="password"
           autoComplete="current-password"
+          leadingIcon="lock"
+          labelEnd={
+            <Link className={authStyles.forgot} href="/forgot-password">
+              Forgot password
+            </Link>
+          }
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
+          revealable
         />
-        <Button type="submit" variant="primary">
-          Sign in
+        <Button
+          type="submit"
+          variant="primary"
+          className={authStyles.primaryWide}
+          disabled={pending}
+        >
+          {pending ? "Signing in…" : "Sign in"}
         </Button>
       </form>
+      <p className={authStyles.divider}>Or continue with</p>
       <GoogleOAuthButton />
-      <p className={styles.muted}>
-        <Link href="/signup">Sign up</Link>
-        {" · "}
-        <Link href="/forgot-password">Forgot password</Link>
-        {" · "}
-        <Link href="/invitations/accept">Accept invitation</Link>
+      <p className={authStyles.links}>
+        Don&apos;t have an account? <Link href="/signup">Sign up</Link>
       </p>
     </div>
   );
@@ -210,7 +214,7 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
 /**
  * Email/password sign-up. Success is not a dashboard.
  *
- * @returns Sign-up form.
+ * @returns Sign-up card.
  */
 export function SignUpForm() {
   const supabase = useMemo(() => createBrowserSupabase(), []);
@@ -239,10 +243,10 @@ export function SignUpForm() {
   );
 
   return (
-    <div className={styles.shell}>
+    <div className={authStyles.card}>
       <h1>Sign up</h1>
-      <p className={styles.muted}>
-        Creates an Auth user. FastAPI membership still needs an invitation.
+      <p className={authStyles.lead}>
+        Create an account. Workspace access still requires an invitation.
       </p>
       <EnvMissingBanner />
       {failed ? (
@@ -256,15 +260,16 @@ export function SignUpForm() {
         </StatusBanner>
       ) : null}
       {success ? (
-        <p className={styles.muted}>
+        <p className={authStyles.lead}>
           Signed up as <UserText value={email} />.
         </p>
       ) : null}
-      <form className={styles.panel} onSubmit={(event) => void onSubmit(event)}>
+      <form className={authStyles.form} onSubmit={(event) => void onSubmit(event)}>
         <Input
           label="Email"
           type="email"
           autoComplete="username"
+          leadingIcon="mail"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
@@ -273,26 +278,28 @@ export function SignUpForm() {
           label="Password"
           type="password"
           autoComplete="new-password"
+          leadingIcon="lock"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
+          revealable
         />
         <Input
           label="Confirm password"
           type="password"
           autoComplete="new-password"
+          leadingIcon="lock"
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
           required
+          revealable
         />
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" className={authStyles.primaryWide}>
           Sign up
         </Button>
       </form>
-      <p className={styles.muted}>
-        <Link href="/login">Sign in</Link>
-        {" · "}
-        <Link href="/invitations/accept">Accept invitation</Link>
+      <p className={authStyles.links}>
+        Already have an account? <Link href="/login">Sign in</Link>
       </p>
     </div>
   );
@@ -301,7 +308,7 @@ export function SignUpForm() {
 /**
  * Request a password-reset email. Always shows check-inbox copy after submit.
  *
- * @returns Forgot-password form.
+ * @returns Forgot-password card.
  */
 export function ForgotPasswordForm() {
   const supabase = useMemo(() => createBrowserSupabase(), []);
@@ -323,15 +330,18 @@ export function ForgotPasswordForm() {
   );
 
   return (
-    <div className={styles.shell}>
+    <div className={authStyles.card}>
       <h1>Forgot password</h1>
+      <p className={authStyles.lead}>
+        We will send a reset link if that address can receive mail.
+      </p>
       <EnvMissingBanner />
       {sent ? (
         <StatusBanner kind="info" role="status">
           {RESET_EMAIL_SENT}
         </StatusBanner>
       ) : null}
-      <form className={styles.panel} onSubmit={(event) => void onSubmit(event)}>
+      <form className={authStyles.form} onSubmit={(event) => void onSubmit(event)}>
         <Input
           label="Email"
           type="email"
@@ -340,11 +350,11 @@ export function ForgotPasswordForm() {
           onChange={(event) => setEmail(event.target.value)}
           required
         />
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" className={authStyles.primaryWide}>
           Send reset link
         </Button>
       </form>
-      <p className={styles.muted}>
+      <p className={authStyles.links}>
         <Link href="/login">Sign in</Link>
       </p>
     </div>
@@ -354,7 +364,7 @@ export function ForgotPasswordForm() {
 /**
  * Set a new password after a recovery callback.
  *
- * @returns Update-password form.
+ * @returns Update-password card.
  */
 export function ResetPasswordForm() {
   const { supabase } = useSession();
@@ -381,7 +391,7 @@ export function ResetPasswordForm() {
   );
 
   return (
-    <div className={styles.shell}>
+    <div className={authStyles.card}>
       <h1>Reset password</h1>
       <EnvMissingBanner />
       {failed ? (
@@ -394,7 +404,7 @@ export function ResetPasswordForm() {
           Password updated. Continue to the console.
         </StatusBanner>
       ) : null}
-      <form className={styles.panel} onSubmit={(event) => void onSubmit(event)}>
+      <form className={authStyles.form} onSubmit={(event) => void onSubmit(event)}>
         <Input
           label="New password"
           type="password"
@@ -402,12 +412,13 @@ export function ResetPasswordForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
+          revealable
         />
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" className={authStyles.primaryWide}>
           Update password
         </Button>
       </form>
-      <p className={styles.muted}>
+      <p className={authStyles.links}>
         <Link href="/">Console</Link>
       </p>
     </div>
@@ -417,7 +428,7 @@ export function ResetPasswordForm() {
 /**
  * TOTP enrollment for aal1 sessions.
  *
- * @returns Enroll form. QR is an img only for data-URL `qr_code`.
+ * @returns Enroll card. QR is an img only for data-URL `qr_code`.
  */
 export function MfaEnrollForm() {
   const { supabase, signOut } = useSession();
@@ -472,7 +483,7 @@ export function MfaEnrollForm() {
   );
 
   return (
-    <div className={styles.shell}>
+    <div className={authStyles.card}>
       <h1>Enroll MFA</h1>
       <StatusBanner kind="error" role="alert">
         {MFA_REQUIRED_BANNER}
@@ -488,10 +499,10 @@ export function MfaEnrollForm() {
       ) : null}
       {verified ? (
         <StatusBanner kind="success" role="status">
-          TOTP verified. The session should now be aal2.
+          Authenticator verified. Continue to the console.
         </StatusBanner>
       ) : null}
-      <div className={styles.row}>
+      <div className={authStyles.form}>
         <Button type="button" variant="primary" onClick={() => void startEnroll()}>
           Start TOTP enrollment
         </Button>
@@ -505,11 +516,11 @@ export function MfaEnrollForm() {
         <img src={qrSrc} alt="TOTP QR code" width={160} height={160} />
       ) : null}
       {secret ? (
-        <p className={styles.muted}>
+        <p className={authStyles.lead}>
           Authenticator secret: <CodeText value={secret} />
         </p>
       ) : null}
-      <form className={styles.panel} onSubmit={(event) => void verify(event)}>
+      <form className={authStyles.form} onSubmit={(event) => void verify(event)}>
         <Input
           label="Authenticator code"
           inputMode="numeric"
@@ -522,10 +533,8 @@ export function MfaEnrollForm() {
           Verify TOTP
         </Button>
       </form>
-      <p className={styles.muted}>
+      <p className={authStyles.links}>
         <Link href="/mfa/challenge">Challenge an existing factor</Link>
-        {" · "}
-        <Link href="/unavailable/GAP-07-07">Unavailable GAP-07-07</Link>
       </p>
     </div>
   );
@@ -534,7 +543,7 @@ export function MfaEnrollForm() {
 /**
  * TOTP challenge for verified factors at aal1.
  *
- * @returns Challenge form. No fake success without Auth verify.
+ * @returns Challenge card. No fake success without Auth verify.
  */
 export function MfaChallengeForm() {
   const { supabase, signOut } = useSession();
@@ -576,7 +585,7 @@ export function MfaChallengeForm() {
   );
 
   return (
-    <div className={styles.shell}>
+    <div className={authStyles.card}>
       <h1>MFA challenge</h1>
       <StatusBanner kind="error" role="alert">
         {MFA_REQUIRED_BANNER}
@@ -592,10 +601,10 @@ export function MfaChallengeForm() {
       ) : null}
       {verified ? (
         <StatusBanner kind="success" role="status">
-          TOTP verified. The session should now be aal2.
+          Authenticator verified. Continue to the console.
         </StatusBanner>
       ) : null}
-      <form className={styles.panel} onSubmit={(event) => void onSubmit(event)}>
+      <form className={authStyles.form} onSubmit={(event) => void onSubmit(event)}>
         <Input
           label="Authenticator code"
           inputMode="numeric"
@@ -604,19 +613,15 @@ export function MfaChallengeForm() {
           onChange={(event) => setCode(event.target.value)}
           required
         />
-        <div className={styles.row}>
-          <Button type="submit" variant="primary">
-            Verify TOTP
-          </Button>
-          <Button type="button" onClick={() => void signOut()}>
-            Sign out
-          </Button>
-        </div>
+        <Button type="submit" variant="primary">
+          Verify TOTP
+        </Button>
+        <Button type="button" onClick={() => void signOut()}>
+          Sign out
+        </Button>
       </form>
-      <p className={styles.muted}>
+      <p className={authStyles.links}>
         <Link href="/mfa/enroll">Enroll TOTP</Link>
-        {" · "}
-        <Link href="/unavailable/GAP-07-07">Unavailable GAP-07-07</Link>
       </p>
     </div>
   );
@@ -656,11 +661,10 @@ export function InvitationAcceptForm() {
   );
 
   return (
-    <div className={styles.shell}>
+    <div className={authStyles.card}>
       <h1>Accept invitation</h1>
-      <p className={styles.muted}>
-        Email comes from the signed-in JWT, not this form. Team create/offboard
-        is a later packet.
+      <p className={authStyles.lead}>
+        Email comes from the signed-in account, not this form.
       </p>
       <StatusBanner kind="info" role="status">
         {OWNER_BOOTSTRAP_UNAVAILABLE}
@@ -671,7 +675,7 @@ export function InvitationAcceptForm() {
           Sign in, then paste the invitation token.
         </StatusBanner>
       ) : (
-        <p className={styles.muted}>
+        <p className={authStyles.lead}>
           Signed in as <UserText value={email ?? ""} />.
         </p>
       )}
@@ -685,7 +689,7 @@ export function InvitationAcceptForm() {
           Invitation accepted: <CodeText value={invitationId} />
         </StatusBanner>
       ) : null}
-      <form className={styles.panel} onSubmit={(event) => void onSubmit(event)}>
+      <form className={authStyles.form} onSubmit={(event) => void onSubmit(event)}>
         <Input
           label="Invitation token"
           value={token}
@@ -697,10 +701,8 @@ export function InvitationAcceptForm() {
           Accept invitation
         </Button>
       </form>
-      <p className={styles.muted}>
+      <p className={authStyles.links}>
         <Link href="/login">Sign in</Link>
-        {" · "}
-        <Link href="/unavailable/GAP-07-08">Unavailable GAP-07-08</Link>
       </p>
       {supabase === null ? <EnvMissingBanner /> : null}
     </div>
@@ -726,18 +728,16 @@ export function UnavailableGap({ gap }: { gap: string }) {
       ? KNOWN_GAPS[gap as KnownUnavailableGap]
       : "This surface is unavailable. No mocked API is provided.";
   return (
-    <div className={styles.shell}>
+    <div className={authStyles.card}>
       <h1>Unavailable</h1>
       <StatusBanner kind="warning" role="status">
         {copy}
       </StatusBanner>
-      <p className={styles.muted}>
+      <p className={authStyles.lead}>
         Gap id: <CodeText value={gap} />
       </p>
-      <p className={styles.muted}>
+      <p className={authStyles.links}>
         <Link href="/login">Sign in</Link>
-        {" · "}
-        <Link href="/invitations/accept">Accept invitation</Link>
       </p>
     </div>
   );

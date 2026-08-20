@@ -13,6 +13,12 @@ export type LiveRegionProps = {
   politeness?: "polite" | "assertive" | "off";
   /** Optional accessible name. */
   "aria-label"?: string;
+  /** Extra class names. */
+  className?: string;
+  /** Bordered panel treatment for transcript-like regions. */
+  panel?: boolean;
+  /** Visually hide while remaining announced. */
+  visuallyHidden?: boolean;
 };
 
 /**
@@ -25,10 +31,21 @@ export function LiveRegion({
   children,
   politeness = "polite",
   "aria-label": ariaLabel,
+  className,
+  panel = false,
+  visuallyHidden = false,
 }: LiveRegionProps) {
   const body = typeof children === "string" ? displayText(children) : children;
+  const combined = [
+    styles.liveRegion,
+    panel ? styles.liveRegionPanel : undefined,
+    visuallyHidden ? styles.srOnly : undefined,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div className={styles.liveRegion} aria-live={politeness} aria-label={ariaLabel}>
+    <div className={combined} aria-live={politeness} aria-label={ariaLabel}>
       {body}
     </div>
   );

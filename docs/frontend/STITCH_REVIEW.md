@@ -2,7 +2,7 @@
 title: Stitch review and component-system fallback
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-20
 audience: frontend, reviewers, client-approver
 packet: P07-06
 ---
@@ -14,15 +14,20 @@ Bounded review for Phase 7. The user delivered a Stitch export under
 target). Round 2 (user): **it is a template, not a layout for us; if a
 frame is not necessary, do not add it.**
 
-Production implementation is the **component-system fallback**. Do not
+Round 3 (2026-08-20) supersedes the fallback **visual** reading: Stitch
+`screen.png` files are the composition target for existing routes. Do not
 port `code.html`. Do not add Stitch frames as product routes, pages, or
 IA. Do not fill missing Stitch numbers 02/08/11/12/13 with extra screens.
+Implementation remains typed native HTML plus brief tokens (the
+**component-system fallback** for HTML/CSP), composed to match Stitch.
 
 Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) ·
 [STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
+[VISUAL_MAP.md](./VISUAL_MAP.md) ·
+[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
 [ADMINISTRATION.md](./ADMINISTRATION.md) ·
@@ -40,9 +45,10 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 | Rounds used | 2 of 2 |
 | Approver | user (Cursor chat; no legal name provided) |
 | Stitch HTML accepted as production | **no** |
-| Stitch accepted as product layout | **no** |
+| Stitch accepted as product layout | **no** (no extra frame routes) |
+| Stitch screenshots accepted as visual composition | **yes** (Round 3) |
 | Stitch frames added as routes | **none** |
-| Implementation | **component-system fallback** (native HTML + brief tokens) |
+| Implementation | **component-system fallback** (native HTML + brief tokens) composed to Stitch |
 
 A third revision round is forbidden. Open-ended waiting is forbidden.
 Bundle presence alone is not production approval.
@@ -104,11 +110,13 @@ not import it.
 
 ## Why fallback owns implementation
 
-1. The export is a template, not our layout.
+1. The export is a template, not our layout (no extra numbered-frame routes).
 2. HTML is not accessible, CSP-safe, or typed.
 3. [API_UI_MAPPING.md](./API_UI_MAPPING.md) is the screen list.
 4. Tokens stay as frozen in [STITCH_BRIEF.md](./STITCH_BRIEF.md)
    (accent `#2563EB`, canvas `#F8FAFC`, radius 8px, no blur).
+5. Mapped screenshots still control composition, hierarchy, and density
+   ([VISUAL_MAP.md](./VISUAL_MAP.md)).
 
 ## Selected fallback primitives
 
@@ -119,7 +127,7 @@ Phase 8 implements `apps/frontend` with:
 | Framework | Next.js App Router 16.3, React 19, TypeScript strict (already pinned) |
 | Server state | TanStack Query 5.85.5 |
 | Auth | `@supabase/ssr` 0.7.0 SSR cookies + browser client; Bearer to FastAPI. See [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) |
-| Visual intent | brief tokens + native hierarchy; **not** Stitch frame layout |
+| Visual intent | brief tokens + native hierarchy composed to mapped `screen.png` files; **not** extra Stitch frame routes |
 | Styling | CSS variables from the brief token table; optional **build-time** Tailwind. **No** runtime Tailwind CDN |
 | Components | native `button`, `dialog`, `textarea`, `table`, `details`; no required animation |
 | Graph | search + list first; optional SVG later; hop cap 3 |
@@ -170,7 +178,19 @@ add Stitch frames.
 - Mock-dependent interactions
 - Indefinite wait for another Stitch round
 
+## Round 3 operator restoration (2026-08-20)
+
+This is **not** a third Stitch revision round. A third revision round is
+forbidden. The user clarified that “template, not a layout” and “if a
+frame is not necessary, do not add it” forbade extra routes, not visual
+fidelity. Production UI must look like the mapped screenshots while
+remaining native HTML.
+
+See [ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md) and
+[VISUAL_MAP.md](./VISUAL_MAP.md).
+
 ## Rollback
 
 Revert this round-2 section only with an explicit user instruction. Do not
-un-check packets 1–5.
+un-check packets 1–5. Round 3 visual restoration is recorded in
+[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md).

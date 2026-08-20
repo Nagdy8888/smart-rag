@@ -6,16 +6,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
-  padding: 0 calc(var(--space) * 3);
+  gap: calc(var(--space) * 2);
+  min-height: var(--control-height);
+  padding: 0 calc(var(--space) * 4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
+  font-weight: 500;
   line-height: var(--line-height-en);
   cursor: pointer;
   box-shadow: var(--shadow-1);
+  transition: background-color 120ms ease, opacity 120ms ease, border-color 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--color-bg);
 }
 
 .button:disabled {
@@ -27,6 +34,11 @@
   background: var(--color-accent);
   color: var(--color-accent-fg);
   border-color: var(--color-accent);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: var(--color-accent);
+  opacity: 0.92;
 }
 
 .buttonDanger {
@@ -143,8 +155,16 @@
   color: var(--color-text);
 }
 
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--space) * 2);
+}
+
 .control {
-  min-height: 2.5rem;
+  min-height: var(--control-height);
+  width: 100%;
   padding: calc(var(--space) * 2) calc(var(--space) * 3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -152,6 +172,48 @@
   color: var(--color-text);
   font: inherit;
   line-height: var(--line-height-en);
+}
+
+.controlWrap {
+  position: relative;
+  display: flex;
+}
+
+.controlWithLeading {
+  width: 100%;
+  padding-inline-start: 2.75rem;
+}
+
+.leadingGlyph {
+  position: absolute;
+  inset-inline-start: calc(var(--space) * 3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  pointer-events: none;
+}
+
+.controlWithAddon {
+  width: 100%;
+  padding-inline-end: 2.75rem;
+}
+
+.addonButton {
+  position: absolute;
+  inset-inline-end: calc(var(--space) * 1);
+  top: 50%;
+  transform: translateY(-50%);
+  min-height: 2.25rem;
+  min-width: 2.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
 }
 
 .control[aria-invalid="true"] {
@@ -210,6 +272,22 @@
   color: var(--color-text);
 }
 
+.table caption {
+  text-align: start;
+  font-weight: 600;
+  padding: calc(var(--space) * 3);
+  caption-side: top;
+}
+
+.table thead th {
+  background: var(--color-accent-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
 .table th,
 .table td {
   min-height: var(--row-height);
@@ -218,6 +296,10 @@
   border-bottom: 1px solid var(--color-border);
   text-align: start;
   vertical-align: middle;
+}
+
+.table tbody tr:hover {
+  background: var(--color-bg);
 }
 
 .table tbody tr {
@@ -250,13 +332,54 @@
 
 .liveRegion {
   white-space: pre-wrap;
+  color: var(--color-text);
+  line-height: var(--line-height-ar);
+}
+
+.liveRegionPanel {
   min-height: 6rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: calc(var(--space) * 3);
   background: var(--color-surface);
-  color: var(--color-text);
-  line-height: var(--line-height-ar);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skeleton {
+  display: block;
+  min-height: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  animation: ui-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ui-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--space) * 2);
+  padding: calc(var(--space) * 6);
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
 }
 
 .errorState {
@@ -293,9 +416,14 @@
 .drawer {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: calc(var(--space) * 3);
+  padding: calc(var(--space) * 4);
   background: var(--color-surface);
   box-shadow: var(--shadow-2);
+}
+
+.iconButton {
+  min-width: var(--control-height);
+  padding-inline: 0;
 }
 
 .drawerHeader {

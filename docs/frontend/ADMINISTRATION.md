@@ -2,7 +2,7 @@
 title: Administration surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-20
 audience: engineering, frontend, security
 packet: P08-04
 ---
@@ -10,14 +10,16 @@ packet: P08-04
 # Administration surfaces (Phase 8 packet 4)
 
 Native Team, Tools, Curation, Usage, and Profile mapped to FastAPI
-contracts. Stitch frames 02/08/11/12/13/14 are a **template, not a
-layout**. This packet does not add those frames as routes and does not
-create an `app/admin` folder.
+contracts. Stitch frames 02/08/11/12/13 are unused as routes; frame 14 is
+the visual composition target for `/usage` ([VISUAL_MAP.md](./VISUAL_MAP.md)).
+This packet does not add extra frames as routes and does not create an
+`app/admin` folder.
 
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
+[VISUAL_MAP.md](./VISUAL_MAP.md) ·
 [PHASE8_JOURNEY_MATRIX.md](./PHASE8_JOURNEY_MATRIX.md) ·
 [QUERY_BUDGETS.md](../agent/QUERY_BUDGETS.md) ·
 [OPTIONAL_TOOLS.md](../agent/OPTIONAL_TOOLS.md) ·
@@ -64,12 +66,12 @@ an Authorization role claim. Production never sends `X-Test-*`.
 
 ## Missing-frame decision (frame 14)
 
-Frame 14 is not a product route. The usage page recreates the information
-hierarchy from [API_UI_MAPPING.md](./API_UI_MAPPING.md): caller token and
+Frame 14 is not a second product route. `/usage` follows that dashboard
+hierarchy using [API_UI_MAPPING.md](./API_UI_MAPPING.md): caller token and
 cost meters, company totals for owner/admin, 402 `budget_exhausted` copy,
 and `ready.rate_limit_degraded` / 429 rate banners. Budget-policy sliders
-and graph-maintenance reserve editors are **Unavailable GAP-07-11**. There
-is no `/budgets` HTTP.
+and graph-maintenance reserve editors are a polished unavailable state
+(GAP-07-11). There is no `/budgets` HTTP.
 
 ## Gap table (do not mock)
 

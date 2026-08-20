@@ -215,11 +215,14 @@ export function CurationApp() {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.row}>
-        <h1>Curation</h1>
-        <p className={styles.muted}>
-          Glossary aliases and graph entity rules. Mutations are owner/admin.
-        </p>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1>Curation</h1>
+          <p className={styles.pageLead}>
+            Glossary aliases and graph entity rules. Changes are limited to
+            owners and admins.
+          </p>
+        </div>
       </header>
       <HandshakeBanner />
       {error ? (

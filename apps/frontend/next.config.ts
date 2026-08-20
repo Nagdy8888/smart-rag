@@ -21,6 +21,9 @@ import type { NextConfig } from "next";
  * `NEXT_PUBLIC_SUPABASE_URL` origins. Loopback hosts are added only when
  * `NODE_ENV=development`. Production never ships hardcoded localhost or
  * a wildcard supabase.co host.
+ *
+ * `devIndicators: false` hides the Next.js route badge in `next dev` so
+ * Playwright visual snapshots match production chrome.
  */
 
 /** Inputs used to build the CSP `connect-src` directive. */
@@ -131,6 +134,7 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  devIndicators: false,
   async headers() {
     return [
       {

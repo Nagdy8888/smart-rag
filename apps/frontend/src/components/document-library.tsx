@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { HandshakeBanner } from "./auth/auth-screens";
 import { Button } from "./ui/button";
 import { FileDropZone } from "./ui/file-drop-zone";
+import { EmptyState } from "./ui/empty-state";
 import { Input } from "./ui/input";
 import { LimitationCallout } from "./ui/limitation-callout";
 import { RovingList } from "./ui/roving-list";
@@ -54,7 +55,6 @@ import {
   objectNameForUpload,
   sha256Hex,
   uploadReservedObject,
-  UPLOAD_METHOD_STORAGE_JWT,
 } from "../lib/upload-client";
 import styles from "./developer-app.module.css";
 
@@ -151,9 +151,7 @@ export function DocumentLibrary() {
     },
     onSuccess: (result) => {
       setUploadNote(
-        `Finalized document ${result.finalized.document_id}. Reservation signed_url is ${
-          result.reserved.signed_url === null ? "null" : "set"
-        }. upload_method=${result.reserved.upload_method || UPLOAD_METHOD_STORAGE_JWT}. Reserve is not Hybrid Ready.`,
+        `Uploaded “${result.finalized.document_id}”. The file is in quarantine until ingestion finishes.`,
       );
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
@@ -214,24 +212,26 @@ export function DocumentLibrary() {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.row}>
-        <h1>Documents</h1>
-        <Button type="button" onClick={() => void session.signOut()}>
-          Sign out
-        </Button>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1>Document library</h1>
+          <p className={styles.pageLead}>
+            Manage authorized sources and follow ingestion status.
+          </p>
+        </div>
       </header>
       <HandshakeBanner />
 
       {showUpload ? (
         <section className={styles.panel} aria-label="Upload">
-          <h2>Upload</h2>
+          <h2>Upload file</h2>
           <FileDropZone
             onFiles={(files) => setFile(files[0] ?? null)}
             disabled={!handshake.allowPaidPost}
           />
           {file ? (
             <p className={styles.muted}>
-              <UserText value={file.name} /> — declared_bytes={String(file.size)}
+              <UserText value={file.name} /> — {String(file.size)} bytes
             </p>
           ) : null}
           <label>
@@ -250,7 +250,8 @@ export function DocumentLibrary() {
             </select>
           </label>
           <p className={styles.muted}>
-            attestation_policy_version={ATTESTATION_POLICY_VERSION}
+            Category and attestation are recorded with the upload. Files are not
+            searchable until ingestion completes.
           </p>
           <Input
             label="Document title"
@@ -258,7 +259,8 @@ export function DocumentLibrary() {
             onChange={(event) => setTitle(event.target.value)}
           />
           <p className={styles.muted}>
-            Local signed_url is null. upload_method={UPLOAD_METHOD_STORAGE_JWT}.
+            Uploads use your signed-in session. A reservation is never treated as
+            ready for search.
           </p>
           <Button
             type="button"
@@ -276,7 +278,7 @@ export function DocumentLibrary() {
                 ? MFA_UPLOAD_DENIED
                 : uploadMutation.error instanceof Error &&
                     uploadMutation.error.message.startsWith("storage_upload_failed")
-                  ? "Storage upload did not complete. Finalize needs object_name, content_hash, and actual_bytes after a successful Storage write. Reserve is not Hybrid Ready."
+                  ? "The file did not finish uploading. Try again after the storage write succeeds."
                   : "Upload rejected. Server authorization is authoritative."}
             </StatusBanner>
           ) : null}
@@ -290,7 +292,7 @@ export function DocumentLibrary() {
 
       {showCrawl ? (
         <section className={styles.panel} aria-label="Website crawl">
-          <h2>Website crawl</h2>
+          <h2>Request website</h2>
           <Input
             label="Start URL"
             value={startUrl}
@@ -316,15 +318,17 @@ export function DocumentLibrary() {
         </section>
       ) : (
         <p className={styles.muted}>
-          Crawl is hidden for this role as convenience only. POST /ingestion/crawls
-          still returns 403 for members and viewers.
+          Website crawl is hidden for this role. The server still denies members
+          and viewers.
         </p>
       )}
 
       <section className={styles.panel} aria-label="Library">
         <h2>Library</h2>
         {(documentsQuery.data ?? []).length === 0 ? (
-          <p className={styles.muted}>No documents you can see</p>
+          <EmptyState title="No documents you can see">
+            Upload a file or wait for an invitation that grants access.
+          </EmptyState>
         ) : null}
         <RovingList
           aria-label="Documents"
@@ -349,7 +353,7 @@ export function DocumentLibrary() {
           {(documentsQuery.data ?? []).map((doc) => (
             <li key={`status-${doc.document_id}`}>
               <span className={styles.muted}>
-                current_version_id{" "}
+                Version{" "}
                 <UserText value={doc.current_version_id ?? "none"} />
               </span>
               {doc.current_version_id ? (

@@ -1,11 +1,11 @@
 /**
- * Honest capability marker for the Phase 6 thin developer UI.
+ * Honest capability marker for the production console shell.
  *
- * Retrieval quality is proven by API/eval packets, not by this shell.
- * Stitch and production frontend remain later phases.
+ * Retrieval quality is proven by API/eval packets, not by chrome alone.
+ * Visual composition follows mapped Stitch screenshots.
  */
 export const foundationCapability = {
-  status: "thin_developer_ui",
+  status: "stitch_first_console",
   retrievalImplemented: false,
-  stitchImplemented: false,
+  stitchImplemented: true,
 } as const;

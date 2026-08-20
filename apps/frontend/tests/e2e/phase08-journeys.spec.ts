@@ -10,6 +10,7 @@ const PUBLIC_AUTH_PATHS = [
   "/mfa/challenge",
   "/unavailable/GAP-07-07",
   "/unavailable/GAP-07-08",
+  "/review-fixtures",
 ] as const;
 
 const PROTECTED_PATHS = [
@@ -39,21 +40,13 @@ test("unauthenticated shipped routes redirect to login except public auth pages"
   }
 });
 
-test("login chrome has skip link, Sign in, and contract nav without Stitch frames", async ({
+test("login chrome has skip link and Sign in without console nav or Stitch frames", async ({
   page,
 }) => {
   await page.goto("/login");
   await expect(page.getByRole("link", { name: "Skip to main content" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/");
-  await expect(page.getByRole("link", { name: "Documents" })).toHaveAttribute(
-    "href",
-    "/documents",
-  );
-  await expect(page.getByRole("link", { name: "Curation" })).toHaveAttribute(
-    "href",
-    "/curation",
-  );
+  await expect(page.getByTestId("app-shell-nav")).toHaveCount(0);
   await expect(page.getByText("Stitch")).toHaveCount(0);
   await expect(page.getByText("frame_04")).toHaveCount(0);
 });

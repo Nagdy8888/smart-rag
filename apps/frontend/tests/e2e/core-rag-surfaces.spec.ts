@@ -3,8 +3,14 @@ import { limitationCopy } from "../../src/lib/limitations";
 import { DOCUMENT_NOT_FOUND_COPY } from "../../src/lib/citation-drawer";
 import { signInLiveMember } from "./live-auth";
 
-test("login chrome includes Chat Documents Graph Tables nav", async ({ page }) => {
+test("login has no console nav; authenticated chrome includes Chat Documents Graph Tables", async ({
+  page,
+  request,
+}) => {
   await page.goto("/login");
+  await expect(page.getByTestId("app-shell-nav")).toHaveCount(0);
+  await signInLiveMember(page, request);
+  await page.goto("/");
   await expect(page.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("link", { name: "Documents" })).toHaveAttribute(
     "href",
@@ -43,8 +49,8 @@ test("unauthenticated document detail does not leak a title", async ({ page }) =
   await expect(page.getByText("SECRET TITLE")).toHaveCount(0);
 });
 
-test("login still shows BM25 and graph outage copy", async ({ page }) => {
-  await page.goto("/login");
+test("reviewed fixtures still show BM25 and graph outage copy", async ({ page }) => {
+  await page.goto("/review-fixtures");
   await expect(page.getByText(limitationCopy("bm25_unavailable"))).toBeVisible();
   await expect(page.getByText(limitationCopy("graph_outage"))).toBeVisible();
 });

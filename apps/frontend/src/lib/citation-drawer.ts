@@ -7,15 +7,15 @@ import { isSafeHttpUrl } from "./safe-text";
 
 /** Honest GAP copy. No preview HTTP. */
 export const SOURCE_PREVIEW_UNAVAILABLE =
-  "Source preview and download are unavailable (GAP-07-09).";
+  "Source preview and download are not available.";
 
 /** Inference chains are not in the SSE catalog. */
 export const INFERENCE_LINKS_UNAVAILABLE =
-  "Inference-chain objects are not in the SSE catalog (GAP-07-02). Citation chips show authorized ids only.";
+  "Inference-chain details are not part of this stream. Citation chips show authorized identifiers only.";
 
 /** Document delete HTTP does not exist. */
 export const DOCUMENT_DELETE_UNAVAILABLE =
-  "Document deletion is unavailable (GAP-07-14).";
+  "Document deletion is not available in this console.";
 
 /** 404 / IDOR copy. Never interpolates a title. */
 export const DOCUMENT_NOT_FOUND_COPY = "Not found.";

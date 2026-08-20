@@ -1,6 +1,8 @@
+/**
+ * Shared HTML shell. Route groups supply Auth vs console chrome.
+ */
 import type { Metadata } from "next";
 import { AppProviders } from "../components/providers";
-import { AppShell } from "../components/ui/app-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,21 +11,18 @@ export const metadata: Metadata = {
 };
 
 /**
- * Render the shared HTML shell for console routes.
+ * Render the root document for every App Router page.
  *
- * @param children - App Router content for the active route.
- * @returns The root document with English LTR chrome and the system font stack.
+ * @param children - Auth or console layout content.
+ * @returns English LTR html/body with providers. No AppShell here.
  * @remarks
- * Google Fonts and CDN typefaces are forbidden by the CSP/token contract.
- * Fonts are the STITCH_BRIEF system stack in `globals.css`.
+ * Google Fonts and CDN typefaces are forbidden. Inter is self-hosted.
  */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" dir="ltr">
       <body>
-        <AppProviders>
-          <AppShell>{children}</AppShell>
-        </AppProviders>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

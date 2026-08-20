@@ -4,8 +4,50 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import "@testing-library/jest-dom/vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CLIENT_NAV_IS_NOT_AUTHORIZATION } from "../../lib/client-authorization";
+import { SessionProvider } from "../../lib/auth/session-provider";
 import { AppShell } from "./app-shell";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+}));
+
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...rest
+  }: {
+    href: string;
+    children: ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
+vi.mock("../../lib/auth/browser", () => ({
+  createBrowserSupabase: () => ({
+    auth: {
+      getSession: vi.fn(async () => ({ data: { session: null } })),
+      onAuthStateChange: vi.fn(() => ({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      })),
+      signOut: vi.fn(),
+    },
+  }),
+}));
+
+vi.mock("../../lib/env", () => ({
+  publicSupabaseConfig: () => ({
+    url: "http://127.0.0.1:54321",
+    anonKey: "anon",
+  }),
+  apiBaseUrl: () => "http://127.0.0.1:8000",
+}));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
@@ -33,10 +75,17 @@ afterEach(() => {
 
 describe("AppShell", () => {
   it("exposes a skip link, 280px token nav, and main landmark", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     render(
-      <AppShell>
-        <p>Console body</p>
-      </AppShell>,
+      <QueryClientProvider client={client}>
+        <SessionProvider>
+          <AppShell>
+            <p>Console body</p>
+          </AppShell>
+        </SessionProvider>
+      </QueryClientProvider>,
     );
     const skip = screen.getByRole("link", { name: "Skip to main content" });
     expect(skip).toHaveAttribute("href", "#main");

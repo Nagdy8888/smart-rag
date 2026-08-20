@@ -6,6 +6,7 @@ const PUBLIC_EXACT = new Set([
   "/login",
   "/signup",
   "/forgot-password",
+  "/review-fixtures",
 ]);
 
 const PUBLIC_PREFIXES = [

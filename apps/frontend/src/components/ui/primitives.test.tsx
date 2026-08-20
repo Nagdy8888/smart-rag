@@ -13,6 +13,7 @@ import { Badge } from "./badge";
 import { Button } from "./button";
 import { CitationChip } from "./citation-chip";
 import { DataTable } from "./data-table";
+import { EmptyState } from "./empty-state";
 import { ErrorState } from "./error-state";
 import { FileDropZone } from "./file-drop-zone";
 import { Input } from "./input";
@@ -56,6 +57,7 @@ describe("primitives render hostile and mixed-direction text", () => {
         <LiveRegion>{MIXED_BIDI}</LiveRegion>
         <CitationChip index={1} citationId={XSS_FILENAME} />
         <ErrorState title="Error" message={XSS_ENTITY} />
+        <EmptyState title="Empty">{XSS_FILENAME}</EmptyState>
         <Button aria-label="Hostile filename">{XSS_FILENAME}</Button>
         <Input label="Filename" defaultValue={XSS_FILENAME} readOnly />
         <Textarea label="Note" defaultValue={MIXED_BIDI} readOnly />

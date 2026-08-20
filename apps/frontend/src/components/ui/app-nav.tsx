@@ -8,19 +8,36 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useSession } from "../../lib/auth/session-provider";
+import { Button } from "./button";
+import { Icon, type IconName } from "./icon";
+import { UserText } from "./user-text";
 import styles from "./app-shell.module.css";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Chat" },
-  { href: "/documents", label: "Documents" },
-  { href: "/graph", label: "Graph" },
-  { href: "/tables", label: "Tables" },
-  { href: "/team", label: "Team" },
-  { href: "/tools", label: "Tools" },
-  { href: "/curation", label: "Curation" },
-  { href: "/usage", label: "Usage" },
-  { href: "/profile", label: "Profile" },
-] as const;
+const NAV_ITEMS: ReadonlyArray<{ href: string; label: string; icon: IconName }> = [
+  { href: "/", label: "Chat", icon: "chat" },
+  { href: "/documents", label: "Documents", icon: "documents" },
+  { href: "/graph", label: "Graph", icon: "graph" },
+  { href: "/tables", label: "Tables", icon: "tables" },
+  { href: "/team", label: "Team", icon: "team" },
+  { href: "/tools", label: "Tools", icon: "tools" },
+  { href: "/curation", label: "Curation", icon: "curation" },
+  { href: "/usage", label: "Usage", icon: "usage" },
+  { href: "/profile", label: "Profile", icon: "profile" },
+];
+
+const PAGE_TITLES: Record<string, string> = {
+  "/": "Chat",
+  "/documents": "Documents",
+  "/graph": "Graph explorer",
+  "/tables": "Tables",
+  "/team": "Team",
+  "/tools": "Tools",
+  "/curation": "Curation",
+  "/usage": "Usage",
+  "/profile": "Profile",
+  "/invitations/accept": "Accept invitation",
+};
 
 /**
  * Return whether a nav href is the current page.
@@ -34,6 +51,19 @@ export function navItemIsCurrent(pathname: string, href: string): boolean {
     return pathname === "/";
   }
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/**
+ * Return the English top-bar title for a console pathname.
+ *
+ * @param pathname - `usePathname()` value.
+ * @returns Title. Nested document routes use Documents.
+ */
+export function consolePageTitle(pathname: string): string {
+  if (pathname.startsWith("/documents/")) {
+    return "Document";
+  }
+  return PAGE_TITLES[pathname] ?? "Console";
 }
 
 /**
@@ -71,6 +101,7 @@ export function AppNav() {
             href={item.href}
             aria-current={navItemIsCurrent(pathname, item.href) ? "page" : undefined}
           >
+            <Icon name={item.icon} />
             {item.label}
           </Link>
         </li>
@@ -84,8 +115,46 @@ export function AppNav() {
 
   return (
     <details className={styles.navMenu}>
-      <summary>Menu</summary>
+      <summary>
+        <Icon name="menu" />
+        Menu
+      </summary>
       {list}
     </details>
   );
+}
+
+/**
+ * Render the signed-in identity in the sidebar footer.
+ *
+ * @returns Email, workspace label, and Sign out. Null before session restore.
+ * @remarks
+ * Sign-out clears Auth cookies. FastAPI still authorizes each request.
+ */
+export function ShellUser() {
+  const session = useSession();
+  if (!session.ready || session.accessToken === null) {
+    return null;
+  }
+  return (
+    <div className={styles.userBlock}>
+      <p className={styles.userEmail}>
+        <UserText value={session.email ?? "Signed in"} />
+      </p>
+      <p className={styles.userMeta}>Workspace</p>
+      <Button type="button" variant="ghost" onClick={() => void session.signOut()}>
+        Sign out
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Render the console top-bar title for the active route.
+ *
+ * @returns Heading derived from the pathname.
+ */
+export function TopbarTitle() {
+  const pathname = usePathname() ?? "/";
+  return <h2 className={styles.topbarTitle}>{consolePageTitle(pathname)}</h2>;
 }

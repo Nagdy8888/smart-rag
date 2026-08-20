@@ -2,7 +2,7 @@
 title: Production console design system
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-20
 audience: frontend, reviewers
 packet: P08-01
 ---
@@ -12,10 +12,15 @@ packet: P08-01
 Build-time tokens and typed primitives for the production console shell.
 Canonical values are the token table in [STITCH_BRIEF.md](./STITCH_BRIEF.md).
 The Stitch export is a **template, not a layout**: there is no `frame_00`
-route and no design-system gallery page.
+route and no design-system gallery page. `frame_00` still supplies the
+shared visual language (type scale, tonal cards, chips, 8px controls)
+applied to every existing route. See
+[VISUAL_MAP.md](./VISUAL_MAP.md) and
+[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md).
 
 Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
+[VISUAL_MAP.md](./VISUAL_MAP.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
@@ -56,38 +61,43 @@ reintroduce them.
 | `--space` | `4px` grid |
 | `--shadow-1` | `0 1px 2px rgb(15 23 42 / 0.08)` |
 | `--shadow-2` | `0 8px 24px rgb(15 23 42 / 0.08)` |
-| `--font-sans` | `"Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif` |
+| `--font-sans` | `"Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif` |
 | `--font-mono` | `ui-monospace, "Cascadia Code", monospace` |
 | `--line-height-ar` | `1.75` |
 | `--line-height-en` | `1.5` |
 | `--nav-width` | `280px` |
 | `--row-height` | `48px` |
 
-Light scheme only. Motion honors `prefers-reduced-motion`. Fonts are the
-system stack; no Google Fonts CDN and no self-hosted files in this packet.
+Light scheme only. Motion honors `prefers-reduced-motion`. Fonts are
+self-hosted Inter under `apps/frontend/public/fonts` plus the system
+Arabic fallbacks. No Google Fonts CDN and no `next/font/google`.
 
 ## Shell metrics
 
 ```mermaid
 flowchart LR
   skip["Skip to main"]
+  skip --> auth["Auth card layout"]
   skip --> nav["Nav 280px desktop"]
-  nav --> main["Main landmark"]
-  nav --> stacked["Stacked nav at 390px"]
-  main --> console["Phase 6 DeveloperApp"]
-  console --> diagnostics["Diagnostics details"]
+  nav --> topbar["Top bar"]
+  topbar --> main["Main landmark"]
+  nav --> drawer["Mobile nav drawer"]
+  main --> product["Stitch-first product surfaces"]
+  product --> diagnostics["Collapsible diagnostics"]
 ```
 
 - English chrome (`lang="en"`, `dir="ltr"`).
 - User/content strings: `dir="auto"` plus `unicode-bidi: isolate`.
 - Codes, IDs, URLs: `dir="ltr"` isolate.
 - Desktop (1280): navigation column `280px`, tonal `shadow-1` / `shadow-2`.
-- Mobile (390): navigation stacks above main; diagnostics start collapsed.
-- List and table rows: minimum `48px`.
+- Mobile (390): authenticated nav is a Menu drawer; login has **no** console
+  nav and the sign-in card fits the first viewport.
+- List and table rows: minimum `48px`. Mobile controls: minimum `44px`.
 
-Packet 1 nav is **Console** → `/` only. Hidden future items are not HTTP 403.
+Authenticated nav lists Chat through Profile. Hidden items are not HTTP 403.
 See `CLIENT_NAV_IS_NOT_AUTHORIZATION` in
-`apps/frontend/src/lib/client-authorization.ts`.
+`apps/frontend/src/lib/client-authorization.ts`. Public Auth routes use
+`(auth)` layout; console routes use `(console)` layout.
 
 ## Primitives
 
@@ -95,13 +105,14 @@ Typed components live in `apps/frontend/src/components/ui/`:
 
 `AppShell`, `StatusBanner`, `StatusPill`, `CitationChip`,
 `LimitationCallout`, `LiveRegion`, `Button`, `Badge`, `Input`, `Textarea`,
-`FileDropZone`, `DataTable`, `Spinner`, `ErrorState`, `UserText`, `CodeText`.
+`FileDropZone`, `DataTable`, `Spinner`, `Skeleton`, `EmptyState`,
+`ErrorState`, `Icon`, `UserText`, `CodeText`.
 
 Focus is the global `:focus-visible` 2px accent ring. Untrusted strings
 pass through `displayText` as React text nodes.
 
-Packet 1 wraps the existing Phase 6 `DeveloperApp` in `AppShell`. It does
-not add chat/auth/admin screens, placeholder routes, or Stitch HTML.
+Primitives plus the application shell implement Stitch composition for
+contract-backed routes. They do not add placeholder routes or Stitch HTML.
 
 ## Prohibited patterns
 
@@ -129,7 +140,7 @@ pnpm --filter smart-rag-frontend exec next typegen
 pnpm --filter smart-rag-frontend exec tsc --noEmit
 pnpm --filter smart-rag-frontend test
 pnpm --filter smart-rag-frontend build
-pnpm --filter smart-rag-frontend exec playwright test tests/e2e/design-system.spec.ts tests/e2e/login.spec.ts
+pnpm --filter smart-rag-frontend exec playwright test tests/e2e/design-system.spec.ts tests/e2e/login.spec.ts tests/e2e/visual-routes.spec.ts
 uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json
 ```
 

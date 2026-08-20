@@ -1,8 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { signInLiveMember } from "./live-auth";
 
-test("login chrome includes administration nav links", async ({ page }) => {
+test("authenticated chrome includes administration nav links", async ({
+  page,
+  request,
+}) => {
   await page.goto("/login");
+  await expect(page.getByTestId("app-shell-nav")).toHaveCount(0);
+  await signInLiveMember(page, request);
+  await page.goto("/");
   await expect(page.getByRole("link", { name: "Team" })).toHaveAttribute(
     "href",
     "/team",

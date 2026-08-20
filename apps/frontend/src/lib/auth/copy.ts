@@ -23,18 +23,18 @@ export const SESSION_REVOKED_BANNER =
 
 /** GAP-07-07 honest copy. No recovery-code HTTP. */
 export const MFA_RECOVERY_UNAVAILABLE =
-  "Lost-factor MFA recovery is unavailable (GAP-07-07). mfa_recovery.py is a service with no HTTP router.";
+  "Lost-factor MFA recovery is not available. Contact an administrator if you cannot complete authenticator verification.";
 
 /** GAP-07-08 honest copy. No bootstrap wizard. */
 export const OWNER_BOOTSTRAP_UNAVAILABLE =
-  "Owner bootstrap is unavailable (GAP-07-08). bootstrap_owner has no HTTP router. Accept an invitation after sign-in.";
+  "Owner bootstrap is not available. Sign in with an invited account, then accept the invitation.";
 
 /** Disabled Google control (GAP-07-04). */
 export const GOOGLE_OAUTH_BUTTON_LABEL = "Continue with Google (when enabled)";
 
 /** Helper under the disabled Google button. */
 export const GOOGLE_OAUTH_HELPER =
-  "Google sign-in stays disabled until Auth [auth.external.google] is enabled (GAP-07-04). This control does not call OAuth.";
+  "Google sign-in is not enabled for this workspace.";
 
 /** Sign-up success. Membership is FastAPI invitation, not a fake dashboard. */
 export const SIGN_UP_SUCCESS =

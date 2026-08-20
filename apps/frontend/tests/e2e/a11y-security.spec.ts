@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { GENERIC_PRODUCTION_ERROR } from "../../src/lib/failure-copy";
+import { signInLiveMember } from "./live-auth";
 
 test("Tab order on login starts at the skip link and focuses main", async ({
   page,
@@ -12,25 +13,25 @@ test("Tab order on login starts at the skip link and focuses main", async ({
   await expect(page.locator("#main")).toBeFocused();
 });
 
-test("200% zoom keeps composer, banners, and chips visible", async ({ page }) => {
+test("200% zoom keeps composer, banners, and chips visible on fixtures", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 640, height: 400 });
-  await page.goto("/login");
+  await page.goto("/review-fixtures");
   const fixtures = page.getByTestId("reviewed-content-fixtures");
   await expect(fixtures).toBeVisible();
   await expect(page.getByLabel("Stub composer")).toBeVisible();
   await expect(page.getByRole("button", { name: "Citation 1" })).toBeVisible();
   await expect(page.getByRole("status").first()).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Sign in" }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 });
 
-test("mobile Menu disclosure is keyboard accessible at 390px", async ({
+test("mobile Menu disclosure is keyboard accessible at 390px when signed in", async ({
   page,
+  request,
 }) => {
+  await signInLiveMember(page, request);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/login");
+  await page.goto("/");
   const menu = page.getByText("Menu", { exact: true });
   await expect(menu).toBeVisible();
   await menu.press("Enter");

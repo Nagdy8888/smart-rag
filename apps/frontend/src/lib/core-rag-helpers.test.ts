@@ -30,6 +30,6 @@ describe("objectNameForUpload", () => {
 
 describe("GAP-07-14 copy", () => {
   it("documents that document delete HTTP is unavailable", () => {
-    expect(DOCUMENT_DELETE_UNAVAILABLE).toContain("GAP-07-14");
+    expect(DOCUMENT_DELETE_UNAVAILABLE).toMatch(/not available/i);
   });
 });

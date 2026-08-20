@@ -49,7 +49,9 @@ export function GraphNeighborhoodSvg({
     return null;
   }
   const width = 480;
-  const height = 240;
+  const height = 320;
+  const originX = width / 2;
+  const originY = height / 2;
   return (
     <div className={styles.svgWrap}>
       <svg
@@ -60,11 +62,29 @@ export function GraphNeighborhoodSvg({
         aria-label="Bounded graph neighborhood"
       >
         {nodes.map((node, index) => {
-          const x = 40 + (index % 10) * 44;
-          const y = 40 + Math.floor(index / 10) * 44;
+          const angle = (index / Math.max(nodes.length, 1)) * Math.PI * 2 - Math.PI / 2;
+          const radius = index === 0 ? 0 : 110;
+          const x = originX + Math.cos(angle) * radius;
+          const y = originY + Math.sin(angle) * radius;
+          const hue = 217;
           return (
             <g key={`${node.object_id}-${String(index)}`}>
-              <circle cx={x} cy={y} r={12} fill="currentColor" opacity={0.2} />
+              {index > 0 ? (
+                <line
+                  x1={originX}
+                  y1={originY}
+                  x2={x}
+                  y2={y}
+                  stroke="var(--color-border)"
+                  strokeWidth={1.5}
+                />
+              ) : null}
+              <circle
+                cx={x}
+                cy={y}
+                r={index === 0 ? 18 : 12}
+                fill={`hsl(${String(hue)} 84% ${index === 0 ? "54%" : "72%"})`}
+              />
               <title>{displayText(node.object_id)}</title>
             </g>
           );
@@ -136,10 +156,10 @@ export function GraphExplorer() {
   return (
     <div className={styles.shell}>
       <h1>Graph explorer</h1>
-      <p className={styles.muted}>
-        List-first. Hop cap {String(GRAPH_INSPECT_MAX_DEPTH)}. At most{" "}
-        {String(GRAPH_INSPECT_MAX_ROWS)} nodes. Graph-only is inspection, not
-        an answering mode.
+      <p className={styles.pageLead}>
+        Search first, then inspect a bounded neighborhood. Depth stays at most{" "}
+        {String(GRAPH_INSPECT_MAX_DEPTH)}. This is inspection, not an answering
+        mode.
       </p>
       <div className={styles.panes}>
         <section className={styles.panel} aria-label="Search">
@@ -207,7 +227,7 @@ export function GraphExplorer() {
           <ul className={styles.list}>
             {(inspect?.nodes ?? []).map((node, index) => (
               <li key={`${node.object_id}-${String(index)}`}>
-                hop={String(node.hop)}{" "}
+                hop {String(node.hop)}{" "}
                 <UserText value={node.object_type} />{" "}
                 <UserText value={node.object_id} />
               </li>
@@ -247,6 +267,10 @@ export function GraphExplorer() {
           {limitations.some((item) => item.code === "graph_acl_blindness") ? (
             <p className={styles.muted}>{limitationCopy("graph_acl_blindness")}</p>
           ) : null}
+          <p className={styles.muted}>
+            Relationship editing is not available. This explorer is
+            inspection-only.
+          </p>
         </section>
       </div>
     </div>

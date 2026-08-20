@@ -42,8 +42,9 @@ export function ProfileApp() {
     <div className={styles.shell}>
       <header className={styles.row}>
         <h1>Profile</h1>
-        <p className={styles.muted}>
-          GET /me five fields. Name and locale are not editable (GAP-07-19).
+        <p className={styles.pageLead}>
+          Account details for the signed-in user. Name and language cannot be
+          edited here.
         </p>
       </header>
       <HandshakeBanner />

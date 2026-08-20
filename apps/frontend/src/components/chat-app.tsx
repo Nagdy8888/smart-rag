@@ -9,15 +9,16 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { HandshakeBanner } from "./auth/auth-screens";
-import { ReadinessPanel, SignedOutageCopy } from "./readiness-panel";
 import { Button } from "./ui/button";
 import { CitationChip } from "./ui/citation-chip";
 import { Drawer } from "./ui/drawer";
+import { Icon } from "./ui/icon";
 import { Input } from "./ui/input";
 import { LimitationCallout } from "./ui/limitation-callout";
 import { LiveRegion } from "./ui/live-region";
-import { ReviewedContentFixtures } from "./ui/reviewed-content-fixtures";
+import { EmptyState } from "./ui/empty-state";
 import { RovingList } from "./ui/roving-list";
+import { Skeleton } from "./ui/skeleton";
 import { StatusBanner } from "./ui/status-banner";
 import { Textarea } from "./ui/textarea";
 import { UserText } from "./ui/user-text";
@@ -138,6 +139,7 @@ export function ChatApp() {
   const [thumbsUp, setThumbsUp] = useState(true);
   const [selectedCitation, setSelectedCitation] =
     useState<CitationResponse | null>(null);
+  const [lastUserMessage, setLastUserMessage] = useState("");
   const citationTriggerRef = useRef<HTMLElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const auth = useMemo<ApiAuth | null>(
@@ -218,6 +220,7 @@ export function ChatApp() {
     if (!mayStartPaidPost(handshake, chat)) {
       return;
     }
+    setLastUserMessage(draft.trim());
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -393,14 +396,11 @@ export function ChatApp() {
       <div className={styles.shell}>
         <h1>Auto chat</h1>
         <StatusBanner kind="info" role="status">
-          Sign in to continue. Optimistic cookie checks are not authorization.
+          Sign in to continue.
         </StatusBanner>
         <p className={styles.muted}>
           <Link href="/login">Sign in</Link>
         </p>
-        <ReadinessPanel ready={readyQuery.data} />
-        <SignedOutageCopy />
-        <ReviewedContentFixtures />
       </div>
     );
   }
@@ -408,7 +408,7 @@ export function ChatApp() {
   if (mfaRequired) {
     return (
       <div className={styles.shell}>
-        <header className={styles.row}>
+        <header className={styles.pageHeader}>
           <h1>Auto chat</h1>
           <Button type="button" onClick={() => void session.signOut()}>
             Sign out
@@ -417,7 +417,7 @@ export function ChatApp() {
         <StatusBanner kind="error" role="alert">
           {MFA_REQUIRED_BANNER}
         </StatusBanner>
-        <LiveRegion politeness="assertive" aria-label="Blocking errors">
+        <LiveRegion politeness="assertive" aria-label="Blocking errors" visuallyHidden>
           {MFA_REQUIRED_BANNER}
         </LiveRegion>
         <p className={styles.muted}>
@@ -425,7 +425,6 @@ export function ChatApp() {
           {" · "}
           <Link href="/mfa/enroll">Enroll TOTP</Link>
         </p>
-        <ReadinessPanel ready={readyQuery.data} />
       </div>
     );
   }
@@ -449,20 +448,27 @@ export function ChatApp() {
     !composerDraftIsSendable(draft) ||
     conversationId === null;
 
+  const pipelineStage = (chat.stage ?? "").toLowerCase();
+  const pipelineSteps = [
+    { id: "preparing", label: "Preparing" },
+    { id: "searching", label: "Searching" },
+    { id: "resolving", label: "Resolving graph" },
+    { id: "reranking", label: "Reranking" },
+    { id: "answering", label: "Answering" },
+  ] as const;
+
   return (
     <div className={styles.shell}>
-      <header className={styles.row}>
-        <h1>Auto chat</h1>
-        <p className={styles.muted} data-testid="auto-label">
-          Auto (server-routed). This label does not change the POST body.
-        </p>
-        <p className={styles.muted}>
-          Signed in as <UserText value={meQuery.data?.role ?? "unknown"} />{" "}
-          <UserText value={meQuery.data?.user_id ?? ""} />
-        </p>
-        <Button type="button" onClick={() => void session.signOut()}>
-          Sign out
-        </Button>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1>Auto chat</h1>
+          <p className={styles.pageLead}>Ask across authorized documents. Routing is automatic.</p>
+        </div>
+        <div className={styles.row}>
+          <span className={`${styles.routeChip} ${styles.routeChipActive}`} data-testid="auto-label">
+            Auto
+          </span>
+        </div>
       </header>
 
       <HandshakeBanner />
@@ -476,7 +482,7 @@ export function ChatApp() {
         </StatusBanner>
       ) : null}
 
-      <LiveRegion politeness="assertive" aria-label="Blocking errors">
+      <LiveRegion politeness="assertive" aria-label="Blocking errors" visuallyHidden>
         {assertiveCopy || ""}
       </LiveRegion>
 
@@ -487,7 +493,7 @@ export function ChatApp() {
         </StatusBanner>
       ) : null}
 
-      <div className={styles.grid}>
+      <div className={styles.chatWorkspace}>
         <aside className={styles.panel}>
           <h2>Conversations</h2>
           <div className={styles.row}>
@@ -503,11 +509,13 @@ export function ChatApp() {
             </Button>
           </div>
           {conversationsQuery.isPending ? (
-            <p className={styles.muted}>Loading conversations</p>
+            <Skeleton label="Loading conversations" width="100%" />
           ) : null}
           {(conversationsQuery.data ?? []).length === 0 &&
           !conversationsQuery.isPending ? (
-            <p className={styles.muted}>No conversations yet</p>
+            <EmptyState title="No conversations yet">
+              Start a conversation to ask across authorized documents.
+            </EmptyState>
           ) : null}
           <RovingList
             aria-label="Conversations"
@@ -524,6 +532,7 @@ export function ChatApp() {
               idempotencyRef.current = newIdempotencyKey();
               setChat(createChatViewState(idempotencyRef.current));
               setFailure(null);
+              setLastUserMessage("");
             }}
           >
             {(item) => (
@@ -532,39 +541,62 @@ export function ChatApp() {
           </RovingList>
         </aside>
 
-        <section className={styles.panel} aria-label="Auto chat">
-          <p className={styles.muted}>
-            SubmitMessageRequest is message plus required idempotency_key only.
-            Hybrid/Combined/Table/Inspect send controls are not present
-            (GAP-07-01).
-          </p>
-          <Textarea
-            label="Message"
-            rows={4}
-            maxLength={COMPOSER_MAX_CHARS}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            disabled={!mayStartPaidPost(handshake, chat)}
-          />
-          <div className={styles.row}>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => void send()}
-              disabled={sendDisabled}
-            >
-              Send
-            </Button>
-            <Button type="button" onClick={() => void reconnect()}>
-              Reconnect
-            </Button>
-            <Button type="button" onClick={() => void cancel()}>
-              Cancel
-            </Button>
+        <section className={`${styles.panel} ${styles.chatStage}`} aria-label="Auto chat">
+          <ul className={styles.pipeline} aria-label="Run pipeline">
+            {pipelineSteps.map((step) => {
+              const active = pipelineStage.includes(step.id);
+              const done =
+                Boolean(chat.terminal) ||
+                pipelineSteps.findIndex((item) => pipelineStage.includes(item.id)) >
+                  pipelineSteps.findIndex((item) => item.id === step.id);
+              const className = [
+                styles.pipelineStep,
+                active ? styles.pipelineActive : undefined,
+                done && !active ? styles.pipelineDone : undefined,
+              ]
+                .filter(Boolean)
+                .join(" ");
+              return (
+                <li key={step.id} className={className}>
+                  {step.label}
+                </li>
+              );
+            })}
+          </ul>
+          <div className={styles.chatTranscript}>
+            {lastUserMessage ? (
+              <div className={styles.bubbleUser}>
+                <UserText value={lastUserMessage} />
+              </div>
+            ) : (
+              <EmptyState title="Ask a question">
+                Answers use authorized Hybrid evidence. Routing is automatic.
+              </EmptyState>
+            )}
+            <div className={styles.bubbleAssistant}>
+              <LiveRegion aria-label="Answer tokens" politeness="polite">
+                <UserText value={chat.answerText || "No tokens yet."} />
+              </LiveRegion>
+              {(citationsQuery.data ?? []).length > 0 ? (
+                <ul className={styles.citationRow}>
+                  {(citationsQuery.data ?? []).map((citation) => (
+                    <li key={citation.citation_id}>
+                      <CitationChip
+                        index={citation.citation_index}
+                        citationId={citation.citation_id}
+                        unavailable={citation.source_unavailable}
+                        href={citationChipHref(citation.provenance.url)}
+                        onSelect={(trigger) => {
+                          citationTriggerRef.current = trigger;
+                          setSelectedCitation(citation);
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           </div>
-          <LiveRegion aria-label="Answer tokens" politeness="polite">
-            <UserText value={chat.answerText || "No tokens yet."} />
-          </LiveRegion>
           {isGraphOnlyInspectionRoute(
             chat.diagnostics.effectiveRoute ?? chat.routeFamily,
           ) ? (
@@ -573,65 +605,6 @@ export function ChatApp() {
               Hybrid evidence.
             </LimitationCallout>
           ) : null}
-
-          <details className={styles.diagnostics} data-testid="advanced-diagnostics">
-            <summary>Advanced (requested vs effective route)</summary>
-            <dl>
-              <dt>Requested route</dt>
-              <dd>
-                <UserText
-                  value={
-                    chat.diagnostics.requestedRoute ?? chat.routeFamily ?? "—"
-                  }
-                />
-              </dd>
-              <dt>Effective route</dt>
-              <dd>
-                <UserText value={chat.diagnostics.effectiveRoute ?? "—"} />
-              </dd>
-              <dt>Corrected route</dt>
-              <dd>
-                <UserText value={chat.diagnostics.correctedRoute ?? "none"} />
-              </dd>
-              <dt>Correction reason</dt>
-              <dd>
-                <UserText value={chat.diagnostics.correctionReason ?? "—"} />
-              </dd>
-              <dt>Cache</dt>
-              <dd>
-                <UserText value={chat.diagnostics.cacheStatus ?? "—"} />
-              </dd>
-              <dt>Coverage</dt>
-              <dd>
-                {chat.diagnostics.coverageScore === null
-                  ? "—"
-                  : String(chat.diagnostics.coverageScore)}
-              </dd>
-              <dt>Tools</dt>
-              <dd>
-                <UserText
-                  value={chat.diagnostics.toolKeys.map(displayText).join(", ") || "none"}
-                />
-              </dd>
-              <dt>Heartbeats</dt>
-              <dd>{String(chat.diagnostics.heartbeatCount)}</dd>
-              <dt>Unknown events</dt>
-              <dd>
-                {chat.diagnostics.unknownEvents.join(", ") || "none (ignored)"}
-              </dd>
-              <dt>Stage</dt>
-              <dd>
-                <UserText value={chat.stage ?? "—"} /> /{" "}
-                <UserText value={chat.status ?? "—"} />
-              </dd>
-              <dt>Terminal</dt>
-              <dd>
-                <UserText value={chat.terminal ?? "running"} />
-              </dd>
-            </dl>
-            <p className={styles.muted}>{INFERENCE_LINKS_UNAVAILABLE}</p>
-          </details>
-
           {chat.diagnostics.limitationCodes.map((code) => (
             <LimitationCallout key={code} tone={limitationTone(code)}>
               {limitationCopy(code)}
@@ -644,86 +617,145 @@ export function ChatApp() {
           ) : null}
           {paradeDbDown && bm25Limitation ? (
             <p className={styles.muted}>
-              Ready ParadeDB is down and the run reported bm25_unavailable. BM25
-              is not claimed healthy.
+              Search is degraded. Keyword retrieval is not claimed healthy.
             </p>
           ) : null}
-
-          <ReadinessPanel ready={readyQuery.data} />
-          <SignedOutageCopy />
-
-          <p className={styles.muted} data-testid="usage-strip">
-            Usage {String(chat.diagnostics.promptTokens)}/
-            {String(chat.diagnostics.completionTokens)} tokens. Company total{" "}
-            {String(usageQuery.data?.cost_usd ?? "—")} USD.
-          </p>
-
-          <h2>Citations</h2>
-          <ul className={styles.list}>
-            {(citationsQuery.data ?? []).map((citation) => (
-              <li key={citation.citation_id}>
-                <CitationChip
-                  index={citation.citation_index}
-                  citationId={citation.citation_id}
-                  unavailable={citation.source_unavailable}
-                  href={citationChipHref(citation.provenance.url)}
-                  onSelect={(trigger) => {
-                    citationTriggerRef.current = trigger;
-                    setSelectedCitation(citation);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
           <CitationDrawer
             citation={selectedCitation}
             onClose={() => setSelectedCitation(null)}
             returnFocusRef={citationTriggerRef}
           />
-
-          <ReviewedContentFixtures />
-
-          <h2>Feedback</h2>
-          <div className={styles.row}>
-            <Button
-              type="button"
-              variant={thumbsUp ? "primary" : "secondary"}
-              onClick={() => setThumbsUp(true)}
-            >
-              Thumbs up
-            </Button>
-            <Button
-              type="button"
-              variant={!thumbsUp ? "primary" : "secondary"}
-              onClick={() => setThumbsUp(false)}
-            >
-              Thumbs down
-            </Button>
+          <div className={styles.composerDock}>
+            <Textarea
+              label="Message"
+              rows={3}
+              maxLength={COMPOSER_MAX_CHARS}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              disabled={!mayStartPaidPost(handshake, chat)}
+              placeholder="Ask anything about your documents…"
+            />
+            <div className={styles.row}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void send()}
+                disabled={sendDisabled}
+              >
+                <Icon name="send" />
+                Send
+              </Button>
+              <Button type="button" onClick={() => void reconnect()}>
+                Reconnect
+              </Button>
+              <Button type="button" onClick={() => void cancel()}>
+                Cancel
+              </Button>
+            </div>
+            <div className={styles.row}>
+              <Button
+                type="button"
+                variant={thumbsUp ? "primary" : "secondary"}
+                onClick={() => setThumbsUp(true)}
+              >
+                Thumbs up
+              </Button>
+              <Button
+                type="button"
+                variant={!thumbsUp ? "primary" : "secondary"}
+                onClick={() => setThumbsUp(false)}
+              >
+                Thumbs down
+              </Button>
+              <label>
+                Tag
+                <select
+                  value={feedbackTag}
+                  onChange={(event) =>
+                    setFeedbackTag(event.target.value as FeedbackTag)
+                  }
+                >
+                  {FEEDBACK_TAGS.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Input
+                label="Comment"
+                value={feedbackComment}
+                onChange={(event) => setFeedbackComment(event.target.value)}
+              />
+              <Button type="button" onClick={() => void sendFeedback()}>
+                Submit feedback
+              </Button>
+            </div>
           </div>
-          <label>
-            Tag
-            <select
-              value={feedbackTag}
-              onChange={(event) =>
-                setFeedbackTag(event.target.value as FeedbackTag)
-              }
-            >
-              {FEEDBACK_TAGS.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Input
-            label="Comment"
-            value={feedbackComment}
-            onChange={(event) => setFeedbackComment(event.target.value)}
-          />
-          <Button type="button" onClick={() => void sendFeedback()}>
-            Submit feedback
-          </Button>
         </section>
+
+        <details className={styles.diagnostics} data-testid="advanced-diagnostics">
+          <summary>Diagnostics</summary>
+          <dl>
+            <dt>Requested route</dt>
+            <dd>
+              <UserText
+                value={
+                  chat.diagnostics.requestedRoute ?? chat.routeFamily ?? "—"
+                }
+              />
+            </dd>
+            <dt>Effective route</dt>
+            <dd>
+              <UserText value={chat.diagnostics.effectiveRoute ?? "—"} />
+            </dd>
+            <dt>Corrected route</dt>
+            <dd>
+              <UserText value={chat.diagnostics.correctedRoute ?? "none"} />
+            </dd>
+            <dt>Correction reason</dt>
+            <dd>
+              <UserText value={chat.diagnostics.correctionReason ?? "—"} />
+            </dd>
+            <dt>Cache</dt>
+            <dd>
+              <UserText value={chat.diagnostics.cacheStatus ?? "—"} />
+            </dd>
+            <dt>Coverage</dt>
+            <dd>
+              {chat.diagnostics.coverageScore === null
+                ? "—"
+                : String(chat.diagnostics.coverageScore)}
+            </dd>
+            <dt>Tools</dt>
+            <dd>
+              <UserText
+                value={chat.diagnostics.toolKeys.map(displayText).join(", ") || "none"}
+              />
+            </dd>
+            <dt>Heartbeats</dt>
+            <dd>{String(chat.diagnostics.heartbeatCount)}</dd>
+            <dt>Unknown events</dt>
+            <dd>
+              {chat.diagnostics.unknownEvents.join(", ") || "none (ignored)"}
+            </dd>
+            <dt>Stage</dt>
+            <dd>
+              <UserText value={chat.stage ?? "—"} /> /{" "}
+              <UserText value={chat.status ?? "—"} />
+            </dd>
+            <dt>Terminal</dt>
+            <dd>
+              <UserText value={chat.terminal ?? "running"} />
+            </dd>
+          </dl>
+          <p className={styles.muted}>{INFERENCE_LINKS_UNAVAILABLE}</p>
+          <p className={styles.muted} data-testid="usage-strip">
+            Usage {String(chat.diagnostics.promptTokens)}/
+            {String(chat.diagnostics.completionTokens)} tokens. Company total{" "}
+            {String(usageQuery.data?.cost_usd ?? "—")} USD.
+          </p>
+        </details>
       </div>
     </div>
   );

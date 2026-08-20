@@ -111,12 +111,13 @@ export function TeamApp() {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.row}>
-        <h1>Team</h1>
-        <p className={styles.muted}>
-          Signed in as <UserText value={meQuery.data?.role ?? "unknown"} />{" "}
-          <CodeText value={meQuery.data?.user_id ?? ""} />
-        </p>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1>Team</h1>
+          <p className={styles.pageLead}>
+            Invite people and offboard accounts. There is no member directory.
+          </p>
+        </div>
       </header>
       <HandshakeBanner />
       {error ? (
@@ -163,7 +164,7 @@ export function TeamApp() {
                 disabled={role === "viewer"}
                 onChange={(event) => setUploadEnabled(event.target.checked)}
               />{" "}
-              upload_enabled
+              Upload enabled
             </label>
           </div>
           <Button
@@ -236,8 +237,8 @@ export function TeamApp() {
         </section>
       ) : (
         <p className={styles.muted}>
-          Offboard is hidden for this role. `offboardUser` still exists and
-          FastAPI still 403s.
+          Offboarding is hidden for this role. The server still denies the
+          request.
         </p>
       )}
     </div>

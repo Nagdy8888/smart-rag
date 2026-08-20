@@ -133,12 +133,14 @@ export function ToolsApp() {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.row}>
-        <h1>Tools</h1>
-        <p className={styles.muted}>
-          Catalog for any member. Enable and permissions are owner/admin
-          convenience. Server authorization remains authoritative.
-        </p>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1>Tools</h1>
+          <p className={styles.pageLead}>
+            Optional tools available to your role. Enabling a tool still
+            requires server authorization.
+          </p>
+        </div>
       </header>
       <HandshakeBanner />
       {error ? (
@@ -272,8 +274,8 @@ export function ToolsApp() {
         </section>
       ) : (
         <p className={styles.muted}>
-          Enable and seed controls are hidden. `enableTool` still exists and
-          FastAPI still 403s.
+          Enable and seed controls are hidden. The server still denies the
+          request.
         </p>
       )}
     </div>

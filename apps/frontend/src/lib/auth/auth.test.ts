@@ -22,7 +22,7 @@ describe("totp QR src", () => {
 
 describe("public auth paths", () => {
   it("allows Auth-direct routes without treating them as the security boundary", () => {
-    expect(isPublicAuthPath("/login")).toBe(true);
+    expect(isPublicAuthPath("/review-fixtures")).toBe(true);
     expect(isPublicAuthPath("/signup")).toBe(true);
     expect(isPublicAuthPath("/mfa/challenge")).toBe(true);
     expect(isPublicAuthPath("/unavailable/GAP-07-07")).toBe(true);

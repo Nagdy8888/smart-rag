@@ -63,9 +63,9 @@ export const SHADOW_1 = "0 1px 2px rgb(15 23 42 / 0.08)";
 /** Raised tonal elevation for drawers. No blur. */
 export const SHADOW_2 = "0 8px 24px rgb(15 23 42 / 0.08)";
 
-/** System sans stack. No Google Fonts CDN. */
+/** Self-hosted Inter plus system Arabic fallbacks. No Google Fonts CDN. */
 export const FONT_SANS =
-  '"Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif';
+  '"Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif';
 
 /** Monospace stack for codes and IDs. */
 export const FONT_MONO = 'ui-monospace, "Cascadia Code", monospace';

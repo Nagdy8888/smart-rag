@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-latin-500-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter-latin-600-normal.woff2") format("woff2");
+}
+
 /*
  * Canonical tokens: docs/frontend/STITCH_BRIEF.md (not DESIGN.md YAML,
  * not lavender #faf8ff, not #004ac6, not teal #0F766E canvas/accent,
@@ -24,12 +48,16 @@
   --space: 4px;
   --shadow-1: 0 1px 2px rgb(15 23 42 / 0.08);
   --shadow-2: 0 8px 24px rgb(15 23 42 / 0.08);
-  --font-sans: "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif;
+  --font-sans: "Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", monospace;
   --line-height-ar: 1.75;
   --line-height-en: 1.5;
   --nav-width: 280px;
   --row-height: 48px;
+  --color-accent-muted: #EFF6FF;
+  --color-accent-soft: #DBEAFE;
+  --topbar-height: 64px;
+  --control-height: 44px;
 }
 
 @theme {

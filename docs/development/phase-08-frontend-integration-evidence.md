@@ -2,7 +2,7 @@
 title: Phase 8 frontend integration evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-17
+last-reviewed: 2026-08-20
 audience: engineering, reviewers, client-approver
 ---
 
@@ -756,3 +756,48 @@ evidence. Do not start Phase 9 until the user accepts this exit record.
 
 - User acceptance of this Phase 8 exit record
 - Do not start Phase 9 local release-candidate load/eval until accepted
+
+## Stitch-first UX restoration (2026-08-20)
+
+The user clarified that “template, not a layout” forbade extra numbered-frame
+routes, not visual fidelity. Historical packet-1 notes that App Router
+exposed only `/` remain true of **that packet**. Current routes and the
+visual restoration are recorded in
+[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md) and
+[VISUAL_MAP.md](../frontend/VISUAL_MAP.md).
+
+| Check | Status |
+| --- | --- |
+| Round 3 review language + ADR | proven |
+| Route groups: `(auth)` card vs `(console)` 280px shell; URLs unchanged | proven (`next build` route table) |
+| Login has no console nav; form in first 390px viewport | proven (Playwright login + design-system) |
+| Chat transcript/composer outrank collapsible diagnostics | proven in component tests; live screenshot **unverified-live** (Docker/GoTrue/FastAPI down) |
+| Mapped routes follow Stitch composition without mock Hybrid/nDCG/sliders | proven in Vitest; authenticated Playwright screenshots **unverified-live** |
+| Public Auth visual baselines 1280 and 390 | proven (`tests/e2e/visual-routes.spec.ts-snapshots`) |
+| Frontend lint, `tsc --noEmit`, Vitest 171, production build | proven |
+| Playwright Chromium | proven 23 passed, 9 skipped (live session required) |
+| `test_phase07_stitch_review.py` | proven |
+
+### Intentional deviations from Stitch frames
+
+| Frame / control | Implementation | Reason |
+| --- | --- | --- |
+| Google SSO label | `Continue with Google (when enabled)` | GAP-07-04 accessible name contract |
+| Request access | Sign up | Contract-backed `/signup` |
+| Remember this session | omitted | No remember-me HTTP |
+| System Status: All Systems Operational | omitted | Mock health chrome |
+| Hybrid / Combined send, nDCG, TTFB, confidence | omitted | No client route POST; no fake metrics |
+| Global search, bell, help, avatars | omitted | No APIs; placeholder avatars prohibited |
+| Budget sliders, Slack, export report | honest unavailable cards | GAP-07-11 / no export tool on `/usage` |
+| Edit Relationship, depth 5 | omitted; hop cap 3 | ACL-safe inspect only |
+| Owner-bootstrap wizard | omitted | GAP-07-08 |
+| GAP ids on product pages | `/unavailable/` and tests only | Human copy on normal journeys |
+| Review fixtures | `/review-fixtures` | Not a product journey |
+
+### Remaining live-only gaps
+
+Docker Desktop was not running, so local GoTrue (`:54321`) and FastAPI
+(`:8000`) were unreachable. Authenticated Playwright (nav 280px, Menu
+drawer, Auto chrome, usage 403, product-route screenshots) skipped via
+`signInLiveMember`. Re-run `pnpm exec playwright test --update-snapshots`
+from `apps/frontend` after `npx supabase start` and the API are up.

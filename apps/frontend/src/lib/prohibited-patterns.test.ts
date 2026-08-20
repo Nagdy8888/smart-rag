@@ -20,6 +20,24 @@ const SKIP_NAMES = new Set([
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".css", ".mjs", ".mts"]);
 
 /**
+ * List App Router folder names, flattening Next.js route groups.
+ *
+ * @param appDir - `src/app` path.
+ * @returns Top-level and grouped route folder names.
+ */
+function appRouteNames(appDir: string): string[] {
+  const names: string[] = [];
+  for (const entry of readdirSync(appDir)) {
+    if (entry.startsWith("(") && entry.endsWith(")")) {
+      names.push(...readdirSync(path.join(appDir, entry)));
+      continue;
+    }
+    names.push(entry);
+  }
+  return names;
+}
+
+/**
  * Recursively list source files under a directory.
  *
  * @param directory - Start path.
@@ -90,7 +108,7 @@ describe("prohibited production patterns", () => {
 
   it("does not add Stitch frame or design-system product routes", () => {
     const appDir = path.join(srcRoot, "app");
-    const names = readdirSync(appDir);
+    const names = appRouteNames(appDir);
     expect(names).not.toContain("frame_00");
     expect(names).not.toContain("design-system");
     expect(names).not.toContain("gallery");
@@ -121,8 +139,7 @@ describe("prohibited production patterns", () => {
   });
 
   it("allows Auth-direct App Router folders", () => {
-    const appDir = path.join(srcRoot, "app");
-    const names = readdirSync(appDir);
+    const names = appRouteNames(path.join(srcRoot, "app"));
     expect(names).toEqual(
       expect.arrayContaining(["login", "signup", "auth", "mfa", "invitations"]),
     );

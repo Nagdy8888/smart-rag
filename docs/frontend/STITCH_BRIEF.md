@@ -2,7 +2,7 @@
 title: Stitch brief for the Smart RAG console
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-20
 audience: design, frontend, reviewers
 packet: P07-02
 ---
@@ -18,6 +18,7 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) ·
+[VISUAL_MAP.md](./VISUAL_MAP.md) ·
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) ·
 [docs index](../README.md)
@@ -28,8 +29,11 @@ limitation, fallback, partial-readiness, budget, and degraded state.
 [STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md) is the accessibility
 and security review.
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) records that the delivered Stitch
-export is a **template, not product layout**. Do not add Stitch frames as
-routes. Implementation is the component-system fallback (do not port HTML).
+export is a **template, not product layout**: do not add Stitch frames as
+routes. Screenshots remain the visual composition target
+([VISUAL_MAP.md](./VISUAL_MAP.md),
+[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md)). Implementation is
+typed native HTML (do not port `code.html`).
 
 ## Localization decision
 
@@ -88,7 +92,7 @@ wins.** **Blur is rejected** (no frosted glass, no `backdrop-filter`).
 | `--space` | `4px` grid | 8/12/16/24/32 |
 | `--shadow-1` | `0 1px 2px rgb(15 23 42 / 0.08)` | |
 | `--shadow-2` | `0 8px 24px rgb(15 23 42 / 0.08)` | drawers; no blur overlay |
-| `--font-sans` | `"Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif` | CSP-compatible; optional self-hosted Inter later |
+| `--font-sans` | `"Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif` | CSP `font-src 'self'`; self-hosted Inter, then system Arabic fallbacks |
 | `--font-mono` | `ui-monospace, "Cascadia Code", monospace` | IDs/codes |
 | `--line-height-ar` | `1.75` | diacritics |
 | `--line-height-en` | `1.5` | chrome |
@@ -305,7 +309,9 @@ comment; random cost; complete corpus summary without coverage_score.
 
 Implement in `apps/frontend` with Next.js App Router 16.3, React 19,
 `@supabase/ssr` 0.7.0, TanStack Query 5.85. The Stitch export is a template,
-not a layout: do not add its frames as pages. Phase 8 uses accessible native
-HTML plus build-time Tailwind tokens (not CDN) matching the token table in
-this brief, and only surfaces with typed contracts in
+not a layout: do not add its frames as pages. Mapped `screen.png` files
+still control composition, hierarchy, spacing, and interaction language
+([VISUAL_MAP.md](./VISUAL_MAP.md)). Phase 8 uses accessible native HTML plus
+build-time Tailwind tokens (not CDN) matching the token table in this brief,
+and only surfaces with typed contracts in
 [API_UI_MAPPING.md](./API_UI_MAPPING.md).

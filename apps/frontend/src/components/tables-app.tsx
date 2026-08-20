@@ -130,9 +130,9 @@ export function TablesApp() {
   return (
     <div className={styles.shell}>
       <h1>Structured tables</h1>
-      <p className={styles.muted}>
-        Deterministic execution only. There is no generated-analysis API, so
-        this page has no LLM commentary panel. Client total is{" "}
+      <p className={styles.pageLead}>
+        Deterministic results from authorized spreadsheets. This page has no
+        generated commentary. Client total is{" "}
         {String(clientComputedTableTotal())}.
       </p>
       <section className={styles.panel} aria-label="Manifests">
@@ -255,7 +255,8 @@ export function TablesApp() {
       ) : null}
       {analyzeMutation.data ? (
         <section className={styles.panel} aria-label="Deterministic results">
-          <h2>Deterministic results</h2>
+          <h2>Data execution</h2>
+          <p className={styles.muted}>Deterministic rows from the typed plan.</p>
           {columns.length > 0 ? (
             <label>
               Sort displayed rows
