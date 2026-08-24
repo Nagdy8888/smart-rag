@@ -256,7 +256,7 @@ ParadeDB writer credentials: `PARADEDB_URL` on worker only (Compose `paradedb_wr
 | Source ids per relation | count | 200 | 200 | Packet 1 `GRAPH_FIELD_SEP` | mapper | truncated unavailable | Silent provenance |
 
 The accepted synthetic Graph-200 demo may raise only the entity/relation
-enumeration limits to 1,600/1,200. The worker applies that pair only when
+enumeration limits to 2,000/1,800. The worker applies that pair only when
 `APP_ENV=local` and the durable job payload contains
 `local_demo_mapping_override=true`, `content_class=synthetic`, and
 `review_approved=true`. Staging, production, and every other job retain the

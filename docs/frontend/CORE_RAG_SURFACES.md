@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-24
 audience: engineering, frontend, reviewers
 packet: P08-03
 ---
@@ -11,8 +11,10 @@ packet: P08-03
 
 Native Chat, Documents, Graph, and Tables mapped to FastAPI/SSE contracts.
 Stitch frames 04/05/06/07/09/10 are a **template, not a layout** (no extra
-frame routes). Their `screen.png` files are still the visual composition
-target ([VISUAL_MAP.md](./VISUAL_MAP.md)). This packet does not port HTML.
+frame routes). Their `screen.png` files are historical references only. Live
+composition is the light Precision Workspace in
+[STITCH_BRIEF.md](./STITCH_BRIEF.md) and [VISUAL_MAP.md](./VISUAL_MAP.md).
+This packet does not port HTML.
 
 Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·

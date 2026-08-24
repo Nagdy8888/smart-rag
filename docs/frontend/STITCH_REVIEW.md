@@ -2,7 +2,7 @@
 title: Stitch review and component-system fallback
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-24
 audience: frontend, reviewers, client-approver
 packet: P07-06
 ---
@@ -189,8 +189,18 @@ remaining native HTML.
 See [ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md) and
 [VISUAL_MAP.md](./VISUAL_MAP.md).
 
+## Round 4 visual contract (2026-08-24)
+
+The user rejected the mapped Stitch `screen.png` composition as the live
+target while keeping native HTML, accessibility, API mapping, safe text,
+and no extra routes. Stitch screenshots are **historical references**.
+The live visual contract is the light Precision Workspace token table in
+[STITCH_BRIEF.md](./STITCH_BRIEF.md). This is not a third Stitch revision
+round.
+
 ## Rollback
 
 Revert this round-2 section only with an explicit user instruction. Do not
 un-check packets 1–5. Round 3 visual restoration is recorded in
-[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md).
+[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md). Round 4 supersedes
+screenshot composition, not the template-not-layout rule.

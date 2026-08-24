@@ -11,6 +11,7 @@ import { AppShell } from "./app-shell";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 vi.mock("next/link", () => ({
@@ -51,6 +52,7 @@ vi.mock("../../lib/env", () => ({
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
 vi.mock("next/link", () => ({
@@ -74,7 +76,7 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
-  it("exposes a skip link, 280px token nav, and main landmark", () => {
+  it("exposes a skip link, 232px token nav, and main landmark", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -90,7 +92,7 @@ describe("AppShell", () => {
     const skip = screen.getByRole("link", { name: "Skip to main content" });
     expect(skip).toHaveAttribute("href", "#main");
     expect(screen.getByRole("navigation", { name: "Console" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Ask" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Documents" })).toHaveAttribute(
       "href",
       "/documents",

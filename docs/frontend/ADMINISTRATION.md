@@ -2,7 +2,7 @@
 title: Administration surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-24
 audience: engineering, frontend, security
 packet: P08-04
 ---
@@ -10,10 +10,10 @@ packet: P08-04
 # Administration surfaces (Phase 8 packet 4)
 
 Native Team, Tools, Curation, Usage, and Profile mapped to FastAPI
-contracts. Stitch frames 02/08/11/12/13 are unused as routes; frame 14 is
-the visual composition target for `/usage` ([VISUAL_MAP.md](./VISUAL_MAP.md)).
-This packet does not add extra frames as routes and does not create an
-`app/admin` folder.
+contracts. Stitch frames 02/08/11/12/13 are unused as routes; frame 14 is a
+historical screenshot only, not the live `/usage` composition
+([VISUAL_MAP.md](./VISUAL_MAP.md)). This packet does not add extra frames as
+routes and does not create an `app/admin` folder.
 
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·

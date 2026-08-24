@@ -1,8 +1,12 @@
-"""Requeue Graph-200 mapping without deleting or re-extracting vendor data."""
+"""Requeue Graph-200 mapping without deleting or re-extracting vendor data.
+
+Unsafe for canonical-passage Graph-200: vendor lookup uses the whole-version
+id, and the workspace reset un-quarantines live ``company_default``. Use
+``scripts/ops/rebuild_demo_graph_canonical_passages.py --map-only`` instead.
+"""
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -11,11 +15,6 @@ import psycopg
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
-
-from scripts.ops.ingest_demo_plot_slices import (  # noqa: E402
-    merged_env,
-    require_env,
-)
 
 GRAPH_JOB_ID = "542628df-2c38-4b15-a180-893d7fd74998"
 GRAPH_VERSION_ID = "c9b7a989-d575-4346-be92-2537f01fa7c8"
@@ -136,18 +135,19 @@ def requeue_demo_graph_mapping(operator_url: str) -> dict[str, object]:
 
 
 def main() -> int:
-    """Requeue mapping and print a sanitized snapshot.
+    """Refuse the unsafe whole-version mapping retry.
 
     Returns:
-        Process exit code.
+        Unused. Always raises.
+
+    Raises:
+        RuntimeError: Canonical-passage Graph-200 must use ``--map-only``.
     """
 
-    env = merged_env()
-    snapshot = requeue_demo_graph_mapping(
-        require_env(env, "OPERATOR_SUPABASE_DB_URL")
+    raise RuntimeError(
+        "retry_demo_graph_mapping_unsafe_for_canonical_passages:"
+        " use scripts/ops/rebuild_demo_graph_canonical_passages.py --map-only"
     )
-    print(json.dumps(snapshot, sort_keys=True), flush=True)
-    return 0
 
 
 if __name__ == "__main__":

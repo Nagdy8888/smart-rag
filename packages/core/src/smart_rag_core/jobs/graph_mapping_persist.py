@@ -30,31 +30,40 @@ def delete_version_maps(
     version_id: UUID,
     workspace_key: str,
 ) -> None:
-    """Remove prior chunk and evidence rows for one version/workspace.
+    """Remove prior chunk and evidence rows for one version.
+
+    ``lightrag_chunk_map.chunk_id`` is the table primary key, and
+    ``graph_evidence_map`` is unique on ``(graph_object_type, graph_object_id,
+    chunk_id)``. Isolate rebuilds therefore cannot keep leftover live-workspace
+    rows for the same canonical chunks. Deletes are version-scoped, not
+    workspace-scoped.
 
     Args:
         connection: ``app_worker`` connection inside the mapping txn.
         version_id: Canonical version being remapped.
-        workspace_key: Application workspace.
+        workspace_key: Application workspace. Retained for callers; chunk and
+            evidence uniqueness is version-global.
 
     Side Effects:
-        Deletes ``lightrag_chunk_map`` and ``graph_evidence_map`` rows.
+        Deletes ``lightrag_chunk_map`` and ``graph_evidence_map`` rows for
+        ``version_id`` in every workspace.
     """
 
+    del workspace_key
     with connection.cursor() as cursor:
         cursor.execute(
             """
             DELETE FROM app.lightrag_chunk_map
-            WHERE version_id = %s AND workspace_key = %s
+            WHERE version_id = %s
             """,
-            (version_id, workspace_key),
+            (version_id,),
         )
         cursor.execute(
             """
             DELETE FROM app.graph_evidence_map
-            WHERE version_id = %s AND workspace_key = %s
+            WHERE version_id = %s
             """,
-            (version_id, workspace_key),
+            (version_id,),
         )
 
 

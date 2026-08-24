@@ -5,14 +5,16 @@
 
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { EntitySearch } from "./graph/entity-search";
+import { GraphListFallback } from "./graph/graph-list-fallback";
+import { GraphInspector } from "./graph/graph-inspector";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { LimitationCallout } from "./ui/limitation-callout";
-import { UserText } from "./ui/user-text";
 import {
   inspectGraph,
   searchGraphEntities,
@@ -24,14 +26,16 @@ import {
   GRAPH_INSPECT_MAX_ROWS,
   buildGraphInspectRequest,
   clampGraphInspectDepth,
-  graphLimitationDisplay,
-  isGraphPendingLimitation,
 } from "../lib/graph-client";
-import { graphNotReadyCopy, limitationCopy, limitationTone } from "../lib/limitations";
 import { sessionQueryKeys } from "../lib/query-keys";
-import { displayText, formatProvenance } from "../lib/safe-text";
+import { displayText } from "../lib/safe-text";
 import type { GraphInspectResponse } from "../lib/types";
-import styles from "./developer-app.module.css";
+import styles from "./graph/graph.module.css";
+
+const GraphCanvas = dynamic(
+  () => import("./graph/graph-canvas").then((mod) => mod.GraphCanvas),
+  { ssr: false, loading: () => <p>Loading canvas</p> },
+);
 
 /**
  * Optional bounded SVG of inspect nodes. React elements only, not innerHTML.
@@ -122,11 +126,12 @@ export function GraphExplorer() {
   });
 
   const inspectMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (keysOverride?: string) => {
       if (auth === null) {
         throw new Error("unsigned");
       }
-      const keysList = entityKey
+      const raw = keysOverride ?? entityKey;
+      const keysList = raw
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean);
@@ -142,7 +147,7 @@ export function GraphExplorer() {
   if (!session.ready || accessToken === null) {
     return (
       <div className={styles.shell}>
-        <h1>Graph</h1>
+        <h2>Graph</h2>
         <p className={styles.muted}>
           <Link href="/login">Sign in</Link>
         </p>
@@ -155,41 +160,24 @@ export function GraphExplorer() {
 
   return (
     <div className={styles.shell}>
-      <h1>Graph explorer</h1>
+      <h2>Graph explorer</h2>
       <p className={styles.pageLead}>
         Search first, then inspect a bounded neighborhood. Depth stays at most{" "}
         {String(GRAPH_INSPECT_MAX_DEPTH)}. This is inspection, not an answering
         mode.
       </p>
       <div className={styles.panes}>
-        <section className={styles.panel} aria-label="Search">
-          <h2>Search</h2>
-          <Input
-            label="Entity query"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <Button
-            type="button"
-            onClick={() => setSubmitted(query.trim())}
-            disabled={query.trim() === ""}
-          >
-            Search
-          </Button>
-          <ul className={styles.list}>
-            {(searchQuery.data ?? []).map((hit) => (
-              <li key={`${hit.object_id}-${hit.chunk_id}`}>
-                <button
-                  type="button"
-                  onClick={() => setEntityKey(hit.object_id)}
-                >
-                  <UserText value={hit.object_type} />{" "}
-                  <UserText value={hit.object_id} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <EntitySearch
+          query={query}
+          onQuery={setQuery}
+          onSearch={() => setSubmitted(query.trim())}
+          hits={searchQuery.data ?? []}
+          onSelect={(objectId) => {
+            setEntityKey(objectId);
+            inspectMutation.mutate(objectId);
+          }}
+          loading={searchQuery.isFetching}
+        />
         <section className={styles.panel} aria-label="Inspect">
           <h2>Inspect</h2>
           <Input
@@ -197,25 +185,28 @@ export function GraphExplorer() {
             value={entityKey}
             onChange={(event) => setEntityKey(event.target.value)}
           />
-          <Input
-            label="Document id seed"
-            value={documentId}
-            onChange={(event) => setDocumentId(event.target.value)}
-          />
-          <Input
-            label="Depth (1–3)"
-            type="number"
-            min={1}
-            max={GRAPH_INSPECT_MAX_DEPTH}
-            value={String(depth)}
-            onChange={(event) =>
-              setDepth(clampGraphInspectDepth(Number(event.target.value)))
-            }
-          />
+          <details className={styles.details}>
+            <summary>Advanced inspect</summary>
+            <Input
+              label="Document id seed"
+              value={documentId}
+              onChange={(event) => setDocumentId(event.target.value)}
+            />
+            <Input
+              label="Depth (1–3)"
+              type="number"
+              min={1}
+              max={GRAPH_INSPECT_MAX_DEPTH}
+              value={String(depth)}
+              onChange={(event) =>
+                setDepth(clampGraphInspectDepth(Number(event.target.value)))
+              }
+            />
+          </details>
           <Button
             type="button"
             variant="primary"
-            onClick={() => inspectMutation.mutate()}
+            onClick={() => inspectMutation.mutate(undefined)}
             disabled={entityKey.trim() === "" && documentId.trim() === ""}
           >
             Inspect
@@ -223,55 +214,14 @@ export function GraphExplorer() {
           {inspectMutation.isError ? (
             <p className={styles.muted}>Inspect rejected.</p>
           ) : null}
-          <h3>Nodes</h3>
-          <ul className={styles.list}>
-            {(inspect?.nodes ?? []).map((node, index) => (
-              <li key={`${node.object_id}-${String(index)}`}>
-                hop {String(node.hop)}{" "}
-                <UserText value={node.object_type} />{" "}
-                <UserText value={node.object_id} />
-              </li>
-            ))}
-          </ul>
+          <GraphListFallback nodes={inspect?.nodes ?? []} />
+          {inspect ? <GraphCanvas nodes={inspect.nodes} /> : null}
           {inspect ? <GraphNeighborhoodSvg inspect={inspect} /> : null}
         </section>
-        <section className={styles.panel} aria-label="Locators and limitations">
-          <h2>Locators</h2>
-          <ul className={styles.list}>
-            {(inspect?.locators ?? []).map((locator) => (
-              <li key={locator.chunk_id}>
-                <UserText
-                  value={formatProvenance({
-                    page_number: locator.page_number,
-                    section_path: locator.section_path,
-                    sheet_name: locator.sheet_name,
-                    range_ref: locator.range_ref,
-                    source_url: locator.source_url,
-                  })}
-                />
-              </li>
-            ))}
-          </ul>
-          {limitations.map((item) => (
-            <LimitationCallout
-              key={item.code}
-              tone={limitationTone(item.code)}
-            >
-              {graphLimitationDisplay(item)}
-              {isGraphPendingLimitation(item.code) &&
-              item.code !== "graph_acl_blindness"
-                ? ` ${graphNotReadyCopy(item.count ?? 0)}`
-                : null}
-            </LimitationCallout>
-          ))}
-          {limitations.some((item) => item.code === "graph_acl_blindness") ? (
-            <p className={styles.muted}>{limitationCopy("graph_acl_blindness")}</p>
-          ) : null}
-          <p className={styles.muted}>
-            Relationship editing is not available. This explorer is
-            inspection-only.
-          </p>
-        </section>
+        <GraphInspector
+          locators={inspect?.locators ?? []}
+          limitations={limitations}
+        />
       </div>
     </div>
   );

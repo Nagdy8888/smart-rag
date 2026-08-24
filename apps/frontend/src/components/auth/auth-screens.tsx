@@ -29,6 +29,7 @@ import {
 import { GOOGLE_OAUTH_ENABLED, maybeSignInWithGoogle } from "../../lib/auth/google";
 import { totpQrImageSrc } from "../../lib/auth/totp-qr";
 import { useSession } from "../../lib/auth/session-provider";
+import { SIGN_IN_TIMEOUT_MS, raceTimeout } from "../../lib/auth/timeout";
 import { publicSupabaseConfig } from "../../lib/env";
 import { evaluatePaidHandshake, handshakeBelowMinCopy } from "../../lib/handshake";
 import { mutationFailureBanner } from "../../lib/failure-copy";
@@ -140,10 +141,16 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
           setFailed(true);
           return;
         }
-        const result = await supabase.auth.signInWithPassword({ email, password });
+        const result = await raceTimeout(
+          supabase.auth.signInWithPassword({ email, password }),
+          SIGN_IN_TIMEOUT_MS,
+          "sign_in_timeout",
+        );
         if (result.error || !result.data.session?.access_token) {
           setFailed(true);
         }
+      } catch {
+        setFailed(true);
       } finally {
         setPending(false);
       }

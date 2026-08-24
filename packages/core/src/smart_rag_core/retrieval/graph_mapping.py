@@ -8,6 +8,7 @@ most once per document; support rerank is invoked at most once per document.
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -507,6 +508,55 @@ def _span_offsets(haystack: str, needle: str) -> dict[str, int] | None:
     if index < 0:
         return None
     return {"start": index, "end": index + len(needle)}
+
+
+def stitch_overlapping_texts(parts: Sequence[str]) -> str:
+    """Reconstruct one LightRAG source from overlapping vendor chunk texts.
+
+    LightRAG 1.5.6 still applies its 1200/100 chunker to each canonical
+    passage source. Consecutive chunks overlap; this joins them without
+    doubling the overlap. Empty parts are skipped.
+
+    Args:
+        parts: Vendor chunk contents in ``chunk_order_index`` order.
+
+    Returns:
+        Reconstructed source text, possibly still envelope-prefixed.
+    """
+
+    reconstructed = ""
+    for part in parts:
+        if not part:
+            continue
+        if not reconstructed:
+            reconstructed = part
+            continue
+        overlap = 0
+        max_try = min(len(reconstructed), len(part))
+        for size in range(max_try, 0, -1):
+            if reconstructed.endswith(part[:size]):
+                overlap = size
+                break
+        reconstructed += part[overlap:]
+    return reconstructed
+
+
+def mapping_content_digest(text: str) -> str:
+    """Return the mapping hash for reconstructed vendor or canonical text.
+
+    LightRAG HTML-unescapes stored chunk text (``&mdash;`` becomes an em
+    dash). Mapping compares unescaped vendor reconstruction to unescaped
+    canonical ``raw_text`` so that entity encoding is not treated as
+    source drift.
+
+    Args:
+        text: Envelope-stripped passage text.
+
+    Returns:
+        Ingest ``content_hash`` of HTML-unescaped text.
+    """
+
+    return content_hash(html.unescape(text))
 
 
 def map_vendor_chunk(

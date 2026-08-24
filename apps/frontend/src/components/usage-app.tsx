@@ -28,7 +28,7 @@ import { mutationFailureBanner } from "../lib/failure-copy";
 import { publicQueryKeys, sessionQueryKeys } from "../lib/query-keys";
 import { showCompanyUsageConvenience } from "../lib/roles";
 import type { UsageResponse } from "../lib/types";
-import styles from "./developer-app.module.css";
+import styles from "./admin/admin.module.css";
 
 /**
  * Render usage totals without prompt text.
@@ -131,7 +131,7 @@ export function UsageApp() {
     <div className={styles.shell}>
       <header className={styles.pageHeader}>
         <div>
-          <h1>Usage and budgets</h1>
+          <h2>Usage and budgets</h2>
           <p className={styles.pageLead}>
             Token and cost totals for your account. Budget editors are not
             available.

@@ -14,13 +14,14 @@ const PUBLIC_PREFIXES = [
   "/auth/reset",
   "/mfa/",
   "/unavailable/",
+  "/fonts/",
 ];
 
 /**
  * Return whether a path may render without a session cookie.
  *
  * @param pathname - Request path.
- * @returns True for Auth-direct and Unavailable surfaces.
+ * @returns True for Auth-direct, Unavailable, and self-hosted `/fonts` files.
  */
 export function isPublicAuthPath(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) {

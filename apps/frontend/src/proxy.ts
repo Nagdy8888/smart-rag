@@ -10,6 +10,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { isPublicAuthPath } from "./lib/auth/paths";
+import { AUTH_CLAIMS_TIMEOUT_MS, raceTimeout } from "./lib/auth/timeout";
 
 /**
  * Copy refreshed Auth cookies onto a redirect so PKCE/session is not dropped.
@@ -58,7 +59,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   let signedIn = false;
   try {
-    const { data } = await supabase.auth.getClaims();
+    const { data } = await raceTimeout(
+      supabase.auth.getClaims(),
+      AUTH_CLAIMS_TIMEOUT_MS,
+      "auth_claims_timeout",
+    );
     signedIn = Boolean(data?.claims);
   } catch {
     signedIn = false;
@@ -89,6 +94,6 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|fonts/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2|woff)$).*)",
   ],
 };

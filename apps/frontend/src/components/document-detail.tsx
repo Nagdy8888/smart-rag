@@ -1,16 +1,19 @@
 /**
- * Document detail: metadata, ingestion status, graph inspect seed, tables list.
- * No audit/PII/source-preview tabs (GAP-07-09/12). 404 has no title leak.
+ * Document detail: overview, processing, graph seed, tables. 404 has no title leak.
  */
 
 "use client";
 
 import Link from "next/link";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { Button } from "./ui/button";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { ProcessingTimeline } from "./documents/processing-timeline";
+import {
+  INGESTION_STATUS_POLL_MS,
+  ingestionStatusIsTerminal,
+} from "./documents/ingestion-inspector";
 import { ErrorState } from "./ui/error-state";
-import { LimitationCallout } from "./ui/limitation-callout";
+import { Skeleton } from "./ui/skeleton";
 import { StatusPill } from "./ui/status-pill";
 import { UserText } from "./ui/user-text";
 import {
@@ -27,15 +30,8 @@ import {
   DOCUMENT_NOT_FOUND_COPY,
   SOURCE_PREVIEW_UNAVAILABLE,
 } from "../lib/citation-drawer";
-import {
-  formatBm25Summary,
-  formatGraphHandoffSummary,
-  ingestionStatusLabel,
-  ingestionStatusTone,
-} from "../lib/ingestion-status";
-import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
 import { sessionQueryKeys } from "../lib/query-keys";
-import styles from "./developer-app.module.css";
+import styles from "./documents/documents.module.css";
 
 /**
  * Authorized document detail. 404 renders "Not found" without a title.
@@ -52,6 +48,15 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
     [accessToken],
   );
   const keys = sessionQueryKeys(accessToken);
+  const [pageVisible, setPageVisible] = useState(true);
+
+  useEffect(() => {
+    function onVisibility(): void {
+      setPageVisible(document.visibilityState === "visible");
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   const documentQuery = useQuery({
     queryKey: keys.document(documentId),
@@ -68,6 +73,16 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
     queryKey: keys.versionStatus(versionId),
     queryFn: () => fetchVersionStatus(auth as ApiAuth, versionId as string),
     enabled: auth !== null && versionId !== null,
+    refetchInterval: (query) => {
+      if (!pageVisible || versionId === null) {
+        return false;
+      }
+      const status = query.state.data?.version?.status;
+      if (!status || ingestionStatusIsTerminal(status)) {
+        return false;
+      }
+      return INGESTION_STATUS_POLL_MS;
+    },
   });
 
   const tablesQuery = useQuery({
@@ -93,7 +108,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
 
   if (!session.ready || accessToken === null) {
     return (
-      <div className={styles.shell}>
+      <div className={styles.page}>
         <p className={styles.muted}>
           <Link href="/login">Sign in</Link>
         </p>
@@ -103,111 +118,92 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
 
   if (documentQuery.isPending) {
     return (
-      <div className={styles.shell}>
-        <p className={styles.muted}>Loading</p>
+      <div className={styles.page}>
+        <Skeleton label="Loading document" width="16rem" />
+        <Skeleton label="Loading metadata" width="24rem" />
       </div>
     );
   }
 
   if (documentQuery.data?.ok === false || documentQuery.isError) {
     return (
-      <div className={styles.shell}>
+      <div className={styles.page}>
         <ErrorState title="Not found" message={DOCUMENT_NOT_FOUND_COPY} />
       </div>
     );
   }
 
-  const document =
+  const record =
     documentQuery.data?.ok === true ? documentQuery.data.document : null;
-  if (document === null) {
+  if (record === null) {
     return (
-      <div className={styles.shell}>
+      <div className={styles.page}>
         <ErrorState title="Not found" message={DOCUMENT_NOT_FOUND_COPY} />
       </div>
     );
   }
 
-  const version = versionQuery.data?.version ?? null;
+  const versionPayload = versionQuery.data;
   const tables = (tablesQuery.data ?? []).filter(
-    (item) => item.document_id === document.document_id,
+    (item) => item.document_id === record.document_id,
   );
-  const retryAllowed = version?.retry_allowed === true;
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.page}>
       <p className={styles.muted}>
         <Link href="/documents">Documents</Link>
       </p>
-      <h1>
-        <UserText value={document.title ?? document.document_id} />
-      </h1>
-      <StatusPill status={document.visibility} />
-      <dl>
-        <dt>Document</dt>
-        <dd>
-          <UserText value={document.document_id} />
-        </dd>
-        <dt>Current version</dt>
-        <dd>
-          <UserText value={document.current_version_id ?? "none"} />
-        </dd>
-      </dl>
-      {version ? (
-        <section className={styles.panel} aria-label="Ingestion status">
-          <h2>Ingestion status</h2>
-          <StatusPill
-            status={ingestionStatusLabel(version.status)}
-            tone={ingestionStatusTone(version.status)}
-          />
-          <dl>
-            <dt>BM25</dt>
-            <dd>{formatBm25Summary(version.bm25)}</dd>
-            <dt>Graph handoff</dt>
-            <dd>{formatGraphHandoffSummary(version.graph_handoff)}</dd>
-          </dl>
-          {version.status === "graph_pending" ? (
-            <LimitationCallout tone="warning">
-              {limitationCopy("graph_pending")} {graphNotReadyCopy(1)}
-            </LimitationCallout>
-          ) : null}
-          {version.status === "deletion_pending" ? (
-            <StatusPill status="deletion_pending" tone="warning" />
-          ) : null}
-          <ul className={styles.list}>
-            {(versionQuery.data?.recent_jobs ?? []).map((job) => (
-              <li key={job.id}>
-                <UserText value={job.job_kind} /> —{" "}
-                <UserText value={job.status} />
-                {retryAllowed ? (
-                  <Button
-                    type="button"
-                    onClick={() => retryMutation.mutate(job.id)}
-                  >
-                    Retry
-                  </Button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <header className={styles.header}>
+        <div>
+          <h2>
+            <UserText value={record.title ?? record.document_id} />
+          </h2>
+          <StatusPill status={record.visibility} />
+        </div>
+      </header>
 
-      <section className={styles.panel} aria-label="Graph inspect seed">
-        <h2>Graph inspect seed</h2>
+      <section className={styles.section} aria-label="Overview">
+        <h2>Overview</h2>
+        <dl className={styles.dl}>
+          <dt>Document</dt>
+          <dd className={styles.mono}>
+            <UserText value={record.document_id} />
+          </dd>
+          <dt>Current version</dt>
+          <dd className={styles.mono}>
+            <UserText value={record.current_version_id ?? "none"} />
+          </dd>
+        </dl>
+      </section>
+
+      {versionPayload ? (
+        <ProcessingTimeline
+          payload={versionPayload}
+          onRetry={(jobId) => retryMutation.mutate(jobId)}
+        />
+      ) : (
+        <section className={styles.section} aria-label="Processing">
+          <h2>Processing</h2>
+          <p className={styles.muted}>No current version to inspect.</p>
+        </section>
+      )}
+
+      <section className={styles.section} aria-label="Graph">
+        <h2>Graph</h2>
         <p className={styles.muted}>
           Hop cap 3. This is a seed, not Graph Ready.
         </p>
-        <Link href={`/graph?documentId=${encodeURIComponent(document.document_id)}`}>
+        <Link href={`/graph?documentId=${encodeURIComponent(record.document_id)}`}>
           Inspect graph for this document
         </Link>
       </section>
 
-      <section className={styles.panel} aria-label="Tables">
+      <section className={styles.section} aria-label="Tables">
         <h2>Tables</h2>
         {tables.length === 0 ? (
           <p className={styles.muted}>No authorized tables on this document.</p>
         ) : (
-          <ul className={styles.list}>
+          <ul className={styles.jobList}>
             {tables.map((table) => (
               <li key={table.table_id}>
                 <Link href="/tables">

@@ -1,5 +1,5 @@
 /**
- * Production console shell: skip link, 280px desktop nav, top bar, main landmark.
+ * Production console shell: skip link, 232px/72px nav rail, 56px top bar, main.
  *
  * Navigation is not an authorization boundary. See `client-authorization.ts`.
  */
@@ -9,7 +9,7 @@ import {
   CLIENT_NAV_IS_NOT_AUTHORIZATION,
   hiddenNavImpliesForbidden,
 } from "../../lib/client-authorization";
-import { AppNav, ShellUser, TopbarTitle } from "./app-nav";
+import { AppNav, ConsoleTopbar, ShellUser } from "./app-nav";
 import { Icon } from "./icon";
 import styles from "./app-shell.module.css";
 
@@ -19,7 +19,7 @@ export type AppShellProps = {
 };
 
 /**
- * Render the high-density light application chrome.
+ * Render the light Precision Workspace chrome.
  *
  * @param props - Shell children. No fetch or auth side effects in this file.
  * @returns Landmark structure with English LTR chrome.
@@ -45,7 +45,7 @@ export function AppShell({ children }: AppShellProps) {
             </span>
             <span className={styles.brandText}>
               <p className={styles.brandName}>Smart RAG</p>
-              <p className={styles.brandSub}>Enterprise AI Console</p>
+              <p className={styles.brandSub}>Company console</p>
             </span>
           </div>
           <AppNav />
@@ -53,8 +53,7 @@ export function AppShell({ children }: AppShellProps) {
         </nav>
         <div className={styles.content}>
           <header className={styles.topbar}>
-            <TopbarTitle />
-            <p className={styles.topbarMeta}>Workspace</p>
+            <ConsoleTopbar />
           </header>
           <main id="main" className={styles.main} tabIndex={-1}>
             {children}

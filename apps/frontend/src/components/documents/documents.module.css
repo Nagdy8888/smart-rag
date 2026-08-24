@@ -1,0 +1,130 @@
+/**
+ * Document library and detail layouts. Tokens from globals. No blur.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+  max-width: 73.75rem;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(var(--space) * 3);
+}
+
+.lead {
+  margin: calc(var(--space) * 1) 0 0;
+  color: var(--color-text-muted);
+  max-width: 72ch;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 3);
+  align-items: flex-end;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: calc(var(--space) * 2) calc(var(--space) * 3);
+  text-align: start;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.tabs {
+  display: flex;
+  gap: calc(var(--space) * 2);
+  margin-bottom: calc(var(--space) * 3);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 3);
+  padding: calc(var(--space) * 4) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: calc(var(--space) * 2);
+  margin: 0;
+}
+
+.dl dt {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.jobList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 3);
+}
+
+.phase {
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .table th:nth-child(3),
+  .table td:nth-child(3) {
+    display: none;
+  }
+
+  .dl {
+    grid-template-columns: 1fr;
+  }
+}

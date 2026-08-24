@@ -3,6 +3,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ReactElement } from "react";
+import React from "react";
 import "@testing-library/jest-dom/vitest";
 import {
   MIXED_BIDI,
@@ -24,6 +26,10 @@ import { StatusBanner } from "./status-banner";
 import { StatusPill } from "./status-pill";
 import { Textarea } from "./textarea";
 import { CodeText, UserText } from "./user-text";
+import { Menu } from "./menu";
+import { Select } from "./select";
+import { Sheet } from "./sheet";
+import { Tooltip } from "./tooltip";
 
 afterEach(() => {
   cleanup();
@@ -105,5 +111,72 @@ describe("primitives render hostile and mixed-direction text", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Denied");
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it("keeps hostile option labels as text in Select and Menu", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <div>
+        <Select
+          label="Visibility"
+          value="private"
+          options={[
+            { value: "private", label: XSS_FILENAME },
+            { value: "shared", label: XSS_ENTITY },
+          ]}
+          onChange={() => undefined}
+        />
+        <Menu
+          label="Row actions"
+          trigger="Actions"
+          items={[
+            { id: "open", label: MIXED_BIDI, onSelect },
+            { id: "delete", label: XSS_FILENAME, onSelect, danger: true },
+          ]}
+        />
+        <Tooltip text={XSS_ENTITY}>
+          <Button aria-label="Help">Help</Button>
+        </Tooltip>
+      </div>,
+    );
+    expect(screen.getByRole("combobox", { name: "Visibility" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: XSS_FILENAME })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Row actions" }));
+    expect(screen.getByRole("menuitem", { name: XSS_FILENAME })).toBeInTheDocument();
+    expect(document.querySelector("script")).toBeNull();
+    expect(screen.queryByRole("img")).toBeNull();
+  });
+
+  it("traps focus in a Sheet and restores the trigger", async () => {
+    const user = userEvent.setup();
+    function SheetHarness() {
+      const [open, setOpen] = React.useState(false);
+      const triggerRef = React.useRef<HTMLButtonElement>(null);
+      return (
+        <div>
+          <Button ref={triggerRef} onClick={() => setOpen(true)}>
+            Open sheet
+          </Button>
+          {open ? (
+            <Sheet
+              title="Sources"
+              onClose={() => setOpen(false)}
+              returnFocusRef={triggerRef}
+            >
+              <Button>Inside</Button>
+              <p>{XSS_FILENAME}</p>
+            </Sheet>
+          ) : null}
+        </div>
+      );
+    }
+    render(<SheetHarness />);
+    await user.click(screen.getByRole("button", { name: "Open sheet" }));
+    expect(screen.getByRole("dialog", { name: "Sources" })).toBeInTheDocument();
+    expect(screen.getByText(XSS_FILENAME)).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Open sheet" })).toHaveFocus();
   });
 });

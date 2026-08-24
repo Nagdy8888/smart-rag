@@ -10,7 +10,7 @@ test("login has no console navigation", async ({ page }) => {
   await expect(page.locator("#main")).toBeVisible();
 });
 
-test("authenticated desktop navigation is 280px when a session exists", async ({
+test("authenticated desktop navigation is 232px when a session exists", async ({
   page,
   request,
 }) => {
@@ -20,26 +20,23 @@ test("authenticated desktop navigation is 280px when a session exists", async ({
   const nav = page.getByTestId("app-shell-nav");
   await expect(nav).toBeVisible();
   const width = await nav.evaluate((element) => element.getBoundingClientRect().width);
-  expect(width).toBe(280);
-  await expect(page.getByRole("link", { name: "Chat" })).toHaveAttribute(
+  expect(width).toBe(232);
+  await expect(page.getByRole("link", { name: "Ask" })).toHaveAttribute(
     "href",
     "/",
   );
 });
 
-test("authenticated mobile navigation stacks above main", async ({
+test("authenticated mobile keeps compact brand and a menu control", async ({
   page,
   request,
 }) => {
   await signInLiveMember(page, request);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  const navBox = await page.getByTestId("app-shell-nav").boundingBox();
-  const mainBox = await page.locator("#main").boundingBox();
-  expect(navBox).not.toBeNull();
-  expect(mainBox).not.toBeNull();
-  expect(navBox!.y).toBeLessThan(mainBox!.y);
-  expect(navBox!.width).toBeGreaterThan(300);
+  await expect(page.getByText("Smart RAG").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
+  await expect(page.locator("#main")).toBeVisible();
 });
 
 test("reduced motion disables authored transitions", async ({ page }) => {

@@ -2,7 +2,7 @@
 title: Stitch brief for the Smart RAG console
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-24
 audience: design, frontend, reviewers
 packet: P07-02
 ---
@@ -30,10 +30,14 @@ limitation, fallback, partial-readiness, budget, and degraded state.
 and security review.
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) records that the delivered Stitch
 export is a **template, not product layout**: do not add Stitch frames as
-routes. Screenshots remain the visual composition target
-([VISUAL_MAP.md](./VISUAL_MAP.md),
-[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md)). Implementation is
-typed native HTML (do not port `code.html`).
+routes. On 2026-08-24 the user rejected the mapped Stitch screenshot
+composition as the live visual target. Those `screen.png` files are
+**historical references only**. The current composition target is the
+light Precision Workspace in this brief, [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md),
+[VISUAL_MAP.md](./VISUAL_MAP.md), and
+[ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md). Implementation
+remains typed native HTML (do not port `code.html`). API/UI mapping,
+states, accessibility, security, bidi, and honest-gap rules are unchanged.
 
 ## Localization decision
 
@@ -61,8 +65,15 @@ fixtures in this brief.
 
 ## Canonical design tokens
 
-Round 1 (2026-08-17) reconciles three conflicting sources. **One set
-wins.** **Blur is rejected** (no frosted glass, no `backdrop-filter`).
+**v1 chrome is English.** User and retrieved content may be Arabic, English,
+or mixed and uses `dir="auto"` plus `unicode-bidi: isolate`. Citation
+highlights use logical Unicode offsets on canonical text, never visual
+order ([GAP-07-19](./API_UI_MAPPING.md)).
+
+Round 1 (2026-08-17) reconciled conflicting Stitch sources. Round 4
+(2026-08-24) replaces the live token set with the user-approved light
+Precision Workspace. **One set wins.** **Blur is rejected** (no frosted
+glass, no `backdrop-filter`, no runtime Tailwind CDN).
 
 | Source | What it said | Disposition |
 | --- | --- | --- |
@@ -75,23 +86,29 @@ wins.** **Blur is rejected** (no frosted glass, no `backdrop-filter`).
 
 | Token | Value | Notes |
 | --- | --- | --- |
-| `--color-bg` | `#F8FAFC` | page (chat frame + DESIGN prose) |
-| `--color-surface` | `#FFFFFF` | cards |
-| `--color-text` | `#0F172A` | AA; YAML `on-surface` `#131B2E` is equivalent |
-| `--color-text-muted` | `#475569` | secondary; still AA on white |
-| `--color-border` | `#CBD5E1` | 1px |
-| `--color-accent` | `#2563EB` | delivered primary-container / DESIGN prose |
+| `--color-bg` | `#F4F6F8` | page canvas |
+| `--color-surface` | `#FFFFFF` | primary surface |
+| `--color-surface-muted` | `#F8FAFC` | quiet surface |
+| `--color-text` | `#182230` | ink; WCAG AA |
+| `--color-text-muted` | `#637083` | muted ink; AA on white |
+| `--color-border` | `#DDE3EA` | 1px structure |
+| `--color-accent` | `#4E5BD5` | brand indigo |
 | `--color-accent-fg` | `#FFFFFF` | |
+| `--color-accent-muted` | `#EEF0FF` | selected nav / soft fill |
+| `--color-accent-soft` | `#EEF0FF` | alias for muted indigo |
+| `--color-evidence` | `#0E8584` | teal evidence/graph signal only |
 | `--color-danger` | `#B91C1C` | YAML error `#ba1a1a` rounded to AA body text |
 | `--color-warning` | `#A16207` | quota/degraded; non-alarming |
 | `--color-success` | `#166534` | ready/complete |
-| `--color-focus` | `#2563EB` | 2px solid ring, offset 2px |
-| `--radius-sm` | `6px` | chips |
-| `--radius-md` | `8px` | inputs, buttons (`rounded-lg` in frames) |
-| `--radius-lg` | `12px` | cards, drawers |
+| `--color-focus` | `#4E5BD5` | 2px solid ring, offset 2px |
+| `--radius-sm` | `6px` | chips and controls |
+| `--radius-md` | `10px` | panels |
+| `--radius-lg` | `12px` | overlays |
 | `--space` | `4px` grid | 8/12/16/24/32 |
 | `--shadow-1` | `0 1px 2px rgb(15 23 42 / 0.08)` | |
 | `--shadow-2` | `0 8px 24px rgb(15 23 42 / 0.08)` | drawers; no blur overlay |
+| `--nav-width` | `232px` | desktop rail; collapses to 72px at 1024–1279px |
+| `--topbar-height` | `56px` | console top bar |
 | `--font-sans` | `"Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif` | CSP `font-src 'self'`; self-hosted Inter, then system Arabic fallbacks |
 | `--font-mono` | `ui-monospace, "Cascadia Code", monospace` | IDs/codes |
 | `--line-height-ar` | `1.75` | diacritics |
@@ -168,6 +185,17 @@ Tokens: background #F8FAFC, surface #FFFFFF, text #0F172A, accent #2563EB, dange
 WCAG AA contrast, visible 2px focus ring, keyboard-only operable, skip link.
 Desktop 1280px and mobile 390px. Mixed-direction fixtures required on chat and citations.
 ```
+
+## Contract strings retained for specification tests
+
+**v1 chrome is English.** Mixed content uses `dir="auto"` and
+`unicode-bidi: isolate`. Citation highlights use logical Unicode offsets.
+GAP-07-19. **Blur is rejected**. No runtime Tailwind CDN.
+Auto is the default chat route. Do not invent API fields.
+Do not show graph-only as a normal answering mode.
+Do not treat a BM25 snippet as a citation. Hostile filename fixture:
+`<img src=x onerror=alert(1)>.pdf`. Desktop 1280 and mobile 390 frames
+remain the responsive targets.
 
 ## Copy-ready screen prompts
 
@@ -310,7 +338,7 @@ comment; random cost; complete corpus summary without coverage_score.
 Implement in `apps/frontend` with Next.js App Router 16.3, React 19,
 `@supabase/ssr` 0.7.0, TanStack Query 5.85. The Stitch export is a template,
 not a layout: do not add its frames as pages. Mapped `screen.png` files
-still control composition, hierarchy, spacing, and interaction language
+are historical composition references
 ([VISUAL_MAP.md](./VISUAL_MAP.md)). Phase 8 uses accessible native HTML plus
 build-time Tailwind tokens (not CDN) matching the token table in this brief,
 and only surfaces with typed contracts in

@@ -159,6 +159,20 @@ def test_security_headers_are_present_on_live() -> None:
     assert "text/html" not in response.headers.get("content-type", "")
 
 
+def test_local_openapi_docs_serve_html_with_docs_csp() -> None:
+    """Local Swagger UI keeps ``text/html`` and a CDN-safe docs CSP."""
+
+    test_client, create_app, as_openapi_client = _http_app()
+    with test_client(create_app()) as raw:
+        response = as_openapi_client(raw).get("/docs")
+    assert response.status_code == 200
+    assert response.headers.get("content-type", "").startswith("text/html")
+    csp = response.headers.get("content-security-policy", "")
+    assert "cdn.jsdelivr.net" in csp
+    assert "connect-src 'self'" in csp
+    assert "swagger-ui" in response.text.lower()
+
+
 def test_local_keeps_openapi_docs() -> None:
     """Local apps still mount ``/docs`` and ``/openapi.json``."""
 

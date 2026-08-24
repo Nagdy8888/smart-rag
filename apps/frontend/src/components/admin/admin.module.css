@@ -13,7 +13,8 @@
   line-height: var(--line-height-en);
 }
 
-.shell h1 {
+.shell h1,
+.shell h2 {
   font-size: 1.75rem;
   font-weight: 600;
   letter-spacing: -0.02em;

@@ -17,7 +17,6 @@ from uuid import UUID
 
 import psycopg
 
-from smart_rag_core.ingestion.chunking.normalize import content_hash
 from smart_rag_core.jobs import graph_mapping_persist as persist
 from smart_rag_core.jobs.entity_rule_service import load_extraction_policy
 from smart_rag_core.jobs.exceptions import GraphMappingError
@@ -59,11 +58,13 @@ from smart_rag_core.retrieval.graph_mapping import (
     graph_statement_id,
     internal_chunk_key,
     mapping_config_generation,
+    mapping_content_digest,
     normalize_relation_label,
     ordered_statement_endpoints,
     parse_object_source_ids,
     resolve_entity_name,
     run_support_rerank,
+    stitch_overlapping_texts,
 )
 from smart_rag_core.retrieval.profiles import MAX_NORMALIZED_QUERY_CHARS
 from smart_rag_core.retrieval.rerank import RerankPassage, excerpt_text
@@ -175,6 +176,24 @@ class _ChunkMapRow:
     vendor_doc_id: str
     match: ChunkMatch | None
     internal_key: str
+    vendor_piece_ids: tuple[str, ...] = ()
+
+
+def _vendor_chunk_order(raw: Mapping[str, object]) -> int:
+    """Return LightRAG ``chunk_order_index`` for stitch order.
+
+    Args:
+        raw: Vendor chunk row.
+
+    Returns:
+        Non-negative order, or ``0`` when the field is missing.
+    """
+
+    value = raw.get("chunk_order_index")
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
 
 
 class GraphMappingService:
@@ -200,9 +219,9 @@ class GraphMappingService:
             hybrid_retrieve: Optional ``(query, version_id) -> HybridRunResult``.
             support_rerank: Optional OpenAI-only support rerank batch.
             max_entities: Effective entity enumeration cap. Production default
-                is 200; the fixed local synthetic-demo ceiling is 1,600.
+                is 200; the fixed local synthetic-demo ceiling is 2,000.
             max_relations: Effective relation enumeration cap. Production
-                default is 200; the fixed local synthetic-demo ceiling is 1,200.
+                default is 200; the fixed local synthetic-demo ceiling is 1,800.
 
         Raises:
             ValueError: If an injected cap is non-positive or exceeds the
@@ -441,6 +460,10 @@ class GraphMappingService:
         known_chunk_ids.update(
             row.vendor_doc_id for row in chunk_rows if row.match is not None
         )
+        for row in chunk_rows:
+            if row.match is None:
+                continue
+            known_chunk_ids.update(row.vendor_piece_ids)
         assert_mapping_budget(
             vendor_chunks=len(vendor_chunks),
             entities=len(nodes),
@@ -588,7 +611,15 @@ class GraphMappingService:
         workspace_key: str,
         config_generation: str,
     ) -> list[_ChunkMapRow]:
-        """Require a 1:1 hash bijection between passages and vendor chunks.
+        """Require a reconstructed-hash bijection between passages and sources.
+
+        LightRAG may emit more than one overlapping vendor chunk per
+        processed passage source. Those pieces are stitched in
+        ``chunk_order_index`` order. The reconstructed, envelope-stripped,
+        HTML-unescaped hash must equal the unescaped canonical passage.
+        One map row is persisted per canonical passage (table PK is
+        ``chunk_id``). Overlap piece IDs stay on the row so entity joins
+        still resolve.
 
         Args:
             vendor_chunks: Vendor rows whose ``full_doc_id`` is a passage
@@ -603,8 +634,8 @@ class GraphMappingService:
             One mapped row per canonical passage.
 
         Raises:
-            GraphMappingError: If any source is missing, split, duplicated, or
-                the stripped vendor hash does not match the passage.
+            GraphMappingError: If any source is missing, empty, or the
+                reconstructed hash does not match the passage.
         """
 
         by_source: dict[str, list[Mapping[str, object]]] = {}
@@ -614,16 +645,24 @@ class GraphMappingService:
         by_chunk = {item.chunk_id: item for item in canonicals}
         rows: list[_ChunkMapRow] = []
         for source_id, canonical in zip(expected_source_ids, canonicals, strict=True):
-            vendor_rows = by_source.get(source_id, [])
-            if len(vendor_rows) != 1:
+            vendor_rows = sorted(
+                by_source.get(source_id, []),
+                key=_vendor_chunk_order,
+            )
+            if not vendor_rows:
                 raise GraphMappingError("graph_source_snapshot_mismatch")
-            raw = vendor_rows[0]
-            vendor_chunk_id = str(raw.get("id") or "")
-            if not vendor_chunk_id:
+            piece_ids = tuple(
+                str(raw.get("id") or "") for raw in vendor_rows if str(raw.get("id") or "")
+            )
+            if len(piece_ids) != len(vendor_rows) or not piece_ids[0]:
                 raise GraphMappingError("graph_source_snapshot_mismatch")
-            stripped = strip_graph_source_envelope(str(raw.get("content") or ""))
-            source_hash = content_hash(stripped)
-            if source_hash != canonical.content_hash:
+            stitched = stitch_overlapping_texts(
+                tuple(str(raw.get("content") or "") for raw in vendor_rows)
+            )
+            stripped = strip_graph_source_envelope(stitched)
+            source_hash = mapping_content_digest(stripped)
+            target_hash = mapping_content_digest(canonical.raw_text)
+            if source_hash != target_hash:
                 raise GraphMappingError("graph_source_snapshot_mismatch")
             parsed_version, parsed_chunk = parse_canonical_passage_source_id(source_id)
             if parsed_version != version_id or parsed_chunk != canonical.chunk_id:
@@ -635,10 +674,11 @@ class GraphMappingService:
                 method="hash",
                 score=1.0,
                 source_hash=source_hash,
-                target_hash=canonical.content_hash,
+                target_hash=target_hash,
                 source_span={"start": 0, "end": len(stripped)},
                 target_span={"start": 0, "end": len(canonical.raw_text)},
             )
+            vendor_chunk_id = piece_ids[0]
             rows.append(
                 _ChunkMapRow(
                     vendor_chunk_id=vendor_chunk_id,
@@ -649,6 +689,7 @@ class GraphMappingService:
                         config_generation=config_generation,
                         vendor_chunk_id=vendor_chunk_id,
                     ),
+                    vendor_piece_ids=piece_ids,
                 )
             )
         vendor_chunk_ids = [row.vendor_chunk_id for row in rows]

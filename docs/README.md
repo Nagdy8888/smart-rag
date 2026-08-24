@@ -21,18 +21,18 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-16 | eng, security |
 | [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-08-19 | eng, frontend |
-| [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-08-20 | frontend, reviewers |
+| [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
 | [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-08-19 | eng, frontend, security |
-| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-08-19 | eng, frontend |
-| [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-08-19 | eng, frontend, security |
+| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-08-24 | eng, frontend |
+| [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-08-24 | eng, frontend, security |
 | [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-08-19 | eng, frontend |
-| [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-20 | design, frontend |
+| [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_STATES.md](./frontend/STITCH_STATES.md) | engineering-lead | draft | 2026-08-19 | design, frontend |
 | [frontend/STITCH_A11Y_SECURITY.md](./frontend/STITCH_A11Y_SECURITY.md) | engineering-lead | draft | 2026-08-17 | frontend, security |
 | [frontend/A11Y_SECURITY_IMPLEMENTATION.md](./frontend/A11Y_SECURITY_IMPLEMENTATION.md) | engineering-lead | draft | 2026-08-19 | frontend, security |
 | [frontend/PHASE8_JOURNEY_MATRIX.md](./frontend/PHASE8_JOURNEY_MATRIX.md) | engineering-lead | draft | 2026-08-19 | eng, frontend, reviewers |
-| [frontend/STITCH_REVIEW.md](./frontend/STITCH_REVIEW.md) | engineering-lead | draft | 2026-08-20 | frontend, reviewers |
-| [frontend/VISUAL_MAP.md](./frontend/VISUAL_MAP.md) | engineering-lead | draft | 2026-08-20 | frontend, reviewers |
+| [frontend/STITCH_REVIEW.md](./frontend/STITCH_REVIEW.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
+| [frontend/VISUAL_MAP.md](./frontend/VISUAL_MAP.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
 | [development/phase-07-stitch-specification-evidence.md](./development/phase-07-stitch-specification-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
 | [development/phase-08-frontend-integration-evidence.md](./development/phase-08-frontend-integration-evidence.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
 | [development/phase-08-later-live-verification.md](./development/phase-08-later-live-verification.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
@@ -102,8 +102,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-phase9-local-envelope-reduce.md](./adr/ADR-phase9-local-envelope-reduce.md) | product-owner | accepted | 2026-08-18 | client, engineering |
 | [adr/ADR-phase10-hosted-supabase-reuse.md](./adr/ADR-phase10-hosted-supabase-reuse.md) | product-owner | accepted | 2026-08-18 | client, engineering, ops |
 | [adr/ADR-phase10-free-tier-ec2.md](./adr/ADR-phase10-free-tier-ec2.md) | engineering-lead | accepted | 2026-08-19 | engineering, ops |
-| [adr/ADR-demo-local-ingest-aws-ask.md](./adr/ADR-demo-local-ingest-aws-ask.md) | product-owner / engineering-lead | accepted | 2026-08-19 | client, engineering, ops |
-| [adr/ADR-stitch-first-ux.md](./adr/ADR-stitch-first-ux.md) | engineering-lead | accepted | 2026-08-20 | frontend, eng, reviewers |
+| [adr/ADR-demo-local-ingest-aws-ask.md](./adr/ADR-demo-local-ingest-aws-ask.md) | product-owner / engineering-lead | accepted | 2026-08-20 | client, engineering, ops |
+| [adr/ADR-stitch-first-ux.md](./adr/ADR-stitch-first-ux.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, reviewers |
 | [runbooks/phase10-staging-secrets.md](./runbooks/phase10-staging-secrets.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [adr/ADR-paradedb-edition-availability.md](./adr/ADR-paradedb-edition-availability.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-private-service-tls.md](./adr/ADR-private-service-tls.md) | engineering-lead | accepted | 2026-08-18 | eng, security |

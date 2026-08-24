@@ -12,13 +12,14 @@ export type AuthLayoutProps = {
 };
 
 /**
- * Render brand chrome around Auth-direct pages.
+ * Render a light split Auth composition: product context plus form surface.
  *
  * @param props - Route children.
- * @returns Skip link, brand, and `#main` landmark.
+ * @returns Skip link, restrained brand context, and `#main` landmark.
  * @remarks
  * URLs stay `/login` and siblings. Proxy/session behavior is unchanged.
- * No readiness panels or console nav.
+ * No readiness dashboard, testimonials, gradients, or console nav.
+ * Form fields and Auth callbacks remain in `auth-screens.tsx`.
  */
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
@@ -26,16 +27,30 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       <a className={styles.skipLink} href="#main">
         Skip to main content
       </a>
-      <div className={styles.brand}>
-        <span className={styles.mark} aria-hidden="true">
-          <Icon name="spark" />
-        </span>
-        <p className={styles.product}>Smart RAG</p>
-        <p className={styles.subbrand}>Enterprise AI Console</p>
+      <div className={styles.split}>
+        <aside className={styles.context} aria-label="Product">
+          <span className={styles.mark} aria-hidden="true">
+            <Icon name="spark" />
+          </span>
+          <p className={styles.product}>Smart RAG</p>
+          <p className={styles.subbrand}>Evidence workspace for company knowledge</p>
+          <p className={styles.contextCopy}>
+            Ask grounded questions, inspect sources, and manage ingestion without
+            leaving the signed-in console.
+          </p>
+        </aside>
+        <div className={styles.formColumn}>
+          <div className={styles.mobileBrand}>
+            <span className={styles.mark} aria-hidden="true">
+              <Icon name="spark" />
+            </span>
+            <p className={styles.product}>Smart RAG</p>
+          </div>
+          <main id="main" className={styles.main} tabIndex={-1}>
+            {children}
+          </main>
+        </div>
       </div>
-      <main id="main" className={styles.main} tabIndex={-1}>
-        {children}
-      </main>
     </div>
   );
 }

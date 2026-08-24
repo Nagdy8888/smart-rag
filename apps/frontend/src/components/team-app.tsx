@@ -35,7 +35,7 @@ import {
   type InviteRole,
   type OffboardResponse,
 } from "../lib/types";
-import styles from "./developer-app.module.css";
+import styles from "./admin/admin.module.css";
 
 /**
  * Team surface: invite create, offboard by user_id, accept link.
@@ -113,7 +113,7 @@ export function TeamApp() {
     <div className={styles.shell}>
       <header className={styles.pageHeader}>
         <div>
-          <h1>Team</h1>
+          <h2>Team</h2>
           <p className={styles.pageLead}>
             Invite people and offboard accounts. There is no member directory.
           </p>

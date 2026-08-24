@@ -16,7 +16,7 @@ import {
 } from "../lib/admin-copy";
 import { useSession } from "../lib/auth/session-provider";
 import { sessionQueryKeys } from "../lib/query-keys";
-import styles from "./developer-app.module.css";
+import styles from "./admin/admin.module.css";
 
 /**
  * Show the five `/me` fields and honest Unavailable editors.
@@ -41,7 +41,7 @@ export function ProfileApp() {
   return (
     <div className={styles.shell}>
       <header className={styles.row}>
-        <h1>Profile</h1>
+        <h2>Profile</h2>
         <p className={styles.pageLead}>
           Account details for the signed-in user. Name and language cannot be
           edited here.

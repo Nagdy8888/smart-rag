@@ -53,9 +53,9 @@ describe("design token source of truth", () => {
         expect(brief).toContain(`| \`${name}\` | \`${value}\` |`);
       }
     }
-    expect(COLOR_BG).toBe("#F8FAFC");
-    expect(COLOR_ACCENT).toBe("#2563EB");
-    expect(RADIUS_MD).toBe("8px");
+    expect(COLOR_BG).toBe("#F4F6F8");
+    expect(COLOR_ACCENT).toBe("#4E5BD5");
+    expect(RADIUS_MD).toBe("10px");
   });
 
   it("rejects DESIGN.md YAML, teal canvas/accent, 10px radius, and blur", () => {
@@ -64,7 +64,7 @@ describe("design token source of truth", () => {
     expect(assigned).not.toContain("#faf8ff");
     expect(root["--color-bg"]).not.toBe("#0F766E");
     expect(root["--color-accent"]).not.toBe("#0F766E");
-    expect(root["--radius-md"]).not.toBe("10px");
+    expect(root["--radius-md"]).not.toBe("8px");
     expect(css).not.toMatch(/backdrop-filter/i);
     expect(css).not.toMatch(/\bblur\(/);
     expect(css).not.toContain("cdn.tailwindcss.com");

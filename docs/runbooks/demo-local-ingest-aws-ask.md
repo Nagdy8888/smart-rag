@@ -128,26 +128,37 @@ processed vendor graph exceeds the production 200/200 entity/relation
 enumeration limits. The durable LightRAG job must carry
 `local_demo_mapping_override=true`, `content_class=synthetic`, and
 `review_approved=true`; the worker ignores the override outside
-`APP_ENV=local`. The fixed local ceilings are 1,600 entities and 1,200
-relations. All mapping coverage/support and model-call gates remain unchanged.
+`APP_ENV=local`. The fixed local ceilings are 2,000 entities and 1,800
+relations (the canonical-passage extract measured 1,779 / 1,531). All
+mapping coverage/support and model-call gates remain unchanged.
 
 The original Graph-200 whole-version extract measured **87/95** persisted
 chunk maps and **2,832/3,314 (85.46%)** coverage. Rebuilds must index each
 current canonical Hybrid passage as its own LightRAG source. Do **not**
 ingest `docs/datasets/MovieSummaries/plot_summaries.txt`. Do **not** alter
 completed Hybrid-800/Graph-200 Hybrid indexes. If Graph Ready is still
-`graph_pending`, stop the looping worker and run **one** bounded rebuild:
+`graph_pending` and `company_default__rebuild` already has **164**
+`processed` canonical-passage sources, stop the looping worker and run
+**one** mapping-only job (no vendor deletes, no re-extract):
 
 ```powershell
-uv run python scripts/ops/rebuild_demo_graph_canonical_passages.py
+uv run python scripts/ops/rebuild_demo_graph_canonical_passages.py --map-only
 ```
 
-The command preflights 164 current passages, deletes the legacy
-whole-version vendor ID plus leftover passage IDs, requeues job
-`542628df-2c38-4b15-a180-893d7fd74998`, processes that job once, and
-exits. It does not auto-requeue and does not call `run_forever`. On
-success it prints Graph Ready plus LangSmith token/USD totals. On failure
-it prints the first failed invariant and stops.
+That path requeues job `542628df-2c38-4b15-a180-893d7fd74998` with the
+existing 164-source checkpoint, maps the isolated graph, then verifies
+Graph Ready on the **active pointer workspace** (expected
+`company_default__rebuild` after isolate switch). Leftover maps on retired
+`company_default` are not part of the 164-count. It does not auto-requeue
+and does not call `run_forever`. On success it prints Graph Ready plus
+LangSmith token/USD totals. On failure it prints the first failed
+invariant and stops.
+
+A full rebuild without `--map-only` deletes leftover vendor IDs and
+re-extracts. Refuse that when 164 isolated sources are already
+`processed`. Do **not** use `scripts/ops/retry_demo_graph_mapping.py` for
+this corpus: it looks up the whole-version vendor ID and un-quarantines
+live `company_default`.
 
 The 2026-08-20 attempt failed closed:
 `failed_invariant=version_status:graph_pending`,
@@ -163,6 +174,12 @@ then failed at the first isolated `ainsert` with
 `bind_workspace` now calls in-memory `initialize_pipeline_status` (no DDL)
 before insert. After that fix, run **one** bounded rebuild when the operator
 asks. Do not loop.
+
+On 2026-08-20 the isolated extract (164 processed sources, 1,779/1,531
+objects) reached **Graph Ready** with
+`rebuild_demo_graph_canonical_passages.py --map-only`. The active pointer is
+`company_default__rebuild`. Do not re-extract. Do not start EC2/Phase B
+until the operator says the instance is up.
 
 The long-term fix is in
 [ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md):

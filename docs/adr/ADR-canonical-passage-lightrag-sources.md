@@ -46,9 +46,13 @@ the deletion contract.
    basenames are `g-{version_id}-{chunk_id}.txt`.
 2. Each passage is envelope-bound with that source ID so identical passage
    text cannot collapse distinct canonical chunks.
-3. Mapping is a strict bijection: each canonical passage must yield exactly
-   one processed vendor document and one internal chunk whose normalized hash
-   matches the passage. Source drift is terminal
+3. Mapping is a strict bijection at **source** identity: each canonical
+   passage must yield exactly one processed vendor document whose LightRAG
+   chunks reconstruct (overlap-stitch, envelope strip, HTML unescape) to the
+   unescaped passage hash. LightRAG 1.5.6 still applies its 1200/100 chunker
+   to long enveloped sources, so one processed document may have several
+   overlapping vendor chunks. `lightrag_chunk_map` still stores one row per
+   canonical `chunk_id`. Source drift is terminal
    `graph_source_snapshot_mismatch` and never a mapping retry.
 4. `lightrag_chunk_map.lightrag_doc_id` stores the per-passage vendor ID.
    A vendor chunk cannot overwrite a different canonical mapping.

@@ -38,7 +38,7 @@ import {
   type GlossaryLanguage,
   type GlossaryScope,
 } from "../lib/types";
-import styles from "./developer-app.module.css";
+import styles from "./admin/admin.module.css";
 
 function newIdempotencyKey(): string {
   return crypto.randomUUID();
@@ -217,7 +217,7 @@ export function CurationApp() {
     <div className={styles.shell}>
       <header className={styles.pageHeader}>
         <div>
-          <h1>Curation</h1>
+          <h2>Curation</h2>
           <p className={styles.pageLead}>
             Glossary aliases and graph entity rules. Changes are limited to
             owners and admins.

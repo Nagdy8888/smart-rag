@@ -25,25 +25,29 @@
 }
 
 /*
- * Canonical tokens: docs/frontend/STITCH_BRIEF.md (not DESIGN.md YAML,
- * not lavender #faf8ff, not #004ac6, not teal #0F766E canvas/accent,
- * not 10px radius-md, not blur). CSS variables here plus
+ * Canonical tokens: docs/frontend/STITCH_BRIEF.md Precision Workspace
+ * (not DESIGN.md YAML, not lavender #faf8ff, not #004ac6, not teal
+ * #0F766E canvas/accent, not blur). CSS variables here plus
  * src/lib/design-tokens.ts are the implementation source of truth.
  */
 :root {
-  --color-bg: #F8FAFC;
+  --color-bg: #F4F6F8;
   --color-surface: #FFFFFF;
-  --color-text: #0F172A;
-  --color-text-muted: #475569;
-  --color-border: #CBD5E1;
-  --color-accent: #2563EB;
+  --color-surface-muted: #F8FAFC;
+  --color-text: #182230;
+  --color-text-muted: #637083;
+  --color-border: #DDE3EA;
+  --color-accent: #4E5BD5;
   --color-accent-fg: #FFFFFF;
+  --color-accent-muted: #EEF0FF;
+  --color-accent-soft: #EEF0FF;
+  --color-evidence: #0E8584;
   --color-danger: #B91C1C;
   --color-warning: #A16207;
   --color-success: #166534;
-  --color-focus: #2563EB;
+  --color-focus: #4E5BD5;
   --radius-sm: 6px;
-  --radius-md: 8px;
+  --radius-md: 10px;
   --radius-lg: 12px;
   --space: 4px;
   --shadow-1: 0 1px 2px rgb(15 23 42 / 0.08);
@@ -52,11 +56,11 @@
   --font-mono: ui-monospace, "Cascadia Code", monospace;
   --line-height-ar: 1.75;
   --line-height-en: 1.5;
-  --nav-width: 280px;
+  --nav-width: 232px;
+  --nav-width-collapsed: 72px;
   --row-height: 48px;
-  --color-accent-muted: #EFF6FF;
-  --color-accent-soft: #DBEAFE;
-  --topbar-height: 64px;
+  --topbar-height: 56px;
+  --control-height: 44px;
   --control-height: 44px;
 }
 

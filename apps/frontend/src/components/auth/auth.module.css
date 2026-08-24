@@ -1,17 +1,47 @@
 /**
- * Public authentication layout: brand plus centered card, no console nav.
+ * Public authentication layout: light split context plus form surface.
  */
 
 .page {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding: calc(var(--space) * 6) calc(var(--space) * 4) calc(var(--space) * 8);
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+}
+
+.split {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.context {
+  display: none;
+}
+
+.formColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: calc(var(--space) * 6) calc(var(--space) * 4) calc(var(--space) * 8);
+}
+
+.mobileBrand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--space) * 2);
+  margin-bottom: calc(var(--space) * 5);
+}
+
+.contextCopy {
+  margin: calc(var(--space) * 4) 0 0;
+  max-width: 28rem;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: var(--line-height-en);
 }
 
 .skipLink {
@@ -162,13 +192,34 @@
 }
 
 @media (min-width: 801px) {
-  .page {
+  .split {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .context {
+    display: flex;
+    flex-direction: column;
     justify-content: center;
+    width: min(28rem, 40%);
+    flex: 0 0 min(28rem, 40%);
+    padding: calc(var(--space) * 10);
+    background: var(--color-surface-muted);
+    border-inline-end: 1px solid var(--color-border);
+  }
+
+  .mobileBrand {
+    display: none;
+  }
+
+  .formColumn {
+    justify-content: center;
+    align-items: center;
   }
 }
 
 @media (max-width: 400px) {
-  .page {
+  .formColumn {
     padding: calc(var(--space) * 4) calc(var(--space) * 3);
   }
 

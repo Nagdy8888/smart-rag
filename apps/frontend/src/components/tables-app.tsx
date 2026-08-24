@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { Button } from "./ui/button";
 import { DataTable } from "./ui/data-table";
 import { Input } from "./ui/input";
+import { Sheet } from "./ui/sheet";
 import { UserText } from "./ui/user-text";
 import { analyzeTable, listTables, type ApiAuth } from "../lib/api";
 import { useSession } from "../lib/auth/session-provider";
@@ -28,7 +29,7 @@ import {
   type TableSortDirection,
 } from "../lib/table-plan";
 import type { TableAggregationOp, TableManifestResponse } from "../lib/types";
-import styles from "./developer-app.module.css";
+import styles from "./tables/tables.module.css";
 
 /**
  * Tables list and analyze surface.
@@ -55,6 +56,7 @@ export function TablesApp() {
   const [rowLimit, setRowLimit] = useState(100);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [provenanceOpen, setProvenanceOpen] = useState(false);
 
   const tablesQuery = useQuery({
     queryKey: keys.tables,
@@ -103,7 +105,7 @@ export function TablesApp() {
   if (!session.ready || accessToken === null) {
     return (
       <div className={styles.shell}>
-        <h1>Tables</h1>
+        <h2>Tables</h2>
         <p className={styles.muted}>
           <Link href="/login">Sign in</Link>
         </p>
@@ -129,12 +131,13 @@ export function TablesApp() {
 
   return (
     <div className={styles.shell}>
-      <h1>Structured tables</h1>
+      <h2>Structured tables</h2>
       <p className={styles.pageLead}>
         Deterministic results from authorized spreadsheets. This page has no
         generated commentary. Client total is{" "}
         {String(clientComputedTableTotal())}.
       </p>
+      <div className={styles.workbench}>
       <section className={styles.panel} aria-label="Manifests">
         <h2>Authorized tables</h2>
         {(tablesQuery.data ?? []).length === 0 ? (
@@ -157,6 +160,7 @@ export function TablesApp() {
           </ul>
         )}
       </section>
+      <div>
       {selected ? (
         <section className={styles.panel} aria-label="Plan builder">
           <h2>Plan builder</h2>
@@ -297,11 +301,26 @@ export function TablesApp() {
               value={analyzeMutation.data.source_ranges.join(", ") || "none"}
             />
           </p>
+          <Button type="button" onClick={() => setProvenanceOpen(true)}>
+            Source ranges
+          </Button>
+          {provenanceOpen ? (
+            <Sheet title="Source ranges" onClose={() => setProvenanceOpen(false)}>
+              <p className={styles.muted}>
+            source_ranges:{" "}
+            <UserText
+              value={analyzeMutation.data.source_ranges.join(", ") || "none"}
+            />
+              </p>
+            </Sheet>
+          ) : null}
           {tableExportAllowed([]) ? (
             <Button type="button">Export</Button>
           ) : null}
         </section>
       ) : null}
+      </div>
+      </div>
     </div>
   );
 }

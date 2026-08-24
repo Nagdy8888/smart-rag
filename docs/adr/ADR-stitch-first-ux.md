@@ -3,11 +3,11 @@ title: ADR — Stitch-first production UX
 adr_id: ADR-stitch-first-ux
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-24
 approver: "user (Cursor chat; no legal name provided)"
 approval_date: "2026-08-20"
 audience: frontend, engineering, reviewers
-decision_text: "Stitch screenshots are the visual composition target; template-not-layout forbids extra routes, not visual fidelity."
+decision_text: "Stitch screenshots are historical references; the live visual contract is the 2026-08-24 light Precision Workspace. Template-not-layout still forbids extra routes and pasted Stitch HTML."
 ---
 
 # ADR: Stitch-first production UX
@@ -42,8 +42,9 @@ flowchart TD
 
 ## Decision (accepted)
 
-1. Each mapped `screen.png` is the **visual composition target** for its
-   product route. Compare implementation to the image during development.
+1. Each mapped `screen.png` is a **historical composition reference**. The
+   live visual contract is the light Precision Workspace (2026-08-24). Do
+   not treat those images as current acceptance.
 2. `code.html` may be inspected for spacing, hierarchy, and component
    intent. Reconstruct as typed React. Do not import the gitignored
    export, paste generated HTML, or add one route per frame number.
@@ -71,7 +72,8 @@ Frame-to-route map: [VISUAL_MAP.md](../frontend/VISUAL_MAP.md).
 
 - [STITCH_REVIEW.md](../frontend/STITCH_REVIEW.md) Round 3 supersedes the
   “ignore layout” reading of Round 2.
-- Frontend tokens stay `#F8FAFC` / `#2563EB` / 8px / no blur.
+- Frontend tokens stay the Precision Workspace table (`#F4F6F8` /
+  `#4E5BD5` / 6px controls / 10px panels / no blur).
 - Visual regression is required at 1280×800 and 390×844.
 
 ## Rollback

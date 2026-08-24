@@ -2,7 +2,7 @@
 title: Production console design system
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-24
 audience: frontend, reviewers
 packet: P08-01
 ---
@@ -10,11 +10,11 @@ packet: P08-01
 # Design system (Phase 8 packet 1)
 
 Build-time tokens and typed primitives for the production console shell.
-Canonical values are the token table in [STITCH_BRIEF.md](./STITCH_BRIEF.md).
-The Stitch export is a **template, not a layout**: there is no `frame_00`
-route and no design-system gallery page. `frame_00` still supplies the
-shared visual language (type scale, tonal cards, chips, 8px controls)
-applied to every existing route. See
+Canonical values are the token table in [STITCH_BRIEF.md](./STITCH_BRIEF.md)
+(Precision Workspace, 2026-08-24). Stitch `screen.png` files are historical
+references, not the live composition target. The Stitch export remains a
+**template, not a layout**: there is no `frame_00` route and no
+design-system gallery page. See
 [VISUAL_MAP.md](./VISUAL_MAP.md) and
 [ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md).
 
@@ -44,19 +44,20 @@ reintroduce them.
 
 | Token | Value |
 | --- | --- |
-| `--color-bg` | `#F8FAFC` |
+| `--color-bg` | `#F4F6F8` |
 | `--color-surface` | `#FFFFFF` |
-| `--color-text` | `#0F172A` |
-| `--color-text-muted` | `#475569` |
-| `--color-border` | `#CBD5E1` |
-| `--color-accent` | `#2563EB` |
+| `--color-surface-muted` | `#F8FAFC` |
+| `--color-text` | `#182230` |
+| `--color-text-muted` | `#637083` |
+| `--color-border` | `#DDE3EA` |
+| `--color-accent` | `#4E5BD5` |
 | `--color-accent-fg` | `#FFFFFF` |
 | `--color-danger` | `#B91C1C` |
 | `--color-warning` | `#A16207` |
 | `--color-success` | `#166534` |
-| `--color-focus` | `#2563EB` (2px solid ring, offset 2px) |
+| `--color-focus` | `#4E5BD5` (2px solid ring, offset 2px) |
 | `--radius-sm` | `6px` |
-| `--radius-md` | `8px` |
+| `--radius-md` | `10px` |
 | `--radius-lg` | `12px` |
 | `--space` | `4px` grid |
 | `--shadow-1` | `0 1px 2px rgb(15 23 42 / 0.08)` |
@@ -65,7 +66,7 @@ reintroduce them.
 | `--font-mono` | `ui-monospace, "Cascadia Code", monospace` |
 | `--line-height-ar` | `1.75` |
 | `--line-height-en` | `1.5` |
-| `--nav-width` | `280px` |
+| `--nav-width` | `232px` |
 | `--row-height` | `48px` |
 
 Light scheme only. Motion honors `prefers-reduced-motion`. Fonts are
@@ -78,7 +79,7 @@ Arabic fallbacks. No Google Fonts CDN and no `next/font/google`.
 flowchart LR
   skip["Skip to main"]
   skip --> auth["Auth card layout"]
-  skip --> nav["Nav 280px desktop"]
+  skip --> nav["Nav 232px desktop"]
   nav --> topbar["Top bar"]
   topbar --> main["Main landmark"]
   nav --> drawer["Mobile nav drawer"]
@@ -89,7 +90,8 @@ flowchart LR
 - English chrome (`lang="en"`, `dir="ltr"`).
 - User/content strings: `dir="auto"` plus `unicode-bidi: isolate`.
 - Codes, IDs, URLs: `dir="ltr"` isolate.
-- Desktop (1280): navigation column `280px`, tonal `shadow-1` / `shadow-2`.
+- Desktop (1280): navigation column `232px`, collapsing to `72px` between
+  1024px and 1279px. Tonal `shadow-1` / `shadow-2` on overlays only.
 - Mobile (390): authenticated nav is a Menu drawer; login has **no** console
   nav and the sign-in card fits the first viewport.
 - List and table rows: minimum `48px`. Mobile controls: minimum `44px`.
@@ -146,7 +148,7 @@ uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci
 
 ## Troubleshooting
 
-- Nav not 280px: confirm `globals.css` `--nav-width` and
+- Nav not 232px: confirm `globals.css` `--nav-width` and
   `app-shell.module.css` desktop media query (`min-width: 801px`).
 - Geist / Google Fonts returning: `layout.tsx` must not import
   `next/font` loaders; CSP `font-src 'self'` forbids CDN hosts.

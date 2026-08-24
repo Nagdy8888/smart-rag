@@ -524,11 +524,14 @@ export async function loadConsoleReadiness(
  *
  * @param fetchImpl - Injected fetch.
  * @returns Handshake fields.
+ * @throws Error when the response is not ok, unparsable, or times out after 8s.
  */
 export async function fetchMeta(
   fetchImpl: typeof fetch = fetch,
 ): Promise<MetaResponse> {
-  const response = await fetchImpl(apiUrl("/api/meta"));
+  const response = await fetchImpl(apiUrl("/api/meta"), {
+    signal: AbortSignal.timeout(8_000),
+  });
   const body = await readJsonObject(response);
   if (!response.ok) {
     throw new Error("meta_unreachable");

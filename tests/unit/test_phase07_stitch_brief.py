@@ -25,7 +25,7 @@ def test_brief_reconciles_tokens_and_rejects_blur() -> None:
 
     brief = BRIEF_PATH.read_text(encoding="utf-8")
     assert "--color-accent" in brief
-    assert "#2563EB" in brief
+    assert "#4E5BD5" in brief
     assert "**Blur is rejected**" in brief
     assert "runtime Tailwind CDN" in brief
     assert "--radius-md" in brief

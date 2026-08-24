@@ -9,7 +9,7 @@ import { LimitationCallout } from "./ui/limitation-callout";
 import { limitationCopy } from "../lib/limitations";
 import { displayText } from "../lib/safe-text";
 import type { ReadinessResponse } from "../lib/types";
-import styles from "./developer-app.module.css";
+import styles from "./admin/admin.module.css";
 
 /**
  * Render public `GET /health/ready`. Owner/admin named probes from

@@ -9,29 +9,42 @@
  *
  * @remarks
  * Do not load Google Fonts or Tailwind from a CDN. Motion must honor
- * `prefers-reduced-motion`.
+ * `prefers-reduced-motion`. 2026-08-24 Precision Workspace tokens replace
+ * the prior Stitch screenshot palette.
  */
 
 /** Page canvas. Not lavender `#faf8ff`. */
-export const COLOR_BG = "#F8FAFC";
+export const COLOR_BG = "#F4F6F8";
 
 /** Card and navigation surface. */
 export const COLOR_SURFACE = "#FFFFFF";
 
+/** Quiet nested surface. */
+export const COLOR_SURFACE_MUTED = "#F8FAFC";
+
 /** Primary body text. WCAG AA on canvas and surface. */
-export const COLOR_TEXT = "#0F172A";
+export const COLOR_TEXT = "#182230";
 
 /** Secondary text. AA on white; do not place on `--color-border`. */
-export const COLOR_TEXT_MUTED = "#475569";
+export const COLOR_TEXT_MUTED = "#637083";
 
 /** 1px hairline borders. */
-export const COLOR_BORDER = "#CBD5E1";
+export const COLOR_BORDER = "#DDE3EA";
 
 /** Interactive accent and focus color. Not teal `#0F766E`. */
-export const COLOR_ACCENT = "#2563EB";
+export const COLOR_ACCENT = "#4E5BD5";
 
 /** Text on accent fills. */
 export const COLOR_ACCENT_FG = "#FFFFFF";
+
+/** Soft indigo fill for selected navigation. */
+export const COLOR_ACCENT_MUTED = "#EEF0FF";
+
+/** Alias of muted indigo. */
+export const COLOR_ACCENT_SOFT = "#EEF0FF";
+
+/** Teal evidence/graph signal. Not body text. */
+export const COLOR_EVIDENCE = "#0E8584";
 
 /** Destructive / error text on white. */
 export const COLOR_DANGER = "#B91C1C";
@@ -43,15 +56,15 @@ export const COLOR_WARNING = "#A16207";
 export const COLOR_SUCCESS = "#166534";
 
 /** Keyboard focus ring. 2px solid, 2px offset. */
-export const COLOR_FOCUS = "#2563EB";
+export const COLOR_FOCUS = "#4E5BD5";
 
-/** Chip radius. */
+/** Chip and control radius. */
 export const RADIUS_SM = "6px";
 
-/** Control radius. Not 10px. */
-export const RADIUS_MD = "8px";
+/** Panel radius. Not 8px Stitch control radius. */
+export const RADIUS_MD = "10px";
 
-/** Card and drawer radius. */
+/** Overlay radius. */
 export const RADIUS_LG = "12px";
 
 /** Spacing grid unit. */
@@ -77,10 +90,13 @@ export const LINE_HEIGHT_AR = "1.75";
 export const LINE_HEIGHT_EN = "1.5";
 
 /** Desktop navigation column. */
-export const NAV_WIDTH = "280px";
+export const NAV_WIDTH = "232px";
 
 /** Enterprise list and table row minimum height. */
 export const ROW_HEIGHT = "48px";
+
+/** Console top bar. */
+export const TOPBAR_HEIGHT = "56px";
 
 /**
  * Frozen map of brief CSS custom properties to implementation values.
@@ -92,11 +108,15 @@ export const ROW_HEIGHT = "48px";
 export const DESIGN_TOKENS = {
   "--color-bg": COLOR_BG,
   "--color-surface": COLOR_SURFACE,
+  "--color-surface-muted": COLOR_SURFACE_MUTED,
   "--color-text": COLOR_TEXT,
   "--color-text-muted": COLOR_TEXT_MUTED,
   "--color-border": COLOR_BORDER,
   "--color-accent": COLOR_ACCENT,
   "--color-accent-fg": COLOR_ACCENT_FG,
+  "--color-accent-muted": COLOR_ACCENT_MUTED,
+  "--color-accent-soft": COLOR_ACCENT_SOFT,
+  "--color-evidence": COLOR_EVIDENCE,
   "--color-danger": COLOR_DANGER,
   "--color-warning": COLOR_WARNING,
   "--color-success": COLOR_SUCCESS,
@@ -113,6 +133,7 @@ export const DESIGN_TOKENS = {
   "--line-height-en": LINE_HEIGHT_EN,
   "--nav-width": NAV_WIDTH,
   "--row-height": ROW_HEIGHT,
+  "--topbar-height": TOPBAR_HEIGHT,
 } as const;
 
 /** CSS custom property names owned by the brief plus shell metrics. */

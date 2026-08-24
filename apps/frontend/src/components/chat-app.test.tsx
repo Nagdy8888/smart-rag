@@ -8,6 +8,7 @@ import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { ChatApp } from "./chat-app";
 import {
+  createConversation,
   fetchMe,
   fetchMeta,
   listCitations,
@@ -85,6 +86,12 @@ vi.mock("../lib/api", async () => {
       mfa_enrolled: true,
     })),
     listConversations: vi.fn(async () => []),
+    createConversation: vi.fn(async () => ({
+      conversation_id: "conv-created",
+      creator_user_id: "u1",
+      title: "Chat",
+      created_at: "2026-08-17T00:00:00Z",
+    })),
     fetchUsageMe: vi.fn(async () => ({
       scope: "me",
       cost_usd: "0",
@@ -108,6 +115,7 @@ afterEach(() => {
   vi.mocked(fetchMeta).mockResolvedValue(defaultMeta);
   vi.mocked(listConversations).mockResolvedValue([]);
   vi.mocked(listCitations).mockResolvedValue([]);
+  vi.mocked(createConversation).mockClear();
   vi.mocked(fetchMe).mockResolvedValue({
     user_id: "u1",
     role: "member",
@@ -210,11 +218,13 @@ function stubChatFetch(options: {
   resumeStatus?: number;
   cancelCalls?: string[];
   deleteCalls?: string[];
+  messagePosts?: string[];
 }): typeof fetch {
   return async (input, init) => {
     const url = String(input);
     const method = (init?.method ?? "GET").toUpperCase();
     if (method === "POST" && url.includes("/messages")) {
+      options.messagePosts?.push(url);
       const headers = init?.headers as Record<string, string>;
       expect(headers["X-Test-Role"]).toBeUndefined();
       expect(JSON.parse(String(init?.body ?? "{}")).route).toBeUndefined();
@@ -404,7 +414,8 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     vi.stubGlobal("fetch", stubChatFetch({ deleteCalls }));
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("option", { name: "Chat" }));
-    await user.click(screen.getByRole("button", { name: "Delete conversation" }));
+    await user.click(screen.getByRole("button", { name: "Conversation actions" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete conversation" }));
     expect(
       await screen.findByText(
         "Conversation deleted. Reads, resume, and citations are denied. No source text is shown.",
@@ -413,5 +424,70 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     expect(deleteCalls).toEqual([
       "http://127.0.0.1:8000/conversations/conv-1",
     ]);
+  });
+
+  it("opens run details, sources, and feedback surfaces then restores the trigger", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    renderChat(<ChatApp />);
+    const details = await screen.findByRole("button", { name: "Run details" });
+    await user.click(details);
+    expect(screen.getByRole("dialog", { name: "Run details" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Run details" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Sources (0)" }));
+    expect(screen.getByRole("dialog", { name: "Sources (0)" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Feedback details" }));
+    expect(screen.getByRole("combobox", { name: "Tag" })).toBeInTheDocument();
+  });
+
+  it("creates a conversation on first Send then admits one message", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([]);
+    vi.mocked(createConversation).mockResolvedValue({
+      conversation_id: "conv-created",
+      creator_user_id: "u1",
+      title: "Chat",
+      created_at: "2026-08-17T00:00:00Z",
+    });
+    const messagePosts: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events: "event: completed\nid: 1\ndata: {}\n\n",
+        messagePosts,
+      }),
+    );
+    renderChat(<ChatApp />);
+    await screen.findByRole("heading", { name: "Auto chat" });
+    await user.type(screen.getByLabelText("Message"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => {
+      expect(createConversation).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(messagePosts).toEqual([
+        "http://127.0.0.1:8000/conversations/conv-created/messages",
+      ]);
+    });
+  });
+
+  it("keeps Send unused when conversation create fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(createConversation).mockReset();
+    vi.mocked(createConversation).mockRejectedValue(new Error("create_failed"));
+    const messagePosts: string[] = [];
+    vi.stubGlobal("fetch", stubChatFetch({ messagePosts }));
+    renderChat(<ChatApp />);
+    await user.type(await screen.findByLabelText("Message"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => {
+      expect(createConversation).toHaveBeenCalledTimes(1);
+    });
+    expect(messagePosts).toEqual([]);
   });
 });

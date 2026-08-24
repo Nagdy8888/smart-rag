@@ -51,10 +51,12 @@ from smart_rag_core.retrieval.graph_mapping import (
     graph_statement_id,
     map_vendor_chunk,
     mapping_config_generation,
+    mapping_content_digest,
     normalize_relation_label,
     parse_object_source_ids,
     resolve_entity_name,
     run_support_rerank,
+    stitch_overlapping_texts,
 )
 from smart_rag_core.retrieval.lightrag_qualification import DocumentStatusView
 from smart_rag_core.retrieval.rerank import RerankPassage, RerankRanking
@@ -424,6 +426,44 @@ def test_mapping_budget_bounds() -> None:
         )
 
 
+def test_local_demo_caps_cover_canonical_passage_graph_200_flood() -> None:
+    """Local demo ceilings must cover the measured isolate extract flood."""
+
+    measured_entities = 1_779
+    measured_relations = 1_531
+    assert LOCAL_DEMO_MAX_MAPPING_ENTITIES >= measured_entities
+    assert LOCAL_DEMO_MAX_MAPPING_RELATIONS >= measured_relations
+    assert_mapping_budget(
+        vendor_chunks=164,
+        entities=measured_entities,
+        relations=measured_relations,
+        hybrid_calls=0,
+        rerank_calls=0,
+        max_entities=LOCAL_DEMO_MAX_MAPPING_ENTITIES,
+        max_relations=LOCAL_DEMO_MAX_MAPPING_RELATIONS,
+    )
+    with pytest.raises(MappingBudgetError, match="mapping_budget_entities"):
+        assert_mapping_budget(
+            vendor_chunks=164,
+            entities=measured_entities,
+            relations=measured_relations,
+            hybrid_calls=0,
+            rerank_calls=0,
+        )
+
+
+def test_mapping_service_rejects_caps_above_local_demo() -> None:
+    """Injected mapper caps cannot exceed the approved local ceiling."""
+
+    with pytest.raises(ValueError, match="invalid_mapping_entity_limit"):
+        GraphMappingService(
+            _mapping_connection(),
+            vendor_reader=_FakeVendor(),
+            writer=_mapping_writer(),
+            max_entities=LOCAL_DEMO_MAX_MAPPING_ENTITIES + 1,
+        )
+
+
 def test_support_threshold_is_eighty() -> None:
     """Accepted canonical support cannot be lowered below 0.80."""
 
@@ -444,6 +484,21 @@ def test_hash_uses_ingest_normalizer_after_envelope_strip() -> None:
     assert match.method == "hash"
     assert match.source_hash == content_hash(body)
     assert match.target_hash == canonical.content_hash
+
+
+def test_stitch_overlapping_texts_drops_shared_suffix_prefix() -> None:
+    """LightRAG overlap tails must reconstruct the original source text."""
+
+    assert stitch_overlapping_texts(("hello world", "world!!")) == "hello world!!"
+    assert stitch_overlapping_texts(("only",)) == "only"
+
+
+def test_mapping_content_digest_unescapes_html_entities() -> None:
+    """Vendor HTML-unescaped dashes still match the canonical passage."""
+
+    canonical = "burns in the fire &mdash; now"
+    vendor = "burns in the fire — now"
+    assert mapping_content_digest(canonical) == mapping_content_digest(vendor)
 
 
 class _FakeVendor:
@@ -730,6 +785,95 @@ def test_exact_hash_bijection_skips_hybrid(monkeypatch: pytest.MonkeyPatch) -> N
     assert captured["ready"] is True
     chunk_rows = cast(list[object], captured["chunk_rows"])
     assert len(chunk_rows) == 1
+
+
+def test_exact_mapping_stitches_overlapping_vendor_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Split LightRAG chunks still map when reconstruction hashes match."""
+
+    body = "alpha beta gamma delta epsilon"
+    canonical = _passage(text=body, version_id=VERSION_A)
+    source_id = canonical_passage_source_id(
+        version_id=VERSION_A,
+        chunk_id=canonical.chunk_id,
+    )
+    enveloped = bind_graph_source_text(
+        document_version_id=source_id,
+        normalized_text=body,
+    )
+    first = enveloped[: max(len(enveloped) // 2, 8)]
+    second = enveloped[len(first) - 6 :]
+    assert stitch_overlapping_texts((first, second)) == enveloped
+
+    def _load_canonicals(
+        _connection: psycopg.Connection, *, version_id: UUID
+    ) -> tuple[CanonicalPassage, ...]:
+        """Return the single canonical passage under test."""
+
+        del version_id
+        return (canonical,)
+
+    captured: dict[str, object] = {}
+
+    def _persist(self: GraphMappingService, **kwargs: object) -> MappingOutcome:
+        """Capture mapped rows without Postgres."""
+
+        captured["ready"] = kwargs["ready"]
+        captured["chunk_rows"] = kwargs["chunk_rows"]
+        return _outcome_from_persist(self, **kwargs)
+
+    monkeypatch.setattr(
+        "smart_rag_core.jobs.graph_mapping_persist.load_canonical_passages",
+        _load_canonicals,
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.jobs.graph_mapping_persist.load_entity_rules",
+        _empty_entity_rules,
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.jobs.graph_mapping_service.load_extraction_policy",
+        _stub_extraction_policy,
+    )
+    monkeypatch.setattr(GraphMappingService, "_persist", _persist)
+    monkeypatch.setattr(
+        GraphMappingService,
+        "_load_version_language",
+        _english_language,
+    )
+    service = GraphMappingService(
+        _mapping_connection(),
+        vendor_reader=_FakeVendor(
+            chunks=[
+                {
+                    "id": "vc-a",
+                    "full_doc_id": source_id,
+                    "content": first,
+                    "chunk_order_index": 0,
+                },
+                {
+                    "id": "vc-b",
+                    "full_doc_id": source_id,
+                    "content": second,
+                    "chunk_order_index": 1,
+                },
+            ]
+        ),
+        writer=_mapping_writer(),
+    )
+    outcome = asyncio.run(
+        service.map_after_vendor_success(
+            document_id=uuid4(),
+            version_id=VERSION_A,
+        )
+    )
+    assert outcome.reason == ""
+    assert captured["ready"] is True
+    chunk_rows = cast(list[object], captured["chunk_rows"])
+    assert len(chunk_rows) == 1
+    row = chunk_rows[0]
+    assert row.vendor_chunk_id == "vc-a"
+    assert row.vendor_piece_ids == ("vc-a", "vc-b")
 
 
 def test_multi_source_entity_keeps_all_passage_matches(

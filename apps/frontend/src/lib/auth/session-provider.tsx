@@ -16,6 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import { createBrowserSupabase } from "./browser";
+import { SESSION_RESTORE_TIMEOUT_MS, raceTimeout } from "./timeout";
 
 export type SessionSnapshot = {
   /** Bearer JWT for FastAPI, or null when signed out. */
@@ -42,8 +43,10 @@ const SessionContext = createContext<SessionSnapshot | null>(null);
  * @param props - App Router children.
  * @returns Context provider.
  * @remarks
- * Side effects: subscribes to `onAuthStateChange`. Missing cookies are not
- * the security boundary; FastAPI still authorizes Bearer calls.
+ * Side effects: subscribes to `onAuthStateChange`. `getSession` is bounded
+ * by `SESSION_RESTORE_TIMEOUT_MS` so a hung Auth call cannot freeze Chat
+ * on "Restoring session." Missing cookies are not the security boundary;
+ * FastAPI still authorizes Bearer calls.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => createBrowserSupabase(), []);
@@ -56,14 +59,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) {
-        return;
-      }
-      setAccessToken(data.session?.access_token ?? null);
-      setEmail(data.session?.user.email ?? null);
-      setReady(true);
-    });
+    void raceTimeout(
+      supabase.auth.getSession(),
+      SESSION_RESTORE_TIMEOUT_MS,
+      "session_restore_timeout",
+    )
+      .then(({ data }) => {
+        if (cancelled) {
+          return;
+        }
+        setAccessToken(data.session?.access_token ?? null);
+        setEmail(data.session?.user.email ?? null);
+      })
+      .catch(() => {
+        /* Stay signed out in the snapshot so the console unfreezes. */
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setReady(true);
+        }
+      });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setAccessToken(session?.access_token ?? null);
       setEmail(session?.user.email ?? null);

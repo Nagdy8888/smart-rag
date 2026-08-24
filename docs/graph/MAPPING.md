@@ -49,7 +49,7 @@ because each passage is envelope-bound to `{version_id}:{chunk_id}`.
 ```mermaid
 flowchart TD
   processed[AllPassageSourcesProcessed] --> enumerate[EnumerateExactSourceIds]
-  enumerate --> bijection[OneVendorChunkPerPassageHash]
+  enumerate --> bijection[ReconstructedPassageHash]
   bijection --> drift{HashOrCountDrift}
   drift -->|yes| mismatch[TerminalSnapshotMismatch]
   mismatch --> pending[KeepGraphPendingPlusRepair]
@@ -158,7 +158,7 @@ contribute to Graph Ready or later query.
 | --- | --- | --- |
 | `vendor_not_processed` | Status is not terminal `processed` | repair; stay pending |
 | `vendor_basename_mismatch` | Basename is not `g-{version_id}-{chunk_id}.txt` | repair |
-| `graph_source_snapshot_mismatch` | Passage/vendor hash or 1:1 counts disagree | terminal; no Hybrid retry |
+| `graph_source_snapshot_mismatch` | Passage/vendor reconstructed hash or source counts disagree | terminal; no Hybrid retry |
 | `chunk_map_collision` | Canonical chunk already maps to another vendor id | repair |
 | `source_truncated` / `source_ambiguous` | `<SEP>` list at cap, blank, or duplicate | object unavailable |
 | `unsupported_relation` | Empty structured `keywords` | statement unavailable |

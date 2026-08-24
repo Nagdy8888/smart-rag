@@ -41,8 +41,9 @@ MAX_MAPPING_ENTITIES = 200
 MAX_MAPPING_RELATIONS = 200
 # Explicit ceiling for the approved synthetic local Graph-200 demo only.
 # Production and staging continue to use the 200/200 defaults above.
-LOCAL_DEMO_MAX_MAPPING_ENTITIES = 1_600
-LOCAL_DEMO_MAX_MAPPING_RELATIONS = 1_200
+# Canonical-passage extract measured 1,779 entities / 1,531 relations.
+LOCAL_DEMO_MAX_MAPPING_ENTITIES = 2_000
+LOCAL_DEMO_MAX_MAPPING_RELATIONS = 1_800
 MAX_MAPPING_HYBRID_CALLS = 1
 MAX_MAPPING_RERANK_CALLS = 1
 MAX_MAPPING_RERANK_POOL = 20

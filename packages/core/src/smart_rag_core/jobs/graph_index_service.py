@@ -195,9 +195,11 @@ class GraphIndexService:
             pause_controller: User-load pause for clean rebuilds. Defaults
                 to fail-closed missing telemetry.
             mapping_max_entities: Effective entity mapping cap passed to the
-                default mapper.
+                default mapper. Production default is 200; the local
+                synthetic-demo ceiling is 2,000.
             mapping_max_relations: Effective relation mapping cap passed to
-                the default mapper.
+                the default mapper. Production default is 200; the local
+                synthetic-demo ceiling is 1,800.
         """
 
         self._connection = connection

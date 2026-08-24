@@ -30,7 +30,7 @@ import {
   type InviteRole,
   type ToolPermission,
 } from "../lib/types";
-import styles from "./developer-app.module.css";
+import styles from "./admin/admin.module.css";
 
 /**
  * Render the permission-filtered tool catalog.
@@ -135,7 +135,7 @@ export function ToolsApp() {
     <div className={styles.shell}>
       <header className={styles.pageHeader}>
         <div>
-          <h1>Tools</h1>
+          <h2>Tools</h2>
           <p className={styles.pageLead}>
             Optional tools available to your role. Enabling a tool still
             requires server authorization.

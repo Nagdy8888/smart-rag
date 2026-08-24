@@ -1,24 +1,26 @@
 /**
- * Document library: cards, quota-aware upload, crawl (owner/admin convenience),
- * status pills from real version status.
+ * Document library: import drawer, loaded-row filter, ingestion inspector.
+ * Mutations stay in this root. Children are controlled views.
  */
 
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HandshakeBanner } from "./auth/auth-screens";
+import { DocumentList } from "./documents/document-list";
+import {
+  INGESTION_STATUS_POLL_MS,
+  IngestionInspector,
+  ingestionStatusIsTerminal,
+} from "./documents/ingestion-inspector";
+import {
+  ImportSourceSheet,
+  type ImportSourceTab,
+} from "./documents/import-source-sheet";
 import { Button } from "./ui/button";
-import { FileDropZone } from "./ui/file-drop-zone";
-import { EmptyState } from "./ui/empty-state";
 import { Input } from "./ui/input";
-import { LimitationCallout } from "./ui/limitation-callout";
-import { RovingList } from "./ui/roving-list";
-import { StatusBanner } from "./ui/status-banner";
-import { StatusPill } from "./ui/status-pill";
-import { UserText } from "./ui/user-text";
 import {
   enqueueWebsiteCrawl,
   fetchMe,
@@ -30,25 +32,15 @@ import {
   retryIngestionJob,
   type ApiAuth,
 } from "../lib/api";
-import { MFA_UPLOAD_DENIED } from "../lib/auth/copy";
 import { useSession } from "../lib/auth/session-provider";
 import {
   ATTESTATION_POLICY_VERSION,
   CRAWL_CONTENT_CLASS_DEFAULT,
   CRAWL_MAX_DEPTH_DEFAULT,
   CRAWL_MAX_PAGES_DEFAULT,
-  DECLARED_CATEGORIES,
   type DeclaredCategory,
 } from "../lib/attestation";
-import { DOCUMENT_DELETE_UNAVAILABLE } from "../lib/citation-drawer";
 import { evaluatePaidHandshake } from "../lib/handshake";
-import {
-  formatBm25Summary,
-  formatGraphHandoffSummary,
-  ingestionStatusLabel,
-  ingestionStatusTone,
-} from "../lib/ingestion-status";
-import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
 import { publicQueryKeys, sessionQueryKeys } from "../lib/query-keys";
 import { showCrawlConvenience, showUploadConvenience } from "../lib/roles";
 import {
@@ -56,20 +48,38 @@ import {
   sha256Hex,
   uploadReservedObject,
 } from "../lib/upload-client";
-import styles from "./developer-app.module.css";
+import type { DocumentResponse } from "../lib/types";
+import styles from "./documents/documents.module.css";
 
 function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
 /**
+ * Return whether a loaded document matches the local filter.
+ *
+ * @param doc - List row.
+ * @param needle - Lowercased filter text.
+ * @returns True when title or visibility contains the needle.
+ */
+function documentMatchesFilter(doc: DocumentResponse, needle: string): boolean {
+  if (needle === "") {
+    return true;
+  }
+  const title = (doc.title ?? doc.document_id).toLowerCase();
+  return title.includes(needle) || doc.visibility.toLowerCase().includes(needle);
+}
+
+/**
  * Document library and upload/crawl convenience.
  *
  * @returns Library surface.
+ * @remarks
+ * File import is still reserve → Storage JWT → finalize. Polling stops on
+ * terminal status, closed inspector, hidden tab, sign-out, or unmount.
  */
 export function DocumentLibrary() {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const session = useSession();
   const accessToken = session.accessToken;
   const auth = useMemo<ApiAuth | null>(
@@ -81,9 +91,22 @@ export function DocumentLibrary() {
   const [category, setCategory] = useState<DeclaredCategory>("allowed");
   const [title, setTitle] = useState("");
   const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [uploadPhase, setUploadPhase] = useState<string | null>(null);
   const [startUrl, setStartUrl] = useState("");
   const [approvedDomain, setApprovedDomain] = useState("");
   const [statusVersionId, setStatusVersionId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importTab, setImportTab] = useState<ImportSourceTab>("file");
+  const [filter, setFilter] = useState("");
+  const [pageVisible, setPageVisible] = useState(true);
+
+  useEffect(() => {
+    function onVisibility(): void {
+      setPageVisible(document.visibilityState === "visible");
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   const metaQuery = useQuery({
     queryKey: publicQueryKeys.meta,
@@ -110,6 +133,16 @@ export function DocumentLibrary() {
     queryKey: keys.versionStatus(statusVersionId),
     queryFn: () => fetchVersionStatus(auth as ApiAuth, statusVersionId as string),
     enabled: auth !== null && statusVersionId !== null,
+    refetchInterval: (query) => {
+      if (!pageVisible || statusVersionId === null) {
+        return false;
+      }
+      const status = query.state.data?.version?.status;
+      if (!status || ingestionStatusIsTerminal(status)) {
+        return false;
+      }
+      return INGESTION_STATUS_POLL_MS;
+    },
   });
 
   const uploadMutation = useMutation({
@@ -121,11 +154,13 @@ export function DocumentLibrary() {
         throw new Error("handshake_blocked");
       }
       const idempotencyKey = newIdempotencyKey();
+      setUploadPhase("Reserving");
       const reserved = await reserveUpload(auth, file.size, idempotencyKey);
       const objectName = objectNameForUpload(reserved.storage_path, file.name);
       const hash = await sha256Hex(file);
       const supabase = session.supabase;
       if (supabase !== null && reserved.signed_url === null) {
+        setUploadPhase("Uploading");
         const uploaded = await uploadReservedObject(
           supabase,
           reserved.storage_bucket,
@@ -136,6 +171,7 @@ export function DocumentLibrary() {
           throw new Error(`storage_upload_failed:${uploaded.error ?? "unknown"}`);
         }
       }
+      setUploadPhase("Finalizing");
       const finalized = await finalizeUpload(auth, {
         reservation_id: reserved.reservation_id,
         object_name: objectName,
@@ -150,10 +186,14 @@ export function DocumentLibrary() {
       return { reserved, finalized };
     },
     onSuccess: (result) => {
+      setUploadPhase(null);
       setUploadNote(
         `Uploaded “${result.finalized.document_id}”. The file is in quarantine until ingestion finishes.`,
       );
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+    onError: () => {
+      setUploadPhase(null);
     },
   });
 
@@ -196,8 +236,8 @@ export function DocumentLibrary() {
 
   if (!session.ready || accessToken === null) {
     return (
-      <div className={styles.shell}>
-        <h1>Documents</h1>
+      <div className={styles.page}>
+        <h2>Documents</h2>
         <p className={styles.muted}>
           <Link href="/login">Sign in</Link>
         </p>
@@ -208,218 +248,97 @@ export function DocumentLibrary() {
   const role = meQuery.data?.role;
   const showUpload = showUploadConvenience(role, meQuery.data?.upload_enabled);
   const showCrawl = showCrawlConvenience(role);
-  const version = versionQuery.data?.version ?? null;
+  const needle = filter.trim().toLowerCase();
+  const loaded = documentsQuery.data ?? [];
+  const visibleDocs = loaded.filter((doc) => documentMatchesFilter(doc, needle));
 
   return (
-    <div className={styles.shell}>
-      <header className={styles.pageHeader}>
+    <div className={styles.page}>
+      <header className={styles.header}>
         <div>
-          <h1>Document library</h1>
-          <p className={styles.pageLead}>
-            Manage authorized sources and follow ingestion status.
+          <h2>Document library</h2>
+          <p className={styles.lead}>
+            Manage authorized sources and follow ingestion status. Filters apply
+            only to documents already loaded.
           </p>
         </div>
-      </header>
-      <HandshakeBanner />
-
-      {showUpload ? (
-        <section className={styles.panel} aria-label="Upload">
-          <h2>Upload file</h2>
-          <FileDropZone
-            onFiles={(files) => setFile(files[0] ?? null)}
-            disabled={!handshake.allowPaidPost}
-          />
-          {file ? (
-            <p className={styles.muted}>
-              <UserText value={file.name} /> — {String(file.size)} bytes
-            </p>
-          ) : null}
-          <label>
-            Declared category
-            <select
-              value={category}
-              onChange={(event) =>
-                setCategory(event.target.value as DeclaredCategory)
-              }
-            >
-              {DECLARED_CATEGORIES.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className={styles.muted}>
-            Category and attestation are recorded with the upload. Files are not
-            searchable until ingestion completes.
-          </p>
-          <Input
-            label="Document title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-          <p className={styles.muted}>
-            Uploads use your signed-in session. A reservation is never treated as
-            ready for search.
-          </p>
+        {showUpload || showCrawl ? (
           <Button
             type="button"
             variant="primary"
-            disabled={file === null || !handshake.allowPaidPost}
-            onClick={() => uploadMutation.mutate()}
+            onClick={() => setImportOpen(true)}
           >
-            Reserve, upload, finalize
+            Import source
           </Button>
-          {uploadNote ? <p className={styles.muted}>{uploadNote}</p> : null}
-          {uploadMutation.isError ? (
-            <StatusBanner kind="error" role="alert">
-              {uploadMutation.error instanceof Error &&
-              uploadMutation.error.message === "mfa_required"
-                ? MFA_UPLOAD_DENIED
-                : uploadMutation.error instanceof Error &&
-                    uploadMutation.error.message.startsWith("storage_upload_failed")
-                  ? "The file did not finish uploading. Try again after the storage write succeeds."
-                  : "Upload rejected. Server authorization is authoritative."}
-            </StatusBanner>
-          ) : null}
-        </section>
-      ) : (
+        ) : null}
+      </header>
+      <HandshakeBanner />
+
+      {showUpload ? null : (
         <p className={styles.muted}>
           Upload controls are hidden as convenience only. The server still
           denies viewers and callers without upload_enabled.
         </p>
       )}
-
-      {showCrawl ? (
-        <section className={styles.panel} aria-label="Website crawl">
-          <h2>Request website</h2>
-          <Input
-            label="Start URL"
-            value={startUrl}
-            onChange={(event) => setStartUrl(event.target.value)}
-          />
-          <Input
-            label="Approved domain"
-            value={approvedDomain}
-            onChange={(event) => setApprovedDomain(event.target.value)}
-          />
-          <Button
-            type="button"
-            disabled={!handshake.allowPaidPost || startUrl.trim() === ""}
-            onClick={() => crawlMutation.mutate()}
-          >
-            Enqueue crawl
-          </Button>
-          {crawlMutation.isError ? (
-            <StatusBanner kind="error" role="alert">
-              Crawl rejected. Members receive HTTP 403 from the server.
-            </StatusBanner>
-          ) : null}
-        </section>
-      ) : (
+      {showCrawl ? null : (
         <p className={styles.muted}>
           Website crawl is hidden for this role. The server still denies members
           and viewers.
         </p>
       )}
 
-      <section className={styles.panel} aria-label="Library">
-        <h2>Library</h2>
-        {(documentsQuery.data ?? []).length === 0 ? (
-          <EmptyState title="No documents you can see">
-            Upload a file or wait for an invitation that grants access.
-          </EmptyState>
-        ) : null}
-        <RovingList
-          aria-label="Documents"
-          className={styles.list}
-          items={(documentsQuery.data ?? []).map((doc) => ({
-            id: doc.document_id,
-            item: doc,
-          }))}
-          onSelect={(doc) => {
-            void router.push(`/documents/${doc.document_id}`);
-          }}
-        >
-          {(doc) => (
-            <>
-              <UserText value={doc.title ?? doc.document_id} />
-              {" — "}
-              <StatusPill status={doc.visibility} />
-            </>
-          )}
-        </RovingList>
-        <ul className={styles.list} aria-label="Version status shortcuts">
-          {(documentsQuery.data ?? []).map((doc) => (
-            <li key={`status-${doc.document_id}`}>
-              <span className={styles.muted}>
-                Version{" "}
-                <UserText value={doc.current_version_id ?? "none"} />
-              </span>
-              {doc.current_version_id ? (
-                <Button
-                  type="button"
-                  onClick={() => setStatusVersionId(doc.current_version_id)}
-                >
-                  Load status
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <div className={styles.toolbar}>
+        <Input
+          label="Filter loaded documents"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+        />
+      </div>
 
-      {version ? (
-        <section className={styles.panel} aria-label="Version status">
-          <h2>Ingestion status</h2>
-          <StatusPill
-            status={ingestionStatusLabel(version.status)}
-            tone={ingestionStatusTone(version.status)}
-          />
-          <dl>
-            <dt>BM25</dt>
-            <dd>{formatBm25Summary(version.bm25)}</dd>
-            <dt>Graph handoff</dt>
-            <dd>{formatGraphHandoffSummary(version.graph_handoff)}</dd>
-            <dt>Scan</dt>
-            <dd>
-              <UserText value={version.scan?.result ?? "none"} />
-            </dd>
-            <dt>Attestation</dt>
-            <dd>
-              <UserText value={version.review?.declared_category ?? "none"} />{" "}
-              <UserText
-                value={version.review?.attestation_policy_version ?? ""}
-              />
-            </dd>
-          </dl>
-          {version.status === "graph_pending" ||
-          !version.document_graph_eligible ? (
-            <LimitationCallout tone="warning">
-              {limitationCopy("graph_pending")} {graphNotReadyCopy(1)}
-            </LimitationCallout>
-          ) : null}
-          {version.status === "deletion_pending" ? (
-            <StatusPill status="deletion_pending" tone="warning" />
-          ) : null}
-          <p className={styles.muted}>{DOCUMENT_DELETE_UNAVAILABLE}</p>
-          <ul className={styles.list}>
-            {(versionQuery.data?.recent_jobs ?? []).map((job) => (
-              <li key={job.id}>
-                <UserText value={job.job_kind} /> —{" "}
-                <UserText value={job.status} />
-                {version.retry_allowed ? (
-                  <Button
-                    type="button"
-                    onClick={() => retryMutation.mutate(job.id)}
-                  >
-                    Retry
-                  </Button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </section>
+      {documentsQuery.isPending ? (
+        <p className={styles.muted}>Loading documents</p>
+      ) : (
+        <DocumentList
+          documents={visibleDocs}
+          onLoadStatus={(versionId) => setStatusVersionId(versionId)}
+        />
+      )}
+
+      {importOpen && (showUpload || showCrawl) ? (
+        <ImportSourceSheet
+          onClose={() => setImportOpen(false)}
+          tab={importTab}
+          onTabChange={setImportTab}
+          showUpload={showUpload}
+          showCrawl={showCrawl}
+          file={file}
+          onFile={setFile}
+          category={category}
+          onCategory={setCategory}
+          title={title}
+          onTitle={setTitle}
+          allowPaidPost={handshake.allowPaidPost}
+          onUpload={() => uploadMutation.mutate()}
+          uploadPhase={uploadPhase}
+          uploadNote={uploadNote}
+          uploadError={
+            uploadMutation.error instanceof Error ? uploadMutation.error : null
+          }
+          startUrl={startUrl}
+          onStartUrl={setStartUrl}
+          approvedDomain={approvedDomain}
+          onApprovedDomain={setApprovedDomain}
+          onCrawl={() => crawlMutation.mutate()}
+          crawlError={crawlMutation.isError}
+        />
+      ) : null}
+
+      {statusVersionId !== null && versionQuery.data ? (
+        <IngestionInspector
+          payload={versionQuery.data}
+          onClose={() => setStatusVersionId(null)}
+          onRetry={(jobId) => retryMutation.mutate(jobId)}
+        />
       ) : null}
     </div>
   );

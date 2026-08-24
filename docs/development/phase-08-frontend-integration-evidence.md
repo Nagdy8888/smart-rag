@@ -801,3 +801,13 @@ Docker Desktop was not running, so local GoTrue (`:54321`) and FastAPI
 drawer, Auto chrome, usage 403, product-route screenshots) skipped via
 `signInLiveMember`. Re-run `pnpm exec playwright test --update-snapshots`
 from `apps/frontend` after `npx supabase start` and the API are up.
+
+## Precision Workspace restyle (2026-08-24)
+
+Route CSS moved off the shared `developer-app.module.css` module. That file
+is deleted. Chat, documents, graph, tables, and admin each own a CSS
+module. Live composition is the light Precision Workspace in
+[STITCH_BRIEF.md](../frontend/STITCH_BRIEF.md), not historical Stitch
+`screen.png` files. New runtime UI dependencies: `lucide-react` and
+`@xyflow/react` (graph canvas only, dynamically imported). Authenticated
+visual snapshots remain **unverified-live**.

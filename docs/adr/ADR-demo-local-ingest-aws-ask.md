@@ -3,7 +3,7 @@ title: ADR — Demo local ingest, hosted Supabase, AWS ask later
 adr_id: ADR-demo-local-ingest-aws-ask
 status: accepted
 owner: product-owner / engineering-lead
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-20
 approver: "user (Cursor chat; laptop ingest+ask until EC2 is up)"
 approval_date: "2026-08-19"
 audience: client-approver, engineering, ops
@@ -85,13 +85,14 @@ flowchart LR
 7. Freeze constants in `phase10_constants.py` / intended topology stay
    Pro/us-east-1. This ADR is an accepted **demo** deviation, not a freeze
    rewrite.
-8. **Graph mapping:** the observed 200-line extract contains 1,416 entities
-   and 993 relations, above the production 200/200 mapping bounds. The
-   operator approved fixed 1,600/1,200 enumeration limits only for a durable
-   job marked `local_demo_mapping_override=true`, `content_class=synthetic`,
-   and `review_approved=true` while `APP_ENV=local`. Production and staging
-   keep 200/200. Vendor-chunk, Hybrid-call, rerank-call, support, and coverage
-   gates do not change.
+8. **Graph mapping:** the first whole-version 200-line extract contained
+   1,416 entities and 993 relations. The canonical-passage isolate extract
+   then measured **1,779 entities / 1,531 relations**, still above production
+   200/200. The operator approved fixed **2,000/1,800** enumeration limits
+   only for a durable job marked `local_demo_mapping_override=true`,
+   `content_class=synthetic`, and `review_approved=true` while
+   `APP_ENV=local`. Production and staging keep 200/200. Vendor-chunk,
+   Hybrid-call, rerank-call, support, and coverage gates do not change.
 
 ## Consequences
 
