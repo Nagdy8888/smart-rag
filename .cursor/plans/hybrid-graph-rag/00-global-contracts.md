@@ -247,3 +247,14 @@ The detailed `Deliver`, `Review`, and `Done when` checkpoint is colocated with e
 9. [Phase 9: Local release candidate](./09-phase-local-release-candidate.md#phase-deliver-review-and-done-gate)
 10. [Phase 10: Managed staging](./10-phase-managed-staging.md#phase-deliver-review-and-done-gate)
 11. [Phase 11: Production](./11-phase-production.md#phase-deliver-review-and-done-gate)
+
+## Approved planned deviation: complete application MFA removal
+
+User approval on 2026-08-24: remove MFA, TOTP enrollment/challenge/recovery, and AAL2 authorization requirements from every application environment. This is a deliberate security reduction, not ordinary UI cleanup.
+
+- Recorded in `docs/adr/ADR-frontend-functional-overhaul.md`.
+- Implementation is P08-11 then P08-12 on one feature branch; neither packet may merge alone.
+- Existing applied migrations remain immutable. Use additive replacement functions/policies.
+- Do not silently replace MFA with a new second factor.
+- Preserve JWT verification, revoked/disabled-session checks, live role and authorization-version checks, RLS, server-side owner/admin enforcement, rate limits, destructive confirmations, generic errors, audit events, and IDOR-safe 404 behavior.
+- Supabase Auth may retain dormant provider capability or compatibility fields that cannot be removed without breaking the current API major. Those fields must be deprecated, hidden from product UI, excluded from authorization decisions, and documented; they must not keep MFA operational in this application.

@@ -29,8 +29,11 @@ Screen list is [`STITCH_REVIEW.md`](../../../../docs/frontend/STITCH_REVIEW.md)
 plus [`API_UI_MAPPING.md`](../../../../docs/frontend/API_UI_MAPPING.md): ship
 typed-contract surfaces with native UI; do not add Unavailable-gap pages.
 
-Auth-direct sign-up, reset/callback, and MFA enroll/challenge remain in
-scope because those Auth APIs exist, not because Stitch numbered them.
+Auth-direct sign-up and reset/callback remain in scope because those Auth
+APIs exist. MFA enroll/challenge remain historically implemented by packets
+1-6 and are scheduled for complete removal in P08-11 and P08-12 after the
+user-approved security reduction. Do not claim MFA is gone until both
+packets pass.
 Record mapping/gap proof in
 [`docs/development/phase-08-frontend-integration-evidence.md`](../../../../docs/development/phase-08-frontend-integration-evidence.md).
 
@@ -49,3 +52,12 @@ Use build-time Tailwind, typed event handlers and API/SSE data, real Supabase SS
 Complete packets `P08-01` through `P08-06` in order. One model run selects exactly one unchecked packet, quotes its exact title, states acceptance checks, and records proof before any checkbox can be checked.
 
 Append packet proof to the Phase 8 evidence document. Include mapping/gap traceability (not Stitch frame numbers), token decisions, real contract mappings, authorization/failure/idempotency/fallback/bounded-resource proof, exact commands/results, unverified external checks, deviations/ADR approval, rollback notes, and handoff blockers. Stop under the wrapper's listed conditions, and do not set phase status complete until its final done gate is proven and accepted.
+
+## Approved remediation amendments (P08-07)
+
+- Packets `P08-07` through `P08-23` are additive remediation after completed `P08-01` through `P08-06`. Do not uncheck historical packets.
+- Complete MFA/TOTP/AAL2 removal is an approved planned security reduction recorded in `docs/adr/ADR-frontend-functional-overhaul.md`. It is not implemented until both P08-11 and P08-12 evidence pass. Compensating controls (JWT, revocation, live role/authorization-version, RLS, server owner/admin enforcement, rate limits, destructive confirmations, generic errors, audit, IDOR-safe 404) remain mandatory.
+- P08-09 is a Phase 6/Phase 8 co-owned defect repair. It must keep Phase 6 admission, budget, deadline, cancellation, one-terminal, ownership, idempotency, and resume tests green and update both phase evidence records.
+- Answer delivery is verified-final, not fake token streaming. Keep LangGraph `stream_mode="updates"`. Hold structured answer text until verification completes, then emit persisted `token_delta` compatibility chunks of at most 4096 characters without typewriter delay.
+- Frontend visual packets read [00-visual-contract.md](./00-visual-contract.md) plus their selected packet. Do not search for a new theme.
+- Ordered packet discipline now includes `P08-07` through `P08-23` after the original six completed packets.

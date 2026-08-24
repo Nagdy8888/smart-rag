@@ -33,6 +33,10 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [frontend/PHASE8_JOURNEY_MATRIX.md](./frontend/PHASE8_JOURNEY_MATRIX.md) | engineering-lead | draft | 2026-08-19 | eng, frontend, reviewers |
 | [frontend/STITCH_REVIEW.md](./frontend/STITCH_REVIEW.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
 | [frontend/VISUAL_MAP.md](./frontend/VISUAL_MAP.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
+| [frontend/design-tokens-and-primitives.md](./frontend/design-tokens-and-primitives.md) | engineering-lead | draft | 2026-08-24 | frontend |
+| [frontend/workspace-screens.md](./frontend/workspace-screens.md) | engineering-lead | draft | 2026-08-24 | frontend |
+| [frontend/admin-and-auth-screens.md](./frontend/admin-and-auth-screens.md) | engineering-lead | draft | 2026-08-24 | frontend, security |
+| [frontend/action-inventory.json](./frontend/action-inventory.json) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
 | [development/phase-07-stitch-specification-evidence.md](./development/phase-07-stitch-specification-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
 | [development/phase-08-frontend-integration-evidence.md](./development/phase-08-frontend-integration-evidence.md) | engineering-lead | draft | 2026-08-20 | eng, reviewers |
 | [development/phase-08-later-live-verification.md](./development/phase-08-later-live-verification.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
@@ -104,6 +108,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-phase10-free-tier-ec2.md](./adr/ADR-phase10-free-tier-ec2.md) | engineering-lead | accepted | 2026-08-19 | engineering, ops |
 | [adr/ADR-demo-local-ingest-aws-ask.md](./adr/ADR-demo-local-ingest-aws-ask.md) | product-owner / engineering-lead | accepted | 2026-08-20 | client, engineering, ops |
 | [adr/ADR-stitch-first-ux.md](./adr/ADR-stitch-first-ux.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, reviewers |
+| [adr/ADR-frontend-functional-overhaul.md](./adr/ADR-frontend-functional-overhaul.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, security, reviewers |
 | [runbooks/phase10-staging-secrets.md](./runbooks/phase10-staging-secrets.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [adr/ADR-paradedb-edition-availability.md](./adr/ADR-paradedb-edition-availability.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-private-service-tls.md](./adr/ADR-private-service-tls.md) | engineering-lead | accepted | 2026-08-18 | eng, security |

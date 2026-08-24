@@ -811,3 +811,54 @@ module. Live composition is the light Precision Workspace in
 `screen.png` files. New runtime UI dependencies: `lucide-react` and
 `@xyflow/react` (graph canvas only, dynamically imported). Authenticated
 visual snapshots remain **unverified-live**.
+
+## Packet 7 — Canonical remediation amendment and baseline
+
+### Requirement (quoted)
+
+> Record this approved overhaul as additive Phase 8 packets P08-07 through
+> P08-23, create `feat/frontend-functional-overhaul`, ADR, action inventory,
+> visual contract, and baseline evidence. Do not edit application source,
+> migrations, dependencies, or runtime config. Do not uncheck packets 1–6.
+> Wrapper status stays pending.
+
+### Concrete acceptance checks
+
+- Plan integrity structural validation passes before `--update`.
+- Wrapper `status` remains `pending`.
+- Next coding packet is P08-08.
+- No application/runtime files changed in this packet.
+
+### Baseline defects (repository inspection, 2026-08-24)
+
+- `packages/core/src/smart_rag_core/settings/backend.py`
+  `resolved_checkpoint_dsn()` falls back from `LANGGRAPH_CHECKPOINT_URL` to
+  `SUPABASE_DB_URL`.
+- `docker-compose.yml` `api` service does not inject
+  `LANGGRAPH_CHECKPOINT_URL` or `LIGHTRAG_DB_URL`.
+- `apps/backend/src/smart_rag_api/services/sse_stream.py` uses
+  `stream_mode="updates"` and can yield `completed` with no `token_delta`.
+- Frontend chat can render an empty answer; cancel/feedback helpers currently
+  collapse HTTP failure into booleans.
+- MFA enroll/challenge routes and AAL2 checks still exist; complete removal is
+  an approved planned deviation (P08-11 then P08-12).
+
+### Files in this packet
+
+- Additive Phase 8 packet files 07–23 and `00-visual-contract.md`
+- ADR `docs/adr/ADR-frontend-functional-overhaul.md`
+- `docs/frontend/action-inventory.json` (baseline dispositions)
+- Maintained visual docs under `docs/frontend/`
+- Global/Phase 8 contract amendments for MFA deviation, verified-final
+  delivery, and P08-09 Phase 6 co-ownership
+
+### Verification
+
+Plan integrity is run after these files land. Application tests are not in
+scope for P08-07.
+
+### Unverified
+
+Live `/health/ready` against a running stack was not re-probed in this
+documentation packet. Historical empty-answer/reservation symptoms remain
+the baseline until P08-08/P08-09.

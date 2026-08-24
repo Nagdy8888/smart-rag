@@ -27,6 +27,7 @@ audience: engineering
 | Phase 10 live EC2 Free Tier instance type | accepted | 10 | [ADR-phase10-free-tier-ec2.md](./ADR-phase10-free-tier-ec2.md) |
 | Demo local ingest / AWS ask later | accepted | 10 demo | [ADR-demo-local-ingest-aws-ask.md](./ADR-demo-local-ingest-aws-ask.md) |
 | Stitch-first production UX | accepted | 8 UX | [ADR-stitch-first-ux.md](./ADR-stitch-first-ux.md) |
+| Frontend functional overhaul | accepted | 8 remediation | [ADR-frontend-functional-overhaul.md](./ADR-frontend-functional-overhaul.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | Canonical-passage LightRAG sources | accepted | 5 | [ADR-canonical-passage-lightrag-sources.md](./ADR-canonical-passage-lightrag-sources.md) |
