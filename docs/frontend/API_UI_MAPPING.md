@@ -424,7 +424,7 @@ Unknown additive SSE types: log and ignore. One terminal among
 | H Graph not-ready copy | sentence | `graphNotReadyCopy(n)` from authorized counts only | never restricted | n/a |
 | H Delete document | owner/admin | `DELETE /documents/{id}` | owner/admin; 204/404 | COST_MUTATION |
 | I Restricted preview | — | GAP-07-09 | — | Unavailable |
-| I Graph tab | inspect | `POST /graph/inspect` `document_id` | ACL | n/a |
+| I Graph tab | Open graph | `/graph?documentId=` then `POST /graph/inspect` | ACL | n/a |
 | I Tables tab | list | `GET /tables` | ACL | n/a |
 
 ### Graph, tables, tools, usage, settings
@@ -432,7 +432,7 @@ Unknown additive SSE types: log and ignore. One terminal among
 | Screen | Control | Contract | Authz | Bounds |
 | --- | --- | --- | --- | --- |
 | J Search | q, limit | `GET /graph/entities/search` | ACL | limit ≤25 |
-| J Inspect | keys, depth | `POST /graph/inspect` | ACL | keys ≤12, depth ≤3, rows ≤200 |
+| J Inspect graph | chips, depth 1–3 | `POST /graph/inspect` | ACL | keys ≤12, depth ≤3, rows ≤200; list-first; no SVG/edit |
 | J ETA | — | GAP-07-10 | — | handoff counts only |
 | K Analyze | plan | `POST /tables/analyze` | ACL | `TableQueryPlan` extra=forbid |
 | K Export | — | optional tool after disclosure | live role recheck | no button otherwise |

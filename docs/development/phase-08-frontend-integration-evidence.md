@@ -1684,3 +1684,73 @@ Revert this commit. Restore `apps/frontend/src/components/tables-app.tsx` only i
 
 P08-17 Tables is complete. P08-18 may rebuild Graph without changing Tables contracts.
 
+
+## P08-18 — Rebuild bounded Graph inspection
+
+Quoted requirement: retain graph evidence inspection while removing the
+duplicate custom SVG and unsupported relationship editing.
+
+### Acceptance checks
+
+- Entity search submits only when trimmed `q` length is at least 1.
+- Selecting a search hit adds a chip; Inspect graph is a separate POST.
+- URL `?documentId=` seeds inspect without requiring chips.
+- Depth Select is 1/2/3. Entity chips cap at 12 with helper copy. Results cap at 200.
+- List is the default. Canvas is optional `@xyflow/react`. The custom SVG neighborhood is gone.
+- Inspector shows Type, Object ID, Document ID, Version ID, Chunk ID, Hop, Support, locators, and signed limitation copy. ACL blindness ignores `count`.
+- Empty inspect: “No authorized graph evidence matched this inspection.”
+- No Edit, Add relationship, Export, or Save. Mixed-direction labels render as text.
+- Tables files were not edited in this packet.
+
+### Changed paths
+
+- Moved `apps/frontend/src/components/graph-explorer.tsx` once to `apps/frontend/src/components/graph/graph-explorer.tsx`
+- `apps/frontend/src/components/graph/entity-search.tsx`, `graph-list-fallback.tsx`, `graph-inspector.tsx`, `graph-canvas.tsx`, `graph.module.css`, `graph-explorer.test.tsx`
+- `apps/frontend/src/app/(console)/graph/page.tsx`
+- `apps/frontend/src/lib/graph-client.ts`, `graph-client.test.ts`, `api.ts`, `api.test.ts`
+- Tests: `core-rag-surfaces.test.tsx`
+- Docs: `CORE_RAG_SURFACES.md`, `PHASE8_JOURNEY_MATRIX.md`, `API_UI_MAPPING.md`, `STITCH_BRIEF.md`, `STITCH_STATES.md`, `action-inventory.json`
+
+### Authorization / failure / fallback / idempotency
+
+- `searchGraphEntities` and `inspectGraph` throw `ClassifiedApiError`. Inspect 400 maps to `validation`; 403 is `auth`.
+- Inspect 403 keeps selected chips and shows classified copy.
+- ACL blindness never interpolates unauthorized counts. Graph outage is distinct from Graph Pending.
+- Inspect POST is pending-blocked. Duplicate SVG and relationship-edit chrome are absent rather than disabled.
+- Canvas is not an editor (`nodesConnectable={false}`, `deleteKeyCode={null}`). No MiniMap.
+
+### Verification
+
+```text
+npx vitest run src/components/graph/graph-explorer.test.tsx src/lib/graph-client.test.ts src/components/core-rag-surfaces.test.tsx src/lib/api.test.ts
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/graph src/lib/graph-client.ts src/lib/api.ts src/components/core-rag-surfaces.test.tsx
+```
+
+Results:
+
+- Targeted Graph Vitest: 8 GraphExplorer tests passed; graph-client and API inspect 403 passed.
+- Full frontend Vitest: 39 files, 254 passed.
+- `npx tsc --noEmit`: passed after `BackgroundVariant.Dots`.
+- ESLint on Graph/API files: 0 errors.
+
+### Unverified
+
+- Playwright Graph snapshots wait for P08-21/22.
+- Live `POST /graph/inspect` against a running stack waits for P08-22.
+- React Flow canvas rendering in jsdom is not asserted; Canvas tab is toggled and the duplicate SVG is proven absent.
+
+### Deviations
+
+- Inspect payloads have no edge list. The canvas does not invent edges; hop/support stay on nodes.
+- Fit lives with labeled zoom controls on the canvas, not as a third toolbar button beside List/Canvas.
+- Compact inspector uses `matchMedia("(max-width: 1279px)")` so jsdom (no `matchMedia`) keeps the dock only and avoids duplicate inspector copy in tests.
+
+### Rollback
+
+Revert this commit. Restore `apps/frontend/src/components/graph-explorer.tsx` only if a later packet proves the unscoped path is still required.
+
+### Handoff
+
+P08-18 Graph is complete. P08-19 may consolidate Admin without changing Graph contracts.

@@ -3,8 +3,12 @@ import {
   GRAPH_INSPECT_MAX_DEPTH,
   buildGraphInspectRequest,
   clampGraphInspectDepth,
+  clampGraphSearchQuery,
   graphLimitationDisplay,
+  graphSearchQueryIsRunnable,
+  isGraphOutageLimitation,
   isGraphPendingLimitation,
+  visibleInspectNodes,
 } from "./graph-client";
 
 describe("clampGraphInspectDepth", () => {
@@ -36,5 +40,13 @@ describe("graphLimitationDisplay", () => {
     expect(
       graphLimitationDisplay({ code: "graph_pending", count: 2 }),
     ).toContain("not ready");
+    expect(isGraphOutageLimitation("graph_outage")).toBe(true);
+    expect(isGraphOutageLimitation("graph_acl_blindness")).toBe(false);
+    expect(graphSearchQueryIsRunnable("  ")).toBe(false);
+    expect(graphSearchQueryIsRunnable("acme")).toBe(true);
+    expect(clampGraphSearchQuery("x".repeat(200)).length).toBe(128);
+    expect(visibleInspectNodes(Array.from({ length: 201 }, (_, index) => index))).toHaveLength(
+      200,
+    );
   });
 });

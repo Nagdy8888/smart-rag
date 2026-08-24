@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 18
-status: pending
+status: complete
 title: "Rebuild bounded Graph inspection"
 requirement_ids: [P08-18]
 ---

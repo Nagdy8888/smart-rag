@@ -10,7 +10,7 @@ import { DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/cita
 import { CitationDrawer } from "./chat/chat-app";
 import { DocumentDetail } from "./documents/document-detail";
 import { DocumentLibrary } from "./documents/document-library";
-import { GraphExplorer } from "./graph-explorer";
+import { GraphExplorer } from "./graph/graph-explorer";
 import { TablesApp } from "./tables/tables-app";
 import { SessionProvider } from "../lib/auth/session-provider";
 import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
@@ -23,6 +23,7 @@ const listDocuments = vi.fn();
 const listTables = vi.fn();
 const fetchVersionStatus = vi.fn();
 const inspectGraph = vi.fn();
+const searchGraphEntities = vi.fn();
 const analyzeTable = vi.fn();
 const fetchDocument = vi.fn();
 const deleteDocument = vi.fn();
@@ -92,6 +93,7 @@ vi.mock("../lib/api", async () => {
     listCitations: vi.fn(async () => []),
     fetchVersionStatus: (...args: unknown[]) => fetchVersionStatus(...args),
     inspectGraph: (...args: unknown[]) => inspectGraph(...args),
+    searchGraphEntities: (...args: unknown[]) => searchGraphEntities(...args),
     analyzeTable: (...args: unknown[]) => analyzeTable(...args),
   };
 });
@@ -131,6 +133,7 @@ beforeEach(() => {
     row_count: 0,
     depth: 3,
   });
+  searchGraphEntities.mockResolvedValue([]);
   analyzeTable.mockResolvedValue({
     table_id: "t",
     version_id: "v",
@@ -205,11 +208,23 @@ describe("GraphExplorer ACL vs Graph Pending", () => {
       row_count: 1,
       depth: 3,
     });
+    searchGraphEntities.mockResolvedValue([
+      {
+        object_id: "acme",
+        object_type: "entity",
+        chunk_id: "c1",
+        document_id: "d1",
+        version_id: "v1",
+        support: 1,
+      },
+    ]);
     renderSurface(<GraphExplorer />);
-    fireEvent.change(await screen.findByLabelText("Entity keys (comma-separated, max 12)"), {
+    fireEvent.change(await screen.findByLabelText("Search entities."), {
       target: { value: "acme" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: /acme/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Inspect graph" }));
     expect(await screen.findAllByText(limitationCopy("graph_acl_blindness"))).not.toHaveLength(0);
     expect(screen.queryByText("99")).toBeNull();
     expect(screen.queryByText("SECRET TITLE")).toBeNull();
@@ -225,14 +240,26 @@ describe("GraphExplorer ACL vs Graph Pending", () => {
       row_count: 0,
       depth: 3,
     });
+    searchGraphEntities.mockResolvedValue([
+      {
+        object_id: "acme",
+        object_type: "entity",
+        chunk_id: "c1",
+        document_id: "d1",
+        version_id: "v1",
+        support: 1,
+      },
+    ]);
     renderSurface(<GraphExplorer />);
-    fireEvent.change(await screen.findByLabelText("Entity keys (comma-separated, max 12)"), {
+    fireEvent.change(await screen.findByLabelText("Search entities."), {
       target: { value: "acme" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: /acme/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Inspect graph" }));
     expect(
-      await screen.findByText(limitationCopy("graph_pending"), { exact: false }),
-    ).toBeInTheDocument();
+      await screen.findAllByText(limitationCopy("graph_pending"), { exact: false }),
+    ).not.toHaveLength(0);
     expect(screen.getByText(graphNotReadyCopy(2), { exact: false })).toBeInTheDocument();
     expect(screen.queryByText(/restricted/i)).toBeNull();
     expect(screen.queryByText(/ineligible/i)).toBeNull();

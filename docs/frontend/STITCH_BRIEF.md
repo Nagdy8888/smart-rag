@@ -259,7 +259,7 @@ Detail from GET /documents/{id}. Tabs: metadata, ingestion status, graph inspect
 ### J. Graph explorer
 
 ```text
-Search GET /graph/entities/search?q=&limit= and inspect POST /graph/inspect. Visualize at most 200 authorized nodes. Show limitations codes including graph_acl_blindness without unauthorized names/titles/counts for other users. Distinct Graph Pending (status graph_pending / limitation graph_updating / graph_partial_readiness) versus ACL blindness. No rolling ETA field — show graph_handoff counts only (GAP-07-10). Graph-only is inspection, not chat fallback.
+Search GET /graph/entities/search (trimmed q length at least 1). Clicking a hit adds a chip; it does not inspect. Primary Inspect graph POSTs /graph/inspect. Depth 1-3, keys at most 12, rows at most 200. List is default; Canvas is optional @xyflow/react. No custom SVG neighborhood. No relationship editing. Empty inspect: No authorized graph evidence matched this inspection. ACL blindness never interpolates count. Graph-only is inspection, not chat fallback. GAP-07-10: handoff counts only.
 ```
 
 ### K. Structured tables

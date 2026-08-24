@@ -168,7 +168,8 @@ is read-only (GAP-07-01).
 
 | State | Signal | Copy / UI |
 | --- | --- | --- |
-| Empty search | no q | prompt for q |
+| Empty search | trimmed q length 0 | Search disabled |
+| Empty inspect | nodes empty after inspect | No authorized graph evidence matched this inspection. |
 | Loading | GET search / POST inspect | Loading |
 | Success | nodes ≤200 | authorized graph |
 | Empty authorized | `graph_empty` | No authorized graph objects |
@@ -179,6 +180,8 @@ is read-only (GAP-07-01).
 | Outage | `graph_outage` | Graph inspection unavailable |
 | Seed required | 422 inspect_seed_required | Provide entity or document |
 | ETA | none | Unavailable GAP-07-10; show handoff counts only |
+| Relationship edit | no mutation API | omitted, not a disabled control |
+| Custom SVG neighborhood | removed | React Flow canvas only |
 
 ## Tables
 

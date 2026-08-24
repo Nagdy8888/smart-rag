@@ -1149,7 +1149,14 @@ export async function searchGraphEntities(
     `/graph/entities/search?q=${encodeURIComponent(query)}&limit=${String(capped)}`,
   );
   const response = await fetchImpl(url, { headers: resumeHeaders(auth) });
-  const parsed: unknown = await response.json();
+  const parsed: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const body =
+      parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    throwIfNotOk(response, body);
+  }
   if (!Array.isArray(parsed)) {
     return [];
   }
@@ -1203,9 +1210,13 @@ export async function inspectGraph(
     body: JSON.stringify(payload),
   });
   const parsed = await readJsonObject(response);
-  if (!response.ok) {
-    throw new Error(sanitizedDetail(parsed, "inspect_rejected"));
+  if (response.status === 400) {
+    throw new ClassifiedApiError({
+      kind: "validation",
+      detail: sanitizedDetail(parsed, "inspect_rejected"),
+    });
   }
+  throwIfNotOk(response, parsed);
   const nodesRaw = Array.isArray(parsed.nodes) ? parsed.nodes : [];
   const locatorsRaw = Array.isArray(parsed.locators) ? parsed.locators : [];
   const limitationsRaw = Array.isArray(parsed.limitations)

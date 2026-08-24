@@ -2,7 +2,7 @@
 title: Phase 8 journey matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: engineering, reviewers
 packet: P08-06
 ---
@@ -143,6 +143,12 @@ is no client route field.
 | Tables URL preselect | `src/components/tables/tables-app.test.tsx` | preselects an accessible tableId from the URL | vitest-component | proven |
 | Tables invalid plan | `src/components/tables/tables-app.test.tsx` | rejects unknown columns and raw SQL before submission | vitest-component | proven |
 | Tables failure preservation | `src/components/tables/tables-app.test.tsx` | preserves the draft and submitted plan on 403 | vitest-component | proven |
+| Graph search-select-inspect | `src/components/graph/graph-explorer.test.tsx` | searches, inspects, lists nodes, and opens evidence details | vitest-component | proven |
+| Graph document seed | `src/components/graph/graph-explorer.test.tsx` | inspects from a document seed without entity chips | vitest-component | proven |
+| Graph chip cap | `src/components/graph/graph-explorer.test.tsx` | caps chips at 12 and shows mixed-direction labels as text | vitest-component | proven |
+| Graph outage vs ACL | `src/components/graph/graph-explorer.test.tsx` | distinguishes graph outage from ACL blindness | vitest-component | proven |
+| Graph inspect 403 chips | `src/components/graph/graph-explorer.test.tsx` | preserves chips on inspect 403 | vitest-component | proven |
+| Graph inspect 403 client | `src/lib/api.test.ts` | classifies inspect 403 as ClassifiedApiError | vitest-unit | proven |
 | `graph_partial_readiness` copy | `src/lib/limitations.test.ts` | covers GraphLimitationCode values without unauthorized counts | vitest-unit | proven |
 | Curation approve `row_version` | `src/components/administration-surfaces.test.tsx` | approves an entity rule with row_version only for an owner | vitest-component | proven |
 | Rate / `budget_exhausted` | `src/lib/api.test.ts` | maps 402 budget_exhausted | vitest-unit | proven |

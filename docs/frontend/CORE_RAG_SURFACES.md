@@ -4,7 +4,7 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-24
 audience: engineering, frontend, reviewers
-packet: P08-17
+packet: P08-18
 ---
 
 # Core RAG surfaces (Phase 8 packet 3)
@@ -36,10 +36,10 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 | `/` | Ask workspace. Sessions rail, verified-final answers, citation drawers |
 | `/documents` | Library, import/upload/crawl, keyset pagination, owner/admin delete |
 | `/documents/[documentId]` | Metadata, shared IngestionStatus timeline, graph seed, tables list |
-| `/graph` | Entity search + inspect, list-first, hop cap 3 |
+| `/graph` | Search → chips → Inspect graph; list-first plus optional React Flow |
 | `/tables` | Manifests + guided `TableQueryPlan` builder, display-only sort, cell provenance |
 
-Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). Tables live under `apps/frontend/src/components/tables/` (`tables-app.tsx`). List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer. There is no `app/admin`
+Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). Tables live under `apps/frontend/src/components/tables/` (`tables-app.tsx`). Graph lives under `apps/frontend/src/components/graph/` (`graph-explorer.tsx`): search hits become chips; Inspect graph POSTs `/graph/inspect`. List is the default accessible view. Canvas is optional `@xyflow/react`. There is no custom SVG neighborhood and no relationship editor. List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer. There is no `app/admin`
 folder. Team, tools, curation, usage, and profile are packet 4 native
 routes in [ADMINISTRATION.md](./ADMINISTRATION.md). Nav uses Next.js
 `Link`. `aria-current` follows the pathname. Nav is not authorization.
@@ -87,6 +87,7 @@ flowchart TD
 - Tables: no SQL textarea, no client-summed total, no fake LLM commentary.
   `/tables` has no standalone export contract, so Export/Save/Share are absent.
   Optional-tool export remains a chat-run disclosure concern, not this page.
+- Graph inspect has no edge list, so the canvas does not invent edges. Empty inspect copy is “No authorized graph evidence matched this inspection.”
 - Production UI never sends `X-Test-User-Id` or `X-Test-Role`.
 
 ## Failure modes
@@ -101,6 +102,8 @@ flowchart TD
 | Viewer upload | Convenience hidden; server 403 |
 | Document delete 403/404/429 | Confirmation stays open with classified copy; 404 navigates without a title leak |
 | Inspect depth greater than 3 | Client clamps to 3 |
+| Inspect 403 | Classified banner; selected chips stay |
+| Empty inspect | No authorized graph evidence matched this inspection. |
 | Table unknown column / SQL | Rejected before POST; Analyze is not sent |
 | Table analyze 403/422/429 | Classified banner; draft and submitted plan stay |
 

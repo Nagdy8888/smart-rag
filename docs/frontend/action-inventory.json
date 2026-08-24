@@ -442,16 +442,16 @@
     {
       "action_id": "graph.inspect",
       "route": "/graph",
-      "label": "Inspect",
-      "control_kind": "submit",
+      "label": "Inspect graph",
+      "control_kind": "button",
       "contract_owner": "fastapi",
-      "contract": "GET graph search/inspect",
+      "contract": "POST /graph/inspect; GET /graph/entities/search",
       "role": "authenticated",
-      "success_state": "bounded neighborhood",
-      "failure_state": "pending/outage/ACL silence",
+      "success_state": "bounded list or React Flow; evidence inspector",
+      "failure_state": "classified 403/422; pending/outage/ACL silence",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "pending-P08-18"
+      "test_id": "graph-explorer.test.tsx"
     },
     {
       "action_id": "admin.offboard",

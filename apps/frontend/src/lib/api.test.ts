@@ -591,6 +591,21 @@ describe("inspectGraph client clamp", () => {
     expect(JSON.stringify(result.nodes[0])).not.toContain("SECRET");
     expect(result.limitations[0]?.count).toBe(7);
   });
+
+  it("classifies inspect 403 as ClassifiedApiError", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      inspectGraph(
+        { accessToken: "jwt-token" },
+        { entity_keys: ["e1"], depth: 3 },
+        fetchImpl,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+  });
 });
 
 describe("analyzeTable extra fields", () => {
