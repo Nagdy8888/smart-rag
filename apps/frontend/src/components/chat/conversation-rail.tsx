@@ -44,12 +44,12 @@ export function ConversationRail({
   onDelete,
 }: ConversationRailProps) {
   return (
-    <aside className={styles.rail} aria-label="Conversations">
+    <aside className={styles.rail} aria-label="Sessions">
       <div className={styles.railHeader}>
-        <h2 className={styles.railTitle}>Conversations</h2>
+        <h2 className={styles.railTitle}>Sessions</h2>
         <div className={styles.row}>
-          <Button type="button" variant="secondary" onClick={onCreate}>
-            New conversation
+          <Button type="button" variant="primary" onClick={onCreate}>
+            New
           </Button>
           <Menu
             label="Conversation actions"
@@ -57,7 +57,7 @@ export function ConversationRail({
             items={[
               {
                 id: "delete",
-                label: "Delete conversation",
+                label: "Delete",
                 danger: true,
                 disabled: selectedId === null,
                 onSelect: onDelete,
@@ -68,12 +68,12 @@ export function ConversationRail({
       </div>
       {loading ? <Skeleton label="Loading conversations" width="100%" /> : null}
       {conversations.length === 0 && !loading ? (
-        <EmptyState title="No conversations yet">
-          Start a conversation to ask across authorized documents.
+        <EmptyState title="No sessions yet. Ask a question to create one.">
+          Earlier messages are not loaded in this client.
         </EmptyState>
       ) : null}
       <RovingList
-        aria-label="Conversations"
+        aria-label="Sessions"
         selectedId={selectedId}
         items={conversations.map((item) => ({
           id: item.conversation_id,
@@ -84,6 +84,11 @@ export function ConversationRail({
         {(item) => (
           <span className={styles.conversationButton}>
             <UserText value={item.title ?? item.conversation_id} />
+            {item.created_at ? (
+              <span className={styles.muted} aria-hidden="true">
+                {new Date(item.created_at).toLocaleString()}
+              </span>
+            ) : null}
           </span>
         )}
       </RovingList>

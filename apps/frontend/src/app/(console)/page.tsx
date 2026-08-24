@@ -1,10 +1,10 @@
 /**
- * Auto chat at `/`. Replaces the Phase 6 DeveloperApp monolith.
+ * Ask at `/`. Replaces the Phase 6 DeveloperApp monolith.
  */
-import { ChatApp } from "../../components/chat-app";
+import { ChatApp } from "../../components/chat/chat-app";
 
 /**
- * Render the authenticated Auto chat surface.
+ * Render the authenticated Ask surface.
  *
  * @returns ChatApp. AppShell comes from the console route group.
  */

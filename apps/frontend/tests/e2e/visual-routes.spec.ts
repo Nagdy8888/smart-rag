@@ -69,7 +69,7 @@ test("authenticated product routes visual when a session exists", async ({
 }) => {
   await signInLiveMember(page, request);
   const routes: Array<{ path: string; name: string; heading: string | RegExp }> = [
-    { path: "/", name: "chat", heading: "Auto chat" },
+    { path: "/", name: "chat", heading: "Ask" },
     { path: "/documents", name: "documents", heading: /Document/ },
     { path: "/graph", name: "graph", heading: /Graph/ },
     { path: "/tables", name: "tables", heading: /table/i },

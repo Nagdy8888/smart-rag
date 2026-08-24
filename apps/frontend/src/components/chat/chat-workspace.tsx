@@ -10,9 +10,7 @@ export type ChatWorkspaceProps = {
   rail: ReactNode;
   /** Answer column. */
   stage: ReactNode;
-  /** Optional sources column at 1440px. */
-  sources?: ReactNode;
-  /** Compact conversation/sources triggers for narrow viewports. */
+  /** Compact Sessions trigger for narrow viewports. */
   toolbar?: ReactNode;
 };
 
@@ -25,7 +23,6 @@ export type ChatWorkspaceProps = {
 export function ChatWorkspace({
   rail,
   stage,
-  sources,
   toolbar,
 }: ChatWorkspaceProps) {
   return (
@@ -34,7 +31,6 @@ export function ChatWorkspace({
       <div className={styles.workspace}>
         {rail}
         {stage}
-        {sources}
       </div>
     </div>
   );

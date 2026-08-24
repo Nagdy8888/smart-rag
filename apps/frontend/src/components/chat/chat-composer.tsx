@@ -7,6 +7,7 @@
 import { COMPOSER_MAX_CHARS, composerDraftIsSendable } from "../../lib/composer";
 import { Button } from "../ui/button";
 import { Icon } from "../ui/icon";
+import { StatusBanner } from "../ui/status-banner";
 import { Textarea } from "../ui/textarea";
 import styles from "./chat.module.css";
 
@@ -67,15 +68,24 @@ export function ChatComposer({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Ask anything about your documents…"
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing || event.key !== "Enter" || event.shiftKey) {
+            return;
+          }
+          event.preventDefault();
+          if (!running && !sendDisabled) {
+            onSend();
+          }
+        }}
       />
       <p className={styles.hint}>
-        {remaining} characters remaining. Enter sends only through the Send
-        control. Attachments are not accepted here.
+        {remaining} characters remaining. Enter sends, Shift+Enter adds a line.
+        Attachments are not accepted here.
       </p>
       <div className={styles.composerActions}>
         {running ? (
           <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
+            Stop
           </Button>
         ) : (
           <Button
@@ -94,9 +104,11 @@ export function ChatComposer({
         </Button>
       </div>
       {sendBlockedReason ? (
-        <p id="chat-send-reason" className={styles.hint} role="status">
-          {sendBlockedReason}
-        </p>
+        <div id="chat-send-reason">
+          <StatusBanner kind="warning" role="status">
+            {sendBlockedReason}
+          </StatusBanner>
+        </div>
       ) : null}
       {running || reconnectAttempt > 0 || reconnectExhausted ? (
         <p className={styles.hint} role="status" data-testid="reconnect-status">
@@ -106,7 +118,7 @@ export function ChatComposer({
               ? `Reconnecting… attempt ${String(reconnectAttempt)} of ${String(reconnectMaxAttempts)}${
                   nextRetryMs !== null ? `. Next retry in ${String(nextRetryMs)} ms.` : ""
                 }`
-              : "Cancel stops the run. Reconnect resumes the same run."}
+              : "Stop ends the run. Reconnect resumes the same run."}
         </p>
       ) : null}
     </div>

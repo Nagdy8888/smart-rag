@@ -7,10 +7,9 @@ import styles from "./chat.module.css";
 
 const PIPELINE_STEPS = [
   { id: "preparing", label: "Preparing" },
-  { id: "searching", label: "Searching" },
-  { id: "resolving", label: "Resolving graph" },
-  { id: "reranking", label: "Reranking" },
-  { id: "answering", label: "Answering" },
+  { id: "retrieving", label: "Retrieving" },
+  { id: "generating", label: "Generating" },
+  { id: "verifying", label: "Verifying" },
 ] as const;
 
 export type RunProgressProps = {
@@ -25,7 +24,13 @@ export type RunProgressProps = {
  * @returns Pipeline list or collapsed status.
  */
 export function RunProgress({ chat }: RunProgressProps) {
-  const stage = (chat.stage ?? "").toLowerCase();
+  const raw = (chat.stage ?? "").toLowerCase();
+  const stage =
+    raw.includes("verif") ? "verifying"
+    : raw.includes("generat") || raw.includes("answer") ? "generating"
+    : raw.includes("retriev") || raw.includes("search") ? "retrieving"
+    : raw.includes("connect") || raw.includes("queue") || raw.includes("prepar") ? "preparing"
+    : raw;
   if (chat.terminal !== null) {
     return (
       <p className={styles.pipelineCollapsed}>
@@ -35,7 +40,7 @@ export function RunProgress({ chat }: RunProgressProps) {
     );
   }
   return (
-    <ul className={styles.pipeline} aria-label="Run pipeline">
+    <ul className={styles.pipeline} aria-label="Run pipeline" aria-live="polite">
       {PIPELINE_STEPS.map((step) => (
         <li
           key={step.id}

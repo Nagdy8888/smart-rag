@@ -66,7 +66,7 @@ Remediation packets P08-07 through P08-23 are additive. Do not uncheck packets 1
 12. [x] [Remove frontend/provider MFA and finish single-factor Auth](./08-phase-frontend-integration/packets/12-remove-frontend-provider-mfa-and-finish-single-factor-auth.md)
 13. [x] [Implement exact design tokens and reusable primitives](./08-phase-frontend-integration/packets/13-implement-exact-design-tokens-and-reusable-primitives.md)
 14. [x] [Build the streamlined role-aware shell and routes](./08-phase-frontend-integration/packets/14-build-the-streamlined-role-aware-shell-and-routes.md)
-15. [ ] [Rebuild Ask around verified final answers](./08-phase-frontend-integration/packets/15-rebuild-ask-around-verified-final-answers.md)
+15. [x] [Rebuild Ask around verified final answers](./08-phase-frontend-integration/packets/15-rebuild-ask-around-verified-final-answers.md)
 16. [ ] [Rebuild Documents as one complete ingestion workflow](./08-phase-frontend-integration/packets/16-rebuild-documents-as-one-complete-ingestion-workflow.md)
 17. [ ] [Rebuild deterministic Tables](./08-phase-frontend-integration/packets/17-rebuild-deterministic-tables.md)
 18. [ ] [Rebuild bounded Graph inspection](./08-phase-frontend-integration/packets/18-rebuild-bounded-graph-inspection.md)

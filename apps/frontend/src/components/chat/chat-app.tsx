@@ -1,5 +1,5 @@
 /**
- * Auto chat surface at `/`. Handshake, SSE, citations, feedback, usage.
+ * Ask surface at `/`. Handshake, SSE, citations, feedback, usage.
  * Upload and graph live on other routes. GAP-07-01: no route POST field.
  */
 
@@ -8,13 +8,13 @@
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { HandshakeBanner } from "./auth/auth-screens";
-import { Button } from "./ui/button";
-import { Drawer } from "./ui/drawer";
-import { LimitationCallout } from "./ui/limitation-callout";
-import { LiveRegion } from "./ui/live-region";
-import { StatusBanner } from "./ui/status-banner";
-import { UserText } from "./ui/user-text";
+import { HandshakeBanner } from "../auth/auth-screens";
+import { Button } from "../ui/button";
+import { Drawer } from "../ui/drawer";
+import { LimitationCallout } from "../ui/limitation-callout";
+import { LiveRegion } from "../ui/live-region";
+import { StatusBanner } from "../ui/status-banner";
+import { UserText } from "../ui/user-text";
 import {
   cancelRun,
   createConversation,
@@ -33,60 +33,65 @@ import {
   isClassifiedApiError,
   type ApiAuth,
   type ApiFailure,
-} from "../lib/api";
-import { SESSION_REVOKED_BANNER } from "../lib/auth/copy";
-import { useSession } from "../lib/auth/session-provider";
+} from "../../lib/api";
+import { SESSION_REVOKED_BANNER } from "../../lib/auth/copy";
+import { useSession } from "../../lib/auth/session-provider";
 import {
   SOURCE_PREVIEW_UNAVAILABLE,
   citationChipHref,
-} from "../lib/citation-drawer";
+} from "../../lib/citation-drawer";
 import {
   applyAdmission,
   createChatViewState,
   type ChatViewState,
-} from "../lib/chat-view";
+} from "../../lib/chat-view";
 import {
   clearChatRunPointer,
   isActiveRunStatus,
   readChatRunPointer,
   writeChatRunPointer,
-} from "../lib/chat-pointer";
-import { composerDraftIsSendable } from "../lib/composer";
+} from "../../lib/chat-pointer";
+import { composerDraftIsSendable } from "../../lib/composer";
 import {
   evaluatePaidHandshake,
-  mayStartPaidPost,
   paidSendBlockReason,
-} from "../lib/handshake";
-import { apiFailureBanner, GENERIC_PRODUCTION_ERROR } from "../lib/failure-copy";
+} from "../../lib/handshake";
+import { apiFailureBanner, GENERIC_PRODUCTION_ERROR } from "../../lib/failure-copy";
 import {
   isGraphOnlyInspectionRoute,
   limitationCopy,
   limitationTone,
-} from "../lib/limitations";
-import { publicQueryKeys, sessionQueryKeys } from "../lib/query-keys";
-import { formatProvenance } from "../lib/safe-text";
-import { consumeSse, isAbortError } from "../lib/sse-consume";
+} from "../../lib/limitations";
+import { publicQueryKeys, sessionQueryKeys } from "../../lib/query-keys";
+import { formatProvenance } from "../../lib/safe-text";
+import { consumeSse, isAbortError } from "../../lib/sse-consume";
 import {
   MAX_RECONNECT_ATTEMPTS,
   reconnectDelayMs,
   shouldStopReconnect,
   waitForReconnectDelay,
-} from "../lib/stream-reconnect";
-import { FEEDBACK_TAGS, type CitationResponse, type FeedbackTag } from "../lib/types";
-import { AnswerSurface } from "./chat/answer-surface";
-import { ChatComposer } from "./chat/chat-composer";
-import { ChatWorkspace } from "./chat/chat-workspace";
-import { CitationSheet } from "./chat/citation-sheet";
-import { ConversationRail } from "./chat/conversation-rail";
-import { FeedbackPopover } from "./chat/feedback-popover";
-import { RunDetailsSheet } from "./chat/run-details-sheet";
-import { RunProgress } from "./chat/run-progress";
-import { Sheet } from "./ui/sheet";
-import chatStyles from "./chat/chat.module.css";
+} from "../../lib/stream-reconnect";
+import { FEEDBACK_TAGS, type CitationResponse, type FeedbackTag } from "../../lib/types";
+import { AnswerSurface } from "./answer-surface";
+import { ChatComposer } from "./chat-composer";
+import { ChatWorkspace } from "./chat-workspace";
+import { CitationSheet } from "./citation-sheet";
+import { ConversationRail } from "./conversation-rail";
+import { FeedbackPopover } from "./feedback-popover";
+import { RunDetailsSheet } from "./run-details-sheet";
+import { RunProgress } from "./run-progress";
+import { Sheet } from "../ui/sheet";
+import chatStyles from "./chat.module.css";
 
 function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }
+
+const PROMPT_CHIPS = [
+  "Summarize an uploaded policy",
+  "Compare two documented values",
+  "Find a relationship between entities",
+] as const;
 
 /**
  * Render citation ids and provenance in a drawer. No privileged href and
@@ -139,7 +144,7 @@ export function CitationDrawer({
 }
 
 /**
- * Auto chat: conversations, composer, transcript, diagnostics, feedback.
+ * Ask: sessions, composer, transcript, diagnostics, feedback.
  *
  * @returns Chat surface.
  */
@@ -163,7 +168,7 @@ export function ChatApp() {
   const citationTriggerRef = useRef<HTMLElement | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [conversationsOpen, setConversationsOpen] = useState(false);
+  const [conversationsOpen, setSessionsOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const sendLockRef = useRef(false);
@@ -320,6 +325,7 @@ export function ChatApp() {
           reconnect: started.admission.reconnect,
         });
         setChat(current);
+        setDraft("");
       }
       current = await consumeSse(
         started.response,
@@ -577,10 +583,10 @@ export function ChatApp() {
       setFeedbackStatus("Feedback recorded.");
     } catch (error) {
       if (isClassifiedApiError(error)) {
-        setFeedbackStatus(apiFailureBanner(error.failure));
+        setFeedbackStatus("Feedback could not be recorded. Try again.");
         return;
       }
-      setFeedbackStatus("Feedback could not be recorded.");
+      setFeedbackStatus("Feedback could not be recorded. Try again.");
     }
   }, [auth, chat.runId, feedbackComment, feedbackTag, thumbsUp]);
 
@@ -615,7 +621,7 @@ export function ChatApp() {
   if (!session.ready) {
     return (
       <div className={chatStyles.page}>
-        <h2>Auto chat</h2>
+        <h2>Ask</h2>
         <p className={chatStyles.muted}>Restoring session.</p>
       </div>
     );
@@ -624,7 +630,7 @@ export function ChatApp() {
   if (accessToken === null) {
     return (
       <div className={chatStyles.page}>
-        <h2>Auto chat</h2>
+        <h2>Ask</h2>
         <StatusBanner kind="info" role="status">
           Sign in to continue.
         </StatusBanner>
@@ -638,7 +644,7 @@ export function ChatApp() {
   if (sessionRevoked || (failure?.kind === "auth" && failure.detail === "session_revoked")) {
     return (
       <div className={chatStyles.page}>
-        <h2>Auto chat</h2>
+        <h2>Ask</h2>
         <StatusBanner kind="error" role="alert">
           {SESSION_REVOKED_BANNER}
         </StatusBanner>
@@ -668,22 +674,36 @@ export function ChatApp() {
       loading={conversationsQuery.isPending}
       onCreate={() => createMutation.mutate()}
       onSelect={(item) => {
-        setConversationId(item.conversation_id);
-        idempotencyRef.current = newIdempotencyKey();
-        setChat(createChatViewState(idempotencyRef.current));
-        setFailure(null);
-        setLastUserMessage("");
+        if (auth === null) {
+          return;
+        }
+        void fetchConversation(auth, item.conversation_id).then(
+          (confirmed) => {
+            setConversationId(confirmed.conversation_id);
+            idempotencyRef.current = newIdempotencyKey();
+            setChat(createChatViewState(idempotencyRef.current));
+            setFailure(null);
+            setLastUserMessage("");
+          },
+          (error: unknown) => {
+            if (isClassifiedApiError(error)) {
+              setFailure(error.failure);
+            }
+          },
+        );
       }}
       onDelete={() => deleteMutation.mutate()}
     />
   );
 
   const stage = (
-    <section className={chatStyles.stage} aria-label="Auto chat">
+    <section className={chatStyles.stage} aria-label="Answer">
       <div className={chatStyles.stageHeader}>
+        {conversationId !== null ? (
         <p className={chatStyles.historyNote}>
-          This view shows the current run only. Earlier turns are not loaded.
+          Continuing this session. Earlier messages are not available in this client.
         </p>
+        ) : null}
         <div className={chatStyles.row}>
           <Button type="button" variant="ghost" onClick={() => setSourcesOpen(true)}>
             Sources ({String(citations.length)})
@@ -732,6 +752,23 @@ export function ChatApp() {
           Search is degraded. Keyword retrieval is not claimed healthy.
         </p>
       ) : null}
+      {lastUserMessage === "" && chat.answerText === "" ? (
+        <div className={chatStyles.emptyPrompts}>
+          {PROMPT_CHIPS.map((chip) => (
+            <Button
+              key={chip}
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setDraft(chip);
+              }}
+            >
+              {chip}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {chat.terminal !== null && chat.answerText !== "" ? (
       <FeedbackPopover
         thumbsUp={thumbsUp}
         onThumbs={setThumbsUp}
@@ -741,6 +778,7 @@ export function ChatApp() {
         onComment={setFeedbackComment}
         onSubmit={() => void sendFeedback()}
       />
+      ) : null}
       <ChatComposer
         value={draft}
         onChange={setDraft}
@@ -762,8 +800,8 @@ export function ChatApp() {
     <div className={chatStyles.page}>
       <header className={chatStyles.header}>
         <div>
-          <h2>Auto chat</h2>
-          <p className={chatStyles.lead}>Ask across authorized documents. Routing is automatic.</p>
+          <h2>Ask</h2>
+          <p className={chatStyles.lead}>Answers come from authorized documents and include available evidence.</p>
         </div>
         <span className={chatStyles.autoChip} data-testid="auto-label">
           Auto
@@ -819,8 +857,8 @@ export function ChatApp() {
       ) : null}
 
       <div className={chatStyles.mobileBar}>
-        <Button type="button" variant="secondary" onClick={() => setConversationsOpen(true)}>
-          Conversations
+        <Button type="button" variant="secondary" onClick={() => setSessionsOpen(true)}>
+          Sessions
         </Button>
         <Button type="button" variant="ghost" onClick={() => setSourcesOpen(true)}>
           Sources
@@ -830,16 +868,10 @@ export function ChatApp() {
       <ChatWorkspace
         rail={rail}
         stage={stage}
-        sources={
-          <div className={chatStyles.sourcesPane}>
-            <h2>Sources</h2>
-            <p className={chatStyles.hint}>{SOURCE_PREVIEW_UNAVAILABLE}</p>
-          </div>
-        }
       />
 
       {conversationsOpen ? (
-        <Sheet title="Conversations" side="left" onClose={() => setConversationsOpen(false)}>
+        <Sheet title="Sessions" side="left" onClose={() => setSessionsOpen(false)}>
           {rail}
         </Sheet>
       ) : null}

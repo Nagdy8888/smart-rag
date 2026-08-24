@@ -33,13 +33,15 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 
 | Route | Surface |
 | --- | --- |
-| `/` | Auto chat. Replaces the Phase 6 DeveloperApp monolith |
+| `/` | Ask workspace. Sessions rail, verified-final answers, citation drawers |
 | `/documents` | Library, upload/crawl convenience, status |
 | `/documents/[documentId]` | Metadata, ingestion status, graph seed, tables list |
 | `/graph` | Entity search + inspect, list-first, hop cap 3 |
 | `/tables` | Manifests + typed `TableQueryPlan` builder |
 
-Chat stays at `/`. There is no `app/chat` folder. There is no `app/admin`
+Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer.
+
+Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer. There is no `app/admin`
 folder. Team, tools, curation, usage, and profile are packet 4 native
 routes in [ADMINISTRATION.md](./ADMINISTRATION.md). Nav uses Next.js
 `Link`. `aria-current` follows the pathname. Nav is not authorization.

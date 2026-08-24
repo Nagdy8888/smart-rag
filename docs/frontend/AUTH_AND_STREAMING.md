@@ -37,7 +37,7 @@ convenience. FastAPI still authorizes every Bearer call.
 | `/auth/callback` | PKCE `exchangeCodeForSession` | Replay → "Sign-in could not be completed" |
 | `/auth/reset` | `updateUser({ password })` | After recovery `next=/auth/reset` |
 | `/invitations/accept` | `POST /invitations/accept` `{ token }` | Email from JWT, not the form |
-| `/` | Auto chat | Packet 3. No route POST field. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) |
+| `/` | Ask | Packet 15 rebuild. No route POST field. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) |
 | `/admin` | Team/Tools/Curation/Usage tabs | Convenience only. FastAPI still authorizes. Legacy `/team|/tools|/curation|/usage` redirect here |
 | `/account` | Read-only `GET /me` | Legacy `/profile` redirects here. No MFA field |
 

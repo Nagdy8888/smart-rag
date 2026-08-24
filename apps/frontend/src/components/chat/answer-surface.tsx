@@ -7,6 +7,7 @@
 import type { CitationResponse } from "../../lib/types";
 import { CitationChip } from "../ui/citation-chip";
 import { EmptyState } from "../ui/empty-state";
+import { Icon } from "../ui/icon";
 import { LiveRegion } from "../ui/live-region";
 import { UserText } from "../ui/user-text";
 import styles from "./chat.module.css";
@@ -56,19 +57,30 @@ export function AnswerSurface({
   return (
     <div className={styles.answer}>
       {question ? (
-        <p className={styles.queryBlock}>
+        <p className={styles.queryBlock} dir="auto">
           <UserText value={question} />
         </p>
       ) : (
-        <EmptyState title="Ask a question">
-          Answers use authorized Hybrid evidence. Routing is automatic.
+        <EmptyState title="Ask your company knowledge.">
+          <Icon name="spark" />
+          Answers come from authorized documents and include available evidence.
         </EmptyState>
       )}
-      <LiveRegion aria-label="Answer tokens" politeness="polite">
-        <p className={styles.answerProse}>
-          <UserText value={answer || "No tokens yet."} />
-        </p>
-      </LiveRegion>
+      {answer ? (
+        <div>
+          <p className={styles.answerHeader}>
+            <Icon name="spark" />
+            Answer
+          </p>
+          <LiveRegion aria-label="Answer" politeness="polite">
+            <p className={styles.answerProse} dir="auto">
+              <UserText value={answer} />
+            </p>
+          </LiveRegion>
+        </div>
+      ) : (
+        <LiveRegion aria-label="Answer" politeness="polite">{""}</LiveRegion>
+      )}
       {citations.length > 0 ? (
         <ul className={styles.citationRow}>
           {citations.map((citation) => (

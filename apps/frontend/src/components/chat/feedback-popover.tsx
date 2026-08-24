@@ -45,18 +45,20 @@ export function FeedbackPopover({
 }: FeedbackPopoverProps) {
   return (
     <div className={styles.answerFooter}>
-      <Button type="button" variant={thumbsUp ? "primary" : "ghost"} onClick={() => onThumbs(true)}>
-        Thumbs up
-      </Button>
-      <Button
-        type="button"
-        variant={!thumbsUp ? "primary" : "ghost"}
-        onClick={() => onThumbs(false)}
-      >
-        Thumbs down
-      </Button>
-      <Popover label="Feedback details" trigger="Add details">
+      <Popover label="Give feedback" trigger="Give feedback">
         <div className={styles.feedbackForm}>
+          <div className={styles.row}>
+            <Button type="button" variant={thumbsUp ? "primary" : "ghost"} onClick={() => onThumbs(true)}>
+              Thumbs up
+            </Button>
+            <Button
+              type="button"
+              variant={!thumbsUp ? "primary" : "ghost"}
+              onClick={() => onThumbs(false)}
+            >
+              Thumbs down
+            </Button>
+          </div>
           <Select
             label="Tag"
             value={tag}

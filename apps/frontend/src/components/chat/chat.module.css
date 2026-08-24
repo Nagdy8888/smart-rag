@@ -4,9 +4,9 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: 15.75rem minmax(0, 1fr);
-  gap: calc(var(--space) * 4);
-  min-height: calc(100vh - 8rem);
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 16px;
+  min-height: calc(100dvh - 56px);
   align-items: stretch;
 }
 
@@ -60,6 +60,9 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-width: 880px;
+  width: 100%;
+  margin-inline: auto;
   min-height: 28rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -266,7 +269,7 @@
   font-size: 0.8rem;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1279px) {
   .workspace {
     grid-template-columns: 1fr;
   }
@@ -280,12 +283,22 @@
   }
 }
 
-@media (min-width: 1440px) {
-  .workspace {
-    grid-template-columns: 15.75rem minmax(0, 1fr) 22.5rem;
-  }
+.emptyPrompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  margin: calc(var(--space) * 3) 0;
+}
 
-  .sourcesPane {
-    display: block;
-  }
+.answerHeader {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 2);
+  margin: 0 0 calc(var(--space) * 2);
+  font-weight: 600;
+}
+
+.queryBlock {
+  margin-inline-start: auto;
+  max-width: 78%;
 }

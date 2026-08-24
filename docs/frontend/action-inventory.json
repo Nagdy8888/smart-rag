@@ -339,7 +339,7 @@
       "failure_state": "visible typed error",
       "idempotency": "Idempotency-Key",
       "disposition": "keep",
-      "test_id": "pending-P08-10"
+      "test_id": "chat-app.test.tsx"
     },
     {
       "action_id": "ask.cancel",
@@ -353,21 +353,21 @@
       "failure_state": "visible cancel failure",
       "idempotency": "run id",
       "disposition": "keep",
-      "test_id": "pending-P08-10"
+      "test_id": "chat-app.test.tsx"
     },
     {
       "action_id": "ask.feedback",
       "route": "/",
-      "label": "Send feedback",
+      "label": "Give feedback",
       "control_kind": "submit",
       "contract_owner": "fastapi",
       "contract": "POST run feedback",
       "role": "authenticated-owner",
-      "success_state": "recorded after 201",
-      "failure_state": "form preserved",
+      "success_state": "Feedback recorded.",
+      "failure_state": "Feedback could not be recorded. Try again.",
       "idempotency": "run id + tags",
       "disposition": "keep",
-      "test_id": "pending-P08-10"
+      "test_id": "chat-app.test.tsx"
     },
     {
       "action_id": "documents.upload",

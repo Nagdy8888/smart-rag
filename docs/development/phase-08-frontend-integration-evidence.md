@@ -1472,3 +1472,74 @@ P08-14 shell and routes are complete. P08-15 may rebuild Ask without changing
 the rail/topbar IA. Do not reintroduce Team/Tools/Curation/Usage/Profile as
 primary nav items.
 
+## P08-15 — Rebuild Ask around verified final answers
+
+Quoted requirement: produce a focused RAG workspace using only real
+conversation/run/SSE contracts and the explicit verified-final-delivery
+decision.
+
+### Acceptance checks
+
+- Two-region desktop layout: 248px Sessions rail at `>=1280px`; mobile Sessions sheet; no permanent sources column.
+- Sessions use `GET /conversations`. New, Continue (`GET /conversations/{id}`), and Delete are real. Continue clears local transcript and states prior messages are unavailable.
+- Prompt chips fill the composer only and never POST.
+- Sticky composer with one Send/Stop control, Enter to send, Shift+Enter newline, IME-safe.
+- Real stages only. Generating then Verifying, then immediate verified `token_delta` insertion. No caret/typewriter.
+- Safe text with `dir="auto"`. Delivered text kept on later failure/cancel.
+- Citation chips for real IDs; one provenance drawer; no fake preview/download.
+- Diagnostics collapsed in Run details. No Hybrid/Combined/Table/Inspect send controls and no nDCG/TTFB.
+- Feedback only after a terminal non-empty answer, using the server tag catalog.
+- Polite live regions for progress/answer; assertive banners for blocking errors.
+
+### Changed paths
+
+- Moved `apps/frontend/src/components/chat-app.tsx` once to `apps/frontend/src/components/chat/chat-app.tsx`
+- `apps/frontend/src/components/chat/answer-surface.tsx`, `chat-composer.tsx`, `conversation-rail.tsx`, `feedback-popover.tsx`, `run-progress.tsx`, `chat-workspace.tsx`, `chat.module.css`
+- `apps/frontend/src/components/chat-app.test.tsx`, `core-rag-surfaces.test.tsx`
+- `apps/frontend/src/app/(console)/page.tsx`
+- e2e heading updates: `core-rag-surfaces.spec.ts`, `visual-routes.spec.ts`
+- `docs/frontend/CORE_RAG_SURFACES.md`, `AUTH_AND_STREAMING.md`, `PHASE8_JOURNEY_MATRIX.md`, `action-inventory.json`
+
+### Authorization / failure / fallback / idempotency
+
+- Continue validates `GET /conversations/{id}` before selecting the session; classified API failures surface in the existing failure banner.
+- Send remains handshake/`query_ready` gated. Draft clears only after successful admission.
+- Stop posts `POST /runs/{id}/cancel` without `X-Client-Version`.
+- Empty-success `completed` still maps to the protocol `empty_answer` error in `chat-view`.
+- Feedback is hidden until a terminal answer with text; submit uses the existing ten-tag catalog.
+
+### Verification
+
+```text
+npx vitest run src/components/chat-app.test.tsx
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/chat src/components/chat-app.test.tsx
+```
+
+Results:
+
+- Targeted Vitest: 1 file, 14 passed (chip fill, Continue GET, Generating then Verifying then verified answer, Stop cancel, no Hybrid/Combined/Inspect send).
+- Full frontend Vitest: 36 files, 209 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on Ask components/tests: 0 errors.
+
+### Unverified
+
+- Playwright journeys were retargeted from "Auto chat" to "Ask" but not executed here (P08-21/22).
+- Live Generating/Verifying against a running executor waits for P08-22.
+- 390/1280 visual snapshots of Ask empty/generating/verifying/completed wait for P08-21/22.
+
+### Deviations
+
+- `GET /conversations` returns a single page with no cursor, so Sessions has no Load more control.
+- Shared `CitationChip` still labels `Citation {n}` rather than `[n] Source`; chips still open the real sources drawer.
+- Give feedback is the post-terminal trigger; thumbs/tag/comment live inside that popover instead of always-visible footer thumbs.
+
+### Rollback
+
+Revert this commit. Restore `apps/frontend/src/components/chat-app.tsx` only if a later packet proves the unscoped path is still required.
+
+### Handoff
+
+P08-15 Ask is complete. P08-16 may rebuild Documents without changing the shell IA or Ask body.

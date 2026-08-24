@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 15
-status: pending
+status: complete
 title: "Rebuild Ask around verified final answers"
 requirement_ids: [P08-15]
 ---

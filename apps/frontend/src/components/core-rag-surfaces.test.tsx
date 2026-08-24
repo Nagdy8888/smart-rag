@@ -7,7 +7,7 @@ import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { XSS_ENTITY, XSS_FILENAME } from "../lib/hostile-text-fixtures";
 import { DOCUMENT_DELETE_UNAVAILABLE, DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/citation-drawer";
-import { CitationDrawer } from "./chat-app";
+import { CitationDrawer } from "./chat/chat-app";
 import { DocumentDetail } from "./document-detail";
 import { DocumentLibrary } from "./document-library";
 import { GraphExplorer } from "./graph-explorer";

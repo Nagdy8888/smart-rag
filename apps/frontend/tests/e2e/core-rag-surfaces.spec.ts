@@ -54,7 +54,7 @@ test("authenticated Auto chrome when a session exists", async ({
 }) => {
   await signInLiveMember(page, request);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Auto chat" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask" })).toBeVisible();
   await expect(page.getByTestId("auto-label")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });

@@ -6,18 +6,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
-import { ChatApp } from "./chat-app";
+import { ChatApp } from "./chat/chat-app";
 import {
   createConversation,
   fetchMe,
   fetchMeta,
   listCitations,
+  fetchConversation,
   listConversations,
   loadConsoleReadiness,
 } from "../lib/api";
 import { SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { SessionProvider } from "../lib/auth/session-provider";
-import { handshakeBelowMinCopy, QUERY_NOT_READY_COPY } from "../lib/handshake";
+import { handshakeBelowMinCopy } from "../lib/handshake";
 import { limitationCopy } from "../lib/limitations";
 
 vi.mock("next/navigation", () => ({
@@ -86,6 +87,12 @@ vi.mock("../lib/api", async () => {
       upload_enabled: true,
     })),
     listConversations: vi.fn(async () => []),
+    fetchConversation: vi.fn(async (_auth: unknown, conversationId: string) => ({
+      conversation_id: conversationId,
+      creator_user_id: "u1",
+      title: "Chat",
+      created_at: "2026-08-17T00:00:00Z",
+    })),
     createConversation: vi.fn(async () => ({
       conversation_id: "conv-created",
       creator_user_id: "u1",
@@ -153,7 +160,7 @@ describe("ChatApp Auto chrome", () => {
   it("shows Auto, blocks Send on handshake, and has no route send buttons", async () => {
     renderChat(<ChatApp />);
     const send = await screen.findByRole("button", { name: "Send" });
-    expect(screen.getByRole("heading", { name: "Auto chat" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ask" })).toBeInTheDocument();
     expect(screen.getByTestId("auto-label")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
@@ -289,7 +296,7 @@ function stubChatFetch(options: {
 describe("ChatApp MFA removal and revoked session", () => {
   it("does not render MFA challenge or enroll links", async () => {
     renderChat(<ChatApp />);
-    await screen.findByRole("heading", { name: "Auto chat" });
+    await screen.findByRole("heading", { name: "Ask" });
     expect(screen.queryByRole("link", { name: "MFA challenge" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Enroll TOTP" })).toBeNull();
     expect(screen.queryByLabelText(/recovery/i)).toBeNull();
@@ -330,7 +337,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     ]);
     vi.stubGlobal("fetch", stubChatFetch({ events: routingLimitationSse() }));
     renderChat(<ChatApp />);
-    await screen.findByRole("heading", { name: "Auto chat" });
+    await screen.findByRole("heading", { name: "Ask" });
     await user.click(await screen.findByRole("option", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "What connected ACME?");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -376,7 +383,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     ).toBeInTheDocument();
   });
 
-  it("Cancel posts /runs/{id}/cancel without X-Client-Version", async () => {
+  it("Stop posts /runs/{id}/cancel without X-Client-Version", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
@@ -436,7 +443,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     await waitFor(() => {
       expect(screen.getByTestId("advanced-diagnostics")).toHaveTextContent("1");
     });
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Stop" }));
     await waitFor(() => {
       expect(cancelCalls).toEqual(["http://127.0.0.1:8000/runs/run-1/cancel"]);
     });
@@ -451,7 +458,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("option", { name: "Chat" }));
     await user.click(screen.getByRole("button", { name: "Conversation actions" }));
-    await user.click(screen.getByRole("menuitem", { name: "Delete conversation" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
     expect(
       await screen.findByText(
         "Conversation deleted. Reads, resume, and citations are denied. No source text is shown.",
@@ -475,8 +482,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     await user.click(screen.getByRole("button", { name: "Sources (0)" }));
     expect(screen.getByRole("dialog", { name: "Sources (0)" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
-    await user.click(screen.getByRole("button", { name: "Feedback details" }));
-    expect(screen.getByRole("combobox", { name: "Tag" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Give feedback" })).toBeNull();
   });
 
   it("creates a conversation on first Send then admits one message", async () => {
@@ -498,7 +504,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
       }),
     );
     renderChat(<ChatApp />);
-    await screen.findByRole("heading", { name: "Auto chat" });
+    await screen.findByRole("button", { name: "Send" });
     await user.type(screen.getByLabelText("Message"), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
@@ -538,5 +544,116 @@ describe("ChatApp query_ready gate", () => {
       expect(screen.getByText(/query_ready/i)).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
+  });
+});
+
+describe("ChatApp Ask workspace", () => {
+  it("fills the composer from a prompt chip without sending", async () => {
+    const user = userEvent.setup();
+    renderChat(<ChatApp />);
+    await screen.findByRole("heading", { name: "Ask" });
+    await user.click(
+      screen.getByRole("button", { name: "Summarize an uploaded policy" }),
+    );
+    expect(screen.getByLabelText("Message")).toHaveValue(
+      "Summarize an uploaded policy",
+    );
+    expect(createConversation).not.toHaveBeenCalled();
+  });
+
+  it("Continue validates GET /conversations/{id} and states prior transcript is unavailable", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await waitFor(() => {
+      expect(fetchConversation).toHaveBeenCalled();
+    });
+    expect(
+      screen.getByText(
+        "Continuing this session. Earlier messages are not available in this client.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No tokens yet.")).toBeNull();
+  });
+
+  it("shows Generating then Verifying then inserts the verified answer without a caret", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    const encoder = new TextEncoder();
+    const streamCtl: { send: (chunk: string) => void; close: () => void } = {
+      send() {},
+      close() {},
+    };
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamCtl.send = (chunk: string) => {
+          controller.enqueue(encoder.encode(chunk));
+        };
+        streamCtl.close = () => {
+          controller.close();
+        };
+      },
+    });
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "POST" && url.includes("/messages")) {
+        return new Response(
+          JSON.stringify({
+            run_id: "run-1",
+            stream_path: "/runs/run-1/events",
+            reconnect: false,
+            reservation_id: "res-1",
+            route_family: "hybrid",
+            status: "pending",
+          }),
+          { status: 202, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (method === "GET" && url.includes("/events")) {
+        return new Response(stream, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
+      return new Response("{}", { status: 200 });
+    };
+    vi.stubGlobal("fetch", fetchImpl);
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.type(screen.getByLabelText("Message"), "Summarize the policy");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByRole("button", { name: "Stop" });
+    streamCtl.send(
+      'event: status\nid: 1\ndata: {"stage":"generate_answer","status":"running"}\n\n',
+    );
+    expect(await screen.findByText("Generating")).toBeInTheDocument();
+    expect(screen.queryByText("Verified policy summary.")).toBeNull();
+    expect(document.querySelector(".typewriter, [data-caret]")).toBeNull();
+    streamCtl.send(
+      'event: status\nid: 2\ndata: {"stage":"verify_answer","status":"running"}\n\n',
+    );
+    expect(await screen.findByText("Verifying")).toBeInTheDocument();
+    expect(screen.queryByText("Verified policy summary.")).toBeNull();
+    streamCtl.send(
+      'event: token_delta\nid: 3\ndata: {"delta":"Verified policy summary."}\n\n',
+    );
+    expect(await screen.findByText("Verified policy summary.")).toBeInTheDocument();
+    streamCtl.send("event: completed\nid: 4\ndata: {}\n\n");
+    streamCtl.close();
+    expect(await screen.findByRole("button", { name: "Give feedback" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Inspect" })).toBeNull();
   });
 });

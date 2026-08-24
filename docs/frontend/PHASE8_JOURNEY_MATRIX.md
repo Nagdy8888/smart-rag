@@ -99,7 +99,7 @@ flowchart TD
 | Unknown SSE events | `src/lib/chat-view.test.ts` | keeps the answer when an unknown additive event is injected | vitest-unit | proven |
 | Heartbeat + Cancel terminal | `src/lib/chat-view.test.ts` | counts heartbeats and records cancelled as the terminal | vitest-unit | proven |
 | Cancel HTTP | `src/lib/api.test.ts` | posts cancel with resume headers and no X-Client-Version | vitest-unit | proven |
-| Cancel from ChatApp | `src/components/chat-app.test.tsx` | Cancel posts /runs/{id}/cancel without X-Client-Version | vitest-component | proven |
+| Cancel from ChatApp | `src/components/chat-app.test.tsx` | Stop posts /runs/{id}/cancel without X-Client-Version | vitest-component | proven |
 | Reconnect 404 private-run | `src/lib/api.test.ts` | classifies a foreign or missing run as deleted without a second POST | vitest-unit | proven |
 | Reconnect 404 chrome | `src/components/chat-app.test.tsx` | reconnect 404 shows deleted copy without source text | vitest-component | proven |
 | Conversation DELETE | `src/lib/api.test.ts` | DELETEs the conversation and treats 204 as success | vitest-unit | proven |
