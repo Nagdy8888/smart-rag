@@ -127,7 +127,7 @@ Those are [GAP-07-02](#gap-register).
 | `rate_limited` | 429 + `Retry-After` | FastAPI limiter |
 | `limiter_unavailable` | 503 + `Retry-After` | Mutation limiter fail-closed |
 | `authorization_rejected` / `forbidden` | 403 | Role/capability |
-| `MFA required` | 403 | Privileged caller without aal2 |
+| `MFA required` | (removed) | No live backend path emits this; P08-12 removes leftover UI |
 | `not_found` | 404 | Missing, unauthorized, tombstone, IDOR |
 | `idempotency_conflict` | 409 | Key reuse mismatch |
 | `budget_exhausted` | 402 | Durable query budget |
@@ -162,7 +162,7 @@ ParadeDB `down` on ready is Hybrid degrade, not BM25-snippet success.
 | GET | `/me` | `user_id`, `role`, `authorization_version`, `upload_enabled`, `mfa_enrolled` | any active member |
 | POST | `/admin/invitations` | req `email`, `role`, `upload_enabled`; resp `invitation_id`, `email`, `role`, `upload_enabled`, `expires_at` (token by mail only; `APP_ENV=test` may set `X-Test-Invitation-Token`) | owner/admin; only owner may invite owner |
 | POST | `/invitations/accept` | req `token`; resp `invitation_id` | authenticated; email from JWT |
-| POST | `/admin/users/{user_id}/offboard` | resp `request_id`, `subject_user_id`, `completed_at` | owner/admin **AAL2** |
+| POST | `/admin/users/{user_id}/offboard` | resp `request_id`, `subject_user_id`, `completed_at` | owner/admin |
 
 No HTTP for owner bootstrap (`bootstrap_owner` service), MFA recovery
 (`mfa_recovery.py` service), company-settings CRUD, or audit list/export.
@@ -250,7 +250,7 @@ status `graph_handoff.{pending,processing,completed,failed,dead_letter}`.
 | Lost-factor / session revoke / re-enrollment | offboard HTTP; recovery service | none | GAP-07-07 |
 | Owner setup | `bootstrap_owner` **service**, no router | none | GAP-07-08 |
 | Invitations | FastAPI create/accept | none | UI only |
-| Team / offboard | FastAPI offboard AAL2 | none | UI only |
+| Team / offboard | FastAPI offboard owner/admin | none | UI only |
 | Chat Auto | messages + SSE + citations + feedback + delete | yes | diagnostics limited to catalog |
 | Advanced route panel | **no** request field | copy-only | GAP-07-01 |
 | Documents / upload / status | list, reserve, status | reserve + status | finalize/crawl/retry UI |
@@ -375,7 +375,7 @@ where listed.
 | E Invite create | email, role, upload_enabled | `POST /admin/invitations` | owner/admin | AUTH_ADJACENT |
 | E Invite token | delivered by mail | not in JSON | owner/admin | n/a |
 | E Accept | token | `POST /invitations/accept` | JWT email, not body email | AUTH_ADJACENT |
-| E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin AAL2 | AUTH_ADJACENT |
+| E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin | AUTH_ADJACENT |
 | E Owner setup | bootstrap | GAP-07-08 | none | Unavailable |
 | E Member directory | list | none | none | no HTTP; do not mock |
 

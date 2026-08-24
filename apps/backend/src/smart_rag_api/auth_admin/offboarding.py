@@ -50,12 +50,11 @@ def _require_offboarding_actor(
         Authoritative owner/admin role.
 
     Raises:
-        OffboardingError: If the actor is disabled, unprivileged, stale/forged,
-            or not authenticated at AAL2.
+        OffboardingError: If the actor is disabled, unprivileged, or stale/forged.
+            ``assurance_level`` is retained and ignored.
     """
 
-    if assurance_level != "aal2":
-        raise OffboardingError("offboarding actor must use an AAL2 session")
+    _ = assurance_level
     cursor.execute(
         """
         SELECT role::text

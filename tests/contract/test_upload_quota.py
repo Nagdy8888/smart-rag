@@ -145,10 +145,10 @@ def test_reserve_finalize_idempotent_and_over_limit(
         assert replay[0] == 5000
 
 
-def test_reserve_rejects_quota_and_missing_mfa(
+def test_reserve_rejects_quota_and_allows_member_without_mfa(
     db_connection: psycopg.Connection,
 ) -> None:
-    """Per-user cap and MFA gates fail closed."""
+    """Per-user cap still fails closed; MFA enrollment is not an upload gate."""
 
     capped = uuid.uuid4()
     no_mfa = uuid.uuid4()
@@ -168,7 +168,7 @@ def test_reserve_rejects_quota_and_missing_mfa(
         )
         auth_version = _auth_version(cursor)
         cursor.execute("SET ROLE app_api")
-
+        cursor.execute("SAVEPOINT over_quota")
         with pytest.raises(psycopg.Error):
             cursor.execute(
                 """
@@ -178,22 +178,18 @@ def test_reserve_rejects_quota_and_missing_mfa(
                 """,
                 (capped, auth_version),
             )
-
-        cursor.execute("ROLLBACK")
-    # Fresh transaction after rollback
-    db_connection.rollback()
-    with db_connection.cursor() as cursor:
-        auth_version = _auth_version(cursor)
-        cursor.execute("SET ROLE app_api")
-        with pytest.raises(psycopg.Error):
-            cursor.execute(
-                """
-                SELECT * FROM app.reserve_upload_quota(
-                  %s, 'member', %s, 100, 'nomfa', 's', NULL
-                )
-                """,
-                (no_mfa, auth_version),
+        cursor.execute("ROLLBACK TO SAVEPOINT over_quota")
+        cursor.execute("RELEASE SAVEPOINT over_quota")
+        cursor.execute(
+            """
+            SELECT reservation_id FROM app.reserve_upload_quota(
+              %s, 'member', %s, 100, 'nomfa', 's', NULL
             )
+            """,
+            (no_mfa, auth_version),
+        )
+        allowed = cursor.fetchone()
+        assert allowed is not None
 
 
 def test_effective_capability_lifetime_label() -> None:

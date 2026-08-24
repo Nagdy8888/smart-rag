@@ -62,7 +62,7 @@ flowchart TD
 | Upload reserve | `POST /documents/uploads`; local `signed_url` is null |
 | Version status | `GET /ingestion/versions/{id}/status` for Hybrid/BM25/graph-handoff |
 | Readiness | public `GET /health/ready`; named ParadeDB/Valkey/LightRAG probes on `GET /ops/ready` (owner/admin) |
-| MFA | `403 MFA required` for owner/admin/`upload_enabled` until TOTP aal2 |
+| MFA | Not an authorization gate. `GET /me.mfa_enrolled` is always false |
 
 Paid chat uses JSON 202 so `run_id` is in the body, then the same GET EventSource
 path as reconnect. That is one paid reservation. Unknown SSE event types are

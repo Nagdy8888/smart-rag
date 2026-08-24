@@ -174,10 +174,10 @@ def test_accept_invitation_does_not_demote_owner(
     assert row == ("owner", True)
 
 
-def test_accept_invitation_privileged_upgrade_requires_aal2(
+def test_accept_invitation_privileged_upgrade_succeeds_at_aal1(
     db_connection: psycopg.Connection,
 ) -> None:
-    """Member-to-admin upgrades require AAL2 and then revoke sessions."""
+    """Member-to-admin upgrades succeed at ordinary assurance and revoke sessions."""
 
     user_id = uuid.uuid4()
     email = f"upgrade-{user_id}@example.com"
@@ -207,17 +207,9 @@ def test_accept_invitation_privileged_upgrade_requires_aal2(
         assert invitation_row is not None
         invitation_id = invitation_row[0]
         cursor.execute("SET ROLE app_api")
-        cursor.execute("SAVEPOINT aal1_upgrade")
-        with pytest.raises(psycopg.errors.RaiseException, match="requires aal2"):
-            cursor.execute(
-                "SELECT app.accept_invitation(%s, %s, %s, %s)",
-                (digest, user_id, email, "aal1"),
-            )
-        cursor.execute("ROLLBACK TO SAVEPOINT aal1_upgrade")
-        cursor.execute("RELEASE SAVEPOINT aal1_upgrade")
         cursor.execute(
             "SELECT app.accept_invitation(%s, %s, %s, %s)",
-            (digest, user_id, email, "aal2"),
+            (digest, user_id, email, "aal1"),
         )
         cursor.execute("RESET ROLE")
         cursor.execute(

@@ -307,6 +307,7 @@
             "type": "integer"
           },
           "mfa_enrolled": {
+            "description": "Deprecated compatibility field. Always false. Never used for authorization.",
             "title": "Mfa Enrolled",
             "type": "boolean"
           },
@@ -4904,7 +4905,7 @@
     },
     "/admin/users/{user_id}/offboard": {
       "post": {
-        "description": "Disable one subject and revoke sessions. Owner/admin AAL2.\n\nArgs:\n    request: Active request with assurance level.\n    user_id: Subject user id.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Completed offboarding identifiers.",
+        "description": "Disable one subject and revoke sessions. Owner/admin only.\n\nArgs:\n    request: Active request with assurance level.\n    user_id: Subject user id.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Completed offboarding identifiers.",
         "operationId": "offboard_user_route_admin_users__user_id__offboard_post",
         "parameters": [
           {
@@ -6725,7 +6726,7 @@
     },
     "/graph/inspect": {
       "post": {
-        "description": "Inspect authorized graph objects. Members and viewers are ACL-filtered.\n\nFastAPI applies ``COST_MUTATION`` rate limits here. Adding ``/graph`` to\npreauth ``_MUTATION_PREFIXES`` is owned by the API-hardening agent; this\nhandler still closes the unthrottled FastAPI gap if that prefix is absent.\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Seed entity keys and/or document id, depth at most 3.\n    caller: Authenticated caller context.\n\nReturns:\n    At most 200 rows and canonical locators. Native prose is omitted.\n\nRaises:\n    HTTPException: 401 via identity dependency, 400 for seed/deadline,\n        503 when the database URL is unset.",
+        "description": "Inspect authorized graph objects. Members and viewers are ACL-filtered.\n\nFastAPI applies ``COST_MUTATION`` rate limits here. Pre-auth IP limits\nalso cover ``POST /graph/*`` via ``_MUTATION_PREFIXES`` (GET search is\nskipped because this middleware ignores GET/HEAD/OPTIONS).\n\nArgs:\n    request: FastAPI request with backend settings.\n    body: Seed entity keys and/or document id, depth at most 3.\n    caller: Authenticated caller context.\n\nReturns:\n    At most 200 rows and canonical locators. Native prose is omitted.\n\nRaises:\n    HTTPException: 401 via identity dependency, 400 for seed/deadline,\n        503 when the database URL is unset.",
         "operationId": "inspect_graph_route_graph_inspect_post",
         "parameters": [
           {
@@ -7475,7 +7476,7 @@
     },
     "/me": {
       "get": {
-        "description": "Return the server-derived caller snapshot.\n\nArgs:\n    caller: Authenticated caller.\n\nReturns:\n    Role and capability flags. Client claims are ignored.",
+        "description": "Return the server-derived caller snapshot.\n\nArgs:\n    caller: Authenticated caller.\n\nReturns:\n    Role and capability flags. ``mfa_enrolled`` is always false.",
         "operationId": "current_user_me_get",
         "parameters": [
           {

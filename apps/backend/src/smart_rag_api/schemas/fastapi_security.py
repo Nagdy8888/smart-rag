@@ -31,7 +31,12 @@ class CurrentUserResponse(BaseModel):
     role: str
     authorization_version: int
     upload_enabled: bool
-    mfa_enrolled: bool
+    mfa_enrolled: bool = Field(
+        description=(
+            "Deprecated compatibility field. Always false. Never used for "
+            "authorization."
+        ),
+    )
 
 
 class CreateInvitationRequest(BaseModel):

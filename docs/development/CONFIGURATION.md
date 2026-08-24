@@ -124,11 +124,12 @@ Phase 6 packet 1 query admission still uses
 classifies that bucket as `COST_MUTATION` (Valkey then Postgres, never
 fail-open).
 
-## Local Auth MFA (developer UI uploads)
+## Local Auth MFA (dormant provider capability)
 
-Owner, admin, and `upload_enabled` callers require a verified TOTP session
-(`aal2`). Local password grants are `aal1`. Enable TOTP in
-`supabase/config.toml`:
+Application authorization no longer requires TOTP or `aal2`. Owner, admin,
+and `upload_enabled` callers may upload and offboard at ordinary
+authenticated assurance. Supabase Auth may still expose dormant TOTP
+settings; they must not authorize. Historical local TOTP config:
 
 ```toml
 [auth.mfa]

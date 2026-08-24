@@ -1105,3 +1105,116 @@ is clean.
 Revert this commit. Chat returns to boolean cancel/feedback helpers and
 does not persist a sessionStorage run pointer.
 
+## Packet 11 — Remove backend and database MFA/AAL2 enforcement
+
+### Requirement (quoted)
+
+> Remove every live backend check that requires `aal2`, `mfa_enrolled`, an
+> enrolled factor, or an `MFA required` error for upload reserve/finalize,
+> offboarding, document administration, or any other route.
+> Keep owner/admin/member/viewer roles, upload capability,
+> authorization-version reloads, JWT verification, revoked/disabled sessions,
+> RLS, rate limits, audit events, destructive confirmations, and IDOR-safe
+> errors unchanged.
+> Replace AAL2-gated database functions/policies with additive versions or
+> compatibility wrappers that preserve existing signatures during the current
+> API major while removing only the AAL2 rejection.
+> Remove MFA from `GET /me` product semantics. If deleting `mfa_enrolled`
+> would break additive API evolution, retain it only as a deprecated
+> compatibility field fixed to `false`; no authorization decision may read it.
+> This packet may leave the old optional MFA frontend visible for one
+> feature-branch commit, but it may not be merged or followed by surface work.
+> P08-12 is the mandatory next packet.
+
+### Concrete acceptance checks
+
+- Owner/admin at ordinary authenticated assurance can upload and offboard when
+  all non-MFA checks pass.
+- Member/viewer forged upload/admin/offboard requests still fail with the same
+  403/404 semantics.
+- No live backend path emits `MFA required`, checks `aal2`, or authorizes from
+  `mfa_enrolled`.
+- Existing JWT, revoked-session, role, capability, RLS, rate-limit, audit,
+  IDOR, upload, and offboarding tests remain green after updating MFA-positive
+  assertions.
+- OpenAPI, current types, schema tests, RLS matrix, migration checks, security
+  docs, and plan integrity pass.
+- Evidence explicitly marks P08-12 as required before any UI packet or merge.
+
+### Files in this packet
+
+- `supabase/migrations/20260824140000_remove_mfa_aal2_enforcement_v1.sql`
+- `apps/backend/src/smart_rag_api/services/profile_loader.py`
+- `apps/backend/src/smart_rag_api/dependencies/identity.py`
+- `apps/backend/src/smart_rag_api/auth_admin/offboarding.py`
+- `apps/backend/src/smart_rag_api/auth_admin/mfa_recovery.py`
+- `apps/backend/src/smart_rag_api/services/auth_team.py`
+- `apps/backend/src/smart_rag_api/routers/auth_team.py`
+- `apps/backend/src/smart_rag_api/schemas/fastapi_security.py`
+- `packages/core/src/smart_rag_core/security/identity.py`
+- `tests/unit/test_profile_loader.py`
+- `tests/contract/test_mfa_aal2_removed.py`
+- `tests/contract/test_invitations_auth.py`
+- `tests/contract/test_upload_quota.py`
+- `tests/contract/test_auth_lifecycle.py`
+- `tests/contract/test_thin_developer_ui_live.py`
+- `docs/api/openapi.foundation.json`
+- security/API/admin docs and this evidence file
+
+### Authorization / failure / fallback / idempotency
+
+- `GET /me` always returns `mfa_enrolled: false`. Callers at aal1 with
+  `upload_enabled` receive 200, not 403 `MFA required`.
+- `app.reserve_upload_quota` still rejects viewers and members without
+  `upload_enabled`, still enforces quota, and no longer raises MFA exceptions.
+- `app.accept_invitation` still refuses demotion, still revokes sessions on
+  privileged/upload upgrades, and ignores deprecated `p_assurance_level`.
+- Offboarding still requires an active owner/admin whose asserted role matches
+  the live profile; AAL2 is ignored. Members cannot offboard.
+- JWT verification, revoked/disabled sessions, RLS, rate limits, audit events,
+  and IDOR-safe errors are unchanged.
+- Historical applied migrations were not edited. The new migration is additive
+  `CREATE OR REPLACE` of the same signatures.
+
+### Verification
+
+```text
+py -m ruff check apps/backend/src/smart_rag_api/services/profile_loader.py apps/backend/src/smart_rag_api/dependencies/identity.py apps/backend/src/smart_rag_api/auth_admin/offboarding.py apps/backend/src/smart_rag_api/auth_admin/mfa_recovery.py tests/unit/test_profile_loader.py tests/contract/test_mfa_aal2_removed.py
+py -m pytest tests/unit/test_profile_loader.py tests/contract/test_mfa_aal2_removed.py tests/contract/test_invitations_auth.py tests/contract/test_upload_quota.py tests/contract/test_auth_lifecycle.py tests/unit/test_auth_admin_boundaries.py -q
+py scripts/ci/check_openapi.py
+py .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py
+```
+
+Results:
+
+- `ruff check` on the listed backend/core/test modules: all checks passed.
+- `pytest` unit: `tests/unit/test_profile_loader.py` and
+  `tests/unit/test_auth_admin_boundaries.py` — 7 passed.
+- `scripts/ci/check_openapi.py`: snapshot matched after committing the
+  `mfa_enrolled` deprecation description.
+- Contract tests targeting the new SQL (`test_mfa_aal2_removed`,
+  invitations, upload quota, auth lifecycle) skipped: local Supabase
+  Postgres is not bound on `127.0.0.1:54322` (`supabase start` failed
+  because Windows reserved the port). SQL behavior is implemented in
+  `20260824140000_remove_mfa_aal2_enforcement_v1.sql` and covered by
+  those tests when the local database is available.
+
+### Unverified
+
+- Live GoTrue TOTP enroll is no longer required for upload; the remaining live
+  reserve test still accepts an aal2 token as a non-blocking extra path when
+  TOTP is configured.
+- Frontend MFA screens remain visible until P08-12. This packet must not merge
+  without P08-12.
+- Local Supabase was not running (port 54322 reserved by Windows), so SQL
+  contract tests skipped. Re-run them after a successful supabase start.
+
+### Rollback
+
+Revert this commit. Recreate MFA/AAL2 only with a new additive migration; do
+not edit `20260824140000_remove_mfa_aal2_enforcement_v1.sql` after apply.
+
+### Handoff blocker
+
+P08-12 is mandatory next. Do not start UI surface packets and do not merge this
+feature branch until frontend/provider MFA is removed.

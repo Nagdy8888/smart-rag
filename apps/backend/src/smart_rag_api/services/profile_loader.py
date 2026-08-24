@@ -121,32 +121,23 @@ def build_caller_context(
     assurance_level: str | None,
     authentication_methods: tuple[str, ...],
 ) -> CallerContext:
-    """Map a profile snapshot and JWT MFA signals into ``CallerContext``.
+    """Map a profile snapshot into ``CallerContext`` without MFA authorization.
+
+    ``assurance_level`` and ``authentication_methods`` remain in the signature
+    for call compatibility. They are ignored and never authorize.
 
     Args:
         snapshot: Authoritative profile row.
         session_id: Verified JWT session identifier.
-        assurance_level: JWT ``aal`` claim when present.
-        authentication_methods: JWT ``amr`` methods.
+        assurance_level: Deprecated JWT ``aal`` claim; ignored.
+        authentication_methods: Deprecated JWT ``amr`` methods; ignored.
 
     Returns:
-        Frozen caller context for RPC binding.
-
-    Raises:
-        ValueError: When MFA is required but not satisfied.
+        Frozen caller context for RPC binding. ``mfa_enrolled`` is always
+        ``False`` so no caller can authorize from the dormant profile flag.
     """
 
-    requires_mfa = (
-        snapshot.role in {UserRole.OWNER, UserRole.ADMIN} or snapshot.upload_enabled
-    )
-    mfa_satisfied = snapshot.mfa_enrolled and (
-        assurance_level in {"aal2", "aal3"}
-        or "mfa" in authentication_methods
-        or "totp" in authentication_methods
-    )
-    if requires_mfa and not mfa_satisfied:
-        raise ValueError("mfa required")
-
+    _ = (assurance_level, authentication_methods)
     return CallerContext(
         user_id=snapshot.user_id,
         role=snapshot.role,
@@ -154,5 +145,5 @@ def build_caller_context(
         session_id=session_id,
         disabled=snapshot.disabled,
         upload_enabled=snapshot.upload_enabled,
-        mfa_enrolled=snapshot.mfa_enrolled,
+        mfa_enrolled=False,
     )

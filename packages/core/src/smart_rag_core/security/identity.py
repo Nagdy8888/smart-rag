@@ -32,8 +32,8 @@ class CallerContext(BaseModel):
             ``app.company_settings.authorization_version``.
         session_id: Optional refresh-session identifier for revocation checks.
         disabled: Whether ``app.profiles.disabled_at`` is set.
-        upload_enabled: Upload capability flag from profile (MFA enforced upstream).
-        mfa_enrolled: Whether the profile records enrolled MFA.
+        upload_enabled: Upload capability flag from profile.
+        mfa_enrolled: Deprecated compatibility flag. Never used for authorization.
     """
 
     model_config = ConfigDict(frozen=True, strict=True)
@@ -87,7 +87,7 @@ class CallerContext(BaseModel):
             session_id: Optional session identifier for revocation checks.
             disabled_at: Profile ``disabled_at`` timestamp when set.
             upload_enabled: Profile upload capability flag.
-            mfa_enrolled: Profile MFA enrollment flag.
+            mfa_enrolled: Deprecated compatibility flag. Ignored for authorization.
 
         Returns:
             Immutable ``CallerContext`` suitable for RPC argument binding.

@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 11
-status: pending
+status: complete
 title: "Remove backend and database MFA/AAL2 enforcement"
 requirement_ids: [P08-11]
 ---

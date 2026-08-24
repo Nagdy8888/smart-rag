@@ -93,7 +93,7 @@ wrong; FastAPI returns 401/403.
 
 ## MFA vs GAP-07-07
 
-TOTP enroll/challenge are Auth-direct. FastAPI 403 `MFA required` shows the
+TOTP enroll/challenge remain Auth-direct until P08-12. FastAPI no longer emits 403 `MFA required`. Historical UI still shows the
 banner, Sign out, and links to `/mfa/challenge` and `/mfa/enroll`. Upload 403
 uses the same banner and never fakes TOTP success.
 

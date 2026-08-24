@@ -52,7 +52,7 @@ def current_user(caller: CallerContextDep) -> CurrentUserResponse:
         caller: Authenticated caller.
 
     Returns:
-        Role and capability flags. Client claims are ignored.
+        Role and capability flags. ``mfa_enrolled`` is always false.
     """
 
     return CurrentUserResponse(
@@ -60,7 +60,7 @@ def current_user(caller: CallerContextDep) -> CurrentUserResponse:
         role=caller.role.value,
         authorization_version=caller.authorization_version,
         upload_enabled=caller.upload_enabled,
-        mfa_enrolled=caller.mfa_enrolled,
+        mfa_enrolled=False,
     )
 
 
@@ -175,7 +175,7 @@ def offboard_user_route(
     caller: CallerContextDep,
     service: Annotated[AuthTeamService, Depends(get_auth_team_service)],
 ) -> OffboardResponse:
-    """Disable one subject and revoke sessions. Owner/admin AAL2.
+    """Disable one subject and revoke sessions. Owner/admin only.
 
     Args:
         request: Active request with assurance level.

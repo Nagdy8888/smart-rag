@@ -52,7 +52,7 @@ flowchart TD
   anyMember --> usageMe["GET /usage/me"]
   anyMember --> toolsGet["GET /tools"]
   ownerAdmin["owner or admin"] --> invitePost["POST /admin/invitations"]
-  ownerAdmin --> offboardPost["POST /admin/users/user_id/offboard AAL2"]
+  ownerAdmin --> offboardPost["POST /admin/users/user_id/offboard"]
   ownerAdmin --> toolAdmin["POST /admin/tools enable permissions"]
   ownerAdmin --> glossaryPost["POST /admin/glossary/imports"]
   ownerAdmin --> rulesGet["GET /admin/graph/entity-rules"]
@@ -92,7 +92,7 @@ GET /me and audit when available". Identify offboard subjects from `GET
 - Invitation create body is `{ email, role, upload_enabled }`. Roles are
   `owner` \| `admin` \| `member` \| `viewer`. The one-time token is
   mail-only; JSON never includes `raw_token`.
-- Offboard is irreversible. 403 `MFA required` shows the MFA banner.
+- Offboard is irreversible. Owner/admin at ordinary assurance may offboard.
 - Tool cards show `tool_key`, `version_label`, `short_name`, `purpose`,
   `required_role`, `risk_class`, and `active`. Unauthorized names are
   omitted, never fake-redacted.
@@ -108,7 +108,7 @@ GET /me and audit when available". Identify offboard subjects from `GET
 | Signal | UI |
 | --- | --- |
 | 403 `forbidden` | "Server denied this request (forbidden). UI hiding is convenience only." |
-| 403 `MFA required` | MFA banner. Offboard needs AAL2 |
+| 403 `forbidden` / missing subject | Generic denial. Member/viewer stay unauthorized |
 | 402 `budget_exhausted` | Budget exhausted copy. No slider |
 | 429 | Rate-limit banner. Ready `rate_limit_degraded` is informational |
 | 409 `stale_row_version` | Reload and retry with the current `row_version` |
