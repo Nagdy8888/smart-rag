@@ -71,10 +71,11 @@ describe("classifyApiError", () => {
     });
   });
 
-  it("maps 403 MFA required to an MFA banner", () => {
+  it("maps leftover 403 MFA required copy to generic auth, not an MFA kind", () => {
     expect(classifyApiError(403, { detail: "MFA required" })).toEqual({
-      kind: "mfa",
-      detail: "MFA required",
+      kind: "auth",
+      status: 403,
+      detail: "unauthorized",
     });
   });
 
@@ -609,14 +610,14 @@ describe("administration clients", () => {
     expect(body).not.toContain("drop table");
   });
 
-  it("createInvitation classifies MFA required, 402, and 429", async () => {
+  it("createInvitation classifies leftover 403 MFA copy, 402, and 429", async () => {
     const cases: Array<{
       status: number;
       detail: string;
       thrown: string;
       headers?: Record<string, string>;
     }> = [
-      { status: 403, detail: "MFA required", thrown: "mfa_required" },
+      { status: 403, detail: "MFA required", thrown: "request_rejected" },
       { status: 402, detail: "budget_exhausted", thrown: "budget_exhausted" },
       {
         status: 429,
@@ -893,8 +894,8 @@ describe("loadConsoleReadiness", () => {
   });
 });
 
-describe("reserveUpload MFA", () => {
-  it("throws mfa_required on 403 MFA required", async () => {
+describe("reserveUpload leftover MFA copy", () => {
+  it("does not throw mfa_required on 403 MFA required", async () => {
     const fetchImpl: typeof fetch = async () =>
       new Response(JSON.stringify({ detail: "MFA required" }), {
         status: 403,
@@ -907,7 +908,7 @@ describe("reserveUpload MFA", () => {
         "idem-upload-1",
         fetchImpl,
       ),
-    ).rejects.toThrow("mfa_required");
+    ).rejects.toThrow("upload_reserve_failed");
   });
 
   it("does not return a reservation on 402 quota or budget exhaustion", async () => {

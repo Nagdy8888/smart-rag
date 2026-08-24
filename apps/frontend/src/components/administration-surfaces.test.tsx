@@ -121,7 +121,6 @@ beforeEach(() => {
     role: "owner",
     authorization_version: 1,
     upload_enabled: true,
-    mfa_enrolled: true,
   });
   fetchUsageMe.mockResolvedValue({
     scope: "me",
@@ -192,7 +191,6 @@ describe("TeamApp", () => {
       role: "viewer",
       authorization_version: 1,
       upload_enabled: false,
-      mfa_enrolled: false,
     });
     renderSurface(<TeamApp />);
     expect(await screen.findByText(NO_MEMBER_DIRECTORY_COPY)).toBeInTheDocument();
@@ -228,7 +226,6 @@ describe("ToolsApp", () => {
       role: "member",
       authorization_version: 1,
       upload_enabled: true,
-      mfa_enrolled: true,
     });
     renderSurface(<ToolsApp />);
     expect(await screen.findByText("CSV export")).toBeInTheDocument();
@@ -281,7 +278,6 @@ describe("CurationApp", () => {
       role: "viewer",
       authorization_version: 1,
       upload_enabled: false,
-      mfa_enrolled: false,
     });
     renderSurface(<CurationApp />);
     expect(await screen.findByText(/Curation mutations are hidden/)).toBeInTheDocument();
@@ -325,7 +321,6 @@ describe("UsageApp member 403 and rate degradation", () => {
       role: "member",
       authorization_version: 1,
       upload_enabled: true,
-      mfa_enrolled: true,
     });
     fetchUsageCompany.mockRejectedValue(new Error("forbidden"));
     loadConsoleReadiness.mockResolvedValue({

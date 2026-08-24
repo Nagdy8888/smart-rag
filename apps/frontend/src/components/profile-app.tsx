@@ -67,10 +67,6 @@ export function ProfileApp() {
           <dd>
             <UserText value={String(me?.upload_enabled ?? "")} />
           </dd>
-          <dt>mfa_enrolled</dt>
-          <dd>
-            <UserText value={String(me?.mfa_enrolled ?? "")} />
-          </dd>
         </dl>
       </section>
       <section

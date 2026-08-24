@@ -48,7 +48,7 @@ flowchart TD
 
 | Class | Owner | FastAPI throttle? |
 | --- | --- | --- |
-| Email/password, Google OAuth, password reset, MFA enroll/challenge/verify, session | Supabase Auth (`@supabase/ssr` 0.7.0, JS 2.57.4) | **No** |
+| Email/password, password reset, session | Supabase Auth (`@supabase/ssr` 0.7.0, JS 2.57.4). Google omitted while disabled. MFA UI removed P08-12. | **No** |
 | Invitation create/accept, offboarding, chat, upload, crawl, admin mutations | FastAPI | Yes (`AUTH_ADJACENT` / `COST_MUTATION`) |
 | Authenticated reads | FastAPI | Yes (`LOW_RISK_READ`) |
 | Anonymous sign-in | Disabled in `supabase/config.toml` | N/A |
@@ -127,7 +127,7 @@ Those are [GAP-07-02](#gap-register).
 | `rate_limited` | 429 + `Retry-After` | FastAPI limiter |
 | `limiter_unavailable` | 503 + `Retry-After` | Mutation limiter fail-closed |
 | `authorization_rejected` / `forbidden` | 403 | Role/capability |
-| `MFA required` | (removed) | No live backend path emits this; P08-12 removes leftover UI |
+| `MFA required` | removed | Backend P08-11 + frontend P08-12: no MFA kind, route, or banner |
 | `not_found` | 404 | Missing, unauthorized, tombstone, IDOR |
 | `idempotency_conflict` | 409 | Key reuse mismatch |
 | `budget_exhausted` | 402 | Durable query budget |
@@ -245,7 +245,7 @@ status `graph_handoff.{pending,processing,completed,failed,dead_letter}`.
 | Google OAuth | Auth `signInWithOAuth`; local `[auth.external.google] enabled=false` | none | GAP-07-04 |
 | Forgot/reset | Auth `resetPasswordForEmail` | none | GAP-07-05 |
 | Auth callback | Redirect includes `http://127.0.0.1:3010/auth/callback` | no page | GAP-07-05 |
-| MFA enroll/challenge | Auth TOTP enroll/verify enabled | banner only | GAP-07-06 |
+| MFA enroll/challenge | Auth TOTP enroll/verify disabled | omitted | P08-12 |
 | MFA recovery | `mfa_recovery.py` **service**, no router | none | GAP-07-07 |
 | Lost-factor / session revoke / re-enrollment | offboard HTTP; recovery service | none | GAP-07-07 |
 | Owner setup | `bootstrap_owner` **service**, no router | none | GAP-07-08 |
@@ -365,7 +365,7 @@ where listed.
 | D MFA challenge | code | `mfa.challenge` / `verify` | Auth | |
 | D MFA required | banner, Sign out | 403 `MFA required` + `signOut` | FastAPI identity + Auth | no fake TOTP success |
 | D Recovery | any control | GAP-07-07 | none | Unavailable |
-| A Google | Continue with Google | `signInWithOAuth` | GAP-07-04 disabled locally | disabled button |
+| A Google | omitted | `signInWithOAuth` never called | GAP-07-04 disabled locally | no button |
 
 ### FastAPI identity and team
 

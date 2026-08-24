@@ -22,6 +22,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-16 | eng, security |
 | [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-08-19 | eng, frontend |
 | [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
+| [runbooks/managed-auth-totp-residue.md](./runbooks/managed-auth-totp-residue.md) | engineering-lead | accepted | 2026-08-24 | ops, security |
 | [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-08-19 | eng, frontend, security |
 | [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-08-24 | eng, frontend |
 | [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-08-24 | eng, frontend, security |

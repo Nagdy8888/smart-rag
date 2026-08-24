@@ -10,7 +10,6 @@ import { XSS_FILENAME } from "../../lib/hostile-text-fixtures";
 import { SIGN_IN_FAILED } from "../../lib/auth/copy";
 import { SessionProvider } from "../../lib/auth/session-provider";
 import {
-  GoogleOAuthButton,
   SignInForm,
   SignUpForm,
   UnavailableGap,
@@ -109,15 +108,12 @@ describe("SignUpForm", () => {
   });
 });
 
-describe("GoogleOAuthButton", () => {
-  it("stays disabled and does not call OAuth", async () => {
-    const user = userEvent.setup();
-    renderAuth(<GoogleOAuthButton />);
-    const button = screen.getByRole("button", {
-      name: "Continue with Google (when enabled)",
-    });
-    expect(button).toBeDisabled();
-    await user.click(button);
+describe("SignInForm Google omission", () => {
+  it("does not render a Google button while the provider is disabled", () => {
+    renderAuth(<SignInForm />);
+    expect(
+      screen.queryByRole("button", { name: /google/i }),
+    ).not.toBeInTheDocument();
     expect(signInWithOAuth).not.toHaveBeenCalled();
   });
 });

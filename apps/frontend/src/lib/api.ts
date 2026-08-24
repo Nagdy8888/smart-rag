@@ -149,11 +149,6 @@ export type AuthFailure = {
   detail: string;
 };
 
-export type MfaFailure = {
-  kind: "mfa";
-  detail: string;
-};
-
 export type FailClosedFailure = {
   kind: "fail_closed";
   status: number;
@@ -198,7 +193,6 @@ export type ServerFailure = {
 export type ApiFailure =
   | HandshakeFailure
   | AuthFailure
-  | MfaFailure
   | FailClosedFailure
   | BudgetFailure
   | RateFailure
@@ -239,13 +233,10 @@ export function isClassifiedApiError(error: unknown): error is ClassifiedApiErro
  * Return whether a FastAPI `detail` looks like a short code, not a trace.
  *
  * @param value - Candidate detail.
- * @returns True for `snake_case` / `MFA required` codes at most 64 chars.
+ * @returns True for `snake_case` codes at most 64 chars.
  */
 export function isSafeDetailCode(value: string): boolean {
   const trimmed = value.trim();
-  if (trimmed === "MFA required") {
-    return true;
-  }
   return /^[a-z][a-z0-9_]{0,63}$/i.test(trimmed);
 }
 
@@ -309,9 +300,6 @@ export function classifyApiError(
       minClientVersion: min,
       sseSchemaVersion: schema,
     };
-  }
-  if (status === 403 && body.detail === "MFA required") {
-    return { kind: "mfa", detail: "MFA required" };
   }
   if (status === 401 || status === 403) {
     return {
@@ -450,13 +438,12 @@ export function adminMutationHeaders(auth: ApiAuth): Record<string, string> {
 /**
  * Map a non-OK administration response to a thrown Error code.
  *
- * 404 is not treated as conversation deletion. 403 MFA required stays
- * distinct from forbidden.
+ * 404 is not treated as conversation deletion. 403 is authorization, not MFA.
  *
  * @param status - HTTP status.
  * @param body - JSON-ish object.
  * @param headers - Optional headers for 429 Retry-After classification.
- * @throws Error with `mfa_required`, `forbidden`, `budget_exhausted`,
+ * @throws Error with `forbidden`, `budget_exhausted`,
  *   `rate_limited`, `stale_row_version`, or a sanitized detail.
  */
 export function throwClassifiedAdminError(
@@ -465,9 +452,6 @@ export function throwClassifiedAdminError(
   headers?: Headers | Record<string, string>,
 ): never {
   const classified = classifyApiError(status, body, headers);
-  if (classified?.kind === "mfa") {
-    throw new Error("mfa_required");
-  }
   if (classified?.kind === "budget") {
     throw new Error("budget_exhausted");
   }
@@ -680,9 +664,6 @@ export async function fetchMe(
   const body = await readJsonObject(response);
   if (!response.ok) {
     const classified = classifyApiError(response.status, body);
-    if (classified?.kind === "mfa") {
-      throw new Error("mfa_required");
-    }
     if (classified?.kind === "auth" && classified.detail === "session_revoked") {
       throw new Error("session_revoked");
     }
@@ -693,7 +674,6 @@ export async function fetchMe(
     role: String(body.role ?? ""),
     authorization_version: Number(body.authorization_version ?? 0),
     upload_enabled: Boolean(body.upload_enabled),
-    mfa_enrolled: Boolean(body.mfa_enrolled),
   };
 }
 
@@ -849,10 +829,6 @@ export async function reserveUpload(
   });
   if (!response.ok) {
     const body = await readJsonObject(response);
-    const classified = classifyApiError(response.status, body);
-    if (classified?.kind === "mfa") {
-      throw new Error("mfa_required");
-    }
     throw new Error("upload_reserve_failed");
   }
   return (await response.json()) as SignedUploadResponse;
@@ -995,10 +971,6 @@ export async function finalizeUpload(
   });
   if (!response.ok) {
     const errorBody = await readJsonObject(response);
-    const classified = classifyApiError(response.status, errorBody);
-    if (classified?.kind === "mfa") {
-      throw new Error("mfa_required");
-    }
     throw new Error(sanitizedDetail(errorBody, "upload_finalize_rejected"));
   }
   const parsed = await readJsonObject(response);
@@ -1481,7 +1453,7 @@ export async function fetchUsageCompany(
  * @param token - Raw invitation secret.
  * @param fetchImpl - Injected fetch.
  * @returns Accepted invitation id.
- * @throws Error when FastAPI rejects the call. MFA maps to `mfa_required`.
+ * @throws Error when FastAPI rejects the call.
  */
 export async function acceptInvitation(
   auth: ApiAuth,
@@ -1499,9 +1471,6 @@ export async function acceptInvitation(
   const body = await readJsonObject(response);
   if (!response.ok) {
     const classified = classifyApiError(response.status, body, response.headers);
-    if (classified?.kind === "mfa") {
-      throw new Error("mfa_required");
-    }
     if (classified?.kind === "auth" && classified.detail === "session_revoked") {
       throw new Error("session_revoked");
     }
@@ -1521,7 +1490,7 @@ export async function acceptInvitation(
  * @param input - Invitee email, role, and upload flag.
  * @param fetchImpl - Injected fetch.
  * @returns Invitation identifiers without the mail token.
- * @throws Error `forbidden`, `mfa_required`, `budget_exhausted`, or `rate_limited`.
+ * @throws Error `forbidden`, `budget_exhausted`, or `rate_limited`.
  */
 export async function createInvitation(
   auth: ApiAuth,
@@ -1554,7 +1523,7 @@ export async function createInvitation(
  * @param userId - Subject user UUID from `GET /me` (no member directory).
  * @param fetchImpl - Injected fetch.
  * @returns Completed identifiers.
- * @throws Error `forbidden` or `mfa_required` on 403.
+ * @throws Error `forbidden` on 403.
  */
 export async function offboardUser(
   auth: ApiAuth,

@@ -23,7 +23,6 @@ export type CurrentUserResponse = {
   role: string;
   authorization_version: number;
   upload_enabled: boolean;
-  mfa_enrolled: boolean;
 };
 
 /** One named probe from authenticated `GET /ops/ready`. */

@@ -25,7 +25,7 @@ Copy uses signed sentences. Production never shows exception text. BM25
 degrade and Graph Pending are **warning**, not danger. Graph-only is never a
 success answering state.
 
-Live-region: `polite` for progress/tokens; `assertive` for MFA, 426, 402,
+Live-region: `polite` for progress/tokens; `assertive` for 426, 402,
 terminal `error`.
 
 ## Shared HTTP banners
@@ -41,7 +41,7 @@ terminal `error`.
 | Limiter fail-closed | 503 `limiter_unavailable` | Service cannot admit this action safely. | retry later | mutations |
 | Budget exhausted | 402 `budget_exhausted` | Company or user query budget is exhausted. | owner funds/wait; no hidden retry spend | all paid |
 | Concurrency | 429 `concurrency_limit` | Five query runs are already active. | wait/cancel | chat |
-| MFA required | 403 `MFA required` | Multi-factor authentication is required. | Auth-direct TOTP; Sign out | privileged |
+| MFA required | removed P08-12 | MFA is not a product gate. Single-factor Auth. | none | none |
 | Authz deny | 403 `forbidden` | You cannot perform this action. | none | convenience hide + server deny |
 | Not found / IDOR / tombstone | 404 `not_found` | Not found. | leave | no existence leak |
 | Idempotency conflict | 409 `idempotency_conflict` | This request does not match the original. | new key | chat/upload |
@@ -63,7 +63,7 @@ challenge. Those failures are Auth-provider generic copy only.
 | Success | session + `GET /me` 200 | app shell | none |
 | Sign-in failed | Auth error | Sign in failed | retry |
 | Env missing | no `NEXT_PUBLIC_SUPABASE_*` | Public Auth configuration is missing | set env |
-| Google disabled | `enabled=false` | Google OAuth is not enabled on this project | GAP-07-04 |
+| Google omitted | `enabled=false` | No Google button is rendered | GAP-07-04 |
 | Sign-up | Auth `signUp` | invitation may still be required | accept invite |
 | Reset sent | Auth reset | Check your email (Inbucket locally) | none |
 | Callback loading | `/auth/callback` | Completing sign-in | none |

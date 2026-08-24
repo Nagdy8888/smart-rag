@@ -35,8 +35,6 @@ const PUBLIC_VISUAL: Array<{
   { path: "/login", name: "login", heading: "Sign in" },
   { path: "/signup", name: "signup", heading: "Sign up" },
   { path: "/forgot-password", name: "forgot-password", heading: "Forgot password" },
-  { path: "/mfa/challenge", name: "mfa-challenge", heading: "MFA challenge" },
-  { path: "/unavailable/GAP-07-07", name: "unavailable-mfa", heading: "Unavailable" },
 ];
 
 test("public auth visual desktop and mobile", async ({ page }) => {

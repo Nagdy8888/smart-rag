@@ -1,13 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { handshakeBelowMinCopy } from "../../src/lib/handshake";
-import { MFA_RECOVERY_UNAVAILABLE, OWNER_BOOTSTRAP_UNAVAILABLE } from "../../src/lib/auth/copy";
+import { OWNER_BOOTSTRAP_UNAVAILABLE } from "../../src/lib/auth/copy";
 
 const PUBLIC_AUTH_PATHS = [
   "/login",
   "/signup",
   "/forgot-password",
-  "/mfa/enroll",
-  "/mfa/challenge",
   "/unavailable/GAP-07-07",
   "/unavailable/GAP-07-08",
   "/review-fixtures",
@@ -56,7 +54,7 @@ test("GAP-07-07 and GAP-07-08 unavailable pages have no mocked recovery or boots
 }) => {
   await page.goto("/unavailable/GAP-07-07");
   await expect(page.getByRole("heading", { name: "Unavailable" })).toBeVisible();
-  await expect(page.getByText(MFA_RECOVERY_UNAVAILABLE)).toBeVisible();
+  await expect(page.getByText(/MFA required|recovery code/i)).toHaveCount(0);
   await expect(page.getByLabel(/recovery/i)).toHaveCount(0);
   await expect(page.locator("input")).toHaveCount(0);
 

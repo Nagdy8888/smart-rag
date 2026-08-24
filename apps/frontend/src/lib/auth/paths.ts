@@ -12,7 +12,6 @@ const PUBLIC_EXACT = new Set([
 const PUBLIC_PREFIXES = [
   "/auth/callback",
   "/auth/reset",
-  "/mfa/",
   "/unavailable/",
   "/fonts/",
 ];

@@ -9,7 +9,7 @@ packet: P08-02
 
 # Auth and streaming (Phase 8 packet 2)
 
-SSR Auth, MFA/invitation surfaces, min-client handshake, and Bearer SSE UX.
+SSR Auth, invitation accept, min-client handshake, and Bearer SSE UX.
 Stitch frames are a **template, not a layout**. These routes exist because
 Auth/FastAPI contracts exist, not because Stitch numbered them.
 
@@ -31,13 +31,11 @@ convenience. FastAPI still authorizes every Bearer call.
 
 | Path | Contract | Notes |
 | --- | --- | --- |
-| `/login` | `signInWithPassword` | Generic "Sign in failed". Google disabled (GAP-07-04) |
+| `/login` | `signInWithPassword` | Generic "Sign in failed". Google omitted while disabled (GAP-07-04) |
 | `/signup` | `signUp` | Invitation still required for FastAPI membership |
 | `/forgot-password` | `resetPasswordForEmail` | Check-inbox copy; does not reveal existence |
 | `/auth/callback` | PKCE `exchangeCodeForSession` | Replay → "Sign-in could not be completed" |
 | `/auth/reset` | `updateUser({ password })` | After recovery `next=/auth/reset` |
-| `/mfa/enroll` | `mfa.enroll` TOTP | QR `<img>` only for data-URL `qr_code` |
-| `/mfa/challenge` | `mfa.challenge` / `verify` | MFA-required banner + Sign out |
 | `/invitations/accept` | `POST /invitations/accept` `{ token }` | Email from JWT, not the form |
 | `/unavailable/GAP-07-07` | none | Honest Unavailable; no recovery HTTP |
 | `/unavailable/GAP-07-08` | none | Honest Unavailable; no bootstrap HTTP |
@@ -87,19 +85,14 @@ wrong; FastAPI returns 401/403.
 
 | Surface | Owner | UI claim |
 | --- | --- | --- |
-| Email/password, reset, MFA enroll/challenge | Supabase Auth | Must **not** say FastAPI throttles login (GAP-07-20) |
+| Email/password, reset | Supabase Auth | Must **not** say FastAPI throttles login (GAP-07-20) |
 | Invitation accept | FastAPI `AUTH_ADJACENT` | Sanitized `detail` codes |
 | Chat POST / upload reserve | FastAPI handshake + limiter | 426/402/429/503 banners |
 
-## MFA vs GAP-07-07
+## MFA removed (P08-12)
 
-TOTP enroll/challenge remain Auth-direct until P08-12. FastAPI no longer emits 403 `MFA required`. Historical UI still shows the
-banner, Sign out, and links to `/mfa/challenge` and `/mfa/enroll`. Upload 403
-uses the same banner and never fakes TOTP success.
+TOTP enroll/challenge routes and MFA-required banners are deleted. Local Auth sets `auth.mfa.totp.enroll_enabled` and `verify_enabled` to false. Hosted residue is handled by [managed-auth-totp-residue.md](../runbooks/managed-auth-totp-residue.md). GAP-07-07 is a generic Unavailable page without recovery-code HTTP.
 
-Lost-factor recovery, admin session revoke UI, and recovery codes are
-**Unavailable GAP-07-07** because `mfa_recovery.py` has no router. Owner
-bootstrap is **Unavailable GAP-07-08**.
 
 ## Handshake before spend
 
@@ -128,7 +121,7 @@ whose `query_run_id` is not the current run are ignored.
 ## Frame 01/03 and gap decisions
 
 Frame 01 sign-in chrome is **not** a product route. Native `/login` covers
-email/password, disabled Google, and readiness pills. Frame 03 owner-setup
+email/password, omitted Google, and readiness pills. Frame 03 owner-setup
 wizard is **not** shipped (GAP-07-08). Invitation accept fills team entry.
 
 ## Failure modes

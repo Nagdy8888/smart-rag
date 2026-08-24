@@ -116,7 +116,6 @@ beforeEach(() => {
     role: "member",
     authorization_version: 1,
     upload_enabled: true,
-    mfa_enrolled: true,
   });
   fetchDocument.mockResolvedValue({ ok: false, notFound: true });
   listDocuments.mockResolvedValue([]);
@@ -275,7 +274,6 @@ describe("DocumentLibrary status and roles", () => {
       role: "viewer",
       authorization_version: 1,
       upload_enabled: true,
-      mfa_enrolled: false,
     });
     renderSurface(<DocumentLibrary />);
     expect(await screen.findByText(/Upload controls are hidden/)).toBeInTheDocument();

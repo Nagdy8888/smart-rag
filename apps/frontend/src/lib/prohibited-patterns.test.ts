@@ -141,8 +141,9 @@ describe("prohibited production patterns", () => {
   it("allows Auth-direct App Router folders", () => {
     const names = appRouteNames(path.join(srcRoot, "app"));
     expect(names).toEqual(
-      expect.arrayContaining(["login", "signup", "auth", "mfa", "invitations"]),
+      expect.arrayContaining(["login", "signup", "auth", "invitations"]),
     );
+    expect(names).not.toContain("mfa");
   });
 
   it("does not embed service-role or privileged keys in frontend source", () => {

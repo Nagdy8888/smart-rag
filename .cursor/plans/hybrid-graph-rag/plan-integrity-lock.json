@@ -24,7 +24,7 @@
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/04-map-ui-to-real-contracts.md": "20acbd402eeed315806c2ecb6b1cba98b156bca63f023da980761a7d5684a35b",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/05-review-accessibility-and-security.md": "5388e4ed6ecccf1e8a10d20501b8b373250226631fb7c6f82b2e5b2062965614",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/06-record-approval-or-fallback.md": "d75f570528bd5140481fb891a678cfa35a6b778eed2f683f5aaabd264cfeef59",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md": "ee73e2bbdbfb9b36a6076463fc0132647cd11ad74001d35de874ecda32d76007",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md": "00db0097b2ec9531af79db72562228fc7b529be8267a41807aa278222ef87f25",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-shared-contracts.md": "1a8a6a4e6a49d9cd4d831d136c2d7bf44fc734cf5c50d18eaf42f84e04d7eba9",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md": "15da3601961bd90195458705d599eb113e5f0cd1b88d62e70c675b35ca4d1d46",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/01-integrate-approved-design-system.md": "03a92cd69bec4f616a94dc3f27d726b5350968f38e1a89a071dbc680038c3e7c",
@@ -38,7 +38,7 @@
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/09-repair-phase-6-execution-durability-and-verified-answers.md": "b61611f69b5418889f56436fe481f0491e4f84c20d69033a3dbd8027c1a69361",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/10-harden-frontend-chat-protocol-and-recovery.md": "b1208057a20655a0b0d5441e81e40ad921bc0ce8fb701279502a86b169ab99eb",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/11-remove-backend-and-database-mfa-aal2-enforcement.md": "e027643c0ec714ca292e5bccc5e892a472ced6b6a1167eafa7e0c68bf504961c",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/12-remove-frontend-provider-mfa-and-finish-single-factor-auth.md": "56ec1449cf6748f3d1ac4959c12a31852cb50d10471ea0e5a8eeb9e9737a71c8",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/12-remove-frontend-provider-mfa-and-finish-single-factor-auth.md": "40b488a840341b667b5b4be909a7c7fe1da9802cc119974f45a69da9c2caaddb",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/13-implement-exact-design-tokens-and-reusable-primitives.md": "3004d499a981e93845f829bc2a896734e3703f72b39842526007c41c5f7927c4",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/14-build-the-streamlined-role-aware-shell-and-routes.md": "11bb57ccfe7bcf48bffd4e5ce5a0361bef6f8af39b696192b7f7e77a2b68ea34",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/15-rebuild-ask-around-verified-final-answers.md": "1e29f39d65cd14e269f0674d06152e25a9cd5b3b1ee9f28f188798c45f564d96",
@@ -95,12 +95,12 @@
     ".cursor/skills/implement-observability-evals/SKILL.md": "b6dd9db6248919410d8147176c7e127ea995111d3051e12b1538a3b1a05045d9",
     ".cursor/skills/implement-plan-phase/SKILL.md": "a1fbdfcff599c1e97f3a99d96928c98c9f63142e9d6f1e996459d56f70535a9d",
     ".cursor/skills/implement-query-agent/SKILL.md": "8a8bc2a231c6059a0281df279ec6a3c1ea423aca83a99e2c0707b0e2f443d6a5",
-    ".cursor/skills/implement-rag-frontend/SKILL.md": "255fa735f464f5917ee7226bb0782a82e419c448eb4e1acdf6aa1ef63b830e00",
+    ".cursor/skills/implement-rag-frontend/SKILL.md": "9a9fb5009fe7fb170f8a39622293bd78860d4039198cc2f1ef10c6aedee45141",
     ".cursor/skills/implement-structured-table/SKILL.md": "0cc45e9db79958d79e608407c197b4e8df9cd2ba44ac5908103f4a37c903c61c",
     ".cursor/skills/implement-supabase-security/SKILL.md": "613ce2f90271dca8d652135f0b6e45b0f72348c2e40206bc6dea3253fb8a2bb1",
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-08-24T19:25:02.373190+00:00",
+  "generated_at": "2026-08-24T19:55:31.319443+00:00",
   "schema_version": 1
 }

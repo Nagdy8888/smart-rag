@@ -62,7 +62,7 @@ flowchart TD
 | Upload reserve | `POST /documents/uploads`; local `signed_url` is null |
 | Version status | `GET /ingestion/versions/{id}/status` for Hybrid/BM25/graph-handoff |
 | Readiness | public `GET /health/ready`; named ParadeDB/Valkey/LightRAG probes on `GET /ops/ready` (owner/admin) |
-| MFA | Not an authorization gate. `GET /me.mfa_enrolled` is always false |
+| MFA | Removed from product UI. `GET /me.mfa_enrolled` is ignored (backend always false) |
 
 Paid chat uses JSON 202 so `run_id` is in the body, then the same GET EventSource
 path as reconnect. That is one paid reservation. Unknown SSE event types are
@@ -95,9 +95,8 @@ on the console; live SSE still owns per-run codes. Host uvicorn without
 `PARADEDB_URL` / `VALKEY_LIMITS_URL` reports public `detail=not_query_ready`,
 which is not a fake-healthy probe.
 
-Owner/admin and `upload_enabled` callers need MFA. A password JWT is `aal1`;
-the UI shows **MFA required** instead of a successful upload. After TOTP
-verify (`aal2`) plus `mfa_enrolled` and `upload_enabled`, local reserve still
+Owner/admin and `upload_enabled` callers do not need MFA. Upload authorization
+is role plus `upload_enabled` plus quota. Local reserve still
 returns `signed_url=null`.
 
 ## Environment

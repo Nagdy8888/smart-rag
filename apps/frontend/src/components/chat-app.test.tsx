@@ -15,7 +15,7 @@ import {
   listConversations,
   loadConsoleReadiness,
 } from "../lib/api";
-import { MFA_REQUIRED_BANNER, SESSION_REVOKED_BANNER } from "../lib/auth/copy";
+import { SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { SessionProvider } from "../lib/auth/session-provider";
 import { handshakeBelowMinCopy, QUERY_NOT_READY_COPY } from "../lib/handshake";
 import { limitationCopy } from "../lib/limitations";
@@ -84,7 +84,6 @@ vi.mock("../lib/api", async () => {
       role: "member",
       authorization_version: 1,
       upload_enabled: true,
-      mfa_enrolled: true,
     })),
     listConversations: vi.fn(async () => []),
     createConversation: vi.fn(async () => ({
@@ -130,7 +129,6 @@ afterEach(() => {
     role: "member",
     authorization_version: 1,
     upload_enabled: true,
-    mfa_enrolled: true,
   });
 });
 
@@ -288,14 +286,13 @@ function stubChatFetch(options: {
   };
 }
 
-describe("ChatApp MFA and revoked session", () => {
-  it("shows MFA required banner and has no recovery-code control", async () => {
-    vi.mocked(fetchMe).mockRejectedValue(new Error("mfa_required"));
+describe("ChatApp MFA removal and revoked session", () => {
+  it("does not render MFA challenge or enroll links", async () => {
     renderChat(<ChatApp />);
-    expect(await screen.findAllByText(MFA_REQUIRED_BANNER)).not.toHaveLength(0);
-    expect(screen.getByRole("link", { name: "MFA challenge" })).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Auto chat" });
+    expect(screen.queryByRole("link", { name: "MFA challenge" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Enroll TOTP" })).toBeNull();
     expect(screen.queryByLabelText(/recovery/i)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   });
 
   it("shows session_revoked banner and signs out", async () => {

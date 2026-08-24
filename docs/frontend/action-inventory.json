@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "packet": "P08-07",
-  "status": "baseline",
+  "packet": "P08-12",
+  "status": "auth-mfa-removed",
   "generated_at": "2026-08-24",
-  "notes": "Baseline of visible controls before the functional overhaul. Unsupported actions are recorded as removed_target, not shipped replacements. Test IDs are filled as later packets land.",
+  "notes": "P08-12 removed TOTP product routes and omitted disabled Google chrome. Kept Auth actions have stable test ids. MFA/Google rows stay as removed_target.",
   "actions": [
     {
       "action_id": "auth.sign_in",
@@ -17,7 +17,7 @@
       "failure_state": "generic auth error",
       "idempotency": "new session",
       "disposition": "keep",
-      "test_id": "pending-P08-12"
+      "test_id": "auth-sign-in"
     },
     {
       "action_id": "auth.sign_up",
@@ -31,7 +31,7 @@
       "failure_state": "generic auth error",
       "idempotency": "provider unique email",
       "disposition": "keep",
-      "test_id": "pending-P08-12"
+      "test_id": "auth-sign-up"
     },
     {
       "action_id": "auth.forgot_password",
@@ -45,7 +45,7 @@
       "failure_state": "generic auth error",
       "idempotency": "provider rate limit",
       "disposition": "keep",
-      "test_id": "pending-P08-12"
+      "test_id": "auth-forgot-password"
     },
     {
       "action_id": "auth.reset_password",
@@ -59,7 +59,21 @@
       "failure_state": "generic auth error",
       "idempotency": "single recovery token",
       "disposition": "keep",
-      "test_id": "pending-P08-12"
+      "test_id": "auth-reset-password"
+    },
+    {
+      "action_id": "auth.accept_invitation",
+      "route": "/invitations/accept",
+      "label": "Accept invitation",
+      "control_kind": "submit",
+      "contract_owner": "fastapi",
+      "contract": "POST /invitations/accept { token }",
+      "role": "authenticated",
+      "success_state": "membership accepted",
+      "failure_state": "generic auth or forbidden",
+      "idempotency": "single-use token",
+      "disposition": "keep",
+      "test_id": "auth-accept-invitation"
     },
     {
       "action_id": "auth.mfa_enroll",
@@ -73,7 +87,7 @@
       "failure_state": "generic MFA error",
       "idempotency": "factor id",
       "disposition": "removed_target",
-      "test_id": "pending-P08-12"
+      "test_id": "removed-P08-12"
     },
     {
       "action_id": "auth.mfa_challenge",
@@ -87,7 +101,7 @@
       "failure_state": "generic MFA error",
       "idempotency": "challenge id",
       "disposition": "removed_target",
-      "test_id": "pending-P08-12"
+      "test_id": "removed-P08-12"
     },
     {
       "action_id": "auth.google_oauth",
@@ -101,7 +115,7 @@
       "failure_state": "n/a",
       "idempotency": "n/a",
       "disposition": "removed_target",
-      "test_id": "pending-P08-12"
+      "test_id": "removed-P08-12"
     },
     {
       "action_id": "nav.ask",

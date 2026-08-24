@@ -7,7 +7,7 @@ import {
   STALE_ROW_VERSION_COPY,
 } from "./admin-copy";
 import type { ApiFailure } from "./api";
-import { MFA_REQUIRED_BANNER, SESSION_REVOKED_BANNER } from "./auth/copy";
+import { SESSION_REVOKED_BANNER } from "./auth/copy";
 import { handshakeBelowMinCopy } from "./handshake";
 import { displayText } from "./safe-text";
 
@@ -24,8 +24,6 @@ export function apiFailureBanner(failure: ApiFailure): string {
   switch (failure.kind) {
     case "upgrade":
       return handshakeBelowMinCopy();
-    case "mfa":
-      return MFA_REQUIRED_BANNER;
     case "auth":
       if (failure.detail === "session_revoked") {
         return SESSION_REVOKED_BANNER;
@@ -72,8 +70,6 @@ export function apiFailureBanner(failure: ApiFailure): string {
  */
 export function mutationFailureBanner(error: Error): string {
   switch (error.message) {
-    case "mfa_required":
-      return MFA_REQUIRED_BANNER;
     case "forbidden":
       return FORBIDDEN_MUTATION_COPY;
     case "budget_exhausted":

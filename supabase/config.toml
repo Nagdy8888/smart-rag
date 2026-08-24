@@ -56,15 +56,16 @@ jwt_expiry = 3600
 minimum_password_length = 8
 password_requirements = "lower_upper_letters_digits"
 
-# TOTP is the local MFA factor for owner/admin and upload_enabled callers.
-# Restart Auth after changing this file: `npx supabase stop && npx supabase start`.
-# Do not `db reset`.
+# P08-12: TOTP is disabled through documented CLI keys
+# (auth.mfa.totp.enroll_enabled / verify_enabled). Restart Auth after
+# changing this file: `npx supabase stop && npx supabase start`.
+# Do not `db reset`. Do not delete auth.mfa_factors with SQL.
 [auth.mfa]
 max_enrolled_factors = 10
 
 [auth.mfa.totp]
-enroll_enabled = true
-verify_enabled = true
+enroll_enabled = false
+verify_enabled = false
 
 [auth.email]
 enable_signup = true

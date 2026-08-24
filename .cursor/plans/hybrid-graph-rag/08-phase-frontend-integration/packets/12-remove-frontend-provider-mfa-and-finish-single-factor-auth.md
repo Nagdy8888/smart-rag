@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 12
-status: pending
+status: complete
 title: "Remove frontend/provider MFA and finish single-factor Auth"
 requirement_ids: [P08-12]
 ---

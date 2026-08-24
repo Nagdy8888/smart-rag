@@ -74,7 +74,7 @@ describe("logical highlight fixture", () => {
 });
 
 describe("error focus", () => {
-  it("moves focus to a 426/402/MFA error StatusBanner", () => {
+  it("moves focus to a 426/402 error StatusBanner", () => {
     render(
       <StatusBanner kind="error" role="alert">
         {GENERIC_PRODUCTION_ERROR}

@@ -66,9 +66,9 @@ flowchart TD
 | Sign-up / reset links | `tests/e2e/login.spec.ts` | signup and forgot-password links are visible from login | playwright-unauth | proven |
 | Callback replay | `tests/e2e/login.spec.ts` | callback replay shows generic failure copy | playwright-unauth | proven |
 | Google disabled GAP-07-04 | `src/lib/handshake.test.ts` | does not invoke OAuth when the provider is disabled | vitest-unit | proven |
-| MFA challenge copy | `tests/e2e/login.spec.ts` | MFA required banner copy is on the challenge surface | playwright-unauth | proven |
-| MFA required (chat) | `src/components/chat-app.test.tsx` | shows MFA required banner and has no recovery-code control | vitest-component | proven |
-| Upload MFA | `src/lib/api.test.ts` | throws mfa_required on 403 MFA required | vitest-unit | proven |
+| MFA routes removed | `tests/e2e/login.spec.ts` | `/mfa/challenge` redirects to login; no Google button | playwright-unauth | proven |
+| MFA required (chat) | `src/components/chat-app.test.tsx` | no MFA challenge/enroll links | vitest-component | proven |
+| Upload leftover MFA copy | `src/lib/api.test.ts` | 403 `MFA required` is generic auth/upload failure, not `mfa_required` | vitest-unit | proven |
 | MFA recovery GAP-07-07 | `src/components/auth/auth-screens.test.tsx` | has no recovery-code input that submits | vitest-component | proven |
 | MFA recovery GAP-07-07 | `tests/e2e/phase08-journeys.spec.ts` | GAP-07-07 and GAP-07-08 unavailable pages have no mocked recovery or bootstrap | playwright-unauth | proven |
 | Owner bootstrap GAP-07-08 | `src/components/auth/auth-screens.test.tsx` | has no owner-bootstrap form | vitest-component | proven |

@@ -34,7 +34,7 @@ import {
   type ApiAuth,
   type ApiFailure,
 } from "../lib/api";
-import { MFA_REQUIRED_BANNER, SESSION_REVOKED_BANNER } from "../lib/auth/copy";
+import { SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { useSession } from "../lib/auth/session-provider";
 import {
   SOURCE_PREVIEW_UNAVAILABLE,
@@ -584,11 +584,6 @@ export function ChatApp() {
     }
   }, [auth, chat.runId, feedbackComment, feedbackTag, thumbsUp]);
 
-  const mfaRequired =
-    meQuery.isError &&
-    meQuery.error instanceof Error &&
-    meQuery.error.message === "mfa_required";
-
   const sessionRevoked =
     meQuery.isError &&
     meQuery.error instanceof Error &&
@@ -610,9 +605,6 @@ export function ChatApp() {
   const assertiveCopy = (() => {
     if (failure?.kind === "upgrade" || failure?.kind === "budget") {
       return apiFailureBanner(failure);
-    }
-    if (mfaRequired) {
-      return MFA_REQUIRED_BANNER;
     }
     if (chat.terminal === "error") {
       return GENERIC_PRODUCTION_ERROR;
@@ -638,30 +630,6 @@ export function ChatApp() {
         </StatusBanner>
         <p className={chatStyles.muted}>
           <Link href="/login">Sign in</Link>
-        </p>
-      </div>
-    );
-  }
-
-  if (mfaRequired) {
-    return (
-      <div className={chatStyles.page}>
-        <header className={chatStyles.header}>
-          <h2>Auto chat</h2>
-          <Button type="button" onClick={() => void session.signOut()}>
-            Sign out
-          </Button>
-        </header>
-        <StatusBanner kind="error" role="alert">
-          {MFA_REQUIRED_BANNER}
-        </StatusBanner>
-        <LiveRegion politeness="assertive" aria-label="Blocking errors" visuallyHidden>
-          {MFA_REQUIRED_BANNER}
-        </LiveRegion>
-        <p className={chatStyles.muted}>
-          <Link href="/mfa/challenge">MFA challenge</Link>
-          {" · "}
-          <Link href="/mfa/enroll">Enroll TOTP</Link>
         </p>
       </div>
     );

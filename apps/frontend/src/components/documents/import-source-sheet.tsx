@@ -10,7 +10,6 @@ import { Select } from "../ui/select";
 import { Sheet } from "../ui/sheet";
 import { StatusBanner } from "../ui/status-banner";
 import { UserText } from "../ui/user-text";
-import { MFA_UPLOAD_DENIED } from "../../lib/auth/copy";
 import {
   DECLARED_CATEGORIES,
   type DeclaredCategory,
@@ -174,11 +173,9 @@ export function ImportSourceSheet({
           {uploadNote ? <p className={styles.muted}>{uploadNote}</p> : null}
           {uploadError ? (
             <StatusBanner kind="error" role="alert">
-              {uploadError.message === "mfa_required"
-                ? MFA_UPLOAD_DENIED
-                : uploadError.message.startsWith("storage_upload_failed")
-                  ? "The file did not finish uploading. Try again after the storage write succeeds."
-                  : "Upload rejected. Server authorization is authoritative."}
+              {uploadError.message.startsWith("storage_upload_failed")
+                ? "The file did not finish uploading. Try again after the storage write succeeds."
+                : "Upload rejected. Server authorization is authoritative."}
             </StatusBanner>
           ) : null}
         </div>

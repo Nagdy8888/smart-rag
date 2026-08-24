@@ -54,3 +54,5 @@ frontend, health, or `SharedSettings` paths.
 - [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md)
 - [SUPABASE_JWKS_ROLLOVER.md](../runbooks/SUPABASE_JWKS_ROLLOVER.md)
 - [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md)
+
+Product Auth is single-factor after P08-11/P08-12. The frontend has no TOTP enroll/challenge UI. Operator factor deletion uses Auth Admin APIs only; see docs/runbooks/managed-auth-totp-residue.md.

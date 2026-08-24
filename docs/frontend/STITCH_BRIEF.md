@@ -9,6 +9,9 @@ packet: P07-02
 
 # Stitch brief (Phase 7)
 
+P08-12 product Auth is single-factor: `/mfa/*` is gone and Google chrome is omitted while the provider is disabled. Frames below remain historical Stitch templates, not shipped layout.
+
+
 Copy-ready Google Stitch prompts, frames, tokens, and localization for the
 production console. This is specification only. Phase 8 implements against
 [API_UI_MAPPING.md](./API_UI_MAPPING.md). Do not treat generated HTML, static
