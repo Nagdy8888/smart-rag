@@ -223,3 +223,11 @@ def test_probe_interrupt_resume_does_not_duplicate_ledger(
     finally:
         checkpointer.close()
         worker.close()
+
+
+def test_session_dsn_opens_pinned_saver_and_store(postgres_url: str) -> None:
+    """A direct/session checkpoint DSN opens the pinned saver and store."""
+
+    from smart_rag_agents.query.checkpointer import probe_query_checkpoint_runtime
+
+    probe_query_checkpoint_runtime(postgres_url, timeout_seconds=2)

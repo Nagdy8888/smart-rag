@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 8
-status: pending
+status: complete
 title: "Restore query runtime connectivity and deterministic readiness"
 requirement_ids: [P08-08]
 ---

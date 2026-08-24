@@ -389,6 +389,9 @@ async function readJsonObject(response: Response): Promise<Record<string, unknow
   return {};
 }
 
+/** Browser abort budget for public/operator readiness probes, in milliseconds. */
+export const HEALTH_READY_TIMEOUT_MS = 8000;
+
 /**
  * GET `/health/ready` without authentication.
  *
@@ -402,7 +405,7 @@ export async function fetchReady(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ReadinessResponse | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3000);
+  const timer = setTimeout(() => controller.abort(), HEALTH_READY_TIMEOUT_MS);
   try {
     const response = await fetchImpl(apiUrl("/health/ready"), {
       signal: controller.signal,
@@ -437,7 +440,7 @@ export async function fetchOperatorReady(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ReadinessResponse | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3000);
+  const timer = setTimeout(() => controller.abort(), HEALTH_READY_TIMEOUT_MS);
   try {
     const response = await fetchImpl(apiUrl("/ops/ready"), {
       signal: controller.signal,

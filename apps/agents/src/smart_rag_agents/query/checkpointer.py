@@ -116,6 +116,50 @@ def open_query_checkpointer(
     return IngestionCheckpointer(pool=opened.pool, saver=compact)
 
 
+def probe_query_checkpoint_runtime(dsn: str, *, timeout_seconds: int = 1) -> None:
+    """Open the pinned saver and store on one bounded connection, then close.
+
+    Args:
+        dsn: Session/direct Postgres URL.
+        timeout_seconds: libpq connect timeout in seconds.
+
+    Raises:
+        ValueError: If ``dsn`` is a known transaction-pooler URL. The
+            message never includes the DSN.
+        Exception: Connection, role, or schema failure. Callers must not
+            log exception text that might include the DSN.
+
+    Side Effects:
+        Opens one autocommit connection, applies ``app_checkpointer`` and
+        ``langgraph`` search_path, constructs ``PostgresSaver`` and
+        ``PostgresStore`` without ``setup()``, then closes.
+    """
+
+    import psycopg
+    from langgraph.store.postgres import PostgresStore
+    from psycopg.rows import dict_row
+    from smart_rag_core.settings.postgres_dsn import require_session_postgres_dsn
+
+    from smart_rag_agents.ingestion.checkpointer import (
+        _configure_checkpointer_connection,
+    )
+
+    require_session_postgres_dsn(dsn, setting_name="LANGGRAPH_CHECKPOINT_URL")
+    with psycopg.connect(
+        dsn,
+        autocommit=True,
+        connect_timeout=max(1, timeout_seconds),
+        prepare_threshold=0,
+        row_factory=dict_row,
+    ) as connection:
+        _configure_checkpointer_connection(connection)
+        saver = PostgresSaver(connection)
+        store = PostgresStore(conn=connection)
+        connection.execute("SELECT 1")
+        if saver is None or store is None:
+            raise RuntimeError("langgraph runtime probe failed")
+
+
 def _compact_checkpoint(checkpoint: Checkpoint) -> Checkpoint:
     """Copy a checkpoint and hash nested source-document fields.
 

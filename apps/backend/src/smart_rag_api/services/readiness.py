@@ -8,6 +8,7 @@ import psycopg
 from pydantic import BaseModel, ConfigDict, Field
 from smart_rag_core.runtime.valkey import ValkeyClient, ValkeyTimeoutError
 from smart_rag_core.settings import BackendSettings
+from smart_rag_core.settings.postgres_dsn import TransactionPoolerDsnError
 
 
 class DependencyStatus(BaseModel):
@@ -29,9 +30,11 @@ class ReadinessResponse(BaseModel):
 
     Attributes:
         status: ``unconfigured``, ``not_ready``, ``degraded``, or ``ready``.
-        query_ready: True only when DB, Valkey, real models, and LightRAG
-            attach are all healthy. Mock mode never sets this true.
-            ParadeDB down is reported but does not block query_ready;
+        query_ready: True only when the core Hybrid query path, durable
+            checkpointer/store, Valkey, and real models are healthy. Mock
+            mode never sets this true. Missing LightRAG is a typed
+            degraded dependency and does not clear ``query_ready``.
+            ParadeDB down is reported but does not block ``query_ready``;
             Hybrid then degrades to dense+term.
         detail: Short operator-facing reason.
         rate_limit_degraded: True when the emergency limiter was used.
@@ -100,6 +103,30 @@ def _probe_valkey(client: ValkeyClient | None) -> str:
         return "down"
 
 
+def _probe_checkpoint(dsn: str | None) -> str:
+    """Open the pinned LangGraph saver and store, then close.
+
+    Args:
+        dsn: Optional session/direct checkpoint DSN.
+
+    Returns:
+        ``unconfigured``, ``ok``, or ``down``. The result never includes
+        the DSN.
+    """
+
+    if dsn is None:
+        return "unconfigured"
+    try:
+        from smart_rag_agents.query.checkpointer import probe_query_checkpoint_runtime
+
+        probe_query_checkpoint_runtime(dsn, timeout_seconds=1)
+    except (TransactionPoolerDsnError, ValueError, psycopg.Error, OSError):
+        return "down"
+    except Exception:
+        return "down"
+    return "ok"
+
+
 def build_readiness(
     settings: BackendSettings | None,
     *,
@@ -109,6 +136,7 @@ def build_readiness(
     rate_limit_degraded: bool,
     postgres_probe: str | None = None,
     paradedb_probe: str | None = None,
+    checkpoint_probe: str | None = None,
 ) -> ReadinessResponse:
     """Compose an honest readiness document.
 
@@ -120,12 +148,15 @@ def build_readiness(
         rate_limit_degraded: Emergency limiter flag.
         postgres_probe: Optional precomputed DB probe for tests.
         paradedb_probe: Optional precomputed ParadeDB probe for tests.
+        checkpoint_probe: Optional precomputed checkpointer/store probe
+            for tests.
 
     Returns:
-        Readiness payload. ``query_ready`` is false in mock mode, when
-        LightRAG is unconfigured, or when DB/Valkey are not ok. ParadeDB
-        ``down`` is visible on the payload and does not by itself clear
-        ``query_ready``.
+        Readiness payload. ``query_ready`` is true when the core Hybrid
+        path, durable checkpointer/store, Valkey, and real models are
+        usable. Mock mode never sets it true. Missing LightRAG degrades
+        graph but does not clear ``query_ready``. ParadeDB ``down`` is
+        visible and does not by itself clear ``query_ready``.
     """
 
     if settings is None:
@@ -138,6 +169,7 @@ def build_readiness(
                 DependencyStatus(name="valkey_limits", status="unconfigured"),
                 DependencyStatus(name="valkey_cache", status="unconfigured"),
                 DependencyStatus(name="paradedb", status="unconfigured"),
+                DependencyStatus(name="langgraph_checkpoint", status="unconfigured"),
                 DependencyStatus(name="model_gateway", status="unconfigured"),
                 DependencyStatus(name="lightrag", status="unconfigured"),
             ),
@@ -157,6 +189,17 @@ def build_readiness(
     paradedb = (
         paradedb_probe if paradedb_probe is not None else _probe_paradedb(paradedb_url)
     )
+    try:
+        checkpoint_dsn = settings.resolved_checkpoint_dsn()
+    except (TransactionPoolerDsnError, ValueError):
+        checkpoint_dsn = None
+        checkpoint = "down"
+    else:
+        checkpoint = (
+            checkpoint_probe
+            if checkpoint_probe is not None
+            else _probe_checkpoint(checkpoint_dsn)
+        )
     limits = _probe_valkey(valkey_limits)
     cache = _probe_valkey(valkey_cache)
     model = "mock" if settings.mock_model_mode else "ok"
@@ -166,16 +209,17 @@ def build_readiness(
         DependencyStatus(name="valkey_limits", status=limits),
         DependencyStatus(name="valkey_cache", status=cache),
         DependencyStatus(name="paradedb", status=paradedb),
+        DependencyStatus(name="langgraph_checkpoint", status=checkpoint),
         DependencyStatus(name="model_gateway", status=model),
         DependencyStatus(name="lightrag", status=graph),
     )
 
     query_ready = (
         database == "ok"
+        and checkpoint == "ok"
         and limits == "ok"
         and cache == "ok"
         and model == "ok"
-        and graph == "attached"
         and not rate_limit_degraded
     )
     if database == "unconfigured":
@@ -184,15 +228,30 @@ def build_readiness(
     elif database == "down":
         status_value = "not_ready"
         detail = "Database probe failed."
+    elif checkpoint == "down":
+        status_value = "not_ready"
+        detail = "Checkpointer probe failed."
+    elif checkpoint == "unconfigured":
+        status_value = "degraded"
+        detail = "Checkpointer DSN unset; query path cannot persist runs."
+    elif query_ready and graph != "attached" and paradedb == "down":
+        status_value = "degraded"
+        detail = (
+            "ParadeDB is down; Hybrid degrades to dense plus exact/trigram term. "
+            "LightRAG is unconfigured."
+        )
     elif query_ready and paradedb == "down":
         status_value = "degraded"
         detail = "ParadeDB is down; Hybrid degrades to dense plus exact/trigram term."
+    elif query_ready and graph != "attached":
+        status_value = "degraded"
+        detail = "LightRAG is unconfigured; Hybrid query path remains available."
     elif query_ready:
         status_value = "ready"
         detail = "Dependencies healthy."
     else:
         status_value = "degraded"
-        detail = "Service is up but not query-ready (mock, graph, Valkey, or limiter)."
+        detail = "Service is up but not query-ready (mock, Valkey, or limiter)."
 
     return ReadinessResponse(
         status=status_value,

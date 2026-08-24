@@ -1,0 +1,41 @@
+# Secrets and local env files. Tracked examples stay available to the build.
+.env
+.env.*
+!.env.example
+!.env.*.example
+**/.env.local
+**/.vercel
+
+# VCS and editor/agent state
+.git
+.github
+.cursor
+.agents
+
+# Node / Next.js artifacts
+**/.next
+**/node_modules
+**/.turbo
+**/.pnpm-store
+**/coverage
+**/playwright-report
+**/test-results
+
+# Python artifacts
+**/.venv
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/__pycache__
+**/*.pyc
+**/.coverage
+**/htmlcov
+
+# Reports, local dumps, keys
+prev_review
+docs/reviews
+*.pem
+*.key
+*.p12
+.tmp*
+logs

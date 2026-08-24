@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: developers, operators
 ---
 
@@ -86,11 +86,12 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `SUPABASE_URL` | HTTP origin; `http://127.0.0.1:54321` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. See local `iss` aliases below. |
 | `SUPABASE_JWT_AUDIENCE` | non-empty string; `authenticated` | public | Required JWT `aud` claim |
 | `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
-| `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api`. Compose API/worker must not use the postgres superuser DSN; see `APP_RUNTIME_DB_PASSWORD` |
+| `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api`. Compose API/worker must not use the postgres superuser DSN; see `APP_RUNTIME_DB_PASSWORD`. May be a transaction pooler for short API work. |
 | `APP_RUNTIME_DB_PASSWORD` | secret; required for local Compose | secret | Password for LOGIN wrapper `app_runtime`. `app_api` is NOLOGIN. See [LOCAL_RUNTIME_ROLES.md](../deployment/LOCAL_RUNTIME_ROLES.md) |
 | `API_SUPABASE_DB_URL` | optional secret URL | secret | Compose API DSN override. Must be non-superuser |
 | `WORKER_SUPABASE_DB_URL` | optional secret URL | secret | Compose worker DSN override. Must be non-superuser |
-| `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. |
+| `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Session/direct checkpointer/store DSN. Falls back to `SUPABASE_DB_URL` only when that fallback is also session/direct. Port `6543` and `pgbouncer=true` fail closed. Role `app_checkpointer`, schema `langgraph`. Runtime never auto-migrates. |
+| `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Session/direct only. Unset = unconfigured. Never schema-admin. |
 | `CORS_ALLOW_ORIGINS` | comma-separated exact origins; `http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010` | public | Wildcards forbidden. Never pair `*` with credentials. `:3010` is the Playwright developer-console origin so tests do not reuse Compose `:3000` |
 | `API_VERSION` | `major.minor.patch`; `0.1.0` | public | Published by `GET /api/meta` |
 | `SSE_SCHEMA_VERSION` | safe token; `1` | public | Published by `GET /api/meta` and the first SSE `schema` event |
@@ -155,7 +156,7 @@ listed in `additional_redirect_urls`. Local upload reserve still returns
 | `JOB_HEARTBEAT_INTERVAL_SECONDS` | integer 10–900; `60` | public | Heartbeat cadence while a job is leased |
 | `JOB_POLL_INTERVAL_SECONDS` | integer 1–60; `5` | public | Idle delay between queue polls |
 | `WORKER_CONCURRENCY` | integer 1–8; `2` | public | Maximum concurrently processed ingestion jobs |
-| `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Checkpointer/store DSN; defaults to `SUPABASE_DB_URL`. Role `app_checkpointer`, schema `langgraph`. Runtime never auto-migrates. |
+| `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Checkpointer/store DSN; defaults to `SUPABASE_DB_URL` only when that URL is session/direct. Role `app_checkpointer`, schema `langgraph`. Transaction pooler DSNs fail closed. Runtime never auto-migrates. |
 | `SMART_RAG_PROMPT_ENV` | `dev`, `staging`, or `prod`; `dev` | public | Prompt registry promotion. Unknown ids fail closed. See [prompts/CHANGELOG.md](../../apps/agents/src/smart_rag_agents/prompts/CHANGELOG.md) |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. Cap 4. |
 
@@ -216,9 +217,11 @@ Browser bundles may only contain publishable values. See
 
 | Variable | Type / default | Security | Contract |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | HTTP origin; `http://127.0.0.1:8000` | public | FastAPI origin for Bearer fetch SSE |
-| `NEXT_PUBLIC_SUPABASE_URL` | HTTP origin | public | Browser-direct Auth. Never a service-role URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | publishable anon key | public | Browser Auth only. Never the service role |
+| `NEXT_PUBLIC_API_BASE_URL` | HTTP origin; `http://127.0.0.1:8000` | public | FastAPI origin for Bearer fetch SSE. Must be supplied as a Docker **build-arg** when building the frontend image; runtime env does not rewrite the Next.js bundle. |
+| `NEXT_PUBLIC_SUPABASE_URL` | HTTP origin | public | Browser-direct Auth. Never a service-role URL. Docker image **build-arg**. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | publishable anon key | public | Browser Auth only. Never the service role. Docker image **build-arg**. |
+
+`GET /health/ready` is bounded (Postgres and checkpointer probes use a 1s connect timeout). The browser client aborts the public probe after 8000ms (`HEALTH_READY_TIMEOUT_MS`).
 
 ## Failure and security behavior
 

@@ -2,7 +2,7 @@
 title: Phase 8 frontend integration evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-24
 audience: engineering, reviewers, client-approver
 ---
 
@@ -862,3 +862,82 @@ scope for P08-07.
 Live `/health/ready` against a running stack was not re-probed in this
 documentation packet. Historical empty-answer/reservation symptoms remain
 the baseline until P08-08/P08-09.
+
+## Packet 8 — Restore query runtime connectivity and deterministic readiness
+
+### Requirement (quoted)
+
+> Fail fast with a sanitized configuration error when a known
+> transaction-pooler DSN is supplied to a session/direct-only
+> integration. Do not “fix” this by disabling prepared statements.
+> `query_ready=true` when the core Hybrid query path, durable run
+> store/checkpointer, and model gateway prerequisites are usable.
+> Missing LightRAG may produce a typed degraded dependency.
+
+### Concrete acceptance checks
+
+- Transaction-pooler checkpoint DSN fails closed without leaking the DSN.
+- Direct/session DSN is accepted; factories refuse pooler URLs before connect.
+- `/health/ready` stays bounded (1s connect probes; browser abort 8000ms).
+- Core healthy plus LightRAG unavailable is degraded-but-query-capable.
+- `.dockerignore` excludes `.env.local`; frontend image build-args exist.
+- Compose injects `LANGGRAPH_CHECKPOINT_URL` and `LIGHTRAG_DB_URL`.
+
+### Files in this packet
+
+- `packages/core/src/smart_rag_core/settings/postgres_dsn.py`
+- `packages/core/src/smart_rag_core/settings/backend.py`
+- `packages/core/src/smart_rag_core/settings/worker.py`
+- `apps/agents/src/smart_rag_agents/ingestion/checkpointer.py`
+- `apps/agents/src/smart_rag_agents/query/store.py`
+- `apps/agents/src/smart_rag_agents/query/checkpointer.py`
+- `apps/backend/src/smart_rag_api/services/readiness.py`
+- `docker-compose.yml`
+- `apps/frontend/Dockerfile`
+- `.dockerignore`
+- `.env.example`
+- `apps/frontend/src/lib/api.ts` (`HEALTH_READY_TIMEOUT_MS = 8000`)
+- `docs/development/CONFIGURATION.md`
+- `docs/frontend/THIN_DEVELOPER_UI.md`
+- `docs/api/FASTAPI_SECURITY.md`
+- unit/contract tests listed below
+
+### Authorization / failure / fallback
+
+- Pooler DSN (`:6543` or `pgbouncer=true`) raises `TransactionPoolerDsnError`
+  / `SettingsValidationError` with setting name only. Password and host are
+  absent from the exception text.
+- Session-mode pooler hosts on port `5432` and local `54322` remain accepted.
+- Prepared-statement threshold is unchanged (`prepare_threshold=0`, meaning
+  prepare immediately, not disable).
+- `query_ready` no longer requires LightRAG attach. Missing LightRAG is
+  `status=degraded` with `query_ready=true` when Hybrid, checkpointer,
+  Valkey, and real models are healthy. Public `/health/ready` still omits
+  named dependencies.
+- Checkpointer probe opens `PostgresSaver` and `PostgresStore` without
+  `setup()`, applies `app_checkpointer` / `langgraph`, and closes.
+
+### Verification
+
+```text
+.\.venv\Scripts\pytest.exe tests/unit/test_postgres_dsn.py tests/unit/test_settings.py tests/unit/test_readiness.py tests/unit/test_dockerignore.py tests/unit/test_fastapi_security.py tests/unit/test_package_imports.py tests/unit/test_backend_middleware.py tests/contract/test_checkpoint_postgres.py::test_checkpointer_factory_never_calls_setup tests/contract/test_checkpoint_postgres.py::test_session_dsn_opens_pinned_saver_and_store -q
+```
+
+Result: passing unit/contract tests; live saver/store open skipped when local
+Postgres is unreachable (`s`). Ruff on the touched Python files is clean.
+
+### Unverified
+
+- Clean `docker compose build frontend` was not executed in this packet
+  (Docker daemon not used). Source tests prove `.dockerignore` and Dockerfile
+  ARG/ENV wiring.
+- Image layer inspection was not run. Operators should rotate any Vercel
+  token that may have lived in an ignored local env file.
+- Live `/health/ready` against Compose was not re-probed.
+
+### Rollback
+
+Revert this commit. Hosted processes that already used a session DSN keep
+working. Processes that only had a transaction-pooler `SUPABASE_DB_URL` as
+the checkpoint fallback will fail closed until `LANGGRAPH_CHECKPOINT_URL` is
+set to a session/direct URL.

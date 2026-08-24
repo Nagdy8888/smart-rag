@@ -2,7 +2,7 @@
 title: Thin authenticated developer UI
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: engineering, frontend
 ---
 
@@ -85,8 +85,12 @@ includes restricted or ineligible counts.
 
 Public `GET /health/ready` is `{status, query_ready, coarse detail}` only.
 The login page polls it so query-not-ready is visible without naming ParadeDB,
-Valkey, or LightRAG. Signed-in owner/admin consoles merge named probes from
-`GET /ops/ready`. Signed `bm25_unavailable` and `graph_outage` copy is always
+Valkey, LightRAG, or the checkpointer. The browser aborts that probe after
+8000ms. Signed-in owner/admin consoles merge named probes from
+`GET /ops/ready`. `query_ready` is true when the Hybrid path, durable
+checkpointer/store, Valkey, and real models are usable. Missing LightRAG is a
+typed degraded dependency and does not fake graph readiness or block Hybrid
+chat. Signed `bm25_unavailable` and `graph_outage` copy is always
 on the console; live SSE still owns per-run codes. Host uvicorn without
 `PARADEDB_URL` / `VALKEY_LIMITS_URL` reports public `detail=not_query_ready`,
 which is not a fake-healthy probe.

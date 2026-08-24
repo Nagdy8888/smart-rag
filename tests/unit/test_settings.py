@@ -167,6 +167,41 @@ def test_worker_checkpoint_url_falls_back_to_database_url(
     )
 
 
+def test_checkpoint_pooler_dsn_fails_closed_without_leaking_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Transaction-pooler checkpoint URLs fail before a paid run can start."""
+
+    secret = "super-secret-pooler-password"  # noqa: S105 - inert fixture
+    host = "aws-0-us-east-1.pooler.supabase.com"
+    monkeypatch.setenv(
+        "LANGGRAPH_CHECKPOINT_URL",
+        f"postgresql://unit:{secret}@{host}:6543/postgres",
+    )
+    with pytest.raises(SettingsValidationError) as exc_info:
+        load_backend_settings()
+    text = str(exc_info.value)
+    assert secret not in text
+    assert host not in text
+    assert "postgresql://" not in text
+
+
+def test_session_checkpoint_dsn_is_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Direct/session checkpoint URLs remain valid."""
+
+    monkeypatch.setenv(
+        "LANGGRAPH_CHECKPOINT_URL",
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    )
+    settings = load_backend_settings()
+    assert (
+        settings.resolved_checkpoint_dsn()
+        == "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    )
+
+
 def test_jwks_operation_settings_validate_and_redact_secrets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
