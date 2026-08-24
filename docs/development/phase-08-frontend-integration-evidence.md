@@ -1310,3 +1310,83 @@ Revert this commit. Restoring TOTP UI without restoring backend AAL2 gates
 
 P08-11 + P08-12 MFA removal is complete. UI surface packets P08-13+ may start.
 Do not merge this branch until remaining Phase 8 remediation packets finish.
+
+## Packet 13 — Implement exact design tokens and reusable primitives
+
+### Requirement (quoted)
+
+> Implement the exact styling architecture, color, typography, spacing, geometry,
+> elevation, focus, motion, and responsive values in the normative UI/UX
+> specification. Do not approximate or substitute framework defaults. Extend
+> existing primitives before creating alternatives. Add `PageHeader`,
+> `PrimaryAction`, `AsyncButton`, and `ConfirmDialog` only where an equivalent
+> does not exist. Do not edit app navigation, routes, or feature-page
+> composition in this packet.
+
+### Concrete acceptance checks
+
+- `:root` in `apps/frontend/src/app/globals.css` and
+  `apps/frontend/src/lib/design-tokens.ts` carry the visual-contract palette,
+  40px controls, 8px control radius, 12px card radius, 48px rows, Inter stack,
+  and 2px/2px focus ring.
+- CSS-source geometry tests lock those values (jsdom does not apply CSS modules).
+- `Button` pending/disabledReason blocks duplicate submits; `ConfirmDialog`
+  traps focus, focuses Cancel for danger, and ignores Escape while pending.
+- No second token table, Google Fonts CDN, or overlay blur.
+
+### Files in this packet
+
+- `apps/frontend/src/app/globals.css`
+- `apps/frontend/src/lib/design-tokens.ts`
+- `apps/frontend/src/lib/design-tokens.test.ts`
+- `apps/frontend/src/lib/geometry.test.ts`
+- `apps/frontend/src/lib/contrast.test.ts` (existing AA pairs re-run)
+- `apps/frontend/src/components/ui/ui.module.css`
+- `apps/frontend/src/components/ui/button.tsx`
+- `apps/frontend/src/components/ui/page-header.tsx`
+- `apps/frontend/src/components/ui/confirm-dialog.tsx`
+- `apps/frontend/src/components/ui/index.ts`
+- `apps/frontend/src/components/ui/primitives.test.tsx`
+- `docs/frontend/design-tokens-and-primitives.md`
+- this evidence file
+
+### Authorization / failure / fallback / idempotency
+
+- Disabled/pending is visual only; it is not an authorization boundary.
+- Pending confirm blocks overlay click, Escape, and a second confirm.
+- Hostile fixtures in primitives tests remain React text nodes.
+- No route/nav rewrite; no invented API.
+
+### Verification
+
+```text
+npx vitest run src/lib/design-tokens.test.ts src/lib/geometry.test.ts src/lib/contrast.test.ts src/components/ui/primitives.test.tsx
+npx vitest run
+npx tsc --noEmit
+```
+
+Results:
+
+- Targeted Vitest: 4 files, 14 passed.
+- Full frontend Vitest: 34 files, 200 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on touched TS/TSX: 0 errors (pre-existing unused `ReactElement` warning in primitives tests).
+
+### Unverified
+
+- jsdom `getComputedStyle` does not apply CSS modules; geometry is locked from
+  stylesheet source rather than computed pixels in the unit runner.
+- Playwright visual snapshots and 390/1280 layout proof wait for P08-21/22.
+- Live browser contrast at 390px/1280px was not re-measured with a meter;
+  token hex pairs still meet WCAG AA in `contrast.test.ts`.
+
+### Rollback
+
+Revert this commit. Feature packets must not reintroduce a second palette,
+lavender canvas, teal-as-canvas, overlay blur, or Google Fonts CDN.
+
+### Handoff
+
+P08-13 tokens and primitive extensions are complete. P08-14 may compose the
+streamlined shell on top of these primitives without mixing Ask/Documents
+body rewrites into that packet.

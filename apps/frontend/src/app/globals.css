@@ -25,43 +25,74 @@
 }
 
 /*
- * Canonical tokens: docs/frontend/STITCH_BRIEF.md Precision Workspace
- * (not DESIGN.md YAML, not lavender #faf8ff, not #004ac6, not teal
- * #0F766E canvas/accent, not blur). CSS variables here plus
- * src/lib/design-tokens.ts are the implementation source of truth.
+ * Canonical tokens: Phase 8 visual contract (P08-13).
+ * CSS variables here plus src/lib/design-tokens.ts are the implementation
+ * source of truth. No lavender canvas, teal accent-as-canvas, or blur.
  */
 :root {
   --color-bg: #F4F6F8;
   --color-surface: #FFFFFF;
   --color-surface-muted: #F8FAFC;
+  --color-surface-hover: #F1F4F8;
+  --color-surface-selected: #EEF0FF;
   --color-text: #182230;
+  --color-text-secondary: #475467;
   --color-text-muted: #637083;
+  --color-text-disabled: #8A94A3;
   --color-border: #DDE3EA;
+  --color-border-strong: #C7D0DB;
   --color-accent: #4E5BD5;
+  --color-accent-hover: #414CC4;
+  --color-accent-pressed: #343DA8;
   --color-accent-fg: #FFFFFF;
   --color-accent-muted: #EEF0FF;
   --color-accent-soft: #EEF0FF;
+  --color-accent-border: #C9CDF8;
   --color-evidence: #0E8584;
-  --color-danger: #B91C1C;
-  --color-warning: #A16207;
+  --color-evidence-hover: #0A6F6E;
+  --color-evidence-muted: #ECFDFC;
   --color-success: #166534;
+  --color-success-bg: #F0FDF4;
+  --color-success-border: #BBF7D0;
+  --color-warning: #A16207;
+  --color-warning-bg: #FFFBEB;
+  --color-warning-border: #FDE68A;
+  --color-danger: #B91C1C;
+  --color-danger-hover: #991B1B;
+  --color-danger-bg: #FEF2F2;
+  --color-danger-border: #FECACA;
+  --color-info: #1D4ED8;
+  --color-info-bg: #EFF6FF;
+  --color-info-border: #BFDBFE;
   --color-focus: #4E5BD5;
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --color-overlay: rgb(15 23 42 / 0.42);
+  --radius-sm: 8px;
+  --radius-md: 12px;
   --radius-lg: 12px;
+  --radius-pill: 999px;
   --space: 4px;
   --shadow-1: 0 1px 2px rgb(15 23 42 / 0.08);
-  --shadow-2: 0 8px 24px rgb(15 23 42 / 0.08);
+  --shadow-2: 0 8px 24px rgb(15 23 42 / 0.10);
   --font-sans: "Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", monospace;
+  --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   --line-height-ar: 1.75;
   --line-height-en: 1.5;
   --nav-width: 232px;
   --nav-width-collapsed: 72px;
   --row-height: 48px;
   --topbar-height: 56px;
-  --control-height: 44px;
-  --control-height: 44px;
+  --control-height: 40px;
+  --control-height-compact: 32px;
+  --control-height-lg: 44px;
+  --icon-button-size: 36px;
+  --text-page-title-size: 24px;
+  --text-page-title-height: 32px;
+  --text-body-size: 14px;
+  --text-body-height: 20px;
+  --text-label-size: 13px;
+  --text-label-height: 18px;
+  --motion-fast: 120ms;
+  --motion-panel: 160ms;
 }
 
 @theme {
@@ -76,9 +107,9 @@
   --color-warning-text: var(--color-warning);
   --color-success-text: var(--color-success);
   --color-focus-ring: var(--color-focus);
-  --radius-chip: var(--radius-sm);
-  --radius-control: var(--radius-md);
-  --radius-card: var(--radius-lg);
+  --radius-chip: var(--radius-pill);
+  --radius-control: var(--radius-sm);
+  --radius-card: var(--radius-md);
   --shadow-elevation-1: var(--shadow-1);
   --shadow-elevation-2: var(--shadow-2);
   --font-console: var(--font-sans);
@@ -105,7 +136,8 @@ body {
   color: var(--color-text);
   background: var(--color-bg);
   font-family: var(--font-sans);
-  line-height: var(--line-height-en);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -125,6 +157,19 @@ body {
 
 [dir="ltr"].code-isolate {
   unicode-bidi: isolate;
+}
+
+.type-page-title {
+  font-size: var(--text-page-title-size);
+  line-height: var(--text-page-title-height);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.type-label {
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-height);
+  font-weight: 600;
 }
 
 @media (prefers-reduced-motion: reduce) {

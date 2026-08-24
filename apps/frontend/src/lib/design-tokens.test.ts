@@ -1,5 +1,5 @@
 /**
- * Token source-of-truth: brief table, CSS `:root`, and the TS module match.
+ * Token source of truth: visual contract, CSS `:root`, and the TS module match.
  */
 
 import { readFileSync } from "node:fs";
@@ -9,16 +9,14 @@ import { describe, expect, it } from "vitest";
 import {
   COLOR_ACCENT,
   COLOR_BG,
+  CONTROL_HEIGHT,
   DESIGN_TOKENS,
   RADIUS_MD,
+  RADIUS_SM,
 } from "./design-tokens";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cssPath = path.join(here, "../app/globals.css");
-const briefPath = path.join(
-  here,
-  "../../../../docs/frontend/STITCH_BRIEF.md",
-);
 
 /**
  * Parse `:root` custom properties from `globals.css`.
@@ -43,22 +41,20 @@ function parseRootTokens(css: string): Record<string, string> {
 
 describe("design token source of truth", () => {
   const css = readFileSync(cssPath, "utf8");
-  const brief = readFileSync(briefPath, "utf8");
   const root = parseRootTokens(css);
 
-  it("matches STITCH_BRIEF.md hex and radius values in CSS and TS", () => {
+  it("matches the Phase 8 visual-contract palette in CSS and TS", () => {
     for (const [name, value] of Object.entries(DESIGN_TOKENS)) {
       expect(root[name], name).toBe(value);
-      if (name.startsWith("--color-") || name.startsWith("--radius-")) {
-        expect(brief).toContain(`| \`${name}\` | \`${value}\` |`);
-      }
     }
     expect(COLOR_BG).toBe("#F4F6F8");
     expect(COLOR_ACCENT).toBe("#4E5BD5");
-    expect(RADIUS_MD).toBe("10px");
+    expect(RADIUS_SM).toBe("8px");
+    expect(RADIUS_MD).toBe("12px");
+    expect(CONTROL_HEIGHT).toBe("40px");
   });
 
-  it("rejects DESIGN.md YAML, teal canvas/accent, 10px radius, and blur", () => {
+  it("rejects DESIGN.md YAML, teal canvas/accent, and blur", () => {
     const assigned = Object.values(root).join("\n").toLowerCase();
     expect(assigned).not.toContain("#004ac6");
     expect(assigned).not.toContain("#faf8ff");
@@ -71,8 +67,8 @@ describe("design token source of truth", () => {
     expect(css).not.toContain("fonts.googleapis.com");
   });
 
-  it("maps brief tokens into Tailwind @theme without a second hex table", () => {
-    expect(css).toContain("@import \"tailwindcss\"");
+  it("maps tokens into Tailwind @theme without a second hex table", () => {
+    expect(css).toContain('@import "tailwindcss"');
     expect(css).toContain("--color-page: var(--color-bg)");
     expect(css).toContain("--color-brand: var(--color-accent)");
     expect(css).toContain("--spacing: var(--space)");
