@@ -4,7 +4,7 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-24
 audience: engineering, frontend, reviewers
-packet: P08-03
+packet: P08-16
 ---
 
 # Core RAG surfaces (Phase 8 packet 3)
@@ -34,14 +34,12 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 | Route | Surface |
 | --- | --- |
 | `/` | Ask workspace. Sessions rail, verified-final answers, citation drawers |
-| `/documents` | Library, upload/crawl convenience, status |
-| `/documents/[documentId]` | Metadata, ingestion status, graph seed, tables list |
+| `/documents` | Library, import/upload/crawl, keyset pagination, owner/admin delete |
+| `/documents/[documentId]` | Metadata, shared IngestionStatus timeline, graph seed, tables list |
 | `/graph` | Entity search + inspect, list-first, hop cap 3 |
 | `/tables` | Manifests + typed `TableQueryPlan` builder |
 
-Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer.
-
-Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer. There is no `app/admin`
+Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer. There is no `app/admin`
 folder. Team, tools, curation, usage, and profile are packet 4 native
 routes in [ADMINISTRATION.md](./ADMINISTRATION.md). Nav uses Next.js
 `Link`. `aria-current` follows the pathname. Nav is not authorization.
@@ -60,6 +58,7 @@ flowchart TD
   browser -->|GET /documents| library[Library]
   library -->|POST uploads| reserve[Reserve signed_url null]
   reserve -->|Storage JWT plus SHA-256| finalize[POST finalize]
+  library -->|DELETE /documents/id| tombstone[Owner or admin 204]
   browser -->|POST /graph/inspect depth le 3| inspect[Inspect le 200]
   browser -->|POST /tables/analyze plan extra forbid| table[Deterministic rows]
 ```
@@ -73,7 +72,7 @@ flowchart TD
 | GAP-07-09 | Source drawer: ids + provenance text. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
 | GAP-07-10 | No rolling ETA/cost. Authorized `graph_handoff` counts + `graphNotReadyCopy(n)` only |
 | GAP-07-12 | No anomaly toast counts or audit tabs |
-| GAP-07-14 | No `DELETE /documents`. `deletion_pending` pill when the server returns it |
+| GAP-07-14 | `DELETE /documents/{id}` is wired for owner/admin with confirmation. Members still 403. No source preview/download |
 
 ## Honest contracts
 
@@ -100,6 +99,7 @@ flowchart TD
 | Storage upload fail | Honest error. Do not finalize a fake success |
 | Crawl as member | UI hidden; helper still 403 |
 | Viewer upload | Convenience hidden; server 403 |
+| Document delete 403/404/429 | Confirmation stays open with classified copy; 404 navigates without a title leak |
 | Inspect depth greater than 3 | Client clamps to 3 |
 
 ## Verification

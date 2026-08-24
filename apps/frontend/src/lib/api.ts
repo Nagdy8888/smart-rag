@@ -783,25 +783,83 @@ export async function deleteConversation(
   return response.status === 204;
 }
 
+/** Default `GET /documents` page size. Has-more when a page is full. */
+export const DOCUMENT_LIST_PAGE_SIZE = 50;
+
 /**
- * List visible documents.
+ * Map one FastAPI document object. Includes existing `created_at`.
+ *
+ * @param body - JSON object.
+ * @returns Typed document row.
+ */
+export function parseDocumentResponse(body: Record<string, unknown>): DocumentResponse {
+  return {
+    document_id: String(body.document_id ?? ""),
+    title: typeof body.title === "string" ? body.title : null,
+    visibility: String(body.visibility ?? ""),
+    current_version_id:
+      typeof body.current_version_id === "string" ? body.current_version_id : null,
+    visibility_generation: Number(body.visibility_generation ?? 0),
+    created_at: typeof body.created_at === "string" ? body.created_at : null,
+  };
+}
+
+/**
+ * List ACL-visible documents with bounded `created_at,id` keyset pagination.
+ *
+ * Continuation is inferred from page length. This client never invents
+ * `next_cursor`.
  *
  * @param auth - Access token.
+ * @param options - Optional keyset cursor and page size.
  * @param fetchImpl - Injected fetch.
- * @returns Document summaries.
+ * @returns One page of documents, newest first.
  */
 export async function listDocuments(
   auth: ApiAuth,
+  options: { cursor?: string | null; limit?: number } = {},
   fetchImpl: typeof fetch = fetch,
 ): Promise<DocumentResponse[]> {
-  const response = await fetchImpl(apiUrl("/documents"), {
+  const limit = options.limit ?? DOCUMENT_LIST_PAGE_SIZE;
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
+  }
+  const response = await fetchImpl(apiUrl(`/documents?${params.toString()}`), {
     headers: resumeHeaders(auth),
   });
+  if (!response.ok) {
+    const failureBody = await readJsonObject(response);
+    throwIfNotOk(response, failureBody);
+  }
   const parsed: unknown = await response.json();
   if (!Array.isArray(parsed)) {
     return [];
   }
-  return parsed as DocumentResponse[];
+  return parsed
+    .filter((row): row is Record<string, unknown> => row !== null && typeof row === "object")
+    .map(parseDocumentResponse);
+}
+
+/**
+ * Build the next `created_at,id` cursor from the last row of a full page.
+ *
+ * @param page - Current page.
+ * @param limit - Requested page size.
+ * @returns Cursor string, or null when the page is short or `created_at` is missing.
+ */
+export function nextDocumentCursor(
+  page: DocumentResponse[],
+  limit: number = DOCUMENT_LIST_PAGE_SIZE,
+): string | null {
+  if (page.length < limit) {
+    return null;
+  }
+  const last = page[page.length - 1];
+  if (last === undefined || last.created_at === null || last.created_at === "") {
+    return null;
+  }
+  return `${last.created_at},${last.document_id}`;
 }
 
 /**
@@ -828,7 +886,7 @@ export async function reserveUpload(
     }),
   });
   if (!response.ok) {
-    const body = await readJsonObject(response);
+    await readJsonObject(response);
     throw new Error("upload_reserve_failed");
   }
   return (await response.json()) as SignedUploadResponse;
@@ -923,17 +981,32 @@ export async function fetchDocument(
   const body = await readJsonObject(response);
   return {
     ok: true,
-    document: {
-      document_id: String(body.document_id ?? ""),
-      title: typeof body.title === "string" ? body.title : null,
-      visibility: String(body.visibility ?? ""),
-      current_version_id:
-        typeof body.current_version_id === "string"
-          ? body.current_version_id
-          : null,
-      visibility_generation: Number(body.visibility_generation ?? 0),
-    },
+    document: parseDocumentResponse(body),
   };
+}
+
+/**
+ * DELETE `/documents/{document_id}`. Owner/admin only. 204 is success.
+ *
+ * @param auth - Access token.
+ * @param documentId - Document UUID.
+ * @param fetchImpl - Injected fetch.
+ * @throws ClassifiedApiError on 403/404/429/5xx.
+ */
+export async function deleteDocument(
+  auth: ApiAuth,
+  documentId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const response = await fetchImpl(apiUrl(`/documents/${documentId}`), {
+    method: "DELETE",
+    headers: paidMutationHeaders(auth),
+  });
+  if (response.status === 204) {
+    return;
+  }
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
 }
 
 /**
@@ -1017,11 +1090,7 @@ export async function enqueueWebsiteCrawl(
   });
   const parsed = await readJsonObject(response);
   if (!response.ok) {
-    const classified = classifyApiError(response.status, parsed);
-    if (classified?.kind === "auth") {
-      throw new Error("forbidden");
-    }
-    throw new Error(sanitizedDetail(parsed, "crawl_enqueue_rejected"));
+    throwIfNotOk(response, parsed);
   }
   return {
     document_id: String(parsed.document_id ?? ""),

@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { XSS_ENTITY, XSS_FILENAME } from "../lib/hostile-text-fixtures";
-import { DOCUMENT_DELETE_UNAVAILABLE, DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/citation-drawer";
+import { DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/citation-drawer";
 import { CitationDrawer } from "./chat/chat-app";
-import { DocumentDetail } from "./document-detail";
-import { DocumentLibrary } from "./document-library";
+import { DocumentDetail } from "./documents/document-detail";
+import { DocumentLibrary } from "./documents/document-library";
 import { GraphExplorer } from "./graph-explorer";
 import { TablesApp } from "./tables-app";
 import { SessionProvider } from "../lib/auth/session-provider";
@@ -25,6 +25,7 @@ const fetchVersionStatus = vi.fn();
 const inspectGraph = vi.fn();
 const analyzeTable = vi.fn();
 const fetchDocument = vi.fn();
+const deleteDocument = vi.fn();
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
@@ -77,6 +78,7 @@ vi.mock("../lib/api", async () => {
     fetchMeta: (...args: unknown[]) => fetchMeta(...args),
     fetchReady: (...args: unknown[]) => fetchReady(...args),
     fetchDocument: (...args: unknown[]) => fetchDocument(...args),
+    deleteDocument: (...args: unknown[]) => deleteDocument(...args),
     listConversations: vi.fn(async () => []),
     listDocuments: (...args: unknown[]) => listDocuments(...args),
     listTables: (...args: unknown[]) => listTables(...args),
@@ -118,6 +120,7 @@ beforeEach(() => {
     upload_enabled: true,
   });
   fetchDocument.mockResolvedValue({ ok: false, notFound: true });
+  deleteDocument.mockResolvedValue(undefined);
   listDocuments.mockResolvedValue([]);
   listTables.mockResolvedValue([]);
   fetchVersionStatus.mockResolvedValue(null);
@@ -289,6 +292,7 @@ describe("DocumentLibrary status and roles", () => {
         visibility: "company",
         current_version_id: "ver-1",
         visibility_generation: 1,
+        created_at: "2026-08-24T00:00:00Z",
       },
     ]);
     fetchVersionStatus.mockResolvedValue({
@@ -326,11 +330,14 @@ describe("DocumentLibrary status and roles", () => {
       recent_jobs: [],
     });
     renderSurface(<DocumentLibrary />);
-    fireEvent.click(await screen.findByRole("button", { name: "Load status" }));
-    expect(await screen.findByText("Deletion pending")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Document actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Load status" }));
+    expect(await screen.findAllByText("Deletion pending")).not.toHaveLength(0);
     expect(screen.getByText(/index=none/)).toBeInTheDocument();
     expect(screen.getByText(limitationCopy("graph_pending"), { exact: false })).toBeInTheDocument();
-    expect(screen.getByText(DOCUMENT_DELETE_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByText(/Document deletion is not available/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Document actions" }));
+    expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
     expect(screen.queryByRole("button", { name: /delete document/i })).toBeNull();
     expect(screen.getByText(XSS_FILENAME, { exact: false })).toBeInTheDocument();
     expect(document.querySelector("img")).toBeNull();

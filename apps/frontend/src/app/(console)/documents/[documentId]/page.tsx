@@ -1,7 +1,7 @@
 /**
  * Document detail. 404 copy is "Not found" with no title leak.
  */
-import { DocumentDetail } from "../../../../components/document-detail";
+import { DocumentDetail } from "../../../../components/documents/document-detail";
 
 /**
  * Render one document's metadata and ingestion status.

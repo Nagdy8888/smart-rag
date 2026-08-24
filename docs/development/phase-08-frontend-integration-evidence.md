@@ -1543,3 +1543,72 @@ Revert this commit. Restore `apps/frontend/src/components/chat-app.tsx` only if 
 ### Handoff
 
 P08-15 Ask is complete. P08-16 may rebuild Documents without changing the shell IA or Ask body.
+
+## P08-16 — Rebuild Documents as one complete ingestion workflow
+
+Quoted requirement: make document ingestion, status, pagination, and
+deletion understandable and fully backed by existing APIs.
+
+### Acceptance checks
+
+- One responsive list/table with name, visibility, search/graph status, created, and overflow actions.
+- Frontend `DocumentResponse` includes existing FastAPI `created_at`. No backend schema/router edit.
+- Keyset pagination uses the real `created_at,id` cursor and page-length continuation. No invented `next_cursor`.
+- Local filter is labeled as filtering loaded rows.
+- `IngestionStatus` is shared: compact pills on the list (after Load status), timeline on detail.
+- Upload remains reserve → Storage JWT → finalize with one stable idempotency key until success. Stages are real; no simulated percentages.
+- Website crawl is owner/admin convenience, keeps one retry key, and exposes current API depth/pages.
+- Retry is shown only when `retry_allowed`.
+- `DELETE /documents/{id}` is wired behind “Delete document?” confirmation; 204/403/404/429 handled; list/detail invalidated; detail navigates safely.
+- `DOCUMENT_DELETE_UNAVAILABLE`, source preview/download, and unsupported GAP panels are removed from Documents.
+
+### Changed paths
+
+- Moved `apps/frontend/src/components/document-library.tsx` and `document-detail.tsx` once under `apps/frontend/src/components/documents/`
+- `apps/frontend/src/components/documents/document-list.tsx`, `ingestion-status.tsx`, `ingestion-inspector.tsx`, `processing-timeline.tsx`, `import-source-sheet.tsx`, `documents.module.css`, `document-library.test.tsx`
+- `apps/frontend/src/lib/api.ts`, `types.ts`, `ingestion-status.ts`, `citation-drawer.ts`
+- Tests: `api.test.ts`, `core-rag-surfaces.test.tsx`, `core-rag-helpers.test.ts`, `prohibited-patterns.test.ts`, `ingestion-status.test.ts`
+- Docs: `CORE_RAG_SURFACES.md`, `PHASE8_JOURNEY_MATRIX.md`, `API_UI_MAPPING.md`, `action-inventory.json`
+
+### Authorization / failure / fallback / idempotency
+
+- Delete is owner/admin convenience only. Member list has no Delete item. Server 403 maps to “You cannot delete this document.” 404 maps to “Document not found.” or safe navigation from detail. 429 maps to retry copy.
+- Upload is handshake-gated. Duplicate submit is pending-blocked; the same idempotency key is reused until success.
+- Crawl 403/422/429 are classified `ClassifiedApiError` kinds `auth` / `validation` / `rate`. Members still do not see the Website tab.
+- Pagination appends unique `document_id`s and hides Load more when the page is short or `created_at` is missing.
+- Version polling stops when the inspector is closed, the tab is hidden, the status is terminal, or the tree unmounts.
+
+### Verification
+
+```text
+npx vitest run src/components/documents/document-library.test.tsx src/components/core-rag-surfaces.test.tsx src/lib/api.test.ts src/lib/ingestion-status.test.ts
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/documents src/lib/api.ts src/lib/ingestion-status.ts src/lib/citation-drawer.ts src/components/core-rag-surfaces.test.tsx
+```
+
+Results:
+
+- Targeted Vitest: 4 files, 81 passed (upload idempotency, handshake-disabled Upload, crawl 403, delete 204/403, keyset append, detail graph seed, 404 navigation).
+- Full frontend Vitest: 37 files, 226 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on Documents/API files: 0 errors.
+
+### Unverified
+
+- Playwright Documents populated / Import source / Document detail snapshots wait for P08-21/22.
+- Live reserve → Storage JWT → finalize against a running stack waits for P08-22.
+
+### Deviations
+
+- List search/graph pills stay em dash until `GET /ingestion/versions/{id}/status` is loaded. The list HTTP body has no status fields; Ready is never inferred from upload.
+- Compact pills keep the last loaded version after the inspector closes so polling can stop without inventing a list-status API.
+- Import empty-state and header both expose “Import source” when import is allowed.
+
+### Rollback
+
+Revert this commit. Restore the previous Documents GAP copy only if a later packet reverts `DELETE /documents/{id}` wiring.
+
+### Handoff
+
+P08-16 Documents is complete. P08-17 may rebuild Tables without changing Documents contracts.

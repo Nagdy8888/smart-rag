@@ -1,7 +1,7 @@
 /**
  * Document library route.
  */
-import { DocumentLibrary } from "../../../components/document-library";
+import { DocumentLibrary } from "../../../components/documents/document-library";
 
 /**
  * Render the document library, upload, and crawl convenience.

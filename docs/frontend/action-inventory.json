@@ -381,7 +381,7 @@
       "failure_state": "quota/capability/upload error",
       "idempotency": "operation key",
       "disposition": "keep",
-      "test_id": "pending-P08-16"
+      "test_id": "document-library.test.tsx"
     },
     {
       "action_id": "documents.delete",
@@ -395,7 +395,7 @@
       "failure_state": "403/404/429",
       "idempotency": "document id",
       "disposition": "keep",
-      "test_id": "pending-P08-16"
+      "test_id": "document-library.test.tsx"
     },
     {
       "action_id": "documents.preview",
@@ -409,7 +409,7 @@
       "failure_state": "n/a",
       "idempotency": "n/a",
       "disposition": "removed_target",
-      "test_id": "pending-P08-16"
+      "test_id": "document-library.test.tsx"
     },
     {
       "action_id": "tables.analyze",

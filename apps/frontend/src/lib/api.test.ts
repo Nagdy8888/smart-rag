@@ -16,6 +16,8 @@ import {
   finalizeUpload,
   importGlossary,
   inspectGraph,
+  listDocuments,
+  nextDocumentCursor,
   listCitations,
   listTools,
   offboardUser,
@@ -27,6 +29,8 @@ import {
   startOrResumeMessageStream,
   cancelRun,
   deleteConversation,
+  deleteDocument,
+  DOCUMENT_LIST_PAGE_SIZE,
   fetchMe,
   fetchRun,
   fetchConversation,
@@ -474,9 +478,74 @@ describe("enqueueWebsiteCrawl", () => {
         },
         fetchImpl,
       ),
-    ).rejects.toThrow("forbidden");
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+  });
+
+  it("classifies validation and rate-limit crawl failures", async () => {
+    const fetch422: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "invalid_url" }), {
+        status: 422,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      enqueueWebsiteCrawl(
+        { accessToken: "jwt-token" },
+        {
+          start_url: "https://example.com",
+          approved_domain: "example.com",
+          idempotency_key: "crawl-key-2",
+        },
+        fetch422,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "validation" } });
+
+    const fetch429: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "rate_limited" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "8" },
+      });
+    await expect(
+      enqueueWebsiteCrawl(
+        { accessToken: "jwt-token" },
+        {
+          start_url: "https://example.com",
+          approved_domain: "example.com",
+          idempotency_key: "crawl-key-3",
+        },
+        fetch429,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "rate" } });
+  });
+
+  it("reuses the caller idempotency key on the Idempotency-Key header", async () => {
+    let key = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      const headers = init?.headers as Record<string, string>;
+      key = headers["Idempotency-Key"];
+      return new Response(
+        JSON.stringify({
+          document_id: "doc-c",
+          version_id: "ver-c",
+          source_id: "src-c",
+          approval_id: "appr-c",
+          job_id: "job-c",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    await enqueueWebsiteCrawl(
+      { accessToken: "jwt-token" },
+      {
+        start_url: "https://example.com",
+        approved_domain: "example.com",
+        idempotency_key: "stable-crawl-key",
+      },
+      fetchImpl,
+    );
+    expect(key).toBe("stable-crawl-key");
   });
 });
+
 
 describe("fetchDocument", () => {
   it("returns notFound on 404 without reading a title", async () => {
@@ -556,10 +625,91 @@ describe("analyzeTable extra fields", () => {
   });
 });
 
-describe("GAP-07-14 no delete-document HTTP helper", () => {
-  it("does not export a deleteDocument client", async () => {
+describe("deleteDocument", () => {
+  it("exports a DELETE client and treats 204 as success", async () => {
     const api = await import("./api");
-    expect("deleteDocument" in api).toBe(false);
+    expect("deleteDocument" in api).toBe(true);
+    const fetchImpl: typeof fetch = async (input, init) => {
+      expect(String(input)).toContain("/documents/doc-1");
+      expect(init?.method).toBe("DELETE");
+      return new Response(null, { status: 204 });
+    };
+    await expect(
+      deleteDocument({ accessToken: "jwt-token" }, "doc-1", fetchImpl),
+    ).resolves.toBeUndefined();
+  });
+
+  it("classifies 403, 404, and 429", async () => {
+    const cases: Array<{ status: number; kind: string }> = [
+      { status: 403, kind: "auth" },
+      { status: 404, kind: "deleted" },
+      { status: 429, kind: "rate" },
+    ];
+    for (const item of cases) {
+      const fetchImpl: typeof fetch = async () =>
+        new Response(JSON.stringify({ detail: "denied" }), {
+          status: item.status,
+          headers: { "Content-Type": "application/json" },
+        });
+      const failure =
+        item.status === 403
+          ? { kind: "auth", status: 403 }
+          : { kind: item.kind };
+      await expect(
+        deleteDocument({ accessToken: "jwt-token" }, "doc-1", fetchImpl),
+      ).rejects.toMatchObject({ failure });
+    }
+  });
+});
+
+describe("listDocuments keyset pagination", () => {
+  it("sends limit and cursor and maps created_at", async () => {
+    let url = "";
+    const fetchImpl: typeof fetch = async (input) => {
+      url = String(input);
+      return new Response(
+        JSON.stringify([
+          {
+            document_id: "doc-1",
+            title: "Policy",
+            visibility: "company",
+            current_version_id: "ver-1",
+            visibility_generation: 1,
+            created_at: "2026-08-24T12:00:00Z",
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const page = await listDocuments(
+      { accessToken: "jwt-token" },
+      { cursor: "2026-08-24T12:00:00Z,doc-0", limit: 50 },
+      fetchImpl,
+    );
+    expect(url).toContain("limit=50");
+    expect(url).toContain("cursor=2026-08-24T12%3A00%3A00Z%2Cdoc-0");
+    expect(page[0]?.created_at).toBe("2026-08-24T12:00:00Z");
+  });
+
+  it("builds the next created_at,id cursor only for a full page", () => {
+    const full = Array.from({ length: DOCUMENT_LIST_PAGE_SIZE }, (_, index) => ({
+      document_id: `doc-${String(index)}`,
+      title: "T",
+      visibility: "company",
+      current_version_id: null,
+      visibility_generation: 1,
+      created_at: "2026-08-24T00:00:00Z",
+    }));
+    expect(nextDocumentCursor(full, DOCUMENT_LIST_PAGE_SIZE)).toBe(
+      "2026-08-24T00:00:00Z,doc-49",
+    );
+    expect(nextDocumentCursor(full.slice(0, 3), DOCUMENT_LIST_PAGE_SIZE)).toBeNull();
+    expect(
+      nextDocumentCursor(
+        [{ ...full[0], created_at: null }],
+        1,
+      ),
+    ).toBeNull();
   });
 });
 

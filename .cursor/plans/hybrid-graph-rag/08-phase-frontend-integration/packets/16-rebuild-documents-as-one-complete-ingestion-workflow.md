@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 16
-status: pending
+status: complete
 title: "Rebuild Documents as one complete ingestion workflow"
 requirement_ids: [P08-16]
 ---

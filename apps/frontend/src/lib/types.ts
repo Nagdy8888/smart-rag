@@ -89,6 +89,7 @@ export type DocumentResponse = {
   visibility: string;
   current_version_id: string | null;
   visibility_generation: number;
+  created_at: string | null;
 };
 
 /** `POST /documents/uploads/finalize` body. Field names match OpenAPI. */

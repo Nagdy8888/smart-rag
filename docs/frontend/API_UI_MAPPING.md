@@ -183,9 +183,9 @@ No HTTP for owner bootstrap (`bootstrap_owner` service), MFA recovery
 Version `status` enum: `uploading`, `uploaded`, `scanning`, `parsing`,
 `hybrid_ready`, `graph_pending`, `graph_ready`, `graph_ineligible`,
 `deletion_pending`, `failed`. `DELETE /documents/{id}` is owner/admin HTTP
-(tombstone + `exclude_version_from_retrieval`). There is **no** signed
-source-preview/download HTTP route. The Stitch library delete control may
-still be unwired (GAP-07-14 UI).
+(tombstone + `exclude_version_from_retrieval`) and is wired in the Documents
+console behind confirmation. There is **no** signed
+source-preview/download HTTP route.
 
 ### Chat and runs
 
@@ -330,7 +330,7 @@ mocks. Stitch may show an honest unavailable/blocked state.
 | GAP-07-11 | Budget policy read/write HTTP | Phase 6 | Show 402 `budget_exhausted`; no budget editor |
 | GAP-07-12 | Audit list/export HTTP | Phase 2/6 | Chain exists; no viewer API; do not mock events |
 | GAP-07-13 | Company settings HTTP | Phase 6 | Singleton loaded for `authorization_version`; no CRUD |
-| GAP-07-14 | Document delete UI | Phase 3/6 | HTTP `DELETE /documents/{id}` exists for owner/admin; Stitch library control may still be unwired |
+| GAP-07-14 | Document delete UI | Phase 8 P08-16 | HTTP `DELETE /documents/{id}` is wired for owner/admin; members 403; 404 is not-found without title leak |
 | GAP-07-15 | Upload finalize / crawl / retry UI | Phase 7/8 UI | APIs exist |
 | GAP-07-16 | Graph/table/tools/glossary/entity-rule UI | Phase 7/8 UI | APIs exist |
 | GAP-07-17 | Company usage dashboard | Phase 7/8 UI | `GET /usage/company` exists |

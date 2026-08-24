@@ -133,8 +133,9 @@ is no client route field.
 | Quota 402 reserve | `src/lib/api.test.ts` | does not return a reservation on 402 quota or budget exhaustion | vitest-unit | proven |
 | Crawl member 403 | `src/lib/api.test.ts` | still posts for a member helper call (server 403 is authoritative) | vitest-unit | proven |
 | Quarantine labels | `src/lib/ingestion-status.test.ts` | labels Graph Pending distinctly from failed and does not invent quarantine HTTP | vitest-unit | proven |
-| Graph Pending vs deletion | `src/components/core-rag-surfaces.test.tsx` | loads Graph Pending, BM25 none, and deletion_pending without a delete control | vitest-component | proven |
-| Document delete GAP-07-14 | `src/lib/api.test.ts` | does not export a deleteDocument client | vitest-unit | proven |
+| Graph Pending vs deletion | `src/components/core-rag-surfaces.test.tsx` | loads Graph Pending, BM25 none, and deletion_pending without a member delete control | vitest-component | proven |
+| Document delete | `src/lib/api.test.ts` | deleteDocument 204/403/404/429 | vitest-unit | proven |
+| Document delete chrome | `src/components/documents/document-library.test.tsx` | owner confirmation 204; member 403 copy; pagination append | vitest-component | proven |
 | Document 404 no title | `src/components/core-rag-surfaces.test.tsx` | shows Not found without a title leak | vitest-component | proven |
 | Unauth document 404 → login | `tests/e2e/phase08-journeys.spec.ts` | unauthenticated document 404 still redirects to login | playwright-unauth | proven |
 | ACL blindness no count | `src/components/core-rag-surfaces.test.tsx` | shows ACL blindness without unauthorized counts or titles | vitest-component | proven |

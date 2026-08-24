@@ -132,12 +132,13 @@ describe("prohibited production patterns", () => {
     );
   });
 
-  it("does not ship a DELETE /documents client or privileged Storage href helper", () => {
+  it("ships a DELETE /documents client and keeps citation href null", () => {
     const api = readFileSync(path.join(srcRoot, "lib/api.ts"), "utf8");
-    expect(api).not.toMatch(/DELETE[`'"\s]*\/documents\//);
-    expect(api).not.toContain("deleteDocument");
+    expect(api).toContain("deleteDocument");
+    expect(api).toMatch(/method:\s*"DELETE"/);
     const drawer = readFileSync(path.join(srcRoot, "lib/citation-drawer.ts"), "utf8");
     expect(drawer).toContain("return null");
+    expect(drawer).not.toContain("DOCUMENT_DELETE_UNAVAILABLE");
   });
 
   it("allows Auth-direct App Router folders", () => {
