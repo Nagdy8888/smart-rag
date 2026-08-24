@@ -37,6 +37,8 @@ import type {
   RetryIngestionJobResponse,
   SignedUploadResponse,
   SubmitMessageResponse,
+  RunResponse,
+  FeedbackResponse,
   TableAnalyzeResponse,
   TableManifestResponse,
   TableQueryPlan,
@@ -173,6 +175,21 @@ export type DeletedFailure = {
   kind: "deleted";
 };
 
+export type ConflictFailure = {
+  kind: "conflict";
+  detail: string;
+};
+
+export type ValidationFailure = {
+  kind: "validation";
+  detail: string;
+};
+
+export type ProtocolFailure = {
+  kind: "protocol";
+  detail: string;
+};
+
 export type ServerFailure = {
   kind: "server";
   status: number;
@@ -186,7 +203,37 @@ export type ApiFailure =
   | BudgetFailure
   | RateFailure
   | DeletedFailure
+  | ConflictFailure
+  | ValidationFailure
+  | ProtocolFailure
   | ServerFailure;
+
+/**
+ * Typed HTTP failure thrown by chat mutations. Callers must not treat this as
+ * success.
+ */
+export class ClassifiedApiError extends Error {
+  readonly failure: ApiFailure;
+
+  /**
+   * @param failure - Classified FastAPI failure.
+   */
+  constructor(failure: ApiFailure) {
+    super(failure.kind);
+    this.name = "ClassifiedApiError";
+    this.failure = failure;
+  }
+}
+
+/**
+ * Return whether an unknown thrown value is a classified API failure.
+ *
+ * @param error - Caught value.
+ * @returns True when `error` is `ClassifiedApiError`.
+ */
+export function isClassifiedApiError(error: unknown): error is ClassifiedApiError {
+  return error instanceof ClassifiedApiError;
+}
 
 /**
  * Return whether a FastAPI `detail` looks like a short code, not a trace.
@@ -296,6 +343,18 @@ export function classifyApiError(
   if (status === 404) {
     return { kind: "deleted" };
   }
+  if (status === 409) {
+    return {
+      kind: "conflict",
+      detail: sanitizedDetail(body, "conflict"),
+    };
+  }
+  if (status === 422) {
+    return {
+      kind: "validation",
+      detail: sanitizedDetail(body, "validation_error"),
+    };
+  }
   if (status >= 500) {
     return { kind: "server", status };
   }
@@ -316,6 +375,60 @@ export function classifiedOrGenericFailure(
   headers?: Headers | Record<string, string>,
 ): ApiFailure {
   return classifyApiError(status, body, headers) ?? { kind: "server", status };
+}
+
+/**
+ * Throw a classified error when a mutation or fetch is not successful.
+ *
+ * @param response - Fetch response.
+ * @param body - Parsed JSON object, or empty.
+ * @throws ClassifiedApiError
+ */
+export function throwIfNotOk(
+  response: Response,
+  body: Record<string, unknown>,
+): void {
+  if (response.ok) {
+    return;
+  }
+  throw new ClassifiedApiError(
+    classifiedOrGenericFailure(response.status, body, response.headers),
+  );
+}
+
+/**
+ * Parse an owned run JSON body.
+ *
+ * @param body - FastAPI object.
+ * @returns Run identifiers only. No transcript fields.
+ */
+export function parseRunResponse(body: Record<string, unknown>): RunResponse {
+  return {
+    run_id: String(body.run_id ?? ""),
+    conversation_id: String(body.conversation_id ?? ""),
+    creator_user_id: String(body.creator_user_id ?? ""),
+    status: String(body.status ?? ""),
+    reservation_id:
+      body.reservation_id === null || body.reservation_id === undefined
+        ? null
+        : String(body.reservation_id),
+    created_at:
+      body.created_at === null || body.created_at === undefined
+        ? null
+        : String(body.created_at),
+  };
+}
+
+/**
+ * Parse a 201 feedback body.
+ *
+ * @param body - FastAPI object.
+ * @returns Feedback id.
+ */
+export function parseFeedbackResponse(
+  body: Record<string, unknown>,
+): FeedbackResponse {
+  return { feedback_id: String(body.feedback_id ?? "") };
 }
 
 /**
@@ -624,6 +737,50 @@ export async function createConversation(
     body: JSON.stringify(title ? { title } : {}),
   });
   return (await response.json()) as ConversationResponse;
+}
+
+/**
+ * Fetch one owned conversation. Foreign or tombstoned ids are 404.
+ *
+ * @param auth - Access token.
+ * @param conversationId - Conversation UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Conversation row.
+ * @throws ClassifiedApiError on non-OK responses.
+ */
+export async function fetchConversation(
+  auth: ApiAuth,
+  conversationId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ConversationResponse> {
+  const response = await fetchImpl(apiUrl(`/conversations/${conversationId}`), {
+    headers: resumeHeaders(auth),
+  });
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return body as unknown as ConversationResponse;
+}
+
+/**
+ * Fetch one owned run. Foreign runs are 404.
+ *
+ * @param auth - Access token.
+ * @param runId - Run UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Run identifiers. No answer or citation text.
+ * @throws ClassifiedApiError on non-OK responses.
+ */
+export async function fetchRun(
+  auth: ApiAuth,
+  runId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RunResponse> {
+  const response = await fetchImpl(apiUrl(`/runs/${runId}`), {
+    headers: resumeHeaders(auth),
+  });
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return parseRunResponse(body);
 }
 
 /**
@@ -1213,7 +1370,7 @@ export async function submitFeedback(
   tag: FeedbackTag,
   comment: string | null,
   fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
+): Promise<FeedbackResponse> {
   const response = await fetchImpl(apiUrl(`/runs/${runId}/feedback`), {
     method: "POST",
     headers: paidMutationHeaders(auth),
@@ -1223,7 +1380,13 @@ export async function submitFeedback(
       comment,
     }),
   });
-  return response.ok;
+  const body = await readJsonObject(response);
+  if (response.status !== 201) {
+    throw new ClassifiedApiError(
+      classifiedOrGenericFailure(response.status, body, response.headers),
+    );
+  }
+  return parseFeedbackResponse(body);
 }
 
 /**
@@ -1238,12 +1401,14 @@ export async function cancelRun(
   auth: ApiAuth,
   runId: string,
   fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
+): Promise<RunResponse> {
   const response = await fetchImpl(apiUrl(`/runs/${runId}/cancel`), {
     method: "POST",
     headers: resumeHeaders(auth),
   });
-  return response.ok;
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return parseRunResponse(body);
 }
 
 /**

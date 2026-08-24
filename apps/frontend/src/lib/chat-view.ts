@@ -221,6 +221,18 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
       next.terminal = frame.event;
       if (frame.event === "error" || frame.event === "partial") {
         next.status = stringField(payload, "code") ?? stringField(payload, "reason");
+        next.failure = {
+          kind: "protocol",
+          detail: next.status ?? "run_error",
+        };
+      }
+      if (frame.event === "completed") {
+        const refusal = stringField(payload, "refusal");
+        if (state.answerText.trim() === "" && (refusal === null || refusal.trim() === "")) {
+          next.terminal = "error";
+          next.status = "empty_answer";
+          next.failure = { kind: "protocol", detail: "empty_answer" };
+        }
       }
       break;
     default:

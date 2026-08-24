@@ -3,7 +3,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { ChatApp } from "./chat-app";
@@ -13,10 +13,11 @@ import {
   fetchMeta,
   listCitations,
   listConversations,
+  loadConsoleReadiness,
 } from "../lib/api";
 import { MFA_REQUIRED_BANNER, SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { SessionProvider } from "../lib/auth/session-provider";
-import { handshakeBelowMinCopy } from "../lib/handshake";
+import { handshakeBelowMinCopy, QUERY_NOT_READY_COPY } from "../lib/handshake";
 import { limitationCopy } from "../lib/limitations";
 
 vi.mock("next/navigation", () => ({
@@ -112,10 +113,18 @@ const defaultMeta = {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  sessionStorage.clear();
   vi.mocked(fetchMeta).mockResolvedValue(defaultMeta);
   vi.mocked(listConversations).mockResolvedValue([]);
   vi.mocked(listCitations).mockResolvedValue([]);
   vi.mocked(createConversation).mockClear();
+  vi.mocked(loadConsoleReadiness).mockResolvedValue({
+    status: "degraded",
+    query_ready: false,
+    detail: "mock",
+    rate_limit_degraded: false,
+    dependencies: [{ name: "paradedb", status: "down" }],
+  });
   vi.mocked(fetchMe).mockResolvedValue({
     user_id: "u1",
     role: "member",
@@ -247,7 +256,7 @@ function stubChatFetch(options: {
           headers: { "Content-Type": "application/json" },
         });
       }
-      return new Response(options.events ?? "event: completed\nid: 1\ndata: {}\n\n", {
+      return new Response(options.events ?? "event: token_delta\nid: 1\ndata: {\"delta\":\"Hi\"}\n\nevent: completed\nid: 2\ndata: {}\n\n", {
         status: 200,
         headers: { "Content-Type": "text/event-stream" },
       });
@@ -256,7 +265,17 @@ function stubChatFetch(options: {
       options.cancelCalls?.push(url);
       const headers = init?.headers as Record<string, string>;
       expect(headers["X-Client-Version"]).toBeUndefined();
-      return new Response(null, { status: 204 });
+      return new Response(
+        JSON.stringify({
+          run_id: "run-1",
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          status: "cancelled",
+          reservation_id: "res-1",
+          created_at: "2026-08-17T00:00:00Z",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
     }
     if (method === "DELETE" && url.includes("/conversations/")) {
       options.deleteCalls?.push(url);
@@ -289,6 +308,16 @@ describe("ChatApp MFA and revoked session", () => {
 });
 
 describe("ChatApp SSE limitation families and reconnect", () => {
+  beforeEach(() => {
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "degraded",
+      query_ready: true,
+      detail: "mock",
+      rate_limit_degraded: false,
+      dependencies: [{ name: "paradedb", status: "down" }],
+    });
+  });
+
   it("renders Auto POST limitation copy, unknown events, and citations without snippets", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
@@ -333,7 +362,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
     const fetchImpl = stubChatFetch({
-      events: "event: heartbeat\nid: 1\ndata: {}\n\nevent: completed\nid: 2\ndata: {}\n\n",
+      events: "event: token_delta\nid: 1\ndata: {\"delta\":\"Hi\"}\n\nevent: completed\nid: 2\ndata: {}\n\n",
     });
     vi.stubGlobal("fetch", fetchImpl);
     renderChat(<ChatApp />);
@@ -388,7 +417,17 @@ describe("ChatApp SSE limitation families and reconnect", () => {
         cancelCalls.push(url);
         const headers = init?.headers as Record<string, string>;
         expect(headers["X-Client-Version"]).toBeUndefined();
-        return new Response(null, { status: 204 });
+        return new Response(
+          JSON.stringify({
+            run_id: "run-1",
+            conversation_id: "conv-1",
+            creator_user_id: "u1",
+            status: "cancelled",
+            reservation_id: "res-1",
+            created_at: "2026-08-17T00:00:00Z",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
       }
       return new Response("{}", { status: 200 });
     };
@@ -457,7 +496,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     vi.stubGlobal(
       "fetch",
       stubChatFetch({
-        events: "event: completed\nid: 1\ndata: {}\n\n",
+        events: "event: token_delta\nid: 1\ndata: {\"delta\":\"Hi\"}\n\nevent: completed\nid: 2\ndata: {}\n\n",
         messagePosts,
       }),
     );
@@ -489,5 +528,18 @@ describe("ChatApp SSE limitation families and reconnect", () => {
       expect(createConversation).toHaveBeenCalledTimes(1);
     });
     expect(messagePosts).toEqual([]);
+  });
+});
+
+
+describe("ChatApp query_ready gate", () => {
+  it("disables Send with query_ready copy while Hybrid remains the answering mode", async () => {
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    renderChat(<ChatApp />);
+    expect(await screen.findByRole("button", { name: "Send" })).toBeDisabled();
+    await waitFor(() => {
+      expect(screen.getByText(/query_ready/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
   });
 });

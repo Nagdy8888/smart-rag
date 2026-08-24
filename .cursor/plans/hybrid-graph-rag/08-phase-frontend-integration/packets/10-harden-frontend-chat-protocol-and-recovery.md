@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 10
-status: pending
+status: complete
 title: "Harden the frontend chat protocol and recovery state"
 requirement_ids: [P08-10]
 ---

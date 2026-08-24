@@ -9,7 +9,7 @@ import {
   CLIENT_VERSION,
   clientVersionIsSupported,
 } from "./client-version";
-import type { MetaResponse } from "./types";
+import type { MetaResponse, ReadinessResponse } from "./types";
 
 /** Outcome of comparing local pins to `GET /api/meta`. */
 export type HandshakeDecision = {
@@ -28,6 +28,10 @@ export type HandshakeDecision = {
 export function handshakeBelowMinCopy(): string {
   return "This client is below min_client_version. Update before asking a question.";
 }
+
+/** Copy when core `query_ready` is false. Optional BM25/graph degradation is not this. */
+export const QUERY_NOT_READY_COPY =
+  "Ask is unavailable until query_ready is true.";
 
 /**
  * Compare published SSE schema labels. Numeric strings use integer order;
@@ -129,4 +133,45 @@ export function mayStartPaidPost(
     return true;
   }
   return decision.allowPaidPost;
+}
+
+export type PaidSendBlock = {
+  reason: string;
+};
+
+/**
+ * Return why a new paid Send is blocked. In-flight resume is not a new POST.
+ *
+ * BM25 or graph degradation does not block Hybrid. Only handshake failure or
+ * `query_ready=false` blocks a new question.
+ *
+ * @param decision - Meta handshake.
+ * @param ready - Console readiness, or undefined while loading.
+ * @param run - Current chat pointer.
+ * @returns Block reason, or null when Send may proceed (draft aside).
+ */
+export function paidSendBlockReason(
+  decision: HandshakeDecision,
+  ready: ReadinessResponse | null | undefined,
+  run: { runId: string | null; terminal: string | null },
+): string | null {
+  if (run.runId !== null && run.terminal === null) {
+    return null;
+  }
+  if (!decision.allowPaidPost) {
+    if (decision.kind === "below_min") {
+      return handshakeBelowMinCopy();
+    }
+    if (decision.kind === "loading") {
+      return "Checking API compatibility.";
+    }
+    return "API handshake is unavailable.";
+  }
+  if (ready === undefined) {
+    return "Checking query readiness.";
+  }
+  if (ready === null || ready.query_ready !== true) {
+    return QUERY_NOT_READY_COPY;
+  }
+  return null;
 }

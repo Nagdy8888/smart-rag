@@ -48,14 +48,26 @@ describe("chat view", () => {
 
   it("freezes token deltas after a terminal event", () => {
     let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 7\ndata: {"delta":"Hi"}'),
+    );
     state = applySseFrame(state, parseSseBlock("event: completed\nid: 8\ndata: {}"));
     state = applySseFrame(
       state,
       parseSseBlock('event: token_delta\nid: 9\ndata: {"delta":"late"}'),
     );
-    expect(state.answerText).toBe("");
+    expect(state.answerText).toBe("Hi");
     expect(state.terminal).toBe("completed");
     expect(state.lastSequence).toBe(9);
+  });
+
+  it("treats completed without answer or refusal as a protocol failure", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(state, parseSseBlock("event: completed\nid: 8\ndata: {}"));
+    expect(state.terminal).toBe("error");
+    expect(state.status).toBe("empty_answer");
+    expect(state.failure).toEqual({ kind: "protocol", detail: "empty_answer" });
   });
 
   it("ignores duplicate and older sequences", () => {

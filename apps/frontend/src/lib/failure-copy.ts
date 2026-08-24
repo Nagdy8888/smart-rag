@@ -30,6 +30,9 @@ export function apiFailureBanner(failure: ApiFailure): string {
       if (failure.detail === "session_revoked") {
         return SESSION_REVOKED_BANNER;
       }
+      if (failure.status === 403) {
+        return FORBIDDEN_MUTATION_COPY;
+      }
       return `Session rejected (${displayText(failure.detail)}). Sign in again. UI state is not authorization.`;
     case "budget":
       return `Budget exhausted (${displayText(failure.detail)}).`;
@@ -44,6 +47,14 @@ export function apiFailureBanner(failure: ApiFailure): string {
       return `Limiter fail-closed (${displayText(failure.detail)}). Approved reads may degrade; cost mutations are denied.`;
     case "deleted":
       return "Conversation deleted. Reads, resume, and citations are denied. No source text is shown.";
+    case "conflict":
+      return `Request conflict (${displayText(failure.detail)}). Reload and retry.`;
+    case "validation":
+      return `Request invalid (${displayText(failure.detail)}).`;
+    case "protocol":
+      return failure.detail === "empty_answer"
+        ? "The run completed without an answer."
+        : `Run error (${displayText(failure.detail)}).`;
     case "server":
       return GENERIC_PRODUCTION_ERROR;
     default: {

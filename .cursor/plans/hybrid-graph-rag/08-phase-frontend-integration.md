@@ -61,7 +61,7 @@ Remediation packets P08-07 through P08-23 are additive. Do not uncheck packets 1
 7. [ ] [Canonical remediation amendment and baseline](./08-phase-frontend-integration/packets/07-canonical-remediation-amendment-and-baseline.md)
 8. [x] [Restore query runtime connectivity and deterministic readiness](./08-phase-frontend-integration/packets/08-restore-query-runtime-connectivity-and-readiness.md)
 9. [x] [Repair Phase 6 execution durability and verified answer delivery](./08-phase-frontend-integration/packets/09-repair-phase-6-execution-durability-and-verified-answers.md)
-10. [ ] [Harden the frontend chat protocol and recovery state](./08-phase-frontend-integration/packets/10-harden-frontend-chat-protocol-and-recovery.md)
+10. [x] [Harden the frontend chat protocol and recovery state](./08-phase-frontend-integration/packets/10-harden-frontend-chat-protocol-and-recovery.md)
 11. [ ] [Remove backend and database MFA/AAL2 enforcement](./08-phase-frontend-integration/packets/11-remove-backend-and-database-mfa-aal2-enforcement.md)
 12. [ ] [Remove frontend/provider MFA and finish single-factor Auth](./08-phase-frontend-integration/packets/12-remove-frontend-provider-mfa-and-finish-single-factor-auth.md)
 13. [ ] [Implement exact design tokens and reusable primitives](./08-phase-frontend-integration/packets/13-implement-exact-design-tokens-and-reusable-primitives.md)

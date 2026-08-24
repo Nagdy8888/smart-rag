@@ -28,6 +28,9 @@ import {
   startOrResumeMessageStream,
   submitFeedback,
   resumeEventStream,
+  fetchConversation,
+  fetchRun,
+  isClassifiedApiError,
   type ApiAuth,
   type ApiFailure,
 } from "../lib/api";
@@ -42,8 +45,18 @@ import {
   createChatViewState,
   type ChatViewState,
 } from "../lib/chat-view";
+import {
+  clearChatRunPointer,
+  isActiveRunStatus,
+  readChatRunPointer,
+  writeChatRunPointer,
+} from "../lib/chat-pointer";
 import { composerDraftIsSendable } from "../lib/composer";
-import { evaluatePaidHandshake, mayStartPaidPost } from "../lib/handshake";
+import {
+  evaluatePaidHandshake,
+  mayStartPaidPost,
+  paidSendBlockReason,
+} from "../lib/handshake";
 import { apiFailureBanner, GENERIC_PRODUCTION_ERROR } from "../lib/failure-copy";
 import {
   isGraphOnlyInspectionRoute,
@@ -157,6 +170,10 @@ export function ChatApp() {
   const autoResumeRef = useRef<((currentChat: ChatViewState, controller: AbortController) => Promise<void>) | null>(null);
   const [disconnected, setDisconnected] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState<string | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [reconnectExhausted, setReconnectExhausted] = useState(false);
+  const [nextRetryMs, setNextRetryMs] = useState<number | null>(null);
+  const recoveredRef = useRef(false);
   const auth = useMemo<ApiAuth | null>(
     () => (accessToken ? { accessToken } : null),
     [accessToken],
@@ -243,7 +260,7 @@ export function ChatApp() {
     if (auth === null || !composerDraftIsSendable(draft)) {
       return;
     }
-    if (!mayStartPaidPost(handshake, chat)) {
+    if (paidSendBlockReason(handshake, readyQuery.data ?? null, chat) !== null) {
       return;
     }
     sendLockRef.current = true;
@@ -334,7 +351,7 @@ export function ChatApp() {
     } finally {
       sendLockRef.current = false;
     }
-  }, [auth, chat, conversationId, draft, handshake, queryClient]);
+  }, [auth, chat, conversationId, draft, handshake, queryClient, readyQuery.data]);
 
   const resumeOnce = useCallback(
     async (currentChat: ChatViewState, controller: AbortController) => {
@@ -370,6 +387,7 @@ export function ChatApp() {
   const autoResume = useCallback(
     async (currentChat: ChatViewState, controller: AbortController) => {
       let latest = currentChat;
+      setReconnectExhausted(false);
       for (let attemptIndex = 0; attemptIndex < MAX_RECONNECT_ATTEMPTS; attemptIndex += 1) {
         const stop = shouldStopReconnect({
           attemptIndex,
@@ -382,11 +400,15 @@ export function ChatApp() {
         if (stop !== null) {
           return;
         }
+        setReconnectAttempt(attemptIndex + 1);
+        const delay = reconnectDelayMs(attemptIndex);
+        setNextRetryMs(delay);
         try {
-          await waitForReconnectDelay(reconnectDelayMs(attemptIndex), controller.signal);
+          await waitForReconnectDelay(delay, controller.signal);
         } catch {
           return;
         }
+        setNextRetryMs(null);
         try {
           const resumed = await resumeOnce(latest, controller);
           if (resumed === "deleted" || resumed === null) {
@@ -404,6 +426,8 @@ export function ChatApp() {
         }
       }
       setDisconnected(true);
+      setReconnectExhausted(true);
+      setNextRetryMs(null);
     },
     [auth, failure?.kind, resumeOnce],
   );
@@ -411,6 +435,82 @@ export function ChatApp() {
   useEffect(() => {
     autoResumeRef.current = autoResume;
   }, [autoResume]);
+
+  useEffect(() => {
+    if (conversationId !== null && chat.runId !== null && chat.terminal === null) {
+      writeChatRunPointer({
+        conversationId,
+        runId: chat.runId,
+        lastSequence: chat.lastSequence,
+      });
+      return;
+    }
+    if (chat.terminal !== null) {
+      clearChatRunPointer();
+    }
+  }, [chat.lastSequence, chat.runId, chat.terminal, conversationId]);
+
+  useEffect(() => {
+    if (auth === null || recoveredRef.current) {
+      return;
+    }
+    const pointer = readChatRunPointer();
+    if (pointer === null) {
+      recoveredRef.current = true;
+      return;
+    }
+    recoveredRef.current = true;
+    let cancelled = false;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    void (async () => {
+      try {
+        const conversation = await fetchConversation(auth, pointer.conversationId);
+        if (cancelled) {
+          return;
+        }
+        const run = await fetchRun(auth, pointer.runId);
+        if (cancelled) {
+          return;
+        }
+        if (run.conversation_id !== conversation.conversation_id) {
+          clearChatRunPointer();
+          return;
+        }
+        if (!isActiveRunStatus(run.status)) {
+          clearChatRunPointer();
+          return;
+        }
+        setConversationId(pointer.conversationId);
+        const recovered = {
+          ...createChatViewState(idempotencyRef.current ?? newIdempotencyKey()),
+          runId: run.run_id,
+          lastSequence: pointer.lastSequence,
+          reservationId: run.reservation_id,
+        };
+        setChat(recovered);
+        const resumed = await resumeOnce(recovered, controller);
+        if (resumed === "deleted" || resumed === null || cancelled) {
+          return;
+        }
+        if (resumed.terminal === null && !controller.signal.aborted) {
+          setDisconnected(true);
+          void autoResumeRef.current?.(resumed, controller);
+        }
+      } catch (error) {
+        clearChatRunPointer();
+        if (cancelled) {
+          return;
+        }
+        if (isClassifiedApiError(error)) {
+          setFailure(error.failure);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [auth, resumeOnce]);
 
   const reconnect = useCallback(async () => {
     if (auth === null || chat.runId === null) {
@@ -420,6 +520,8 @@ export function ChatApp() {
     const controller = new AbortController();
     abortRef.current = controller;
     setDisconnected(false);
+    setReconnectExhausted(false);
+    setReconnectAttempt(0);
     try {
       const resumed = await resumeOnce(chat, controller);
       if (resumed === "deleted" || resumed === null) {
@@ -439,8 +541,24 @@ export function ChatApp() {
 
   const cancel = useCallback(async () => {
     abortRef.current?.abort();
-    if (auth !== null && chat.runId !== null) {
-      await cancelRun(auth, chat.runId);
+    if (auth === null || chat.runId === null) {
+      return;
+    }
+    try {
+      const run = await cancelRun(auth, chat.runId);
+      setChat((prev) => ({
+        ...prev,
+        terminal: "cancelled",
+        status: run.status,
+      }));
+      clearChatRunPointer();
+      setFailure(null);
+    } catch (error) {
+      if (isClassifiedApiError(error)) {
+        setFailure(error.failure);
+        return;
+      }
+      setFailure({ kind: "server", status: 500 });
     }
   }, [auth, chat.runId]);
 
@@ -457,7 +575,11 @@ export function ChatApp() {
         feedbackComment || null,
       );
       setFeedbackStatus("Feedback recorded.");
-    } catch {
+    } catch (error) {
+      if (isClassifiedApiError(error)) {
+        setFeedbackStatus(apiFailureBanner(error.failure));
+        return;
+      }
       setFeedbackStatus("Feedback could not be recorded.");
     }
   }, [auth, chat.runId, feedbackComment, feedbackTag, thumbsUp]);
@@ -559,8 +681,13 @@ export function ChatApp() {
     );
   }
 
+  const sendBlockReason = paidSendBlockReason(
+    handshake,
+    readyQuery.isPending ? undefined : readyQuery.data ?? null,
+    chat,
+  );
   const sendDisabled =
-    !mayStartPaidPost(handshake, chat) ||
+    sendBlockReason !== null ||
     !composerDraftIsSendable(draft);
 
   const citations = citationsQuery.data ?? [];
@@ -654,6 +781,11 @@ export function ChatApp() {
         onReconnect={() => void reconnect()}
         sendDisabled={sendDisabled}
         running={chat.terminal === null && chat.runId !== null}
+        sendBlockedReason={sendBlockReason}
+        reconnectAttempt={reconnectAttempt}
+        reconnectMaxAttempts={MAX_RECONNECT_ATTEMPTS}
+        nextRetryMs={nextRetryMs}
+        reconnectExhausted={reconnectExhausted}
       />
     </section>
   );
@@ -681,10 +813,23 @@ export function ChatApp() {
         </StatusBanner>
       ) : null}
 
+      {chat.failure !== null ? (
+        <StatusBanner kind="error" role="alert">
+          {apiFailureBanner(chat.failure)}
+          {chat.runId ? ` Run ${chat.runId}.` : ""}
+          {chat.status ? ` (${chat.status})` : ""}
+        </StatusBanner>
+      ) : null}
+
       {disconnected && chat.terminal === null ? (
         <StatusBanner kind="warning" role="status">
-          The stream disconnected. Automatic resume uses the same run. Use
-          Reconnect if it does not recover.
+          {reconnectExhausted
+            ? `Automatic reconnect stopped after ${String(MAX_RECONNECT_ATTEMPTS)} attempts. Partial output is kept. Use Retry.`
+            : reconnectAttempt > 0
+              ? `Connection interrupted. Reconnecting… attempt ${String(reconnectAttempt)} of ${String(MAX_RECONNECT_ATTEMPTS)}${
+                  nextRetryMs !== null ? `. Next retry in ${String(nextRetryMs)} ms.` : ""
+                }`
+              : "The stream disconnected. Automatic resume uses the same run. Use Reconnect if it does not recover."}
         </StatusBanner>
       ) : null}
 

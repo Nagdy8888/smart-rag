@@ -1022,3 +1022,86 @@ Revert this commit. SSE resume tests stay on in-memory stores. Applied
 migration `20260824130000_query_run_messages_runtime_v1.sql` is additive
 (`run_id` on `app.messages` plus RPCs); reverse only with a new down
 migration if a follow-up packet requires it.
+
+## Packet 10 — Harden the frontend chat protocol and recovery state
+
+### Requirement (quoted)
+
+> Change mutation helpers such as cancel and feedback from ambiguous
+> booleans to typed success payloads or classified thrown errors.
+> Store only `{conversationId, runId, lastSequence}` for the active run
+> in `sessionStorage`.
+> On page reload, fetch the owned run, resume from the durable sequence
+> if running, and clear the pointer when terminal/deleted/foreign.
+> Treat `completed` without answer/refusal content as a protocol failure.
+> Gate paid send on compatible handshake and core `query_ready`.
+> Fix caller usage labeling from “Company total” to “Your usage.”
+
+### Concrete acceptance checks
+
+- `cancelRun` / `submitFeedback` return typed JSON or throw
+  `ClassifiedApiError`; callers never mark success on HTTP failure.
+- Reload reads `GET /runs/{id}` and `GET /conversations/{id}` and resumes
+  GET `/runs/{id}/events` without a second paid POST.
+- Empty `completed` SSE becomes `terminal=error` with
+  `{ kind: "protocol", detail: "empty_answer" }`.
+- Terminal SSE `error` / protocol failure banners render in the main
+  workspace with run id.
+- New Send is blocked when `query_ready` is false; ParadeDB-down Hybrid
+  still allows Send.
+- Reconnect chrome shows attempt count, next delay, Cancel, and Retry
+  after the automatic ceiling.
+- Usage strip says “Your usage”, not “Company total”.
+
+### Files in this packet
+
+- `apps/frontend/src/lib/types.ts`
+- `apps/frontend/src/lib/api.ts`
+- `apps/frontend/src/lib/api.test.ts`
+- `apps/frontend/src/lib/handshake.ts`
+- `apps/frontend/src/lib/handshake.test.ts`
+- `apps/frontend/src/lib/failure-copy.ts`
+- `apps/frontend/src/lib/failure-copy.test.ts`
+- `apps/frontend/src/lib/chat-view.ts`
+- `apps/frontend/src/lib/chat-view.test.ts`
+- `apps/frontend/src/lib/chat-pointer.ts`
+- `apps/frontend/src/lib/chat-pointer.test.ts`
+- `apps/frontend/src/components/chat-app.tsx`
+- `apps/frontend/src/components/chat-app.test.tsx`
+- `apps/frontend/src/components/chat/chat-composer.tsx`
+- `apps/frontend/src/components/chat/run-details-sheet.tsx`
+- this evidence file
+
+### Authorization / failure / fallback / idempotency
+
+- Foreign or missing run/conversation GET is 404 → `deleted`; pointer is
+  cleared; no transcript fields are invented.
+- Cancel/feedback 403/404/422 throw classified errors; feedback form
+  values are preserved on failure.
+- `402` / `403` / `404` / `409` / `422` / `426` / `429`+Retry-After /
+  `503` map to approved banners without traces.
+- Idempotency key stays stable until a durable terminal, then rotates.
+- sessionStorage pointer never includes tokens, evidence, or answer text.
+- Optional BM25/graph degradation does not block Hybrid Send.
+
+### Verification
+
+```text
+pnpm test
+pnpm typecheck
+```
+
+Result (from `apps/frontend`): 33 files, 197 tests passed. `tsc --noEmit`
+is clean.
+
+### Unverified
+
+- Browser reload against a live FastAPI/SSE stack was not exercised in
+  this packet.
+- Real 429 Retry-After from a production limiter was not observed live.
+
+### Rollback
+
+Revert this commit. Chat returns to boolean cancel/feedback helpers and
+does not persist a sessionStorage run pointer.
+

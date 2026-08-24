@@ -23,6 +23,8 @@ export type RunDetailsSheetProps = {
   chat: ChatViewState;
   /** Company usage USD string. */
   companyUsd: string;
+  /** Caller usage label. Never company-wide spend. */
+  usageLabel?: string;
 };
 
 /**
@@ -91,7 +93,7 @@ export function RunDetailsSheet({
       <p className={styles.muted}>{INFERENCE_LINKS_UNAVAILABLE}</p>
       <p className={styles.muted} data-testid="usage-strip">
         Usage {String(diagnostics.promptTokens)}/{String(diagnostics.completionTokens)}{" "}
-        tokens. Company total {companyUsd} USD.
+        tokens. Your usage {companyUsd} USD.
       </p>
     </>
   );

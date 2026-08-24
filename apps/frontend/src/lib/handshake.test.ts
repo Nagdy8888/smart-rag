@@ -4,6 +4,8 @@ import {
   handshakeBelowMinCopy,
   isSseSchemaNewerThanCatalog,
   mayStartPaidPost,
+  paidSendBlockReason,
+  QUERY_NOT_READY_COPY,
 } from "./handshake";
 import { CLIENT_VERSION, clientVersionIsSupported } from "./client-version";
 
@@ -82,5 +84,49 @@ describe("google oauth guard", () => {
     expect(GOOGLE_OAUTH_ENABLED).toBe(false);
     expect(result.invoked).toBe(false);
     expect(signInWithOAuth).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("paidSendBlockReason", () => {
+  const meta = {
+    api_version: "1",
+    sse_schema_version: "1",
+    min_client_version: "0.1.0",
+  };
+  const ready = {
+    status: "ok",
+    query_ready: true,
+    detail: "ok",
+    rate_limit_degraded: false,
+    dependencies: [{ name: "paradedb", status: "down" }],
+  };
+
+  it("blocks a new question when query_ready is false", () => {
+    const decision = evaluatePaidHandshake(meta, "ok");
+    expect(
+      paidSendBlockReason(decision, { ...ready, query_ready: false }, {
+        runId: null,
+        terminal: null,
+      }),
+    ).toBe(QUERY_NOT_READY_COPY);
+  });
+
+  it("allows Hybrid when query_ready is true even if BM25 is down", () => {
+    const decision = evaluatePaidHandshake(meta, "ok");
+    expect(
+      paidSendBlockReason(decision, ready, { runId: null, terminal: null }),
+    ).toBeNull();
+  });
+
+  it("does not block resume of an in-flight run", () => {
+    const decision = evaluatePaidHandshake(meta, "ok");
+    expect(
+      paidSendBlockReason(
+        decision,
+        { ...ready, query_ready: false },
+        { runId: "run-1", terminal: null },
+      ),
+    ).toBeNull();
   });
 });

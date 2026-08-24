@@ -59,6 +59,21 @@ export type SubmitMessageResponse = {
   status: string;
 };
 
+/** `GET /runs/{run_id}` and `POST /runs/{run_id}/cancel` body. */
+export type RunResponse = {
+  run_id: string;
+  conversation_id: string;
+  creator_user_id: string;
+  status: string;
+  reservation_id: string | null;
+  created_at: string | null;
+};
+
+/** `POST /runs/{run_id}/feedback` 201 body. */
+export type FeedbackResponse = {
+  feedback_id: string;
+};
+
 /** `GET /runs/{id}/citations` item. */
 export type CitationResponse = {
   citation_id: string;

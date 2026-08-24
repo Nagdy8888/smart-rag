@@ -28,6 +28,10 @@ import {
   cancelRun,
   deleteConversation,
   fetchMe,
+  fetchRun,
+  fetchConversation,
+  submitFeedback,
+  ClassifiedApiError,
 } from "./api";
 import { clientComputedTableTotal } from "./table-plan";
 import { CLIENT_VERSION } from "./client-version";
@@ -1016,11 +1020,28 @@ describe("cancelRun", () => {
       expect(headers.Authorization).toBe("Bearer jwt-token");
       expect(headers["X-Client-Version"]).toBeUndefined();
       expect(headers["X-Test-Role"]).toBeUndefined();
-      return new Response(null, { status: 204 });
+      return new Response(
+        JSON.stringify({
+          run_id: "run-1",
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          status: "cancelled",
+          reservation_id: null,
+          created_at: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
     };
     await expect(
       cancelRun({ accessToken: "jwt-token" }, "run-1", fetchImpl),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({
+      run_id: "run-1",
+      conversation_id: "conv-1",
+      creator_user_id: "u1",
+      status: "cancelled",
+      reservation_id: null,
+      created_at: null,
+    });
   });
 });
 
@@ -1089,5 +1110,120 @@ describe("listCitations without snippets", () => {
       fetchImpl,
     );
     expect(citations).toEqual([]);
+  });
+});
+
+
+describe("classifyApiError conflict and validation", () => {
+  it("maps 409 and 422 to typed failures", () => {
+    expect(classifyApiError(409, { detail: "conflict" })).toEqual({
+      kind: "conflict",
+      detail: "conflict",
+    });
+    expect(classifyApiError(422, { detail: "validation_error" })).toEqual({
+      kind: "validation",
+      detail: "validation_error",
+    });
+  });
+});
+
+describe("fetchRun and fetchConversation", () => {
+  it("returns an owned run and does not invent transcript fields", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      expect(String(input)).toBe("http://127.0.0.1:8000/runs/run-1");
+      return new Response(
+        JSON.stringify({
+          run_id: "run-1",
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          status: "running",
+          reservation_id: "res-1",
+          created_at: "2026-08-17T00:00:00Z",
+          answer: "SECRET",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const run = await fetchRun({ accessToken: "jwt-token" }, "run-1", fetchImpl);
+    expect(run).toEqual({
+      run_id: "run-1",
+      conversation_id: "conv-1",
+      creator_user_id: "u1",
+      status: "running",
+      reservation_id: "res-1",
+      created_at: "2026-08-17T00:00:00Z",
+    });
+    expect(JSON.stringify(run)).not.toContain("SECRET");
+  });
+
+  it("classifies a foreign run as deleted", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "not_found" }), { status: 404 });
+    await expect(
+      fetchRun({ accessToken: "jwt-token" }, "run-foreign", fetchImpl),
+    ).rejects.toBeInstanceOf(ClassifiedApiError);
+  });
+
+  it("fetches an owned conversation", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      expect(String(input)).toBe(
+        "http://127.0.0.1:8000/conversations/conv-1",
+      );
+      return new Response(
+        JSON.stringify({
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          title: "Chat",
+          created_at: "2026-08-17T00:00:00Z",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const conversation = await fetchConversation(
+      { accessToken: "jwt-token" },
+      "conv-1",
+      fetchImpl,
+    );
+    expect(conversation.conversation_id).toBe("conv-1");
+  });
+});
+
+describe("submitFeedback", () => {
+  it("returns the 201 payload and throws on 403", async () => {
+    const ok: typeof fetch = async () =>
+      new Response(JSON.stringify({ feedback_id: "fb-1" }), { status: 201 });
+    await expect(
+      submitFeedback(
+        { accessToken: "jwt-token" },
+        "run-1",
+        true,
+        "chunk/cleaning loss",
+        null,
+        ok,
+      ),
+    ).resolves.toEqual({ feedback_id: "fb-1" });
+
+    const forbidden: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), { status: 403 });
+    await expect(
+      submitFeedback(
+        { accessToken: "jwt-token" },
+        "run-1",
+        true,
+        "chunk/cleaning loss",
+        "note",
+        forbidden,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+  });
+});
+
+describe("cancelRun failures", () => {
+  it("throws a classified error instead of returning success", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), { status: 403 });
+    await expect(
+      cancelRun({ accessToken: "jwt-token" }, "run-1", fetchImpl),
+    ).rejects.toBeInstanceOf(ClassifiedApiError);
   });
 });
