@@ -2,12 +2,43 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
-from smart_rag_core.observability.langsmith_tracing import short_content_hash
-from smart_rag_core.observability.logging import current_correlation_ids
+import langsmith
+
+from smart_rag_core.observability.governance_gate import (
+    assert_langsmith_export_permitted,
+)
+from smart_rag_core.observability.langsmith_tracing import (
+    short_content_hash,
+    traceable,
+    tracing_is_enabled,
+)
+from smart_rag_core.observability.logging import (
+    correlation_context,
+    current_correlation_ids,
+)
+from smart_rag_core.security.external_processing import ContentClass
+from smart_rag_core.settings import SharedSettings
+
+T = TypeVar("T")
+
+QUERY_AGENT_EVAL_RUN = "query.agent.eval"
+_PARENT_INPUT_KEYS = frozenset(
+    {
+        "case_id",
+        "run_id",
+        "user_id_sha256",
+        "conversation_id_sha256",
+        "requested_route",
+        "effective_route",
+        "corrected_route",
+        "graph_name",
+    }
+)
 
 
 def hashed_user_id(user_id: UUID | str) -> str:
@@ -112,3 +143,257 @@ def query_run_trace_metadata(
     if cost_usd is not None:
         payload["cost_usd"] = cost_usd
     return payload
+
+
+def hashed_conversation_id(conversation_id: UUID | str) -> str:
+    """Return a truncated SHA-256 of a conversation id.
+
+    Args:
+        conversation_id: Conversation UUID.
+
+    Returns:
+        First 16 hex characters of SHA-256.
+    """
+
+    return short_content_hash(str(conversation_id))
+
+
+def redact_query_agent_eval_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep case/run hashes and routes; drop query, answer, and secrets.
+
+    Args:
+        inputs: Traceable kwargs.
+
+    Returns:
+        Exportable parent inputs plus correlation ids.
+    """
+
+    payload: dict[str, Any] = {"correlation": current_correlation_ids()}
+    for key in _PARENT_INPUT_KEYS:
+        value = inputs.get(key)
+        if isinstance(value, str) and value:
+            payload[key] = value
+    return payload
+
+
+def redact_query_agent_eval_outputs(outputs: object) -> dict[str, Any]:
+    """Export status, counts, and routes only. Never copy answer text.
+
+    Args:
+        outputs: Traceable return wrapper or the raw thunk result.
+
+    Returns:
+        Completed flag, route, citation count, latency, and cost when present.
+    """
+
+    raw: object = outputs
+    if isinstance(outputs, Mapping):
+        mapped = dict(cast(Mapping[str, object], outputs))
+        raw = mapped.get("output", mapped)
+    if not isinstance(raw, Mapping):
+        return {"completed": True}
+    payload: dict[str, Any] = {}
+    typed = cast(Mapping[str, object], raw)
+    completed = typed.get("completed")
+    if isinstance(completed, bool):
+        payload["completed"] = completed
+    failure_kind = typed.get("failure_kind")
+    if isinstance(failure_kind, str) and failure_kind:
+        payload["failure_kind"] = failure_kind[:64]
+    for key in ("effective_route", "answer_status"):
+        value = typed.get(key)
+        if isinstance(value, str) and value:
+            payload[key] = value[:64]
+    cited = typed.get("cited_chunk_ids")
+    tables = typed.get("cited_table_ids")
+    cited_count = 0
+    if isinstance(cited, (list, tuple)):
+        cited_count += len(cast(Sequence[object], cited))
+    if isinstance(tables, (list, tuple)):
+        cited_count += len(cast(Sequence[object], tables))
+    payload["citation_count"] = cited_count
+    latency = typed.get("latency_ms")
+    if isinstance(latency, int):
+        payload["latency_ms"] = latency
+    cost = typed.get("agent_cost_usd")
+    if isinstance(cost, str):
+        payload["cost_usd"] = cost
+    return payload or {"completed": True}
+
+
+def _optional_trace_str(value: object) -> str | None:
+    """Return a string metadata value or None.
+
+    Args:
+        value: Extra parent-span field.
+
+    Returns:
+        String when ``value`` is a non-empty str; otherwise None.
+    """
+
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def _query_eval_tracing_scope(*, enabled: bool) -> AbstractContextManager[object]:
+    """Open ``langsmith.tracing_context`` when export is on and no scope exists.
+
+    Args:
+        enabled: Whether this process should export the eval parent run.
+
+    Returns:
+        An enabled tracing context when the SDK is not already tracing;
+        otherwise a no-op so unit tests keep their recording client.
+    """
+
+    if not enabled or tracing_is_enabled():
+        return nullcontext()
+    factory = cast(
+        Callable[..., AbstractContextManager[object]],
+        langsmith.tracing_context,  # pyright: ignore[reportUnknownMemberType]
+    )
+    return factory(enabled=True)
+
+
+def assert_query_agent_eval_langsmith_gate(settings: SharedSettings) -> None:
+    """Fail closed before opening a ``query.agent.eval`` parent run.
+
+    Args:
+        settings: Validated process settings.
+
+    Raises:
+        ExternalFlowBlockedError: When real-company export is unverified and
+            the local waiver does not apply.
+    """
+
+    content_class = ContentClass.SYNTHETIC
+    if not (
+        settings.mock_model_mode or settings.allows_unsigned_local_live_providers()
+    ):
+        content_class = ContentClass.REAL_COMPANY
+    assert_langsmith_export_permitted(
+        tracing_enabled=settings.langsmith_tracing,
+        content_class=content_class,
+        provider_settings_verified=settings.subprocessor_matrix_verified,
+        local_unsigned_waiver=settings.allows_unsigned_local_live_providers(),
+    )
+
+
+def invoke_traced_query_agent_eval(
+    thunk: Callable[[], T],
+    *,
+    settings: SharedSettings,
+    case_id: str,
+    run_id: UUID | str | None = None,
+    user_id: UUID | str | None = None,
+    conversation_id: UUID | str | None = None,
+    requested_route: str | None = None,
+    effective_route: str | None = None,
+    corrected_route: str | None = None,
+) -> T:
+    """Wrap one admitted graph invoke in a redacted ``query.agent.eval`` parent.
+
+    Args:
+        thunk: Production graph ``invoke``. Must not log source text.
+        settings: Process settings used for the export gate.
+        case_id: Synthetic development case identifier.
+        run_id: Application run id when admission succeeded.
+        user_id: Subject hashed before export.
+        conversation_id: Conversation id hashed before export.
+        requested_route: Envelope family reserved at admit.
+        effective_route: Planner-selected family.
+        corrected_route: Family after the one correction, if any.
+
+    Returns:
+        The thunk result.
+
+    Raises:
+        ExternalFlowBlockedError: When export is not permitted.
+
+    Side Effects:
+        Sets correlation context. Creates a LangSmith chain run when tracing
+        is enabled. Child gateway spans nest under this parent.
+    """
+
+    assert_query_agent_eval_langsmith_gate(settings)
+    extra: dict[str, Any] = {
+        "correlation": current_correlation_ids(),
+        "case_id": case_id,
+        "graph_name": QUERY_AGENT_EVAL_RUN,
+    }
+    if run_id is not None:
+        extra["run_id"] = str(run_id)
+    if user_id is not None:
+        extra["user_id_sha256"] = hashed_user_id(user_id)
+    if conversation_id is not None:
+        extra["conversation_id_sha256"] = hashed_conversation_id(conversation_id)
+    if requested_route:
+        extra["requested_route"] = requested_route
+    if effective_route:
+        extra["effective_route"] = effective_route
+    if corrected_route:
+        extra["corrected_route"] = corrected_route
+    with correlation_context(run_id=str(run_id) if run_id is not None else None):
+        tracing_on = bool(settings.langsmith_tracing or tracing_is_enabled())
+        if not tracing_on:
+            return thunk()
+
+        @traceable(
+            name=QUERY_AGENT_EVAL_RUN,
+            run_type="chain",
+            process_inputs=redact_query_agent_eval_inputs,
+            process_outputs=redact_query_agent_eval_outputs,
+            metadata=extra,
+        )
+        def _parent(
+            case_id: str,
+            graph_name: str,
+            run_id: str | None = None,
+            user_id_sha256: str | None = None,
+            conversation_id_sha256: str | None = None,
+            requested_route: str | None = None,
+            effective_route: str | None = None,
+            corrected_route: str | None = None,
+        ) -> T:
+            """Redacted query-agent eval parent. Arguments are ids and hashes.
+
+            Args:
+                case_id: Synthetic case identifier.
+                graph_name: Parent run name.
+                run_id: Application run id.
+                user_id_sha256: Hashed user id.
+                conversation_id_sha256: Hashed conversation id.
+                requested_route: Admit family.
+                effective_route: Planner family.
+                corrected_route: Post-correction family.
+
+            Returns:
+                Thunk result.
+            """
+
+            del (
+                case_id,
+                graph_name,
+                run_id,
+                user_id_sha256,
+                conversation_id_sha256,
+                requested_route,
+                effective_route,
+                corrected_route,
+            )
+            return thunk()
+
+        with _query_eval_tracing_scope(enabled=True):
+            return _parent(
+                case_id=case_id,
+                graph_name=QUERY_AGENT_EVAL_RUN,
+                run_id=_optional_trace_str(extra.get("run_id")),
+                user_id_sha256=_optional_trace_str(extra.get("user_id_sha256")),
+                conversation_id_sha256=_optional_trace_str(
+                    extra.get("conversation_id_sha256")
+                ),
+                requested_route=_optional_trace_str(extra.get("requested_route")),
+                effective_route=_optional_trace_str(extra.get("effective_route")),
+                corrected_route=_optional_trace_str(extra.get("corrected_route")),
+            )
