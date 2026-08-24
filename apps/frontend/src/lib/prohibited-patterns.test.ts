@@ -114,13 +114,15 @@ describe("prohibited production patterns", () => {
     expect(names).not.toContain("gallery");
     expect(names).not.toContain("chat");
     expect(names).not.toContain("docs");
-    expect(names).not.toContain("admin");
+    expect(names).not.toContain("gallery");
     expect(names.some((name) => name.startsWith("frame_"))).toBe(false);
     expect(names).toEqual(
       expect.arrayContaining([
         "documents",
         "graph",
         "tables",
+        "admin",
+        "account",
         "team",
         "tools",
         "curation",

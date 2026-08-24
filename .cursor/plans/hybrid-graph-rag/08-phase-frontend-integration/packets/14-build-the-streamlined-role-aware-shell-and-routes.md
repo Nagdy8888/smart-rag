@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 14
-status: pending
+status: complete
 title: "Build the streamlined role-aware shell and routes"
 requirement_ids: [P08-14]
 ---

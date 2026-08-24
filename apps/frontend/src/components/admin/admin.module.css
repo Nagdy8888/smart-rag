@@ -382,3 +382,28 @@
   margin: 0;
   padding: 0;
 }
+
+.tabList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab,
+.tabCurrent {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.tabCurrent {
+  color: var(--color-accent);
+  background: var(--color-accent-muted);
+  font-weight: 600;
+}

@@ -33,11 +33,11 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 
 | Route | Surface | Contract |
 | --- | --- | --- |
-| `/team` | Invite create + offboard by `user_id`. No member directory | `POST /admin/invitations`, `POST /admin/users/{user_id}/offboard`. Accept remains `/invitations/accept` |
-| `/tools` | Catalog for any member. Enable/permissions owner/admin convenience | `GET /tools`, `POST /admin/tools`, `POST /admin/tools/{tool_key}/enable`, `POST /admin/tools/{tool_key}/permissions` |
-| `/curation` | Glossary import/approve/rollback + entity rules | `/admin/glossary/imports*`, `/admin/graph/entity-rules*` |
-| `/usage` | Caller totals for all; company totals owner/admin | `GET /usage/me`, `GET /usage/company`. Totals only, no prompt text |
-| `/profile` | Read-only five `GET /me` fields | GAP-07-19 has no name/locale editor |
+| `/admin?tab=team` | Invite create + offboard by `user_id`. No member directory. `/team` redirects here | `POST /admin/invitations`, `POST /admin/users/{user_id}/offboard`. Accept remains `/invitations/accept` |
+| `/admin?tab=tools` | Catalog for any member. Enable/permissions owner/admin convenience. `/tools` redirects here | `GET /tools`, `POST /admin/tools`, `POST /admin/tools/{tool_key}/enable` |
+| `/admin?tab=curation` | Glossary import/approve/rollback + entity rules. `/curation` redirects here | `/admin/glossary/imports*`, `/admin/graph/entity-rules*` |
+| `/admin?tab=usage` | Caller totals for all; company totals owner/admin. `/usage` redirects here | `GET /usage/me`, `GET /usage/company`. Totals only, no prompt text |
+| `/account` | Read-only `GET /me` fields. `/profile` redirects here | GAP-07-19 has no name/locale editor |
 
 Nav adds Team, Tools, Curation, Usage, and Profile as real `Link`s. Nav
 is not authorization. Viewer/member chrome hides invite, offboard, enable,

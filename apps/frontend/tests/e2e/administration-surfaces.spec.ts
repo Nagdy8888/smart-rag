@@ -9,26 +9,12 @@ test("authenticated chrome includes administration nav links", async ({
   await expect(page.getByTestId("app-shell-nav")).toHaveCount(0);
   await signInLiveMember(page, request);
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Team" })).toHaveAttribute(
-    "href",
-    "/team",
-  );
-  await expect(page.getByRole("link", { name: "Tools" })).toHaveAttribute(
-    "href",
-    "/tools",
-  );
-  await expect(page.getByRole("link", { name: "Curation" })).toHaveAttribute(
-    "href",
-    "/curation",
-  );
-  await expect(page.getByRole("link", { name: "Usage" })).toHaveAttribute(
-    "href",
-    "/usage",
-  );
-  await expect(page.getByRole("link", { name: "Profile" })).toHaveAttribute(
-    "href",
-    "/profile",
-  );
+  await expect(page.getByRole("link", { name: "Ask" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "Team" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Tools" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Curation" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Usage" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Profile" })).toHaveCount(0);
 });
 
 test("unauthenticated administration routes redirect to login", async ({

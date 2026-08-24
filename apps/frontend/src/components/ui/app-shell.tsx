@@ -9,7 +9,7 @@ import {
   CLIENT_NAV_IS_NOT_AUTHORIZATION,
   hiddenNavImpliesForbidden,
 } from "../../lib/client-authorization";
-import { AppNav, ConsoleTopbar, ShellUser } from "./app-nav";
+import { AppNav, ConsoleTopbar } from "./app-nav";
 import { Icon } from "./icon";
 import styles from "./app-shell.module.css";
 
@@ -45,11 +45,10 @@ export function AppShell({ children }: AppShellProps) {
             </span>
             <span className={styles.brandText}>
               <p className={styles.brandName}>Smart RAG</p>
-              <p className={styles.brandSub}>Company console</p>
+              <p className={styles.brandSub}>Company knowledge</p>
             </span>
           </div>
           <AppNav />
-          <ShellUser />
         </nav>
         <div className={styles.content}>
           <header className={styles.topbar}>

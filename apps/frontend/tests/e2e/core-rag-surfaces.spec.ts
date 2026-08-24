@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { limitationCopy } from "../../src/lib/limitations";
 import { DOCUMENT_NOT_FOUND_COPY } from "../../src/lib/citation-drawer";
 import { signInLiveMember } from "./live-auth";
 
-test("login has no console nav; authenticated chrome includes Chat Documents Graph Tables", async ({
+test("login has no console nav; authenticated chrome includes Ask Documents Tables Graph", async ({
   page,
   request,
 }) => {
@@ -11,7 +10,7 @@ test("login has no console nav; authenticated chrome includes Chat Documents Gra
   await expect(page.getByTestId("app-shell-nav")).toHaveCount(0);
   await signInLiveMember(page, request);
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "Ask" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("link", { name: "Documents" })).toHaveAttribute(
     "href",
     "/documents",
@@ -24,14 +23,8 @@ test("login has no console nav; authenticated chrome includes Chat Documents Gra
     "href",
     "/tables",
   );
-  await expect(page.getByRole("link", { name: "Team" })).toHaveAttribute(
-    "href",
-    "/team",
-  );
-  await expect(page.getByRole("link", { name: "Profile" })).toHaveAttribute(
-    "href",
-    "/profile",
-  );
+  await expect(page.getByRole("link", { name: "Team" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Profile" })).toHaveCount(0);
 });
 
 test("unauthenticated documents graph tables redirect to login", async ({ page }) => {
@@ -49,10 +42,10 @@ test("unauthenticated document detail does not leak a title", async ({ page }) =
   await expect(page.getByText("SECRET TITLE")).toHaveCount(0);
 });
 
-test("reviewed fixtures still show BM25 and graph outage copy", async ({ page }) => {
-  await page.goto("/review-fixtures");
-  await expect(page.getByText(limitationCopy("bm25_unavailable"))).toBeVisible();
-  await expect(page.getByText(limitationCopy("graph_outage"))).toBeVisible();
+test("retired review-fixtures route returns production 404", async ({ page }) => {
+  const retired = await page.goto("/review-fixtures");
+  expect(retired?.status()).toBe(404);
+  await expect(page).not.toHaveURL(/\/login/);
 });
 
 test("authenticated Auto chrome when a session exists", async ({

@@ -37,12 +37,12 @@ convenience. FastAPI still authorizes every Bearer call.
 | `/auth/callback` | PKCE `exchangeCodeForSession` | Replay → "Sign-in could not be completed" |
 | `/auth/reset` | `updateUser({ password })` | After recovery `next=/auth/reset` |
 | `/invitations/accept` | `POST /invitations/accept` `{ token }` | Email from JWT, not the form |
-| `/unavailable/GAP-07-07` | none | Honest Unavailable; no recovery HTTP |
-| `/unavailable/GAP-07-08` | none | Honest Unavailable; no bootstrap HTTP |
 | `/` | Auto chat | Packet 3. No route POST field. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) |
+| `/admin` | Team/Tools/Curation/Usage tabs | Convenience only. FastAPI still authorizes. Legacy `/team|/tools|/curation|/usage` redirect here |
+| `/account` | Read-only `GET /me` | Legacy `/profile` redirects here. No MFA field |
 
-Team admin create/offboard, tools, curation, usage, and profile are
-packet 4 native routes. See [ADMINISTRATION.md](./ADMINISTRATION.md).
+`/review-fixtures` and `/unavailable/*` are not product routes; they 404.
+Administration bodies live under `/admin?tab=`. See [ADMINISTRATION.md](./ADMINISTRATION.md).
 Documents, graph, and tables are packet 3 native routes.
 
 ## SSR cookie flow
@@ -91,7 +91,7 @@ wrong; FastAPI returns 401/403.
 
 ## MFA removed (P08-12)
 
-TOTP enroll/challenge routes and MFA-required banners are deleted. Local Auth sets `auth.mfa.totp.enroll_enabled` and `verify_enabled` to false. Hosted residue is handled by [managed-auth-totp-residue.md](../runbooks/managed-auth-totp-residue.md). GAP-07-07 is a generic Unavailable page without recovery-code HTTP.
+TOTP enroll/challenge routes and MFA-required banners are deleted. Local Auth sets `auth.mfa.totp.enroll_enabled` and `verify_enabled` to false. Hosted residue is handled by [managed-auth-totp-residue.md](../runbooks/managed-auth-totp-residue.md). GAP-07-07 has no product route; `/unavailable/*` 404s. There is no recovery-code HTTP.
 
 
 ## Handshake before spend

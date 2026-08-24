@@ -1,13 +1,13 @@
 /**
- * Read-only GET /me profile.
+ * Bookmark redirect from `/profile` to `/account`.
  */
-import { ProfileApp } from "../../../components/profile-app";
+import { redirect } from "next/navigation";
 
 /**
- * Render the five /me fields and honest unavailable editors.
+ * Send legacy Profile bookmarks to the P08-14 destination.
  *
- * @returns Profile surface.
+ * @returns Never. `redirect` throws.
  */
-export default function ProfilePage() {
-  return <ProfileApp />;
+export default function ProfileRedirectPage() {
+  redirect("/account");
 }

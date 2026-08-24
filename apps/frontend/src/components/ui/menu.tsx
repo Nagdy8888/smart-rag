@@ -26,6 +26,8 @@ export type MenuItem = {
   danger?: boolean;
   /** Skip in arrow-key movement. */
   disabled?: boolean;
+  /** Stable `data-action-id` when the row is an inventory action. */
+  actionId?: string;
 };
 
 export type MenuProps = {
@@ -127,6 +129,7 @@ export function Menu({ label, trigger, items }: MenuProps) {
               role="menuitem"
               className={item.danger ? styles.menuItemDanger : styles.menuItem}
               disabled={item.disabled}
+              data-action-id={item.actionId}
               onClick={() => {
                 item.onSelect();
                 setOpen(false);

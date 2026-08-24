@@ -122,23 +122,24 @@
 }
 
 .navRow {
-  min-height: var(--row-height);
+  min-height: var(--control-height);
   display: flex;
   align-items: center;
+  margin-inline: 8px;
 }
 
 .navRow a,
 .profileLink {
   color: var(--color-text-muted);
   text-decoration: none;
-  min-height: var(--row-height);
+  min-height: var(--control-height);
   min-width: 44px;
   width: 100%;
   display: flex;
   align-items: center;
-  gap: calc(var(--space) * 3);
-  padding: 0 calc(var(--space) * 3);
-  border-radius: var(--radius-sm);
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 8px;
   transition: background-color 120ms ease, color 120ms ease;
 }
 
@@ -300,5 +301,45 @@
 @media (max-width: 1023px) {
   .topbar {
     padding-inline-start: calc(var(--space) * 3);
+  }
+}
+
+.avatarMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.commandButton {
+  display: inline-flex;
+}
+
+.readinessPopover {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.readinessPopover ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.navAdmin {
+  margin-top: 16px;
+}
+
+@media (max-width: 479px) {
+  .commandButton {
+    display: none;
   }
 }

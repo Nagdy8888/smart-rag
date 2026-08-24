@@ -1390,3 +1390,85 @@ lavender canvas, teal-as-canvas, overlay blur, or Google Fonts CDN.
 P08-13 tokens and primitive extensions are complete. P08-14 may compose the
 streamlined shell on top of these primitives without mixing Ask/Documents
 body rewrites into that packet.
+
+## P08-14 — Build the streamlined role-aware shell and routes
+
+Quoted requirement: compose the final information architecture on top of
+P08-13 without mixing Ask/Documents/Tables/Graph body rewrites into the
+shell packet.
+
+### Acceptance checks
+
+- One shell: 232px desktop rail, 72px collapsed rail, 56px topbar, mobile nav sheet.
+- Primary nav order Ask, Documents, Tables, Graph.
+- One Admin item only when live `GET /me.role` is owner/admin (convenience).
+- Account in one topbar menu: live `/me` fields, upload state, Sign out; never `mfa_enrolled`.
+- `Link`/router only; no internal `window.location.assign`.
+- Command menu: supported routes plus Sign out.
+- One shell readiness popover; retired `/review-fixtures` and `/unavailable/*` 404.
+- `/team|/tools|/curation|/usage` redirect to `/admin?tab=...`; `/profile` to `/account`.
+
+### Changed paths
+
+- `apps/frontend/src/lib/shell-navigation.ts` (+ test)
+- `apps/frontend/src/components/ui/app-nav.tsx` (+ test)
+- `apps/frontend/src/components/ui/app-shell.tsx` / `app-shell.module.css` / `app-shell.test.tsx`
+- `apps/frontend/src/components/ui/command-menu.tsx`, `menu.tsx`, `readiness-indicator.tsx`
+- `apps/frontend/src/components/admin-workspace.tsx`
+- `apps/frontend/src/app/(console)/admin/page.tsx`, `account/page.tsx`
+- Redirect pages: `team`, `tools`, `curation`, `usage`, `profile`
+- Deleted: `(auth)/review-fixtures`, `(auth)/unavailable/[gap]`
+- `apps/frontend/src/proxy.ts`, `lib/auth/paths.ts`
+- e2e specs, `docs/frontend/action-inventory.json`, AUTH/ADMINISTRATION docs
+
+### Authorization / failure / fallback / idempotency
+
+- Admin nav uses live `GET /me.role` via `isOwnerOrAdmin`. Members do not see Admin.
+- Forged member clients can still open `/admin`; FastAPI remains the denial boundary.
+- Retired product paths skip the login redirect so they 404 instead of bouncing to `/login`.
+- Account menu never renders `mfa_enrolled`.
+- `window.location.assign` is absent from `apps/frontend/src`.
+- Command palette remounts on each open so filter/active index reset without setState-in-effect.
+
+### Verification
+
+```text
+npx vitest run src/lib/shell-navigation.test.ts src/lib/auth/auth.test.ts src/components/ui/app-shell.test.tsx src/components/ui/app-nav.test.tsx
+npx vitest run
+npx next typegen
+npx tsc --noEmit
+npx eslint src/components/ui/command-menu.tsx src/components/ui/app-nav.tsx
+```
+
+Results:
+
+- Targeted Vitest: 4 files, 8 passed.
+- Full frontend Vitest: 36 files, 206 passed.
+- `npx next typegen`: types generated.
+- `npx tsc --noEmit`: passed.
+- ESLint on command menu/nav after remount fix: 0 errors.
+
+### Unverified
+
+- Playwright journeys in this packet were updated but not executed here (P08-21/22).
+- 390/768/1024/1280 keyboard proof in a real browser waits for P08-21/22.
+- Live owner-vs-member Admin visibility against a running API waits for P08-22.
+
+### Deviations
+
+- Readiness popover blocking copy uses the visual-contract sentence rather than
+  `QUERY_NOT_READY_COPY` (handshake still uses the latter for Ask send gating).
+- `ReadinessPanel` remains in the tree as an unmounted helper; only the
+  review-fixtures route that mounted it was removed.
+
+### Rollback
+
+Revert this commit. Restore `/review-fixtures` and `/unavailable/[gap]` only if
+a later packet proves those routes are still required contracts.
+
+### Handoff
+
+P08-14 shell and routes are complete. P08-15 may rebuild Ask without changing
+the rail/topbar IA. Do not reintroduce Team/Tools/Curation/Usage/Profile as
+primary nav items.
+

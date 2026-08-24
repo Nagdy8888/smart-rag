@@ -70,12 +70,12 @@ test("handshake banner appears when min_client_version is 9.0.0", async ({
   await expect(page.getByText(handshakeBelowMinCopy())).toBeVisible();
 });
 
-test("GAP-07-07 unavailable page has no recovery-code control", async ({
+test("retired GAP-07-07 route returns production 404", async ({
   page,
 }) => {
-  await page.goto("/unavailable/GAP-07-07");
-  await expect(page.getByRole("heading", { name: "Unavailable" })).toBeVisible();
-  await expect(page.getByText("GAP-07-07", { exact: true })).toBeVisible();
+  const response = await page.goto("/unavailable/GAP-07-07");
+  expect(response?.status()).toBe(404);
+  await expect(page).not.toHaveURL(/\/login/);
+  await expect(page.getByRole("heading", { name: "Unavailable" })).toHaveCount(0);
   await expect(page.getByLabel(/recovery/i)).toHaveCount(0);
-  await expect(page.locator("input")).toHaveCount(0);
 });

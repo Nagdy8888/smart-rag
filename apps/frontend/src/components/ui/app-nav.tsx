@@ -1,81 +1,37 @@
 /**
- * Console navigation: grouped Work/Manage routes, command menu, readiness.
- * Nav is not an authorization boundary.
+ * Console navigation: Ask/Documents/Tables/Graph, optional Admin, command,
+ * readiness, and Account. Nav is not an authorization boundary.
  */
 
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { loadConsoleReadiness } from "../../lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchMe } from "../../lib/api";
 import { useSession } from "../../lib/auth/session-provider";
 import { sessionQueryKeys } from "../../lib/query-keys";
+import {
+  ACCOUNT_NAV_ITEM,
+  ADMIN_NAV_ITEM,
+  PRIMARY_NAV_ITEMS,
+  consolePageTitle,
+  navItemIsCurrent,
+  showAdminNav,
+  type ShellNavItem,
+} from "../../lib/shell-navigation";
 import { Button } from "./button";
 import { CommandMenu, useCommandMenuShortcut } from "./command-menu";
 import { Icon, type IconName } from "./icon";
 import { Menu } from "./menu";
+import { ReadinessIndicator } from "./readiness-indicator";
 import { Sheet } from "./sheet";
 import { Tooltip } from "./tooltip";
 import { UserText } from "./user-text";
 import styles from "./app-shell.module.css";
 
-type NavItem = { href: string; label: string; icon: IconName };
-
-const WORK_ITEMS: readonly NavItem[] = [
-  { href: "/", label: "Ask", icon: "chat" },
-  { href: "/documents", label: "Documents", icon: "documents" },
-  { href: "/graph", label: "Graph", icon: "graph" },
-  { href: "/tables", label: "Tables", icon: "tables" },
-];
-
-const MANAGE_ITEMS: readonly NavItem[] = [
-  { href: "/team", label: "Team", icon: "team" },
-  { href: "/tools", label: "Tools", icon: "tools" },
-  { href: "/curation", label: "Curation", icon: "curation" },
-  { href: "/usage", label: "Usage", icon: "usage" },
-];
-
-const PAGE_TITLES: Record<string, string> = {
-  "/": "Ask",
-  "/documents": "Documents",
-  "/graph": "Graph explorer",
-  "/tables": "Tables",
-  "/team": "Team",
-  "/tools": "Tools",
-  "/curation": "Curation",
-  "/usage": "Usage",
-  "/profile": "Profile",
-  "/invitations/accept": "Accept invitation",
-};
-
-/**
- * Return whether a nav href is the current page.
- *
- * @param pathname - `usePathname()` value.
- * @param href - Nav target.
- * @returns True for exact `/` or prefix match on nested routes.
- */
-export function navItemIsCurrent(pathname: string, href: string): boolean {
-  if (href === "/") {
-    return pathname === "/";
-  }
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-/**
- * Return the English top-bar title for a console pathname.
- *
- * @param pathname - `usePathname()` value.
- * @returns Title. Nested document routes use Document.
- */
-export function consolePageTitle(pathname: string): string {
-  if (pathname.startsWith("/documents/")) {
-    return "Document";
-  }
-  return PAGE_TITLES[pathname] ?? "Console";
-}
+export { navItemIsCurrent, consolePageTitle };
 
 /**
  * Render one grouped list of console links.
@@ -84,141 +40,150 @@ export function consolePageTitle(pathname: string): string {
  * @param pathname - Current path.
  * @returns List of links.
  */
-function NavGroup({
-  heading,
+function NavList({
   items,
   pathname,
 }: {
-  heading: string;
-  items: readonly NavItem[];
+  items: readonly ShellNavItem[];
   pathname: string;
 }) {
   return (
-    <div className={styles.navGroup}>
-      <p className={styles.navGroupLabel}>{heading}</p>
-      <ul className={styles.navList}>
-        {items.map((item) => {
-          const current = navItemIsCurrent(pathname, item.href);
-          return (
-            <li key={item.href} className={styles.navRow}>
-              <Tooltip text={item.label}>
-                <Link
-                  href={item.href}
-                  aria-current={current ? "page" : undefined}
-                  aria-label={item.label}
-                >
-                  <Icon name={item.icon} />
-                  <span className={styles.navLabel}>{item.label}</span>
-                </Link>
-              </Tooltip>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <ul className={styles.navList}>
+      {items.map((item) => {
+        const current = navItemIsCurrent(pathname, item.href);
+        return (
+          <li key={item.href} className={styles.navRow}>
+            <Tooltip text={item.label}>
+              <Link
+                href={item.href}
+                aria-current={current ? "page" : undefined}
+                aria-label={item.label}
+                data-action-id={item.actionId}
+                data-testid={item.testId}
+              >
+                <Icon name={item.icon} />
+                <span className={styles.navLabel}>{item.label}</span>
+              </Link>
+            </Tooltip>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
 /**
- * Render Work and Manage console links.
+ * Render Ask, Documents, Tables, Graph, and optional Admin.
  *
- * @returns Grouped Next.js `Link` lists. Placeholder hash links are forbidden.
+ * @returns Next.js `Link` lists. Placeholder hash links are forbidden.
  */
 export function AppNav() {
   const pathname = usePathname() ?? "/";
+  const session = useSession();
+  const token = session.accessToken;
+  const auth = token === null ? null : { accessToken: token };
+  const meQuery = useQuery({
+    queryKey: sessionQueryKeys(token).me,
+    queryFn: () => fetchMe(auth!),
+    enabled: auth !== null,
+  });
+  const adminVisible = showAdminNav(meQuery.data?.role);
   return (
     <div className={styles.navGroups}>
-      <NavGroup heading="Work" items={WORK_ITEMS} pathname={pathname} />
-      <NavGroup heading="Manage" items={MANAGE_ITEMS} pathname={pathname} />
-    </div>
-  );
-}
-
-/**
- * Render Profile plus signed-in identity and Sign out.
- *
- * @returns Account footer. Profile remains visible without a session.
- * @remarks
- * Sign-out clears Auth cookies. FastAPI still authorizes each request.
- */
-export function ShellUser() {
-  const session = useSession();
-  return (
-    <div className={styles.userBlock}>
-      {session.ready && session.accessToken !== null ? (
-        <>
-          <p className={styles.userEmail}>
-            <UserText value={session.email ?? "Signed in"} />
-          </p>
-          <p className={styles.userMeta}>Company console</p>
-        </>
-      ) : (
-        <p className={styles.userMeta}>Company console</p>
-      )}
-      <Link href="/profile" className={styles.profileLink}>
-        <Icon name="profile" />
-        <span className={styles.navLabel}>Profile</span>
-      </Link>
-      {session.ready && session.accessToken !== null ? (
-        <Button type="button" variant="ghost" onClick={() => void session.signOut()}>
-          Sign out
-        </Button>
+      <div className={styles.navGroup}>
+        <NavList items={PRIMARY_NAV_ITEMS} pathname={pathname} />
+      </div>
+      {adminVisible ? (
+        <div className={styles.navAdmin}>
+          <NavList items={[ADMIN_NAV_ITEM]} pathname={pathname} />
+        </div>
       ) : null}
     </div>
   );
 }
 
 /**
- * Render the console page title as the single visible H1.
+ * Render Account menu: live /me fields, upload flag, details link, Sign out.
  *
- * @returns Heading derived from the pathname.
+ * @returns Account control. Never renders mfa_enrolled.
  */
-export function TopbarTitle() {
-  const pathname = usePathname() ?? "/";
-  return <h1 className={styles.topbarTitle}>{consolePageTitle(pathname)}</h1>;
-}
-
-/**
- * Render readiness from `loadConsoleReadiness` only.
- *
- * @returns Status text or null while unknown.
- */
-function ReadinessStatus() {
+export function AccountMenu() {
   const session = useSession();
+  const router = useRouter();
   const token = session.accessToken;
-  const query = useQuery({
-    queryKey: sessionQueryKeys(token).consoleReady,
-    queryFn: () => loadConsoleReadiness(token === null ? null : { accessToken: token }),
-    enabled: session.ready,
+  const auth = token === null ? null : { accessToken: token };
+  const meQuery = useQuery({
+    queryKey: sessionQueryKeys(token).me,
+    queryFn: () => fetchMe(auth!),
+    enabled: auth !== null,
   });
-  const ready = query.data;
-  if (ready == null) {
+  if (!session.ready || token === null) {
     return null;
   }
-  let label = "Not ready";
-  if (ready.rate_limit_degraded) {
-    label = "Degraded";
-  } else if (ready.query_ready) {
-    label = "Ready";
-  }
+  const me = meQuery.data;
+  const initials = (session.email ?? "U").slice(0, 2).toUpperCase();
+  const uploadLabel =
+    me?.upload_enabled === true ? "Uploads enabled" : "Uploads disabled";
   return (
-    <p className={styles.readiness} data-testid="console-readiness">
-      {label}
-    </p>
+    <Menu
+      label="Account"
+      trigger={
+        <>
+          <span className={styles.avatarMark} aria-hidden="true">
+            {initials}
+          </span>
+          <span className={styles.srOnly}>Account</span>
+        </>
+      }
+      items={[
+        {
+          id: "identity",
+          label: (
+            <span>
+              <UserText value={session.email ?? ""} />
+              <span>
+                {" "}
+                | <UserText value={me?.role ?? ""} /> | {uploadLabel}
+              </span>
+            </span>
+          ),
+          disabled: true,
+          onSelect: () => undefined,
+        },
+        {
+          id: "account",
+          label: ACCOUNT_NAV_ITEM.label,
+          actionId: ACCOUNT_NAV_ITEM.actionId,
+          onSelect: () => {
+            router.push(ACCOUNT_NAV_ITEM.href);
+          },
+        },
+        {
+          id: "sign-out",
+          label: "Sign out",
+          danger: true,
+          actionId: "account.sign_out",
+          onSelect: () => {
+            void session.signOut();
+          },
+        },
+      ]}
+    />
   );
 }
 
 /**
- * Render the 56px console top bar: brand, title, readiness, command, account.
+ * Render the 56px console top bar: menu, title, readiness, command, account.
  *
  * @returns Header contents and overlays.
  */
 export function ConsoleTopbar() {
-  const session = useSession();
   const [commandOpen, setCommandOpen] = useState(false);
+  const [commandEpoch, setCommandEpoch] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const openCommand = useCallback(() => {
+    setCommandEpoch((value) => value + 1);
     setCommandOpen(true);
   }, []);
   useCommandMenuShortcut(openCommand);
@@ -239,6 +204,8 @@ export function ConsoleTopbar() {
     };
   }, [mobileOpen]);
 
+  const pathname = usePathname() ?? "/";
+
   return (
     <>
       <div className={styles.topbarStart}>
@@ -249,6 +216,8 @@ export function ConsoleTopbar() {
           size="icon"
           className={styles.menuButton}
           aria-label="Open navigation"
+          data-action-id="shell.menu"
+          data-testid="shell-menu"
           onClick={() => {
             setMobileOpen(true);
           }}
@@ -256,70 +225,44 @@ export function ConsoleTopbar() {
           <Icon name="menu" />
           <span className={styles.srOnly}>Menu</span>
         </Button>
-        <div className={styles.topbarBrand}>
-          <span className={styles.brandMark} aria-hidden="true">
-            <Icon name="spark" />
-          </span>
-          <span className={styles.brandName}>Smart RAG</span>
-        </div>
-        <TopbarTitle />
+        <h1 className={styles.topbarTitle}>{consolePageTitle(pathname)}</h1>
       </div>
       <div className={styles.topbarEnd}>
-        <ReadinessStatus />
+        <ReadinessIndicator />
         <Tooltip text="Go to page">
           <Button
             type="button"
             variant="ghost"
             size="icon"
+            className={styles.commandButton}
             aria-label="Open command menu"
+            data-action-id="shell.command"
+            data-testid="shell-command"
             onClick={openCommand}
           >
             <Icon name="command" />
             <span className={styles.srOnly}>Command menu</span>
           </Button>
         </Tooltip>
-        {session.ready && session.accessToken !== null ? (
-          <Menu
-            label="Account"
-            trigger={
-              <>
-                <Icon name="profile" />
-                <span className={styles.srOnly}>Account</span>
-              </>
-            }
-            items={[
-              {
-                id: "profile",
-                label: "Profile",
-                onSelect: () => {
-                  window.location.assign("/profile");
-                },
-              },
-              {
-                id: "sign-out",
-                label: "Sign out",
-                onSelect: () => {
-                  void session.signOut();
-                },
-              },
-            ]}
-          />
-        ) : null}
+        <span data-action-id="shell.account" data-testid="shell-account">
+          <AccountMenu />
+        </span>
       </div>
-      <CommandMenu open={commandOpen} onClose={() => setCommandOpen(false)} />
+      <CommandMenu key={commandEpoch} open={commandOpen} onClose={() => setCommandOpen(false)} />
       {mobileOpen ? (
         <Sheet
           title="Menu"
-          side="left"
           onClose={() => {
             setMobileOpen(false);
           }}
           returnFocusRef={menuButtonRef}
+          side="left"
         >
           <AppNav />
-          <ShellUser />
         </Sheet>
       ) : null}
     </>
   );
 }
+
+export type { IconName };

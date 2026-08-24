@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "packet": "P08-12",
-  "status": "auth-mfa-removed",
+  "packet": "P08-14",
+  "status": "shell-routes",
   "generated_at": "2026-08-24",
-  "notes": "P08-12 removed TOTP product routes and omitted disabled Google chrome. Kept Auth actions have stable test ids. MFA/Google rows stay as removed_target.",
+  "notes": "P08-14 streamlines console IA: Ask/Documents/Tables/Graph, optional Admin, Account menu, redirects from /team|/tools|/curation|/usage|/profile, and production 404 for /review-fixtures and /unavailable/*.",
   "actions": [
     {
       "action_id": "auth.sign_in",
@@ -129,7 +129,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "pending-P08-14"
+      "test_id": "nav-ask"
     },
     {
       "action_id": "nav.documents",
@@ -143,7 +143,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "pending-P08-14"
+      "test_id": "nav-documents"
     },
     {
       "action_id": "nav.tables",
@@ -157,7 +157,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "pending-P08-14"
+      "test_id": "nav-tables"
     },
     {
       "action_id": "nav.graph",
@@ -171,7 +171,77 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "pending-P08-14"
+      "test_id": "nav-graph"
+    },
+    {
+      "action_id": "nav.admin",
+      "route": "/admin",
+      "label": "Admin",
+      "control_kind": "link",
+      "contract_owner": "frontend-shell",
+      "contract": "GET /admin convenience; FastAPI still authorizes",
+      "role": "owner-admin-convenience",
+      "success_state": "Admin workspace",
+      "failure_state": "server 403 on mutations",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "nav-admin"
+    },
+    {
+      "action_id": "nav.account",
+      "route": "/account",
+      "label": "Account details",
+      "control_kind": "link",
+      "contract_owner": "frontend-shell",
+      "contract": "GET /me fields",
+      "role": "authenticated",
+      "success_state": "Account page",
+      "failure_state": "auth redirect",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "nav-account"
+    },
+    {
+      "action_id": "shell.readiness",
+      "route": "shell",
+      "label": "Service readiness",
+      "control_kind": "button",
+      "contract_owner": "frontend-shell",
+      "contract": "GET /health/ready plus optional GET /ops/ready",
+      "role": "authenticated",
+      "success_state": "popover with authorized probes",
+      "failure_state": "Unavailable copy",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "shell-readiness"
+    },
+    {
+      "action_id": "shell.command",
+      "route": "shell",
+      "label": "Open command menu",
+      "control_kind": "button",
+      "contract_owner": "frontend-shell",
+      "contract": "client navigation",
+      "role": "authenticated",
+      "success_state": "dialog of supported routes",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "shell-command"
+    },
+    {
+      "action_id": "shell.menu",
+      "route": "shell",
+      "label": "Open navigation",
+      "control_kind": "button",
+      "contract_owner": "frontend-shell",
+      "contract": "mobile sheet",
+      "role": "authenticated",
+      "success_state": "nav sheet",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "shell-menu"
     },
     {
       "action_id": "nav.team",
@@ -185,7 +255,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "redirect_target",
-      "test_id": "pending-P08-14"
+      "test_id": "redirect-P08-14"
     },
     {
       "action_id": "nav.tools",
@@ -199,7 +269,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "redirect_target",
-      "test_id": "pending-P08-14"
+      "test_id": "redirect-P08-14"
     },
     {
       "action_id": "nav.curation",
@@ -213,7 +283,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "redirect_target",
-      "test_id": "pending-P08-14"
+      "test_id": "redirect-P08-14"
     },
     {
       "action_id": "nav.usage",
@@ -227,7 +297,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "redirect_target",
-      "test_id": "pending-P08-14"
+      "test_id": "redirect-P08-14"
     },
     {
       "action_id": "nav.profile",
@@ -241,7 +311,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "redirect_target",
-      "test_id": "pending-P08-14"
+      "test_id": "redirect-P08-14"
     },
     {
       "action_id": "account.sign_out",
@@ -255,7 +325,7 @@
       "failure_state": "generic error",
       "idempotency": "session revoke",
       "disposition": "keep",
-      "test_id": "pending-P08-14"
+      "test_id": "command-sign-out"
     },
     {
       "action_id": "ask.send",
@@ -385,7 +455,7 @@
     },
     {
       "action_id": "admin.offboard",
-      "route": "/team",
+      "route": "/admin?tab=team",
       "label": "Offboard",
       "control_kind": "submit",
       "contract_owner": "fastapi-auth-admin",
@@ -409,7 +479,7 @@
       "failure_state": "n/a",
       "idempotency": "n/a",
       "disposition": "removed_target",
-      "test_id": "pending-P08-14"
+      "test_id": "retired-P08-14"
     },
     {
       "action_id": "gap.review_fixtures",
@@ -423,7 +493,7 @@
       "failure_state": "n/a",
       "idempotency": "n/a",
       "disposition": "removed_target",
-      "test_id": "pending-P08-14"
+      "test_id": "retired-P08-14"
     }
   ]
 }

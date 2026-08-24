@@ -92,39 +92,23 @@ describe("AppShell", () => {
     const skip = screen.getByRole("link", { name: "Skip to main content" });
     expect(skip).toHaveAttribute("href", "#main");
     expect(screen.getByRole("navigation", { name: "Console" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ask" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Documents" })).toHaveAttribute(
-      "href",
-      "/documents",
-    );
-    expect(screen.getByRole("link", { name: "Graph" })).toHaveAttribute(
-      "href",
-      "/graph",
-    );
-    expect(screen.getByRole("link", { name: "Tables" })).toHaveAttribute(
-      "href",
-      "/tables",
-    );
-    expect(screen.getByRole("link", { name: "Team" })).toHaveAttribute(
-      "href",
-      "/team",
-    );
-    expect(screen.getByRole("link", { name: "Tools" })).toHaveAttribute(
-      "href",
-      "/tools",
-    );
-    expect(screen.getByRole("link", { name: "Curation" })).toHaveAttribute(
-      "href",
-      "/curation",
-    );
-    expect(screen.getByRole("link", { name: "Usage" })).toHaveAttribute(
-      "href",
-      "/usage",
-    );
-    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
-      "href",
-      "/profile",
-    );
+    const ask = screen.getByRole("link", { name: "Ask" });
+    const documents = screen.getByRole("link", { name: "Documents" });
+    const tables = screen.getByRole("link", { name: "Tables" });
+    const graph = screen.getByRole("link", { name: "Graph" });
+    expect(ask).toHaveAttribute("href", "/");
+    expect(documents).toHaveAttribute("href", "/documents");
+    expect(tables).toHaveAttribute("href", "/tables");
+    expect(graph).toHaveAttribute("href", "/graph");
+    const hrefs = [ask, documents, tables, graph].map((node) => node.getAttribute("href"));
+    expect(hrefs).toEqual(["/", "/documents", "/tables", "/graph"]);
+    expect(screen.queryByRole("link", { name: "Team" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Tools" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Curation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Usage" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/mfa_enrolled/i)).not.toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
     expect(screen.getByTestId("app-shell-nav")).toBeInTheDocument();
     expect(CLIENT_NAV_IS_NOT_AUTHORIZATION).toBe(true);

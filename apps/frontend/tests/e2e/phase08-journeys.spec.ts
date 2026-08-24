@@ -6,6 +6,9 @@ const PUBLIC_AUTH_PATHS = [
   "/login",
   "/signup",
   "/forgot-password",
+] as const;
+
+const RETIRED_PATHS = [
   "/unavailable/GAP-07-07",
   "/unavailable/GAP-07-08",
   "/review-fixtures",
@@ -38,6 +41,16 @@ test("unauthenticated shipped routes redirect to login except public auth pages"
   }
 });
 
+test("retired review and gap routes 404 instead of login or Unavailable chrome", async ({
+  page,
+}) => {
+  for (const path of RETIRED_PATHS) {
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(404);
+    await expect(page).not.toHaveURL(/\/login/);
+  }
+});
+
 test("login chrome has skip link and Sign in without console nav or Stitch frames", async ({
   page,
 }) => {
@@ -49,19 +62,15 @@ test("login chrome has skip link and Sign in without console nav or Stitch frame
   await expect(page.getByText("frame_04")).toHaveCount(0);
 });
 
-test("GAP-07-07 and GAP-07-08 unavailable pages have no mocked recovery or bootstrap", async ({
+test("retired gap routes do not serve recovery or bootstrap chrome", async ({
   page,
 }) => {
-  await page.goto("/unavailable/GAP-07-07");
-  await expect(page.getByRole("heading", { name: "Unavailable" })).toBeVisible();
-  await expect(page.getByText(/MFA required|recovery code/i)).toHaveCount(0);
+  const first = await page.goto("/unavailable/GAP-07-07");
+  expect(first?.status()).toBe(404);
   await expect(page.getByLabel(/recovery/i)).toHaveCount(0);
-  await expect(page.locator("input")).toHaveCount(0);
-
-  await page.goto("/unavailable/GAP-07-08");
-  await expect(page.getByText(OWNER_BOOTSTRAP_UNAVAILABLE)).toBeVisible();
+  const second = await page.goto("/unavailable/GAP-07-08");
+  expect(second?.status()).toBe(404);
   await expect(page.getByLabel(/company/i)).toHaveCount(0);
-  await expect(page.locator("input")).toHaveCount(0);
 });
 
 test("handshake 9.0.0 public stub blocks paid-work copy on login", async ({ page }) => {
