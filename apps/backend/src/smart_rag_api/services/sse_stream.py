@@ -18,7 +18,11 @@ from fastapi.responses import StreamingResponse
 import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
-from smart_rag_core.query_admission.service import QueryRunRecord
+from smart_rag_core.query_admission.service import (
+    QueryRunRecord,
+    load_query_run_runtime,
+    true_up_query_reservation,
+)
 
 # isort: on
 from smart_rag_core.security.identity import CallerContext
@@ -29,6 +33,11 @@ from smart_rag_core.sse.catalog import (
 from smart_rag_core.sse.framing import format_sse_event
 from smart_rag_core.sse.sanitize import sanitize_error_payload
 from smart_rag_core.sse.store import PersistedRunEvent, RunEventStore
+
+from smart_rag_api.services.query_sse_mapping import (
+    QuerySseMapper,
+    assert_catalog_event,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -278,9 +287,6 @@ class LangGraphQueryRunExecutor:
             compile_query_graph,
             pending_query_state,
         )
-        from smart_rag_core.query_routing.constants import (
-            LIMITATION_VERIFIER_OMITTED_LINKS,
-        )
 
         from smart_rag_api.services.query_graph_runtime import (
             QueryGraphRuntimeError,
@@ -315,57 +321,49 @@ class LangGraphQueryRunExecutor:
             stream_iter = stream_method(state, cast(Any, config), stream_mode="updates")
             last_remaining_calls = context.model_call_ceiling
             last_status = "running"
+            mapper = QuerySseMapper()
+            LOGGER.info(
+                "query sse stream started",
+                extra={
+                    "event": "query.sse.started",
+                    "run_id": str(context.run_id),
+                },
+            )
             async for raw_chunk in stream_iter:
                 if cancel_event.is_set():
                     return
-                chunk: object = raw_chunk
-                if not isinstance(chunk, dict):
-                    continue
-                updates = {
-                    str(node_name): update
-                    for node_name, update in cast(dict[object, object], chunk).items()
-                }
-                for node_name, update in updates.items():
-                    status = "running"
-                    update_map: dict[str, object] = {}
-                    if isinstance(update, dict):
-                        update_map = {
-                            str(key): value
-                            for key, value in cast(dict[object, object], update).items()
-                        }
-                        raw_status = update_map.get("status")
-                        if isinstance(raw_status, str) and raw_status:
-                            status = raw_status[:64]
-                            last_status = status
-                        remaining = update_map.get("remaining_model_calls")
-                        if isinstance(remaining, int):
-                            last_remaining_calls = remaining
-                    yield (
-                        "status",
-                        {"stage": node_name[:64], "status": status},
-                    )
-                    verification = update_map.get("verification")
-                    if isinstance(verification, dict) and verification.get(
-                        "omitted_link_ids"
-                    ):
-                        yield (
-                            "limitation",
-                            {"code": LIMITATION_VERIFIER_OMITTED_LINKS},
-                        )
-                    if update_map and raw_status_is_partial(update_map):
-                        yield (
-                            "deadline",
-                            {"route_family": context.route_family.value},
-                        )
-                        yield ("partial", {"reason": "deadline_exhausted"})
+                if isinstance(raw_chunk, dict):
+                    for node_update in raw_chunk.values():
+                        if isinstance(node_update, dict):
+                            remaining = node_update.get("remaining_model_calls")
+                            if isinstance(remaining, int):
+                                last_remaining_calls = remaining
+                            raw_status = node_update.get("status")
+                            if isinstance(raw_status, str) and raw_status:
+                                last_status = raw_status[:64]
+                for event_type, payload in mapper.consume_chunk(raw_chunk):
+                    assert_catalog_event(event_type, payload)
+                    yield (event_type, payload)
+                    if event_type in {"completed", "partial", "error", "cancelled"}:
+                        if event_type != "error":
+                            self._maybe_summarize(
+                                context,
+                                remaining_model_calls=last_remaining_calls,
+                                terminal_status=last_status,
+                            )
+                            self._persist_assistant_answer(context, mapper)
                         return
             if not cancel_event.is_set():
-                self._maybe_summarize(
-                    context,
-                    remaining_model_calls=last_remaining_calls,
-                    terminal_status=last_status,
-                )
-                yield ("completed", {})
+                for event_type, payload in mapper.finish():
+                    assert_catalog_event(event_type, payload)
+                    if event_type in {"completed", "partial"}:
+                        self._maybe_summarize(
+                            context,
+                            remaining_model_calls=last_remaining_calls,
+                            terminal_status=last_status,
+                        )
+                        self._persist_assistant_answer(context, mapper)
+                    yield (event_type, payload)
         except QueryGraphRuntimeError as exc:
             yield ("error", {"code": exc.reason})
         finally:
@@ -439,6 +437,58 @@ class LangGraphQueryRunExecutor:
                 store_put=_put,
             )
             connection.commit()
+
+    def _persist_assistant_answer(
+        self,
+        context: AuthorizedRuntimeContext,
+        mapper: QuerySseMapper,
+    ) -> None:
+        """Persist verified assistant prose when a DSN and text exist.
+
+        Args:
+            context: Authorized run context.
+            mapper: Mapper that emitted the verified terminal.
+
+        Side Effects:
+            Inserts one assistant ``app.messages`` row. Skips when the DSN
+            or verified text is missing. Never logs message content.
+        """
+
+        answer_text = mapper.verified_text
+        if not answer_text:
+            return
+        from smart_rag_core.query_admission.messages import append_query_message
+        from smart_rag_core.query_routing.preparation import caller_from_runtime
+        from smart_rag_core.settings import load_backend_settings
+
+        settings = load_backend_settings()
+        postgres_url = (
+            settings.supabase_db_url.get_secret_value()
+            if settings.supabase_db_url is not None
+            else None
+        )
+        if postgres_url is None:
+            return
+        try:
+            with psycopg.connect(postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                append_query_message(
+                    connection,
+                    caller=caller_from_runtime(context),
+                    conversation_id=context.conversation_id,
+                    run_id=context.run_id,
+                    role="assistant",
+                    content=answer_text,
+                )
+                connection.commit()
+        except (QueryAdmissionError, psycopg.Error):
+            LOGGER.info(
+                "assistant message persist skipped",
+                extra={
+                    "event": "query.sse.assistant_persist_failed",
+                    "run_id": str(context.run_id),
+                },
+            )
 
 
 def raw_status_is_partial(update: dict[str, object]) -> bool:
@@ -592,6 +642,7 @@ class SseStreamService:
         executor: QueryRunExecutor,
         sse_schema_version: str,
         heartbeat_interval_seconds: int = HEARTBEAT_INTERVAL_SECONDS,
+        postgres_url: str | None = None,
     ) -> None:
         """Bind store, registry, and executor.
 
@@ -601,6 +652,9 @@ class SseStreamService:
             executor: LangGraph production executor or a test fixture.
             sse_schema_version: Value for the first ``schema`` event.
             heartbeat_interval_seconds: Production default is 15.
+            postgres_url: Optional ``app_api`` DSN for durable resume and
+                reservation settlement. Unit tests omit this so missing
+                process input stays ``worker_unavailable``.
         """
 
         self._store = store
@@ -608,6 +662,8 @@ class SseStreamService:
         self._executor = executor
         self._sse_schema_version = sse_schema_version
         self._heartbeat_interval_seconds = heartbeat_interval_seconds
+        self._postgres_url = postgres_url
+        self._settled_run_ids: set[UUID] = set()
 
     def remember_admitted(
         self,
@@ -720,15 +776,20 @@ class SseStreamService:
 
         if live is None and record.status == "pending":
             if context is None and not self._registry.has_input(run_id):
-                self._emit_worker_unavailable(caller, run_id)
-                async for frame, sequence, terminal in self._replay(
-                    caller, run_id, cursor
-                ):
-                    cursor = sequence
-                    yield frame
-                    if terminal:
-                        return
-                return
+                loaded = self._load_durable_start(caller, run_id)
+                if loaded is None:
+                    self._emit_worker_unavailable(caller, run_id)
+                    async for frame, sequence, terminal in self._replay(
+                        caller, run_id, cursor
+                    ):
+                        cursor = sequence
+                        yield frame
+                        if terminal:
+                            return
+                    return
+                message, runtime = loaded
+                self._registry.remember_input(run_id, message, runtime)
+                context = runtime
             live = self._registry.get_or_create(run_id)
             self._start_once(caller, record, live, context)
 
@@ -803,6 +864,14 @@ class SseStreamService:
             )
         message = self._registry.take_input(record.run_id)
         runtime = context or self._registry.take_context(record.run_id)
+        if (not message or runtime is None) and self._postgres_url:
+            loaded = self._load_durable_start(caller, record.run_id)
+            if loaded is not None:
+                loaded_message, loaded_runtime = loaded
+                if not message:
+                    message = loaded_message
+                if runtime is None:
+                    runtime = loaded_runtime
         live.executor_task = asyncio.create_task(
             self._run_executor(caller, record, live, message, runtime)
         )
@@ -830,6 +899,14 @@ class SseStreamService:
         """
 
         runtime = context or self._registry.take_context(record.run_id)
+        if (runtime is None or not message) and self._postgres_url:
+            loaded = self._load_durable_start(caller, record.run_id)
+            if loaded is not None:
+                loaded_message, loaded_runtime = loaded
+                if not message:
+                    message = loaded_message
+                if runtime is None:
+                    runtime = loaded_runtime
         if runtime is None:
             self._emit_worker_unavailable(caller, record.run_id)
             live.terminal = True
@@ -848,7 +925,12 @@ class SseStreamService:
                 if live.cancel_event.is_set():
                     self._append(caller, record.run_id, "cancelled", {})
                 else:
-                    self._append(caller, record.run_id, "completed", {})
+                    self._append(
+                        caller,
+                        record.run_id,
+                        "error",
+                        {"code": "run_failed"},
+                    )
         except asyncio.CancelledError:
             if not self._has_terminal(caller, record.run_id):
                 self._append(caller, record.run_id, "cancelled", {})
@@ -914,6 +996,74 @@ class SseStreamService:
             {"sse_schema_version": self._sse_schema_version},
         )
 
+    def _load_durable_start(
+        self, caller: CallerContext, run_id: UUID
+    ) -> tuple[str, AuthorizedRuntimeContext] | None:
+        """Rebuild user text and runtime from durable records.
+
+        Args:
+            caller: Owner.
+            run_id: Admitted run.
+
+        Returns:
+            Persisted message and runtime, or None when the DSN is unset
+            or durable input cannot be loaded. Missing input must remain
+            ``worker_unavailable`` for process-local tests.
+        """
+
+        if not self._postgres_url:
+            return None
+        try:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                runtime, message = load_query_run_runtime(
+                    connection, caller=caller, run_id=run_id
+                )
+        except (QueryAdmissionError, psycopg.Error):
+            return None
+        if not message:
+            return None
+        return message, runtime
+
+    def _settle_reservation(self, caller: CallerContext, run_id: UUID) -> None:
+        """True-up the run reservation once on a terminal event.
+
+        Args:
+            caller: Owner.
+            run_id: Run whose reservation should settle.
+
+        Side Effects:
+            Calls ``true_up_query_reservation`` at most once per run in
+            this process. No-ops without a DSN or reservation id.
+        """
+
+        if not self._postgres_url or run_id in self._settled_run_ids:
+            return
+        try:
+            record = self._store.get_authorized_run(caller, run_id=run_id)
+        except QueryAdmissionError:
+            return
+        reservation_id = record.reservation_id
+        if reservation_id is None:
+            self._settled_run_ids.add(run_id)
+            return
+        try:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                true_up_query_reservation(
+                    connection, caller=caller, reservation_id=reservation_id
+                )
+                connection.commit()
+            self._settled_run_ids.add(run_id)
+        except (QueryAdmissionError, psycopg.Error):
+            LOGGER.info(
+                "reservation true-up skipped",
+                extra={
+                    "event": "sse.reservation_true_up_failed",
+                    "run_id": str(run_id),
+                },
+            )
+
     def _emit_worker_unavailable(self, caller: CallerContext, run_id: UUID) -> None:
         """Persist schema then a sanitized terminal when this process cannot run.
 
@@ -958,7 +1108,7 @@ class SseStreamService:
         if event_type == "heartbeat" and self._has_terminal(caller, run_id):
             return None
         try:
-            return self._store.append(
+            persisted = self._store.append(
                 caller,
                 run_id=run_id,
                 event_type=event_type,
@@ -972,7 +1122,7 @@ class SseStreamService:
             if event_type == "error":
                 return None
             try:
-                return self._store.append(
+                persisted = self._store.append(
                     caller,
                     run_id=run_id,
                     event_type="error",
@@ -982,6 +1132,9 @@ class SseStreamService:
                 return None
         except QueryAdmissionError:
             return None
+        if persisted is not None and persisted.event_type in TERMINAL_SSE_EVENT_TYPES:
+            self._settle_reservation(caller, run_id)
+        return persisted
 
     def _has_terminal(self, caller: CallerContext, run_id: UUID) -> bool:
         """Return whether a terminal event is already persisted.

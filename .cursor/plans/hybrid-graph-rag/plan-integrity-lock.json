@@ -24,7 +24,7 @@
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/04-map-ui-to-real-contracts.md": "20acbd402eeed315806c2ecb6b1cba98b156bca63f023da980761a7d5684a35b",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/05-review-accessibility-and-security.md": "5388e4ed6ecccf1e8a10d20501b8b373250226631fb7c6f82b2e5b2062965614",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/06-record-approval-or-fallback.md": "d75f570528bd5140481fb891a678cfa35a6b778eed2f683f5aaabd264cfeef59",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md": "8cd05ed793db33f82786109455cd83e7e70a015a3719f8fd6b1b4a2709ccd526",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md": "044dfcde884b44838cfdf1147f811c59a01acc66b5296f6fbce58038c5f9ffc2",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-shared-contracts.md": "1a8a6a4e6a49d9cd4d831d136c2d7bf44fc734cf5c50d18eaf42f84e04d7eba9",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md": "15da3601961bd90195458705d599eb113e5f0cd1b88d62e70c675b35ca4d1d46",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/01-integrate-approved-design-system.md": "03a92cd69bec4f616a94dc3f27d726b5350968f38e1a89a071dbc680038c3e7c",
@@ -35,7 +35,7 @@
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/06-run-frontend-verification.md": "d8676e7ec8a381a4ffdaa0743290940d3f9e01daba7bb391f4088fbf0f832917",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/07-canonical-remediation-amendment-and-baseline.md": "121b7456c5876ef0c78cab9b4a4e6513c0a4e260e7d7ce587c565e8e455ae8d0",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/08-restore-query-runtime-connectivity-and-readiness.md": "97a8954efcb82de750533dc243cd8fed57822853254173451683e408d298226d",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/09-repair-phase-6-execution-durability-and-verified-answers.md": "eb6b660c1e0ccdf94dc0a80a98cb2e5a8c202fcdcf7f76f918247b51fed0414c",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/09-repair-phase-6-execution-durability-and-verified-answers.md": "b61611f69b5418889f56436fe481f0491e4f84c20d69033a3dbd8027c1a69361",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/10-harden-frontend-chat-protocol-and-recovery.md": "8f32462b97af0a6a009642c87caec2f722a9f1e69f4bf2c0eed3d541bd93fb89",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/11-remove-backend-and-database-mfa-aal2-enforcement.md": "516523ed9e417596ea364bdb953acc8718248de8702ea288bb5b0d6c3eaa56a5",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/12-remove-frontend-provider-mfa-and-finish-single-factor-auth.md": "56ec1449cf6748f3d1ac4959c12a31852cb50d10471ea0e5a8eeb9e9737a71c8",
@@ -101,6 +101,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-08-24T17:14:51.902048+00:00",
+  "generated_at": "2026-08-24T18:08:36.132754+00:00",
   "schema_version": 1
 }

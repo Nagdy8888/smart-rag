@@ -1547,3 +1547,19 @@ not a mock `page.route` 503.
 
 **Please accept Phase 6** if the local Done-when evidence is enough, or keep
 the table above as explicit blockers.
+
+## P08-09 co-owned amendment — durable input and verified-final SSE
+
+Phase 8 packet 9 repairs production executor durability without unchecking
+completed Phase 6 packets. Existing admission, budget true-up, deadline,
+cancellation, ownership, idempotency, one-terminal, and replay/resume suites
+are preserved:
+
+- Fixture executors may still yield empty `completed`.
+- `test_pending_orphan_without_input_emits_worker_unavailable` still holds
+  when process input is missing and durable load is unavailable.
+- Production mapping now holds `generate_answer` draft text until
+  `verify_answer`, emits non-empty `token_delta`, and refuses empty
+  `completed`.
+
+Commands: `.\.venv\Scripts\pytest.exe tests/unit/test_sse_protocol.py tests/contract/test_sse_resume.py tests/contract/test_sse_heartbeat.py tests/unit/test_query_sse_mapping.py tests/unit/test_query_sse_executor.py -q` → 31 passed, 1 skipped.

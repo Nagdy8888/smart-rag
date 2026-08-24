@@ -107,6 +107,7 @@ def get_sse_stream_service(
         executor=executor,
         sse_schema_version=settings.sse_schema_version,
         heartbeat_interval_seconds=HEARTBEAT_INTERVAL_SECONDS,
+        postgres_url=postgres_url,
     )
 
 

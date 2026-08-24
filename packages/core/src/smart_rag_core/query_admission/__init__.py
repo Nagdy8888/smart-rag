@@ -20,6 +20,10 @@ from smart_rag_core.query_admission.exceptions import (
     QueryCeilingError,
     TimeoutAfterSendError,
 )
+from smart_rag_core.query_admission.messages import (
+    append_query_message,
+    load_query_run_user_message,
+)
 from smart_rag_core.query_admission.payload import hash_query_admission_payload
 from smart_rag_core.query_admission.service import (
     QueryAdmissionResult,
@@ -28,9 +32,11 @@ from smart_rag_core.query_admission.service import (
     admit_query_run,
     cancel_query_run,
     consume_query_reservation,
+    fail_query_run,
     get_query_run,
     heartbeat_query_run,
     list_run_citations,
+    load_query_run_runtime,
     reconcile_expired_query_runs,
     record_query_llm_usage,
     record_run_restricted_evidence,
@@ -51,6 +57,7 @@ __all__ = [
     "RunCitationRecord",
     "TimeoutAfterSendError",
     "admit_query_run",
+    "append_query_message",
     "assert_call_available",
     "assert_deadline_open",
     "assert_discovery_available",
@@ -62,10 +69,13 @@ __all__ = [
     "consume_query_reservation",
     "envelope_for_family",
     "execute_counted_model_call",
+    "fail_query_run",
     "get_query_run",
     "hash_query_admission_payload",
     "heartbeat_query_run",
     "list_run_citations",
+    "load_query_run_runtime",
+    "load_query_run_user_message",
     "reconcile_expired_query_runs",
     "record_query_llm_usage",
     "record_run_restricted_evidence",

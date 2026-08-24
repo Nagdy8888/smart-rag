@@ -941,3 +941,84 @@ Revert this commit. Hosted processes that already used a session DSN keep
 working. Processes that only had a transaction-pooler `SUPABASE_DB_URL` as
 the checkpoint fallback will fail closed until `LANGGRAPH_CHECKPOINT_URL` is
 set to a session/direct URL.
+
+## Packet 9 — Repair Phase 6 execution durability and verified answer delivery
+
+### Requirement (quoted)
+
+> Persist the admitted user message in existing `app.messages` before
+> returning a successful 202. Process memory may cache execution handles
+> but must not be the only copy of paid input.
+> Consume LangGraph `stream_mode="updates"` as node-keyed envelopes.
+> Do not emit the answer node’s draft `answer_text`. Hold the typed
+> candidate until the actual verification node completes.
+> Emit `completed` only after a non-empty answer/refusal payload has been
+> emitted. A successful graph with no answer becomes a safe typed `error`.
+> On every terminal path, call the existing reservation true-up/release
+> service exactly once.
+
+### Concrete acceptance checks
+
+- Production executor emits status events, at least one non-empty
+  `token_delta` after `verify_answer`, then exactly one terminal.
+- Draft `answer_text` from `generate_answer` never appears in SSE payloads.
+- Empty verified prose becomes `error` `{code: empty_answer}`, never
+  `completed`.
+- Fixture executors that themselves yield `completed` remain valid.
+- Missing process input without a durable loader still emits
+  `worker_unavailable` (Phase 6 resume contract).
+- Reservation true-up runs at most once per run in-process; dummy test DSNs
+  fail closed without crashing the stream.
+
+### Files in this packet
+
+- `supabase/migrations/20260824130000_query_run_messages_runtime_v1.sql`
+- `packages/core/src/smart_rag_core/query_admission/messages.py`
+- `packages/core/src/smart_rag_core/query_admission/service.py`
+  (`fail_query_run`, `load_query_run_runtime`)
+- `packages/core/src/smart_rag_core/query_admission/__init__.py`
+- `apps/backend/src/smart_rag_api/services/query_sse_mapping.py`
+- `apps/backend/src/smart_rag_api/services/sse_stream.py`
+- `apps/backend/src/smart_rag_api/services/query_runs.py`
+- `apps/backend/src/smart_rag_api/services/http_errors.py`
+- `apps/backend/src/smart_rag_api/dependencies/services.py`
+- `tests/unit/test_query_sse_mapping.py`
+- `tests/unit/test_query_sse_executor.py`
+- this evidence file and Phase 6 evidence
+
+### Authorization / failure / fallback / idempotency
+
+- User-message persist uses `app.append_query_message` under `SET ROLE app_api`.
+  Failure after admit calls `fail_query_run` (settles the reservation) and
+  maps `message_persist_failed` to HTTP 503.
+- Reconnect persist is idempotent per `(run_id, role)` unique indexes.
+- Resume reconstructs input via `app.load_query_run_runtime`; missing durable
+  input stays `worker_unavailable`. Foreign runs remain 404 via existing store
+  authorization.
+- Executor logs `run_id` only. Answer text is never logged.
+- Fallthrough when a production executor emits no terminal is `error`
+  `{code: run_failed}`, not synthesized `completed`.
+
+### Verification
+
+```text
+.\.venv\Scripts\pytest.exe tests/unit/test_query_sse_mapping.py tests/unit/test_query_sse_executor.py tests/unit/test_sse_protocol.py tests/contract/test_sse_resume.py tests/contract/test_sse_heartbeat.py -q
+```
+
+Result: 31 passed, 1 skipped. Ruff `--fix` on the touched stream/test import
+blocks is clean. `from smart_rag_core.query_admission import fail_query_run,
+load_query_run_runtime, append_query_message` imports.
+
+### Unverified
+
+- Live Postgres RPC round-trip for `append_query_message` /
+  `load_query_run_runtime` / `true_up_query_reservation` on a running
+  local stack was not executed in this packet.
+- Live OpenAI/LangGraph answer generation remains mock-gated.
+
+### Rollback
+
+Revert this commit. SSE resume tests stay on in-memory stores. Applied
+migration `20260824130000_query_run_messages_runtime_v1.sql` is additive
+(`run_id` on `app.messages` plus RPCs); reverse only with a new down
+migration if a follow-up packet requires it.

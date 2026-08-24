@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 9
-status: pending
+status: complete
 title: "Repair Phase 6 execution durability and verified answer delivery"
 requirement_ids: [P08-09]
 ---
