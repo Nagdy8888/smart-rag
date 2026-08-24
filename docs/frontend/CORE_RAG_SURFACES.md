@@ -4,7 +4,7 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-24
 audience: engineering, frontend, reviewers
-packet: P08-16
+packet: P08-17
 ---
 
 # Core RAG surfaces (Phase 8 packet 3)
@@ -37,9 +37,9 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 | `/documents` | Library, import/upload/crawl, keyset pagination, owner/admin delete |
 | `/documents/[documentId]` | Metadata, shared IngestionStatus timeline, graph seed, tables list |
 | `/graph` | Entity search + inspect, list-first, hop cap 3 |
-| `/tables` | Manifests + typed `TableQueryPlan` builder |
+| `/tables` | Manifests + guided `TableQueryPlan` builder, display-only sort, cell provenance |
 
-Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer. There is no `app/admin`
+Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). Tables live under `apps/frontend/src/components/tables/` (`tables-app.tsx`). List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer. There is no `app/admin`
 folder. Team, tools, curation, usage, and profile are packet 4 native
 routes in [ADMINISTRATION.md](./ADMINISTRATION.md). Nav uses Next.js
 `Link`. `aria-current` follows the pathname. Nav is not authorization.
@@ -85,8 +85,8 @@ flowchart TD
 - Graph-only inspection is never a success answering mode.
 - ParadeDB `down` on ready plus `bm25_unavailable` are both visible.
 - Tables: no SQL textarea, no client-summed total, no fake LLM commentary.
-  Export only after `optional_tool_disclosure` listed an export tool on the
-  **current chat run**. `/tables` has no disclosure, so no export button.
+  `/tables` has no standalone export contract, so Export/Save/Share are absent.
+  Optional-tool export remains a chat-run disclosure concern, not this page.
 - Production UI never sends `X-Test-User-Id` or `X-Test-Role`.
 
 ## Failure modes
@@ -101,6 +101,8 @@ flowchart TD
 | Viewer upload | Convenience hidden; server 403 |
 | Document delete 403/404/429 | Confirmation stays open with classified copy; 404 navigates without a title leak |
 | Inspect depth greater than 3 | Client clamps to 3 |
+| Table unknown column / SQL | Rejected before POST; Analyze is not sent |
+| Table analyze 403/422/429 | Classified banner; draft and submitted plan stay |
 
 ## Verification
 

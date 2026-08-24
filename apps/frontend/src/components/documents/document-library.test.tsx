@@ -441,7 +441,10 @@ describe("DocumentDetail delete and context links", () => {
       "href",
       "/graph?documentId=doc-1",
     );
-    expect(screen.getByRole("link", { name: "Open tables" })).toHaveAttribute("href", "/tables");
+    expect(screen.getByRole("link", { name: "Open tables" })).toHaveAttribute(
+      "href",
+      "/tables?documentId=doc-1",
+    );
     expect(screen.getByText("Owned table")).toBeInTheDocument();
     expect(screen.queryByText("Other table")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Document actions" }));

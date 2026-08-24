@@ -68,7 +68,7 @@ Remediation packets P08-07 through P08-23 are additive. Do not uncheck packets 1
 14. [x] [Build the streamlined role-aware shell and routes](./08-phase-frontend-integration/packets/14-build-the-streamlined-role-aware-shell-and-routes.md)
 15. [x] [Rebuild Ask around verified final answers](./08-phase-frontend-integration/packets/15-rebuild-ask-around-verified-final-answers.md)
 16. [x] [Rebuild Documents as one complete ingestion workflow](./08-phase-frontend-integration/packets/16-rebuild-documents-as-one-complete-ingestion-workflow.md)
-17. [ ] [Rebuild deterministic Tables](./08-phase-frontend-integration/packets/17-rebuild-deterministic-tables.md)
+17. [x] [Rebuild deterministic Tables](./08-phase-frontend-integration/packets/17-rebuild-deterministic-tables.md)
 18. [ ] [Rebuild bounded Graph inspection](./08-phase-frontend-integration/packets/18-rebuild-bounded-graph-inspection.md)
 19. [ ] [Consolidate Admin and supported Account operations](./08-phase-frontend-integration/packets/19-consolidate-admin-and-supported-account-operations.md)
 20. [ ] [Enforce action, accessibility, security, and documentation integrity](./08-phase-frontend-integration/packets/20-enforce-action-accessibility-security-and-documentation-integrity.md)

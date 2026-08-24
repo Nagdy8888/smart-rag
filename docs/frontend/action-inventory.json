@@ -423,7 +423,7 @@
       "failure_state": "422/403/404/429",
       "idempotency": "plan body",
       "disposition": "keep",
-      "test_id": "pending-P08-17"
+      "test_id": "tables-app.test.tsx"
     },
     {
       "action_id": "tables.export",
@@ -437,7 +437,7 @@
       "failure_state": "n/a",
       "idempotency": "n/a",
       "disposition": "removed_target",
-      "test_id": "pending-P08-17"
+      "test_id": "tables-app.test.tsx"
     },
     {
       "action_id": "graph.inspect",

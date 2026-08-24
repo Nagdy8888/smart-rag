@@ -13,6 +13,8 @@ export type DataTableColumn<T> = {
   header: string;
   /** Cell renderer. Hostile values must go through `UserText`. */
   cell: (row: T) => ReactNode;
+  /** Numeric columns use end alignment and tabular numerals. */
+  align?: "start" | "end";
 };
 
 export type DataTableProps<T> = {
@@ -49,7 +51,11 @@ export function DataTable<T>({
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.id} scope="col">
+              <th
+                key={column.id}
+                scope="col"
+                className={column.align === "end" ? styles.tableNumeric : undefined}
+              >
                 {column.header}
               </th>
             ))}
@@ -59,7 +65,12 @@ export function DataTable<T>({
           {rows.map((row) => (
             <tr key={getRowId(row)}>
               {columns.map((column) => (
-                <td key={column.id}>{column.cell(row)}</td>
+                <td
+                  key={column.id}
+                  className={column.align === "end" ? styles.tableNumeric : undefined}
+                >
+                  {column.cell(row)}
+                </td>
               ))}
             </tr>
           ))}

@@ -11,7 +11,7 @@ import { CitationDrawer } from "./chat/chat-app";
 import { DocumentDetail } from "./documents/document-detail";
 import { DocumentLibrary } from "./documents/document-library";
 import { GraphExplorer } from "./graph-explorer";
-import { TablesApp } from "./tables-app";
+import { TablesApp } from "./tables/tables-app";
 import { SessionProvider } from "../lib/auth/session-provider";
 import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
 import type { CitationResponse } from "../lib/types";
@@ -261,11 +261,16 @@ describe("TablesApp source_ranges", () => {
     });
     renderSurface(<TablesApp />);
     fireEvent.click(await screen.findByRole("button", { name: /Sheet1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    fireEvent.change(screen.getByLabelText("Filter column"), {
+      target: { value: "amount" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+    fireEvent.click(await screen.findByRole("button", { name: "View provenance" }));
     expect(await screen.findByText("Sheet1!A1:B2")).toBeInTheDocument();
-    expect(screen.getByText(XSS_FILENAME, { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText(XSS_FILENAME, { exact: false }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
-    expect(screen.getByText(/Client total is null/)).toBeInTheDocument();
+    expect(screen.queryByText(/Client total is null/)).toBeNull();
     expect(document.querySelector("img")).toBeNull();
   });
 });

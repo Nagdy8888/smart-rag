@@ -355,6 +355,11 @@
   vertical-align: middle;
 }
 
+.tableNumeric {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
 .table tbody tr:hover {
   background: var(--color-bg);
 }

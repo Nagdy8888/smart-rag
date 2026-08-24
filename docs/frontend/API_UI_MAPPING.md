@@ -213,8 +213,8 @@ Feedback tags (byte-for-byte): `chunk/cleaning loss`, `profile field wrong`,
 | --- | --- | --- |
 | POST | `/graph/inspect` | req `entity_keys` ≤12 and/or `document_id`, `depth` 1–3; resp `nodes`, `locators`, `limitations[{code,count?}]`, `row_count` ≤200, `depth`. FastAPI COST_MUTATION. No vendor prose |
 | GET | `/graph/entities/search` | `q`, `limit` ≤25; hits `object_id`, `object_type`, `chunk_id`, `document_id`, `version_id`, `support` |
-| GET | `/tables` | manifests without storage paths |
-| POST | `/tables/analyze` | body `plan` (`TableQueryPlan`); resp `table_id`, `version_id`, `document_id`, `rows`, `source_ranges` |
+| GET | `/tables` | manifests without storage paths; UI preselects `?tableId=` / `?documentId=` only when listed |
+| POST | `/tables/analyze` | body `plan` (`TableQueryPlan` extra=forbid); resp `table_id`, `version_id`, `document_id`, `rows`, `source_ranges`. No export API. |
 | GET | `/tools` | role-filtered cards; unauthorized names omitted |
 | POST | `/admin/tools` | owner/admin seed |
 | POST | `/admin/tools/{tool_key}/enable` | owner/admin |

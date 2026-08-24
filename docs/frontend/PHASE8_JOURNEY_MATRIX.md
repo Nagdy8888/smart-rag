@@ -121,7 +121,7 @@ is no client route field.
 | Media `media_limitation` | `src/lib/chat-view.test.ts` | records route correction, deadline, and limitation codes from the catalog | vitest-unit | proven |
 | BM25 `bm25_unavailable` | `src/lib/limitations.test.ts` | uses signed historical-graph language | vitest-unit | proven |
 | LightRAG `graph_outage` | `src/lib/limitations.test.ts` | uses signed historical-graph language | vitest-unit | proven |
-| Table / comparison `source_ranges` | `src/components/core-rag-surfaces.test.tsx` | renders deterministic source_ranges and no client total or export | vitest-component | proven |
+| Table / comparison `source_ranges` | `src/components/tables/tables-app.test.tsx` | runs a valid analyze, labels display sort, and opens cell provenance | vitest-component | proven |
 | Citations without snippets GAP-07-09 | `src/lib/api.test.ts` | keeps ids and drops passage snippet fields | vitest-unit | proven |
 | Live five composite streams | `tests/contract/test_thin_developer_ui_live.py` | test_thin_ui_live_five_composite_streams | python-contract-live | proven |
 
@@ -140,6 +140,9 @@ is no client route field.
 | Unauth document 404 → login | `tests/e2e/phase08-journeys.spec.ts` | unauthenticated document 404 still redirects to login | playwright-unauth | proven |
 | ACL blindness no count | `src/components/core-rag-surfaces.test.tsx` | shows ACL blindness without unauthorized counts or titles | vitest-component | proven |
 | Graph Pending authorized count | `src/components/core-rag-surfaces.test.tsx` | shows Graph Pending with authorized not-ready count only | vitest-component | proven |
+| Tables URL preselect | `src/components/tables/tables-app.test.tsx` | preselects an accessible tableId from the URL | vitest-component | proven |
+| Tables invalid plan | `src/components/tables/tables-app.test.tsx` | rejects unknown columns and raw SQL before submission | vitest-component | proven |
+| Tables failure preservation | `src/components/tables/tables-app.test.tsx` | preserves the draft and submitted plan on 403 | vitest-component | proven |
 | `graph_partial_readiness` copy | `src/lib/limitations.test.ts` | covers GraphLimitationCode values without unauthorized counts | vitest-unit | proven |
 | Curation approve `row_version` | `src/components/administration-surfaces.test.tsx` | approves an entity rule with row_version only for an owner | vitest-component | proven |
 | Rate / `budget_exhausted` | `src/lib/api.test.ts` | maps 402 budget_exhausted | vitest-unit | proven |

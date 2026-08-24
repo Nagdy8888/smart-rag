@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 17
-status: pending
+status: complete
 title: "Rebuild deterministic Tables"
 requirement_ids: [P08-17]
 ---

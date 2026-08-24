@@ -281,7 +281,9 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
             <Link href={`/graph?documentId=${encodeURIComponent(record.document_id)}`}>
               Inspect in graph
             </Link>
-            <Link href="/tables">Open tables</Link>
+            <Link href={`/tables?documentId=${encodeURIComponent(record.document_id)}`}>
+              Open tables
+            </Link>
           </div>
           <p className={styles.muted}>
             Signed in as <UserText value={meQuery.data?.role ?? ""} />. Role hiding

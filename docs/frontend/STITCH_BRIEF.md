@@ -265,7 +265,7 @@ Search GET /graph/entities/search?q=&limit= and inspect POST /graph/inspect. Vis
 ### K. Structured tables
 
 ```text
-List GET /tables. Analyze POST /tables/analyze with a TableQueryPlan. Show deterministic rows and source_ranges in a sortable table, visually separated from any later generated commentary. No SQL textarea. Export: only if an optional tool card is disclosed; otherwise no export button.
+List GET /tables. Analyze POST /tables/analyze with a TableQueryPlan. Show deterministic rows and source_ranges in a sortable table, visually separated from any later generated commentary. No SQL textarea. No Export/Save/Share on `/tables` (no standalone export contract). Display sort is client-only.
 ```
 
 ### L. Tools, glossary, entity rules

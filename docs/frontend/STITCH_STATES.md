@@ -184,11 +184,13 @@ is read-only (GAP-07-01).
 
 | State | Signal | Copy / UI |
 | --- | --- | --- |
-| Empty | GET /tables `[]` | No authorized tables |
-| Analyze success | rows + source_ranges | deterministic table; separate from commentary |
+| Empty | GET /tables `[]` | No structured tables are available. |
+| Analyze success | rows + source_ranges | deterministic table; display-only sort; Cell provenance drawer |
+| Empty success | rows `[]` | The analysis returned no rows. |
 | 404 parquet | not_found | Table artifact unavailable |
-| Forbidden extra field | 422 | Plan rejected |
-| Export | only after optional tool disclosure | else no button |
+| Forbidden extra field | 422 | Plan rejected; draft preserved |
+| Unknown column / SQL | client compile | rejected before POST |
+| Export | none | removed; no standalone export contract |
 
 ## Tools, glossary, entity rules
 

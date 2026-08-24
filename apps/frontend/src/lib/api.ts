@@ -1256,6 +1256,7 @@ export async function inspectGraph(
  * @param auth - Access token.
  * @param fetchImpl - Injected fetch.
  * @returns Manifests.
+ * @throws ClassifiedApiError on 401/403/429/5xx.
  */
 export async function listTables(
   auth: ApiAuth,
@@ -1264,7 +1265,14 @@ export async function listTables(
   const response = await fetchImpl(apiUrl("/tables"), {
     headers: resumeHeaders(auth),
   });
-  const parsed: unknown = await response.json();
+  const parsed: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const body =
+      parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    throwIfNotOk(response, body);
+  }
   if (!Array.isArray(parsed)) {
     return [];
   }
@@ -1289,6 +1297,7 @@ export async function listTables(
  * @param plan - Declarative plan.
  * @param fetchImpl - Injected fetch.
  * @returns Deterministic rows and source_ranges.
+ * @throws ClassifiedApiError on 400/401/403/404/422/429/5xx.
  */
 export async function analyzeTable(
   auth: ApiAuth,
@@ -1301,9 +1310,13 @@ export async function analyzeTable(
     body: JSON.stringify(tableAnalyzeBody(plan)),
   });
   const parsed = await readJsonObject(response);
-  if (!response.ok) {
-    throw new Error(sanitizedDetail(parsed, "table_plan_rejected"));
+  if (response.status === 400) {
+    throw new ClassifiedApiError({
+      kind: "validation",
+      detail: sanitizedDetail(parsed, "table_plan_rejected"),
+    });
   }
+  throwIfNotOk(response, parsed);
   const rowsRaw = Array.isArray(parsed.rows) ? parsed.rows : [];
   const rangesRaw = Array.isArray(parsed.source_ranges)
     ? parsed.source_ranges

@@ -17,6 +17,7 @@ import {
   importGlossary,
   inspectGraph,
   listDocuments,
+  listTables,
   nextDocumentCursor,
   listCitations,
   listTools,
@@ -622,6 +623,72 @@ describe("analyzeTable extra fields", () => {
     expect(result.rows).toHaveLength(2);
     expect(result.source_ranges).toEqual(["A1:B2"]);
     expect(clientComputedTableTotal()).toBeNull();
+  });
+
+  it("classifies analyze 403/422/429 as ClassifiedApiError", async () => {
+    const denied: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      analyzeTable(
+        { accessToken: "jwt-token" },
+        {
+          table_id: "11111111-1111-4111-8111-111111111111",
+          version_id: "22222222-2222-4222-8222-222222222222",
+          predicates: [{ column: "amount", operator: "gt", value: 0 }],
+        },
+        denied,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+
+    const invalid: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "table_plan_rejected" }), {
+        status: 422,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      analyzeTable(
+        { accessToken: "jwt-token" },
+        {
+          table_id: "11111111-1111-4111-8111-111111111111",
+          version_id: "22222222-2222-4222-8222-222222222222",
+          predicates: [{ column: "amount", operator: "gt", value: 0 }],
+        },
+        invalid,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "validation" } });
+
+    const limited: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "rate_limited" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "2" },
+      });
+    await expect(
+      analyzeTable(
+        { accessToken: "jwt-token" },
+        {
+          table_id: "11111111-1111-4111-8111-111111111111",
+          version_id: "22222222-2222-4222-8222-222222222222",
+          predicates: [{ column: "amount", operator: "gt", value: 0 }],
+        },
+        limited,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "rate" } });
+  });
+});
+
+describe("listTables", () => {
+  it("throws ClassifiedApiError on 403", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      listTables({ accessToken: "jwt-token" }, fetchImpl),
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
   });
 });
 

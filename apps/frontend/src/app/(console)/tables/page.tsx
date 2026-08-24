@@ -1,7 +1,7 @@
 /**
  * Structured tables route.
  */
-import { TablesApp } from "../../../components/tables-app";
+import { TablesApp } from "../../../components/tables/tables-app";
 
 /**
  * Render table manifests and the typed plan builder.

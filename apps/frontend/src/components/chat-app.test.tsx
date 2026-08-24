@@ -551,9 +551,8 @@ describe("ChatApp Ask workspace", () => {
   it("fills the composer from a prompt chip without sending", async () => {
     const user = userEvent.setup();
     renderChat(<ChatApp />);
-    await screen.findByRole("heading", { name: "Ask" });
     await user.click(
-      screen.getByRole("button", { name: "Summarize an uploaded policy" }),
+      await screen.findByRole("button", { name: "Summarize an uploaded policy" }),
     );
     expect(screen.getByLabelText("Message")).toHaveValue(
       "Summarize an uploaded policy",

@@ -1612,3 +1612,75 @@ Revert this commit. Restore the previous Documents GAP copy only if a later pack
 ### Handoff
 
 P08-16 Documents is complete. P08-17 may rebuild Tables without changing Documents contracts.
+
+## P08-17 — Rebuild deterministic Tables
+
+Quoted requirement: retain bounded structured-table analysis while removing
+unsupported controls and isolating this surface from Graph work.
+
+### Acceptance checks
+
+- URL `tableId` / `documentId` preselects only a manifest returned by `GET /tables`.
+- Guided `TableQueryPlan` covers columns, filters, aggregations, group by, sort, and comparison. No SQL editor.
+- One Analyze primary action. The exact posted plan stays visible on 403/422/429/server failure.
+- Deterministic rows render first. Display sort is labeled as not changing the submitted plan.
+- Provenance drawer lists document/version/table/sheet/range. No fake source link.
+- Export/Save/Share are absent. Unknown columns and SQL-shaped values are rejected before POST.
+- Empty manifests: “No structured tables are available.” Empty success: “The analysis returned no rows.”
+- Graph files were not edited.
+
+### Changed paths
+
+- Moved `apps/frontend/src/components/tables-app.tsx` once to `apps/frontend/src/components/tables/tables-app.tsx`
+- `apps/frontend/src/components/tables/analysis-plan.tsx`, `analysis-results.tsx`, `tables.module.css`, `tables-app.test.tsx`
+- `apps/frontend/src/app/(console)/tables/page.tsx`
+- `apps/frontend/src/lib/table-plan.ts`, `table-plan.test.ts`, `api.ts`
+- `apps/frontend/src/components/ui/data-table.tsx` optional numeric `align`
+- Document Open tables href seeds `?documentId=`
+- Tests: `core-rag-surfaces.test.tsx`, `api.test.ts`, `document-library.test.tsx`
+- Docs: `CORE_RAG_SURFACES.md`, `PHASE8_JOURNEY_MATRIX.md`, `API_UI_MAPPING.md`, `STITCH_BRIEF.md`, `STITCH_STATES.md`, `action-inventory.json`
+
+### Authorization / failure / fallback / idempotency
+
+- `listTables` and `analyzeTable` throw `ClassifiedApiError`. 400 `table_plan_rejected` maps to `validation`.
+- Inaccessible `tableId` stays unselected even when `documentId` matches another row.
+- Client compile rejects unknown column ids and SQL/path-shaped values before fetch.
+- Result keys that are not internal identifiers are omitted.
+- Analyze POST body remains `{ plan }` with extra SQL keys omitted. Duplicate submit is pending-blocked.
+- `/tables` never renders Export.
+
+### Verification
+
+```text
+npx vitest run src/components/tables/tables-app.test.tsx src/lib/table-plan.test.ts src/components/core-rag-surfaces.test.tsx src/lib/api.test.ts src/components/documents/document-library.test.tsx
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/tables src/lib/table-plan.ts src/lib/api.ts src/components/ui/data-table.tsx src/components/core-rag-surfaces.test.tsx
+```
+
+Results:
+
+- Targeted Vitest: 5 files, 99 passed (URL preselect, unknown column/SQL before POST, 403 plan preservation, provenance drawer, no Export, empty manifests, list 403).
+- Full frontend Vitest: 38 files, 245 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on Tables/API files: 0 errors.
+
+### Unverified
+
+- Playwright Tables snapshots wait for P08-21/22.
+- Live `POST /tables/analyze` against a running stack waits for P08-22.
+
+### Deviations
+
+- `GET /tables` has no column schema. Allow-listed columns are internal identifier regex plus operator/aggregation enums, not workbook headers.
+- Manifest picker Select is shown below 1024px; the sidebar stays in the DOM and is hidden with CSS.
+- Chat prompt-chip test now waits for the chip instead of the Ask heading so it does not match the restoring-session chrome.
+
+### Rollback
+
+Revert this commit. Restore `apps/frontend/src/components/tables-app.tsx` only if a later packet proves the unscoped path is still required.
+
+### Handoff
+
+P08-17 Tables is complete. P08-18 may rebuild Graph without changing Tables contracts.
+
