@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import hashlib
-import os
 from dataclasses import dataclass
 from pathlib import Path
+
+from smart_rag_core.settings.base import get_process_environ
 
 _PROMPTS_DIR = Path(__file__).resolve().parent
 _ALLOWED_ENVIRONMENTS = frozenset({"dev", "staging", "prod"})
@@ -92,7 +93,7 @@ def current_prompt_environment() -> str:
         PromptRegistryError: When ``SMART_RAG_PROMPT_ENV`` is not allow-listed.
     """
 
-    raw = os.environ.get(_PROMPT_ENV_VAR, "dev").strip().lower()
+    raw = (get_process_environ(_PROMPT_ENV_VAR, "dev") or "dev").strip().lower()
     if raw not in _ALLOWED_ENVIRONMENTS:
         raise PromptRegistryError("unknown_prompt_environment")
     return raw

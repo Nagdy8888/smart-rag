@@ -24,7 +24,7 @@ export type AuthLayoutProps = {
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className={styles.page}>
-      <a className={styles.skipLink} href="#main">
+      <a className={styles.skipLink} href="#main" data-action-id="shell.skip">
         Skip to main content
       </a>
       <div className={styles.split}>

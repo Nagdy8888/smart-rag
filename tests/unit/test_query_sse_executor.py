@@ -149,7 +149,9 @@ def test_production_executor_emits_verified_delta_then_one_terminal(
         lambda **kwargs: {},
     )
     graph_mod = sys.modules[_compile_query_graph.__module__]
-    monkeypatch.setattr(graph_mod, "compile_query_graph", lambda *args, **kwargs: compiled)
+    monkeypatch.setattr(
+        graph_mod, "compile_query_graph", lambda *args, **kwargs: compiled
+    )
     monkeypatch.setattr(
         graph_mod,
         "pending_query_state",
@@ -164,12 +166,24 @@ def test_production_executor_emits_verified_delta_then_one_terminal(
         lambda **kwargs: object(),
     )
     executor = LangGraphQueryRunExecutor()
-    monkeypatch.setattr(executor, "_process_bindings", lambda settings: SimpleNamespace(supabase_dsn="postgresql://x"))
+    monkeypatch.setattr(
+        executor,
+        "_process_bindings",
+        lambda settings: SimpleNamespace(supabase_dsn="postgresql://x"),
+    )
     monkeypatch.setattr(executor, "_bind_memory_store", lambda settings: (None, None))
     monkeypatch.setattr(executor, "_maybe_summarize", lambda *args, **kwargs: None)
-    monkeypatch.setattr(executor, "_persist_assistant_answer", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        executor, "_persist_assistant_answer", lambda *args, **kwargs: None
+    )
 
     async def _collect() -> list[tuple[str, dict[str, object]]]:
+        """Drain production executor events.
+
+        Returns:
+            SSE event name and payload pairs.
+        """
+
         events: list[tuple[str, dict[str, object]]] = []
         cancel = asyncio.Event()
         async for event in executor.execute(
@@ -185,7 +199,11 @@ def test_production_executor_emits_verified_delta_then_one_terminal(
     assert "schema" not in types
     assert types.count("completed") == 1
     assert types[-1] == "completed"
-    deltas = [payload.get("delta") for event_type, payload in events if event_type == "token_delta"]
+    deltas = [
+        payload.get("delta")
+        for event_type, payload in events
+        if event_type == "token_delta"
+    ]
     assert deltas == ["VISIBLE_FINAL"]
     assert "DRAFT_HIDDEN" not in str(events)
     assert any(event_type == "status" for event_type in types)
@@ -199,17 +217,17 @@ def test_production_executor_empty_answer_cannot_complete(monkeypatch: Any) -> N
             {
                 "generate_answer": {
                     "status": "drafted",
-                    "answer": AnswerPayload(answer_text="x", status="complete").model_dump(
-                        mode="json"
-                    ),
+                    "answer": AnswerPayload(
+                        answer_text="x", status="complete"
+                    ).model_dump(mode="json"),
                 }
             },
             {
                 "verify_answer": {
                     "status": "verified",
-                    "answer": AnswerPayload(answer_text="  ", status="complete").model_dump(
-                        mode="json"
-                    ),
+                    "answer": AnswerPayload(
+                        answer_text="  ", status="complete"
+                    ).model_dump(mode="json"),
                 }
             },
         )
@@ -233,7 +251,9 @@ def test_production_executor_empty_answer_cannot_complete(monkeypatch: Any) -> N
         lambda **kwargs: {},
     )
     graph_mod = sys.modules[_compile_query_graph.__module__]
-    monkeypatch.setattr(graph_mod, "compile_query_graph", lambda *args, **kwargs: compiled)
+    monkeypatch.setattr(
+        graph_mod, "compile_query_graph", lambda *args, **kwargs: compiled
+    )
     monkeypatch.setattr(
         graph_mod,
         "pending_query_state",
@@ -248,12 +268,24 @@ def test_production_executor_empty_answer_cannot_complete(monkeypatch: Any) -> N
         lambda **kwargs: object(),
     )
     executor = LangGraphQueryRunExecutor()
-    monkeypatch.setattr(executor, "_process_bindings", lambda settings: SimpleNamespace(supabase_dsn="postgresql://x"))
+    monkeypatch.setattr(
+        executor,
+        "_process_bindings",
+        lambda settings: SimpleNamespace(supabase_dsn="postgresql://x"),
+    )
     monkeypatch.setattr(executor, "_bind_memory_store", lambda settings: (None, None))
     monkeypatch.setattr(executor, "_maybe_summarize", lambda *args, **kwargs: None)
-    monkeypatch.setattr(executor, "_persist_assistant_answer", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        executor, "_persist_assistant_answer", lambda *args, **kwargs: None
+    )
 
     async def _collect() -> list[tuple[str, dict[str, object]]]:
+        """Drain empty-answer executor events.
+
+        Returns:
+            SSE event name and payload pairs.
+        """
+
         events: list[tuple[str, dict[str, object]]] = []
         async for event in executor.execute(
             context=_runtime(),
@@ -293,9 +325,21 @@ def test_sse_service_settles_reservation_once_on_terminal(monkeypatch: Any) -> N
             return None
 
         def __enter__(self) -> _Conn:
+            """Enter the dummy connection context.
+
+            Returns:
+                This connection.
+            """
+
             return self
 
         def __exit__(self, *args: object) -> None:
+            """Ignore context-exit arguments.
+
+            Args:
+                *args: Exception context unused by the stub.
+            """
+
             del args
 
     def _connect(url: str) -> _Conn:
@@ -311,7 +355,9 @@ def test_sse_service_settles_reservation_once_on_terminal(monkeypatch: Any) -> N
         del url
         return _Conn()
 
-    def _true_up(connection: object, *, caller: CallerContext, reservation_id: UUID) -> None:
+    def _true_up(
+        connection: object, *, caller: CallerContext, reservation_id: UUID
+    ) -> None:
         """Record settlement.
 
         Args:
@@ -343,6 +389,12 @@ def test_sse_service_settles_reservation_once_on_terminal(monkeypatch: Any) -> N
     service.remember_admitted(caller, runtime, message="hello")
 
     async def _drain() -> list[str]:
+        """Collect SSE frames from the stream service.
+
+        Returns:
+            Raw SSE frame strings.
+        """
+
         frames: list[str] = []
         async for frame in service.iter_frames(
             caller, run_id=runtime.run_id, after=0, context=runtime
@@ -351,7 +403,9 @@ def test_sse_service_settles_reservation_once_on_terminal(monkeypatch: Any) -> N
         return frames
 
     frames = asyncio.run(_drain())
-    assert any("event: completed" in frame or "event: error" in frame for frame in frames)
+    assert any(
+        "event: completed" in frame or "event: error" in frame for frame in frames
+    )
     assert calls == [runtime.reservation_id]
     service._append(caller, runtime.run_id, "error", {"code": "run_failed"})
     assert calls == [runtime.reservation_id]
@@ -374,6 +428,12 @@ def test_sse_service_fallthrough_without_terminal_is_error_not_completed() -> No
     service.remember_admitted(caller, runtime, message="hello")
 
     async def _drain() -> list[str]:
+        """Collect SSE frames from the stream service.
+
+        Returns:
+            Raw SSE frame strings.
+        """
+
         frames: list[str] = []
         async for frame in service.iter_frames(
             caller, run_id=runtime.run_id, after=0, context=runtime

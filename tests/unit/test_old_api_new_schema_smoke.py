@@ -211,6 +211,15 @@ def test_live_smoke_passes_then_restores_freeze(
     seen: list[str] = []
 
     def _recreate(image_id: str) -> str:
+        """Record one API slot recreate.
+
+        Args:
+            image_id: Image digest placed in the API slot.
+
+        Returns:
+            The same image id.
+        """
+
         seen.append(image_id)
         return image_id
 
@@ -251,6 +260,15 @@ def test_http_failure_still_restores_freeze(
     seen: list[str] = []
 
     def _recreate(image_id: str) -> str:
+        """Record one API slot recreate.
+
+        Args:
+            image_id: Image digest placed in the API slot.
+
+        Returns:
+            The same image id.
+        """
+
         seen.append(image_id)
         return image_id
 
@@ -278,6 +296,15 @@ def test_restore_failure_is_failed(
     monkeypatch.setenv(OLD_API_IMAGE_ENV, PRIOR)
 
     def _recreate(image_id: str) -> str | None:
+        """Fail when restoring the freeze image.
+
+        Args:
+            image_id: Requested slot image.
+
+        Returns:
+            The prior image, or ``None`` when freeze restore is requested.
+        """
+
         if ids_equal(image_id, FREEZE):
             return None
         return PRIOR
@@ -303,6 +330,15 @@ def test_authenticated_http_smoke_accepts_read_chat_upload() -> None:
     conversation_id = "11111111-1111-1111-1111-111111111111"
 
     def _handler(request: httpx.Request) -> httpx.Response:
+        """Serve compatible old-slot HTTP responses.
+
+        Args:
+            request: Incoming mock request.
+
+        Returns:
+            Status 200/201/202/403 for supported paths, otherwise 404.
+        """
+
         path = request.url.path
         if path == "/health/live":
             return httpx.Response(200, json={"status": "live"})
@@ -346,6 +382,15 @@ def test_authenticated_http_smoke_rejects_unauth_upload() -> None:
     conversation_id = "11111111-1111-1111-1111-111111111111"
 
     def _handler(request: httpx.Request) -> httpx.Response:
+        """Serve an unauthorized upload response.
+
+        Args:
+            request: Incoming mock request.
+
+        Returns:
+            Compatible reads plus HTTP 401 on upload.
+        """
+
         path = request.url.path
         if path == "/health/live":
             return httpx.Response(200, json={"status": "live"})

@@ -11,6 +11,8 @@ packet: P08-19
 
 P08-19 ships this visual contract on `/login` family pages, `/admin` tabs, and `/account`. Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md). Do not reinterpret them.
 
+## Screen specifications
+
 ### Auth component and page specification
 
 #### `AuthLayout`
@@ -37,6 +39,7 @@ Exact pages:
 - Invitation title: “Accept invitation.” Helper: “Sign in with the email address that received this invitation.”
 - Callback page shows Spinner plus “Completing sign in…” and a safe timeout error with “Return to sign in.”
 - No Google button, MFA/TOTP page, recovery page, owner-bootstrap page, or unavailable-gap page.
+
 ### Admin component specification
 
 #### Admin frame
@@ -77,6 +80,7 @@ Exact pages:
 - Each card shows tokens and USD from the real response, using 24px numeric value and 13px label.
 - Below: real readiness/rate degradation StatusBanner.
 - No charts without time-series data. No budget editor, hard-cap slider, audit panel, forecast, fake trend, or progress bar.
+
 ### Remaining reusable component rules
 
 - `ConversationRail` is renamed/implemented as `SessionRail`; do not keep both.
@@ -85,6 +89,7 @@ Exact pages:
 - `CitationDrawer` and `CitationSheet` become one responsive `SourcesDrawer`; do not maintain separate desktop/mobile logic beyond the shared Drawer primitive.
 - `ProfileApp`, dedicated Usage/Team/Tools/Curation page bodies, `ReadinessPanel`, gap pages, MFA components, and review fixture route are removed or reduced to redirects as specified.
 - A component not named in this target specification is retained only if it is a structural implementation detail required by one named component and has no separate visual behavior. Otherwise remove it after reference checks.
+
 ### Exact product copy rules
 
 - Brand: “Smart RAG.”
@@ -100,6 +105,7 @@ Exact pages:
 - Budget: “Question answering is paused because the usage limit was reached.”
 - Service unavailable: “Question answering is temporarily unavailable.”
 - Never show GAP IDs, stack traces, exception strings, database/provider names, “mock,” “fixture,” or implementation-phase language in production UI.
+
 ### Mandatory visual acceptance criteria
 
 - The implementation must include screenshots or Playwright visual snapshots at 390px and 1280px for Sign in, Ask empty, Ask generating, Ask verifying, Ask completed with citations, Documents populated, Import source, Document detail, Tables results, Graph list, Graph canvas, and every Admin tab.

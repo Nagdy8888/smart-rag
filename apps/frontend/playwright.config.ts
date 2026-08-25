@@ -22,7 +22,9 @@ export default defineConfig({
   webServer: {
     command: "pnpm dev --port 3010 --hostname 127.0.0.1",
     url: "http://127.0.0.1:3010",
-    reuseExistingServer: false,
+    // CI always starts a fresh :3010. Local reuse avoids failing the
+    // frontend tier when a leftover Playwright Next process is already bound.
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
       ...process.env,

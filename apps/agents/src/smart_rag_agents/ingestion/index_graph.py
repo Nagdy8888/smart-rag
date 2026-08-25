@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Literal, TypeAlias, TypedDict, cast
@@ -51,7 +50,7 @@ from smart_rag_core.security.external_processing import (
     ContentClass,
     ExternalProcessingDecisionInput,
 )
-from smart_rag_core.settings.base import SharedSettings
+from smart_rag_core.settings.base import SharedSettings, get_process_environ
 
 from smart_rag_agents.ingestion.checkpointer import compile_ingestion_graph
 
@@ -157,9 +156,7 @@ def validate_index_lease(
         try:
             repository.validate_active_lease(
                 job_id=UUID(state["job_id"]),
-                lease_token=configurable_job_lease_token(
-                    config, state["lease_token"]
-                ),
+                lease_token=configurable_job_lease_token(config, state["lease_token"]),
             )
         except JobLeaseError:
             connection.rollback()
@@ -891,7 +888,7 @@ def allow_index_without_scan(configurable: dict[str, object]) -> bool:
 
     if configurable.get("allow_index_without_scan") is not True:
         return False
-    return os.environ.get("APP_ENV", "").strip().lower() == "test"
+    return (get_process_environ("APP_ENV", "") or "").strip().lower() == "test"
 
 
 def index_scan_gate_allows(

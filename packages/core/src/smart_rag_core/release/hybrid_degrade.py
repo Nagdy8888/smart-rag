@@ -9,7 +9,6 @@ dense+term with ``bm25_unavailable``. Query text is not written to JSON.
 from __future__ import annotations
 
 import json
-import os
 import sys
 
 import psycopg
@@ -22,6 +21,7 @@ from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.retrieval.terms import TermRetriever
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.settings import SharedSettings
+from smart_rag_core.settings.base import get_process_environ
 
 DEGRADE_SCHEMA_VERSION = "phase09-candidate-packet5-hybrid-degrade-v1"
 
@@ -169,8 +169,8 @@ def main() -> int:
         Process exit code.
     """
 
-    supabase_url = os.environ.get("SUPABASE_DB_URL")
-    parade_url = os.environ.get("PARADEDB_URL")
+    supabase_url = get_process_environ("SUPABASE_DB_URL")
+    parade_url = get_process_environ("PARADEDB_URL")
     if not supabase_url or not parade_url:
         sys.stderr.write("SUPABASE_DB_URL and PARADEDB_URL are required\n")
         return 2

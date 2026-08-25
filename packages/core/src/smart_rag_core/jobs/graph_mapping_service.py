@@ -652,7 +652,9 @@ class GraphMappingService:
             if not vendor_rows:
                 raise GraphMappingError("graph_source_snapshot_mismatch")
             piece_ids = tuple(
-                str(raw.get("id") or "") for raw in vendor_rows if str(raw.get("id") or "")
+                str(raw.get("id") or "")
+                for raw in vendor_rows
+                if str(raw.get("id") or "")
             )
             if len(piece_ids) != len(vendor_rows) or not piece_ids[0]:
                 raise GraphMappingError("graph_source_snapshot_mismatch")

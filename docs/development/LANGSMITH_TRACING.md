@@ -173,7 +173,6 @@ uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.
 uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/openai_lightrag.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_openai_lightrag.py
 ```
 
-
 Live LangSmith project visibility is **unverified** until
 `LANGSMITH_TRACING=true` is used with a real key.
 

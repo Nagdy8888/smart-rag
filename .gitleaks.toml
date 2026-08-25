@@ -44,6 +44,8 @@ condition = "AND"
 regexTarget = "line"
 paths = [
   '''(?:^|/)tests/unit/test_langsmith_tracing\.py$''',
+  '''(?:^|/)tests/unit/test_query_agent_eval_trace\.py$''',
+  '''(?:^|/)tests/unit/test_ingest_trace\.py$''',
 ]
 regexes = [
   '''sk-canarysecretFORBID''',

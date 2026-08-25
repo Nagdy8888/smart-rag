@@ -954,8 +954,7 @@ def classify_jwt_issuer_alignment(
 
     exact = token_iss == api_expected_iss
     local_pair = (
-        token_iss in LOCAL_JWT_ISSUER_PAIR
-        and api_expected_iss in LOCAL_JWT_ISSUER_PAIR
+        token_iss in LOCAL_JWT_ISSUER_PAIR and api_expected_iss in LOCAL_JWT_ISSUER_PAIR
     )
     aligned = exact or local_pair
     if exact:

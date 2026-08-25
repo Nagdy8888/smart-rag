@@ -419,6 +419,14 @@ class LangGraphQueryRunExecutor:
             key: str,
             payload: dict[str, object],
         ) -> None:
+            """Write one compacted store item.
+
+            Args:
+                namespace: Store namespace tuple.
+                key: Item key.
+                payload: JSON-compatible value.
+            """
+
             store.put_compact(namespace, key, payload)
 
         with psycopg.connect(postgres_url) as connection:

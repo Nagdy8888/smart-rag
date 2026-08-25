@@ -4,6 +4,8 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 
 P08-13 implementation: `:root` in `apps/frontend/src/app/globals.css` and `apps/frontend/src/lib/design-tokens.ts` are the only token tables. Primitives live under `apps/frontend/src/components/ui/` (`Button` / `PrimaryAction` / `AsyncButton`, `PageHeader`, `ConfirmDialog`, and the existing Input/Table/Sheet set). This packet does not rewrite routes.
 
+## Token contract
+
 ### Styling architecture
 
 - Use the existing CSS-variable theme in `apps/frontend/src/app/globals.css` and route/component CSS Modules.

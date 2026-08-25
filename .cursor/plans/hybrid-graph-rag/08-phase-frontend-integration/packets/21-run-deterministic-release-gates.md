@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 21
-status: pending
+status: complete
 title: "Run deterministic release gates"
 requirement_ids: [P08-21]
 ---

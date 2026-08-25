@@ -1,13 +1,18 @@
 /**
- * Structured tables route.
+ * Structured tables route. `useSearchParams` requires a Suspense boundary.
  */
+import { Suspense } from "react";
 import { TablesApp } from "../../../components/tables/tables-app";
 
 /**
  * Render table manifests and the typed plan builder.
  *
- * @returns Tables surface.
+ * @returns Tables wrapped in Suspense.
  */
 export default function TablesPage() {
-  return <TablesApp />;
+  return (
+    <Suspense fallback={<p>Loading tables</p>}>
+      <TablesApp />
+    </Suspense>
+  );
 }

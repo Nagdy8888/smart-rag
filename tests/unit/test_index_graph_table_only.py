@@ -34,9 +34,7 @@ def test_csv_hybrid_index_uses_table_artifacts(tmp_path: Path) -> None:
     assert chunking.chunks == ()
     assert chunking.table_artifacts
     assert hybrid_index_has_content(chunking) is True
-    embedding = table_only_embedding_result(
-        version_id=VERSION_ID, chunking=chunking
-    )
+    embedding = table_only_embedding_result(version_id=VERSION_ID, chunking=chunking)
     assert embedding.embedded == ()
     assert embedding.provider_request_id == "table_only"
     assert len(embedding.chunk_set_hash) == 64

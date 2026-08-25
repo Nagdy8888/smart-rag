@@ -3,7 +3,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ReactElement } from "react";
 import React from "react";
 import "@testing-library/jest-dom/vitest";
 import {

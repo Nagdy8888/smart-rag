@@ -28,7 +28,7 @@ flowchart LR
   chat["frame_04 chat"] --> home["/"]
   library["frame_06 plus 07"] --> docs["/documents"]
   detail["frame_09"] --> docId["/documents/id"]
-  graphFrame["frame_10"] --> graph["/graph"]
+  graphFrame["frame_10"] --> graphRoute["/graph"]
   tablesFrame["frame_05"] --> tables["/tables"]
   usageFrame["frame_14"] --> usage["/usage"]
   primitives["frame_00"] --> shell["AppShell and admin routes"]

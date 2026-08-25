@@ -15,7 +15,9 @@ from smart_rag_core.schema.enums import JobErrorCategory
 CANARY_PASSAGE = "SECRET_COMPANY_PASSAGE_DO_NOT_EXPORT"
 
 
-def test_hybrid_and_graph_prefixes_are_present(caplog: pytest.LogCaptureFixture) -> None:
+def test_hybrid_and_graph_prefixes_are_present(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Fixture job kinds emit ``[hybrid]`` and ``[graph]`` without canary text."""
 
     job_id = uuid4()

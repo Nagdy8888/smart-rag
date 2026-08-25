@@ -7,19 +7,26 @@ from inspect import signature
 from pathlib import Path
 
 import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
+from smart_rag_agents.prompts import answer_prompt_text, verifier_prompt_text
 from smart_rag_agents.query.checkpointer import (
     QUERY_CHECKPOINTER_POOL_MAX_SIZE,
     open_query_checkpointer,
 )
 from smart_rag_agents.query.deps import QueryGraphDeps
-from smart_rag_agents.query.nodes.pipeline import _run_coro, generate_answer_node
+from smart_rag_agents.query.nodes.pipeline import (
+    _run_coro,
+    generate_answer_node,
+    verify_answer_node,
+)
 from smart_rag_agents.query.state import pending_query_state
 from smart_rag_api.services.query_graph_runtime import (
     QueryGraphRuntimeError,
     build_query_graph_deps,
     build_query_process_bindings,
 )
+from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 from smart_rag_api.services.sse_stream import LangGraphQueryRunExecutor
+from smart_rag_core.gateways.model import create_model_gateway
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import mock_answer_payload
 from smart_rag_core.query_answer.models import AnswerPayload
@@ -184,6 +191,53 @@ def test_executor_default_bindings_are_not_empty_query_graph_deps() -> None:
     assert cached.hybrid_retriever is not None
     assert cached.model_gateway is not None
     assert cached is bindings
+
+
+def test_bound_mock_gateway_drives_sse_without_token_injection() -> None:
+    """Production generate/verify uses a bound mock gateway, not injected deltas.
+
+    Acceptance:
+        ``create_model_gateway(mock_model_mode=True)`` is the answer adapter.
+        Mapper events come from real node outputs. An SSE fixture that yields
+        ``token_delta`` without running generate/verify is insufficient.
+    """
+
+    settings = SharedSettings(mock_model_mode=True)
+    gateway = create_model_gateway(settings)
+    deps = QueryGraphDeps(
+        hybrid_retriever=_DummyHybrid(),
+        model_gateway=gateway,
+        answer_prompt_text=answer_prompt_text(),
+        verifier_prompt_text=verifier_prompt_text(),
+    )
+    state = pending_query_state(user_query="What is the refund period?")
+    state["status"] = "optional_tools_resolved"
+    state["remaining_model_calls"] = 8
+    state["fusion"] = _fusion().model_dump(mode="json")
+    generated = generate_answer_node(state, deps)
+    generated_answer = AnswerPayload.model_validate(generated["answer"])
+    assert generated_answer.answer_text.strip()
+    verified = verify_answer_node(generated, deps)
+    mapper = QuerySseMapper()
+    events = list(mapper.consume_chunk({"generate_answer": generated}))
+    events.extend(mapper.consume_chunk({"verify_answer": verified}))
+    if not mapper.terminal_emitted:
+        events.extend(mapper.finish())
+    types = [item[0] for item in events]
+    terminals = [
+        name for name in types if name in {"completed", "partial", "error", "cancelled"}
+    ]
+    assert len(terminals) == 1
+    if verified["status"] == "verified" and generated_answer.answer_text.strip():
+        assert types.count("completed") == 1
+        deltas = [
+            payload.get("delta")
+            for event_type, payload in events
+            if event_type == "token_delta"
+        ]
+        assert "".join(str(item or "") for item in deltas).strip()
+    else:
+        assert "completed" not in types or verified["status"] == "verified"
 
 
 def test_unbound_hybrid_never_emits_verified() -> None:

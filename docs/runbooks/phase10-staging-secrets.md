@@ -54,6 +54,7 @@ not installed on `Nagdy8888/Demo_Project_3`, so later git-linked
 deploys need [Vercel GitHub App](https://github.com/apps/vercel).
 
 Optional later:
+
 - Google OAuth client id/secret only if Packet 5 live Auth is in scope.
 - `OPENAI_API_KEY` is already local. Keep `MOCK_MODEL_MODE=true` until
   you explicitly turn mocks off.

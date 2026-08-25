@@ -2,9 +2,9 @@
 
 from smart_rag_core.observability.langsmith_tracing import (
     configure_langsmith,
+    traced_async_openai_client,
     traced_embeddings_create,
     traced_embeddings_create_async,
-    traced_async_openai_client,
     traced_openai_client,
 )
 from smart_rag_core.observability.logging import (
@@ -22,8 +22,8 @@ __all__ = [
     "correlation_context",
     "current_correlation_ids",
     "redact_text",
+    "traced_async_openai_client",
     "traced_embeddings_create",
     "traced_embeddings_create_async",
-    "traced_async_openai_client",
     "traced_openai_client",
 ]

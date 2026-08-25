@@ -52,7 +52,7 @@ def main() -> None:
         for table in sagas:
             name = table[0]
             rows = connection.execute(
-                f"SELECT * FROM app.{name} WHERE version_id = %s OR saga_idempotency_key LIKE %s LIMIT 5",
+                f"SELECT * FROM app.{name} WHERE version_id = %s OR saga_idempotency_key LIKE %s LIMIT 5",  # noqa: S608
                 (VERSION_ID, f"%{JOB_ID}%"),
             ).fetchall()
             print(name, rows)

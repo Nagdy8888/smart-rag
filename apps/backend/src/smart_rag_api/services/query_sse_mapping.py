@@ -86,9 +86,7 @@ def _status_event(
 
     raw_status = update.get("status")
     status = (
-        raw_status[:64]
-        if isinstance(raw_status, str) and raw_status
-        else "running"
+        raw_status[:64] if isinstance(raw_status, str) and raw_status else "running"
     )
     return ("status", {"stage": node_name[:64], "status": status})
 

@@ -12,6 +12,7 @@ from smart_rag_core.settings import snapshot_process_environ
 from smart_rag_core.tables.limits import (
     TABLE_KILL_GRACE_SECONDS,
     TABLE_STATEMENT_DEADLINE_SECONDS,
+    TABLE_WORKER_WINDOWS_STARTUP_SECONDS,
 )
 from smart_rag_core.tables.types import CompiledTableQuery
 
@@ -55,6 +56,13 @@ def stripped_worker_env(source: dict[str, str] | None = None) -> dict[str, str]:
         "TZ",
         "HOME",
         "USERPROFILE",
+        "USERNAME",
+        "USERDOMAIN",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMDATA",
+        "NUMBER_OF_PROCESSORS",
+        "PROCESSOR_ARCHITECTURE",
         "TMP",
         "TEMP",
         "TMPDIR",
@@ -68,6 +76,25 @@ def stripped_worker_env(source: dict[str, str] | None = None) -> dict[str, str]:
     kept.setdefault("PYTHONIOENCODING", "utf-8")
     kept["SMART_RAG_TABLE_SANDBOX"] = "1"
     return kept
+
+
+def _communicate_timeout_seconds(deadline_seconds: float) -> float:
+    """Return the process wait that covers SQL plus interpreter startup.
+
+    Args:
+        deadline_seconds: DuckDB statement bound requested by the caller.
+
+    Returns:
+        Seconds passed to ``Popen.communicate``. On Windows the default
+        3-second statement bound also allows
+        ``TABLE_WORKER_WINDOWS_STARTUP_SECONDS`` for CPython and DuckDB
+        import. Explicit shorter deadlines used by timeout tests stay
+        unchanged.
+    """
+
+    if sys.platform == "win32" and deadline_seconds >= TABLE_STATEMENT_DEADLINE_SECONDS:
+        return deadline_seconds + TABLE_WORKER_WINDOWS_STARTUP_SECONDS
+    return deadline_seconds
 
 
 def execute_compiled_query(
@@ -131,7 +158,8 @@ def execute_compiled_query(
     )
     try:
         stdout, stderr = process.communicate(
-            json.dumps(payload), timeout=deadline_seconds
+            json.dumps(payload),
+            timeout=_communicate_timeout_seconds(deadline_seconds),
         )
     except subprocess.TimeoutExpired as exc:
         process.terminate()

@@ -2,6 +2,8 @@
 
 Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md). Do not reinterpret them.
 
+## Screen specifications
+
 ### Application shell component specification
 
 #### `AppShell`
@@ -68,6 +70,7 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 - Mobile: stacked, action full width only when it is the page’s main task.
 - Title uses Page title style; description uses secondary body, max width 720px.
 - Bottom margin 24px.
+
 ### Ask workspace component specification
 
 #### Overall layout

@@ -18,11 +18,15 @@ def _unauthorized_environment_reads(path: Path) -> list[int]:
 
     Returns:
         One-based lines containing direct ``os.getenv`` or ``os.environ``
-        access, including equivalent direct imports.
+        access, including equivalent direct imports. Operator CLIs under
+        ``scripts/ops/`` are excluded; they bootstrap host env before the
+        settings package can load.
     """
 
     normalized = path.as_posix()
     if "/smart_rag_core/settings/" in normalized:
+        return []
+    if "/scripts/ops/" in normalized:
         return []
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     direct_names: set[str] = set()
@@ -47,7 +51,7 @@ def _unauthorized_environment_reads(path: Path) -> list[int]:
 
 
 def test_process_environment_reads_are_centralized() -> None:
-    """No authored Python file reads environment outside core settings."""
+    """Application Python reads environment only through core settings."""
 
     findings = {
         path.relative_to(REPO_ROOT): lines

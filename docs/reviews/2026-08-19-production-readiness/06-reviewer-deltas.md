@@ -28,15 +28,15 @@ flowchart TD
 
 | Reviewer | Topic | Merged as |
 | --- | --- | --- |
-| [Ops release gates](fe082625-78a4-4e5e-83d7-29155c131ba0) | Phase 9/10/11 gates | C-002 C-003 C-013 H-015 H-020 H-032 H-033 |
-| [Auth RLS secrets](280111eb-9434-4be6-a390-e09938437d0c) | Identity proof | Strengths kept; H-016; M-029 worker Storage Admin env; L-011 L-012 |
-| [Ingestion worker](32cb551e-b092-40a5-bfb2-ea65d670eaef) | Scan/jobs/parser | C-011 C-012 C-015 C-016 H-030 H-031 M-015 M-029 |
-| [Agents LangGraph](27edae6f-b5f7-4239-ad66-80796ef03ded) | Query graph runtime | C-009 C-014 H-017 H-018 H-029 M-027 L-013 |
-| [Backend API](ef30f339-44db-4eb1-8ee3-cdbd95e423eb) | FastAPI IDOR/SSE | C-010 H-005 H-019 M-021 M-022 M-023 M-024 M-028 |
-| [Frontend UX](22dbe7a1-e9a5-4a4d-9032-792b0c689e23) | CSP/SSE cancel | H-002 H-021 M-025 M-026 L-013 |
-| [System design](1d753950-7c9a-433a-8aa0-be09b72f0322) | Capacity/latency | H-019 H-020 H-022 H-023 M-028 |
-| [Retrieval graph](6756d3b8-178a-49c8-9c0f-887122c906ab) | Hybrid/Combined | C-009 H-024 H-029 QT-EVAL-009 still unverified |
-| [Security production](0a96d791-5040-4838-9e41-bc0a7ac87cda) | Full-repo security | C-010 C-012 H-016 H-025 H-026 H-033 M-013–M-016 M-021 L-009 L-012 |
+| Ops release gates | Phase 9/10/11 gates | C-002 C-003 C-013 H-015 H-020 H-032 H-033 |
+| Auth RLS secrets | Identity proof | Strengths kept; H-016; M-029 worker Storage Admin env; L-011 L-012 |
+| Ingestion worker | Scan/jobs/parser | C-011 C-012 C-015 C-016 H-030 H-031 M-015 M-029 |
+| Agents LangGraph | Query graph runtime | C-009 C-014 H-017 H-018 H-029 M-027 L-013 |
+| Backend API | FastAPI IDOR/SSE | C-010 H-005 H-019 M-021 M-022 M-023 M-024 M-028 |
+| Frontend UX | CSP/SSE cancel | H-002 H-021 M-025 M-026 L-013 |
+| System design | Capacity/latency | H-019 H-020 H-022 H-023 M-028 |
+| Retrieval graph | Hybrid/Combined | C-009 H-024 H-029 QT-EVAL-009 still unverified |
+| Security production | Full-repo security | C-010 C-012 H-016 H-025 H-026 H-033 M-013–M-016 M-021 L-009 L-012 |
 | Parent clean-code pass | God files, 300-line docs, docstring/TSDoc gates | H-027 H-028 M-017–M-020 L-010 |
 
 ## Highest-confidence new defects (re-read)

@@ -216,9 +216,7 @@ def test_isolate_index_initializes_pipeline_before_insert(
     writer.workspace_key = "company_default"
     adapter = MagicMock()
     adapter.ensure_pipeline_status = AsyncMock()
-    adapter.callbacks.counts = SimpleNamespace(
-        embed=0, entity_extract=0, other=0
-    )
+    adapter.callbacks.counts = SimpleNamespace(embed=0, entity_extract=0, other=0)
     service._indexer.adapter = adapter
     service._revalidate_index_eligibility = MagicMock()  # type: ignore[method-assign]
     service._assert_version_still_pending = MagicMock()  # type: ignore[method-assign]

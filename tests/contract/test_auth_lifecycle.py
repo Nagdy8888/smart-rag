@@ -470,7 +470,6 @@ def test_offboarding_disables_revokes_and_bumps_authorization(
         )
 
 
-
 def test_offboarding_succeeds_at_ordinary_assurance(
     postgres_url: str,
     privileged_settings: PrivilegedAuthSettings,

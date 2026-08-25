@@ -188,7 +188,9 @@ class Bm25WorkerLoop:
                 repository = self._repository(connection)
                 if success:
                     repository.complete(job_id, lease_token)
-                    stage = "hybrid_ready" if operation != "delete" else "bm25_delete_done"
+                    stage = (
+                        "hybrid_ready" if operation != "delete" else "bm25_delete_done"
+                    )
                     log_ingest_progress("hybrid", stage, job_id)
                 else:
                     repository.fail(

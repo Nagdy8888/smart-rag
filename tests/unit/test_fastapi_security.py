@@ -521,6 +521,8 @@ def test_member_company_usage_is_forbidden(
     )
 
     class _Usage:
+        """Usage service stub that refuses member company reads."""
+
         def company_usage(self, caller: CallerContext) -> Any:
             """Reject members.
 

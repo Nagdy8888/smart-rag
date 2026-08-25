@@ -25,8 +25,12 @@ if str(REPO) not in sys.path:
 from scripts.ops.mark_demo_graph_eligible import mark_graph_eligible  # noqa: E402
 from tests.contract.rfc6238_totp import totp_window  # noqa: E402
 
-HYBRID_PATH = REPO / "docs" / "datasets" / "MovieSummaries" / "plot_summaries.hybrid-800.txt"
-GRAPH_PATH = REPO / "docs" / "datasets" / "MovieSummaries" / "plot_summaries.graph-200.txt"
+HYBRID_PATH = (
+    REPO / "docs" / "datasets" / "MovieSummaries" / "plot_summaries.hybrid-800.txt"
+)
+GRAPH_PATH = (
+    REPO / "docs" / "datasets" / "MovieSummaries" / "plot_summaries.graph-200.txt"
+)
 API_URL = "http://127.0.0.1:8000"
 DEMO_LOGIN = "LocalDemo-Upload-1!"
 ATTESTATION_POLICY_VERSION = "2026-08-13"
@@ -281,7 +285,9 @@ def requeue_hybrid_index_jobs(
                 (job_id,),
             ).fetchone()
             if row is None:
-                snapshots.append({"id": job_id, "status": "missing", "attempt_count": 0})
+                snapshots.append(
+                    {"id": job_id, "status": "missing", "attempt_count": 0}
+                )
             else:
                 snapshots.append(
                     {

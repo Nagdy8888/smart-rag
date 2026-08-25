@@ -622,9 +622,7 @@ def traced_embeddings_create(
     input_tokens = (
         int(getattr(usage, "prompt_tokens", 0) or 0) if usage is not None else 0
     )
-    cost = (
-        Decimal(input_tokens) * input_usd_per_million / Decimal(1_000_000)
-    )
+    cost = Decimal(input_tokens) * input_usd_per_million / Decimal(1_000_000)
     record_current_usage_metadata(
         provider="openai",
         model=str(kwargs.get("model", "") or ""),
@@ -669,9 +667,7 @@ async def traced_embeddings_create_async(
     input_tokens = (
         int(getattr(usage, "prompt_tokens", 0) or 0) if usage is not None else 0
     )
-    cost = (
-        Decimal(input_tokens) * input_usd_per_million / Decimal(1_000_000)
-    )
+    cost = Decimal(input_tokens) * input_usd_per_million / Decimal(1_000_000)
     record_current_usage_metadata(
         provider="openai",
         model=str(kwargs.get("model", "") or ""),

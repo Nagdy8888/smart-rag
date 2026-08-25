@@ -125,21 +125,65 @@ def local_supabase_status() -> dict[str, str]:
     return cast(dict[str, str], untyped)
 
 
+def _local_supabase_runtime_ready(connection: psycopg.Connection) -> bool:
+    """Return whether a ``postgres`` database has the Smart RAG runtime.
+
+    A reachable TCP port is not enough for contract isolation. Vanilla or
+    unrestored local Postgres on ``:54322`` accepts connections but lacks
+    ``app`` / ``app_worker``. ParadeDB and other databases are unchanged.
+
+    Args:
+        connection: Open psycopg connection.
+
+    Returns:
+        ``True`` when the database is not local Supabase ``postgres``, or
+        when that database has schema ``app`` and role ``app_worker``.
+    """
+
+    try:
+        database = connection.execute("SELECT current_database()").fetchone()
+        if database is None or database[0] != "postgres":
+            return True
+        schema = connection.execute(
+            "SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = 'app'"
+        ).fetchone()
+        if schema is None:
+            return False
+        role = connection.execute(
+            "SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'app_worker'"
+        ).fetchone()
+    except psycopg.Error:
+        return False
+    return role is not None
+
+
 def try_connect(url: str, *, connect_timeout: int = 3) -> psycopg.Connection | None:
-    """Open one Postgres connection when the target is reachable.
+    """Open one Postgres connection when the target is a usable stack.
 
     Args:
         url: PostgreSQL connection URL.
         connect_timeout: Seconds to wait for TCP/auth completion.
 
     Returns:
-        An open connection, or ``None`` when the server is unreachable.
+        An open connection, or ``None`` when the server is unreachable or
+        the local ``postgres`` database lacks ``app`` / ``app_worker``.
+        Incomplete local Postgres is treated as unavailable so CPU/local
+        contract runs skip live integration instead of erroring.
     """
 
     try:
-        return psycopg.connect(url, connect_timeout=connect_timeout)
+        connection = psycopg.connect(url, connect_timeout=connect_timeout)
     except psycopg.Error:
         return None
+    try:
+        if not _local_supabase_runtime_ready(connection):
+            connection.close()
+            return None
+        connection.rollback()
+    except psycopg.Error:
+        connection.close()
+        return None
+    return connection
 
 
 def docker_compose_available() -> bool:

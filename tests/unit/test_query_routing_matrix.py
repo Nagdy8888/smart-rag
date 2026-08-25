@@ -431,6 +431,16 @@ def test_model_assisted_prep_uses_at_most_one_call() -> None:
     calls = {"n": 0}
 
     def _caller(query: str, memory: object) -> object:
+        """Count one preparation model call.
+
+        Args:
+            query: User query.
+            memory: Unused memory snapshot.
+
+        Returns:
+            A preparation payload that keeps the entity token.
+        """
+
         del memory
         calls["n"] += 1
         from smart_rag_core.query_routing.models import PreparationModelPayload
@@ -460,6 +470,16 @@ def test_rewrite_dropping_entity_keeps_original() -> None:
     """A rewrite that drops codes is discarded; original remains the fallback."""
 
     def _caller(query: str, memory: object) -> object:
+        """Return a rewrite that drops the invoice code.
+
+        Args:
+            query: Unused original query.
+            memory: Unused memory snapshot.
+
+        Returns:
+            A preparation payload without the code token.
+        """
+
         del query, memory
         from smart_rag_core.query_routing.models import PreparationModelPayload
 

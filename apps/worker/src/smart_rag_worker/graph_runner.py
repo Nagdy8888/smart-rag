@@ -432,9 +432,7 @@ class GraphWorkerLoop:
                         )
                         connection.commit()
                 except psycopg.Error:
-                    LOGGER.exception(
-                        "unable to quarantine after graph job %s", job_id
-                    )
+                    LOGGER.exception("unable to quarantine after graph job %s", job_id)
             self._fail_job(
                 postgres_url,
                 job_id,
@@ -603,7 +601,11 @@ def _log_graph_outcome(
     if outcome_kind == "completed":
         log_ingest_progress("graph", "graph_ready", job_id)
         return
-    stage = "graph_ineligible" if outcome_kind == "graph_ineligible" else "lightrag_index_failed"
+    stage = (
+        "graph_ineligible"
+        if outcome_kind == "graph_ineligible"
+        else "lightrag_index_failed"
+    )
     reason = outcome_kind if outcome_kind.replace("_", "").isalnum() else "job_failed"
     log_ingest_progress(
         "graph",

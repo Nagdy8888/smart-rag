@@ -211,10 +211,10 @@ is read-only (GAP-07-01).
 | --- | --- | --- |
 | Usage me | GET /usage/me | cost_usd, tokens, rows |
 | Usage company | GET /usage/company or 403 | owner/admin only |
-| Budget editor | none | omitted; 402 classified only |
-| Audit | none | omitted; no panel |
+| Budget editor | none | omitted GAP-07-11; 402 classified only |
+| Audit | none | omitted GAP-07-12; no panel |
 | Account | GET /me | four fields only |
-| Company settings | none | omitted; no save |
+| Company settings | none | omitted GAP-07-13; no save |
 
 ## Negative scenarios (must not look like success)
 

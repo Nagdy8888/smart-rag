@@ -597,9 +597,7 @@ class GraphIndexService:
             if hasattr(self._mapper, "set_map_workspace_key"):
                 self._mapper.set_map_workspace_key(None)
             bind_key = (
-                candidate_key
-                if isolate_candidate and maps_verified
-                else live_workspace
+                candidate_key if isolate_candidate and maps_verified else live_workspace
             )
             await self._bind_index_workspace(adapter, bind_key)
         if (

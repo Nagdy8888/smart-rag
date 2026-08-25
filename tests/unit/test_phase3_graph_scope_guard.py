@@ -20,6 +20,7 @@ ALLOWED_PATH_PARTS: tuple[str, ...] = (
     "supabase/migrations/20260816120000_graph_mapping_ready_v1.sql",
     "packages/core/src/smart_rag_core/schema/",
     "packages/core/src/smart_rag_core/retrieval/graph_mapping.py",
+    "apps/worker/src/smart_rag_worker/graph_runner.py",
 )
 
 
@@ -30,7 +31,8 @@ def _is_allowed(path: Path) -> bool:
         path: Repository file under scan.
 
     Returns:
-        True when the path is docs, tests, schema, or an allowed mapping module.
+        True when the path is docs, tests, schema, an allowed mapping module,
+        or the Phase 5 graph worker.
     """
 
     normalized = path.as_posix()

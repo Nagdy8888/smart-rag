@@ -9,7 +9,6 @@ SQL-stamped.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +22,7 @@ from smart_rag_core.ingestion.bm25_projection import Bm25ProjectionService
 from smart_rag_core.ingestion.limits import DEFAULT_BM25_UPSERT_BATCH_SIZE
 from smart_rag_core.release.hybrid import mark_bm25_job_processing
 from smart_rag_core.release.io import as_json_list, as_json_object
+from smart_rag_core.settings.base import get_process_environ
 
 REPROJECT_SCHEMA_VERSION = "phase09-candidate-packet4-bm25-v1"
 _WORKER_OUTPUT = Path("/tmp/phase09/candidate-packet4-bm25.json")  # noqa: S108
@@ -614,8 +614,8 @@ def main() -> int:
         SystemExit: When required environment variables are missing.
     """
 
-    supabase_url = os.environ.get("SUPABASE_DB_URL")
-    parade_url = os.environ.get("PARADEDB_URL")
+    supabase_url = get_process_environ("SUPABASE_DB_URL")
+    parade_url = get_process_environ("PARADEDB_URL")
     if not supabase_url or not parade_url:
         sys.stderr.write("SUPABASE_DB_URL and PARADEDB_URL are required\n")
         return 2

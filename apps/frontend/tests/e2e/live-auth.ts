@@ -151,7 +151,7 @@ export async function signInLiveMember(
   }
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(LIVE_PASSWORD);
+  await page.getByRole("textbox", { name: "Password" }).fill(LIVE_PASSWORD);
   const tokenOk = page.waitForResponse(
     (response) => response.url().includes("/auth/v1/token") && response.ok(),
     { timeout: 20_000 },

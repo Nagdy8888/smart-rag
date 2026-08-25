@@ -1567,4 +1567,3 @@ Commands: `.\.venv\Scripts\pytest.exe tests/unit/test_sse_protocol.py tests/cont
 P08-20 documentation integrity: frontend action inventory and Phase 8
 docs now treat this co-owned SSE repair as closed. Do not restore empty
 `completed` success or typewriter streaming.
-

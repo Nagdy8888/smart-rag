@@ -4,7 +4,7 @@
  * `EXTERNAL_PROCESSING_POLICY_VERSION` (`2026-08-13`).
  */
 
-/** Signed external-processing policy version from `smart_rag_core.ingestion.limits`. */
+/** Signed external-processing policy version from core ingestion limits. */
 export const ATTESTATION_POLICY_VERSION = "2026-08-13";
 
 /** CategoryDisposition values accepted on finalize. */

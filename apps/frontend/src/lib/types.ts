@@ -410,7 +410,7 @@ export type SignedUploadResponse = {
   upload_method: string;
 };
 
-/** Catalog event names from `smart_rag_core.sse.catalog`. */
+/** Catalog event names from the backend SSE catalog. */
 export const KNOWN_SSE_EVENT_TYPES = [
   "schema",
   "status",

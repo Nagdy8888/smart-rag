@@ -2,7 +2,7 @@
  * Fetch SSE framing for FastAPI `text/event-stream` bodies.
  *
  * Unknown event types are returned so callers can log and continue. Terminal
- * types match `smart_rag_core.sse.catalog`.
+ * types match the backend SSE catalog.
  */
 
 import {

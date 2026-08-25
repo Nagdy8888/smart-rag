@@ -854,7 +854,9 @@ class MockModelAdapter:
             or request.prompt_sha256 != EVAL_JUDGE_PROMPT_SHA256
         ):
             raise ValueError("eval_judge_prompt_version_mismatch")
-        joined = request.question + request.answer_text + "".join(request.acceptable_answers)
+        joined = (
+            request.question + request.answer_text + "".join(request.acceptable_answers)
+        )
         if len(joined) > self._max_input_chars:
             raise ValueError(
                 f"Model input exceeds configured {self._max_input_chars}-character bound"
@@ -1102,7 +1104,9 @@ class OpenAIRerankAdapter:
             One HTTPS call with ``max_retries=0``.
         """
 
-        joined = request.question + request.answer_text + "".join(request.acceptable_answers)
+        joined = (
+            request.question + request.answer_text + "".join(request.acceptable_answers)
+        )
         if len(joined) > self._max_input_chars:
             raise ValueError(
                 f"Model input exceeds configured {self._max_input_chars}-character bound"
@@ -1174,8 +1178,7 @@ class OpenAIRerankAdapter:
         input_bound = min(self._max_input_chars, LIGHTRAG_LLM_MAX_INPUT_CHARS)
         if len(combined) > input_bound:
             raise ValueError(
-                "Model input exceeds configured "
-                f"{input_bound}-character bound"
+                f"Model input exceeds configured {input_bound}-character bound"
             )
         (
             content,
@@ -1184,14 +1187,12 @@ class OpenAIRerankAdapter:
             cached_input_tokens,
             output_tokens,
             estimated_cost_usd,
-        ) = (
-            execute_openai_lightrag_llm(
-                api_key=self._api_key,
-                model_id=LIGHTRAG_LLM_MODEL_ID,
-                prompt=request.prompt,
-                system_prompt=request.system_prompt,
-                timeout_seconds=request.timeout_seconds,
-            )
+        ) = execute_openai_lightrag_llm(
+            api_key=self._api_key,
+            model_id=LIGHTRAG_LLM_MODEL_ID,
+            prompt=request.prompt,
+            system_prompt=request.system_prompt,
+            timeout_seconds=request.timeout_seconds,
         )
         return LightRagLlmResponse(
             mode="openai",

@@ -21,9 +21,9 @@ sequenceDiagram
   participant RPC as app.list_visible_documents
 
   Browser->>FastAPI: Authorization Bearer JWT
-  FastAPI->>JWKS: Verify iss/aud/alg/exp/sub/kid/role (ES256/RS256; role=authenticated)
+  FastAPI->>JWKS: "Verify JWT claims ES256 or RS256 authenticated role"
   JWKS-->>FastAPI: Valid subject + session claims
-  FastAPI->>DB: SELECT profiles + company_settings (app_api)
+  FastAPI->>DB: "SELECT profiles and company_settings as app_api"
   DB-->>FastAPI: role, disabled, MFA, authorization_version
   FastAPI->>FastAPI: Session revocation + live role/capability check
   FastAPI->>RPC: caller_user_id, caller_role, authorization_version
@@ -162,7 +162,7 @@ sequenceDiagram
   participant AW as app_audit_writer
   participant AE as app.audit_events
 
-  Svc->>AW: append_audit_event(...) or INSERT policy
+  Svc->>AW: "append_audit_event or INSERT policy"
   AW->>AE: INSERT only
   Note over AE: UPDATE/DELETE blocked by trigger
 ```

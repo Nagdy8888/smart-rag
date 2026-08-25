@@ -22,12 +22,13 @@ REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from tests.contract.rfc6238_totp import totp_window
+from tests.contract.rfc6238_totp import totp_window  # noqa: E402
+
 CSV_PATH = REPO / "docs" / "datasets" / "MovieSummaries" / "movie.metadata.demo.csv"
 API_URL = "http://127.0.0.1:8000"
 DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 ATTESTATION_POLICY_VERSION = "2026-08-13"
-PASSWORD = "LocalDemo-Upload-1!"
+PASSWORD = "LocalDemo-Upload-1!"  # noqa: S105
 TERMINAL = frozenset(
     {"graph_ineligible", "hybrid_ready", "graph_pending", "graph_ready", "failed"}
 )
@@ -86,7 +87,9 @@ def _create_uploader(status: dict[str, str]) -> tuple[str, str, str]:
         )
         token_response.raise_for_status()
         access = str(
-            _json_object(token_response.json(), "password grant").get("access_token", "")
+            _json_object(token_response.json(), "password grant").get(
+                "access_token", ""
+            )
         )
         if not access:
             raise RuntimeError("password grant omitted access_token")
@@ -376,7 +379,10 @@ def main() -> int:
                     print("ingestion complete: graph_ineligible (Hybrid only)")
                     return 0
                 if public_status == "graph_pending":
-                    print("unexpected graph_pending; LightRAG handoff was created", file=sys.stderr)
+                    print(
+                        "unexpected graph_pending; LightRAG handoff was created",
+                        file=sys.stderr,
+                    )
                     return 3
                 print(f"ingestion stopped at {public_status}", file=sys.stderr)
                 print(json.dumps({"jobs": jobs}, default=str), file=sys.stderr)

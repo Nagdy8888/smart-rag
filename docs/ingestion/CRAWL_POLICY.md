@@ -24,12 +24,12 @@ sequenceDiagram
   participant Web as PublicWeb
 
   API->>DB: document_sources + approved source_approval_requests
-  API->>DB: ingestion_jobs (website_crawl)
+  API->>DB: "ingestion_jobs website_crawl"
   Worker->>DB: claim job + load approval
-  Worker->>Core: BoundedCrawlAdapter.crawl(scope)
+  Worker->>Core: "BoundedCrawlAdapter.crawl scope"
   Core->>Core: normalize URL, DNS, robots, limits
-  Core->>Proxy: POST /fetch (pin_ip, host_header)
-  Proxy->>Web: pinned TCP/TLS fetch (no auto-redirect)
+  Core->>Proxy: "POST /fetch pin_ip host_header"
+  Proxy->>Web: "pinned TCP TLS fetch no auto-redirect"
   Proxy-->>Core: peer_ip, bounded body, headers
   Core->>DB: web_crawl_runs, web_snapshots, crawl_fetch_events
   Core->>DB: Storage web-snapshots immutable objects

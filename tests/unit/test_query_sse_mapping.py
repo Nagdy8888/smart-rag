@@ -74,7 +74,11 @@ def test_mapper_holds_draft_until_verify_then_emits_token_delta() -> None:
     )
     for event_type, payload in final_events:
         assert_catalog_event(event_type, payload)
-    deltas = [payload["delta"] for event_type, payload in final_events if event_type == "token_delta"]
+    deltas = [
+        payload["delta"]
+        for event_type, payload in final_events
+        if event_type == "token_delta"
+    ]
     assert deltas == ["PUBLIC_FINAL_ANSWER"]
     assert final_events[-1][0] == "completed"
     assert mapper.verified_text == "PUBLIC_FINAL_ANSWER"
@@ -111,6 +115,12 @@ def test_compiled_graph_updates_are_node_keyed() -> None:
     compiled = compile_query_graph()
 
     async def _drain() -> list[object]:
+        """Collect the first graph update chunks.
+
+        Returns:
+            Node-keyed update mappings.
+        """
+
         chunks: list[object] = []
         async for chunk in compiled.astream(
             pending_query_state(),
@@ -128,13 +138,19 @@ def test_compiled_graph_updates_are_node_keyed() -> None:
         assert chunk
         assert all(isinstance(key, str) for key in chunk)
         dumped = str(chunk)
-        assert "answer_text" not in dumped or "generate_answer" in chunk or "verify_answer" in chunk
+        assert (
+            "answer_text" not in dumped
+            or "generate_answer" in chunk
+            or "verify_answer" in chunk
+        )
 
 
 def test_mini_compiled_graph_does_not_emit_draft_before_verify() -> None:
     """A compiled generate_answer/verify_answer graph holds draft prose."""
 
     class _State(TypedDict):
+        """Minimal compiled-graph state for draft-hold proof."""
+
         answer: dict[str, object]
         status: str
 
@@ -181,6 +197,8 @@ def test_mini_compiled_graph_does_not_emit_draft_before_verify() -> None:
     seen_types: list[str] = []
 
     async def _run() -> None:
+        """Stream mini-graph updates into the SSE mapper."""
+
         async for chunk in compiled.astream(
             {"status": "pending", "answer": {}},
             stream_mode="updates",

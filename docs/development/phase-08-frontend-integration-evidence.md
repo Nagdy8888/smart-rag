@@ -2,7 +2,7 @@
 title: Phase 8 frontend integration evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-25
 audience: engineering, reviewers, client-approver
 ---
 
@@ -1684,7 +1684,6 @@ Revert this commit. Restore `apps/frontend/src/components/tables-app.tsx` only i
 
 P08-17 Tables is complete. P08-18 may rebuild Graph without changing Tables contracts.
 
-
 ## P08-18 — Rebuild bounded Graph inspection
 
 Quoted requirement: retain graph evidence inspection while removing the
@@ -1935,4 +1934,151 @@ would reintroduce GAP chrome and duplicate status UI.
 P08-20 quality integrity is complete. P08-21 may run deterministic release
 gates, including docs Mermaid and Playwright Chromium.
 
+## P08-21 — Run deterministic release gates
 
+Quoted requirement: isolate repeatable CPU and local checks from
+credentialed stack verification so failures are attributable and the
+weak-model run remains bounded.
+
+### Acceptance checks
+
+- Production executor test binds
+  `create_model_gateway(mock_model_mode=True)` and maps generate/verify
+  node output. An SSE fixture that injects `token_delta` events is
+  insufficient.
+- Record command, exit code, duration, and test count for every listed
+  gate.
+- Do not run the real OpenAI provider.
+- Do not claim production-like verification.
+
+### Changed paths
+
+- Production executor proof:
+  `tests/unit/test_query_graph_runtime.py`
+  (`test_bound_mock_gateway_drives_sse_without_token_injection`)
+- Windows table sandbox start:
+  `packages/core/src/smart_rag_core/tables/limits.py`
+  (`TABLE_WORKER_WINDOWS_STARTUP_SECONDS = 7.0`),
+  `executor.py`, `sandbox_worker.py` (DuckDB parquet load),
+  `tables/__init__.py` (lazy exports)
+- Windows walk isolation:
+  `tests/contract/docstring_scanner.py`,
+  `tests/contract/boundary_scanner.py`,
+  `tests/unit/test_collect_runtime_shared_libs.py`
+  (skip `node_modules` / undici junctions)
+- Environment-boundary reads via `get_process_environ` in agents,
+  parser launcher, and hybrid/BM25 release helpers
+- Migrations allowlist:
+  `scripts/ci/check_migrations.py` adds
+  `20260824130000_query_run_messages_runtime_v1.sql` and
+  `20260824140000_remove_mfa_aal2_enforcement_v1.sql`
+- Frontend build: Suspense around `useSearchParams` on
+  `documents/page.tsx` and `tables/page.tsx`
+- Playwright local reuse of an existing `:3010` Next process when `CI`
+  is unset; Auth skip link `data-action-id="shell.skip"`;
+  live sign-in uses `getByRole("textbox", { name: "Password" })`
+- Docs lint and Mermaid quote/reserved-id fixes under `docs/`
+- Nested helper docstrings required by the contract scanner
+
+### Authorization / failure / idempotency / fallback
+
+- `test_bound_mock_gateway_drives_sse_without_token_injection` constructs
+  `QueryGraphDeps.model_gateway` from `create_model_gateway` with
+  `mock_model_mode=True`, runs `generate_answer_node` and
+  `verify_answer_node`, then maps real chunk output through
+  `QuerySseMapper`. Token events are not injected by the test fixture.
+- Unbound Hybrid stays `insufficient_evidence`. Unbound gateway with
+  Hybrid stays `verified_partial` / `model_gateway_unbound`.
+- Table `statement_deadline` is still 3.0s on Linux. Windows only adds
+  process-start allowance; the two structured-table unit tests passed
+  in the recorded unit tier and in an isolated file run (6429 ms).
+- Local Playwright reuses `:3010` only when `CI` is unset so a leftover
+  developer-console Next process does not fail the frontend tier. CI
+  still starts a fresh server.
+
+### Verification
+
+Host: Windows PowerShell, repo root, `.\.venv\Scripts\python.exe`.
+`MOCK_MODEL_MODE=true` for unit and contract. No real OpenAI calls.
+
+| Gate | Command | Exit | Duration (ms) | Counts |
+| --- | --- | --- | --- | --- |
+| format | `.\.venv\Scripts\python.exe scripts/check.py --tier format` | 0 | 642 | 778 files already formatted |
+| lint | `.\.venv\Scripts\python.exe scripts/check.py --tier lint` | 0 | 643 | Ruff all checks passed |
+| types | `.\.venv\Scripts\python.exe scripts/check.py --tier types` | 1 | 35926 | Pyright ratchet 0 to 340 (+340). Documented pre-existing deviation. Second pyright command did not run after ratchet fail. |
+| unit | `$env:MOCK_MODEL_MODE='true'; .\.venv\Scripts\python.exe scripts/check.py --tier unit` | 0 | 44444 | 1038 passed, 3 skipped, 7 warnings. Isolated `test_structured_table.py` 6429 ms, exit 0. |
+| contract | `$env:MOCK_MODEL_MODE='true'; .\.venv\Scripts\python.exe scripts/check.py --tier contract` | 1 | 590769 | 8 failed, 415 passed, 21 skipped, 7 warnings. Live stack failures, not CPU fixtures. |
+| docs | `.\.venv\Scripts\python.exe scripts/check.py --tier docs` | 0 | 313491 | markdownlint 0 issues in 186 files; Mermaid and links OK; action inventory verified |
+| frontend | `.\.venv\Scripts\python.exe scripts/check.py --tier frontend` | 1 | 90402 | ESLint 0 errors; typegen OK; `tsc --noEmit` OK; Vitest 39 files / 260 passed; `next build` 20 routes. Playwright then failed because `:3010` was already bound (`reuseExistingServer` was false). |
+| frontend Playwright retry | `pnpm --filter smart-rag-frontend exec playwright test` with `CI` unset | 1 | 25935 | 28 passed, 7 failed of 35. Signed-in and visual journeys remain P08-22. |
+| OpenAPI | `.\.venv\Scripts\python.exe scripts/ci/check_openapi.py` | 0 | 3334 | snapshot matches |
+| migrations | `.\.venv\Scripts\python.exe scripts/ci/check_migrations.py` | 0 | 163 | 63 reviewed files after allowlisting the two P08-09/11 migrations |
+| git diff --check | `git diff --check` | 0 | 155 | CRLF warnings only; no conflict markers |
+| secret scan | `docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f detect --source=/repo --config=/repo/.gitleaks.toml --no-banner --redact` | 1 | 1160247 | 134 commits, ~158.66 MB in 19m19s. 7 `generic-api-key` findings. Values not printed. |
+
+Contract failures (live Postgres/API, hand off to P08-22):
+
+- `tests/contract/test_bm25_reconcile.py::test_reconcile_upsert_verify_fail_does_not_complete_outbox`
+- `tests/contract/test_hybrid_fusion.py::test_live_bm25_recheck_drops_restricted_before_fusion`
+- `tests/contract/test_hybrid_retrieval.py::test_bm25_typed_query_and_injection`
+- `tests/contract/test_query_run_admission.py::test_over_budget_and_concurrency_cap_reject_without_reservation`
+- `tests/contract/test_rls_matrix.py::test_runtime_roles_are_non_privileged_and_schema_isolated`
+- `tests/contract/test_schema_reset.py::test_schema_fingerprint_covers_reset_determinism_contract`
+- `tests/contract/test_thin_developer_ui_live.py::test_upload_enabled_aal1_can_reserve_without_mfa`
+- `tests/contract/test_thin_developer_ui_live.py::test_live_public_ready_omits_named_dependencies`
+
+Playwright failures after the locator and skip-link fixes (not claimed as
+production-like):
+
+- visual `login-desktop` pixel ratio 0.04 greater than 0.03; authenticated
+  route snapshots are absent on this host
+- signed-in mobile menu, usage 403 copy, Ask heading strict mode, Ask
+  unmapped-action audit, compact brand visibility
+
+### Unverified
+
+- Full-repo Pyright remains red (340 errors vs baseline 0 recorded
+  2026-08-16 on 417 files). Phase 5 already records this as a standing
+  types-tier deviation. This packet did not treat the 340 as a new
+  overhaul regression and did not raise the baseline.
+- Eight live contract tests failed against the partial local stack. The
+  database was not reset or migrated in this packet.
+- Playwright Chromium signed-in and visual journeys failed. This is not
+  production-like stack, role, or real-answer proof.
+- Real OpenAI was not invoked.
+- Secret scan exit 1 with 7 `generic-api-key` hits, all in historical
+  commits: two inert `sk-canarysecretFORBID` unit canaries (same family
+  as the existing LangSmith allowlist; paths now allowlisted), one empty
+  example env key name, one Phase 10 capability token name, and three
+  Phase 9 image-digest JSON lines. No live provider values were printed.
+  A follow-up redacted scan after allowlist edits was not re-run (19 min
+  Windows bind-mount). Do not treat the repository as secret-clean.
+
+### Deviations
+
+- Types tier exit 1 is an approved documented pre-existing deviation,
+  not a P08-21 waiver of `FAST_TIERS` membership or of the zero
+  baseline file.
+- Contract and frontend Playwright exits are recorded as failed, not
+  skipped. They belong to P08-22 credentialed/visual verification.
+- `TABLE_WORKER_WINDOWS_STARTUP_SECONDS` is 7.0. The Linux 3.0s SQL
+  bound is unchanged.
+- Local Playwright `reuseExistingServer` is `!process.env.CI`.
+- Secret scan exit 1 is recorded, not waived. Two inert canary paths were
+  added to `.gitleaks.toml`. The other five hits are historical
+  example/digest/name matches. The 19-minute scan was not repeated.
+
+### Rollback
+
+Revert this commit. Restoring token-injecting SSE fixtures as the
+production-executor proof, or removing the Windows table start
+allowance without a replacement, would break the P08-21 attribution
+split.
+
+### Handoff
+
+P08-21 deterministic CPU and local static gates are recorded. Wrapper
+item 21 may be checked. Item 7 stays unchecked. Items 1-6 stay checked.
+P08-22 owns live contract repair, signed-in Playwright, visual
+baselines, and one bounded real-provider answer. Do not claim
+production-like verification from this packet.
