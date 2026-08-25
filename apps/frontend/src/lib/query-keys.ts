@@ -91,7 +91,7 @@ export function sessionQueryKeys(accessToken: string | null) {
       ["document", scope, documentId] as const,
     tables: ["tables", scope] as const,
     graphSearch: (query: string) => ["graph-search", scope, query] as const,
-    tools: ["tools", scope] as const,
+    tools: (query = "") => ["tools", scope, query] as const,
     entityRules: ["entity-rules", scope] as const,
     usageCompany: ["usage-company", scope] as const,
     consoleReady: ["console-ready", scope] as const,

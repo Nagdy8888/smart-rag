@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "packet": "P08-14",
-  "status": "shell-routes",
+  "packet": "P08-19",
+  "status": "admin-workspace",
   "generated_at": "2026-08-24",
-  "notes": "P08-14 streamlines console IA: Ask/Documents/Tables/Graph, optional Admin, Account menu, redirects from /team|/tools|/curation|/usage|/profile, and production 404 for /review-fixtures and /unavailable/*.",
+  "notes": "P08-19 consolidates Admin tabs team/tools/curation/usage with real mutations, Account four /me fields, redirects from /team|/tools|/curation|/usage|/profile, and no bootstrap/budget/audit/profile-editor chrome.",
   "actions": [
     {
       "action_id": "auth.sign_in",
@@ -465,7 +465,7 @@
       "failure_state": "403/404",
       "idempotency": "subject id",
       "disposition": "keep",
-      "test_id": "pending-P08-19"
+      "test_id": "administration-surfaces.test.tsx"
     },
     {
       "action_id": "gap.unavailable",

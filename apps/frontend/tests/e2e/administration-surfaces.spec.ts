@@ -20,7 +20,7 @@ test("authenticated chrome includes administration nav links", async ({
 test("unauthenticated administration routes redirect to login", async ({
   page,
 }) => {
-  for (const path of ["/team", "/tools", "/usage", "/profile", "/curation"]) {
+  for (const path of ["/team", "/tools", "/usage", "/profile", "/curation", "/admin"]) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/login/);
   }
@@ -39,7 +39,7 @@ test("stubbed company usage 403 stays forbidden copy when signed in", async ({
     });
   });
   await page.goto("/usage");
-  await expect(page.getByTestId("budget-editor-unavailable")).toBeVisible();
+  await expect(page.getByText("You don’t have access.")).toBeVisible();
   await expect(page.locator("input[type='range']")).toHaveCount(0);
-  await expect(page.getByTestId("audit-unavailable")).toBeVisible();
+  await expect(page.getByTestId("audit-unavailable")).toHaveCount(0);
 });

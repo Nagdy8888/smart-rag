@@ -1754,3 +1754,96 @@ Revert this commit. Restore `apps/frontend/src/components/graph-explorer.tsx` on
 ### Handoff
 
 P08-18 Graph is complete. P08-19 may consolidate Admin without changing Graph contracts.
+
+## P08-19 — Consolidate Admin and supported Account operations
+
+Quoted requirement: replace four top-level management routes and dead settings
+panels with one compact role-aware admin workspace after the final
+single-factor model.
+
+### Acceptance checks
+
+- `/admin` tabs are Team & access, Tools, Curation, and Usage. Tabs update
+  `?tab=` and remain keyboard-operable.
+- Owner/admin invite, offboard, tool enable/permissions, glossary, and
+  entity-rule mutations run without MFA/AAL2 copy.
+- Member/viewer never see Admin in nav. Direct `/admin` confirms with
+  `GET /admin/graph/entity-rules` and shows “You don’t have access.” on 403.
+- Stale entity-rule PATCH `row_version` shows recoverable 409 and Reload rule.
+- `listTools` URL-encodes `q`. Ordinary Tools UI has no seed form.
+- Usage shows caller/company totals only. No budget slider, audit panel, or
+  `*-unavailable` GAP chrome.
+- Account renders four `/me` fields. No profile editor, locale editor, or
+  company-settings save.
+- Hostile invitation email remains an input text value, not HTML.
+
+### Changed paths
+
+- Moved once: `admin-workspace.tsx` → `apps/frontend/src/components/admin/admin-app.tsx`;
+  `team-app.tsx` → `admin/team-access-panel.tsx`; `tools-app.tsx` →
+  `admin/tools-panel.tsx`; `curation-app.tsx` → `admin/curation-panel.tsx`;
+  `usage-app.tsx` → `admin/usage-panel.tsx`; `profile-app.tsx` →
+  `admin/account-panel.tsx`
+- `apps/frontend/src/app/(console)/admin/page.tsx`, `account/page.tsx`
+- `apps/frontend/src/lib/api.ts`, `api.test.ts`, `types.ts`, `query-keys.ts`,
+  `admin-bodies.ts`
+- Tests: `administration-surfaces.test.tsx`,
+  `apps/frontend/tests/e2e/administration-surfaces.spec.ts`
+- Docs: `ADMINISTRATION.md`, `PHASE8_JOURNEY_MATRIX.md`, `API_UI_MAPPING.md`,
+  `STITCH_BRIEF.md`, `STITCH_STATES.md`, `admin-and-auth-screens.md`,
+  `action-inventory.json`, `docs/README.md`
+
+### Authorization / failure / fallback / idempotency
+
+- Admin gate is a real 403 from `listEntityRules`, not client-only hiding.
+- `createInvitation` / `offboardUser` / `enableTool` remain callable; FastAPI
+  still 403s forged roles. Offboard posts Bearer only (no MFA step).
+- `patchEntityRule` classifies 409 `stale_row_version`. UI offers Reload rule.
+- Tool search uses `encodeURIComponent` on `q`.
+- Unsupported bootstrap, budget, audit, profile-editor, company-settings, and
+  member-directory chrome are omitted, not permanent-disabled Unavailable
+  panels.
+
+### Verification
+
+```text
+npx vitest run src/components/administration-surfaces.test.tsx src/lib/api.test.ts src/lib/admin-bodies.test.ts src/lib/shell-navigation.test.ts
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/admin "src/app/(console)/admin/page.tsx" "src/app/(console)/account/page.tsx" src/lib/api.ts src/lib/query-keys.ts src/lib/types.ts src/lib/admin-bodies.ts src/components/administration-surfaces.test.tsx src/lib/api.test.ts
+```
+
+Results:
+
+- Targeted Admin Vitest: 4 files, 83 passed (12 administration-surfaces).
+- Full frontend Vitest: 39 files, 260 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on Admin/API files: 0 errors.
+
+### Unverified
+
+- Playwright Admin snapshots and live owner mutations wait for P08-21/22.
+- Keyboard Home/End on Admin tabs is implemented; a dedicated keydown case
+  is not asserted beyond URL tab clicks.
+
+### Deviations
+
+- Admin access is confirmed with `GET /admin/graph/entity-rules` because that
+  list is already owner/admin-only. Members hitting `/usage` or `/tools`
+  bookmarks redirect into `/admin` and receive the same 403 ErrorState.
+- `GET /me` may still emit deprecated `mfa_enrolled=false`. Account does not
+  render it.
+- `POST /admin/tools` seed remains an API helper; the Tools tab has no seed
+  form.
+
+### Rollback
+
+Revert this commit. Restore unscoped `*-app.tsx` files only if a later packet
+proves those paths are still required.
+
+### Handoff
+
+P08-19 Admin is complete. P08-20 may enforce action-inventory, accessibility,
+CSP, and documentation integrity without restoring MFA, bootstrap, budget,
+audit, or seed chrome.
+

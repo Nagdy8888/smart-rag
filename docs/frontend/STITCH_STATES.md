@@ -2,7 +2,7 @@
 title: Visible UI state matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: design, frontend, reviewers
 packet: P07-03
 ---
@@ -84,8 +84,8 @@ challenge. Those failures are Auth-provider generic copy only.
 | Invite forbidden | 403 | You cannot invite | none |
 | Accept loading | POST accept | Accepting | none |
 | Accept success | invitation_id | Continue to chat | none |
-| Offboard | AAL2 owner/admin | irreversible | POST offboard |
-| Member directory | no list API | No member directory API | GAP noted in brief |
+| Offboard | owner/admin Bearer | irreversible; no MFA | POST offboard |
+| Member directory | no list API | omitted; no directory chrome | identify by user_id |
 | Viewer | GET /me role viewer | hide invite/offboard (convenience) | server still denies |
 
 ## Chat and diagnostics
@@ -211,10 +211,10 @@ is read-only (GAP-07-01).
 | --- | --- | --- |
 | Usage me | GET /usage/me | cost_usd, tokens, rows |
 | Usage company | GET /usage/company or 403 | owner/admin only |
-| Budget editor | none | Unavailable GAP-07-11 |
-| Audit | none | Unavailable GAP-07-12 |
-| Profile | GET /me | five fields only |
-| Company settings | none | Unavailable GAP-07-13 |
+| Budget editor | none | omitted; 402 classified only |
+| Audit | none | omitted; no panel |
+| Account | GET /me | four fields only |
+| Company settings | none | omitted; no save |
 
 ## Negative scenarios (must not look like success)
 

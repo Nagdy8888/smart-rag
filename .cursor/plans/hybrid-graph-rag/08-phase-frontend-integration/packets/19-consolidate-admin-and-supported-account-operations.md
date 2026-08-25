@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 19
-status: pending
+status: complete
 title: "Consolidate Admin and supported Account operations"
 requirement_ids: [P08-19]
 ---

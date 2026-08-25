@@ -21,6 +21,7 @@ import type {
   EntityRuleMutationResponse,
   EntityRuleSource,
   EntityRuleStatus,
+  EntityRuleSuggestRequest,
   EntityRuleUpsertRequest,
   FeedbackTag,
   FinalizeUploadHttpRequest,
@@ -51,6 +52,7 @@ import type {
 } from "./types";
 import {
   buildEntityRuleConcurrencyBody,
+  buildEntityRuleSuggestBody,
   buildEntityRuleUpsertBody,
   buildGlossaryImportBody,
   buildInvitationCreateBody,
@@ -2039,6 +2041,64 @@ export async function revokeEntityRule(
       body: JSON.stringify(buildEntityRuleConcurrencyBody(rowVersion)),
     },
   );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseEntityRuleMutation(body);
+}
+
+/**
+ * PATCH one entity rule including `row_version`.
+ *
+ * @param auth - Access token.
+ * @param ruleId - Rule UUID.
+ * @param input - Upsert fields plus concurrency token.
+ * @param fetchImpl - Injected fetch.
+ * @returns Mutation identifiers.
+ * @throws Error `stale_row_version` on 409.
+ */
+export async function patchEntityRule(
+  auth: ApiAuth,
+  ruleId: string,
+  input: EntityRuleUpsertRequest & Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EntityRuleMutationResponse> {
+  const payload = buildEntityRuleUpsertBody(input);
+  const response = await fetchImpl(
+    apiUrl(`/admin/graph/entity-rules/${ruleId}`),
+    {
+      method: "PATCH",
+      headers: adminMutationHeaders(auth),
+      body: JSON.stringify(payload),
+    },
+  );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseEntityRuleMutation(body);
+}
+
+/**
+ * Store an inactive suggestion. Never auto-approves.
+ *
+ * @param auth - Access token.
+ * @param input - Suggestion payload.
+ * @param fetchImpl - Injected fetch.
+ * @returns Mutation identifiers with `invalidated=false` on success.
+ */
+export async function suggestEntityRule(
+  auth: ApiAuth,
+  input: EntityRuleSuggestRequest & Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EntityRuleMutationResponse> {
+  const payload = buildEntityRuleSuggestBody(input);
+  const response = await fetchImpl(apiUrl("/admin/graph/entity-rules/suggestions"), {
+    method: "POST",
+    headers: adminMutationHeaders(auth),
+    body: JSON.stringify(payload),
+  });
   const body = await readJsonObject(response);
   if (!response.ok) {
     throwClassifiedAdminError(response.status, body, response.headers);

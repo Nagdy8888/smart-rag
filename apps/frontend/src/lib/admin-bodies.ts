@@ -16,6 +16,7 @@ import {
   type EntityRuleConcurrencyRequest,
   type EntityRuleSource,
   type EntityRuleStatus,
+  type EntityRuleSuggestRequest,
   type EntityRuleUpsertRequest,
   type GlossaryAliasRequest,
   type GlossaryEntryRequest,
@@ -267,6 +268,48 @@ export function buildEntityRuleUpsertBody(
   }
   if (typeof input.row_version === "number") {
     body.row_version = input.row_version;
+  }
+  return body;
+}
+
+/**
+ * Build a suggestion body. Status and row_version are omitted.
+ *
+ * @param input - Suggestion form. Extra keys are dropped.
+ * @returns Suggestion POST body with source default `feedback`.
+ */
+export function buildEntityRuleSuggestBody(
+  input: EntityRuleSuggestRequest & Record<string, unknown>,
+): EntityRuleSuggestRequest {
+  const upsert = buildEntityRuleUpsertBody({
+    ...input,
+    source: input.source ?? "feedback",
+    status: "suggested",
+  });
+  const body: EntityRuleSuggestRequest = {
+    entity_type: upsert.entity_type,
+    canonical_name: upsert.canonical_name,
+    aliases: upsert.aliases,
+    do_not_merge: upsert.do_not_merge,
+    source: upsert.source === "admin" ? "feedback" : upsert.source,
+  };
+  if (upsert.display_label) {
+    body.display_label = upsert.display_label;
+  }
+  if (upsert.languages) {
+    body.languages = upsert.languages;
+  }
+  if (upsert.alias_scope) {
+    body.alias_scope = upsert.alias_scope;
+  }
+  if (upsert.relation_label_policy) {
+    body.relation_label_policy = upsert.relation_label_policy;
+  }
+  if (typeof upsert.reason === "string") {
+    body.reason = upsert.reason;
+  }
+  if (typeof upsert.confidence === "number") {
+    body.confidence = upsert.confidence;
   }
   return body;
 }

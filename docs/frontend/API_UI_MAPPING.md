@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -159,7 +159,7 @@ ParadeDB `down` on ready is Hybrid degrade, not BM25-snippet success.
 
 | Method | Path | Fields | Authz |
 | --- | --- | --- | --- |
-| GET | `/me` | `user_id`, `role`, `authorization_version`, `upload_enabled`, `mfa_enrolled` | any active member |
+| GET | `/me` | `user_id`, `role`, `authorization_version`, `upload_enabled`; deprecated `mfa_enrolled` is always false and unused | any active member |
 | POST | `/admin/invitations` | req `email`, `role`, `upload_enabled`; resp `invitation_id`, `email`, `role`, `upload_enabled`, `expires_at` (token by mail only; `APP_ENV=test` may set `X-Test-Invitation-Token`) | owner/admin; only owner may invite owner |
 | POST | `/invitations/accept` | req `token`; resp `invitation_id` | authenticated; email from JWT |
 | POST | `/admin/users/{user_id}/offboard` | resp `request_id`, `subject_user_id`, `completed_at` | owner/admin |
@@ -215,8 +215,8 @@ Feedback tags (byte-for-byte): `chunk/cleaning loss`, `profile field wrong`,
 | GET | `/graph/entities/search` | `q`, `limit` ≤25; hits `object_id`, `object_type`, `chunk_id`, `document_id`, `version_id`, `support` |
 | GET | `/tables` | manifests without storage paths; UI preselects `?tableId=` / `?documentId=` only when listed |
 | POST | `/tables/analyze` | body `plan` (`TableQueryPlan` extra=forbid); resp `table_id`, `version_id`, `document_id`, `rows`, `source_ranges`. No export API. |
-| GET | `/tools` | role-filtered cards; unauthorized names omitted |
-| POST | `/admin/tools` | owner/admin seed |
+| GET | `/tools` | role-filtered cards; unauthorized names omitted; `q` is URL-encoded |
+| POST | `/admin/tools` | owner/admin seed API only; ordinary `/admin` Tools tab has no seed form |
 | POST | `/admin/tools/{tool_key}/enable` | owner/admin |
 | POST | `/admin/tools/{tool_key}/permissions` | owner/admin; executor still rechecks live role |
 | POST | `/admin/glossary/imports` | owner/admin |
@@ -371,12 +371,12 @@ where listed.
 
 | Screen | Control | Contract | Authz | Idempotency |
 | --- | --- | --- | --- | --- |
-| Shell | role, user_id, upload, mfa | `GET /me` | live profile | n/a |
+| Shell | role, user_id, upload | `GET /me` | live profile | n/a |
 | E Invite create | email, role, upload_enabled | `POST /admin/invitations` | owner/admin | AUTH_ADJACENT |
 | E Invite token | delivered by mail | not in JSON | owner/admin | n/a |
 | E Accept | token | `POST /invitations/accept` | JWT email, not body email | AUTH_ADJACENT |
-| E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin | AUTH_ADJACENT |
-| E Owner setup | bootstrap | GAP-07-08 | none | Unavailable |
+| E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin; no MFA | AUTH_ADJACENT |
+| E Owner setup | bootstrap | GAP-07-08 | none | omitted; no chrome |
 | E Member directory | list | none | none | no HTTP; do not mock |
 
 ### Chat, SSE, citations, feedback
@@ -436,16 +436,16 @@ Unknown additive SSE types: log and ignore. One terminal among
 | J ETA | — | GAP-07-10 | — | handoff counts only |
 | K Analyze | plan | `POST /tables/analyze` | ACL | `TableQueryPlan` extra=forbid |
 | K Export | — | optional tool after disclosure | live role recheck | no button otherwise |
-| L Catalog | cards | `GET /tools` | role-filtered | omit unauthorized names |
+| L Catalog | cards, `q` | `GET /tools?q=` | role-filtered | omit unauthorized names; no seed form |
 | L Enable | active | `POST /admin/tools/{key}/enable` | owner/admin | allow-listed keys |
 | L Permissions | role, permission | `POST /admin/tools/{key}/permissions` | owner/admin | executor rechecks |
 | L Glossary | import/approve/rollback | `/admin/glossary/imports*` | owner/admin | `idempotency_key` |
-| L Entity rules | CRUD/suggest/approve/revoke | `/admin/graph/entity-rules*` | owner/admin | `row_version` |
-| M Usage company | totals | `GET /usage/company` | owner/admin | 403 else |
-| M Budget editor | — | GAP-07-11 | — | 402 only |
-| M Audit | — | GAP-07-12 | — | Unavailable |
-| M Profile editor | name/locale | GAP-07-19 | — | `/me` five fields only |
-| M Company settings | — | GAP-07-13 | — | Unavailable |
+| L Entity rules | CRUD/suggest/approve/revoke/PATCH | `/admin/graph/entity-rules*` | owner/admin | `row_version`; 409 Reload rule |
+| M Usage me/company | totals | `GET /usage/me`, `GET /usage/company` | company 403 else | two cards; no charts |
+| M Budget editor | — | GAP-07-11 | — | omitted; 402 classified only |
+| M Audit | — | GAP-07-12 | — | omitted; no panel |
+| M Account | four `/me` fields | `GET /me` | any member | no name/locale editor |
+| M Company settings | — | GAP-07-13 | — | omitted; no save |
 
 ### Negative mapping tests
 

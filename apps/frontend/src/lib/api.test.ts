@@ -21,6 +21,7 @@ import {
   nextDocumentCursor,
   listCitations,
   listTools,
+  patchEntityRule,
   offboardUser,
   paidMutationHeaders,
   reserveUpload,
@@ -946,6 +947,32 @@ describe("administration clients", () => {
     expect(cards.map((card) => card.tool_key)).toEqual(["export_csv"]);
     expect(JSON.stringify(cards)).not.toContain("admin_secret_tool");
     expect(JSON.stringify(cards)).not.toContain("REDACTED");
+  });
+
+  it("listTools URL-encodes q", async () => {
+    let url = "";
+    const fetchImpl: typeof fetch = async (input) => {
+      url = String(input);
+      return new Response("[]", { status: 200 });
+    };
+    await listTools({ accessToken: "jwt-token" }, "a b/c", fetchImpl);
+    expect(url).toContain("q=a%20b%2Fc");
+  });
+
+  it("patchEntityRule classifies 409 stale_row_version", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "stale_row_version" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      patchEntityRule(
+        { accessToken: "jwt-token" },
+        "rule-1",
+        { entity_type: "ORG", canonical_name: "Acme", row_version: 1 },
+        fetchImpl,
+      ),
+    ).rejects.toThrow("stale_row_version");
   });
 
   it("approveEntityRule posts { row_version } only", async () => {

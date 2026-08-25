@@ -1,13 +1,13 @@
 /**
- * Supported Account destination. Reuses the existing read-only `/me` profile app.
+ * Supported Account destination. Read-only `/me` fields.
  */
-import { ProfileApp } from "../../../components/profile-app";
+import { AccountPanel } from "../../../components/admin/account-panel";
 
 /**
- * Render Account details. No MFA, name, or locale editor.
+ * Render Account details. No name or locale editor.
  *
- * @returns Profile surface.
+ * @returns Account surface.
  */
 export default function AccountPage() {
-  return <ProfileApp />;
+  return <AccountPanel />;
 }

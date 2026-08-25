@@ -641,3 +641,18 @@ export type EntityRuleUpsertRequest = {
   status?: EntityRuleStatus;
   row_version?: number | null;
 };
+
+/** `POST /admin/graph/entity-rules/suggestions`. Never auto-approves. */
+export type EntityRuleSuggestRequest = {
+  entity_type: string;
+  canonical_name: string;
+  aliases?: string[];
+  do_not_merge?: string[];
+  display_label?: string | null;
+  languages?: string[];
+  alias_scope?: "company" | "synthetic_eval";
+  relation_label_policy?: "directed" | "symmetric";
+  reason?: string;
+  source?: EntityRuleSource;
+  confidence?: number | null;
+};

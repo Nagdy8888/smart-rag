@@ -229,7 +229,7 @@ Screens: (1) MFA required gate matching FastAPI 403 detail "MFA required" for ow
 ### E. Invitation accept / owner setup / team
 
 ```text
-Invitation accept: authenticated user pastes token into POST /invitations/accept; email comes from the session, not the form. Create invitation (owner/admin): email, role owner/admin/member/viewer, upload_enabled checkbox; token is delivered by mail only (not in JSON). Offboard: owner/admin AAL2, user_id, irreversible copy. Owner bootstrap: Unavailable GAP-07-08. Do not list other members unless an API exists — there is no member-list HTTP route, so team admin shows invitations + offboard by user id only, with empty-state copy "No member directory API; identify users from GET /me and audit when available".
+Invitation accept: authenticated user pastes token into POST /invitations/accept; email comes from the session, not the form. Create invitation (owner/admin): email, role owner/admin/member/viewer, upload_enabled checkbox; token is delivered by mail only (not in JSON). Offboard: owner/admin single-factor, user_id, irreversible copy. Owner bootstrap is omitted (GAP-07-08, no HTTP). Do not list other members — there is no member-list HTTP route, so Team & access shows invite plus offboard by user id only, with no directory or Unavailable chrome.
 ```
 
 ### F. Main chat (Auto)
@@ -271,13 +271,13 @@ List GET /tables. Analyze POST /tables/analyze with a TableQueryPlan. Show deter
 ### L. Tools, glossary, entity rules
 
 ```text
-Tools catalog GET /tools cards (tool_key, version_label, short_name, purpose, required_role, risk_class, active). Admin enable/permissions for owner/admin. Glossary import/approve/rollback. Entity rules list/upsert/suggest/approve/revoke. Members see catalog only. Unauthorized tool names omitted, not redacted with fake titles.
+Tools live on `/admin?tab=tools`. Catalog GET /tools?q= cards (tool_key, version_label, short_name, purpose, required_role, risk_class, active). Enable/permissions for owner/admin. No seed form. Glossary import/approve/rollback. Entity rules list/upsert/PATCH/suggest/approve/revoke with row_version 409 Reload rule. Member/viewer Admin is hidden; APIs still 403. Unauthorized tool names omitted, not redacted with fake titles.
 ```
 
 ### M. Usage, audit, profile, company settings
 
 ```text
-Usage: GET /usage/me for everyone; GET /usage/company for owner/admin. No budget editor (GAP-07-11); 402 is the budget state. Audit history: Unavailable GAP-07-12. Profile: GET /me fields only (user_id, role, authorization_version, upload_enabled, mfa_enrolled). Company settings: Unavailable GAP-07-13.
+Usage lives on `/admin?tab=usage`: GET /usage/me; GET /usage/company for owner/admin. Two metric cards, tokens and USD only. Budget editor and audit history are omitted (GAP-07-11/12), not Unavailable panels. 402 remains a classified API state. Account `/account`: GET /me four fields (user_id, role, authorization_version, upload_enabled). Company settings omitted (GAP-07-13).
 ```
 
 ## Responsive LTR/RTL frames

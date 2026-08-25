@@ -1,8 +1,8 @@
 /**
- * Consolidated Admin workspace. Bodies stay the existing Team/Tools/Curation/Usage apps.
+ * Consolidated Admin workspace.
  */
 import { Suspense } from "react";
-import { AdminWorkspace } from "../../../components/admin-workspace";
+import { AdminApp } from "../../../components/admin/admin-app";
 
 /**
  * Render Admin tabs. Authorization remains on FastAPI.
@@ -12,7 +12,7 @@ import { AdminWorkspace } from "../../../components/admin-workspace";
 export default function AdminPage() {
   return (
     <Suspense fallback={null}>
-      <AdminWorkspace />
+      <AdminApp />
     </Suspense>
   );
 }

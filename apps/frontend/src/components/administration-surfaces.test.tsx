@@ -1,25 +1,18 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
-import {
-  AUDIT_HISTORY_UNAVAILABLE,
-  BUDGET_EDITOR_UNAVAILABLE,
-  COMPANY_SETTINGS_UNAVAILABLE,
-  NO_MEMBER_DIRECTORY_COPY,
-  PROFILE_EDITOR_UNAVAILABLE,
-  RATE_LIMIT_COPY,
-  TEAM_OWNER_BOOTSTRAP_UNAVAILABLE,
-} from "../lib/admin-copy";
+import { RATE_LIMIT_COPY } from "../lib/admin-copy";
 import { SessionProvider } from "../lib/auth/session-provider";
-import { CurationApp } from "./curation-app";
-import { ProfileApp } from "./profile-app";
-import { TeamApp } from "./team-app";
-import { ToolsApp } from "./tools-app";
-import { UsageApp } from "./usage-app";
+import { AdminApp } from "./admin/admin-app";
+import { AccountPanel } from "./admin/account-panel";
+import { CurationPanel } from "./admin/curation-panel";
+import { TeamAccessPanel } from "./admin/team-access-panel";
+import { ToolsPanel } from "./admin/tools-panel";
+import { UsagePanel } from "./admin/usage-panel";
 
 const fetchMe = vi.fn();
 const createInvitation = vi.fn();
@@ -33,10 +26,18 @@ const loadConsoleReadiness = vi.fn();
 const fetchMeta = vi.fn();
 const approveEntityRule = vi.fn();
 const listEntityRules = vi.fn();
+const patchEntityRule = vi.fn();
+const suggestEntityRule = vi.fn();
+const routerReplace = vi.fn();
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/team",
-  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => "/admin",
+  useSearchParams: () => new URLSearchParams("tab=team"),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: routerReplace,
+    prefetch: vi.fn(),
+  }),
 }));
 
 vi.mock("next/link", () => ({
@@ -89,6 +90,8 @@ vi.mock("../lib/api", async () => {
     fetchUsageCompany: (...args: unknown[]) => fetchUsageCompany(...args),
     listEntityRules: (...args: unknown[]) => listEntityRules(...args),
     approveEntityRule: (...args: unknown[]) => approveEntityRule(...args),
+    patchEntityRule: (...args: unknown[]) => patchEntityRule(...args),
+    suggestEntityRule: (...args: unknown[]) => suggestEntityRule(...args),
   };
 });
 
@@ -97,6 +100,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  routerReplace.mockReset();
   fetchMeta.mockResolvedValue({
     api_version: "1",
     sse_schema_version: "1",
@@ -152,6 +156,15 @@ beforeEach(() => {
     rule_id: "rule-1",
     row_version: 2,
   });
+  patchEntityRule.mockResolvedValue({
+    rule_id: "rule-1",
+    row_version: 5,
+  });
+  suggestEntityRule.mockResolvedValue({
+    rule_id: "rule-s",
+    row_version: 1,
+    invalidated: false,
+  });
   createInvitation.mockResolvedValue({
     invitation_id: "inv-1",
     email: "<img src=x onerror=alert(1)>@evil.test",
@@ -184,7 +197,33 @@ function renderSurface(ui: ReactElement) {
   );
 }
 
-describe("TeamApp", () => {
+describe("AdminApp", () => {
+  it("shows a permission error after a real 403 for a member", async () => {
+    fetchMe.mockResolvedValue({
+      user_id: "u-member",
+      role: "member",
+      authorization_version: 1,
+      upload_enabled: true,
+    });
+    listEntityRules.mockRejectedValue(new Error("forbidden"));
+    renderSurface(<AdminApp />);
+    expect(await screen.findByText("You don’t have access.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send invitation" })).toBeNull();
+    expect(screen.queryByText(/bootstrap/i)).toBeNull();
+  });
+
+  it("lets an owner switch tabs through URL state", async () => {
+    renderSurface(<AdminApp />);
+    expect(await screen.findByRole("tab", { name: "Team & access" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Tools" }));
+    expect(routerReplace).toHaveBeenCalledWith("/admin?tab=tools");
+  });
+});
+
+describe("TeamAccessPanel", () => {
   it("hides invite and offboard for a viewer", async () => {
     fetchMe.mockResolvedValue({
       user_id: "u-viewer",
@@ -192,86 +231,127 @@ describe("TeamApp", () => {
       authorization_version: 1,
       upload_enabled: false,
     });
-    renderSurface(<TeamApp />);
-    expect(await screen.findByText(NO_MEMBER_DIRECTORY_COPY)).toBeInTheDocument();
+    renderSurface(<TeamAccessPanel />);
+    await waitFor(() => expect(fetchMe).toHaveBeenCalled());
     expect(screen.queryByTestId("invite-form")).toBeNull();
     expect(screen.queryByTestId("offboard-form")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Create invitation" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send invitation" })).toBeNull();
     expect(createInvitation).toBeDefined();
     expect(offboardUser).toBeDefined();
-    expect(screen.getByText(TEAM_OWNER_BOOTSTRAP_UNAVAILABLE)).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /unavailable GAP-07-08/i })).toBeNull();
+    expect(screen.queryByText(/bootstrap/i)).toBeNull();
+    expect(screen.queryByText(/member directory/i)).toBeNull();
   });
 
   it("does not render an invitation token and keeps hostile email as text", async () => {
-    renderSurface(<TeamApp />);
-    const create = await screen.findByRole("button", { name: "Create invitation" });
-    fireEvent.click(create);
+    renderSurface(<TeamAccessPanel />);
+    const email = await screen.findByLabelText("Email");
+    fireEvent.change(email, {
+      target: { value: "<img src=x onerror=alert(1)>@evil.test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send invitation" }));
     expect(await screen.findByTestId("invite-mail-only")).toHaveTextContent(
       "The invitation token is delivered by mail only",
     );
     expect(screen.queryByTestId("raw-token")).toBeNull();
     expect(screen.queryByText("once-secret")).toBeNull();
-    expect(
-      screen.getByText("<img src=x onerror=alert(1)>@evil.test"),
-    ).toBeInTheDocument();
+    expect(email).toHaveValue("<img src=x onerror=alert(1)>@evil.test");
     expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("offboards a known user id without MFA copy", async () => {
+    renderSurface(<TeamAccessPanel />);
+    const userId = await screen.findByLabelText("User ID");
+    fireEvent.change(userId, { target: { value: "u-2" } });
+    expect(userId).toHaveValue("u-2");
+    fireEvent.click(screen.getByRole("button", { name: "Review offboarding" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Offboard user" }));
+    expect(await screen.findByTestId("offboard-result")).toHaveTextContent("u-2");
+    expect(offboardUser).toHaveBeenCalledWith(
+      { accessToken: "jwt-token" },
+      "u-2",
+    );
+    expect(screen.queryByText(/MFA|AAL2|assurance/i)).toBeNull();
   });
 });
 
-describe("ToolsApp", () => {
-  it("hides enable for a member and still exports enableTool", async () => {
+describe("ToolsPanel", () => {
+  it("hides enable for a member, searches with q, and has no seed form", async () => {
     fetchMe.mockResolvedValue({
       user_id: "u-member",
       role: "member",
       authorization_version: 1,
       upload_enabled: true,
     });
-    renderSurface(<ToolsApp />);
+    renderSurface(<ToolsPanel />);
     expect(await screen.findByText("CSV export")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Disable" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Enable" })).toBeNull();
     expect(screen.queryByText("admin_secret_tool")).toBeNull();
+    expect(screen.queryByRole("button", { name: /seed/i })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Search tools"), {
+      target: { value: "csv export" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(listTools).toHaveBeenCalledWith({ accessToken: "jwt-token" }, "csv export");
     expect(enableTool).toBeDefined();
   });
 });
 
-describe("UsageApp GAP-07-11/12", () => {
+describe("UsagePanel", () => {
   it("shows token meters and no budget slider or fake audit events", async () => {
-    renderSurface(<UsageApp />);
+    renderSurface(<UsagePanel />);
     expect(await screen.findByText("1.25")).toBeInTheDocument();
     expect(screen.getByTestId("usage-meters")).toBeInTheDocument();
     expect(await screen.findByTestId("company-usage-meters")).toBeInTheDocument();
-    expect(screen.getByTestId("budget-editor-unavailable")).toHaveTextContent(
-      BUDGET_EDITOR_UNAVAILABLE,
-    );
-    expect(screen.getByTestId("audit-unavailable")).toHaveTextContent(
-      AUDIT_HISTORY_UNAVAILABLE,
-    );
+    expect(screen.queryByTestId("budget-editor-unavailable")).toBeNull();
+    expect(screen.queryByTestId("audit-unavailable")).toBeNull();
     expect(screen.queryByRole("slider")).toBeNull();
     expect(document.querySelector("input[type='range']")).toBeNull();
     expect(screen.queryByText("SECRET_PASSAGE")).toBeNull();
     expect(screen.queryByRole("table", { name: /audit/i })).toBeNull();
   });
-});
 
-describe("ProfileApp GAP-07-13/19", () => {
-  it("shows five /me fields and has no settings save", async () => {
-    renderSurface(<ProfileApp />);
-    expect(await screen.findByText("u-owner")).toBeInTheDocument();
-    expect(screen.getByText("owner")).toBeInTheDocument();
-    expect(screen.getByTestId("profile-editor-unavailable")).toHaveTextContent(
-      PROFILE_EDITOR_UNAVAILABLE,
-    );
-    expect(screen.getByTestId("company-settings-unavailable")).toHaveTextContent(
-      COMPANY_SETTINGS_UNAVAILABLE,
-    );
-    expect(screen.queryByRole("button", { name: /save/i })).toBeNull();
-    expect(screen.queryByLabelText(/locale/i)).toBeNull();
+  it("hides company meters for a member without audit chrome", async () => {
+    fetchMe.mockResolvedValue({
+      user_id: "u-member",
+      role: "member",
+      authorization_version: 1,
+      upload_enabled: true,
+    });
+    fetchUsageCompany.mockRejectedValue(new Error("forbidden"));
+    loadConsoleReadiness.mockResolvedValue({
+      status: "degraded",
+      query_ready: true,
+      detail: "ok",
+      rate_limit_degraded: true,
+      dependencies: [],
+    });
+    renderSurface(<UsagePanel />);
+    expect(await screen.findByTestId("usage-meters")).toBeInTheDocument();
+    expect(screen.queryByTestId("company-usage-meters")).toBeNull();
+    expect(screen.queryByTestId("audit-unavailable")).toBeNull();
+    expect(await screen.findByText(/Rate limiter is degraded/)).toBeInTheDocument();
+    expect(screen.getByText(RATE_LIMIT_COPY, { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText("SECRET_PASSAGE")).toBeNull();
+    expect(document.querySelector("input[type='range']")).toBeNull();
   });
 });
 
-describe("CurationApp", () => {
+describe("AccountPanel", () => {
+  it("shows /me fields and has no settings save", async () => {
+    renderSurface(<AccountPanel />);
+    expect(await screen.findByText("u-owner")).toBeInTheDocument();
+    expect(screen.getByText("owner")).toBeInTheDocument();
+    expect(screen.queryByTestId("profile-editor-unavailable")).toBeNull();
+    expect(screen.queryByTestId("company-settings-unavailable")).toBeNull();
+    expect(screen.queryByRole("button", { name: /save/i })).toBeNull();
+    expect(screen.queryByLabelText(/locale/i)).toBeNull();
+    expect(screen.queryByText(/mfa_enrolled/i)).toBeNull();
+  });
+});
+
+describe("CurationPanel", () => {
   it("hides glossary and entity-rule mutations for a viewer", async () => {
     fetchMe.mockResolvedValue({
       user_id: "u-viewer",
@@ -279,7 +359,7 @@ describe("CurationApp", () => {
       authorization_version: 1,
       upload_enabled: false,
     });
-    renderSurface(<CurationApp />);
+    renderSurface(<CurationPanel />);
     expect(await screen.findByText(/Curation mutations are hidden/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import glossary" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
@@ -300,9 +380,10 @@ describe("CurationApp", () => {
         },
       ],
     });
-    renderSurface(<CurationApp />);
-    const approve = await screen.findByRole("button", { name: "Approve" });
-    fireEvent.click(approve);
+    renderSurface(<CurationPanel />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Entity rules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rule actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Approve" }));
     expect(await screen.findByText(/row_version=2/)).toBeInTheDocument();
     expect(approveEntityRule).toHaveBeenCalledWith(
       { accessToken: "jwt-token" },
@@ -312,35 +393,28 @@ describe("CurationApp", () => {
     expect(screen.getByText("<script>x</script>")).toBeInTheDocument();
     expect(document.querySelector("script")).toBeNull();
   });
-});
 
-describe("UsageApp member 403 and rate degradation", () => {
-  it("hides company meters for a member and still shows GAP-07-12 without passages", async () => {
-    fetchMe.mockResolvedValue({
-      user_id: "u-member",
-      role: "member",
-      authorization_version: 1,
-      upload_enabled: true,
+  it("shows Reload rule after a stale PATCH", async () => {
+    listEntityRules.mockResolvedValue({
+      rules: [
+        {
+          id: "rule-1",
+          entity_type: "ORG",
+          canonical_name: "Acme",
+          aliases: ["co"],
+          do_not_merge: [],
+          status: "approved",
+          source: "admin",
+          row_version: 4,
+        },
+      ],
     });
-    fetchUsageCompany.mockRejectedValue(new Error("forbidden"));
-    loadConsoleReadiness.mockResolvedValue({
-      status: "degraded",
-      query_ready: true,
-      detail: "ok",
-      rate_limit_degraded: true,
-      dependencies: [],
-    });
-    renderSurface(<UsageApp />);
-    expect(await screen.findByTestId("usage-meters")).toBeInTheDocument();
-    expect(screen.queryByTestId("company-usage-meters")).toBeNull();
-    expect(screen.getByTestId("audit-unavailable")).toHaveTextContent(
-      AUDIT_HISTORY_UNAVAILABLE,
-    );
-    expect(
-      await screen.findByText(/Rate limiter is degraded/),
-    ).toBeInTheDocument();
-    expect(screen.getByText(RATE_LIMIT_COPY, { exact: false })).toBeInTheDocument();
-    expect(screen.queryByText("SECRET_PASSAGE")).toBeNull();
-    expect(document.querySelector("input[type='range']")).toBeNull();
+    patchEntityRule.mockRejectedValue(new Error("stale_row_version"));
+    renderSurface(<CurationPanel />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Entity rules" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rule actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save rule" }));
+    expect(await screen.findByRole("button", { name: "Reload rule" })).toBeInTheDocument();
   });
 });

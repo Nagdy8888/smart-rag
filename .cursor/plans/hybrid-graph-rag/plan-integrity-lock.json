@@ -24,7 +24,7 @@
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/04-map-ui-to-real-contracts.md": "20acbd402eeed315806c2ecb6b1cba98b156bca63f023da980761a7d5684a35b",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/05-review-accessibility-and-security.md": "5388e4ed6ecccf1e8a10d20501b8b373250226631fb7c6f82b2e5b2062965614",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/06-record-approval-or-fallback.md": "d75f570528bd5140481fb891a678cfa35a6b778eed2f683f5aaabd264cfeef59",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md": "b4ce6d5f8b0e902f49ef1d23de348203e29d9c62fc7b0c746edf2835ac8511eb",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md": "866b1ca5ab5e1972f392d3360f283d97bc46b1c4cac0b6abc7c11d926b12b5ee",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-shared-contracts.md": "1a8a6a4e6a49d9cd4d831d136c2d7bf44fc734cf5c50d18eaf42f84e04d7eba9",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md": "15da3601961bd90195458705d599eb113e5f0cd1b88d62e70c675b35ca4d1d46",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/01-integrate-approved-design-system.md": "03a92cd69bec4f616a94dc3f27d726b5350968f38e1a89a071dbc680038c3e7c",
@@ -45,7 +45,7 @@
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/16-rebuild-documents-as-one-complete-ingestion-workflow.md": "a56d983ee77e24d58859e19ef74a480999d657eaa041a94bbc41598323109333",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/17-rebuild-deterministic-tables.md": "a06436d15743ed3cc264f71cbeb14f07ba60a3f35af5246eccb9a95f52666aca",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/18-rebuild-bounded-graph-inspection.md": "941cb91ae8f7885a30a9218abe589d18000c36559696d9aaf5422347ceb78938",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/19-consolidate-admin-and-supported-account-operations.md": "116555792bd60c2054c35e15eaaf9243c063b40d4d393d9236b3fa483e30d7cc",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/19-consolidate-admin-and-supported-account-operations.md": "648ad6d88792ebe7441c2676cdca3d44ca09fb5945a4fda1ddf0bdb7d8eec5c9",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/20-enforce-action-accessibility-security-and-documentation-integrity.md": "4462b726161fd0a5bea73be87049abf50de77f1de517989167cd018664a037c8",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/21-run-deterministic-release-gates.md": "05290c5d30980814a056585804042a7618b929b31b21721e313063e9a3223dbe",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/22-run-production-like-stack-role-visual-and-real-answer-verification.md": "4c1cfa29e24895aa43c77b4e1ca56eeda5dc714b28d52fd8f94e14bddf5768dc",
@@ -101,6 +101,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-08-24T23:48:09.025143+00:00",
+  "generated_at": "2026-08-25T00:18:50.272955+00:00",
   "schema_version": 1
 }

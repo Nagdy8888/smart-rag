@@ -1,6 +1,15 @@
+---
+title: Admin and auth screen specification
+owner: engineering-lead
+status: draft
+last-reviewed: 2026-08-24
+audience: frontend, security
+packet: P08-19
+---
+
 # Admin and auth screens
 
-Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md). Do not reinterpret them.
+P08-19 ships this visual contract on `/login` family pages, `/admin` tabs, and `/account`. Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md). Do not reinterpret them.
 
 ### Auth component and page specification
 

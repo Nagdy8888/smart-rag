@@ -4,16 +4,15 @@ owner: engineering-lead
 status: draft
 last-reviewed: 2026-08-24
 audience: engineering, frontend, security
-packet: P08-04
+packet: P08-19
 ---
 
-# Administration surfaces (Phase 8 packet 4)
+# Administration surfaces (Phase 8 packet 19)
 
-Native Team, Tools, Curation, Usage, and Profile mapped to FastAPI
-contracts. Stitch frames 02/08/11/12/13 are unused as routes; frame 14 is a
-historical screenshot only, not the live `/usage` composition
-([VISUAL_MAP.md](./VISUAL_MAP.md)). This packet does not add extra frames as
-routes and does not create an `app/admin` folder.
+One role-aware `/admin` workspace with tabs Team & access, Tools, Curation,
+and Usage. Account is a separate `/account` page from `GET /me`. Bookmark
+routes `/team`, `/tools`, `/curation`, `/usage`, and `/profile` redirect.
+Stitch frames 02/08/11/12/13/14 are unused as product routes.
 
 Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) ·
@@ -21,11 +20,10 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [VISUAL_MAP.md](./VISUAL_MAP.md) ·
 [PHASE8_JOURNEY_MATRIX.md](./PHASE8_JOURNEY_MATRIX.md) ·
-[QUERY_BUDGETS.md](../agent/QUERY_BUDGETS.md) ·
+[admin-and-auth-screens.md](./admin-and-auth-screens.md) ·
 [OPTIONAL_TOOLS.md](../agent/OPTIONAL_TOOLS.md) ·
 [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) ·
 [ENTITY_RULES.md](../graph/ENTITY_RULES.md) ·
-[AUDIT_CHAIN.md](../security/AUDIT_CHAIN.md) ·
 [phase-08 evidence](../development/phase-08-frontend-integration-evidence.md) ·
 [docs index](../README.md)
 
@@ -33,16 +31,20 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 
 | Route | Surface | Contract |
 | --- | --- | --- |
-| `/admin?tab=team` | Invite create + offboard by `user_id`. No member directory. `/team` redirects here | `POST /admin/invitations`, `POST /admin/users/{user_id}/offboard`. Accept remains `/invitations/accept` |
-| `/admin?tab=tools` | Catalog for any member. Enable/permissions owner/admin convenience. `/tools` redirects here | `GET /tools`, `POST /admin/tools`, `POST /admin/tools/{tool_key}/enable` |
-| `/admin?tab=curation` | Glossary import/approve/rollback + entity rules. `/curation` redirects here | `/admin/glossary/imports*`, `/admin/graph/entity-rules*` |
-| `/admin?tab=usage` | Caller totals for all; company totals owner/admin. `/usage` redirects here | `GET /usage/me`, `GET /usage/company`. Totals only, no prompt text |
-| `/account` | Read-only `GET /me` fields. `/profile` redirects here | GAP-07-19 has no name/locale editor |
+| `/admin?tab=team` | Invite create + offboard by `user_id`. No member directory | `POST /admin/invitations`, `POST /admin/users/{user_id}/offboard`. Accept remains `/invitations/accept` |
+| `/admin?tab=tools` | Catalog search, enable/permissions, details drawer. No seed form | `GET /tools?q=`, `POST /admin/tools/{tool_key}/enable`, `POST /admin/tools/{tool_key}/permissions` |
+| `/admin?tab=curation` | Glossary import/approve/rollback + entity rules including PATCH and suggest | `/admin/glossary/imports*`, `/admin/graph/entity-rules*` |
+| `/admin?tab=usage` | Caller totals; company totals for owner/admin. Rate-degraded banner only when `rate_limit_degraded` | `GET /usage/me`, `GET /usage/company`. Totals only, no prompt text |
+| `/account` | Read-only four `/me` fields. `/profile` redirects here | `user_id`, `role`, `authorization_version`, `upload_enabled`. Sign out stays in the shell menu |
 
-Nav adds Team, Tools, Curation, Usage, and Profile as real `Link`s. Nav
-is not authorization. Viewer/member chrome hides invite, offboard, enable,
-and curation mutations; `createInvitation`, `offboardUser`, and
-`enableTool` still exist and FastAPI still returns 403.
+Nav shows **Admin** for owner/admin convenience and **Account** for every
+signed-in user. Nav is not authorization. Member/viewer never see Admin in
+nav. A direct `/admin` visit confirms with `GET /admin/graph/entity-rules`
+and renders ErrorState **You don’t have access.** on 403. Forged client
+roles do not add claims; FastAPI still 403s.
+
+`POST /admin/tools` seed remains an API helper for tests. Ordinary product
+UI has no seed form.
 
 ## Role matrix
 
@@ -57,78 +59,70 @@ flowchart TD
   ownerAdmin --> glossaryPost["POST /admin/glossary/imports"]
   ownerAdmin --> rulesGet["GET /admin/graph/entity-rules"]
   ownerAdmin --> usageCompany["GET /usage/company"]
-  memberViewer["member or viewer"] --> company403["GET /usage/company 403"]
+  memberViewer["member or viewer"] --> admin403["GET /admin/graph/entity-rules 403"]
+  memberViewer --> company403["GET /usage/company 403"]
   memberViewer --> mutate403["admin mutations 403"]
 ```
 
-UI hiding is convenience. Forged `role=owner` in client state does not add
-an Authorization role claim. Production never sends `X-Test-*`.
+UI hiding is convenience. Production never sends `X-Test-*`. Offboard uses
+ordinary owner/admin Bearer authorization. There is no MFA/AAL2 step.
 
-## Missing-frame decision (frame 14)
+## Unsupported actions (omitted, not Unavailable chrome)
 
-Frame 14 is not a second product route. `/usage` follows that dashboard
-hierarchy using [API_UI_MAPPING.md](./API_UI_MAPPING.md): caller token and
-cost meters, company totals for owner/admin, 402 `budget_exhausted` copy,
-and `ready.rate_limit_degraded` / 429 rate banners. Budget-policy sliders
-and graph-maintenance reserve editors are a polished unavailable state
-(GAP-07-11). There is no `/budgets` HTTP.
+These have no product control and no `*-unavailable` panel:
 
-## Gap table (do not mock)
-
-| ID | UI |
+| ID | Omission |
 | --- | --- |
-| GAP-07-08 | Owner bootstrap: Unavailable on `/team`. `bootstrap_owner` has no HTTP |
-| GAP-07-11 | Budget editor / critical-reserve sliders: Unavailable. Show 402 copy and usage totals. Rate: 429 + `ready.rate_limit_degraded` |
-| GAP-07-12 | Audit list/export / restricted preview-download history: Unavailable. Do not invent events or leak passages |
-| GAP-07-13 | Company settings CRUD: Unavailable on `/profile`. No save control |
-| GAP-07-19 | Profile name/locale editor: Unavailable. Show the five `/me` fields |
+| GAP-07-08 | Owner bootstrap: no HTTP, no Team banner |
+| GAP-07-11 | Budget editor / reserve sliders: no UI. 402 `budget_exhausted` remains a classified API state |
+| GAP-07-12 | Audit list/export: no panel, no events, no passage leak |
+| GAP-07-13 | Company settings CRUD: no save control on Account |
+| GAP-07-19 | Profile name/locale editor: Account shows four `/me` fields only |
 
-No member-list HTTP: copy "No member directory API; identify users from
-GET /me and audit when available". Identify offboard subjects from `GET
-/me` until an audit list exists.
+No member-list HTTP. Offboard subjects are identified by known `user_id`.
+Do not invent a directory.
 
 ## Honest contracts
 
 - Invitation create body is `{ email, role, upload_enabled }`. Roles are
   `owner` \| `admin` \| `member` \| `viewer`. The one-time token is
-  mail-only; JSON never includes `raw_token`.
-- Offboard is irreversible. Owner/admin at ordinary assurance may offboard.
-- Tool cards show `tool_key`, `version_label`, `short_name`, `purpose`,
-  `required_role`, `risk_class`, and `active`. Unauthorized names are
-  omitted, never fake-redacted.
+  mail-only; JSON never includes `raw_token`. Success UI shows invitation ID
+  and expiry only.
+- Offboard is irreversible. Owner/admin at single-factor may offboard.
+- Tool search sends `GET /tools?q=` with the query URL-encoded. Cards show
+  `tool_key`, `version_label`, `short_name`, `purpose`, `required_role`,
+  `risk_class`, and `active`. Unauthorized names are omitted, never
+  fake-redacted.
 - Glossary import uses an extra-forbid client builder. Extra SQL-like
   fields are not posted.
-- Entity-rule approve/revoke posts `{ row_version }`. 409
-  `stale_row_version` is shown honestly.
+- Entity-rule approve/revoke and PATCH post `{ row_version }`. 409
+  `stale_row_version` shows a conflict banner and **Reload rule**.
+- Suggest rule posts the existing suggestions endpoint.
 - Usage responses keep `scope`, `cost_usd`, `prompt_tokens`,
-  `completion_tokens`, and `usage_rows` only.
+  `completion_tokens`, and `usage_rows` only. Numeric values use 24px type
+  and 13px labels. No charts, forecasts, or progress bars.
+- `GET /me` may still emit deprecated `mfa_enrolled=false`. The Account page
+  does not render it.
 
 ## Failure modes
 
 | Signal | UI |
 | --- | --- |
-| 403 `forbidden` | "Server denied this request (forbidden). UI hiding is convenience only." |
-| 403 `forbidden` / missing subject | Generic denial. Member/viewer stay unauthorized |
-| 402 `budget_exhausted` | Budget exhausted copy. No slider |
+| 403 `forbidden` on Admin gate | “You don’t have access.” after the entity-rules GET |
+| 403 on a mutation helper | Classified denial. Member/viewer stay unauthorized |
+| 402 `budget_exhausted` | Classified copy on the calling surface. No slider |
 | 429 | Rate-limit banner. Ready `rate_limit_degraded` is informational |
-| 409 `stale_row_version` | Reload and retry with the current `row_version` |
+| 409 `stale_row_version` | Reload rule and retry with the current `row_version` |
 | Company usage as member | Convenience-hidden; helper still 403s |
-| Hostile email / token | `UserText` / `CodeText`. No HTML |
+| Hostile email / token | Input values and `UserText` / `CodeText`. No HTML |
 
 ## Verification
-
-```powershell
-pnpm --filter smart-rag-frontend lint
-pnpm --filter smart-rag-frontend exec next typegen
-pnpm --filter smart-rag-frontend exec tsc --noEmit
-pnpm --filter smart-rag-frontend test
-pnpm --filter smart-rag-frontend build
-```
 
 From `apps/frontend`:
 
 ```powershell
-pnpm exec playwright test
+npx vitest run src/components/administration-surfaces.test.tsx src/lib/api.test.ts src/lib/admin-bodies.test.ts src/lib/shell-navigation.test.ts
+npx tsc --noEmit
 ```
 
 Docs:
