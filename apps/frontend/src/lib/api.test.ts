@@ -1147,9 +1147,42 @@ describe("loadConsoleReadiness", () => {
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     };
-    const ready = await loadConsoleReadiness({ accessToken: "jwt-token" }, fetchImpl);
+    const ready = await loadConsoleReadiness(
+      { accessToken: "jwt-token" },
+      "owner",
+      fetchImpl,
+    );
     expect(ready?.dependencies).toEqual([{ name: "paradedb", status: "down" }]);
     expect(ready?.rate_limit_degraded).toBe(true);
+  });
+
+  it("skips /ops/ready for member role", async () => {
+    let opsCalls = 0;
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/ops/ready")) {
+        opsCalls += 1;
+        return new Response(JSON.stringify({ detail: "forbidden" }), {
+          status: 403,
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          status: "ok",
+          query_ready: true,
+          detail: "ready",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const ready = await loadConsoleReadiness(
+      { accessToken: "jwt-token" },
+      "member",
+      fetchImpl,
+    );
+    expect(opsCalls).toBe(0);
+    expect(ready?.query_ready).toBe(true);
+    expect(ready?.dependencies).toEqual([]);
   });
 });
 

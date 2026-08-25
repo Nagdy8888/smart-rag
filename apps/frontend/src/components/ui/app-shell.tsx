@@ -28,7 +28,7 @@ export type AppShellProps = {
 };
 
 /**
- * Render the light Precision Workspace chrome.
+ * Render the ink-rail console chrome.
  *
  * @param props - Shell children.
  * @returns Landmark structure with English LTR chrome.
@@ -78,30 +78,25 @@ export function AppShell({ children }: AppShellProps) {
             </span>
             <span className={styles.brandText}>
               <p className={styles.brandName}>Smart RAG</p>
-              <p className={styles.brandSub}>Company knowledge</p>
             </span>
           </div>
-          {navExpanded ? (
-            <Button
-              type="button"
-              variant="secondary"
-              className={styles.navToggle}
-              aria-expanded={navExpanded}
-              data-action-id="shell.nav_toggle"
-              onClick={toggleNavExpanded}
-            >
-              <Icon name="panelCollapse" />
-              {toggleLabel}
-            </Button>
-          ) : null}
           <AppNav />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={styles.navToggle}
+            aria-expanded={navExpanded}
+            aria-label={toggleLabel}
+            data-action-id="shell.nav_toggle"
+            onClick={toggleNavExpanded}
+          >
+            <Icon name={navExpanded ? "panelCollapse" : "panelExpand"} />
+          </Button>
         </nav>
         <div className={styles.content}>
           <header className={styles.topbar}>
-            <ConsoleTopbar
-              navExpanded={navExpanded}
-              onExpandNav={toggleNavExpanded}
-            />
+            <ConsoleTopbar />
           </header>
           <main id="main" className={styles.main} tabIndex={-1}>
             {children}

@@ -16,11 +16,21 @@ def test_langgraph_json_matches_verified_schema_contract() -> None:
     payload = json.loads(LANGGRAPH_JSON.read_text(encoding="utf-8"))
     assert payload["dependencies"] == ["."]
     assert payload["python_version"] == "3.11"
-    assert set(payload["graphs"]) == {"query", "query_studio", "ingestion"}
+    assert payload["env"] == "../../.env.compose"
+    assert set(payload["graphs"]) == {
+        "query",
+        "query_studio",
+        "query_studio_live",
+        "ingestion",
+    }
     assert payload["graphs"]["query"] == "./src/smart_rag_agents/query/graph.py:graph"
     assert (
         payload["graphs"]["query_studio"]
         == "./src/smart_rag_agents/query/studio.py:graph"
+    )
+    assert (
+        payload["graphs"]["query_studio_live"]
+        == "./src/smart_rag_agents/query/studio_live.py:make_graph"
     )
     assert (
         payload["graphs"]["ingestion"]
@@ -38,7 +48,12 @@ def test_langgraph_cli_validate_config_file() -> None:
     graphs = validated.get("graphs")
     assert dependencies == ["."]
     assert graphs is not None
-    assert set(graphs) == {"query", "query_studio", "ingestion"}
+    assert set(graphs) == {
+        "query",
+        "query_studio",
+        "query_studio_live",
+        "ingestion",
+    }
 
 
 def test_langgraph_graph_exports_load_without_business_success_claim() -> None:

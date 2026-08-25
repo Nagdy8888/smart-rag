@@ -11,6 +11,7 @@ touching the live loop.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import threading
 from collections.abc import Coroutine
 from typing import TypeVar, cast
@@ -34,7 +35,8 @@ def run_coro_blocking(coro: object) -> object:
     Side Effects:
         When no event loop is running, uses ``asyncio.run``. When a loop
         is already running, starts one daemon thread with a private loop,
-        runs the coroutine to completion, then closes that loop. The live
+        copies the caller tracing context, runs the coroutine to
+        completion, flushes LangSmith, then closes that loop. The live
         loop is never nested.
 
     Example:
@@ -47,8 +49,24 @@ def run_coro_blocking(coro: object) -> object:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(typed)
+        try:
+            return asyncio.run(typed)
+        finally:
+            _flush_langsmith_traces()
     return _run_in_dedicated_thread(typed)
+
+
+def _flush_langsmith_traces() -> None:
+    """Flush buffered LangSmith runs from this thread.
+
+    Side Effects:
+        Delegates to :func:`flush_langsmith_traces`. No-op when tracing is
+        off or no API key is configured.
+    """
+
+    from smart_rag_core.observability.langsmith_tracing import flush_langsmith_traces
+
+    flush_langsmith_traces()
 
 
 def _run_in_dedicated_thread(coro: Coroutine[object, object, T]) -> T:
@@ -68,24 +86,32 @@ def _run_in_dedicated_thread(coro: Coroutine[object, object, T]) -> T:
 
     box: dict[str, T] = {}
     error: dict[str, BaseException] = {}
+    copied = contextvars.copy_context()
 
     def _worker() -> None:
         """Run ``coro`` to completion on a new event loop.
 
         Side Effects:
             Creates, runs, and closes a private loop. Stores the result
-            or exception in the enclosing dicts.
+            or exception in the enclosing dicts. Flushes LangSmith so
+            spans created on this short-lived thread are exported.
         """
 
-        loop = asyncio.new_event_loop()
-        try:
-            asyncio.set_event_loop(loop)
-            box["value"] = loop.run_until_complete(coro)
-        except BaseException as exc:
-            error["exc"] = exc
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+        def _inner() -> None:
+            """Drive the private loop inside the copied tracing context."""
+
+            loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(loop)
+                box["value"] = loop.run_until_complete(coro)
+            except BaseException as exc:
+                error["exc"] = exc
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+                _flush_langsmith_traces()
+
+        copied.run(_inner)
 
     worker = threading.Thread(
         target=_worker,

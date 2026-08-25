@@ -2280,3 +2280,151 @@ Executor repairs proven on this path: async query checkpointer (13
 checkpoints), temporal `SET ROLE app_api` (hosted pooler cannot become
 `postgres`), idle context-loader for `retrieval_transaction`, generate
 timeout from run deadline not model-call count.
+
+## P06-14 — Ask origin and citation-safe chrome (2026-08-25)
+
+Phase 6/Phase 8 co-owned additive UI. Does not uncheck historical Phase
+8 packets or renumber P08-22/P08-23.
+
+Ask now stores `answerOrigin` from additive `answer_origin` SSE frames.
+`AnswerSurface` renders a `Badge` (`data-testid="answer-origin"`) beside
+the existing route `StatusPill` (`data-testid="answer-route"`). Citation
+chips and Sources count use `shouldShowCitations`: only
+`company_documents` or a null/empty legacy origin may show chips.
+Ambiguous origin shows the existing `LimitationCallout` with the
+generator clarification sentence. Empty-state title/body in
+[workspace-screens.md](../frontend/workspace-screens.md) match the
+surface.
+
+Negative fixtures: origin is not inferred from admission `route_family`
+(`composite` / Hybrid). XSS origin strings render as text through
+`UserText` / `displayText`; no `img`/`script` nodes.
+
+Playwright Ask journey **skipped**: local GoTrue `:54321` and API `:8000`
+were not available; Playwright is configured for those URLs, not hosted
+Auth.
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend test` | 0 (298 passed) |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+
+Rollback: revert origin helpers and Ask header/citation visibility.
+Auth/reconnect/idempotency contracts stay on the prior Phase 8 path.
+
+## P06-15 — Frontend verification note (2026-08-25)
+
+Phase 6 packet 15 re-ran Ask chrome gates after origin UX:
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend test` | 0 (298 passed) |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+
+Playwright Ask journey remains **skipped** (local GoTrue `:54321` / API
+`:8000` not the hosted operator path). P08-22 wrapper item 22 stays
+unchecked. Origin badges and citation hiding are additive and do not
+change handshake, reconnect, or verified-final holding.
+
+## UI/UX overhaul P1
+
+Creator-only `GET /conversations/{conversation_id}/messages` plus
+`app.list_conversation_messages`. User/assistant rows only, full escaped
+content, `limit` 1-100, `before` keyset, generic 404 for foreign/deleted.
+
+| Command | Exit |
+| --- | --- |
+| `.\.venv\Scripts\python.exe -m pytest tests/contract/test_conversation_transcript.py -q` | 0 (7 passed, 1 skipped: live RPC until migration apply) |
+| `.\.venv\Scripts\python.exe scripts/ci/check_openapi.py` | 0 after snapshot regenerate |
+| `.\.venv\Scripts\python.exe scripts/ci/check_migrations.py` | 0 (64 reviewed files) |
+| `.\.venv\Scripts\python.exe scripts/check.py --tier unit` | 0 for P1 tests; full unit tier in this shell needs `APP_ENV=test` because `SUPABASE_URL` is unset at collection. First full run under `APP_ENV=test` was 1103 passed / 4 failed from leaked process `APP_ENV=test` on settings/CORS tests, not from the transcript route. |
+
+## UI/UX overhaul P2
+
+Ink & Indigo tokens in `globals.css` / `design-tokens.ts`, self-hosted
+Inter Display SemiBold, restyled primitives, `EmptyState`, and
+[ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md).
+`@theme` no longer rebinds `--color-ink` onto body text.
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (47 files, 317 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+
+## UI/UX overhaul P3
+
+Ink nav rail (232/72, no width animation, 3px accent bar, collapse at
+rail bottom). Topbar is the only `h1`. `loadConsoleReadiness(auth, role)`
+calls `/ops/ready` only for `owner`/`admin`. ChatApp readiness has
+`staleTime: 30_000` and no interval. `ReadinessIndicator` polls every
+15s with `refetchIntervalInBackground: false`. Account menu shows `··`
+while `/me` loads.
+
+## UI/UX overhaul P4
+
+Composer owns draft. `ConversationRail`, `AnswerSurface`, and
+`ChatComposer` are memoized. Run-pointer writes are throttled to 1/s
+with flush on terminal/unmount. Send uses `pending`/`Sending…`. Delete
+uses mutation pending. Session restore renders the workspace plus
+skeletons. Isolation tests cover typing, `token_delta`, and Send pending.
+
+## UI/UX overhaul P5
+
+`GET /conversations/{id}/messages` renders oldest-first with “Load
+earlier messages”. Sessions rail is 280px with “New chat”, relative
+time, and “Untitled chat”. Composer card copy is exact. Reconnect only
+when a disconnected run exists. Status line replaces the permanent
+stepper. Run details skip “—” rows.
+
+## UI/UX overhaul P6
+
+`SignInForm` calls `router.replace("/")` and `router.refresh()` on a
+real session. Auth layout is 45/55 brand/form at `>=1024px` with
+`--gradient-brand` and “Grounded answers from your company's knowledge.”
+Skip link stays visually hidden until focus.
+
+## UI/UX overhaul P7
+
+Headings drop trailing periods. Documents filter uses “Filter by name…”
+and “Filters apply to loaded documents only.” Tables hide the plan
+builder until a table is selected. Graph cap sentence renders once.
+Visibility/absent status use `formatVisibility` / `absentStatusLabel`.
+Async actions use `pending`/`pendingLabel` or a disabled visible label.
+
+## UI/UX overhaul P8
+
+Quality gates for the Ink & Indigo overhaul. Docs updated:
+[workspace-screens.md](../frontend/workspace-screens.md),
+[CORE_RAG_SURFACES.md](../frontend/CORE_RAG_SURFACES.md),
+[DESIGN_SYSTEM.md](../frontend/DESIGN_SYSTEM.md),
+[design-tokens-and-primitives.md](../frontend/design-tokens-and-primitives.md),
+[admin-and-auth-screens.md](../frontend/admin-and-auth-screens.md).
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (47 files, 322 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+| `.\.venv\Scripts\python.exe scripts/check.py --tier unit` | 0 (1114 passed, 3 skipped). Collection needs `SUPABASE_URL=http://127.0.0.1:54321` and `MOCK_MODEL_MODE=true`; do not load the full host `.env` (`LANGSMITH_TRACING`) and do not set `APP_ENV=test`. |
+| `.\.venv\Scripts\python.exe scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (189 markdown files; links + Mermaid + action inventory) |
+| `.\.venv\Scripts\python.exe scripts/check.py --tier contract` (`MOCK_MODEL_MODE=true`) | 1 (12 failed, 424 passed, 22 skipped in 675s). Failures are live-stack / fixture inventory, not this UI packet: BM25 reconcile/recheck/injection, environment-boundary, Phase 9 applied-migration inventory (includes the new transcript migration until applied), query admission concurrency cap, RLS/runtime roles, schema fingerprint, thin-UI live JWT chat/streams/upload/ready. `test_conversation_transcript.py` is not in the failed list. |
+| `pnpm exec playwright test tests/e2e/visual-routes.spec.ts --update-snapshots` | 0 after locator updates (admin tabs assert topbar `Admin`; Account heading has no trailing period) |
+| `pnpm exec playwright test` (full suite from `apps/frontend`) | 0 (36 passed) |
+
+Browser re-audit (Playwright MCP on `http://127.0.0.1:3000`, plus the :3010 Playwright suite against current source):
+
+- 1440 Ask: ink rail 232px, collapse control at the rail bottom, single `h1` Ask, Sessions complementary 280px, skip link off-screen until focus, no permanent Reconnect.
+- 1024 Graph: same rail + single `h1` Graph; topbar readiness/account unclipped.
+- 390 Graph: desktop rail omitted; `Open navigation` + page `h1`; command control hidden; readiness and Account remain.
+- Documents / Tables / Graph: no duplicate page titles.
+- Network: `/health/ready` 200 only. No `/ops/ready` 403s. Console 401s on this :3000 session were a stale Bearer against local FastAPI (`/me`, `/conversations`), not readiness spam.
+- `createConversation` now throws on non-OK so a 401 cannot produce `GET /conversations/undefined/messages`.
+
+Completion: P2–P8 are implemented on this branch. P1 transcript API remains the only API-surface change. Visual snapshots under `apps/frontend/tests/e2e/visual-routes.spec.ts-snapshots/` were regenerated.

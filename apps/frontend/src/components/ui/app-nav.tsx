@@ -118,7 +118,15 @@ export function AccountMenu() {
     enabled: auth !== null,
   });
   if (!session.ready || token === null) {
-    return null;
+    return (
+      <span
+        className={styles.avatarMark}
+        aria-hidden="true"
+        data-testid="account-avatar-placeholder"
+      >
+        ··
+      </span>
+    );
   }
   const me = meQuery.data;
   const initials = (session.email ?? "U").slice(0, 2).toUpperCase();
@@ -127,6 +135,7 @@ export function AccountMenu() {
   return (
     <Menu
       label="Account"
+      triggerActionId="shell.account"
       trigger={
         <>
           <span className={styles.avatarMark} aria-hidden="true">
@@ -173,22 +182,19 @@ export function AccountMenu() {
 }
 
 export type ConsoleTopbarProps = {
-  /** Desktop console rail visibility. */
+  /** Unused. Collapse lives on the ink rail. Kept for existing imports. */
   navExpanded?: boolean;
-  /** Restore the desktop rail. Shown in the topbar while the rail is collapsed. */
+  /** Unused. Collapse lives on the ink rail. */
   onExpandNav?: () => void;
 };
 
 /**
  * Render the 56px console top bar: menu, title, readiness, command, account.
  *
- * @param props - Optional desktop nav expand control.
+ * @param _props - Optional unused expand props (rail owns collapse).
  * @returns Header contents and overlays.
  */
-export function ConsoleTopbar({
-  navExpanded = true,
-  onExpandNav,
-}: ConsoleTopbarProps) {
+export function ConsoleTopbar() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandEpoch, setCommandEpoch] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -236,19 +242,12 @@ export function ConsoleTopbar({
           <Icon name="menu" />
           <span className={styles.srOnly}>Menu</span>
         </Button>
-        {onExpandNav && !navExpanded ? (
-          <Button
-            type="button"
-            variant="secondary"
-            className={styles.navExpand}
-            aria-expanded={false}
-            data-action-id="shell.nav_toggle"
-            onClick={onExpandNav}
-          >
-            <Icon name="panelExpand" />
-            Expand navigation
-          </Button>
-        ) : null}
+        <div className={styles.topbarBrand}>
+          <span className={styles.brandMark} aria-hidden="true">
+            <Icon name="spark" />
+          </span>
+          <p className={styles.topbarBrandName}>Smart RAG</p>
+        </div>
         <h1 className={styles.topbarTitle}>{consolePageTitle(pathname)}</h1>
       </div>
       <div className={styles.topbarEnd}>

@@ -43,8 +43,9 @@
 .nav {
   display: none;
   box-sizing: border-box;
-  background: var(--color-surface);
-  border-inline-end: 1px solid var(--color-border);
+  background: var(--color-ink);
+  border-inline-end: 1px solid var(--color-ink-border);
+  color: var(--color-ink-text);
   padding: calc(var(--space) * 4);
 }
 
@@ -54,8 +55,22 @@
 }
 
 .navToggle {
-  margin-bottom: calc(var(--space) * 3);
-  align-self: stretch;
+  margin-top: auto;
+  margin-bottom: 0;
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: var(--color-ink-text);
+  background: transparent;
+  border: 1px solid var(--color-ink-border);
+}
+
+.navToggle:hover {
+  background: var(--color-ink-raised);
+  color: #fff;
 }
 
 .brand,
@@ -73,11 +88,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-sm);
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--gradient-brand);
+  color: #fff;
   flex: 0 0 auto;
 }
 
@@ -88,21 +103,35 @@
 }
 
 .brandName {
+  font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin: 0;
+}
+
+.topbarBrandName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
   margin: 0;
 }
 
 .brandSub {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
+  display: none;
 }
 
 .navGroups {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: calc(var(--space) * 4);
+  min-height: 0;
 }
 
 .navGroup {
@@ -135,17 +164,19 @@
 }
 
 .navRow {
-  min-height: var(--control-height);
+  position: relative;
+  min-height: 40px;
   display: flex;
   align-items: center;
-  margin-inline: 8px;
+  margin-inline: 0;
 }
 
 .navRow a,
 .profileLink {
-  color: var(--color-text-muted);
+  color: var(--color-ink-text-muted);
   text-decoration: none;
-  min-height: var(--control-height);
+  min-height: 40px;
+  height: 40px;
   min-width: 44px;
   width: 100%;
   display: flex;
@@ -153,20 +184,34 @@
   gap: 10px;
   padding: 0 12px;
   border-radius: 8px;
-  transition: background-color 120ms ease, color 120ms ease;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background-color var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .navRow a:hover,
 .profileLink:hover {
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--color-ink-raised);
+  color: var(--color-ink-text);
 }
 
 .navRow a[aria-current="page"] {
   font-weight: 600;
-  color: var(--color-accent);
-  background: var(--color-accent-muted);
-  box-shadow: inset 3px 0 0 var(--color-accent);
+  color: #fff;
+  background: var(--color-ink-raised);
+  box-shadow: none;
+}
+
+.navRow a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent);
 }
 
 .userBlock {
@@ -226,8 +271,11 @@
 
 .topbarTitle {
   margin: 0;
-  font-size: 1rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 2rem;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .readiness {
@@ -277,6 +325,11 @@
     flex: 0 0 var(--nav-width-collapsed);
     max-height: 100vh;
     overflow: auto;
+    transition: none;
+  }
+
+  .navToggle {
+    display: inline-flex;
   }
 
   .navToggle,

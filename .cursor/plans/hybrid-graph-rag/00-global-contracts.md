@@ -259,3 +259,15 @@ User approval on 2026-08-24: remove MFA, TOTP enrollment/challenge/recovery, and
 - Do not silently replace MFA with a new second factor.
 - Preserve JWT verification, revoked/disabled-session checks, live role and authorization-version checks, RLS, server-side owner/admin enforcement, rate limits, destructive confirmations, generic errors, audit events, and IDOR-safe 404 behavior.
 - Supabase Auth may retain dormant provider capability or compatibility fields that cannot be removed without breaking the current API major. Those fields must be deprecated, hidden from product UI, excluded from authorization decisions, and documented; they must not keep MFA operational in this application.
+
+## Approved planned deviation: general-chat strict split
+
+User approval on 2026-08-25: the production Ask surface and a separate live LangSmith Studio graph may answer general questions from OpenAI world knowledge, while company/document questions remain citation-required RAG with no world-knowledge fallback. Mixed or uncertain scope must ask for clarification instead of blending sources.
+
+- Recorded in `docs/adr/ADR-general-chat-strict-split.md`.
+- Implementation is additive Phase 6 packets P06-09 through P06-15. P06-14 is a Phase 6/Phase 8 co-owned UI amendment. Do not uncheck historical completed Phase 6 packets or Phase 8 packets 1–21, and do not renumber active P08-22/P08-23.
+- Keep `query_studio` deterministic and unbound. Live document access uses only `query_studio_live` with a real developer JWT from a gitignored environment variable.
+- Never synthesize a live identity or use a service-role key for Studio document access.
+- Never fall back from insufficient company evidence to world knowledge. Never emit canonical citations on a general/user-text/clarification answer.
+- General and user-text model calls consume the existing durable `usage_kind="answer"` reservation and immutable usage rows.
+- Rollback disables general scope and removes the live graph registration without changing document RAG.

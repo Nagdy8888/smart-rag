@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import os
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -43,9 +45,12 @@ LangSmithRunType = Literal[
     "parser",
 ]
 
+LOGGER = logging.getLogger(__name__)
+
 LANGSMITH_HIDE_INPUTS_ENV = "LANGSMITH_HIDE_INPUTS"
 LANGSMITH_HIDE_OUTPUTS_ENV = "LANGSMITH_HIDE_OUTPUTS"
 LANGSMITH_TRACING_ENV = "LANGSMITH_TRACING"
+LANGCHAIN_TRACING_V2_ENV = "LANGCHAIN_TRACING_V2"
 
 _SENSITIVE_KEYS = frozenset(
     {
@@ -144,6 +149,33 @@ def configure_langsmith(settings: SharedSettings) -> dict[str, str]:
     """
 
     return settings.apply_langsmith_sdk_flags()
+
+
+def flush_langsmith_traces() -> None:
+    """Submit buffered LangSmith runs before a short-lived thread exits.
+
+    Returns:
+        None.
+
+    Side Effects:
+        Calls the pinned SDK ``Client.flush`` when tracing is on and a key
+        is configured. No-op for unit tests that inject a recording client
+        without ``LANGSMITH_API_KEY``. Never logs the API key.
+    """
+
+    if not tracing_is_enabled():
+        return
+    if not os.environ.get("LANGSMITH_API_KEY"):
+        return
+    try:
+        from langsmith import Client
+
+        Client().flush()
+    except Exception:
+        LOGGER.info(
+            "LangSmith flush failed",
+            extra={"event": "langsmith.flush_failed"},
+        )
 
 
 def traced_openai_client(
@@ -690,6 +722,24 @@ def rerank_responses_traceable(func: Any) -> Any:
 
     return traceable(
         name="openai.responses.rerank",
+        run_type="llm",
+        process_inputs=redact_openai_call_inputs,
+        process_outputs=redact_rerank_call_outputs,
+    )(func)
+
+
+def general_chat_responses_traceable(func: Any) -> Any:
+    """Apply the redacted Responses general-chat span decorator.
+
+    Args:
+        func: ``execute_openai_general_chat`` implementation.
+
+    Returns:
+        Traceable wrapper that hashes prompt/query text and omits API keys.
+    """
+
+    return traceable(
+        name="openai.responses.general_chat",
         run_type="llm",
         process_inputs=redact_openai_call_inputs,
         process_outputs=redact_rerank_call_outputs,

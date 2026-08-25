@@ -35,10 +35,7 @@ export function AccountPanel() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        title="Account."
-        description="Signed-in identity for this workspace."
-      />
+      <PageHeader description="Signed-in identity for this workspace." />
       <section className={styles.panel} aria-label="Current user" data-testid="profile-fields">
         <dl className={styles.dl}>
           <dt>user_id</dt>

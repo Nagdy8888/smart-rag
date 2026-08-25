@@ -23,6 +23,7 @@ ALLOWED_SSE_EVENT_TYPES: Final[frozenset[str]] = frozenset(
         "coverage",
         "optional_tool_disclosure",
         "citation_preview",
+        "answer_origin",
         "token_delta",
         "usage",
         "completed",
@@ -67,6 +68,7 @@ SseEventType = Literal[
     "coverage",
     "optional_tool_disclosure",
     "citation_preview",
+    "answer_origin",
     "token_delta",
     "usage",
     "completed",
@@ -149,6 +151,12 @@ class CitationPreviewPayload(_SsePayload):
     ranks: tuple[int, ...] = ()
 
 
+class AnswerOriginPayload(_SsePayload):
+    """Strict-split answer origin. Never inferred from route family."""
+
+    origin: str = Field(min_length=1, max_length=64)
+
+
 class TokenDeltaPayload(_SsePayload):
     """Generated answer token delta. Never retrieved source text."""
 
@@ -188,6 +196,7 @@ PAYLOAD_MODELS: Final[dict[str, type[BaseModel]]] = {
     "coverage": CoveragePayload,
     "optional_tool_disclosure": OptionalToolDisclosurePayload,
     "citation_preview": CitationPreviewPayload,
+    "answer_origin": AnswerOriginPayload,
     "token_delta": TokenDeltaPayload,
     "usage": UsagePayload,
     "completed": CompletedPayload,

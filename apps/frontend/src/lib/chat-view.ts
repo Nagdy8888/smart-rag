@@ -10,6 +10,7 @@ import {
   sequenceFromFrame,
   type SseFrame,
 } from "./sse";
+import { shouldShowCitations } from "./answer-origin";
 import type { ApiFailure } from "./api";
 
 /** Developer-visible diagnostics collected from catalog events. */
@@ -27,6 +28,7 @@ export type ChatDiagnostics = {
   completionTokens: number;
   heartbeatCount: number;
   unknownEvents: string[];
+  strayCitationsHidden: number;
 };
 
 /** One Auto chat run as rendered by the thin UI. */
@@ -42,6 +44,8 @@ export type ChatViewState = {
   diagnostics: ChatDiagnostics;
   failure: ApiFailure | null;
   idempotencyKey: string;
+  answerOrigin: string | null;
+  clarificationRequired: boolean;
 };
 
 /**
@@ -64,6 +68,7 @@ export function emptyDiagnostics(): ChatDiagnostics {
     completionTokens: 0,
     heartbeatCount: 0,
     unknownEvents: [],
+    strayCitationsHidden: 0,
   };
 }
 
@@ -86,6 +91,8 @@ export function createChatViewState(idempotencyKey: string): ChatViewState {
     diagnostics: emptyDiagnostics(),
     failure: null,
     idempotencyKey,
+    answerOrigin: null,
+    clarificationRequired: false,
   };
 }
 
@@ -222,7 +229,21 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
       break;
     case "citation_preview":
       diagnostics.citationIds = stringList(payload.citation_ids);
+      if (!shouldShowCitations(next.answerOrigin) && diagnostics.citationIds.length > 0) {
+        diagnostics.strayCitationsHidden = diagnostics.citationIds.length;
+      }
       break;
+    case "answer_origin": {
+      const raw = stringField(payload, "origin");
+      if (raw) {
+        next.answerOrigin = raw;
+        next.clarificationRequired = raw === "ambiguous";
+        if (!shouldShowCitations(raw) && diagnostics.citationIds.length > 0) {
+          diagnostics.strayCitationsHidden = diagnostics.citationIds.length;
+        }
+      }
+      break;
+    }
     case "token_delta":
       next.answerText = `${state.answerText}${displayText(stringField(payload, "delta") ?? "")}`;
       break;

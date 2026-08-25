@@ -16,6 +16,7 @@ from smart_rag_core.gateways.openai_answer import (
     execute_openai_eval_judge,
     execute_openai_verifier,
 )
+from smart_rag_core.gateways.openai_general_chat import execute_openai_general_chat
 from smart_rag_core.gateways.openai_lightrag import (
     execute_openai_lightrag_llm,
 )
@@ -35,6 +36,8 @@ from smart_rag_core.query_answer.versions import (
     EVAL_JUDGE_MODEL_ID,
     EVAL_JUDGE_PROMPT_SHA256,
     EVAL_JUDGE_PROMPT_VERSION,
+    GENERAL_CHAT_PROMPT_SHA256,
+    GENERAL_CHAT_PROMPT_VERSION,
     VERIFIER_MODEL_ID,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
@@ -44,6 +47,7 @@ from smart_rag_core.query_profile.versions import (
     PROFILE_PROMPT_SHA256,
     PROFILE_PROMPT_VERSION,
 )
+from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.retrieval.graph import (
     LIGHTRAG_LLM_MAX_INPUT_CHARS,
     LIGHTRAG_LLM_MODEL_ID,
@@ -246,6 +250,58 @@ class AnswerModelResponse(BaseModel):
     Attributes:
         mode: Adapter mode.
         payload: JSON object awaiting application ID filtering.
+        request_id: Provider or fixture id.
+        input_tokens: Usage input tokens.
+        output_tokens: Usage output tokens.
+        model_calls: Always 1 when this response is returned.
+        retrieval_performed: Always false.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["mock", "openai"]
+    payload: dict[str, object]
+    request_id: str = Field(min_length=1, max_length=128)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    model_calls: Literal[1] = 1
+    retrieval_performed: Literal[False] = False
+
+
+class GeneralChatModelRequest(BaseModel):
+    """Bounded no-source general-chat request. No tools or retrieval.
+
+    Attributes:
+        operation: Must be ``general_chat``.
+        query: Original user query.
+        recent_memory: Delimited untrusted conversation memory.
+        knowledge_scope: ``general_knowledge`` or ``user_supplied_text``.
+        prompt_version: Pinned general-chat prompt version.
+        prompt_sha256: Hash of that prompt file.
+        prompt_text: Prompt body used as Responses instructions.
+        model_id: Existing allow-listed answer model.
+        remaining_deadline_seconds: Client timeout bound.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: Literal["general_chat"] = "general_chat"
+    query: str = Field(min_length=1, max_length=2000)
+    recent_memory: str = Field(default="", max_length=16_384)
+    knowledge_scope: KnowledgeScope
+    prompt_version: str = GENERAL_CHAT_PROMPT_VERSION
+    prompt_sha256: str = GENERAL_CHAT_PROMPT_SHA256
+    prompt_text: str = Field(min_length=1, max_length=16_384)
+    model_id: str = ANSWER_MODEL_ID
+    remaining_deadline_seconds: float = Field(gt=0, le=50)
+
+
+class GeneralChatModelResponse(BaseModel):
+    """Structured general-chat payload plus usage for one operation.
+
+    Attributes:
+        mode: Adapter mode.
+        payload: JSON object with ``answer_text`` and ``status`` only.
         request_id: Provider or fixture id.
         input_tokens: Usage input tokens.
         output_tokens: Usage output tokens.
@@ -520,6 +576,20 @@ class ModelAdapter(Protocol):
 
         ...
 
+    async def generate_general_chat(
+        self, request: GeneralChatModelRequest
+    ) -> GeneralChatModelResponse:
+        """Generate at most one no-source general-chat payload.
+
+        Args:
+            request: Validated general-chat request.
+
+        Returns:
+            Structured general-chat response.
+        """
+
+        ...
+
     async def generate_verifier(
         self, request: VerifierModelRequest
     ) -> VerifierModelResponse:
@@ -774,6 +844,52 @@ class MockModelAdapter:
             mode="mock",
             payload=payload,
             request_id=f"mock-answer-{self._fixture_id}",
+            input_tokens=0,
+            output_tokens=0,
+        )
+
+    async def generate_general_chat(
+        self, request: GeneralChatModelRequest
+    ) -> GeneralChatModelResponse:
+        """Return a fixture general-chat answer. No network or retrieval.
+
+        Args:
+            request: Structured general-chat request.
+
+        Returns:
+            Mock payload with ``answer_text`` and ``status`` only.
+
+        Raises:
+            ValueError: If versions or the input bound fail.
+
+        Side Effects:
+            None. No network, retrieval, or tool calls.
+        """
+
+        if (
+            request.prompt_version != GENERAL_CHAT_PROMPT_VERSION
+            or request.prompt_sha256 != GENERAL_CHAT_PROMPT_SHA256
+        ):
+            raise ValueError("general_chat_prompt_version_mismatch")
+        joined = request.query + request.recent_memory
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        from smart_rag_core.query_answer.generate import mock_general_chat_payload
+
+        fixture = mock_general_chat_payload(
+            request.query,
+            recent_memory=request.recent_memory,
+            knowledge_scope=request.knowledge_scope,
+        )
+        return GeneralChatModelResponse(
+            mode="mock",
+            payload={
+                "answer_text": fixture.answer_text,
+                "status": fixture.status,
+            },
+            request_id=f"mock-general-chat-{self._fixture_id}",
             input_tokens=0,
             output_tokens=0,
         )
@@ -1040,6 +1156,49 @@ class OpenAIRerankAdapter:
             output_tokens=output_tokens,
         )
 
+    async def generate_general_chat(
+        self, request: GeneralChatModelRequest
+    ) -> GeneralChatModelResponse:
+        """Execute one Responses general-chat operation.
+
+        Args:
+            request: Bounded general-chat request.
+
+        Returns:
+            Provider JSON payload plus usage.
+
+        Raises:
+            OpenAIAnswerError: Typed provider failure.
+            ValueError: Input bound errors.
+
+        Side Effects:
+            One HTTPS call with ``max_retries=0`` and ``store=False``.
+        """
+
+        joined = request.query + request.recent_memory
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        payload, request_id, input_tokens, output_tokens = execute_openai_general_chat(
+            api_key=self._api_key,
+            prompt_text=request.prompt_text,
+            prompt_sha256=request.prompt_sha256,
+            prompt_version=request.prompt_version,
+            model_id=request.model_id,
+            user_query=request.query,
+            recent_memory=request.recent_memory,
+            knowledge_scope=request.knowledge_scope,
+            timeout_seconds=request.remaining_deadline_seconds,
+        )
+        return GeneralChatModelResponse(
+            mode="openai",
+            payload=payload,
+            request_id=request_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
     async def generate_verifier(
         self, request: VerifierModelRequest
     ) -> VerifierModelResponse:
@@ -1293,6 +1452,25 @@ class ModelGateway:
         """
 
         return await self._adapter.generate_answer(request)
+
+    @model_call_traceable(name="model.general_chat")
+    async def generate_general_chat(
+        self, request: GeneralChatModelRequest
+    ) -> GeneralChatModelResponse:
+        """Delegate one no-source general-chat request. Never a hidden retry.
+
+        Args:
+            request: Bounded general-chat request.
+
+        Returns:
+            Structured general-chat response plus usage.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            ValueError: If a deployable bound is exceeded.
+        """
+
+        return await self._adapter.generate_general_chat(request)
 
     @model_call_traceable(name="model.verifier")
     async def generate_verifier(

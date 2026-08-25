@@ -36,7 +36,7 @@ from smart_rag_api.services.query_graph_runtime import (
 )
 from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 from smart_rag_api.services.sse_stream import LangGraphQueryRunExecutor
-from smart_rag_core.gateways.model import create_model_gateway
+from smart_rag_core.gateways.model import AnswerModelResponse, create_model_gateway
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import mock_answer_payload
 from smart_rag_core.query_answer.models import AnswerPayload
@@ -51,6 +51,36 @@ from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.settings import SharedSettings
 
 _FAKE_DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+
+class _CountedAnswerGateway:
+    """Gateway that reports non-zero answer tokens without opening a socket."""
+
+    async def generate_answer(self, request: object) -> AnswerModelResponse:
+        """Return a complete answer fixture with counted usage.
+
+        Args:
+            request: Unused structured answer request.
+
+        Returns:
+            Mock answer response with 12 prompt and 7 completion tokens.
+        """
+
+        del request
+        return AnswerModelResponse(
+            mode="mock",
+            payload={
+                "answer_text": "Counted answer from authorized evidence.",
+                "citations": [],
+                "atomic_links": [],
+                "composed_conclusion": None,
+                "table_citations": [],
+                "status": "complete",
+            },
+            request_id="counted-answer",
+            input_tokens=12,
+            output_tokens=7,
+        )
 
 
 class _DummyHybrid:
@@ -230,11 +260,11 @@ def test_context_loader_keeps_connection_idle_for_retrieval_transaction(
         return ()
 
     monkeypatch.setattr(
-        "smart_rag_api.services.query_graph_runtime.psycopg.connect",
+        "smart_rag_agents.query.live_runtime.psycopg.connect",
         _connect,
     )
     monkeypatch.setattr(
-        "smart_rag_api.services.query_graph_runtime.fetch_authorized_chunk_context",
+        "smart_rag_agents.query.live_runtime.fetch_authorized_chunk_context",
         _fetch,
     )
     loader = _context_loader(
@@ -349,6 +379,28 @@ def test_bound_mock_gateway_drives_sse_without_token_injection() -> None:
         assert "".join(str(item or "") for item in deltas).strip()
     else:
         assert "completed" not in types or verified["status"] == "verified"
+
+
+def test_generate_answer_accumulates_provider_tokens() -> None:
+    """Answer generation copies gateway token counts onto query state."""
+
+    deps = QueryGraphDeps(
+        hybrid_retriever=_DummyHybrid(),
+        model_gateway=_CountedAnswerGateway(),
+        answer_prompt_text=answer_prompt_text(),
+    )
+    state = pending_query_state(user_query="What is the refund period?")
+    state["status"] = "optional_tools_resolved"
+    state["remaining_model_calls"] = 8
+    state["fusion"] = _fusion().model_dump(mode="json")
+    generated = generate_answer_node(state, deps)
+    assert generated["prompt_tokens"] == 12
+    assert generated["completion_tokens"] == 7
+    mapper = QuerySseMapper()
+    mapper.consume_chunk({"generate_answer": generated})
+    events = mapper.consume_chunk({"verify_answer": generated})
+    usage = [payload for event_type, payload in events if event_type == "usage"]
+    assert usage == [{"prompt_tokens": 12, "completion_tokens": 7}]
 
 
 def test_unbound_hybrid_never_emits_verified() -> None:

@@ -102,6 +102,58 @@ def test_private_services_have_no_host_ports() -> None:
         assert "ports" not in _service(name)
 
 
+def _env_file_paths(service: dict[str, object]) -> list[str]:
+    """Return Compose env_file paths declared on one service.
+
+    Args:
+        service: Parsed Compose service mapping.
+
+    Returns:
+        Relative env-file paths. Empty when the service has no env_file.
+    """
+
+    raw = service.get("env_file")
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [raw]
+    if not isinstance(raw, list):
+        raise TypeError("Expected Compose env_file list")
+    paths: list[str] = []
+    for item in cast(list[object], raw):
+        if isinstance(item, str):
+            paths.append(item)
+            continue
+        if isinstance(item, dict):
+            path = item.get("path")
+            if isinstance(path, str) and path:
+                paths.append(path)
+            continue
+        raise TypeError("Expected Compose env_file path or mapping")
+    return paths
+
+
+def test_api_and_worker_load_compose_env_file_for_tracing() -> None:
+    """LangSmith flags come from .env.compose, not host-interpolated defaults.
+
+    Host leftover ``LANGSMITH_TRACING=false`` from pytest must not override
+    the operator compose file. Those keys stay out of ``environment:``.
+    """
+
+    for name in ("api", "worker"):
+        service = _service(name)
+        assert ".env.compose" in _env_file_paths(service)
+        environment = _mapping(service["environment"])
+        for key in (
+            "LANGSMITH_TRACING",
+            "LANGSMITH_API_KEY",
+            "LANGSMITH_PROJECT",
+            "MOCK_MODEL_MODE",
+            "OPENAI_API_KEY",
+        ):
+            assert key not in environment, f"{name} interpolates {key} from the host"
+
+
 def test_developer_endpoints_are_explicit() -> None:
     """Only api and frontend may publish documented developer ports."""
 

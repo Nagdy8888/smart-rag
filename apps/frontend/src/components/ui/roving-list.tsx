@@ -32,6 +32,8 @@ export type RovingListProps<T> = {
   children: (item: T) => ReactNode;
   /** Optional extra class on the list. */
   className?: string;
+  /** Override the option accessible name when the row has nested controls. */
+  getAccessibleName?: (item: T) => string;
 };
 
 /**
@@ -49,9 +51,10 @@ export function RovingList<T>({
   onSelect,
   children,
   className,
+  getAccessibleName,
 }: RovingListProps<T>) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const buttonRefs = useRef<Array<HTMLElement | null>>([]);
   const active =
     items.length === 0 ? 0 : Math.min(activeIndex, items.length - 1);
 
@@ -108,19 +111,25 @@ export function RovingList<T>({
         const selected = row.id === selectedId;
         return (
           <li key={row.id} role="presentation">
-            <button
-              type="button"
+            <div
               role="option"
               aria-selected={selected}
+              aria-label={getAccessibleName?.(row.item)}
               tabIndex={index === active ? 0 : -1}
               ref={(node) => {
                 buttonRefs.current[index] = node;
               }}
               onClick={() => onSelect(row.item)}
               onFocus={() => setActiveIndex(index)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelect(row.item);
+                }
+              }}
             >
               {children(row.item)}
-            </button>
+            </div>
           </li>
         );
       })}

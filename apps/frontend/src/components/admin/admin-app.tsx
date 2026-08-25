@@ -82,7 +82,7 @@ export function AdminApp() {
   if (!session.ready || accessToken === null) {
     return (
       <div className={styles.page}>
-        <PageHeader title="Admin." />
+        <PageHeader />
         <p className={styles.muted}>Sign in to manage this workspace.</p>
       </div>
     );
@@ -91,10 +91,7 @@ export function AdminApp() {
   if (gateQuery.isPending) {
     return (
       <div className={styles.page}>
-        <PageHeader
-          title="Admin."
-          description="Manage access, tools, retrieval curation, and usage."
-        />
+        <PageHeader description="Manage access, tools, retrieval curation, and usage." />
         <Spinner label="Checking access" />
       </div>
     );
@@ -105,7 +102,7 @@ export function AdminApp() {
   if (denied) {
     return (
       <div className={styles.page}>
-        <PageHeader title="Admin." />
+        <PageHeader />
         <ErrorState
           title="You don’t have access."
           message="This area is limited to owners and admins. The server denied the request."
@@ -117,7 +114,7 @@ export function AdminApp() {
   if (gateQuery.error) {
     return (
       <div className={styles.page}>
-        <PageHeader title="Admin." />
+        <PageHeader />
         <ErrorState title="Something went wrong." message="The request could not be completed. Try again." />
       </div>
     );
@@ -125,10 +122,7 @@ export function AdminApp() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        title="Admin."
-        description="Manage access, tools, retrieval curation, and usage."
-      />
+      <PageHeader description="Manage access, tools, retrieval curation, and usage." />
       <HandshakeBanner />
       <div role="tablist" aria-label="Admin sections" className={styles.tabList}>
         {ADMIN_TABS.map((id, index) => {

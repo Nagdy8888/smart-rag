@@ -100,7 +100,7 @@ test("login geometry, overflow, and mapped Sign in at required viewports", async
       };
     });
     expect(box.height).toBe(40);
-    expect(box.radius).toBe("8px");
+    expect(box.radius).toBe("10px");
     const email = page.getByLabel("Email");
     const inputHeight = await email.evaluate((element) =>
       Math.round(element.getBoundingClientRect().height),
@@ -128,7 +128,8 @@ test("authenticated Ask has no page overflow or GAP chrome when signed in", asyn
       (item) =>
         !item.startsWith("unmapped visible action: Sessions") &&
         !item.startsWith("unmapped visible action: Menu") &&
-        !item.startsWith("unmapped visible action: Actions"),
+        !item.startsWith("unmapped visible action: Actions") &&
+        !item.startsWith("unmapped visible action: Conversation actions"),
     );
     expect(unexpected).toEqual([]);
   }
@@ -248,7 +249,7 @@ test("authenticated Ask splits Sessions and conversation scroll when signed in",
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Ask", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ask", level: 1 })).toBeVisible();
     await expect(page.getByRole("region", { name: "Conversation" })).toBeVisible();
     const probe = await measureAskScrollIndependence(page);
     expect(probe.conversationCanScroll).toBe(true);

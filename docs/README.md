@@ -14,8 +14,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | --- | --- | --- | --- | --- |
 | [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-18 | client, engineering |
 | [agent/QUERY_ADMISSION.md](./agent/QUERY_ADMISSION.md) | engineering-lead | draft | 2026-08-19 | eng, security |
-| [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-08-19 | eng |
-| [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
+| [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-08-25 | eng |
+| [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-08-25 | eng, reviewers |
 | [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
@@ -26,7 +26,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-08-25 | eng, frontend, security |
 | [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-08-25 | eng, frontend |
 | [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-08-24 | eng, frontend, security |
-| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-08-24 | eng, frontend |
+| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-08-25 | eng, frontend |
 | [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_STATES.md](./frontend/STITCH_STATES.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_A11Y_SECURITY.md](./frontend/STITCH_A11Y_SECURITY.md) | engineering-lead | draft | 2026-08-17 | frontend, security |
@@ -51,7 +51,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [deployment/MANAGED_STAGING.md](./deployment/MANAGED_STAGING.md) | engineering-lead | draft | 2026-08-19 | eng, ops, reviewers |
 | [development/phase-09-local-release-candidate-evidence.md](./development/phase-09-local-release-candidate-evidence.md) | engineering-lead | accepted | 2026-08-18 | eng, reviewers |
 | [development/phase-10-managed-staging-evidence.md](./development/phase-10-managed-staging-evidence.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
-| [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-08-16 | eng, reviewers |
+| [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-08-25 | eng, reviewers |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-08-18 | eng |
@@ -85,8 +85,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [evaluation/QUERY_PROFILE_LABELING.md](./evaluation/QUERY_PROFILE_LABELING.md) | engineering-lead | draft | 2026-08-14 | eng, SME |
 | [development/TOOL_VERSIONS.md](./development/TOOL_VERSIONS.md) | engineering-lead | draft | 2026-08-18 | eng |
 | [development/CONFIGURATION.md](./development/CONFIGURATION.md) | engineering-lead | draft | 2026-08-25 | eng |
-| [development/LANGSMITH_TRACING.md](./development/LANGSMITH_TRACING.md) | engineering-lead | draft | 2026-08-20 | eng, ops, security |
-| [development/LANGGRAPH_STUDIO.md](./development/LANGGRAPH_STUDIO.md) | engineering-lead | draft | 2026-08-19 | eng |
+| [development/LANGSMITH_TRACING.md](./development/LANGSMITH_TRACING.md) | engineering-lead | draft | 2026-08-25 | eng, ops, security |
+| [development/LANGGRAPH_STUDIO.md](./development/LANGGRAPH_STUDIO.md) | engineering-lead | draft | 2026-08-25 | eng |
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
 | [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-08-25 | eng |
 | [development/WORKSPACE_BOUNDARIES.md](./development/WORKSPACE_BOUNDARIES.md) | engineering-lead | draft | 2026-08-12 | eng |
@@ -111,6 +111,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-hosted-runtime-local-test-fixture.md](./adr/ADR-hosted-runtime-local-test-fixture.md) | engineering-lead | accepted | 2026-08-25 | client, engineering, ops |
 | [adr/ADR-stitch-first-ux.md](./adr/ADR-stitch-first-ux.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, reviewers |
 | [adr/ADR-frontend-functional-overhaul.md](./adr/ADR-frontend-functional-overhaul.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, security, reviewers |
+| [adr/ADR-ink-indigo-visual-refresh.md](./adr/ADR-ink-indigo-visual-refresh.md) | engineering-lead | accepted | 2026-08-25 | frontend, eng, reviewers |
+| [adr/ADR-general-chat-strict-split.md](./adr/ADR-general-chat-strict-split.md) | engineering-lead | accepted | 2026-08-25 | frontend, eng, security, reviewers |
 | [runbooks/phase10-staging-secrets.md](./runbooks/phase10-staging-secrets.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [adr/ADR-paradedb-edition-availability.md](./adr/ADR-paradedb-edition-availability.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-private-service-tls.md](./adr/ADR-private-service-tls.md) | engineering-lead | accepted | 2026-08-18 | eng, security |

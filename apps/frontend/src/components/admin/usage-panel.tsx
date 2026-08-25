@@ -89,7 +89,7 @@ export function UsagePanel() {
   });
   const readyQuery = useQuery({
     queryKey: auth === null ? publicQueryKeys.ready : keys.consoleReady,
-    queryFn: () => loadConsoleReadiness(auth),
+    queryFn: () => loadConsoleReadiness(auth, meQuery.data?.role ?? null),
   });
   const companyError =
     companyQuery.error instanceof Error

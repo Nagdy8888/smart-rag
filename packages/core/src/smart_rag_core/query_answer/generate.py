@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
+from typing import Literal
 
 from smart_rag_core.query_answer.assembly import (
     allowed_chunk_ids,
@@ -18,12 +20,48 @@ from smart_rag_core.query_answer.models import (
 )
 from smart_rag_core.query_answer.versions import MAX_ANSWER_GENERATIONS
 from smart_rag_core.query_fusion.models import FusionResult
+from smart_rag_core.query_routing.knowledge_scope import (
+    KnowledgeScope,
+    NoRetrievalAnswerMode,
+)
 from smart_rag_core.query_routing.models import TableEvidenceRecord
-from smart_rag_core.query_routing.signals import is_greeting, is_product_help
+from smart_rag_core.query_routing.signals import (
+    is_greeting,
+    is_product_help,
+    is_user_text_transform,
+)
 
 AnswerCaller = Callable[
     [str, FusionResult, tuple[TableEvidenceRecord, ...]], AnswerPayload
 ]
+GeneralChatCaller = Callable[[str, str, KnowledgeScope], AnswerPayload]
+
+GREETING_TEXT = (
+    "Hi! I'm ready to help. Ask me a question about your uploaded "
+    "documents, and I'll answer from the authorized evidence."
+)
+CLARIFICATION_TEXT = (
+    "This question mixes general knowledge and company documents. "
+    "Ask one general question or one document question so the answer source stays clear."
+)
+GENERAL_DOCUMENT_REFUSAL = (
+    "I can answer general questions from model knowledge, but I cannot claim "
+    "to have searched company documents on this path. Ask a document-scoped "
+    "question for a cited answer."
+)
+_DOCUMENT_CLAIM_PHRASES = (
+    "according to your documents",
+    "i found in your files",
+    "i searched your documents",
+    "i opened your documents",
+    "i read your documents",
+    "based on your uploaded",
+    "in your company documents",
+    "from your company knowledge",
+)
+_SOURCE_ID_CLAIM = re.compile(
+    r"(?i)\b(?:chunk|source|citation|p4-src|inv-sr|sku-p4)[-_:][a-z0-9-]+"
+)
 
 
 def generate_answer(
@@ -35,23 +73,29 @@ def generate_answer(
     already_generated: int,
     company_claim_forbidden: bool,
     graph_as_answer_forbidden: bool,
+    knowledge_scope: KnowledgeScope | None = None,
+    no_retrieval_answer_mode: NoRetrievalAnswerMode | None = None,
+    general_caller: GeneralChatCaller | None = None,
+    recent_memory: str = "",
 ) -> AnswerPayload:
-    """Generate one evidence answer or a safe no-retrieval chat response.
+    """Generate one evidence answer or a scoped no-retrieval response.
 
     Args:
         fusion: Combined or Hybrid-effective evidence.
         tables: Deterministic table snapshots.
         user_query: Original user text. Untrusted.
-        caller: Structured answer adapter. None uses the extractive mock.
+        caller: Structured RAG answer adapter. None uses the extractive mock.
         already_generated: Existing answer count. A second call fails.
-        company_claim_forbidden: True for NoRetrieval. Greetings and product
-            help receive deterministic non-company responses; other requests
-            are refused.
+        company_claim_forbidden: True for NoRetrieval.
         graph_as_answer_forbidden: True for graph-only inspection.
+        knowledge_scope: Strict-split origin from routing, when known.
+        no_retrieval_answer_mode: NoRetrieval answer mode, when known.
+        general_caller: One general-chat adapter. None uses the mock.
+        recent_memory: Delimited untrusted conversation memory.
 
     Returns:
-        Structured answer citing only supplied IDs, or an uncited
-        non-company response for supported NoRetrieval chat intents.
+        Structured answer. Document paths still pass ``filter_invented_ids``.
+        No-retrieval outputs have empty citations and no company claims.
 
     Raises:
         AnswerError: A second answer generation was requested.
@@ -64,38 +108,237 @@ def generate_answer(
             answer_text="Graph inspection cannot answer from graph leads.",
             status="refused",
         )
-    if company_claim_forbidden:
-        if is_greeting(user_query):
-            return AnswerPayload(
-                answer_text=(
-                    "Hi! I'm ready to help. Ask me a question about your uploaded "
-                    "documents, and I'll answer from the authorized evidence."
-                ),
-                status="complete",
-            )
-        if is_product_help(user_query):
-            return AnswerPayload(
-                answer_text=(
-                    "I can answer questions about your authorized documents, "
-                    "compare documented facts, and show the supporting sources."
-                ),
-                status="complete",
-            )
-        return AnswerPayload(
-            answer_text="No company-knowledge claim is authorized for this query.",
-            status="refused",
+    if company_claim_forbidden or knowledge_scope in {
+        KnowledgeScope.GENERAL_KNOWLEDGE,
+        KnowledgeScope.USER_SUPPLIED_TEXT,
+        KnowledgeScope.DETERMINISTIC,
+        KnowledgeScope.AMBIGUOUS,
+    }:
+        return _generate_no_retrieval(
+            user_query=user_query,
+            knowledge_scope=knowledge_scope,
+            no_retrieval_answer_mode=no_retrieval_answer_mode,
+            general_caller=general_caller,
+            recent_memory=recent_memory,
         )
     if not fusion.evidence and not tables:
-        return AnswerPayload(
-            answer_text="Insufficient authorized evidence.",
+        return _empty_no_retrieval(
+            "Insufficient authorized evidence.",
             status="refused",
+            origin=KnowledgeScope.COMPANY_DOCUMENTS,
         )
     records = assemble_source_records(fusion, tables)
     if caller is None:
         payload = mock_answer_payload(fusion, tables, user_query=user_query)
     else:
         payload = caller(records, fusion, tables)
-    return filter_invented_ids(payload, fusion, tables)
+    filtered = filter_invented_ids(payload, fusion, tables)
+    return filtered.model_copy(
+        update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
+    )
+
+
+def _generate_no_retrieval(
+    *,
+    user_query: str,
+    knowledge_scope: KnowledgeScope | None,
+    no_retrieval_answer_mode: NoRetrievalAnswerMode | None,
+    general_caller: GeneralChatCaller | None,
+    recent_memory: str,
+) -> AnswerPayload:
+    """Answer a NoRetrieval query without citations or document claims.
+
+    Args:
+        user_query: Original user text.
+        knowledge_scope: Routed scope, when known.
+        no_retrieval_answer_mode: Routed mode, when known.
+        general_caller: Optional live/mock general-chat adapter.
+        recent_memory: Delimited untrusted memory.
+
+    Returns:
+        Uncited greeting, clarification, general, or user-text payload.
+    """
+
+    mode = _resolve_no_retrieval_mode(
+        user_query, no_retrieval_answer_mode, knowledge_scope
+    )
+    if mode is NoRetrievalAnswerMode.DETERMINISTIC_CHAT:
+        return _empty_no_retrieval(
+            GREETING_TEXT,
+            status="complete",
+            origin=KnowledgeScope.DETERMINISTIC,
+        )
+    if mode is NoRetrievalAnswerMode.CLARIFICATION:
+        return _empty_no_retrieval(
+            CLARIFICATION_TEXT,
+            status="complete",
+            origin=KnowledgeScope.AMBIGUOUS,
+        )
+    if mode in {
+        NoRetrievalAnswerMode.GENERAL_MODEL,
+        NoRetrievalAnswerMode.USER_TEXT_MODEL,
+    }:
+        origin = (
+            KnowledgeScope.USER_SUPPLIED_TEXT
+            if mode is NoRetrievalAnswerMode.USER_TEXT_MODEL
+            else KnowledgeScope.GENERAL_KNOWLEDGE
+        )
+        if general_caller is None:
+            payload = mock_general_chat_payload(
+                user_query, recent_memory=recent_memory, knowledge_scope=origin
+            )
+        else:
+            payload = general_caller(user_query, recent_memory, origin)
+        return sanitize_general_chat_payload(payload, origin=origin)
+    return _empty_no_retrieval(
+        "No company-knowledge claim is authorized for this query.",
+        status="refused",
+        origin=knowledge_scope,
+    )
+
+
+def _resolve_no_retrieval_mode(
+    user_query: str,
+    mode: NoRetrievalAnswerMode | None,
+    knowledge_scope: KnowledgeScope | None,
+) -> NoRetrievalAnswerMode | None:
+    """Resolve a NoRetrieval mode from routing or local signals.
+
+    Args:
+        user_query: Original user text.
+        mode: Routed mode.
+        knowledge_scope: Routed scope.
+
+    Returns:
+        Concrete mode, or None when the query must refuse.
+    """
+
+    if mode is not None:
+        return mode
+    if knowledge_scope is KnowledgeScope.DETERMINISTIC:
+        return NoRetrievalAnswerMode.DETERMINISTIC_CHAT
+    if knowledge_scope is KnowledgeScope.AMBIGUOUS:
+        return NoRetrievalAnswerMode.CLARIFICATION
+    if (
+        knowledge_scope is KnowledgeScope.USER_SUPPLIED_TEXT
+        or is_user_text_transform(user_query)
+    ):
+        return NoRetrievalAnswerMode.USER_TEXT_MODEL
+    if (
+        knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+        or is_greeting(user_query)
+        or is_product_help(user_query)
+    ):
+        return NoRetrievalAnswerMode.GENERAL_MODEL
+    return None
+
+
+def _empty_no_retrieval(
+    text: str,
+    *,
+    status: Literal["complete", "partial", "refused"],
+    origin: KnowledgeScope | None,
+) -> AnswerPayload:
+    """Build an uncited no-retrieval payload.
+
+    Args:
+        text: Answer prose.
+        status: ``complete``, ``partial``, or ``refused``.
+        origin: Strict-split origin, or None.
+
+    Returns:
+        Payload with empty citations, links, and table citations.
+    """
+
+    return AnswerPayload(
+        answer_text=text,
+        status=status,
+        answer_origin=origin,
+    )
+
+
+def claims_document_access(text: str) -> bool:
+    """Return whether general-chat prose claims company-document access.
+
+    Args:
+        text: Model or mock answer text.
+
+    Returns:
+        True when the text claims to have searched documents or emits IDs.
+    """
+
+    lowered = text.casefold()
+    if any(phrase in lowered for phrase in _DOCUMENT_CLAIM_PHRASES):
+        return True
+    return _SOURCE_ID_CLAIM.search(text) is not None
+
+
+def sanitize_general_chat_payload(
+    payload: AnswerPayload, *, origin: KnowledgeScope
+) -> AnswerPayload:
+    """Drop citations and refuse document-access claims.
+
+    Args:
+        payload: General-chat model or mock result.
+        origin: Intended no-retrieval origin.
+
+    Returns:
+        Uncited payload. Document-access claims become a safe refusal
+        instead of a stripped success.
+    """
+
+    if claims_document_access(payload.answer_text):
+        return _empty_no_retrieval(
+            GENERAL_DOCUMENT_REFUSAL,
+            status="refused",
+            origin=origin,
+        )
+    return AnswerPayload(
+        answer_text=payload.answer_text,
+        status=payload.status,
+        answer_origin=origin,
+    )
+
+
+def mock_general_chat_payload(
+    user_query: str,
+    *,
+    recent_memory: str,
+    knowledge_scope: KnowledgeScope,
+) -> AnswerPayload:
+    """Build a deterministic no-network general-chat fixture.
+
+    Args:
+        user_query: Original user text.
+        recent_memory: Unused delimited memory. Kept for the live contract.
+        knowledge_scope: General or user-text origin.
+
+    Returns:
+        Uncited complete answer. No DNS or provider call.
+    """
+
+    del recent_memory
+    if knowledge_scope is KnowledgeScope.USER_SUPPLIED_TEXT:
+        supplied = user_query.split(":", 1)[-1].strip() or user_query.strip()
+        text = f"Rewritten user text: {supplied}"
+    elif is_product_help(user_query):
+        text = (
+            "I can answer general questions from model knowledge, rewrite text "
+            "you paste, or answer from your authorized company documents with "
+            "citations when you ask a document-scoped question."
+        )
+    elif "capital of france" in user_query.casefold():
+        text = "Paris is the capital of France."
+    else:
+        text = (
+            "Here is a general answer from model knowledge, not from your "
+            "company documents."
+        )
+    return AnswerPayload(
+        answer_text=text,
+        status="complete",
+        answer_origin=knowledge_scope,
+    )
 
 
 def filter_invented_ids(
@@ -255,4 +498,5 @@ def mock_answer_payload(
         composed_conclusion=conclusion,
         table_citations=table_citations,
         status="complete" if status == "complete" else "partial",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
     )

@@ -55,6 +55,15 @@ describe("chat run pointer", () => {
       lastSequence: 1,
     });
     expect(parseChatRunPointer(JSON.stringify({ runId: "run-1" }))).toBeNull();
+    expect(
+      parseChatRunPointer(
+        JSON.stringify({
+          conversationId: "undefined",
+          runId: "run-1",
+          lastSequence: 0,
+        }),
+      ),
+    ).toBeNull();
   });
 
   it("clears the pointer and recognizes active statuses", () => {

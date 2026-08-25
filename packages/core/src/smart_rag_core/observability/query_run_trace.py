@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from typing import Any, TypeVar, cast
 from uuid import UUID
@@ -13,6 +13,7 @@ from smart_rag_core.observability.governance_gate import (
     assert_langsmith_export_permitted,
 )
 from smart_rag_core.observability.langsmith_tracing import (
+    flush_langsmith_traces,
     short_content_hash,
     traceable,
     tracing_is_enabled,
@@ -27,6 +28,7 @@ from smart_rag_core.settings import SharedSettings
 T = TypeVar("T")
 
 QUERY_AGENT_EVAL_RUN = "query.agent.eval"
+QUERY_RUN_SSE_SPAN = "query.run.sse"
 _PARENT_INPUT_KEYS = frozenset(
     {
         "case_id",
@@ -236,11 +238,14 @@ def _optional_trace_str(value: object) -> str | None:
     return None
 
 
-def _query_eval_tracing_scope(*, enabled: bool) -> AbstractContextManager[object]:
+def _query_eval_tracing_scope(
+    *, enabled: bool, project_name: str | None = None
+) -> AbstractContextManager[object]:
     """Open ``langsmith.tracing_context`` when export is on and no scope exists.
 
     Args:
         enabled: Whether this process should export the eval parent run.
+        project_name: LangSmith project when this function opens a new scope.
 
     Returns:
         An enabled tracing context when the SDK is not already tracing;
@@ -253,6 +258,8 @@ def _query_eval_tracing_scope(*, enabled: bool) -> AbstractContextManager[object
         Callable[..., AbstractContextManager[object]],
         langsmith.tracing_context,  # pyright: ignore[reportUnknownMemberType]
     )
+    if project_name:
+        return factory(enabled=True, project_name=project_name)
     return factory(enabled=True)
 
 
@@ -397,3 +404,184 @@ def invoke_traced_query_agent_eval(
                 effective_route=_optional_trace_str(extra.get("effective_route")),
                 corrected_route=_optional_trace_str(extra.get("corrected_route")),
             )
+
+
+_SSE_PARENT_INPUT_KEYS = frozenset(
+    {
+        "run_id",
+        "user_id_sha256",
+        "requested_route",
+        "effective_route",
+        "model_versions",
+        "prompt_versions",
+    }
+)
+_SSE_PARENT_OUTPUT_KEYS = frozenset(
+    {
+        "termination_reason",
+        "terminal_event_type",
+        "stream_exhausted",
+    }
+)
+
+
+def redact_query_run_sse_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
+    """Export correlation IDs, hashed user, route, and versions only.
+
+    Args:
+        inputs: Traceable kwargs. Must not contain query text or JWTs.
+
+    Returns:
+        Redacted parent inputs.
+    """
+
+    payload: dict[str, Any] = {"correlation": current_correlation_ids()}
+    for key in _SSE_PARENT_INPUT_KEYS:
+        value = inputs.get(key)
+        if isinstance(value, str) and value:
+            payload[key] = value[:64]
+        elif isinstance(value, Mapping):
+            mapped = cast(Mapping[object, object], value)
+            payload[key] = {
+                str(item_key)[:64]: str(item_value)[:64]
+                for item_key, item_value in mapped.items()
+            }
+    return payload
+
+
+def redact_query_run_sse_outputs(outputs: object) -> dict[str, Any]:
+    """Export the sanitized termination summary only.
+
+    Args:
+        outputs: Traceable return wrapper or the raw summary mapping.
+
+    Returns:
+        Termination reason, terminal type, and exhausted bool. Never query
+        text, messages, sources, JWTs, or citations.
+    """
+
+    raw: object = outputs
+    if isinstance(outputs, Mapping):
+        mapped = dict(cast(Mapping[str, object], outputs))
+        raw = mapped.get("output", mapped)
+    if not isinstance(raw, Mapping):
+        return {"termination_reason": "unknown"}
+    payload: dict[str, Any] = {}
+    typed = cast(Mapping[str, object], raw)
+    for key in _SSE_PARENT_OUTPUT_KEYS:
+        value = typed.get(key)
+        if key == "stream_exhausted" and isinstance(value, bool):
+            payload[key] = value
+        elif isinstance(value, str) and value:
+            payload[key] = value[:64]
+    return payload or {"termination_reason": "unknown"}
+
+
+async def invoke_traced_query_run_sse(
+    thunk: Callable[[], Awaitable[Mapping[str, object]]],
+    *,
+    settings: SharedSettings,
+    run_id: UUID | str,
+    user_id: UUID | str,
+    requested_route: str | None = None,
+    effective_route: str | None = None,
+    model_versions: Mapping[str, str] | None = None,
+    prompt_versions: Mapping[str, str] | None = None,
+) -> Mapping[str, object]:
+    """Wrap complete SSE executor consumption in a redacted parent span.
+
+    Args:
+        thunk: Async consumer that drains the executor and returns the
+            sanitized termination summary.
+        settings: Process settings used for the export gate.
+        run_id: Application run id.
+        user_id: Subject hashed before export.
+        requested_route: Envelope family reserved at admit.
+        effective_route: Planner-selected family.
+        model_versions: Model ids keyed by usage kind.
+        prompt_versions: Prompt version ids keyed by usage kind.
+
+    Returns:
+        The thunk result.
+
+    Raises:
+        ExternalFlowBlockedError: When export is not permitted.
+
+    Side Effects:
+        Creates a LangSmith chain run named ``query.run.sse`` when tracing
+        is enabled. Does not suppress ``GeneratorExit``.
+    """
+
+    assert_query_agent_eval_langsmith_gate(settings)
+    extra: dict[str, Any] = {
+        "correlation": current_correlation_ids(),
+        "run_id": str(run_id),
+        "user_id_sha256": hashed_user_id(user_id),
+        "graph_name": QUERY_RUN_SSE_SPAN,
+    }
+    if requested_route:
+        extra["requested_route"] = requested_route
+    if effective_route:
+        extra["effective_route"] = effective_route
+    if model_versions:
+        extra["model_versions"] = dict(model_versions)
+    if prompt_versions:
+        extra["prompt_versions"] = dict(prompt_versions)
+    tracing_on = bool(settings.langsmith_tracing or tracing_is_enabled())
+    if not tracing_on:
+        return await thunk()
+
+    @traceable(
+        name=QUERY_RUN_SSE_SPAN,
+        run_type="chain",
+        process_inputs=redact_query_run_sse_inputs,
+        process_outputs=redact_query_run_sse_outputs,
+        metadata=extra,
+        project_name=settings.langsmith_project,
+    )
+    async def _parent(
+        run_id: str,
+        user_id_sha256: str,
+        requested_route: str | None = None,
+        effective_route: str | None = None,
+        model_versions: Mapping[str, str] | None = None,
+        prompt_versions: Mapping[str, str] | None = None,
+    ) -> Mapping[str, object]:
+        """Redacted SSE parent. Arguments are ids, hashes, and versions.
+
+        Args:
+            run_id: Application run id.
+            user_id_sha256: Hashed user id.
+            requested_route: Admit family.
+            effective_route: Planner family.
+            model_versions: Model ids by usage kind.
+            prompt_versions: Prompt versions by usage kind.
+
+        Returns:
+            Sanitized termination summary from the thunk.
+        """
+
+        del (
+            run_id,
+            user_id_sha256,
+            requested_route,
+            effective_route,
+            model_versions,
+            prompt_versions,
+        )
+        return await thunk()
+
+    try:
+        with _query_eval_tracing_scope(
+            enabled=True, project_name=settings.langsmith_project
+        ):
+            return await _parent(
+                run_id=str(extra["run_id"]),
+                user_id_sha256=str(extra["user_id_sha256"]),
+                requested_route=_optional_trace_str(extra.get("requested_route")),
+                effective_route=_optional_trace_str(extra.get("effective_route")),
+                model_versions=model_versions,
+                prompt_versions=prompt_versions,
+            )
+    finally:
+        flush_langsmith_traces()

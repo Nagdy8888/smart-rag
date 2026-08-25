@@ -203,11 +203,11 @@ describe("pending buttons and confirm dialog", () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it("renders one PageHeader title", () => {
+  it("renders a PageHeader lead without a duplicate title heading", () => {
     render(
       <PageHeader title="Documents" description="Current versions only." />,
     );
-    expect(screen.getByRole("heading", { level: 1, name: "Documents" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Documents" })).toBeNull();
     expect(screen.getByText("Current versions only.")).toBeInTheDocument();
   });
 
@@ -250,5 +250,26 @@ describe("pending buttons and confirm dialog", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Deleting…" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  });
+});
+
+describe("EmptyState", () => {
+  it("renders title, body, and action", () => {
+    render(
+      <EmptyState
+        title="Ask your company knowledge"
+        body="Answers come from your authorized documents, with citations you can inspect."
+        action={<Button>Try a prompt</Button>}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Ask your company knowledge" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Answers come from your authorized documents, with citations you can inspect.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try a prompt" })).toBeInTheDocument();
   });
 });

@@ -1,6 +1,12 @@
 # Workspace screens
 
-Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md). Do not reinterpret them.
+Live composition follows the Ink & Indigo refresh in
+[ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md),
+[`globals.css`](../../apps/frontend/src/app/globals.css), and
+[`design-tokens.ts`](../../apps/frontend/src/lib/design-tokens.ts). The
+Phase 8 visual-contract packet remains the interaction source; hex values,
+rail treatment, and Ask transcript behavior below supersede that packet
+where they disagree.
 
 ## Screen specifications
 
@@ -8,9 +14,9 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 
 #### `AppShell`
 
-- Desktop grid columns are `232px minmax(0, 1fr)`; collapsed mode is `72px minmax(0, 1fr)`.
-- At `>=1024px` a labeled “Collapse navigation” control in the rail narrows it. “Expand navigation” then appears in the top bar so the click is not covered by a tooltip. The choice is stored in `localStorage`. Breakpoints remain the default before the first toggle. A later `1280px` rule must not force the expanded width; collapsed classes win at every desktop width.
-- Nav and topbar are white with border separators.
+- Desktop grid columns are `232px minmax(0, 1fr)`; collapsed mode is `72px minmax(0, 1fr)`. Width does not animate.
+- At `>=1024px` a 32px ghost “Collapse navigation” / “Expand navigation” icon control sits at the **rail bottom**. The choice is stored in `localStorage`. Breakpoints remain the default before the first toggle. A later `1280px` rule must not force the expanded width; collapsed classes win at every desktop width.
+- Nav rail uses `--color-ink` with `--color-ink-border` on the trailing edge. Topbar stays white with a bottom border.
 - Main area uses canvas background and owns vertical scrolling.
 - Skip link is visually hidden until focused, then appears at top-left as a Primary-style link.
 - No footer is needed.
@@ -18,8 +24,8 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 #### Brand block
 
 - Height 56px, 16px horizontal padding.
-- 28px square accent mark with existing spark icon and 8px radius.
-- “Smart RAG” 14px/20px weight 600; “Company knowledge” 12px muted.
+- 32px logo tile with `--gradient-brand` and a white spark icon.
+- “Smart RAG” Inter Display 15px, `--color-ink-text`. No subtitle.
 - Collapsed nav shows mark only with tooltip.
 
 #### `AppNav`
@@ -28,14 +34,14 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 - Admin is separated by a 16px gap and shown only for owner/admin.
 - Row is 40px high, 8px horizontal margin, 8px radius, 12px horizontal inner padding.
 - Icon 18px, label 14px weight 500, gap 10px.
-- Active: accent-muted background, accent text, and a 3px accent bar inset at left.
-- Hover: surface-hover. No hover movement.
+- Active: `--color-ink-raised` background, white text, and a 3px accent bar on the left edge (full row height).
+- Hover: `--color-ink-text` on `--color-ink-raised`. No hover movement.
 - Collapsed: centered icons, labels visually hidden, tooltips enabled.
 - Mobile sheet uses full labels and no collapsed mode.
 
 #### `ConsoleTopbar`
 
-- Sticky 56px white bar with bottom border.
+- Sticky 56px white bar with bottom border. It is the only page-title owner (`h1`, page-title scale). Pages do not repeat the same title as an `h2`.
 - Left: mobile menu button when needed, then one page title.
 - Right order: readiness control, command control, Account control.
 - Do not repeat logo in the topbar when desktop nav is visible.
@@ -52,7 +58,7 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 
 #### `AccountMenu`
 
-- Trigger is a 36px IconButton containing a generated two-letter initial avatar; no remote avatar.
+- Trigger is a 36px IconButton containing a generated two-letter initial avatar; no remote avatar. While `/me` is loading, show a neutral `··` placeholder (`data-testid="account-avatar-placeholder"`).
 - Menu shows email, role badge, upload capability text, Account details, and Sign out.
 - No MFA field, profile editor, locale editor, or company settings.
 - Sign out is separated as a quiet-danger menu item.
@@ -67,9 +73,9 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 
 #### `PageHeader`
 
-- Desktop: title/description left, one primary action right.
+- Does not render a page title. The topbar owns the `h1`.
+- Optional description (13px secondary) and one primary action.
 - Mobile: stacked, action full width only when it is the page’s main task.
-- Title uses Page title style; description uses secondary body, max width 720px.
 - Bottom margin 24px.
 
 ### Ask workspace component specification
@@ -77,55 +83,53 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 #### Overall layout
 
 - Use available height below topbar. The console shell is viewport-bounded (`100dvh`); non-Ask console pages still scroll inside `main`.
-- Ask fills the remaining height below the page header and banners. The Sessions list and the conversation body each own `overflow-y: auto`. The Sessions header (title, New, actions) and the composer stay outside those scrollports.
-- At `>=1280px`: 248px Sessions rail and `minmax(0, 1fr)` main workspace, 16px gap. A labeled “Collapse sessions” control narrows the rail to 52px. “Expand sessions” then appears in the answer header and restores the same mounted list. The choice is stored in `localStorage`.
-- At `<1280px`: the desktop Sessions rail is omitted from the workspace grid. Sessions open in a left Sheet whose body remains the list scrollport. The conversation body still scrolls independently of the page.
-- The answer column and composer fill the remaining Ask width. The Message field opts out of the 520px form-field cap. Session titles come from the first question on `POST /conversations`. There is no title-update or LLM-title contract.
-- There is no permanent right sources/diagnostics column.
+- Ask fills the remaining height below banners. There is no duplicate Ask `h2`. The Sessions list and the conversation body each own `overflow-y: auto`. The Sessions header and the composer stay outside those scrollports.
+- At `>=1280px`: 280px Sessions rail and `minmax(0, 1fr)` main workspace. A 28px icon-only “Collapse sessions” control narrows the rail. “Expand sessions” restores the same mounted list. The choice is stored in `localStorage`.
+- At `<1280px`: the desktop Sessions rail is omitted from the workspace grid. Sessions open in a left Sheet. Composer card is full-width with 12px margins; hint text is hidden; transcript uses 16px padding.
+- Transcript column is centered at `max-width: 760px`. Opening a session loads `GET /conversations/{id}/messages` (newest 50, rendered oldest-first). “Load earlier messages” prepends the previous page when `next_before_id` is set.
+- The Message field opts out of the 520px form-field cap. Session titles come from the first question on `POST /conversations`. Null titles render exactly “Untitled chat”. There is no title-update or LLM-title contract.
+- There is no permanent right sources/diagnostics column and no permanent 4-step stepper.
 
 ```mermaid
 flowchart TB
   subgraph shell [Console shell]
-    topbar[Topbar]
+    topbar[Topbar h1]
     subgraph mainArea [main]
-      askHeader[Ask header]
       subgraph workspace [Ask workspace]
         subgraph sessionsRail [Sessions rail]
           sessionsHeader[Sessions header]
           sessionsList[Sessions list scroll]
         end
         subgraph answerColumn [Answer column]
-          stageHeader[Continue note]
-          conversation[Conversation scroll]
-          composer[Composer]
+          conversation[Transcript scroll]
+          statusLine[Status line when running]
+          composer[Composer card]
         end
       end
     end
   end
   topbar --> mainArea
-  askHeader --> workspace
   sessionsHeader --> sessionsList
-  stageHeader --> conversation
-  conversation --> composer
+  conversation --> statusLine
+  statusLine --> composer
 ```
 
 #### `SessionRail`
 
-- White bordered panel, 12px radius, vertical layout.
-- Header: “Sessions” and compact Primary “New” button.
+- White bordered panel, 14px radius, 280px wide.
+- Header: “Sessions” label (13px/600) left; one 32px compact primary icon-button “New chat” (plus icon) right.
 - Search is omitted because the API does not provide global search and local first-page search is misleading.
-- Session row: 48px minimum, title one line, created timestamp, current indicator, overflow menu.
-- Clicking row performs real Continue. Active row uses selected background.
-- Overflow contains Delete only.
+- Session row: single-line title (ellipsis) and relative time (`Intl.RelativeTimeFormat`; short date after 7 days). Sticky groups: Today, Yesterday, Previous 7 days, Older.
+- Clicking a row loads that conversation’s transcript. Active row uses `--color-surface-selected` plus `--color-accent-border`.
+- Delete appears on hover/focus as an icon button; the overflow menu is retained for keyboard users and shows pending “Deleting…”.
 - Footer may contain Load more when cursor data supports it.
 - Empty copy: “No sessions yet. Start a question to create one.”
-- Continuing copy above transcript: “Continuing this session. Earlier messages are not available in this client.”
 
 #### Chat empty state
 
-- Icon: spark/search, not a robot avatar.
-- Title: “Ask your company knowledge.”
-- Body: “Answers use authorized documents and show available evidence.”
+- Use `EmptyState` with the brand gradient tile.
+- Title: “Ask your company knowledge”
+- Body: “Answers come from your authorized documents, with citations you can inspect.”
 - Three prompt-fill chips maximum:
   - “Summarize an uploaded policy”
   - “Compare two documented values”
@@ -134,44 +138,41 @@ flowchart TB
 
 #### User message
 
-- Align right, maximum width 78%.
-- Accent-muted background, 12px radius with 4px bottom-right radius, 12px by 14px padding.
+- Align right, maximum width 85%.
+- `--color-accent-muted` background, 14px radius, 10px by 14px padding.
 - Text 14px/22px, `dir="auto"`.
-- No avatar, timestamp, edit, copy, or retry button unless backed by a contract.
+- No avatar, edit, copy, or retry button unless backed by a contract.
 
 #### Assistant answer
 
-- Full-width transparent surface with a 3px evidence-colored left border and 16px left padding.
-- Header row: spark icon, “Answer,” route StatusPill when real, and overflow with real actions only.
-- Answer text 15px/24px for reading comfort.
-- Do not show a streaming caret or typewriter animation. Show the real Generating/Verifying progress state, then insert verified final answer text without artificial delay.
+- Full-width block, no bubble. Body scale, 72ch measure.
+- Citation chips, then a 12px muted meta row (relative time, route badge when known, and this run’s prompt/completion tokens from SSE `usage` when either count is greater than zero).
+- Live runs append to the same list: the in-flight question is a user bubble; the stream is the last assistant block.
+- Do not show a streaming caret or typewriter animation.
 - Partial/cancelled/error retains existing text and adds a StatusBanner below.
-- Footer order: citations, feedback, then “Run details” disclosure.
+- Footer order: citations, feedback, then collapsed “Run details”.
 
-#### `RunProgress`
+#### Status line
 
-- Compact horizontal/vertical step list using real status events.
-- Known stage labels map to: “Preparing,” “Retrieving,” “Generating,” “Verifying.”
-- Unknown stage renders safe neutral exact stage text in details, not as a new primary phase.
-- Current stage uses info style; completed stages success; failure danger.
-- Do not show percentages.
+- While a run is active, one line above the streaming block: 16px spinner plus exactly one of “Preparing…”, “Retrieving…”, “Generating…”, “Verifying…”.
+- Not rendered when idle. The permanent 4-item stepper is removed.
+- Unknown stage stays in Run details, not as a new primary phase.
 
 #### `ChatComposer`
 
-- White bordered panel, 12px radius, shadow-1, 12px padding.
-- Textarea borderless inside composer; focus ring surrounds composer container.
-- Bottom toolbar: left character count/status; right Attach is absent unless a real chat attachment contract exists; primary Send/Stop at far right.
-- Send button: 40px high, label and 16px arrow icon.
-- Running state replaces Send with Secondary/quiet-danger “Stop” and square icon.
+- Elevated card: white, 16px radius, border, `--shadow-composer`, 12px padding.
+- Auto-growing textarea (1–8 rows), borderless inside the card, placeholder exactly “Ask anything about your documents…”.
+- Footer: left hint exactly “Enter to send · Shift+Enter for a new line” (hidden below 480px); right 36px circular primary icon-button (arrow-up, `aria-label="Send"`), pending “Sending…”.
+- Character counter appears only when remaining is under 1000, as “N characters left”. No attachments sentence.
+- Running state replaces Send with Secondary/quiet-danger “Stop”.
 - `Enter` submits, `Shift+Enter` inserts newline; IME composition never submits.
 - Disabled reason appears immediately above composer in a StatusBanner, not only tooltip.
-- Draft remains after admission failure; clears only after successful admission.
+- Draft lives in the composer. It remains after admission failure; clears only after successful admission.
 
 #### `ReconnectState`
 
-- Warning banner above composer.
-- Copy: “Connection interrupted. Reconnecting… attempt X of Y.”
-- Actions: “Cancel” and, after automatic ceiling, “Try again.”
+- Rendered only when `runId` is set, terminal is null, and the stream is disconnected.
+- Warning banner above the composer with a “Reconnect” button. Never a permanent sibling of Send.
 - Keep partial answer visible.
 
 #### `CitationChip`
@@ -191,10 +192,11 @@ flowchart TB
 
 #### `RunDetailsDrawer`
 
-- Width 440px.
-- Sections in order: Status, Route, Limitations, Cache/Coverage, Usage, Technical IDs.
-- Closed by default.
-- “Your usage” labels `/usage/me`; never “Company total.”
+- Width 440px. Closed by default behind a ghost “Run details” control.
+- Render only rows whose value is real. Skip “—” rows.
+- Terminal text must never say “running” when `runId` is null.
+- Per-run tokens use `formatRunTokenUsage` (`412 prompt · 88 completion`) from SSE `usage`. Account USD uses `formatUsd` on `GET /usage/me`.
+- “Your account” labels `/usage/me`; never “Company total.”
 - IDs use monospace and Copy buttons with real clipboard feedback.
 - No raw traces, prompts, provider secrets, source text, nDCG, or invented latency.
 
@@ -211,10 +213,10 @@ flowchart TB
 
 #### Page layout
 
-- PageHeader title “Documents.”
-- Description: “Upload files or add approved websites, then track search and graph readiness.”
+- Topbar title “Documents”. No trailing period and no duplicate page `h2`.
+- Filter input uses a search icon and placeholder “Filter by name…”. Caption under the filter: “Filters apply to loaded documents only.”
 - Primary action: “Import source.”
-- Toolbar below: loaded-row filter left and count/status summary right.
+- Role-gated crawl notice is shown only to roles that can crawl.
 - Main content is one white bordered DataTable, not multiple dashboard cards.
 
 #### Document table
@@ -277,21 +279,22 @@ flowchart TB
 
 #### Layout
 
-- PageHeader title “Tables.”
-- Description: “Run bounded calculations on structured data with exact cell provenance.”
+- Topbar title “Tables”. No trailing period.
+- Until a table is selected, show the picker plus `EmptyState` title “Pick a table to analyze” and body “Deterministic calculations with exact cell provenance.” Analyze stays visible and disabled.
+- Plan-builder sections render only after a table is selected. “Add X” controls are compact secondary buttons.
 - At `>=1024px`: 320px manifest sidebar and main results area; below that manifest picker is a Select.
 
 #### Manifest sidebar
 
 - White bordered panel, 12px radius.
-- Header “Available tables.”
+- Header “Available tables”
 - Rows show safe table/sheet identity and document ID metadata.
 - Active row uses selected treatment.
 - Empty: “No structured tables are available.”
 
 #### Plan builder
 
-- White Card, title “Analysis plan.”
+- White Card, title “Analysis plan”
 - Field order: Table, Columns, Filters, Aggregation, Group by, Sort, Comparison.
 - Optional sections start collapsed and open via real “Add filter,” “Add aggregation,” etc.
 - Repeating row has inputs plus labeled Remove IconButton.
@@ -316,8 +319,8 @@ flowchart TB
 
 #### Layout
 
-- PageHeader title “Graph.”
-- Description: “Inspect bounded entities and relationships backed by authorized evidence.”
+- Topbar title “Graph”. No trailing period.
+- Cap sentence “Inspect is capped at 12 entities, depth 3, and 200 nodes.” renders once, as a 12px muted line under the pane header.
 - At `>=1280px`: 300px search panel, flexible result panel, 320px inspector.
 - At 1024–1279px: search plus result; inspector is right Drawer.
 - Below 1024px: stacked search, list/canvas result, inspector Drawer.
@@ -358,7 +361,8 @@ flowchart TB
 
 #### Graph inspector
 
-- Title “Evidence details.”
+- Title “Evidence details”
+- Empty evidence pane uses `EmptyState` title “Select a node” and body “Evidence for the selected entity appears here.”
 - Definition list: Type, Object ID, Document ID, Version ID, Chunk ID, Hop, Support.
 - Locator cards show page, section path, sheet/range, or safe URL fields that actually exist.
 - Limitation banners appear below details.

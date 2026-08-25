@@ -11,6 +11,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AnalysisPlan } from "./analysis-plan";
 import { AnalysisResults } from "./analysis-results";
+import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
 import { PageHeader } from "../ui/page-header";
 import { Select } from "../ui/select";
@@ -85,7 +86,7 @@ export function TablesApp() {
   if (!session.ready || accessToken === null) {
     return (
       <div className={styles.page}>
-        <PageHeader title="Tables." />
+        <PageHeader />
         <p className={styles.muted}>
           <Link href="/login">Sign in</Link>
         </p>
@@ -135,10 +136,7 @@ export function TablesApp() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        title="Tables."
-        description="Run bounded calculations on structured data with exact cell provenance."
-      />
+      <PageHeader />
       {listError ? (
         <StatusBanner kind="error" role="alert">
           {listError}
@@ -157,7 +155,7 @@ export function TablesApp() {
 
       <div className={styles.layout}>
         <aside className={styles.sidebar} aria-label="Available tables">
-          <h2>Available tables.</h2>
+          <h2>Available tables</h2>
           {manifests.length === 0 ? (
             <EmptyState title={EMPTY_MANIFESTS_COPY} />
           ) : (
@@ -206,17 +204,29 @@ export function TablesApp() {
               <EmptyState title={EMPTY_MANIFESTS_COPY} />
             ) : null}
           </div>
-          <AnalysisPlan
-            manifests={manifests}
-            selected={selected}
-            draft={draft}
-            pending={analyzeMutation.isPending}
-            onSelectTableId={setUserSelectedId}
-            onDraftChange={(next) => {
-              setDraft(next);
-            }}
-            onAnalyze={handleAnalyze}
-          />
+          {selected === null ? (
+            <EmptyState
+              title="Pick a table to analyze"
+              body="Deterministic calculations with exact cell provenance."
+              action={
+                <Button type="button" disabled>
+                  Analyze
+                </Button>
+              }
+            />
+          ) : (
+            <AnalysisPlan
+              manifests={manifests}
+              selected={selected}
+              draft={draft}
+              pending={analyzeMutation.isPending}
+              onSelectTableId={setUserSelectedId}
+              onDraftChange={(next) => {
+                setDraft(next);
+              }}
+              onAnalyze={handleAnalyze}
+            />
+          )}
           {submittedPlan ? (
             <section className={styles.card} aria-label="Submitted plan">
               <h2>Submitted plan</h2>

@@ -16,6 +16,8 @@ export type PopoverProps = {
   trigger: ReactNode;
   /** Popover body. */
   children: ReactNode;
+  /** Inventory id on the trigger button. */
+  actionId?: string;
 };
 
 /**
@@ -24,7 +26,7 @@ export type PopoverProps = {
  * @param props - Label, trigger, and body.
  * @returns Popover widget. Side effects: focus restore on close.
  */
-export function Popover({ label, trigger, children }: PopoverProps) {
+export function Popover({ label, trigger, children, actionId }: PopoverProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -73,6 +75,7 @@ export function Popover({ label, trigger, children }: PopoverProps) {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={label}
+        data-action-id={actionId}
         onClick={() => {
           setOpen((value) => !value);
         }}

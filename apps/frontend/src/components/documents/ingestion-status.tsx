@@ -51,6 +51,8 @@ export type IngestionStatusProps = {
   layout: IngestionStatusLayout;
   /** Retry a job when `retry_allowed`. */
   onRetry?: (jobId: string) => void;
+  /** True while a retry mutation is in flight. */
+  retryPending?: boolean;
   /** Close the sheet. Required when `asSheet` is true. */
   onClose?: () => void;
   /** When true, wrap the timeline in the status sheet. */
@@ -67,6 +69,7 @@ export function IngestionStatus({
   payload,
   layout,
   onRetry,
+  retryPending = false,
   onClose,
   asSheet = false,
 }: IngestionStatusProps): ReactNode {
@@ -169,7 +172,13 @@ export function IngestionStatus({
             <li key={job.id}>
               <UserText value={job.job_kind} /> — <UserText value={job.status} />
               {version.retry_allowed && onRetry ? (
-                <Button type="button" variant="secondary" onClick={() => onRetry(job.id)}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  pending={retryPending}
+                  pendingLabel="Retrying…"
+                  onClick={() => onRetry(job.id)}
+                >
                   Retry
                 </Button>
               ) : null}

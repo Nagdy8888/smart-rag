@@ -219,7 +219,7 @@ describe("GraphExplorer ACL vs Graph Pending", () => {
       },
     ]);
     renderSurface(<GraphExplorer />);
-    fireEvent.change(await screen.findByLabelText("Search entities."), {
+    fireEvent.change(await screen.findByLabelText("Search entities"), {
       target: { value: "acme" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -251,7 +251,7 @@ describe("GraphExplorer ACL vs Graph Pending", () => {
       },
     ]);
     renderSurface(<GraphExplorer />);
-    fireEvent.change(await screen.findByLabelText("Search entities."), {
+    fireEvent.change(await screen.findByLabelText("Search entities"), {
       target: { value: "acme" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));

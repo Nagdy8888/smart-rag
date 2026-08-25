@@ -47,10 +47,10 @@ describe("design token source of truth", () => {
     for (const [name, value] of Object.entries(DESIGN_TOKENS)) {
       expect(root[name], name).toBe(value);
     }
-    expect(COLOR_BG).toBe("#F4F6F8");
-    expect(COLOR_ACCENT).toBe("#4E5BD5");
-    expect(RADIUS_SM).toBe("8px");
-    expect(RADIUS_MD).toBe("12px");
+    expect(COLOR_BG).toBe("#F6F7F9");
+    expect(COLOR_ACCENT).toBe("#4F46E5");
+    expect(RADIUS_SM).toBe("10px");
+    expect(RADIUS_MD).toBe("14px");
     expect(CONTROL_HEIGHT).toBe("40px");
   });
 

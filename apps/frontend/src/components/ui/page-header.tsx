@@ -7,25 +7,30 @@ import type { ReactNode } from "react";
 import styles from "./ui.module.css";
 
 export type PageHeaderProps = {
-  /** Visible page title. One per page. */
-  title: string;
-  /** Optional supporting sentence. */
+  /**
+   * Ignored. The console topbar owns the single page title.
+   * Accepted so existing call sites can drop the heading without an extra PR.
+   */
+  title?: string;
+  /** Optional supporting sentence under the topbar. */
   description?: string;
   /** At most one primary action plus overflow. */
   actions?: ReactNode;
 };
 
 /**
- * Render the page heading block.
+ * Render the page lead and actions. The topbar owns the page title.
  *
- * @param props - Title, optional description and actions.
- * @returns Header landmark contents. No data fetching.
+ * @param props - Optional description and actions. `title` is not rendered.
+ * @returns Header landmark contents, or null when there is nothing to show.
  */
-export function PageHeader({ title, description, actions }: PageHeaderProps) {
+export function PageHeader({ description, actions }: PageHeaderProps) {
+  if (!description && !actions) {
+    return null;
+  }
   return (
     <header className={styles.pageHeader}>
       <div className={styles.pageHeaderCopy}>
-        <h1 className={styles.pageHeaderTitle}>{title}</h1>
         {description ? (
           <p className={styles.pageHeaderDescription}>{description}</p>
         ) : null}

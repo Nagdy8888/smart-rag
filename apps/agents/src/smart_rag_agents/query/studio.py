@@ -26,6 +26,7 @@ from typing_extensions import TypedDict
 
 from smart_rag_agents.query.graph import build_query_graph
 from smart_rag_agents.query.state import QueryGraphState, pending_query_state
+from smart_rag_agents.query.studio_tracing import apply_studio_langsmith_flags
 
 STUDIO_NAMESPACE = UUID("8f1c0d2a-4b7e-4c9a-9d31-7a6e5f4b3c21")
 """Stable UUID namespace for Studio conversation/user ids. Not an auth subject."""
@@ -145,6 +146,44 @@ def query_text_from_studio_input(state: object) -> str:
     return ""
 
 
+def _studio_usage_label(state: QueryGraphState) -> str:
+    """Return a short token-consumption line when the run used a model.
+
+    Args:
+        state: Terminal query state with optional accumulated tokens.
+
+    Returns:
+        ``N prompt · M completion``, or empty when both counts are zero.
+    """
+
+    prompt = state.get("prompt_tokens")
+    completion = state.get("completion_tokens")
+    if not isinstance(prompt, int) or isinstance(prompt, bool):
+        return ""
+    if not isinstance(completion, int) or isinstance(completion, bool):
+        return ""
+    if prompt <= 0 and completion <= 0:
+        return ""
+    return f"{prompt:,} prompt · {completion:,} completion"
+
+
+def _with_studio_usage(text: str, state: QueryGraphState) -> str:
+    """Append token consumption under Studio answer text.
+
+    Args:
+        text: Safe answer or status fallback.
+        state: Terminal query state.
+
+    Returns:
+        ``text`` unchanged when the run spent no tokens.
+    """
+
+    usage = _studio_usage_label(state)
+    if not usage:
+        return text
+    return f"{text}\n\n{usage}"
+
+
 def _answer_text(value: object) -> str:
     """Return non-empty ``answer_text`` from an answer-shaped mapping.
 
@@ -170,7 +209,8 @@ def studio_response_text(state: QueryGraphState) -> str:
 
     Returns:
         Verified answer text when present, then draft answer text, then a safe
-        status/detail fallback. The function never fabricates retrieval
+        status/detail fallback. Provider token totals are appended only when
+        the run spent tokens. The function never fabricates retrieval
         evidence.
     """
 
@@ -178,15 +218,14 @@ def studio_response_text(state: QueryGraphState) -> str:
     if isinstance(verification, dict):
         text = _answer_text(verification.get("answer"))
         if text:
-            return text
+            return _with_studio_usage(text, state)
     text = _answer_text(state.get("answer"))
     if text:
-        return text
+        return _with_studio_usage(text, state)
     status = str(state.get("status") or "finished").replace("_", " ")
     detail = str(state.get("detail") or "").strip()
-    if detail:
-        return f"{status}: {detail}"
-    return f"Studio run {status} without an answer."
+    fallback = f"{status}: {detail}" if detail else f"Studio run {status} without an answer."
+    return _with_studio_usage(fallback, state)
 
 
 def emit_studio_response(
@@ -377,6 +416,8 @@ def seed_studio_runtime(
         requested_manual_route=manual,
     )
 
+
+apply_studio_langsmith_flags()
 
 graph: StudioCompiledGraph = build_query_graph(studio_local=True).compile()  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
 """Compiled Studio query graph. Checkpointer-free and unbound."""

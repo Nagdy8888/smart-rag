@@ -63,6 +63,7 @@
     "coverage",
     "optional_tool_disclosure",
     "citation_preview",
+    "answer_origin",
     "token_delta",
     "usage",
     "completed",

@@ -35,6 +35,8 @@ def execute_counted_model_call(
     actual_prompt_tokens: int | None = None,
     actual_completion_tokens: int | None = None,
     actual_cost_usd: Decimal | None = None,
+    usage_from_result: Callable[[T], tuple[int | None, int | None, Decimal | None]]
+    | None = None,
 ) -> tuple[T, ReservationConsumeResult, UUID]:
     """Consume the run-local reservation, invoke one provider attempt, record usage.
 
@@ -52,9 +54,15 @@ def execute_counted_model_call(
         model_id: Provider model identifier.
         provider_attempt_id: Idempotent attempt identifier.
         send: Provider invocation. Raise ``TimeoutAfterSendError`` after send.
-        actual_prompt_tokens: Tokens from a successful response.
-        actual_completion_tokens: Tokens from a successful response.
-        actual_cost_usd: Measured USD from a successful response.
+        actual_prompt_tokens: Tokens known before ``send``. Prefer
+            ``usage_from_result`` when the provider reports usage on the
+            response.
+        actual_completion_tokens: Tokens known before ``send``.
+        actual_cost_usd: Measured USD known before ``send``.
+        usage_from_result: Optional extractor run after a successful
+            ``send``. Non-null extracted values override the ``actual_*``
+            arguments. Timeout-after-send still records the conservative
+            cap and does not call this extractor.
 
     Returns:
         Provider result, consume snapshot, and ``llm_usage.id``.
@@ -99,6 +107,19 @@ def execute_counted_model_call(
             timeout_after_send=True,
         )
         raise
+    recorded_prompt = actual_prompt_tokens
+    recorded_completion = actual_completion_tokens
+    recorded_cost = actual_cost_usd
+    if usage_from_result is not None:
+        extracted_prompt, extracted_completion, extracted_cost = usage_from_result(
+            result
+        )
+        if extracted_prompt is not None:
+            recorded_prompt = extracted_prompt
+        if extracted_completion is not None:
+            recorded_completion = extracted_completion
+        if extracted_cost is not None:
+            recorded_cost = extracted_cost
     usage_id = record_query_llm_usage(
         connection,
         caller=caller,
@@ -109,14 +130,12 @@ def execute_counted_model_call(
         model_id=model_id,
         provider_attempt_id=provider_attempt_id,
         prompt_tokens=(
-            actual_prompt_tokens if actual_prompt_tokens is not None else prompt_cap
+            recorded_prompt if recorded_prompt is not None else prompt_cap
         ),
         completion_tokens=(
-            actual_completion_tokens
-            if actual_completion_tokens is not None
-            else completion_cap
+            recorded_completion if recorded_completion is not None else completion_cap
         ),
-        cost_usd=actual_cost_usd if actual_cost_usd is not None else usd_cap,
+        cost_usd=recorded_cost if recorded_cost is not None else usd_cap,
         timeout_after_send=False,
     )
     return result, consumed, usage_id

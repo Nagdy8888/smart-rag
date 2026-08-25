@@ -89,7 +89,7 @@ export function AnalysisPlan({
 
   return (
     <section className={styles.card} aria-label="Analysis plan">
-      <h2>Analysis plan.</h2>
+      <h2>Analysis plan</h2>
       <Select
         label="Table"
         value={selected?.table_id ?? ""}
@@ -135,6 +135,8 @@ export function AnalysisPlan({
         ))}
         <Button
           type="button"
+          variant="secondary"
+          size="compact"
           onClick={() => patchDraft({ columns: [...draft.columns, ""] })}
         >
           Add column
@@ -163,6 +165,8 @@ export function AnalysisPlan({
         ))}
         <Button
           type="button"
+          variant="secondary"
+          size="compact"
           onClick={() =>
             patchDraft({
               filters: [
@@ -230,6 +234,8 @@ export function AnalysisPlan({
         ))}
         <Button
           type="button"
+          variant="secondary"
+          size="compact"
           onClick={() =>
             patchDraft({
               aggregations: [
@@ -273,6 +279,8 @@ export function AnalysisPlan({
         ))}
         <Button
           type="button"
+          variant="secondary"
+          size="compact"
           onClick={() => patchDraft({ groupBy: [...draft.groupBy, ""] })}
         >
           Add group by
@@ -331,6 +339,8 @@ export function AnalysisPlan({
         ))}
         <Button
           type="button"
+          variant="secondary"
+          size="compact"
           onClick={() =>
             patchDraft({
               sorts: [...draft.sorts, { column: "", direction: "asc" }],

@@ -10,6 +10,8 @@ RERANK_PROMPT_VERSION = "rerank_v1"
 RERANK_PROMPT_PATH = Path(__file__).resolve().parent / "rerank_v1.md"
 ANSWER_PROMPT_VERSION = "answer_v1"
 ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "answer_v1.md"
+GENERAL_CHAT_PROMPT_VERSION = "general_chat_v1"
+GENERAL_CHAT_PROMPT_PATH = Path(__file__).resolve().parent / "general_chat_v1.md"
 VERIFIER_PROMPT_VERSION = "verifier_v1"
 VERIFIER_PROMPT_PATH = Path(__file__).resolve().parent / "verifier_v1.md"
 OPTIONAL_CATALOG_PROMPT_VERSION = "optional_catalog_v1"
@@ -57,6 +59,19 @@ def answer_prompt_text() -> str:
     """
 
     return ANSWER_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def general_chat_prompt_text() -> str:
+    """Return the Packet 12 no-source general-chat prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return GENERAL_CHAT_PROMPT_PATH.read_text(encoding="utf-8")
 
 
 def verifier_prompt_text() -> str:

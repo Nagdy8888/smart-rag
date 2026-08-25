@@ -12,7 +12,7 @@
   min-height: var(--control-height);
   padding: 0 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
@@ -22,9 +22,9 @@
   cursor: pointer;
   box-shadow: none;
   transition:
-    background-color var(--motion-fast) ease-out,
-    color var(--motion-fast) ease-out,
-    border-color var(--motion-fast) ease-out;
+    background-color var(--motion-fast),
+    color var(--motion-fast),
+    border-color var(--motion-fast);
 }
 
 .button:hover:not(:disabled) {
@@ -75,6 +75,10 @@
   box-shadow: none;
   background: transparent;
   border-color: transparent;
+}
+
+.buttonGhost:hover:not(:disabled) {
+  background: var(--color-surface-hover);
 }
 
 .buttonDangerQuiet {
@@ -217,7 +221,7 @@
   width: 100%;
   padding: 0 12px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
@@ -230,8 +234,11 @@
   border-color: var(--color-border-strong);
 }
 
-.control:focus {
-  border-color: var(--color-accent);
+.control:focus,
+.control:focus-visible {
+  border-color: var(--color-focus);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .controlWrap {
@@ -426,27 +433,74 @@
 .skeleton {
   display: block;
   min-height: 0.75rem;
-  border-radius: var(--radius-sm);
-  background: var(--color-accent-soft);
-  animation: ui-pulse 1.2s ease-in-out infinite;
+  border-radius: var(--radius-control);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-muted) 0%,
+    var(--color-surface-hover) 50%,
+    var(--color-surface-muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.2s ease-in-out infinite;
 }
 
-@keyframes ui-pulse {
-  50% {
-    opacity: 0.55;
+@keyframes ui-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
   }
 }
 
 .emptyState {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: calc(var(--space) * 2);
-  padding: calc(var(--space) * 6);
-  color: var(--color-text-muted);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-lg);
+  align-items: center;
+  text-align: center;
+  gap: calc(var(--space) * 3);
+  padding: calc(var(--space) * 8) calc(var(--space) * 6);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+}
+
+.emptyStateTile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--gradient-brand);
+  color: var(--color-accent-fg);
+}
+
+.emptyStateTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-section-size);
+  line-height: var(--text-section-height);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.emptyStateBody {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-height);
+  color: var(--color-text-secondary);
+}
+
+.emptyStateActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(var(--space) * 2);
 }
 
 .errorState {
@@ -600,11 +654,11 @@
 }
 
 .rovingList > li,
-.rovingList button {
+.rovingList [role="option"] {
   min-height: var(--row-height);
 }
 
-.rovingList button {
+.rovingList [role="option"] {
   width: 100%;
   text-align: start;
   font: inherit;

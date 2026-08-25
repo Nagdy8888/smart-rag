@@ -2,7 +2,7 @@
 title: Query budget engineering defaults
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering
 phase_packet: Phase 6 Packet 1
 ---
@@ -74,6 +74,16 @@ includes batched query embed, one rerank, and answer-class headroom
 Monthly query spend uses
 `COALESCE(profile.monthly_llm_budget_usd, company.monthly_llm_budget_usd, 200)`.
 `graph_maintenance` (QT-COST-003) is not consumable by query.
+
+Auto chat still reserves the Composite envelope once
+([QUERY_ADMISSION.md](./QUERY_ADMISSION.md)). Strict-split general and
+user-text answers consume that same reservation as `usage_kind=answer`
+and write one immutable usage row. Standalone greetings use that same
+`usage_kind=answer` general-chat call. Mixed-scope clarifications make
+zero model calls. A company question with no
+authorized evidence is a counted refusal on the company path; it does
+not spend a second general-knowledge call. Duplicate idempotency keys
+and SSE reconnect reuse the existing paid run.
 
 ## Related
 

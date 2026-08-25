@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import json
+import os
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -16,10 +17,12 @@ import pytest
 from smart_rag_core.gateways.embedding import EmbeddingRequest, create_embedding_gateway
 from smart_rag_core.gateways.model import ModelRequest, create_model_gateway
 from smart_rag_core.observability.langsmith_tracing import (
+    LANGCHAIN_TRACING_V2_ENV,
     LANGSMITH_HIDE_INPUTS_ENV,
     LANGSMITH_HIDE_OUTPUTS_ENV,
     LANGSMITH_TRACING_ENV,
     configure_langsmith,
+    flush_langsmith_traces,
     payload_contains_forbidden_text,
     redact_gateway_inputs,
     short_content_hash,
@@ -41,6 +44,7 @@ _ALLOWED_RESPONSES_CREATE = {
     Path("packages/core/src/smart_rag_core/gateways/openai_rerank.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_answer.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_lightrag.py"),
+    Path("packages/core/src/smart_rag_core/gateways/openai_general_chat.py"),
 }
 _ALLOWED_EMBEDDINGS_CREATE = {
     Path("packages/core/src/smart_rag_core/observability/langsmith_tracing.py"),
@@ -196,6 +200,34 @@ def test_configure_langsmith_forces_hide_and_default_off(
     assert applied[LANGSMITH_HIDE_INPUTS_ENV] == "true"
     assert applied[LANGSMITH_HIDE_OUTPUTS_ENV] == "true"
     assert applied[LANGSMITH_TRACING_ENV] == "false"
+    assert applied[LANGCHAIN_TRACING_V2_ENV] == "false"
+
+
+def test_configure_langsmith_enables_langchain_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Enabled tracing also sets LANGCHAIN_TRACING_V2 for LangGraph export."""
+
+    monkeypatch.setenv(LANGSMITH_TRACING_ENV, "true")
+    monkeypatch.setenv("LANGSMITH_API_KEY", "lsv2_canary_must_not_leak")
+    monkeypatch.setenv("LANGSMITH_PROJECT", "smart-rag")
+    settings = AgentSettings()
+    applied = configure_langsmith(settings)
+    assert applied[LANGSMITH_TRACING_ENV] == "true"
+    assert applied[LANGCHAIN_TRACING_V2_ENV] == "true"
+    assert os.environ[LANGCHAIN_TRACING_V2_ENV] == "true"
+    assert os.environ["LANGCHAIN_PROJECT"] == "smart-rag"
+    assert "lsv2_canary" not in repr(applied)
+    assert "lsv2_canary" not in str(applied)
+
+
+def test_flush_langsmith_traces_skips_without_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Flush is a no-op when unit tests have no LangSmith credential."""
+
+    monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
+    flush_langsmith_traces()
 
 
 def test_redact_gateway_inputs_omits_query_and_excerpts() -> None:

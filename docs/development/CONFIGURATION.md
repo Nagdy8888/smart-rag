@@ -23,9 +23,9 @@ Validation errors list field paths and categories but omit source values.
 | `MOCK_MODEL_MODE` | boolean; `true` | public | Secure default; selects frozen fixtures and denies DNS access to `api.openai.com`. Local live OpenAI is opt-in via gitignored env (`false` plus `OPENAI_API_KEY`). Real company content stays prohibited until the OpenAI org matrix is `verified` |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; `INFO` | public | Root JSON log threshold |
 | `OPENAI_API_KEY` | optional secret in mock mode | secret | Required when `MOCK_MODEL_MODE=false`; never logged or represented in plaintext |
-| `LANGSMITH_TRACING` | boolean; `false` | public | Off by default. When true, every gateway model/embedding call emits a redacted LangSmith span. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) |
+| `LANGSMITH_TRACING` | boolean; `false` | public | Off by default. When true, every gateway model/embedding call emits a redacted LangSmith span. Local Compose reads this from `.env.compose`, not leftover host pytest flags. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) |
 | `LANGSMITH_API_KEY` | optional secret | secret | Required when `LANGSMITH_TRACING=true`. Local LangGraph Studio UI also needs this key to attach at `smith.langchain.com/studio` even when tracing stays false. Never logged or represented in plaintext |
-| `LANGSMITH_PROJECT` | safe identifier; `smart-rag` | public | LangSmith project that receives redacted traces |
+| `LANGSMITH_PROJECT` | safe identifier; `smart-rag` | public | LangSmith project that receives redacted traces. Open this exact project in the UI |
 | `LANGSMITH_ENDPOINT` | optional HTTP URL | internal | Override for a non-default LangSmith API; unset uses the hosted default |
 | `MOCK_MODEL_FIXTURE_ID` | safe identifier; `phase-1-foundation-v1` | internal | Included in fixture provenance; does not imply retrieval |
 | `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 16,384 | public | Deployable gateway input bound |
@@ -46,6 +46,17 @@ Validation errors list field paths and categories but omit source values.
 | `ADMIN_ALERT_SMTP_PORT` | integer; `54325` | public | Exposed local SMTP port from `supabase/config.toml` `local_smtp.smtp_port` |
 | `ADMIN_ALERT_SMTP_FROM` | email; `alerts@localhost` | public | Envelope from for metadata-only admin alerts |
 | `ADMIN_ALERT_SMTP_TO` | email; `owner@localhost` | public | Owner/admin mailbox captured by Inbucket |
+
+## Agent-only variables
+
+These fields live on `AgentSettings` only. `AgentSettings` does not inherit
+`BackendSettings`. Live Studio loads `BackendSettings` separately for JWKS
+and DSNs. See [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md).
+
+| Variable | Type / default | Security | Contract |
+| --- | --- | --- | --- |
+| `LANGGRAPH_STUDIO_LIVE_ENABLED` | boolean; `false` | public | Enables authenticated `query_studio_live` execution. Introspection stays unbound. Enabled without a token rejects and never synthetic-admits |
+| `LANGGRAPH_STUDIO_ACCESS_TOKEN` | optional secret JWT | secret | Verified Supabase user access token for live Studio. Never a service-role key. Omitted from settings repr, logs, traces, checkpoints, and graph state. Rotate by replacing the gitignored value and restarting `langgraph dev`. Remove the variable and set live enabled to false to disable. Do not print this value |
 
 ## Phase 5 LightRAG settings
 

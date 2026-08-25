@@ -55,6 +55,10 @@ class QueryGraphState(TypedDict):
         verifier_call_count: Must be 0 or 1.
         selected_algorithm: Fusion or naive union.
         fusion_config_hash: Frozen configuration digest.
+        knowledge_scope: Strict-split origin copied from preparation, or null.
+        no_retrieval_answer_mode: NoRetrieval answer mode, or null.
+        prompt_tokens: Accumulated provider prompt tokens for this run.
+        completion_tokens: Accumulated provider completion tokens for this run.
     """
 
     status: Literal[
@@ -117,6 +121,10 @@ class QueryGraphState(TypedDict):
     verifier_call_count: int
     selected_algorithm: str | None
     fusion_config_hash: str | None
+    knowledge_scope: str | None
+    no_retrieval_answer_mode: str | None
+    prompt_tokens: int
+    completion_tokens: int
 
 
 QueryStateGraph: TypeAlias = StateGraph[
@@ -195,4 +203,8 @@ def pending_query_state(
         "verifier_call_count": 0,
         "selected_algorithm": None,
         "fusion_config_hash": None,
+        "knowledge_scope": None,
+        "no_retrieval_answer_mode": None,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
     }

@@ -37,6 +37,8 @@ from smart_rag_core.query_answer.verifier import (
 from smart_rag_core.query_answer.versions import (
     ANSWER_PROMPT_SHA256,
     ANSWER_PROMPT_VERSION,
+    GENERAL_CHAT_PROMPT_SHA256,
+    GENERAL_CHAT_PROMPT_VERSION,
     MAX_VERIFIER_LINKS,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
@@ -51,6 +53,7 @@ from smart_rag_core.query_fusion.models import (
     ScoredPassage,
 )
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.models import (
     BranchKind,
     BranchResult,
@@ -166,8 +169,10 @@ def test_answer_and_verifier_prompt_hashes() -> None:
 
     assert ANSWER_PROMPT_VERSION == "answer_v1"
     assert VERIFIER_PROMPT_VERSION == "verifier_v1"
+    assert GENERAL_CHAT_PROMPT_VERSION == "general_chat_v1"
     assert ANSWER_PROMPT_SHA256 == _prompt_digest("answer_v1.md")
     assert VERIFIER_PROMPT_SHA256 == _prompt_digest("verifier_v1.md")
+    assert GENERAL_CHAT_PROMPT_SHA256 == _prompt_digest("general_chat_v1.md")
 
 
 def test_one_answer_generation_and_second_call_fails() -> None:
@@ -512,7 +517,8 @@ def test_graph_inspection_refuses_but_greeting_is_safe_chat() -> None:
         graph_as_answer_forbidden=False,
     )
     assert greeting.status == "complete"
-    assert "uploaded documents" in greeting.answer_text
+    assert greeting.answer_origin is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert "uploaded documents" not in greeting.answer_text
     checked_greeting, greeting_failures = deterministic_check_answer(
         greeting,
         fusion=_fusion(),
@@ -524,13 +530,15 @@ def test_graph_inspection_refuses_but_greeting_is_safe_chat() -> None:
     transform = generate_answer(
         fusion=_fusion(),
         tables=(),
-        user_query="rewrite this paragraph",
+        user_query="rewrite this paragraph: hello",
         caller=None,
         already_generated=0,
         company_claim_forbidden=True,
         graph_as_answer_forbidden=False,
     )
-    assert transform.status == "refused"
+    assert transform.status == "complete"
+    assert transform.citations == ()
+    assert "hello" in transform.answer_text
 
 
 def test_citation_provenance_uses_existing_jsonb() -> None:

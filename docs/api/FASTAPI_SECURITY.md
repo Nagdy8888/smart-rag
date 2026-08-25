@@ -69,6 +69,7 @@ keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGA
 | POST/GET | `/conversations` | authenticated | creator insert / `list_user_conversations_page` | COST_MUTATION on create; GET `limit` default 50 max 200; keyset `cursor` |
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
 | DELETE | `/conversations/{id}` | creator or owner/admin | **204**; foreign/tombstoned **404** | Immediate purge; see [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) |
+| GET | `/conversations/{id}/messages` | creator | `app.list_conversation_messages` | `limit` default 50 max 100; `before` UUID keyset. 200 `{items:[{message_id, role, content, created_at}], next_before_id}`. Roles `user`/`assistant` only. Full content, HTML-escaped. Foreign/deleted/missing → generic **404** `not_found`. LOW_RISK_READ. |
 | POST | `/conversations/{id}/messages` | creator | handshake then idempotent Auto admit **composite** | **Requires** `Idempotency-Key` header or body `idempotency_key` (400 if missing). JSON Accept → 202 `{run_id, stream_path}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) |
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
 | POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |
@@ -161,6 +162,33 @@ anchors, and S3 Object Lock.
 See [SSE.md](./SSE.md). Handshake (`X-Client-Version`) is enforced on
 `POST /conversations/{conversation_id}/messages` before admit. Resume is
 `GET /runs/{run_id}/events`. Conversation deletion is `DELETE /conversations/{id}` (204). Reaper and LangSmith deletion retry: [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md).
+
+### Conversation transcript
+
+`GET /conversations/{conversation_id}/messages` is a creator-only read of
+persisted `app.messages` rows. It does not invent history: only `user` and
+`assistant` roles are returned, with full HTML-escaped `content`. Query
+parameters: `limit` (default 50, minimum 1, maximum 100) and optional
+`before` (UUID of the previous page's last `message_id`). Response
+`next_before_id` is that last id when the page is full, otherwise `null`.
+Missing, deleted, and foreign conversations return the same generic
+`404 {"detail":"not_found"}` as `GET /conversations/{id}`.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as FastAPI
+    participant Rpc as app.list_conversation_messages
+    Browser->>API: GET /conversations/{id}/messages?limit=50
+    API->>Rpc: creator-only keyset page
+    Rpc-->>API: newest-first user/assistant rows
+    API-->>Browser: 200 items plus next_before_id
+    opt Older page
+        Browser->>API: GET .../messages?before=next_before_id
+        API-->>Browser: strictly older rows
+    end
+```
+
 Live Composite LLM streaming remains packet 8. CloudFront/WAF/Caddy IaC
 and a staging 50s CDN stream remain Phase 10; local 90s contract files are
 in [STREAMING_TIMEOUTS.md](../deployment/STREAMING_TIMEOUTS.md).
@@ -169,7 +197,7 @@ in [STREAMING_TIMEOUTS.md](../deployment/STREAMING_TIMEOUTS.md).
 
 ```text
 uv run python scripts/ci/check_openapi.py
-uv run python -m pytest tests/unit/test_fastapi_security.py tests/contract/test_query_admission_api.py tests/contract/test_retrieval_cache.py tests/unit/test_package_imports.py tests/contract/test_import_boundaries.py tests/unit/test_backend_middleware.py -q
+uv run python -m pytest tests/unit/test_fastapi_security.py tests/contract/test_query_admission_api.py tests/contract/test_conversation_transcript.py tests/contract/test_retrieval_cache.py tests/unit/test_package_imports.py tests/contract/test_import_boundaries.py tests/unit/test_backend_middleware.py -q
 ```
 
 Packet 6 SSE:

@@ -6,6 +6,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Button } from "../ui/button";
@@ -91,6 +92,7 @@ export function HandshakeBanner() {
  * @returns Sign-in card.
  */
 export function SignInForm({ callbackError = false }: { callbackError?: boolean }) {
+  const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -114,14 +116,17 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
         );
         if (result.error || !result.data.session?.access_token) {
           setFailed(true);
+          return;
         }
+        router.replace("/");
+        router.refresh();
       } catch {
         setFailed(true);
       } finally {
         setPending(false);
       }
     },
-    [email, password, supabase],
+    [email, password, router, supabase],
   );
 
   return (
@@ -170,11 +175,12 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
           type="submit"
           variant="primary"
           className={authStyles.primaryWide}
-          disabled={pending}
+          pending={pending}
+          pendingLabel="Signing in…"
           data-action-id="auth.sign_in"
           data-testid="auth-sign-in"
         >
-          {pending ? "Signing in…" : "Sign in"}
+          Sign in
         </Button>
       </form>
       <p className={authStyles.links}>

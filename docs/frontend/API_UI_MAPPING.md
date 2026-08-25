@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-25
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -96,6 +96,7 @@ Heartbeat interval is **15** seconds. Forbidden payload keys include
 | `coverage` | `coverage_score?` | no |
 | `optional_tool_disclosure` | `tool_keys` | no |
 | `citation_preview` | `citation_ids`, `ranks` | no |
+| `answer_origin` | `origin` | no |
 | `token_delta` | `delta` | no |
 | `usage` | `prompt_tokens`, `completion_tokens` | no |
 | `completed` | empty | **yes** |
@@ -196,6 +197,7 @@ source-preview/download HTTP route.
 | GET | `/conversations/{conversation_id}` | creator or owner/admin; else 404 |
 | DELETE | `/conversations/{conversation_id}` | **204**; foreign/tombstone **404**; immediate purge |
 | POST | `/conversations/{conversation_id}/messages` | handshake + admit; **requires** Idempotency-Key or body key |
+| GET | `/conversations/{conversation_id}/messages` | creator-only transcript; `limit` 1–100 default 50; `before` keyset; 200 `{items, next_before_id}`; foreign/deleted **404** |
 | GET | `/runs/{run_id}` | creator only; IDOR 404 |
 | POST | `/runs/{run_id}/cancel` | creator |
 | GET | `/runs/{run_id}/events` | Bearer SSE resume |
@@ -384,6 +386,7 @@ where listed.
 | Screen | Control | Contract | Authz | Idempotency / resume |
 | --- | --- | --- | --- | --- |
 | F List | conversations | `GET /conversations` | creator | n/a |
+| F Transcript | earlier messages | `GET /conversations/{id}/messages` | creator; 404 otherwise | `limit`/`before` keyset |
 | F New | title optional | `POST /conversations` | creator | COST_MUTATION |
 | F Delete | delete | `DELETE /conversations/{id}` | creator or owner/admin; 204/404 | n/a |
 | F Handshake | version | `GET /api/meta` then `X-Client-Version` | public then paid POST | 426 blocks reserve |
@@ -402,7 +405,8 @@ where listed.
 | F Citations | chips | `citation_preview` then `GET /runs/{id}/citations` | creator | no snippets |
 | F Source drawer | preview/download | GAP-07-09 | — | IDs/provenance only |
 | F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | exact 10 tags |
-| F Usage strip | totals | `GET /usage/me` | caller | no prompt text |
+| F Usage strip | account totals | `GET /usage/me` | caller | no prompt text |
+| F Run tokens | prompt / completion | SSE `usage` | creator | hidden when both are 0 |
 | F Profile rewrite / candidates / BM25 bytes / rerank / inferences / latency | — | GAP-07-02 | — | do not invent |
 | G 426/402/429/503 | banners | HTTP details above | — | no paid retry on 426/402 |
 

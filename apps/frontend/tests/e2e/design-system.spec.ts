@@ -34,7 +34,7 @@ test("authenticated mobile keeps compact brand and a menu control", async ({
   await signInLiveMember(page, request);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByText("Smart RAG").first()).toBeVisible();
+  await expect(page.getByText("Smart RAG").filter({ visible: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
   await expect(page.locator("#main")).toBeVisible();
 });

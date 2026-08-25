@@ -8,6 +8,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowUp,
   BarChart3,
   Bell,
   CircleHelp,
@@ -31,6 +32,7 @@ import {
   Share2,
   Sparkles,
   Table2,
+  Trash2,
   Upload,
   User,
   Users,
@@ -68,7 +70,9 @@ export type IconName =
   | "logout"
   | "command"
   | "panelExpand"
-  | "panelCollapse";
+  | "panelCollapse"
+  | "arrowUp"
+  | "trash";
 
 export type IconProps = SVGProps<SVGSVGElement> & {
   /** Stable icon id from the typed set. */
@@ -106,6 +110,8 @@ const LUCIDE_BY_NAME: Record<Exclude<IconName, "google">, LucideIcon> = {
   command: Command,
   panelExpand: PanelLeft,
   panelCollapse: PanelLeftClose,
+  arrowUp: ArrowUp,
+  trash: Trash2,
 };
 
 /**

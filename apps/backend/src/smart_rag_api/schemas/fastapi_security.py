@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -86,6 +86,30 @@ class ConversationResponse(BaseModel):
     creator_user_id: UUID
     title: str | None
     created_at: datetime | None = None
+
+
+class ConversationMessage(BaseModel):
+    """One creator-owned transcript message. Content is escaped untrusted text."""
+
+    model_config = ConfigDict(frozen=True)
+
+    message_id: UUID
+    role: Literal["user", "assistant"]
+    content: str
+    created_at: datetime
+
+
+class ConversationMessagesResponse(BaseModel):
+    """Keyset page of conversation messages, newest first.
+
+    ``next_before_id`` is the last item's id when the page is full (exactly
+    ``limit`` rows). Clients pass it as ``before`` to load older messages.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    items: list[ConversationMessage]
+    next_before_id: UUID | None = None
 
 
 class SubmitMessageRequest(BaseModel):

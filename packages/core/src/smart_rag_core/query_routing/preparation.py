@@ -19,6 +19,12 @@ from smart_rag_core.query_profile.profiler import profile_query_sync
 from smart_rag_core.query_routing.constants import USAGE_KIND_PROFILE
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
 from smart_rag_core.query_routing.fidelity import score_rewrite_fidelity
+from smart_rag_core.query_routing.knowledge_scope import (
+    KnowledgeScope,
+    classify_knowledge_scope,
+    company_intent_signal,
+    scope_requires_model,
+)
 from smart_rag_core.query_routing.models import (
     REQUIRED_PREPARATION_FIELDS,
     MemoryRecord,
@@ -37,9 +43,10 @@ from smart_rag_core.query_routing.safety import sanitize_user_text
 from smart_rag_core.query_routing.signals import (
     is_corpus_wide_theme,
     is_graph_inspection,
+    is_greeting,
     is_historical_relationship,
     is_low_confidence_relationship,
-    is_no_retrieval,
+    is_product_help,
     is_whole_document_summary,
 )
 from smart_rag_core.security.identity import CallerContext
@@ -93,28 +100,35 @@ def _needs_model(
     if force_model:
         return True
     extract = extract_deterministic(query)
+    if is_greeting(query):
+        return False
+    if is_product_help(query) and not company_intent_signal(query, extract):
+        return False
     if extract.rewrite_justified:
         return True
     if memory and extract.query_type.value == "factual" and len(query.split()) <= 4:
         return True
+    if scope_requires_model(query, memory=memory):
+        return True
     return False
 
 
-def _extension(query: str) -> Phase6Extension:
-    """Return a Phase 6-only family extension when detectors match.
+def _extension_for_scope(scope: KnowledgeScope, query: str) -> Phase6Extension:
+    """Return the Phase 6 family extension implied by classified scope.
 
     Args:
+        scope: Strict-split knowledge scope.
         query: Original query.
 
     Returns:
-        Graph inspection, no-retrieval, or none.
+        Graph inspection or none for company documents; otherwise no-retrieval.
     """
 
-    if is_no_retrieval(query):
-        return Phase6Extension.NO_RETRIEVAL
-    if is_graph_inspection(query):
-        return Phase6Extension.GRAPH_INSPECTION
-    return Phase6Extension.NONE
+    if scope is KnowledgeScope.COMPANY_DOCUMENTS:
+        if is_graph_inspection(query):
+            return Phase6Extension.GRAPH_INSPECTION
+        return Phase6Extension.NONE
+    return Phase6Extension.NO_RETRIEVAL
 
 
 def _to_inferred(payload: PreparationModelPayload) -> ModelInferredProfile:
@@ -257,6 +271,15 @@ def prepare_query(
     if len(decomposition) > 3:
         raise QueryRoutingError("fourth_subquestion")
     comparison = original.lower().startswith("compare ")
+    scope = classify_knowledge_scope(
+        original,
+        memory=memory,
+        model_scope=None if payload is None else payload.knowledge_scope,
+        model_confidence=(
+            None if payload is None else payload.knowledge_scope_confidence
+        ),
+        model_available=payload is not None,
+    )
     try:
         preparation = QueryPreparation(
             original=original,
@@ -293,7 +316,7 @@ def prepare_query(
             entity_fidelity=entity,
             original_fallback_variant=original,
             query_type=profile_str(profile.query_type, extract.query_type.value),
-            phase6_extension=_extension(original),
+            phase6_extension=_extension_for_scope(scope.knowledge_scope, original),
             comparison=comparison,
             table_intent=profile_bool(profile.table_intent),
             corpus_wide_theme=is_corpus_wide_theme(original),
@@ -301,6 +324,8 @@ def prepare_query(
             routing_surface=routing_surface,
             manual_mode=bool(requested_manual_route)
             and routing_surface is RoutingSurface.DIAGNOSTIC,
+            knowledge_scope=scope.knowledge_scope,
+            knowledge_scope_confidence=scope.confidence,
         )
     except ValueError as exc:
         raise QueryRoutingError(_prep_value_error(exc)) from exc

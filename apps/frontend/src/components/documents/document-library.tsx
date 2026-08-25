@@ -337,7 +337,7 @@ export function DocumentLibrary() {
   if (!session.ready || accessToken === null) {
     return (
       <div className={styles.page}>
-        <PageHeader title="Documents." />
+        <PageHeader />
         <p className={styles.muted}>
           <Link href="/login">Sign in</Link>
         </p>
@@ -367,11 +367,7 @@ export function DocumentLibrary() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        title="Documents."
-        description="Upload files or add approved websites, then track search and graph readiness. Filters apply only to documents already loaded."
-        actions={importButton}
-      />
+      <PageHeader actions={importButton} />
       <HandshakeBanner />
 
       {showUpload ? null : (
@@ -380,19 +376,17 @@ export function DocumentLibrary() {
           denies viewers and callers without upload_enabled.
         </p>
       )}
-      {showCrawl ? null : (
-        <p className={styles.muted}>
-          Website crawl is hidden for this role. The server still denies members
-          and viewers.
-        </p>
-      )}
-
       <div className={styles.toolbar}>
         <Input
           label="Filter loaded documents"
+          leadingIcon="search"
+          placeholder="Filter by name…"
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
         />
+        <p className={styles.toolbarSummary}>
+          Filters apply to loaded documents only.
+        </p>
         <p className={styles.toolbarSummary}>
           Showing {String(visibleDocs.length)} of {String(loaded.length)} loaded
         </p>
@@ -438,6 +432,8 @@ export function DocumentLibrary() {
             <Button
               type="button"
               variant="secondary"
+              pending={loadMoreMutation.isPending}
+              pendingLabel="Loading…"
               onClick={() => loadMoreMutation.mutate()}
             >
               Load more
@@ -495,6 +491,7 @@ export function DocumentLibrary() {
           asSheet
           onClose={() => setInspectorOpen(false)}
           onRetry={(jobId) => retryMutation.mutate(jobId)}
+          retryPending={retryMutation.isPending}
         />
       ) : null}
       {deleteTarget !== null ? (

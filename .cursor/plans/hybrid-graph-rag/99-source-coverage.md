@@ -2,7 +2,7 @@
 name: hybrid-graph-rag-source-coverage
 status: verified-at-split-amended-current-locked
 original_monolith_sha256: 41e3ee603ddb25d985b3636f13969e942cb8f53d0ab9c0753234f71fe46bb8ab
-last_amended: 2026-08-15
+last_amended: 2026-08-25
 current_integrity_lock: ./plan-integrity-lock.json
 ---
 
@@ -21,7 +21,7 @@ The original monolith SHA-256 proves only the source read by the one-time split.
 - **Section 5:** Phase 3 owns ingestion through verified canonical vector/term plus BM25 projection `Hybrid Ready`/`Graph Pending`; Phase 5 owns graph mutation, `Graph Ready`, version switching, and graph cleanup. _The former mixed lifecycle text is now phase-scoped._
 - **Section 6:** Phase 4 owns Supabase vector/term plus private ParadeDB BM25 retrieval/fusion/tuning; Phase 6 embeds a short frozen runtime Hybrid contract. _Phase 6 does not need to load Phase 4 or retune it._
 - **Section 7:** Phase 5. _GraphRAG owner._
-- **Sections 8–10:** Phase 6 wrapper and [`06-phase-agent-intelligence/`](./06-phase-agent-intelligence/). _Agent, tools, and API/security requirements are redistributed across one shared contract and eight canonical packets._
+- **Sections 8–10:** Phase 6 wrapper and [`06-phase-agent-intelligence/`](./06-phase-agent-intelligence/). _Agent, tools, and API/security requirements are redistributed across one shared contract and eight historical packets, plus additive P06-09 through P06-15 for the approved general-chat strict split._
 - **Section 11:** Phase 3 owns signed OpenAI governance; Phase 4 owns dataset/retrieval evaluation; Phase 6 owns prompts, production tracing, agent/API evaluation, and feedback wiring. _Later phases consume rather than recreate earlier artifacts._
 - **Section 12:** Phase 6 owns the thin UI, Phase 7 owns complete Stitch/API specifications and design decision, and Phase 8 owns implementation/E2E. _The shared [`stitch-nextjs-contract.md`](./shared/frontend/stitch-nextjs-contract.md) records the consumer boundary; Phase 7/8 actions remain in their own packet files._
 - **Section 13:** Phase 1 owns CI tiers, Phase 9 owns only local release gates, and Phase 10 owns managed OIDC/CDN/KMS/IaC gates. _Canonical local and managed release concerns are split under [`shared/release/`](./shared/release/) and consumed only by the owning packets._

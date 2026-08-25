@@ -29,6 +29,7 @@ ALLOWED_SSE_FIELDS: Final[frozenset[str]] = frozenset(
         "delta",
         "citation_ids",
         "ranks",
+        "origin",
         "prompt_tokens",
         "completion_tokens",
         "tool_keys",
@@ -116,6 +117,29 @@ def _citation_preview(
         "citation_preview",
         {"citation_ids": tuple(identifiers), "ranks": ranks},
     )
+
+
+def _usage_event(
+    update: dict[str, object],
+) -> tuple[str, dict[str, object]] | None:
+    """Build a catalog ``usage`` event from accumulated graph totals.
+
+    Args:
+        update: Node return mapping. Prompt and completion must be ints.
+
+    Returns:
+        ``usage`` event, or None when counts are missing or negative.
+    """
+
+    prompt = update.get("prompt_tokens")
+    completion = update.get("completion_tokens")
+    if isinstance(prompt, bool) or isinstance(completion, bool):
+        return None
+    if not isinstance(prompt, int) or not isinstance(completion, int):
+        return None
+    if prompt < 0 or completion < 0:
+        return None
+    return ("usage", {"prompt_tokens": prompt, "completion_tokens": completion})
 
 
 def _limitation_from_update(
@@ -262,17 +286,28 @@ class QuerySseMapper:
 
         text = payload.answer_text.strip() if payload is not None else ""
         chunks = chunk_answer_text(text)
+        usage = _usage_event(update)
         if not chunks:
             self.terminal_emitted = True
-            return [("error", {"code": "empty_answer"})]
+            empty: list[tuple[str, dict[str, object]]] = []
+            if usage is not None:
+                empty.append(usage)
+            empty.append(("error", {"code": "empty_answer"}))
+            return empty
         self._final = payload
         events: list[tuple[str, dict[str, object]]] = []
+        if payload is not None and payload.answer_origin is not None:
+            events.append(
+                ("answer_origin", {"origin": payload.answer_origin.value})
+            )
         for piece in chunks:
             events.append(("token_delta", {"delta": piece}))
             self.emitted_token_delta = True
         preview = _citation_preview(payload) if payload is not None else None
         if preview is not None:
             events.append(preview)
+        if usage is not None:
+            events.append(usage)
         raw_status = update.get("status")
         answer_status = payload.status if payload is not None else "complete"
         if (

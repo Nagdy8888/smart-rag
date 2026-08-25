@@ -354,6 +354,8 @@ export function CurationPanel() {
             <Button
               type="button"
               data-action-id="admin.glossary.approve"
+              pending={approveImportMutation.isPending}
+              pendingLabel="Approving…"
               onClick={() => approveImportMutation.mutate()}
             >
               Approve
@@ -361,6 +363,8 @@ export function CurationPanel() {
             <Button
               type="button"
               data-action-id="admin.glossary.rollback"
+              pending={rollbackImportMutation.isPending}
+              pendingLabel="Rolling back…"
               onClick={() => rollbackImportMutation.mutate()}
             >
               Rollback
@@ -465,14 +469,20 @@ export function CurationPanel() {
                       },
                       {
                         id: "approve",
-                        label: "Approve",
+                        label: approveRuleMutation.isPending
+                          ? "Approving…"
+                          : "Approve",
+                        disabled: approveRuleMutation.isPending,
                         actionId: "admin.entity_rule.approve",
                         onSelect: () => approveRuleMutation.mutate(row),
                       },
                       {
                         id: "revoke",
-                        label: "Revoke",
+                        label: revokeRuleMutation.isPending
+                          ? "Revoking…"
+                          : "Revoke",
                         danger: true,
+                        disabled: revokeRuleMutation.isPending,
                         actionId: "admin.entity_rule.revoke",
                         onSelect: () => revokeRuleMutation.mutate(row),
                       },

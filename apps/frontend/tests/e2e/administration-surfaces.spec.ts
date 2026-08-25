@@ -31,7 +31,14 @@ test("stubbed company usage 403 stays forbidden copy when signed in", async ({
   request,
 }) => {
   await signInLiveMember(page, request);
-  await page.route("http://127.0.0.1:8000/usage/company", async (route) => {
+  await page.route("**/admin/graph/entity-rules**", async (route) => {
+    await route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "forbidden" }),
+    });
+  });
+  await page.route("**/usage/company", async (route) => {
     await route.fulfill({
       status: 403,
       contentType: "application/json",

@@ -24,30 +24,46 @@
   src: url("/fonts/inter-latin-600-normal.woff2") format("woff2");
 }
 
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/InterDisplay-SemiBold.woff2") format("woff2");
+}
+
 /*
- * Canonical tokens: Phase 8 visual contract (P08-13).
+ * Canonical tokens: Ink & Indigo refresh (UI/UX overhaul P2).
  * CSS variables here plus src/lib/design-tokens.ts are the implementation
  * source of truth. No lavender canvas, teal accent-as-canvas, or blur.
+ * --gradient-brand is reserved for the auth brand panel, empty-state icon
+ * tile, and nav brand logo tile only.
  */
 :root {
-  --color-bg: #F4F6F8;
+  --color-bg: #F6F7F9;
   --color-surface: #FFFFFF;
-  --color-surface-muted: #F8FAFC;
-  --color-surface-hover: #F1F4F8;
-  --color-surface-selected: #EEF0FF;
-  --color-text: #182230;
+  --color-surface-muted: #F1F3F6;
+  --color-surface-hover: #EDEFF4;
+  --color-surface-selected: #EEF2FF;
+  --color-text: #101828;
   --color-text-secondary: #475467;
-  --color-text-muted: #637083;
-  --color-text-disabled: #8A94A3;
-  --color-border: #DDE3EA;
-  --color-border-strong: #C7D0DB;
-  --color-accent: #4E5BD5;
-  --color-accent-hover: #414CC4;
-  --color-accent-pressed: #343DA8;
+  --color-text-muted: #667085;
+  --color-text-disabled: #98A2B3;
+  --color-border: #E4E7EC;
+  --color-border-strong: #CBD5E1;
+  --color-accent: #4F46E5;
+  --color-accent-hover: #4338CA;
+  --color-accent-pressed: #3730A3;
   --color-accent-fg: #FFFFFF;
-  --color-accent-muted: #EEF0FF;
-  --color-accent-soft: #EEF0FF;
-  --color-accent-border: #C9CDF8;
+  --color-accent-muted: #EEF2FF;
+  --color-accent-soft: #EEF2FF;
+  --color-accent-border: #C7D2FE;
+  --color-ink: #0F1420;
+  --color-ink-raised: #1A2132;
+  --color-ink-border: #232B3E;
+  --color-ink-text: #E2E6EF;
+  --color-ink-text-muted: #8E97AB;
+  --gradient-brand: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
   --color-evidence: #0E8584;
   --color-evidence-hover: #0A6F6E;
   --color-evidence-muted: #ECFDFC;
@@ -64,16 +80,20 @@
   --color-info: #1D4ED8;
   --color-info-bg: #EFF6FF;
   --color-info-border: #BFDBFE;
-  --color-focus: #4E5BD5;
+  --color-focus: #4F46E5;
   --color-overlay: rgb(15 23 42 / 0.42);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 12px;
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
   --space: 4px;
-  --shadow-1: 0 1px 2px rgb(15 23 42 / 0.08);
-  --shadow-2: 0 8px 24px rgb(15 23 42 / 0.10);
+  --shadow-1: 0 1px 3px rgb(16 24 40 / 0.10);
+  --shadow-2: 0 12px 32px rgb(16 24 40 / 0.14);
+  --shadow-composer: 0 8px 24px rgb(16 24 40 / 0.12);
   --font-sans: "Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif;
+  --font-display: "Inter Display", Inter, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   --line-height-ar: 1.75;
   --line-height-en: 1.5;
@@ -85,20 +105,29 @@
   --control-height-compact: 32px;
   --control-height-lg: 44px;
   --icon-button-size: 36px;
+  --text-hero-size: 32px;
+  --text-hero-height: 40px;
   --text-page-title-size: 24px;
   --text-page-title-height: 32px;
+  --text-section-size: 18px;
+  --text-section-height: 26px;
+  --text-card-title-size: 15px;
+  --text-card-title-height: 22px;
   --text-body-size: 14px;
-  --text-body-height: 20px;
+  --text-body-height: 22px;
   --text-label-size: 13px;
   --text-label-height: 18px;
-  --motion-fast: 120ms;
-  --motion-panel: 160ms;
+  --text-meta-size: 12px;
+  --text-meta-height: 16px;
+  --motion-fast: 150ms ease-out;
+  --motion-drawer: 200ms ease-out;
+  --motion-panel: 200ms ease-out;
 }
 
 @theme {
   --color-page: var(--color-bg);
   --color-card: var(--color-surface);
-  --color-ink: var(--color-text);
+  --color-fg: var(--color-text);
   --color-muted: var(--color-text-muted);
   --color-line: var(--color-border);
   --color-brand: var(--color-accent);
@@ -159,11 +188,27 @@ body {
   unicode-bidi: isolate;
 }
 
+.type-hero {
+  font-family: var(--font-display);
+  font-size: var(--text-hero-size);
+  line-height: var(--text-hero-height);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
 .type-page-title {
+  font-family: var(--font-display);
   font-size: var(--text-page-title-size);
   line-height: var(--text-page-title-height);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+}
+
+.type-section {
+  font-family: var(--font-display);
+  font-size: var(--text-section-size);
+  line-height: var(--text-section-height);
+  font-weight: 600;
 }
 
 .type-label {

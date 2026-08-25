@@ -1,8 +1,15 @@
 # Design tokens and primitives
 
-Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md). Do not reinterpret them.
-
-P08-13 implementation: `:root` in `apps/frontend/src/app/globals.css` and `apps/frontend/src/lib/design-tokens.ts` are the only token tables. Primitives live under `apps/frontend/src/components/ui/` (`Button` / `PrimaryAction` / `AsyncButton`, `PageHeader`, `ConfirmDialog`, and the existing Input/Table/Sheet set). This packet does not rewrite routes.
+Canonical live values are the Ink & Indigo refresh in
+[ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md)
+(user-approved 2026-08-25). That ADR supersedes the Precision Workspace
+hex table in
+[.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md).
+`:root` in `apps/frontend/src/app/globals.css` and
+`apps/frontend/src/lib/design-tokens.ts` are the only token tables.
+Primitives live under `apps/frontend/src/components/ui/` (`Button` /
+`PrimaryAction` / `AsyncButton`, `PageHeader`, `ConfirmDialog`,
+`EmptyState`, and the existing Input/Table/Sheet set).
 
 ## Token contract
 
@@ -20,23 +27,28 @@ P08-13 implementation: `:root` in `apps/frontend/src/app/globals.css` and `apps/
 
 Set or retain these exact CSS variables:
 
-- `--color-bg: #F4F6F8` — application canvas.
-- `--color-surface: #FFFFFF` — cards, drawers, topbar, nav, inputs.
-- `--color-surface-muted: #F8FAFC` — secondary panels, table headers, code blocks.
-- `--color-surface-hover: #F1F4F8` — neutral hover.
-- `--color-surface-selected: #EEF0FF` — selected navigation/list item.
-- `--color-text: #182230` — primary text.
+- `--color-bg: #F6F7F9` — application canvas.
+- `--color-surface: #FFFFFF` — cards, drawers, topbar, inputs.
+- `--color-surface-muted: #F1F3F6` — secondary panels, table headers, code blocks.
+- `--color-surface-hover: #EDEFF4` — neutral hover.
+- `--color-surface-selected: #EEF2FF` — selected list item.
+- `--color-text: #101828` — primary text.
 - `--color-text-secondary: #475467` — secondary body text.
-- `--color-text-muted: #637083` — metadata and helper text.
-- `--color-text-disabled: #8A94A3` — disabled text only.
-- `--color-border: #DDE3EA` — normal borders.
-- `--color-border-strong: #C7D0DB` — emphasized separators and input hover.
-- `--color-accent: #4E5BD5` — primary action and active navigation.
-- `--color-accent-hover: #414CC4` — primary hover.
-- `--color-accent-pressed: #343DA8` — primary pressed.
+- `--color-text-muted: #667085` — metadata and helper text.
+- `--color-text-disabled: #98A2B3` — disabled text only.
+- `--color-border: #E4E7EC` — normal borders.
+- `--color-border-strong: #CBD5E1` — emphasized separators and input hover.
+- `--color-accent: #4F46E5` — primary action.
+- `--color-accent-hover: #4338CA` — primary hover.
+- `--color-accent-pressed: #3730A3` — primary pressed.
 - `--color-accent-fg: #FFFFFF` — text on primary action.
-- `--color-accent-muted: #EEF0FF` — active/selected background.
-- `--color-accent-border: #C9CDF8` — selected outline.
+- `--color-accent-muted: #EEF2FF` — active/selected background.
+- `--color-accent-border: #C7D2FE` — selected outline.
+- `--color-ink: #0F1420` — navigation rail background.
+- `--color-ink-raised: #1A2132` — nav hover/active.
+- `--color-ink-border: #232B3E`.
+- `--color-ink-text: #E2E6EF`.
+- `--color-ink-text-muted: #8E97AB`.
 - `--color-evidence: #0E8584` — citations and evidence accents.
 - `--color-evidence-hover: #0A6F6E`.
 - `--color-evidence-muted: #ECFDFC`.
@@ -53,12 +65,12 @@ Set or retain these exact CSS variables:
 - `--color-info: #1D4ED8`.
 - `--color-info-bg: #EFF6FF`.
 - `--color-info-border: #BFDBFE`.
-- `--color-focus: #4E5BD5`.
+- `--color-focus: #4F46E5`.
 - `--color-overlay: rgb(15 23 42 / 0.42)` — modal/sheet overlay, with no blur.
 
 Rules:
 
-- No gradients.
+- `--gradient-brand` may appear only on the auth brand panel, empty-state icon tile, and nav logo tile. No other gradients. Skeleton shimmer is the one loading exception.
 - No glass, transparency-based cards, or `backdrop-filter`.
 - No pure black text.
 - White text is used only on accent/danger fills that pass WCAG AA.
@@ -69,23 +81,23 @@ Rules:
 
 Font families:
 
-- Primary: locally hosted `Inter`, weights 400, 500, and 600 only.
+- Body: locally hosted `Inter`, weights 400, 500, and 600 only.
+- Headings: locally hosted `Inter Display` weight 600, then Inter.
 - Fallback: `"Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif`.
 - Monospace: `ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace`.
-- Do not download fonts at runtime. Do not use a decorative display font.
+- Do not download fonts at runtime.
 
-Type scale:
+Type scale (size/line-height, weight, letter-spacing):
 
-- Page title: 24px size, 32px line-height, weight 600, letter-spacing `-0.01em`.
-- Auth title: 28px size, 36px line-height, weight 600, letter-spacing `-0.015em`.
-- Section title: 20px size, 28px line-height, weight 600.
-- Card title: 16px size, 24px line-height, weight 600.
-- Body: 14px size, 20px line-height, weight 400.
-- Body strong: 14px size, 20px line-height, weight 600.
-- Label: 13px size, 18px line-height, weight 600.
-- Secondary/meta: 13px size, 18px line-height, weight 400.
-- Caption/eyebrow: 12px size, 16px line-height, weight 500.
-- Code/identifier: 12px size, 18px line-height, weight 500, monospace.
+- Hero: 32/40, 600, `-0.02em`.
+- Page title: 24/32, 600, `-0.02em` (Inter Display).
+- Auth title: 28/36, 600 (Inter Display).
+- Section: 18/26, 600.
+- Card title: 15/22, 600.
+- Body: 14/22, 400.
+- Label: 13/18, 600.
+- Meta: 12/16, 400, muted.
+- Code/identifier: 12/18, 500, monospace.
 - Arabic/mixed content uses the same nominal size with `line-height: 1.75`.
 
 Rules:
@@ -128,9 +140,10 @@ Geometry:
 
 Radius:
 
-- Buttons, inputs, selects, search, compact controls: 8px.
-- Cards, panels, banners, menus: 12px.
-- Dialogs and drawers: 12px.
+- Buttons, inputs, selects, search, compact controls: 10px (`--radius-control`).
+- Cards, panels, banners, menus: 14px (`--radius-card`).
+- Dialogs and drawers: 14px.
+- Composer card: 16px.
 - Avatar: 50% circle.
 - Status pills and small filter chips: 999px.
 - Do not make ordinary buttons pill-shaped.
@@ -140,16 +153,17 @@ Borders/elevation:
 - Standard border: `1px solid var(--color-border)`.
 - Strong/hover border: `1px solid var(--color-border-strong)`.
 - Selected border: `1px solid var(--color-accent-border)`.
-- `--shadow-1: 0 1px 2px rgb(15 23 42 / 0.08)` for raised cards and menus.
-- `--shadow-2: 0 8px 24px rgb(15 23 42 / 0.10)` for dialogs and drawers.
+- `--shadow-1: 0 1px 3px rgb(16 24 40 / 0.10)` for raised cards and menus.
+- `--shadow-2: 0 12px 32px rgb(16 24 40 / 0.14)` for dialogs and drawers.
+- `--shadow-composer: 0 8px 24px rgb(16 24 40 / 0.12)` for the Ask composer.
 - Never stack multiple shadows or use glow effects.
 
 ### Motion and feedback
 
-- Hover/focus color transitions: 120ms ease-out.
-- Drawer/dialog open/close: 160ms ease-out, opacity plus at most 8px translation.
+- Hover/focus color transitions: `150ms ease-out` (`--motion-fast`). Color, background, border, and box-shadow only.
+- Drawer/dialog open/close: `200ms ease-out`, opacity plus at most 8px translation.
 - Do not animate layout height while progress events arrive or when the verified answer is inserted.
-- Spinner rotation is allowed; pulsing decorative gradients are forbidden.
+- Spinner rotation is allowed. Skeleton shimmer (1.2s sweep) is the only loading gradient.
 - Under `prefers-reduced-motion: reduce`, transitions become effectively immediate and spinners may remain a static labeled state.
 - Button press feedback uses color change, not scale/bounce.
 - Async work always changes visible label/state immediately and disables only the action being submitted.

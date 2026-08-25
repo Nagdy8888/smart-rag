@@ -48,6 +48,20 @@ export type ConversationResponse = {
   created_at: string | null;
 };
 
+/** One `GET /conversations/{id}/messages` item. Content is escaped text. */
+export type ConversationMessage = {
+  message_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
+/** Keyset page from `GET /conversations/{id}/messages`. */
+export type ConversationMessagesResponse = {
+  items: ConversationMessage[];
+  next_before_id: string | null;
+};
+
 /** JSON 202 from `POST /conversations/{id}/messages`. */
 export type SubmitMessageResponse = {
   run_id: string;
@@ -410,6 +424,18 @@ export type SignedUploadResponse = {
   upload_method: string;
 };
 
+/** Strict-split answer origins from additive `answer_origin` SSE events. */
+export const ANSWER_ORIGINS = [
+  "general_knowledge",
+  "company_documents",
+  "user_supplied_text",
+  "deterministic",
+  "ambiguous",
+] as const;
+
+/** One catalog answer origin. Unknown values are tolerated at the reducer. */
+export type AnswerOrigin = (typeof ANSWER_ORIGINS)[number];
+
 /** Catalog event names from the backend SSE catalog. */
 export const KNOWN_SSE_EVENT_TYPES = [
   "schema",
@@ -423,6 +449,7 @@ export const KNOWN_SSE_EVENT_TYPES = [
   "coverage",
   "optional_tool_disclosure",
   "citation_preview",
+  "answer_origin",
   "token_delta",
   "usage",
   "completed",

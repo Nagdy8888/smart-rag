@@ -3,6 +3,7 @@
  * Relationship editing is omitted; there is no graph mutation API.
  */
 
+import { EmptyState } from "../ui/empty-state";
 import { CodeText, UserText } from "../ui/user-text";
 import { LimitationCallout } from "../ui/limitation-callout";
 import {
@@ -46,7 +47,7 @@ export function GraphInspector({ node, locators, limitations }: GraphInspectorPr
 
   return (
     <div className={styles.inspectorBody}>
-      <h2>Evidence details.</h2>
+      <h2>Evidence details</h2>
       {node ? (
         <dl className={styles.dl}>
           <dt>Type</dt>
@@ -75,7 +76,10 @@ export function GraphInspector({ node, locators, limitations }: GraphInspectorPr
           <dd>{String(node.support)}</dd>
         </dl>
       ) : (
-        <p className={styles.muted}>Select a node to inspect evidence.</p>
+        <EmptyState
+          title="Select a node"
+          body="Evidence for the selected entity appears here."
+        />
       )}
       {shown.map((locator) => (
         <article key={locator.chunk_id} className={styles.locatorCard}>

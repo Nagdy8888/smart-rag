@@ -126,7 +126,7 @@ export function GraphExplorer() {
   if (!session.ready || accessToken === null) {
     return (
       <div className={styles.page}>
-        <PageHeader title="Graph." />
+        <PageHeader />
         <p className={styles.muted}>
           <Link href="/login">Sign in</Link>
         </p>
@@ -194,10 +194,7 @@ export function GraphExplorer() {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        title="Graph."
-        description="Inspect bounded entities and relationships backed by authorized evidence."
-      />
+      <PageHeader />
       {listError ? (
         <StatusBanner kind="error" role="alert">
           {listError}
@@ -277,12 +274,13 @@ export function GraphExplorer() {
 
         <section className={styles.results} aria-label="Graph results">
           <div className={styles.toolbar}>
+            <p className={styles.muted}>{GRAPH_INSPECT_BOUNDS_COPY}</p>
             <p className={styles.muted}>
               {nodes.length}
               {inspect && inspect.row_count > GRAPH_INSPECT_MAX_ROWS
                 ? ` of ${String(inspect.row_count)}`
                 : ""}{" "}
-              nodes. {GRAPH_INSPECT_BOUNDS_COPY}
+              nodes
             </p>
             {limitations[0] ? (
               <StatusPill status={limitations[0].code} tone="warning" />
@@ -319,7 +317,7 @@ export function GraphExplorer() {
               />
             )
           ) : (
-            <p className={styles.muted}>{GRAPH_INSPECT_BOUNDS_COPY}</p>
+            <p className={styles.muted}>Run inspect to load a neighborhood.</p>
           )}
         </section>
 
@@ -330,7 +328,7 @@ export function GraphExplorer() {
 
       {drawerOpen && compactInspector ? (
         <Drawer
-          title="Evidence details."
+          title="Evidence details"
           onClose={() => setDrawerOpen(false)}
           returnFocusRef={selectReturnRef}
         >

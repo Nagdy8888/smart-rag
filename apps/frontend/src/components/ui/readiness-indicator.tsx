@@ -6,7 +6,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { loadConsoleReadiness } from "../../lib/api";
+import { fetchMe, loadConsoleReadiness } from "../../lib/api";
 import { useSession } from "../../lib/auth/session-provider";
 import { publicQueryKeys, sessionQueryKeys } from "../../lib/query-keys";
 import {
@@ -37,11 +37,22 @@ export function ReadinessIndicator() {
   const session = useSession();
   const token = session.accessToken;
   const auth = token === null ? null : { accessToken: token };
+  const meQuery = useQuery({
+    queryKey: sessionQueryKeys(token).me,
+    queryFn: () => fetchMe(auth!),
+    enabled: auth !== null && session.ready,
+  });
+  const role = meQuery.data?.role ?? null;
   const query = useQuery({
     queryKey:
-      token === null ? publicQueryKeys.ready : sessionQueryKeys(token).consoleReady,
-    queryFn: () => loadConsoleReadiness(auth),
-    enabled: session.ready,
+      token === null
+        ? publicQueryKeys.ready
+        : [...sessionQueryKeys(token).consoleReady, role],
+    queryFn: () => loadConsoleReadiness(auth, role),
+    enabled: session.ready && (auth === null || meQuery.isFetched),
+    staleTime: 30_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
   const ready = query.isPending && query.data === undefined ? undefined : query.data ?? null;
   const headline = readinessHeadline(ready);
@@ -51,6 +62,7 @@ export function ReadinessIndicator() {
     <span data-action-id="shell.readiness" data-testid="shell-readiness">
       <Popover
         label="Service readiness"
+        actionId="shell.readiness"
         trigger={<StatusPill status={headline} tone={TONE[headline]} />}
       >
         <div className={styles.readinessPopover}>

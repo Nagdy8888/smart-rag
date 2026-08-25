@@ -184,6 +184,8 @@ export function ToolsPanel() {
                 <Button
                   type="button"
                   data-action-id="admin.tools.permissions"
+                  pending={permissionMutation.isPending}
+                  pendingLabel="Saving…"
                   onClick={() => permissionMutation.mutate(card.tool_key)}
                 >
                   Save permission

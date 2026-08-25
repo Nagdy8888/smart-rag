@@ -14,11 +14,14 @@ import {
   listCitations,
   fetchConversation,
   listConversations,
+  fetchConversationMessages,
   loadConsoleReadiness,
 } from "../lib/api";
+import { conversationRailRenderCount } from "./chat/conversation-rail";
 import { SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { SessionProvider } from "../lib/auth/session-provider";
 import { CHAT_RUN_POINTER_KEY } from "../lib/chat-pointer";
+import { MIXED_SCOPE_CLARIFICATION } from "../lib/answer-origin";
 import { handshakeBelowMinCopy } from "../lib/handshake";
 import { limitationCopy } from "../lib/limitations";
 
@@ -108,6 +111,10 @@ vi.mock("../lib/api", async () => {
       usage_rows: 0,
     })),
     listCitations: vi.fn(async () => []),
+    fetchConversationMessages: vi.fn(async () => ({
+      items: [],
+      next_before_id: null,
+    })),
   };
 });
 
@@ -125,6 +132,10 @@ afterEach(() => {
   vi.mocked(fetchMeta).mockResolvedValue(defaultMeta);
   vi.mocked(listConversations).mockResolvedValue([]);
   vi.mocked(listCitations).mockResolvedValue([]);
+  vi.mocked(fetchConversationMessages).mockResolvedValue({
+    items: [],
+    next_before_id: null,
+  });
   vi.mocked(createConversation).mockClear();
   vi.mocked(fetchConversation).mockClear();
   vi.mocked(fetchConversation).mockImplementation(
@@ -171,7 +182,6 @@ describe("ChatApp Auto chrome", () => {
   it("shows Auto, blocks Send on handshake, and has no route send buttons", async () => {
     renderChat(<ChatApp />);
     const send = await screen.findByRole("button", { name: "Send" });
-    expect(screen.getByRole("heading", { name: "Ask" })).toBeInTheDocument();
     expect(screen.getByTestId("auto-label")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
@@ -179,7 +189,7 @@ describe("ChatApp Auto chrome", () => {
     expect(send).toBeDisabled();
     expect(screen.getAllByText(handshakeBelowMinCopy()).length).toBeGreaterThan(0);
     expect(
-      screen.getAllByText(limitationCopy("bm25_unavailable")).length,
+      (await screen.findAllByText(limitationCopy("bm25_unavailable"))).length,
     ).toBeGreaterThan(0);
   });
 });
@@ -307,7 +317,7 @@ function stubChatFetch(options: {
 describe("ChatApp MFA removal and revoked session", () => {
   it("does not render MFA challenge or enroll links", async () => {
     renderChat(<ChatApp />);
-    await screen.findByRole("heading", { name: "Ask" });
+    await screen.findByRole("button", { name: "Send" });
     expect(screen.queryByRole("link", { name: "MFA challenge" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Enroll TOTP" })).toBeNull();
     expect(screen.queryByLabelText(/recovery/i)).toBeNull();
@@ -348,7 +358,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     ]);
     vi.stubGlobal("fetch", stubChatFetch({ events: routingLimitationSse() }));
     renderChat(<ChatApp />);
-    await screen.findByRole("heading", { name: "Ask" });
+    await screen.findByRole("button", { name: "Send" });
     await user.click(await screen.findByRole("option", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "What connected ACME?");
     await user.click(screen.getByRole("button", { name: "Send" }));
@@ -377,14 +387,14 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
     const fetchImpl = stubChatFetch({
-      events: "event: token_delta\nid: 1\ndata: {\"delta\":\"Hi\"}\n\nevent: completed\nid: 2\ndata: {}\n\n",
+      events: "event: heartbeat\nid: 1\ndata: {}\n\n",
     });
     vi.stubGlobal("fetch", fetchImpl);
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("option", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
-    await screen.findByText("completed", { exact: false });
+    expect(await screen.findByRole("button", { name: "Reconnect" })).toBeInTheDocument();
     vi.stubGlobal("fetch", stubChatFetch({ resumeStatus: 404 }));
     await user.click(screen.getByRole("button", { name: "Reconnect" }));
     expect(
@@ -482,7 +492,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findAllByText(/Reconnecting/)).not.toHaveLength(0);
 
-    await user.click(screen.getByRole("button", { name: "New" }));
+    await user.click(screen.getByRole("button", { name: "New chat" }));
 
     await waitFor(() => {
       expect(createConversation).not.toHaveBeenCalled();
@@ -595,15 +605,154 @@ describe("ChatApp query_ready gate", () => {
 });
 
 describe("ChatApp Ask workspace", () => {
+  it("shows the dual-mode empty state before a question is sent", async () => {
+    renderChat(<ChatApp />);
+    expect(
+      await screen.findByText(
+        "Ask your company knowledge",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("hides citation chips for a general origin even when citations are listed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(listCitations).mockResolvedValue([
+      {
+        citation_id: "cite-1",
+        citation_index: 1,
+        chunk_id: "chunk-1",
+        provenance: {},
+        source_unavailable: false,
+      },
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events: [
+          'event: answer_origin\nid: 1\ndata: {"origin":"general_knowledge"}\n\n',
+          'event: citation_preview\nid: 2\ndata: {"citation_ids":["cite-1"]}\n\n',
+          'event: token_delta\nid: 3\ndata: {"delta":"Paris is the capital of France."}\n\n',
+          'event: usage\nid: 4\ndata: {"prompt_tokens":412,"completion_tokens":88}\n\n',
+          "event: completed\nid: 5\ndata: {}\n\n",
+        ].join(""),
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.type(screen.getByLabelText("Message"), "capital of France");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Paris is the capital of France.")).toBeInTheDocument();
+    expect(screen.getByTestId("answer-origin")).toHaveTextContent("General knowledge");
+    expect(screen.getByTestId("answer-route")).toHaveTextContent("composite");
+    expect(screen.queryByTestId("answer-citations")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Citation 1" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Sources (0)" })).toBeInTheDocument();
+    expect(screen.getByTestId("answer-token-usage")).toHaveTextContent(
+      "412 prompt · 88 completion",
+    );
+  });
+
+  it("shows citation chips for a company origin and keeps the route pill separate", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(listCitations).mockResolvedValue([
+      {
+        citation_id: "cite-1",
+        citation_index: 1,
+        chunk_id: "chunk-1",
+        provenance: {},
+        source_unavailable: false,
+      },
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events: [
+          'event: answer_origin\nid: 1\ndata: {"origin":"company_documents"}\n\n',
+          'event: citation_preview\nid: 2\ndata: {"citation_ids":["cite-1"]}\n\n',
+          'event: token_delta\nid: 3\ndata: {"delta":"The refund period is 30 days."}\n\n',
+          "event: completed\nid: 4\ndata: {}\n\n",
+        ].join(""),
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.type(screen.getByLabelText("Message"), "What is our refund period?");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByRole("button", { name: "Citation 1" })).toBeInTheDocument();
+    expect(screen.getByTestId("answer-origin")).toHaveTextContent("Company documents");
+    expect(screen.getByTestId("answer-route")).toHaveTextContent("composite");
+    expect(screen.getByRole("button", { name: "Sources (1)" })).toBeInTheDocument();
+  });
+
+  it("shows clarification and no citation chips for an ambiguous origin", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(listCitations).mockResolvedValue([
+      {
+        citation_id: "cite-1",
+        citation_index: 1,
+        chunk_id: "chunk-1",
+        provenance: {},
+        source_unavailable: false,
+      },
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events: [
+          'event: answer_origin\nid: 1\ndata: {"origin":"ambiguous"}\n\n',
+          'event: citation_preview\nid: 2\ndata: {"citation_ids":["cite-1"]}\n\n',
+          'event: token_delta\nid: 3\ndata: {"delta":"Please ask one question."}\n\n',
+          "event: completed\nid: 4\ndata: {}\n\n",
+        ].join(""),
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.type(screen.getByLabelText("Message"), "France and refund");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(MIXED_SCOPE_CLARIFICATION)).toBeInTheDocument();
+    expect(screen.getByTestId("answer-origin")).toHaveTextContent("Needs clarification");
+    expect(screen.queryByTestId("answer-citations")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sources (0)" })).toBeInTheDocument();
+  });
+
   it("exposes labeled Sessions and Conversation regions", async () => {
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
     renderChat(<ChatApp />);
-    expect(
-      await screen.findByRole("complementary", { name: "Sessions" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Chat" })).toBeInTheDocument();
+    expect(screen.getByTestId("sessions-rail")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Conversation" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Answer" })).toBeInTheDocument();
-    expect(screen.getByRole("listbox", { name: "Sessions" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("listbox", { name: "Sessions", hidden: true }),
+    ).toBeInTheDocument();
   });
 
   it("collapses the Sessions list without deleting conversations", async () => {
@@ -648,7 +797,7 @@ describe("ChatApp Ask workspace", () => {
       expect(fetchConversation).toHaveBeenCalled();
     });
 
-    await user.click(await screen.findByRole("button", { name: "New" }));
+    await user.click(await screen.findByRole("button", { name: "New chat" }));
     resolveOldConversation?.(CONVERSATION);
 
     await waitFor(() => {
@@ -670,21 +819,41 @@ describe("ChatApp Ask workspace", () => {
     expect(createConversation).not.toHaveBeenCalled();
   });
 
-  it("Continue validates GET /conversations/{id} and states prior transcript is unavailable", async () => {
+  it("renders fetched transcript messages in ascending order", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(fetchConversationMessages).mockResolvedValue({
+      items: [
+        {
+          message_id: "m2",
+          role: "assistant",
+          content: "Later answer",
+          created_at: "2026-08-17T00:01:00Z",
+        },
+        {
+          message_id: "m1",
+          role: "user",
+          content: "First question",
+          created_at: "2026-08-17T00:00:00Z",
+        },
+      ],
+      next_before_id: null,
+    });
     renderChat(<ChatApp />);
     await user.click(await screen.findByRole("option", { name: "Chat" }));
     await waitFor(() => {
       expect(fetchConversation).toHaveBeenCalled();
+      expect(fetchConversationMessages).toHaveBeenCalled();
     });
+    const first = screen.getByText("First question");
+    const later = screen.getByText("Later answer");
+    expect(first.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
-      screen.getByText(
+      screen.queryByText(
         "Continuing this session. Earlier messages are not available in this client.",
       ),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("No tokens yet.")).toBeNull();
+    ).toBeNull();
   });
 
   it("shows Generating then Verifying then inserts the verified answer without a caret", async () => {
@@ -746,13 +915,13 @@ describe("ChatApp Ask workspace", () => {
     streamCtl.send(
       'event: status\nid: 1\ndata: {"stage":"generate_answer","status":"running"}\n\n',
     );
-    expect(await screen.findByText("Generating")).toBeInTheDocument();
+    expect(await screen.findByText("Generating…")).toBeInTheDocument();
     expect(screen.queryByText("Verified policy summary.")).toBeNull();
     expect(document.querySelector(".typewriter, [data-caret]")).toBeNull();
     streamCtl.send(
       'event: status\nid: 2\ndata: {"stage":"verify_answer","status":"running"}\n\n',
     );
-    expect(await screen.findByText("Verifying")).toBeInTheDocument();
+    expect(await screen.findByText("Verifying…")).toBeInTheDocument();
     expect(screen.queryByText("Verified policy summary.")).toBeNull();
     streamCtl.send(
       'event: token_delta\nid: 3\ndata: {"delta":"Verified policy summary."}\n\n',
@@ -849,5 +1018,131 @@ describe("ChatApp Ask workspace", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/Run error/)).toBeNull();
     expect(screen.queryByText(/Something went wrong/)).toBeNull();
+  });
+
+  it("falls back to Untitled chat when the title is null", async () => {
+    vi.mocked(listConversations).mockResolvedValue([
+      {
+        conversation_id: "conv-untitled",
+        creator_user_id: "u1",
+        title: null,
+        created_at: "2026-08-17T00:00:00Z",
+      },
+    ]);
+    renderChat(<ChatApp />);
+    expect(await screen.findByRole("option", { name: "Untitled chat" })).toBeInTheDocument();
+  });
+
+  it("hides Reconnect, the stepper, and attachments copy while idle", async () => {
+    renderChat(<ChatApp />);
+    await screen.findByRole("button", { name: "Send" });
+    expect(screen.queryByRole("button", { name: "Reconnect" })).toBeNull();
+    expect(screen.queryByLabelText("Run pipeline")).toBeNull();
+    expect(screen.queryByText(/Preparing/)).toBeNull();
+    expect(screen.queryByText(/Attachments are not accepted/)).toBeNull();
+    expect(screen.queryByText(/characters remaining/)).toBeNull();
+  });
+
+  it("does not re-render the Sessions rail while typing", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    renderChat(<ChatApp />);
+    await screen.findByRole("button", { name: "Send" });
+    await waitFor(() => {
+      expect(vi.mocked(loadConsoleReadiness).mock.calls.length).toBeGreaterThan(0);
+    });
+    const before = conversationRailRenderCount.value;
+    await user.type(screen.getByLabelText("Message"), "abcdefghij");
+    expect(conversationRailRenderCount.value).toBe(before);
+  });
+
+  it("does not re-render the Sessions rail on token_delta", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    const encoder = new TextEncoder();
+    const streamCtl: { send: (chunk: string) => void; close: () => void } = {
+      send() {},
+      close() {},
+    };
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamCtl.send = (chunk: string) => {
+          controller.enqueue(encoder.encode(chunk));
+        };
+        streamCtl.close = () => {
+          controller.close();
+        };
+      },
+    });
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "POST" && url.includes("/messages")) {
+        return new Response(
+          JSON.stringify({
+            run_id: "run-1",
+            stream_path: "/runs/run-1/events",
+            reconnect: false,
+            reservation_id: "res-1",
+            route_family: "hybrid",
+            status: "pending",
+          }),
+          { status: 202, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (method === "GET" && url.includes("/events")) {
+        return new Response(stream, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
+      return new Response("{}", { status: 200 });
+    };
+    vi.stubGlobal("fetch", fetchImpl);
+    renderChat(<ChatApp />);
+    await user.type(await screen.findByLabelText("Message"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByRole("button", { name: "Stop" });
+    const before = conversationRailRenderCount.value;
+    streamCtl.send('event: token_delta\nid: 1\ndata: {"delta":"Hello tokens."}\n\n');
+    expect(await screen.findByText("Hello tokens.")).toBeInTheDocument();
+    expect(conversationRailRenderCount.value).toBe(before);
+    streamCtl.close();
+  });
+
+  it("shows Sending… before a slow createConversation resolves", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    let resolveCreate: ((value: typeof CONVERSATION) => void) | undefined;
+    vi.mocked(createConversation).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCreate = resolve;
+        }),
+    );
+    renderChat(<ChatApp />);
+    await user.type(await screen.findByLabelText("Message"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByRole("button", { name: "Sending…" })).toBeInTheDocument();
+    resolveCreate?.({
+      conversation_id: "conv-created",
+      creator_user_id: "u1",
+      title: "Chat",
+      created_at: "2026-08-17T00:00:00Z",
+    });
   });
 });

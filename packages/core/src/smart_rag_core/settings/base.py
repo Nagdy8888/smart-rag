@@ -288,28 +288,37 @@ class SharedSettings(BaseSettings):
             Applied flag names and non-secret values. The API key is omitted.
 
         Side Effects:
-            Mutates ``LANGSMITH_*`` process environment keys consumed by the
-            pinned LangSmith SDK. Does not open a network connection.
+            Mutates ``LANGSMITH_*`` and ``LANGCHAIN_TRACING_V2`` process
+            environment keys consumed by the pinned LangSmith and LangGraph
+            SDKs. Does not open a network connection.
         """
 
         os.environ["LANGSMITH_HIDE_INPUTS"] = "true"
         os.environ["LANGSMITH_HIDE_OUTPUTS"] = "true"
+        os.environ["LANGCHAIN_TRACING_V2"] = "false"
         applied: dict[str, str] = {
             "LANGSMITH_HIDE_INPUTS": "true",
             "LANGSMITH_HIDE_OUTPUTS": "true",
             "LANGSMITH_TRACING": "false",
+            "LANGCHAIN_TRACING_V2": "false",
             "LANGSMITH_PROJECT": self.langsmith_project,
         }
         if not self.langsmith_tracing or self.langsmith_api_key is None:
             os.environ["LANGSMITH_TRACING"] = "false"
             return applied
+        secret = self.langsmith_api_key.get_secret_value()
         os.environ["LANGSMITH_TRACING"] = "true"
-        os.environ["LANGSMITH_API_KEY"] = self.langsmith_api_key.get_secret_value()
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGSMITH_API_KEY"] = secret
+        os.environ["LANGCHAIN_API_KEY"] = secret
         os.environ["LANGSMITH_PROJECT"] = self.langsmith_project
+        os.environ["LANGCHAIN_PROJECT"] = self.langsmith_project
         applied["LANGSMITH_TRACING"] = "true"
+        applied["LANGCHAIN_TRACING_V2"] = "true"
         if self.langsmith_endpoint is not None:
             endpoint = str(self.langsmith_endpoint).rstrip("/")
             os.environ["LANGSMITH_ENDPOINT"] = endpoint
+            os.environ["LANGCHAIN_ENDPOINT"] = endpoint
             applied["LANGSMITH_ENDPOINT"] = endpoint
         return applied
 

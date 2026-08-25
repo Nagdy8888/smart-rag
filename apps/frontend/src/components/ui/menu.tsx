@@ -37,6 +37,8 @@ export type MenuProps = {
   trigger: ReactNode;
   /** Action rows. */
   items: readonly MenuItem[];
+  /** Inventory id on the trigger button. */
+  triggerActionId?: string;
 };
 
 /**
@@ -45,7 +47,7 @@ export type MenuProps = {
  * @param props - Label, trigger node, and items.
  * @returns Menu widget. Side effects: focus restore on close.
  */
-export function Menu({ label, trigger, items }: MenuProps) {
+export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -108,6 +110,7 @@ export function Menu({ label, trigger, items }: MenuProps) {
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-label={label}
+        data-action-id={triggerActionId}
         onClick={() => {
           setOpen((value) => !value);
         }}

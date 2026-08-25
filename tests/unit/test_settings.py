@@ -51,6 +51,25 @@ def test_deployable_settings_are_typed_and_share_secure_defaults() -> None:
     assert backend.service_name == "backend"
     assert worker.service_name == "worker"
     assert agents.service_name == "agents"
+    assert agents.langgraph_studio_live_enabled is False
+    assert agents.langgraph_studio_access_token is None
+    assert not issubclass(AgentSettings, BackendSettings)
+
+
+def test_agent_studio_live_token_is_redacted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Studio live JWT stays on AgentSettings and never appears in repr."""
+
+    canary = "studio-live-settings-canary-token"
+    monkeypatch.setenv("LANGGRAPH_STUDIO_LIVE_ENABLED", "true")
+    monkeypatch.setenv("LANGGRAPH_STUDIO_ACCESS_TOKEN", canary)
+    settings = AgentSettings()
+    assert settings.langgraph_studio_live_enabled is True
+    assert settings.langgraph_studio_access_token is not None
+    assert settings.langgraph_studio_access_token.get_secret_value() == canary
+    assert canary not in repr(settings)
+    assert canary not in str(settings)
 
 
 def test_backend_settings_load_documented_environment_aliases(

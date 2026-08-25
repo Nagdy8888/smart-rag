@@ -9,6 +9,7 @@ import { Icon } from "../ui/icon";
 import { Menu, type MenuItem } from "../ui/menu";
 import { StatusPill } from "../ui/status-pill";
 import { UserText } from "../ui/user-text";
+import { absentStatusLabel, formatVisibility } from "../../lib/format-visibility";
 import { compactIngestionPills } from "../../lib/ingestion-status";
 import type {
   DocumentIngestionStatusResponse,
@@ -107,8 +108,8 @@ function StatusCells({
   if (payload === undefined) {
     return (
       <>
-        <td>—</td>
-        <td>—</td>
+        <td>{absentStatusLabel("index")}</td>
+        <td>{absentStatusLabel("index")}</td>
       </>
     );
   }
@@ -119,14 +120,14 @@ function StatusCells({
         {pills.search ? (
           <StatusPill status={pills.search.label} tone={pills.search.tone} />
         ) : (
-          "—"
+          absentStatusLabel("pending")
         )}
       </td>
       <td>
         {pills.graph ? (
           <StatusPill status={pills.graph.label} tone={pills.graph.tone} />
         ) : (
-          "—"
+          absentStatusLabel("pending")
         )}
       </td>
     </>
@@ -165,9 +166,7 @@ export function DocumentList({
     <>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <caption className={styles.muted}>
-            Authorized documents already loaded. Filter does not search the server.
-          </caption>
+          <caption className={styles.muted}>Authorized documents</caption>
           <thead>
             <tr>
               <th scope="col">Name</th>
@@ -195,7 +194,7 @@ export function DocumentList({
                   )}
                 </td>
                 <td>
-                  <StatusPill status={doc.visibility} />
+                  <StatusPill status={formatVisibility(doc.visibility)} />
                 </td>
                 <StatusCells doc={doc} statusByVersionId={statusByVersionId} />
                 <td>

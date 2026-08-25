@@ -40,6 +40,8 @@ from smart_rag_api.services.query_sse_mapping import (
 )
 
 LOGGER = logging.getLogger(__name__)
+CANCEL_GRACE_SECONDS = 0.25
+"""Cooperative executor cleanup window after an explicit cancel."""
 
 SSE_RESPONSE_HEADERS: dict[str, str] = {
     "Cache-Control": "no-cache",
@@ -151,6 +153,11 @@ class LangGraphQueryRunExecutor:
         self._async_holder = None
         self._store = None
         self._bindings = None
+        self.termination_summary: dict[str, object] = {
+            "termination_reason": "unknown",
+            "terminal_event_type": None,
+            "stream_exhausted": False,
+        }
 
     def _process_bindings(self, settings: object):
         """Return process-reusable Hybrid/gateway bindings.
@@ -274,9 +281,6 @@ class LangGraphQueryRunExecutor:
         from smart_rag_core.observability.governance_gate import (
             assert_langsmith_export_permitted,
         )
-        from smart_rag_core.observability.query_run_trace import (
-            query_run_trace_metadata,
-        )
         from smart_rag_core.security.external_processing import ContentClass
         from smart_rag_core.settings import load_backend_settings
 
@@ -294,18 +298,14 @@ class LangGraphQueryRunExecutor:
             provider_settings_verified=settings.subprocessor_matrix_verified,
             local_unsigned_waiver=settings.allows_unsigned_local_live_providers(),
         )
-        trace_extra = query_run_trace_metadata(
-            run_id=context.run_id,
-            user_id=context.user_id,
-            requested_route=context.route_family.value,
-            effective_route=context.route_family.value,
-            corrected_route=None,
-            model_versions={},
-            prompt_versions={},
+        self._set_termination(
+            reason="unknown",
+            terminal_event_type=None,
+            stream_exhausted=False,
         )
-        del trace_extra
 
         if datetime.now(tz=UTC) >= context.deadline_at:
+            self._set_termination(reason="deadline", terminal_event_type="partial")
             yield ("deadline", {"route_family": context.route_family.value})
             yield ("partial", {"reason": "deadline_exhausted"})
             return
@@ -322,7 +322,28 @@ class LangGraphQueryRunExecutor:
         )
 
         connection = None
-        stream_iter: object | None = None
+        connection_closed = False
+        stream_iter: AsyncIterator[object] | None = None
+        stream_exhausted = False
+        stream_aclose_called = False
+        terminal_yielded = False
+        successful_terminal_committed = False
+        last_remaining_calls = context.model_call_ceiling
+        last_status = "running"
+
+        def _close_connection() -> None:
+            """Close the app_api connection exactly once.
+
+            Side Effects:
+                Closes ``connection`` when it is still open.
+            """
+
+            nonlocal connection_closed
+            if connection is None or connection_closed:
+                return
+            connection_closed = True
+            connection.close()
+
         try:
             bindings = self._process_bindings(settings)
             connection = open_run_app_api_connection(bindings.supabase_dsn)
@@ -350,8 +371,6 @@ class LangGraphQueryRunExecutor:
             }
             stream_method: Callable[..., AsyncIterator[object]] = compiled.astream  # type: ignore[reportUnknownMemberType]
             stream_iter = stream_method(state, cast(Any, config), stream_mode="updates")
-            last_remaining_calls = context.model_call_ceiling
-            last_status = "running"
             mapper = QuerySseMapper()
             LOGGER.info(
                 "query sse stream started",
@@ -367,33 +386,98 @@ class LangGraphQueryRunExecutor:
                 # the same run/reservation transaction.
                 connection.commit()
                 if cancel_event.is_set():
-                    return
+                    self._set_termination(
+                        reason="cancelled",
+                        terminal_event_type="cancelled",
+                        stream_exhausted=False,
+                    )
+                    break
+                typed_chunk: dict[str, object] | None = None
                 if isinstance(raw_chunk, dict):
-                    for node_update in raw_chunk.values():
+                    typed_chunk = {
+                        str(key): value
+                        for key, value in cast(dict[object, object], raw_chunk).items()
+                    }
+                    for node_update in typed_chunk.values():
                         if isinstance(node_update, dict):
-                            remaining = node_update.get("remaining_model_calls")
+                            typed_update = {
+                                str(key): value
+                                for key, value in cast(
+                                    dict[object, object], node_update
+                                ).items()
+                            }
+                            remaining = typed_update.get("remaining_model_calls")
                             if isinstance(remaining, int):
                                 last_remaining_calls = remaining
-                            raw_status = node_update.get("status")
+                            raw_status = typed_update.get("status")
                             if isinstance(raw_status, str) and raw_status:
                                 last_status = raw_status[:64]
-                for event_type, payload in mapper.consume_chunk(raw_chunk):
+                for event_type, payload in mapper.consume_chunk(
+                    typed_chunk if typed_chunk is not None else cast(object, raw_chunk)
+                ):
                     assert_catalog_event(event_type, payload)
                     yield (event_type, payload)
                     if event_type in {"completed", "partial", "error", "cancelled"}:
-                        if event_type in {"completed", "partial"}:
+                        if not terminal_yielded:
+                            terminal_yielded = True
+                            reason = (
+                                "error"
+                                if event_type == "error"
+                                else (
+                                    "cancelled"
+                                    if event_type == "cancelled"
+                                    else event_type
+                                )
+                            )
+                            self._set_termination(
+                                reason=reason,
+                                terminal_event_type=event_type,
+                            )
+                        if (
+                            event_type in {"completed", "partial"}
+                            and not successful_terminal_committed
+                        ):
+                            successful_terminal_committed = True
                             self._commit_successful_terminal(
                                 context,
                                 mapper,
                                 remaining_model_calls=last_remaining_calls,
                                 terminal_status=last_status,
                             )
-                        return
-            if not cancel_event.is_set():
+            else:
+                stream_exhausted = True
+                self._set_termination(
+                    reason=str(self.termination_summary.get("termination_reason")),
+                    terminal_event_type=(
+                        str(self.termination_summary["terminal_event_type"])
+                        if isinstance(
+                            self.termination_summary.get("terminal_event_type"),
+                            str,
+                        )
+                        else None
+                    ),
+                    stream_exhausted=True,
+                )
+            if stream_exhausted and not cancel_event.is_set():
                 for event_type, payload in mapper.finish():
                     assert_catalog_event(event_type, payload)
                     yield (event_type, payload)
-                    if event_type in {"completed", "partial"}:
+                    if event_type in {"completed", "partial", "error", "cancelled"}:
+                        terminal_yielded = True
+                        self._set_termination(
+                            reason=(
+                                "error"
+                                if event_type == "error"
+                                else event_type
+                            ),
+                            terminal_event_type=event_type,
+                            stream_exhausted=True,
+                        )
+                    if (
+                        event_type in {"completed", "partial"}
+                        and not successful_terminal_committed
+                    ):
+                        successful_terminal_committed = True
                         self._commit_successful_terminal(
                             context,
                             mapper,
@@ -401,15 +485,93 @@ class LangGraphQueryRunExecutor:
                             terminal_status=last_status,
                         )
         except QueryGraphRuntimeError as exc:
+            self._set_termination(reason="error", terminal_event_type="error")
             yield ("error", {"code": exc.reason})
+        except asyncio.CancelledError:
+            self._set_termination(
+                reason="interrupted",
+                terminal_event_type=str(
+                    self.termination_summary.get("terminal_event_type")
+                )
+                if self.termination_summary.get("terminal_event_type")
+                else "cancelled",
+                stream_exhausted=stream_exhausted,
+            )
+            raise
+        except GeneratorExit:
+            self._set_termination(
+                reason="interrupted",
+                stream_exhausted=stream_exhausted,
+            )
+            raise
+        except Exception:
+            self._set_termination(reason="error", terminal_event_type="error")
+            raise
         finally:
-            if connection is not None:
-                connection.close()
-            close = getattr(stream_iter, "aclose", None)
-            if callable(close):
-                closed = close()
-                if inspect.isawaitable(closed):
-                    await closed
+            _close_connection()
+            if (
+                stream_iter is not None
+                and not stream_exhausted
+                and not stream_aclose_called
+            ):
+                stream_aclose_called = True
+                await self._aclose_stream(stream_iter)
+
+    def _set_termination(
+        self,
+        *,
+        reason: str,
+        terminal_event_type: str | None = None,
+        stream_exhausted: bool | None = None,
+    ) -> None:
+        """Store a sanitized stream-termination summary.
+
+        Args:
+            reason: ``completed``, ``partial``, ``cancelled``, ``deadline``,
+                ``error``, ``interrupted``, or ``unknown``.
+            terminal_event_type: First SSE terminal type, if any.
+            stream_exhausted: Override for natural ``astream`` exhaustion.
+                ``None`` keeps the current value.
+        """
+
+        exhausted = self.termination_summary.get("stream_exhausted")
+        kept = exhausted if stream_exhausted is None else stream_exhausted
+        self.termination_summary = {
+            "termination_reason": reason,
+            "terminal_event_type": terminal_event_type,
+            "stream_exhausted": kept,
+        }
+
+    async def _aclose_stream(self, stream_iter: AsyncIterator[object]) -> None:
+        """Close an unfinished LangGraph stream without converting GeneratorExit.
+
+        Args:
+            stream_iter: ``astream`` iterator that did not exhaust naturally.
+
+        Raises:
+            GeneratorExit: Re-raised when the generator is being closed.
+            asyncio.CancelledError: Re-raised after ``aclose`` finishes.
+        """
+
+        close = getattr(stream_iter, "aclose", None)
+        if not callable(close):
+            return
+
+        async def _close() -> None:
+            """Await ``aclose`` when it returns an awaitable."""
+
+            closed = close()
+            if inspect.isawaitable(closed):
+                await closed
+
+        close_task = asyncio.create_task(_close())
+        try:
+            await asyncio.shield(close_task)
+        except asyncio.CancelledError:
+            await close_task
+            raise
+        except GeneratorExit:
+            raise
 
     def _commit_successful_terminal(
         self,
@@ -815,16 +977,27 @@ class SseStreamService:
             run_id: Run to cancel.
         """
 
+        handle = self._registry.get(run_id)
         self._registry.request_cancel(run_id)
         try:
             self._store.get_authorized_run(caller, run_id=run_id)
         except QueryAdmissionError:
             return
-        self._append(caller, run_id, "cancelled", {})
-        handle = self._registry.get(run_id)
-        if handle is not None:
+        if not self._has_terminal(caller, run_id):
+            self._append(caller, run_id, "cancelled", {})
+        if handle is None:
+            return
+        heartbeat = handle.heartbeat_task
+        if heartbeat is not None and not heartbeat.done():
+            heartbeat.cancel()
+        executor = handle.executor_task
+        if executor is None or executor.done():
             handle.terminal = True
-            self._cancel_tasks(handle)
+            return
+        loop = executor.get_loop()
+        loop.call_soon_threadsafe(
+            lambda: loop.create_task(self._cooperative_cancel(handle))
+        )
 
     async def iter_frames(
         self,
@@ -1010,24 +1183,67 @@ class SseStreamService:
             self._cancel_tasks(live)
             return
         try:
-            async for event_type, payload in self._executor.execute(
-                context=runtime,
-                message=message,
-                cancel_event=live.cancel_event,
-            ):
-                if live.cancel_event.is_set():
-                    break
-                self._append(caller, record.run_id, event_type, payload)
-            if not self._has_terminal(caller, record.run_id):
-                if live.cancel_event.is_set():
-                    self._append(caller, record.run_id, "cancelled", {})
-                else:
-                    self._append(
-                        caller,
-                        record.run_id,
-                        "error",
-                        {"code": "run_failed"},
-                    )
+            from smart_rag_core.observability.query_run_trace import (
+                invoke_traced_query_run_sse,
+            )
+            from smart_rag_core.settings import (
+                SettingsValidationError,
+                load_backend_settings,
+            )
+
+            try:
+                settings = load_backend_settings()
+            except (SettingsValidationError, ValueError):
+                settings = None
+
+            async def _consume() -> dict[str, object]:
+                """Drain the executor and persist drafts.
+
+                Returns:
+                    Sanitized termination summary from the concrete executor.
+                """
+
+                async for event_type, payload in self._executor.execute(
+                    context=runtime,
+                    message=message,
+                    cancel_event=live.cancel_event,
+                ):
+                    self._append(caller, record.run_id, event_type, payload)
+                if not self._has_terminal(caller, record.run_id):
+                    if live.cancel_event.is_set():
+                        self._append(caller, record.run_id, "cancelled", {})
+                    else:
+                        self._append(
+                            caller,
+                            record.run_id,
+                            "error",
+                            {"code": "run_failed"},
+                        )
+                summary = getattr(self._executor, "termination_summary", None)
+                if isinstance(summary, dict):
+                    typed_summary = cast(dict[object, object], summary)
+                    return {
+                        str(key): value for key, value in typed_summary.items()
+                    }
+                return {
+                    "termination_reason": (
+                        "cancelled" if live.cancel_event.is_set() else "unknown"
+                    ),
+                    "terminal_event_type": None,
+                    "stream_exhausted": False,
+                }
+
+            if settings is None:
+                await _consume()
+            else:
+                await invoke_traced_query_run_sse(
+                    _consume,
+                    settings=settings,
+                    run_id=record.run_id,
+                    user_id=runtime.user_id,
+                    requested_route=runtime.route_family.value,
+                    effective_route=runtime.route_family.value,
+                )
         except asyncio.CancelledError:
             if not self._has_terminal(caller, record.run_id):
                 self._append(caller, record.run_id, "cancelled", {})
@@ -1269,6 +1485,38 @@ class SseStreamService:
             )
             terminal = event.event_type in TERMINAL_SSE_EVENT_TYPES
             yield frame, event.sequence, terminal
+
+    async def _cooperative_cancel(self, live: LiveQueryRun) -> None:
+        """Give the executor a short cleanup window, then hard-cancel.
+
+        Args:
+            live: Process handle whose cancel event is already set.
+
+        Side Effects:
+            Cancels ``executor_task`` only when it is still running after
+            ``CANCEL_GRACE_SECONDS``. Marks the handle terminal.
+        """
+
+        executor = live.executor_task
+        if executor is None or executor.done():
+            live.terminal = True
+            return
+        try:
+            await asyncio.wait_for(asyncio.shield(executor), timeout=CANCEL_GRACE_SECONDS)
+        except TimeoutError:
+            if not executor.done():
+                executor.cancel()
+                try:
+                    await executor
+                except asyncio.CancelledError:
+                    pass
+        except asyncio.CancelledError:
+            if not executor.done():
+                try:
+                    await executor
+                except asyncio.CancelledError:
+                    pass
+        live.terminal = True
 
     def _cancel_tasks(self, live: LiveQueryRun) -> None:
         """Cancel heartbeat and executor tasks for a finished run.

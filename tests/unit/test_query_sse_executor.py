@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import sys
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -634,3 +635,523 @@ def test_postgres_event_store_reuses_and_closes_session(monkeypatch: Any) -> Non
     assert calls.count("SET ROLE app_api") == 2
     assert calls.count("COMMIT") == 2
     assert calls[-1] == "CLOSE"
+
+
+class _RecordingAsyncStream:
+    """Typed async stream that records consume and aclose counts."""
+
+    def __init__(self, chunks: tuple[object, ...]) -> None:
+        """Store ordered chunks.
+
+        Args:
+            chunks: Values yielded by ``__anext__``.
+        """
+
+        self._chunks = chunks
+        self._index = 0
+        self.consumed = 0
+        self.aclose_count = 0
+
+    def __aiter__(self) -> _RecordingAsyncStream:
+        """Return this iterator.
+
+        Returns:
+            This stream.
+        """
+
+        return self
+
+    async def __anext__(self) -> object:
+        """Yield the next stored chunk.
+
+        Returns:
+            The next chunk.
+
+        Raises:
+            StopAsyncIteration: When every chunk has been consumed.
+        """
+
+        if self._index >= len(self._chunks):
+            raise StopAsyncIteration
+        item = self._chunks[self._index]
+        self._index += 1
+        self.consumed += 1
+        return item
+
+    async def aclose(self) -> None:
+        """Record one explicit close of an unfinished stream."""
+
+        self.aclose_count += 1
+
+
+class _RecordingCompiled:
+    """Compiled-graph stand-in that returns a recording stream."""
+
+    def __init__(self, stream: _RecordingAsyncStream) -> None:
+        """Bind one stream.
+
+        Args:
+            stream: Iterator returned by ``astream``.
+        """
+
+        self._stream = stream
+
+    def astream(self, *args: object, **kwargs: object) -> _RecordingAsyncStream:
+        """Return the recording stream without wrapping it.
+
+        Args:
+            *args: Ignored graph input.
+            **kwargs: Ignored stream options.
+
+        Returns:
+            The bound recording stream.
+        """
+
+        del args, kwargs
+        return self._stream
+
+
+def _verified_chunk(text: str) -> dict[str, object]:
+    """Build a verify-node update that becomes a completed terminal.
+
+    Args:
+        text: Verified answer text.
+
+    Returns:
+        Node-keyed update mapping.
+    """
+
+    return {
+        "verify_answer": {
+            "status": "verified",
+            "answer": AnswerPayload(answer_text=text, status="complete").model_dump(
+                mode="json"
+            ),
+        }
+    }
+
+
+def _empty_verified_chunk() -> dict[str, object]:
+    """Build a verify-node update that becomes an error terminal.
+
+    Returns:
+        Node-keyed update mapping.
+    """
+
+    return {
+        "verify_answer": {
+            "status": "verified",
+            "answer": AnswerPayload(answer_text="  ", status="complete").model_dump(
+                mode="json"
+            ),
+        }
+    }
+
+
+def _trailing_chunk() -> dict[str, object]:
+    """Build a harmless trailing graph update.
+
+    Returns:
+        Node-keyed update mapping.
+    """
+
+    return {"persist": {"status": "answered"}}
+
+
+def _patch_recording_executor(
+    monkeypatch: Any,
+    executor: LangGraphQueryRunExecutor,
+    compiled: _RecordingCompiled,
+) -> tuple[list[str], list[str]]:
+    """Patch process bindings so execute uses a recording compiled graph.
+
+    Args:
+        monkeypatch: Pytest monkeypatch.
+        executor: Production executor under test.
+        compiled: Graph stand-in.
+
+    Returns:
+        Commit-call log and successful-settlement log.
+    """
+
+    commits: list[str] = []
+    settlements: list[str] = []
+
+    def _settings() -> SimpleNamespace:
+        """Return fixture backend settings.
+
+        Returns:
+            Settings stand-in with tracing disabled.
+        """
+
+        return SimpleNamespace(
+            langsmith_tracing=False,
+            mock_model_mode=True,
+            subprocessor_matrix_verified=True,
+            allows_unsigned_local_live_providers=lambda: True,
+            supabase_db_url=None,
+        )
+
+    def _permit_export(**kwargs: object) -> None:
+        """Skip the LangSmith export gate.
+
+        Args:
+            **kwargs: Unused gate arguments.
+        """
+
+        del kwargs
+
+    def _compile(*args: object, **kwargs: object) -> _RecordingCompiled:
+        """Return the recording compiled graph.
+
+        Args:
+            *args: Ignored graph deps.
+            **kwargs: Ignored compile options.
+
+        Returns:
+            Bound recording compiled graph.
+        """
+
+        del args, kwargs
+        return compiled
+
+    def _pending(**kwargs: object) -> dict[str, str]:
+        """Return a compact pending state.
+
+        Args:
+            **kwargs: Ignored pending fields.
+
+        Returns:
+            Pending status mapping.
+        """
+
+        del kwargs
+        return {"status": "pending"}
+
+    def _open_connection(dsn: object) -> SimpleNamespace:
+        """Return a connection that records commit and close.
+
+        Args:
+            dsn: Unused DSN.
+
+        Returns:
+            Connection stand-in.
+        """
+
+        del dsn
+        return SimpleNamespace(
+            commit=lambda: commits.append("commit"),
+            close=lambda: commits.append("close"),
+        )
+
+    def _deps(**kwargs: object) -> object:
+        """Return a dummy graph-deps object.
+
+        Args:
+            **kwargs: Unused builder arguments.
+
+        Returns:
+            Opaque deps stand-in.
+        """
+
+        del kwargs
+        return object()
+
+    def _bindings(settings: object) -> SimpleNamespace:
+        """Return process bindings with a dummy DSN.
+
+        Args:
+            settings: Unused settings.
+
+        Returns:
+            Bindings stand-in.
+        """
+
+        del settings
+        return SimpleNamespace(supabase_dsn="postgresql://x")
+
+    def _store(settings: object) -> tuple[None, None]:
+        """Return no memory-store binding.
+
+        Args:
+            settings: Unused settings.
+
+        Returns:
+            ``(None, None)`` store pair.
+        """
+
+        del settings
+        return (None, None)
+
+    def _summarize(*args: object, **kwargs: object) -> None:
+        """Skip summary writes.
+
+        Args:
+            *args: Unused summarize arguments.
+            **kwargs: Unused summarize options.
+        """
+
+        del args, kwargs
+
+    def _persist(*args: object, **kwargs: object) -> None:
+        """Record one successful assistant persist.
+
+        Args:
+            *args: Unused persist arguments.
+            **kwargs: Unused persist options.
+        """
+
+        del args, kwargs
+        settlements.append("persist")
+
+    monkeypatch.setattr(
+        "smart_rag_core.settings.load_backend_settings",
+        _settings,
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.observability.governance_gate.assert_langsmith_export_permitted",
+        _permit_export,
+    )
+    graph_mod = sys.modules[_compile_query_graph.__module__]
+    monkeypatch.setattr(graph_mod, "compile_query_graph", _compile)
+    monkeypatch.setattr(graph_mod, "pending_query_state", _pending)
+    monkeypatch.setattr(
+        "smart_rag_api.services.query_graph_runtime.open_run_app_api_connection",
+        _open_connection,
+    )
+    monkeypatch.setattr(
+        "smart_rag_api.services.query_graph_runtime.build_query_graph_deps",
+        _deps,
+    )
+    monkeypatch.setattr(executor, "_process_bindings", _bindings)
+    monkeypatch.setattr(executor, "_bind_memory_store", _store)
+    monkeypatch.setattr(executor, "_maybe_summarize", _summarize)
+    monkeypatch.setattr(executor, "_persist_assistant_answer", _persist)
+    return commits, settlements
+
+
+def test_successful_stream_drains_and_skips_aclose(monkeypatch: Any) -> None:
+    """A terminal plus trailing chunk exhausts naturally without aclose."""
+
+    stream = _RecordingAsyncStream((_verified_chunk("VISIBLE_FINAL"), _trailing_chunk()))
+    executor = LangGraphQueryRunExecutor()
+    commits, settlements = _patch_recording_executor(
+        monkeypatch, executor, _RecordingCompiled(stream)
+    )
+
+    async def _collect() -> list[str]:
+        """Drain executor event types.
+
+        Returns:
+            Event type names.
+        """
+
+        events: list[str] = []
+        async for event_type, _payload in executor.execute(
+            context=_runtime(),
+            message="hello",
+            cancel_event=asyncio.Event(),
+        ):
+            events.append(event_type)
+        return events
+
+    types = asyncio.run(_collect())
+    assert stream.consumed == 2
+    assert stream.aclose_count == 0
+    assert types.count("completed") == 1
+    assert executor.termination_summary["termination_reason"] == "completed"
+    assert executor.termination_summary["stream_exhausted"] is True
+    assert settlements == ["persist"]
+    assert commits.count("close") == 1
+
+
+def test_mid_stream_cancel_closes_once(monkeypatch: Any) -> None:
+    """Cancel after the first yield closes the unfinished stream once."""
+
+    stream = _RecordingAsyncStream(
+        (
+            {
+                "generate_answer": {
+                    "status": "drafted",
+                    "answer": AnswerPayload(
+                        answer_text="draft", status="complete"
+                    ).model_dump(mode="json"),
+                }
+            },
+            _verified_chunk("later"),
+            _trailing_chunk(),
+        )
+    )
+    executor = LangGraphQueryRunExecutor()
+    _commits, settlements = _patch_recording_executor(
+        monkeypatch, executor, _RecordingCompiled(stream)
+    )
+
+    async def _collect() -> list[str]:
+        """Cancel after the first status event.
+
+        Returns:
+            Event type names.
+        """
+
+        events: list[str] = []
+        cancel = asyncio.Event()
+        async for event_type, _payload in executor.execute(
+            context=_runtime(),
+            message="hello",
+            cancel_event=cancel,
+        ):
+            events.append(event_type)
+            cancel.set()
+        return events
+
+    types = asyncio.run(_collect())
+    assert "completed" not in types
+    assert stream.aclose_count == 1
+    assert stream.consumed < 3
+    assert settlements == []
+    assert executor.termination_summary["termination_reason"] == "cancelled"
+    assert executor.termination_summary["stream_exhausted"] is False
+
+
+def test_graph_error_is_one_error_terminal(monkeypatch: Any) -> None:
+    """A natural empty verified answer is one error and no success settlement."""
+
+    stream = _RecordingAsyncStream((_empty_verified_chunk(), _trailing_chunk()))
+    executor = LangGraphQueryRunExecutor()
+    summarize_calls: list[str] = []
+    _commits, settlements = _patch_recording_executor(
+        monkeypatch, executor, _RecordingCompiled(stream)
+    )
+
+    def _record_summary(*args: object, **kwargs: object) -> None:
+        """Record an unexpected successful-settlement summary.
+
+        Args:
+            *args: Unused summarize arguments.
+            **kwargs: Unused summarize options.
+        """
+
+        del args, kwargs
+        summarize_calls.append("summary")
+
+    monkeypatch.setattr(executor, "_maybe_summarize", _record_summary)
+
+    async def _collect() -> list[str]:
+        """Drain error-terminal events.
+
+        Returns:
+            Event type names.
+        """
+
+        events: list[str] = []
+        async for event_type, _payload in executor.execute(
+            context=_runtime(),
+            message="hello",
+            cancel_event=asyncio.Event(),
+        ):
+            events.append(event_type)
+        return events
+
+    types = asyncio.run(_collect())
+    assert types.count("error") == 1
+    assert "completed" not in types
+    assert summarize_calls == []
+    assert settlements == []
+    assert stream.consumed == 2
+    assert stream.aclose_count == 0
+    assert executor.termination_summary["termination_reason"] == "error"
+
+
+def test_consumer_disconnect_leaves_executor_resumable() -> None:
+    """Closing the HTTP consumer does not cancel a still-running executor."""
+
+    store = MemoryRunEventStore()
+    registry = QueryRunRegistry()
+    executor = FixtureQueryRunExecutor(hold_seconds=0.4, emit_completed=True)
+    service = SseStreamService(
+        store=store,
+        registry=registry,
+        executor=executor,
+        sse_schema_version="1",
+    )
+    caller = _caller()
+    runtime = _runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+
+    async def _disconnect_then_resume() -> list[str]:
+        """Close the first attach, then resume remaining events.
+
+        Returns:
+            Event types from the resume attach.
+        """
+
+        agen = service.iter_frames(
+            caller, run_id=runtime.run_id, after=0, context=runtime
+        )
+        first = await agen.__anext__()
+        assert "event:" in first
+        close = getattr(agen, "aclose", None)
+        assert callable(close)
+        closed = close()
+        if inspect.isawaitable(closed):
+            await closed
+        handle = registry.get(runtime.run_id)
+        assert handle is not None
+        assert handle.executor_task is not None
+        assert handle.executor_task.done() is False
+        await handle.executor_task
+        types: list[str] = []
+        async for frame in service.iter_frames(
+            caller, run_id=runtime.run_id, after=0, context=runtime
+        ):
+            if "event: completed" in frame:
+                types.append("completed")
+            if "event: cancelled" in frame:
+                types.append("cancelled")
+        return types
+
+    types = asyncio.run(_disconnect_then_resume())
+    assert "completed" in types
+    assert "cancelled" not in types
+
+
+def test_cancel_grace_hard_cancels_lingering_task() -> None:
+    """Explicit cancel waits briefly, then hard-cancels a stuck executor."""
+
+    store = MemoryRunEventStore()
+    registry = QueryRunRegistry()
+    service = SseStreamService(
+        store=store,
+        registry=registry,
+        executor=FixtureQueryRunExecutor(),
+        sse_schema_version="1",
+    )
+    caller = _caller()
+    runtime = _runtime()
+    service.remember_admitted(caller, runtime, message="hello")
+    live = registry.get_or_create(runtime.run_id)
+    live.started = True
+
+    async def _stuck() -> None:
+        """Ignore cooperative cancel and sleep past the grace window."""
+
+        await asyncio.sleep(2)
+
+    async def _run() -> bool:
+        """Request cancel and wait for the grace hard-cancel.
+
+        Returns:
+            True when the stuck task finished after the grace window.
+        """
+
+        task = asyncio.create_task(_stuck())
+        live.executor_task = task
+        service.notify_cancel(caller, run_id=runtime.run_id)
+        await asyncio.sleep(0.05)
+        still_running = not task.done()
+        await asyncio.sleep(0.35)
+        finished = task.done()
+        return still_running and finished
+
+    assert asyncio.run(_run()) is True

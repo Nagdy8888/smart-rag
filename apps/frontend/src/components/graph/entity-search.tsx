@@ -63,10 +63,10 @@ export function EntitySearch({
   }
 
   return (
-    <section className={styles.search} aria-label="Search entities">
+    <section className={styles.search} aria-label="Entity search">
       <form className={styles.searchForm} onSubmit={handleSubmit}>
         <Input
-          label="Search entities."
+          label="Search entities"
           value={query}
           leadingIcon="search"
           onChange={(event) => onQuery(event.target.value)}

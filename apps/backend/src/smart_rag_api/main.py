@@ -15,7 +15,11 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, Request, Response
 from pydantic import SecretStr
-from smart_rag_core.observability import configure_json_logging, correlation_context
+from smart_rag_core.observability import (
+    configure_json_logging,
+    configure_langsmith,
+    correlation_context,
+)
 from smart_rag_core.settings import BackendSettings, Environment, load_backend_settings
 
 from smart_rag_api.dependencies.identity import reject_forbidden_test_identity_headers
@@ -98,6 +102,13 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         service=settings.service_name,
         environment=settings.app_env.value,
         level=settings.log_level.value,
+    )
+    configure_langsmith(settings)
+    LOGGER.info(
+        "LangSmith tracing configured project=%s enabled=%s",
+        settings.langsmith_project,
+        settings.langsmith_tracing,
+        extra={"event": "backend.langsmith.configured"},
     )
     application.state.settings = settings
     application.state.rate_limit_degraded = False

@@ -85,6 +85,7 @@ def test_backend_identity_modules_do_not_emit_mfa_required() -> None:
     scanned = [
         root / "apps/backend/src/smart_rag_api/dependencies/identity.py",
         root / "apps/backend/src/smart_rag_api/services/profile_loader.py",
+        root / "packages/core/src/smart_rag_core/security/profile_snapshot.py",
         root / "apps/backend/src/smart_rag_api/auth_admin/offboarding.py",
         root / "apps/backend/src/smart_rag_api/auth_admin/mfa_recovery.py",
         root / "apps/backend/src/smart_rag_api/routers/auth_team.py",

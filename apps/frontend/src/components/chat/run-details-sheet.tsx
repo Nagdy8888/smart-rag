@@ -6,6 +6,7 @@
 
 import { INFERENCE_LINKS_UNAVAILABLE } from "../../lib/citation-drawer";
 import type { ChatViewState } from "../../lib/chat-view";
+import { formatRunTokenUsage, formatUsd } from "../../lib/format-usage";
 import { displayText } from "../../lib/safe-text";
 import { Button } from "../ui/button";
 import { Sheet } from "../ui/sheet";
@@ -28,6 +29,33 @@ export type RunDetailsSheetProps = {
 };
 
 /**
+ * Render one diagnostic row when the value is real.
+ *
+ * @param label - Row title.
+ * @param value - Display value. Dash and empty values are omitted.
+ * @returns Fragment, or null.
+ */
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) {
+  if (value === null || value === undefined || value === "" || value === "—") {
+    return null;
+  }
+  return (
+    <>
+      <dt>{label}</dt>
+      <dd>
+        <UserText value={value} />
+      </dd>
+    </>
+  );
+}
+
+/**
  * Render diagnostics. The definition list stays mounted when the sheet is closed.
  *
  * @param props - Open state and chat diagnostics.
@@ -41,65 +69,70 @@ export function RunDetailsSheet({
   companyUsd,
 }: RunDetailsSheetProps) {
   const diagnostics = chat.diagnostics;
+  const terminalValue =
+    chat.terminal !== null
+      ? chat.terminal
+      : chat.runId !== null
+        ? "running"
+        : null;
+  const usageUsd = formatUsd(companyUsd);
+  const runUsage =
+    formatRunTokenUsage(diagnostics.promptTokens, diagnostics.completionTokens) ??
+    "0 prompt · 0 completion";
   const body = (
     <>
       <dl data-testid="advanced-diagnostics">
-        <dt>Requested route</dt>
-        <dd>
-          <UserText value={diagnostics.requestedRoute ?? chat.routeFamily ?? "—"} />
-        </dd>
-        <dt>Effective route</dt>
-        <dd>
-          <UserText value={diagnostics.effectiveRoute ?? "—"} />
-        </dd>
-        <dt>Corrected route</dt>
-        <dd>
-          <UserText value={diagnostics.correctedRoute ?? "none"} />
-        </dd>
-        <dt>Correction reason</dt>
-        <dd>
-          <UserText value={diagnostics.correctionReason ?? "—"} />
-        </dd>
-        <dt>Cache</dt>
-        <dd>
-          <UserText value={diagnostics.cacheStatus ?? "—"} />
-        </dd>
-        <dt>Coverage</dt>
-        <dd>
-          {diagnostics.coverageScore === null
-            ? "—"
-            : String(diagnostics.coverageScore)}
-        </dd>
-        <dt>Tools</dt>
-        <dd>
-          <UserText
-            value={diagnostics.toolKeys.map(displayText).join(", ") || "none"}
-          />
-        </dd>
+        <DetailRow
+          label="Requested route"
+          value={diagnostics.requestedRoute ?? chat.routeFamily}
+        />
+        <DetailRow label="Effective route" value={diagnostics.effectiveRoute} />
+        <DetailRow
+          label="Corrected route"
+          value={diagnostics.correctedRoute === null ? "none" : diagnostics.correctedRoute}
+        />
+        <DetailRow label="Correction reason" value={diagnostics.correctionReason} />
+        <DetailRow label="Cache" value={diagnostics.cacheStatus} />
+        <DetailRow
+          label="Coverage"
+          value={
+            diagnostics.coverageScore === null
+              ? null
+              : String(diagnostics.coverageScore)
+          }
+        />
+        <DetailRow
+          label="Tools"
+          value={diagnostics.toolKeys.map(displayText).join(", ") || "none"}
+        />
         <dt>Heartbeats</dt>
         <dd>{String(diagnostics.heartbeatCount)}</dd>
-        <dt>Unknown events</dt>
-        <dd>{diagnostics.unknownEvents.join(", ") || "none (ignored)"}</dd>
-        <dt>Stage</dt>
-        <dd>
-          <UserText value={chat.stage ?? "—"} /> /{" "}
-          <UserText value={chat.status ?? "—"} />
-        </dd>
-        <dt>Terminal</dt>
-        <dd>
-          <UserText value={chat.terminal ?? "running"} />
-        </dd>
+        <DetailRow
+          label="Unknown events"
+          value={
+            diagnostics.unknownEvents.length === 0
+              ? "none (ignored)"
+              : diagnostics.unknownEvents.join(", ")
+          }
+        />
+        <DetailRow label="Stage" value={chat.stage} />
+        <DetailRow label="Status" value={chat.status} />
+        <DetailRow label="Terminal" value={terminalValue} />
       </dl>
       <p className={styles.muted}>{INFERENCE_LINKS_UNAVAILABLE}</p>
       <p className={styles.muted} data-testid="usage-strip">
-        Usage {String(diagnostics.promptTokens)}/{String(diagnostics.completionTokens)}{" "}
-        tokens. Your usage {companyUsd} USD.
+        This run {runUsage}. Your account {usageUsd}.
       </p>
     </>
   );
   return (
     <>
-      <Button type="button" variant="ghost" onClick={onOpen}>
+      <Button
+        type="button"
+        variant="ghost"
+        data-action-id="ask.run_details"
+        onClick={onOpen}
+      >
         Run details
       </Button>
       {open ? (

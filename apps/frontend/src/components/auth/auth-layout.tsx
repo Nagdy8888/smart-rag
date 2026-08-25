@@ -12,14 +12,13 @@ export type AuthLayoutProps = {
 };
 
 /**
- * Render a light split Auth composition: product context plus form surface.
+ * Render a split Auth composition: gradient brand panel plus form surface.
  *
  * @param props - Route children.
- * @returns Skip link, restrained brand context, and `#main` landmark.
+ * @returns Skip link, brand panel, and `#main` landmark.
  * @remarks
  * URLs stay `/login` and siblings. Proxy/session behavior is unchanged.
- * No readiness dashboard, testimonials, gradients, or console nav.
- * Form fields and Auth callbacks remain in `auth-screens.tsx`.
+ * The brand gradient is the approved exception from the no-gradient rule.
  */
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
@@ -33,10 +32,8 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             <Icon name="spark" />
           </span>
           <p className={styles.product}>Smart RAG</p>
-          <p className={styles.subbrand}>Evidence workspace for company knowledge</p>
           <p className={styles.contextCopy}>
-            Ask grounded questions, inspect sources, and manage ingestion without
-            leaving the signed-in console.
+            Grounded answers from your company&apos;s knowledge.
           </p>
         </aside>
         <div className={styles.formColumn}>

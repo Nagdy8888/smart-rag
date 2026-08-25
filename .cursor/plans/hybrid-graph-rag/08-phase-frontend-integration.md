@@ -76,6 +76,8 @@ Remediation packets P08-07 through P08-23 are additive. Do not uncheck packets 1
 22. [ ] [Run production-like stack, role, visual, and real-answer verification](./08-phase-frontend-integration/packets/22-run-production-like-stack-role-visual-and-real-answer-verification.md)
 23. [ ] [Final review, pull request, and normal merge](./08-phase-frontend-integration/packets/23-final-review-pull-request-and-normal-merge.md)
 
+Additive Phase 6/Phase 8 co-owned UI amendment: [P06-14](./06-phase-agent-intelligence/packets/14-chat-origin-ux.md) records answer-origin, clarification, and citation-safe Ask behavior. Do not uncheck historical completed Phase 8 packets or renumber P08-22/P08-23.
+
 ## Phase sequence requirement
 
 Phase 8 implements the approved Stitch output, auth, chat test bench, documents, graph explorer, tools, settings, accessibility, and E2E tests.

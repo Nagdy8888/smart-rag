@@ -103,6 +103,28 @@ def answer_json_schema() -> dict[str, object]:
     }
 
 
+def general_chat_json_schema() -> dict[str, object]:
+    """Return the strict no-source general-chat schema.
+
+    Returns:
+        OpenAI ``json_schema`` document with ``answer_text`` and ``status``
+        only. Citations and source IDs are omitted.
+    """
+
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["answer_text", "status"],
+        "properties": {
+            "answer_text": {"type": "string"},
+            "status": {
+                "type": "string",
+                "enum": ["complete", "partial", "refused"],
+            },
+        },
+    }
+
+
 def verifier_json_schema(link_ids: tuple[str, ...]) -> dict[str, object]:
     """Return the strict verifier schema bound to supplied link IDs.
 

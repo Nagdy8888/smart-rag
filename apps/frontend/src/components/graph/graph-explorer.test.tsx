@@ -154,7 +154,7 @@ function renderSurface(ui: ReactElement) {
  * Search, select the fixture hit, and inspect.
  */
 async function searchSelectInspect(): Promise<void> {
-  fireEvent.change(await screen.findByLabelText("Search entities."), {
+  fireEvent.change(await screen.findByLabelText("Search entities"), {
     target: { value: "acme" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -172,7 +172,7 @@ describe("GraphExplorer", () => {
     expect(body.entity_keys).toEqual(["acme"]);
     expect(body.depth).toBe(3);
     fireEvent.click(screen.getByRole("button", { name: "Select" }));
-    expect(screen.getAllByText("Evidence details.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Evidence details").length).toBeGreaterThan(0);
     expect(screen.getByText("Intro")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Add relationship" })).toBeNull();
@@ -231,12 +231,12 @@ describe("GraphExplorer", () => {
     ];
     searchGraphEntities.mockResolvedValue(hits);
     renderSurface(<GraphExplorer />);
-    fireEvent.change(await screen.findByLabelText("Search entities."), {
+    fireEvent.change(await screen.findByLabelText("Search entities"), {
       target: { value: "ent" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await screen.findByText(MIXED_BIDI);
-    const searchRegion = screen.getByRole("region", { name: "Search entities" });
+    const searchRegion = screen.getByRole("region", { name: "Entity search" });
     const hitButtons = within(searchRegion)
       .getAllByRole("button")
       .filter((button) => button.getAttribute("type") === "button");

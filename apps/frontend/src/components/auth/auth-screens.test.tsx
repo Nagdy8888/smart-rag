@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -35,6 +35,13 @@ vi.mock("../../lib/auth/browser", () => ({
       signOut: vi.fn(),
     },
   }),
+}));
+
+const replace = vi.fn();
+const refresh = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace, refresh, push: vi.fn() }),
 }));
 
 vi.mock("../../lib/env", () => ({
@@ -128,5 +135,25 @@ describe("Auth omits unsupported recovery and bootstrap chrome", () => {
     expect(screen.queryByText(OWNER_BOOTSTRAP_UNAVAILABLE)).toBeNull();
     expect(screen.queryByLabelText(/company/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /bootstrap|create company/i })).toBeNull();
+  });
+});
+
+describe("SignInForm redirect", () => {
+  it("replaces to / after a successful password sign-in", async () => {
+    replace.mockClear();
+    refresh.mockClear();
+    signInWithPassword.mockResolvedValueOnce({
+      error: null,
+      data: { session: { access_token: "jwt-token" } },
+    });
+    const user = userEvent.setup();
+    renderAuth(<SignInForm />);
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
+    await user.type(screen.getByLabelText("Password"), "secret");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith("/");
+      expect(refresh).toHaveBeenCalled();
+    });
   });
 });

@@ -17,6 +17,8 @@
 
 .context {
   display: none;
+  background: var(--gradient-brand);
+  color: #fff;
 }
 
 .formColumn {
@@ -39,9 +41,9 @@
 .contextCopy {
   margin: calc(var(--space) * 4) 0 0;
   max-width: 28rem;
-  color: var(--color-text-muted);
-  font-size: 0.95rem;
-  line-height: var(--line-height-en);
+  color: rgb(255 255 255 / 0.8);
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .skipLink {
@@ -75,17 +77,30 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
 }
 
 .product {
   margin: 0;
-  font-size: 1.25rem;
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 40px;
   font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.mobileBrand .product {
+  color: var(--color-text);
+  font-size: 24px;
+  line-height: 32px;
+}
+
+.context .product {
+  color: #fff;
 }
 
 .subbrand {
@@ -96,15 +111,15 @@
 
 .main {
   width: 100%;
-  max-width: 26rem;
+  max-width: 420px;
 }
 
 .card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow-1);
-  padding: calc(var(--space) * 6);
+  padding: 32px;
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 4);
@@ -112,8 +127,11 @@
 
 .card h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 36px;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .lead {
@@ -191,7 +209,7 @@
   width: 100%;
 }
 
-@media (min-width: 801px) {
+@media (min-width: 1024px) {
   .split {
     flex-direction: row;
     align-items: stretch;
@@ -201,11 +219,11 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    width: min(28rem, 40%);
-    flex: 0 0 min(28rem, 40%);
-    padding: calc(var(--space) * 10);
-    background: var(--color-surface-muted);
-    border-inline-end: 1px solid var(--color-border);
+    width: 45%;
+    flex: 0 0 45%;
+    padding: 48px;
+    background: var(--gradient-brand);
+    border-inline-end: 0;
   }
 
   .mobileBrand {
@@ -213,6 +231,8 @@
   }
 
   .formColumn {
+    flex: 1 1 55%;
+    width: 55%;
     justify-content: center;
     align-items: center;
   }

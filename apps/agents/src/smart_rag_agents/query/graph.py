@@ -5,6 +5,7 @@ This module compiles without sockets or OpenAI clients.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -193,6 +194,8 @@ def build_query_graph(
     deps: QueryGraphDeps | None = None,
     *,
     studio_local: bool = False,
+    studio_live: bool = False,
+    studio_live_seed: Callable[..., QueryGraphState] | None = None,
 ) -> QueryStateGraph:
     """Construct the packet 2 query ``StateGraph`` (not yet compiled).
 
@@ -202,15 +205,20 @@ def build_query_graph(
         studio_local: When true, prepend ``seed_studio_runtime`` and accept
             ``StudioQueryInput``. FastAPI must not set this. The seed does
             not admit a paid run or open Postgres.
+        studio_live: When true, prepend the authenticated live seed and
+            accept ``StudioQueryInput``. Mutually exclusive with
+            ``studio_local``. FastAPI must not set this.
+        studio_live_seed: Optional live seed closure. The unbound default
+            rejects and never mints ``studio_local``.
 
     Returns:
         An uncompiled graph: admission → memory → prepare → plan →
         branches → one correction → fuse → tables → optional tools →
-        answer → verify → END. Studio adds a local seed before admission.
+        answer → verify → END. Studio adds a seed before admission.
 
     Notes:
         State inputs: ``QueryGraphState``, or ``StudioQueryInput`` when
-            ``studio_local``.
+            ``studio_local`` or ``studio_live``.
         State outputs: fused evidence, one answer, and layered verification.
         Persistence writes: counted prep/answer/verifier consume when used.
         External/model calls: at most one prep, one answer, one verifier.
@@ -219,11 +227,13 @@ def build_query_graph(
             / ``insufficient_evidence`` / ``verified_partial`` then END.
     """
 
+    if studio_local and studio_live:
+        raise ValueError("studio_local and studio_live are mutually exclusive")
     bound = deps or QueryGraphDeps()
     input_schema: type[QueryGraphState] | type[object] = QueryGraphState
     state_schema: type[QueryGraphState] | type[object] = QueryGraphState
     output_schema: type[QueryGraphState] | type[object] = QueryGraphState
-    if studio_local:
+    if studio_local or studio_live:
         from smart_rag_agents.query.studio import StudioQueryInput, StudioQueryState
 
         input_schema = StudioQueryInput
@@ -360,24 +370,32 @@ def build_query_graph(
         enforce_admission,
     )
     terminal_target = END
-    if studio_local:
-        from smart_rag_agents.query.studio import (
-            emit_studio_response,
-            seed_studio_runtime,
-        )
+    if studio_local or studio_live:
+        from smart_rag_agents.query.studio import emit_studio_response
+
+        if studio_local:
+            from smart_rag_agents.query.studio import seed_studio_runtime
+
+            seed_node = seed_studio_runtime
+            seed_name = "seed_studio_runtime"
+        else:
+            from smart_rag_agents.query.studio_live import seed_studio_live_unbound
+
+            seed_node = studio_live_seed or seed_studio_live_unbound
+            seed_name = "seed_studio_live_runtime"
 
         builder.add_node(  # pyright: ignore[reportUnknownMemberType]
-            "seed_studio_runtime",
-            seed_studio_runtime,
+            seed_name,
+            seed_node,
         )
         builder.add_node(  # pyright: ignore[reportUnknownMemberType]
             "emit_studio_response",
             emit_studio_response,
         )
         terminal_target = "emit_studio_response"
-        builder.add_edge(START, "seed_studio_runtime")
+        builder.add_edge(START, seed_name)
         builder.add_conditional_edges(
-            "seed_studio_runtime",
+            seed_name,
             _route_after_studio_seed,
             {"enforce_admission": "enforce_admission", "end": terminal_target},
         )
@@ -446,7 +464,7 @@ def build_query_graph(
     builder.add_edge("disclose_optional_tools", "generate_answer")
     builder.add_edge("generate_answer", "verify_answer")
     builder.add_edge("verify_answer", terminal_target)
-    if studio_local:
+    if studio_local or studio_live:
         builder.add_edge("emit_studio_response", END)
     return builder
 

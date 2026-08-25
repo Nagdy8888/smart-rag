@@ -7,6 +7,8 @@ import { CLIENT_VERSION } from "./client-version";
 import { apiBaseUrl } from "./env";
 import type {
   CitationResponse,
+  ConversationMessage,
+  ConversationMessagesResponse,
   ConversationResponse,
   CurrentUserResponse,
   AcceptInvitationResponse,
@@ -606,15 +608,20 @@ export function mergeReadiness(
  * Public ready plus owner/admin named probes when the Bearer is allowed.
  *
  * @param auth - Access token, or null on the signed-out login page.
+ * @param role - `/me` role. Operator probes run only for `owner` or `admin`.
  * @param fetchImpl - Injected fetch.
  * @returns Merged console readiness, or null when FastAPI is unreachable.
  */
 export async function loadConsoleReadiness(
   auth: ApiAuth | null,
+  role?: string | null,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ReadinessResponse | null> {
   const publicReady = await fetchReady(fetchImpl);
   if (publicReady === null || auth === null) {
+    return publicReady;
+  }
+  if (role !== "owner" && role !== "admin") {
     return publicReady;
   }
   const operatorReady = await fetchOperatorReady(auth, fetchImpl);
@@ -707,6 +714,7 @@ export async function listConversations(
  * @param title - Optional title.
  * @param fetchImpl - Injected fetch.
  * @returns Created conversation.
+ * @throws ClassifiedApiError on non-OK responses.
  */
 export async function createConversation(
   auth: ApiAuth,
@@ -718,7 +726,20 @@ export async function createConversation(
     headers: paidMutationHeaders(auth),
     body: JSON.stringify(title ? { title } : {}),
   });
-  return (await response.json()) as ConversationResponse;
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return {
+    conversation_id: String(body.conversation_id ?? ""),
+    creator_user_id: String(body.creator_user_id ?? ""),
+    title:
+      body.title === null || body.title === undefined
+        ? null
+        : String(body.title),
+    created_at:
+      body.created_at === null || body.created_at === undefined
+        ? null
+        : String(body.created_at),
+  };
 }
 
 /**
@@ -741,6 +762,43 @@ export async function fetchConversation(
   const body = await readJsonObject(response);
   throwIfNotOk(response, body);
   return body as unknown as ConversationResponse;
+}
+
+/**
+ * Load one page of persisted user/assistant messages, newest first.
+ *
+ * @param auth - Access token.
+ * @param conversationId - Conversation UUID.
+ * @param options - Page size (1–100) and optional keyset cursor.
+ * @param fetchImpl - Injected fetch.
+ * @returns Escaped transcript items and the next older cursor.
+ * @throws ClassifiedApiError on non-OK responses.
+ */
+export async function fetchConversationMessages(
+  auth: ApiAuth,
+  conversationId: string,
+  options: { limit?: number; before?: string | null } = {},
+  fetchImpl: typeof fetch = fetch,
+): Promise<ConversationMessagesResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", String(options.limit ?? 50));
+  if (options.before) {
+    params.set("before", options.before);
+  }
+  const response = await fetchImpl(
+    apiUrl(`/conversations/${conversationId}/messages?${params.toString()}`),
+    { headers: resumeHeaders(auth) },
+  );
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  const items = Array.isArray(body.items)
+    ? (body.items as ConversationMessage[])
+    : [];
+  const next =
+    body.next_before_id === null || body.next_before_id === undefined
+      ? null
+      : String(body.next_before_id);
+  return { items, next_before_id: next };
 }
 
 /**

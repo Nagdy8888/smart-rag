@@ -16,7 +16,6 @@ import {
 } from "../../lib/layout-preferences";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { Button } from "../ui/button";
-import { Icon } from "../ui/icon";
 import { Drawer } from "../ui/drawer";
 import { LimitationCallout } from "../ui/limitation-callout";
 import { LiveRegion } from "../ui/live-region";
@@ -36,11 +35,13 @@ import {
   submitFeedback,
   resumeEventStream,
   fetchConversation,
+  fetchConversationMessages,
   fetchRun,
   isClassifiedApiError,
   type ApiAuth,
   type ApiFailure,
 } from "../../lib/api";
+import { shouldShowCitations } from "../../lib/answer-origin";
 import { SESSION_REVOKED_BANNER } from "../../lib/auth/copy";
 import { useSession } from "../../lib/auth/session-provider";
 import {
@@ -83,7 +84,8 @@ import {
   shouldStopReconnect,
   waitForReconnectDelay,
 } from "../../lib/stream-reconnect";
-import { FEEDBACK_TAGS, type CitationResponse, type ConversationResponse, type FeedbackTag } from "../../lib/types";
+import { FEEDBACK_TAGS, type CitationResponse, type ConversationMessage, type ConversationResponse, type FeedbackTag } from "../../lib/types";
+import { Skeleton } from "../ui/skeleton";
 import { AnswerSurface } from "./answer-surface";
 import { ChatComposer } from "./chat-composer";
 import { ChatWorkspace } from "./chat-workspace";
@@ -91,7 +93,7 @@ import { CitationSheet } from "./citation-sheet";
 import { ConversationRail } from "./conversation-rail";
 import { FeedbackPopover } from "./feedback-popover";
 import { RunDetailsSheet } from "./run-details-sheet";
-import { RunProgress } from "./run-progress";
+import { runStatusLine } from "./run-progress";
 import { Sheet } from "../ui/sheet";
 import chatStyles from "./chat.module.css";
 
@@ -167,7 +169,18 @@ export function ChatApp() {
   const session = useSession();
   const accessToken = session.accessToken;
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [composerSeed, setComposerSeed] = useState<{ text: string; key: number }>({
+    text: "",
+    key: 0,
+  });
+  const [olderByConversation, setOlderByConversation] = useState<
+    Record<string, ConversationMessage[]>
+  >({});
+  const [nextBeforeByConversation, setNextBeforeByConversation] = useState<
+    Record<string, string | null>
+  >({});
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [chat, setChat] = useState<ChatViewState>(() =>
     createChatViewState("00000000-0000-4000-8000-000000000001"),
   );
@@ -192,10 +205,18 @@ export function ChatApp() {
   const autoResumeRef = useRef<((currentChat: ChatViewState, controller: AbortController) => Promise<void>) | null>(null);
   const [disconnected, setDisconnected] = useState(false);
   const [feedbackStatus, setFeedbackStatus] = useState<string | null>(null);
+  const [feedbackPending, setFeedbackPending] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectExhausted, setReconnectExhausted] = useState(false);
   const [nextRetryMs, setNextRetryMs] = useState<number | null>(null);
   const recoveredRef = useRef(false);
+  const pointerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPointerWriteRef = useRef(0);
+  const pendingPointerRef = useRef<{
+    conversationId: string;
+    runId: string;
+    lastSequence: number;
+  } | null>(null);
   const auth = useMemo<ApiAuth | null>(
     () => (accessToken ? { accessToken } : null),
     [accessToken],
@@ -212,16 +233,16 @@ export function ChatApp() {
     metaQuery.isPending ? "loading" : metaQuery.isError ? "error" : "ok",
   );
 
-  const readyQuery = useQuery({
-    queryKey: auth === null ? publicQueryKeys.ready : keys.consoleReady,
-    queryFn: () => loadConsoleReadiness(auth),
-    refetchInterval: 5000,
-  });
-
   const meQuery = useQuery({
     queryKey: keys.me,
     queryFn: () => fetchMe(auth as ApiAuth),
     enabled: auth !== null,
+  });
+
+  const readyQuery = useQuery({
+    queryKey: auth === null ? publicQueryKeys.ready : keys.consoleReady,
+    queryFn: () => loadConsoleReadiness(auth, meQuery.data?.role ?? null),
+    staleTime: 30_000,
   });
 
   const conversationsQuery = useQuery({
@@ -229,6 +250,36 @@ export function ChatApp() {
     queryFn: () => listConversations(auth as ApiAuth),
     enabled: auth !== null,
   });
+
+  const messagesQuery = useQuery({
+    queryKey: ["conversation-messages", conversationId],
+    queryFn: () =>
+      fetchConversationMessages(auth as ApiAuth, conversationId as string, {
+        limit: 50,
+      }),
+    enabled:
+      auth !== null &&
+      typeof conversationId === "string" &&
+      conversationId !== "" &&
+      conversationId !== "undefined",
+  });
+
+  const olderMessages = useMemo(
+    () =>
+      conversationId === null
+        ? []
+        : (olderByConversation[conversationId] ?? []),
+    [conversationId, olderByConversation],
+  );
+  const nextBeforeId =
+    conversationId === null
+      ? null
+      : Object.prototype.hasOwnProperty.call(
+            nextBeforeByConversation,
+            conversationId,
+          )
+        ? nextBeforeByConversation[conversationId]
+        : (messagesQuery.data?.next_before_id ?? null);
 
   const usageQuery = useQuery({
     queryKey: keys.usage,
@@ -249,7 +300,9 @@ export function ChatApp() {
     sendLockRef.current = false;
     idempotencyRef.current = newIdempotencyKey();
     setConversationId(null);
-    setDraft("");
+    setSending(false);
+    setOlderByConversation({});
+    setNextBeforeByConversation({});
     setChat(createChatViewState(idempotencyRef.current));
     setFailure(null);
     setLastUserMessage("");
@@ -262,24 +315,26 @@ export function ChatApp() {
   /**
    * Toggle the desktop Sessions column and persist the choice.
    */
-  function toggleSessionsExpanded(): void {
+  const toggleSessionsExpanded = useCallback((): void => {
     setSessionsExpanded((current) => {
       const next = !current;
       writeBooleanPreference(SESSIONS_EXPANDED_STORAGE_KEY, next);
       return next;
     });
-  }
+  }, []);
 
   const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (auth === null || conversationId === null) {
+    mutationFn: async (id: string) => {
+      if (auth === null) {
         return false;
       }
-      return deleteConversation(auth, conversationId);
+      return deleteConversation(auth, id);
     },
-    onSuccess: (ok) => {
+    onSuccess: (ok, id) => {
       if (ok) {
-        resetClientChat();
+        if (conversationId === id) {
+          resetClientChat();
+        }
         void queryClient.invalidateQueries({ queryKey: ["conversations"] });
       }
     },
@@ -293,34 +348,46 @@ export function ChatApp() {
     };
   }, []);
 
-  const send = useCallback(async () => {
+  const send = useCallback(async (text: string): Promise<boolean> => {
     if (sendLockRef.current) {
-      return;
+      return false;
     }
-    if (auth === null || !composerDraftIsSendable(draft)) {
-      return;
+    if (auth === null || !composerDraftIsSendable(text)) {
+      return false;
     }
     if (paidSendBlockReason(handshake, readyQuery.data ?? null, chat) !== null) {
-      return;
+      return false;
     }
     sendLockRef.current = true;
+    setSending(true);
+    let admitted = false;
     let activeConversationId = conversationId;
     if (activeConversationId === null) {
       try {
         const created = await createConversation(
           auth,
-          conversationTitleFromPrompt(draft),
+          conversationTitleFromPrompt(text),
         );
         activeConversationId = created.conversation_id;
+        if (
+          activeConversationId === "" ||
+          activeConversationId === "undefined"
+        ) {
+          setFailure({ kind: "server", status: 500 });
+          sendLockRef.current = false;
+          setSending(false);
+          return false;
+        }
         setConversationId(created.conversation_id);
         void queryClient.invalidateQueries({ queryKey: ["conversations"] });
       } catch {
         setFailure({ kind: "server", status: 500 });
         sendLockRef.current = false;
-        return;
+        setSending(false);
+        return false;
       }
     }
-    setLastUserMessage(draft.trim());
+    setLastUserMessage(text.trim());
     setDisconnected(false);
     setReconnectAttempt(0);
     setReconnectExhausted(false);
@@ -341,7 +408,7 @@ export function ChatApp() {
       const started = await startOrResumeMessageStream(
         auth,
         activeConversationId,
-        draft,
+        text,
         {
           runId: current.runId,
           terminal: current.terminal,
@@ -352,11 +419,11 @@ export function ChatApp() {
         controller.signal,
       );
       if (controller.signal.aborted) {
-        return;
+        return admitted;
       }
       if (started.failure) {
         setFailure(started.failure);
-        return;
+        return false;
       }
       if (started.admission !== null) {
         current = applyAdmission(current, {
@@ -366,7 +433,8 @@ export function ChatApp() {
           reconnect: started.admission.reconnect,
         });
         setChat(current);
-        setDraft("");
+        setSending(false);
+        admitted = true;
       }
       current = await consumeSse(
         started.response,
@@ -376,7 +444,7 @@ export function ChatApp() {
       );
       if (controller.signal.aborted) {
         setChat(current);
-        return;
+        return admitted;
       }
       setChat(current);
       if (current.terminal !== null) {
@@ -385,20 +453,28 @@ export function ChatApp() {
           ...prev,
           idempotencyKey: idempotencyRef.current as string,
         }));
+        if (activeConversationId !== null) {
+          void queryClient.invalidateQueries({
+            queryKey: ["conversation-messages", activeConversationId],
+          });
+        }
       } else if (!controller.signal.aborted) {
         setDisconnected(true);
         void autoResumeRef.current?.(current, controller);
       }
+      return admitted;
     } catch (error) {
       if (controller.signal.aborted || isAbortError(error)) {
-        return;
+        return admitted;
       }
       setDisconnected(true);
       void autoResumeRef.current?.(chat, controller);
+      return admitted;
     } finally {
       sendLockRef.current = false;
+      setSending(false);
     }
-  }, [auth, chat, conversationId, draft, handshake, queryClient, readyQuery.data]);
+  }, [auth, chat, conversationId, handshake, queryClient, readyQuery.data]);
 
   const resumeOnce = useCallback(
     async (currentChat: ChatViewState, controller: AbortController) => {
@@ -487,18 +563,58 @@ export function ChatApp() {
   }, [autoResume]);
 
   useEffect(() => {
+    /**
+     * Persist the latest pointer immediately.
+     */
+    function flushPointer(): void {
+      if (pendingPointerRef.current !== null) {
+        writeChatRunPointer(pendingPointerRef.current);
+        pendingPointerRef.current = null;
+        lastPointerWriteRef.current = Date.now();
+      }
+    }
+
     if (conversationId !== null && chat.runId !== null && chat.terminal === null) {
-      writeChatRunPointer({
+      pendingPointerRef.current = {
         conversationId,
         runId: chat.runId,
         lastSequence: chat.lastSequence,
-      });
-      return;
+      };
+      const elapsed = Date.now() - lastPointerWriteRef.current;
+      if (elapsed >= 1000) {
+        flushPointer();
+        return;
+      }
+      if (pointerTimerRef.current === null) {
+        pointerTimerRef.current = setTimeout(() => {
+          pointerTimerRef.current = null;
+          flushPointer();
+        }, 1000 - elapsed);
+      }
+      return () => {
+        if (pointerTimerRef.current !== null) {
+          clearTimeout(pointerTimerRef.current);
+          pointerTimerRef.current = null;
+        }
+      };
     }
     if (chat.terminal !== null) {
+      flushPointer();
       clearChatRunPointer();
     }
+    return undefined;
   }, [chat.lastSequence, chat.runId, chat.terminal, conversationId]);
+
+  useEffect(() => {
+    return () => {
+      if (pointerTimerRef.current !== null) {
+        clearTimeout(pointerTimerRef.current);
+      }
+      if (pendingPointerRef.current !== null) {
+        writeChatRunPointer(pendingPointerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (auth === null || recoveredRef.current) {
@@ -616,6 +732,7 @@ export function ChatApp() {
     if (auth === null || chat.runId === null) {
       return;
     }
+    setFeedbackPending(true);
     try {
       await submitFeedback(
         auth,
@@ -631,6 +748,8 @@ export function ChatApp() {
         return;
       }
       setFeedbackStatus("Feedback could not be recorded. Try again.");
+    } finally {
+      setFeedbackPending(false);
     }
   }, [auth, chat.runId, feedbackComment, feedbackTag, thumbsUp]);
 
@@ -663,61 +782,30 @@ export function ChatApp() {
     return "";
   })();
 
-  if (!session.ready) {
-    return (
-      <div className={chatStyles.page}>
-        <h2>Ask</h2>
-        <p className={chatStyles.muted}>Restoring session.</p>
-      </div>
-    );
-  }
-
-  if (accessToken === null) {
-    return (
-      <div className={chatStyles.page}>
-        <h2>Ask</h2>
-        <StatusBanner kind="info" role="status">
-          Sign in to continue.
-        </StatusBanner>
-        <p className={chatStyles.muted}>
-          <Link href="/login">Sign in</Link>
-        </p>
-      </div>
-    );
-  }
-
-  if (sessionRevoked || (failure?.kind === "auth" && failure.detail === "session_revoked")) {
-    return (
-      <div className={chatStyles.page}>
-        <h2>Ask</h2>
-        <StatusBanner kind="error" role="alert">
-          {SESSION_REVOKED_BANNER}
-        </StatusBanner>
-        <p className={chatStyles.muted}>
-          <Link href="/login">Sign in</Link>
-        </p>
-      </div>
-    );
-  }
-
+  const running = useMemo(
+    () => chat.terminal === null && chat.runId !== null,
+    [chat.runId, chat.terminal],
+  );
+  const showReconnect = useMemo(
+    () => running && disconnected,
+    [disconnected, running],
+  );
+  const statusLine = useMemo(() => runStatusLine(chat), [chat]);
+  const historyMessages = useMemo(() => {
+    const newest = messagesQuery.data?.items ?? [];
+    return [...olderMessages, ...[...newest].reverse()];
+  }, [messagesQuery.data?.items, olderMessages]);
   const sendBlockReason = paidSendBlockReason(
     handshake,
     readyQuery.isPending ? undefined : readyQuery.data ?? null,
     chat,
   );
-  const sendDisabled =
-    sendBlockReason !== null ||
-    !composerDraftIsSendable(draft);
-
   const citations = citationsQuery.data ?? [];
-  const companyUsd = String(usageQuery.data?.cost_usd ?? "—");
+  const visibleCitations = shouldShowCitations(chat.answerOrigin) ? citations : [];
+  const companyUsd = String(usageQuery.data?.cost_usd ?? "0");
 
-  const railProps = {
-    conversations: conversationsQuery.data ?? [],
-    selectedId: conversationId,
-    loading: conversationsQuery.isPending,
-    onCreate: resetClientChat,
-    onSelect: (item: ConversationResponse) => {
+  const handleSelectConversation = useCallback(
+    (item: ConversationResponse) => {
       if (auth === null) {
         return;
       }
@@ -733,37 +821,143 @@ export function ChatApp() {
         },
       );
     },
-    onDelete: () => deleteMutation.mutate(),
+    [auth, resetClientChat],
+  );
+
+  const mutateDelete = deleteMutation.mutate;
+  const handleDeleteConversation = useCallback(
+    (id: string) => {
+      mutateDelete(id);
+    },
+    [mutateDelete],
+  );
+
+  const handleLoadEarlier = useCallback(async () => {
+    if (auth === null || conversationId === null || nextBeforeId === null) {
+      return;
+    }
+    setLoadingEarlier(true);
+    try {
+      const page = await fetchConversationMessages(auth, conversationId, {
+        limit: 50,
+        before: nextBeforeId,
+      });
+      setOlderByConversation((current) => ({
+        ...current,
+        [conversationId]: [
+          ...page.items.slice().reverse(),
+          ...(current[conversationId] ?? []),
+        ],
+      }));
+      setNextBeforeByConversation((current) => ({
+        ...current,
+        [conversationId]: page.next_before_id,
+      }));
+    } finally {
+      setLoadingEarlier(false);
+    }
+  }, [auth, conversationId, nextBeforeId]);
+
+  const handleSelectCitation = useCallback(
+    (citation: CitationResponse, trigger: HTMLButtonElement) => {
+      citationTriggerRef.current = trigger;
+      setSelectedCitation(citation);
+    },
+    [],
+  );
+
+  const hrefForCitation = useCallback(
+    (citation: CitationResponse) =>
+      citationChipHref(citation.provenance.url) ?? undefined,
+    [],
+  );
+
+  if (!session.ready) {
+    return (
+      <div className={chatStyles.page}>
+        <ChatWorkspace
+          rail={
+            <ConversationRail
+              conversations={[]}
+              selectedId={null}
+              loading
+              onCreate={() => undefined}
+              onSelect={() => undefined}
+              onDelete={() => undefined}
+              expanded={sessionsExpanded}
+              onToggleExpanded={toggleSessionsExpanded}
+              showCollapseToggle
+            />
+          }
+          stage={
+            <section className={chatStyles.stage} aria-label="Answer">
+              <div className={chatStyles.conversation}>
+                <Skeleton label="Restoring session" width="100%" />
+                <Skeleton label="Restoring answer" width="80%" />
+              </div>
+            </section>
+          }
+          sessionsExpanded={sessionsExpanded}
+        />
+      </div>
+    );
+  }
+
+  if (accessToken === null) {
+    return (
+      <div className={chatStyles.page}>
+        <StatusBanner kind="info" role="status">
+          Sign in to continue.
+        </StatusBanner>
+        <p className={chatStyles.muted}>
+          <Link href="/login">Sign in</Link>
+        </p>
+      </div>
+    );
+  }
+
+  if (sessionRevoked || (failure?.kind === "auth" && failure.detail === "session_revoked")) {
+    return (
+      <div className={chatStyles.page}>
+        <StatusBanner kind="error" role="alert">
+          {SESSION_REVOKED_BANNER}
+        </StatusBanner>
+        <p className={chatStyles.muted}>
+          <Link href="/login">Sign in</Link>
+        </p>
+      </div>
+    );
+  }
+
+  const railProps = {
+    conversations: conversationsQuery.data ?? [],
+    selectedId: conversationId,
+    loading: conversationsQuery.isPending,
+    onCreate: resetClientChat,
+    onSelect: handleSelectConversation,
+    onDelete: handleDeleteConversation,
+    deletePending: deleteMutation.isPending,
   };
+
+  const showEmptyPrompts =
+    lastUserMessage === "" &&
+    chat.answerText === "" &&
+    historyMessages.length === 0;
 
   const stage = (
     <section className={chatStyles.stage} aria-label="Answer">
       <div className={chatStyles.stageHeader}>
-        {conversationId !== null ? (
-        <p className={chatStyles.historyNote}>
-          Continuing this session. Earlier messages are not available in this client.
-        </p>
-        ) : null}
         <div className={chatStyles.row}>
-          {!sessionsExpanded ? (
-            <Button
-              type="button"
-              variant="secondary"
-              aria-expanded={false}
-              data-action-id="ask.sessions_toggle"
-              onClick={toggleSessionsExpanded}
-            >
-              <Icon name="panelExpand" />
-              Expand sessions
-            </Button>
-          ) : null}
+          <span className={chatStyles.autoChip} data-testid="auto-label">
+            Auto
+          </span>
           <Button
             type="button"
             variant="ghost"
             data-action-id="ask.sources"
             onClick={() => setSourcesOpen(true)}
           >
-            Sources ({String(citations.length)})
+            Sources ({String(visibleCitations.length)})
           </Button>
           <RunDetailsSheet
             open={detailsOpen}
@@ -780,17 +974,24 @@ export function ChatApp() {
         aria-label="Conversation"
         tabIndex={0}
       >
-        <RunProgress chat={chat} />
         <AnswerSurface
+          messages={historyMessages}
+          hasEarlier={nextBeforeId !== null}
+          onLoadEarlier={() => {
+            void handleLoadEarlier();
+          }}
+          loadingEarlier={loadingEarlier}
           question={lastUserMessage}
           answer={chat.answerText}
-          citations={citations}
+          citations={visibleCitations}
           terminal={chat.terminal}
-          hrefForCitation={(citation) => citationChipHref(citation.provenance.url) ?? undefined}
-          onSelectCitation={(citation, trigger) => {
-            citationTriggerRef.current = trigger;
-            setSelectedCitation(citation);
-          }}
+          answerOrigin={chat.answerOrigin}
+          effectiveRoute={chat.diagnostics.effectiveRoute ?? chat.routeFamily}
+          statusLine={statusLine}
+          hrefForCitation={hrefForCitation}
+          onSelectCitation={handleSelectCitation}
+          promptTokens={chat.diagnostics.promptTokens}
+          completionTokens={chat.diagnostics.completionTokens}
         />
         {isGraphOnlyInspectionRoute(
           chat.diagnostics.effectiveRoute ?? chat.routeFamily,
@@ -815,15 +1016,19 @@ export function ChatApp() {
             Search is degraded. Keyword retrieval is not claimed healthy.
           </p>
         ) : null}
-        {lastUserMessage === "" && chat.answerText === "" ? (
+        {showEmptyPrompts ? (
           <div className={chatStyles.emptyPrompts}>
             {PROMPT_CHIPS.map((chip) => (
               <Button
                 key={chip}
                 type="button"
                 variant="secondary"
+                data-action-id="ask.prompt_fill"
                 onClick={() => {
-                  setDraft(chip);
+                  setComposerSeed((current) => ({
+                    text: chip,
+                    key: current.key + 1,
+                  }));
                 }}
               >
                 {chip}
@@ -840,37 +1045,31 @@ export function ChatApp() {
             comment={feedbackComment}
             onComment={setFeedbackComment}
             onSubmit={() => void sendFeedback()}
+            pending={feedbackPending}
           />
         ) : null}
       </div>
       <ChatComposer
-        value={draft}
-        onChange={setDraft}
-        onSend={() => void send()}
-        onCancel={() => void cancel()}
+        onSubmit={send}
+        disabled={sendBlockReason !== null}
+        sending={sending}
+        running={running}
+        onStop={() => void cancel()}
         onReconnect={() => void reconnect()}
-        sendDisabled={sendDisabled}
-        running={chat.terminal === null && chat.runId !== null}
+        showReconnect={showReconnect}
         sendBlockedReason={sendBlockReason}
         reconnectAttempt={reconnectAttempt}
         reconnectMaxAttempts={MAX_RECONNECT_ATTEMPTS}
         nextRetryMs={nextRetryMs}
         reconnectExhausted={reconnectExhausted}
+        seedText={composerSeed.text || null}
+        seedKey={composerSeed.key}
       />
     </section>
   );
 
   return (
     <div className={chatStyles.page}>
-      <header className={chatStyles.header}>
-        <div>
-          <h2>Ask</h2>
-          <p className={chatStyles.lead}>Answers come from authorized documents and include available evidence.</p>
-        </div>
-        <span className={chatStyles.autoChip} data-testid="auto-label">
-          Auto
-        </span>
-      </header>
 
       <HandshakeBanner />
 
@@ -922,7 +1121,12 @@ export function ChatApp() {
         <Button type="button" variant="secondary" onClick={() => setSessionsOpen(true)}>
           Sessions
         </Button>
-        <Button type="button" variant="ghost" onClick={() => setSourcesOpen(true)}>
+        <Button
+          type="button"
+          variant="ghost"
+          data-action-id="ask.sources"
+          onClick={() => setSourcesOpen(true)}
+        >
           Sources
         </Button>
       </div>
@@ -949,7 +1153,7 @@ export function ChatApp() {
       <CitationSheet
         open={sourcesOpen}
         onClose={() => setSourcesOpen(false)}
-        citations={citations}
+        citations={visibleCitations}
         hrefForCitation={(citation) => citationChipHref(citation.provenance.url) ?? undefined}
         onSelectCitation={(citation, trigger) => {
           citationTriggerRef.current = trigger;

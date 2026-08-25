@@ -2,14 +2,14 @@
 title: Admin and auth screen specification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-25
 audience: frontend, security
 packet: P08-19
 ---
 
 # Admin and auth screens
 
-P08-19 ships this visual contract on `/login` family pages, `/admin` tabs, and `/account`. Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/00-visual-contract.md). Do not reinterpret them.
+P08-19 ships these routes on `/login` family pages, `/admin` tabs, and `/account`. Visual values follow [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md).
 
 ## Screen specifications
 
@@ -17,10 +17,11 @@ P08-19 ships this visual contract on `/login` family pages, `/admin` tabs, and `
 
 #### `AuthLayout`
 
-- Full viewport canvas with centered content.
-- Brand above card with 32px bottom gap.
-- Auth card: width 420px, white, 12px radius, border, shadow-1, 32px padding desktop and 24px mobile.
-- No split-screen marketing panel, stock art, gradient, testimonial, or decorative background.
+- Two columns at `>=1024px` (45% brand / 55% form). Single centered column below.
+- Brand panel: `--gradient-brand`, white content, 48px padding, 40px white logo tile, “Smart RAG” hero scale, one line exactly “Grounded answers from your company's knowledge.”
+- Form column: `--color-bg`, card max-width 420px, `--radius-card`, `--shadow-1`, 32px padding, title 28/36 Inter Display.
+- Skip link is visually hidden until keyboard-focused.
+- Successful sign-in calls `router.replace("/")` and `router.refresh()`. Sign-in button uses `pending` / `pendingLabel="Signing in…"`.
 
 #### `AuthCard`
 
@@ -44,7 +45,7 @@ Exact pages:
 
 #### Admin frame
 
-- PageHeader title “Admin.”
+- Topbar title “Admin”. No trailing period.
 - Description: “Manage access, tools, retrieval curation, and usage.”
 - Horizontal Tabs: Team & access, Tools, Curation, Usage.
 - Tab content is one column with maximum width 1120px.
@@ -93,7 +94,7 @@ Exact pages:
 ### Exact product copy rules
 
 - Brand: “Smart RAG.”
-- Product descriptor: “Company knowledge.”
+- Product descriptor: “Grounded answers from your company's knowledge.”
 - Use “Ask,” not “Chat test bench” or “Auto chat.”
 - Use “Search ready,” not internal “Hybrid Ready,” in primary user-facing status; the exact internal status may appear in details.
 - Use “Graph ready,” “Graph pending,” and “Graph unavailable” only from real state.

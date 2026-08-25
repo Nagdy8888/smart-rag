@@ -26,6 +26,12 @@ from smart_rag_core.security.jwks import (
     JwksVerifier,
     VerifiedAccessToken,
 )
+from smart_rag_core.security.profile_snapshot import (
+    ProfileSnapshot,
+    build_caller_context,
+    is_session_revoked,
+    load_profile_snapshot,
+)
 from smart_rag_core.security.untrusted import isolate_untrusted_text
 
 __all__ = [
@@ -41,11 +47,15 @@ __all__ = [
     "JwksVerificationError",
     "JwksVerifier",
     "LocalHmacAuditExporter",
+    "ProfileSnapshot",
     "UserRole",
     "VerifiedAccessToken",
+    "build_caller_context",
     "canonical_audit_material",
     "decide_external_processing",
+    "is_session_revoked",
     "isolate_untrusted_text",
+    "load_profile_snapshot",
     "redact_audit_payload",
     "sha256_hex",
     "verify_audit_export_rows",

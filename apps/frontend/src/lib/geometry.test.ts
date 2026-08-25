@@ -31,18 +31,18 @@ const chat = readFileSync(
 );
 
 describe("primitive geometry source lock", () => {
-  it("keeps 40px controls, 8px control radius, 12px cards, 48px rows, and 2px/2px focus", () => {
+  it("keeps 40px controls, 10px control radius, 14px cards, 48px rows, and 2px focus", () => {
     expect(CONTROL_HEIGHT).toBe("40px");
-    expect(RADIUS_SM).toBe("8px");
-    expect(RADIUS_MD).toBe("12px");
+    expect(RADIUS_SM).toBe("10px");
+    expect(RADIUS_MD).toBe("14px");
     expect(ROW_HEIGHT).toBe("48px");
     expect(TEXT_PAGE_TITLE_SIZE).toBe("24px");
     expect(TEXT_BODY_SIZE).toBe("14px");
     expect(NAV_WIDTH).toBe("232px");
     expect(TOPBAR_HEIGHT).toBe("56px");
     expect(globals).toMatch(/--control-height:\s*40px;/);
-    expect(globals).toMatch(/--radius-sm:\s*8px;/);
-    expect(globals).toMatch(/--radius-md:\s*12px;/);
+    expect(globals).toMatch(/--radius-sm:\s*10px;/);
+    expect(globals).toMatch(/--radius-md:\s*14px;/);
     expect(globals).toMatch(/--row-height:\s*48px;/);
     expect(globals).toMatch(/--nav-width:\s*232px;/);
     expect(globals).toMatch(/--topbar-height:\s*56px;/);
@@ -86,7 +86,7 @@ describe("Ask independent scroll source lock", () => {
     expect(chat).not.toMatch(/\.stage\s*\{[\s\S]*?max-width:\s*880px/);
     expect(chat).toMatch(/\.composer\s*\{[\s\S]*?width:\s*100%/);
     expect(chat).toMatch(/\.railBody\[hidden\]\s*\{[\s\S]*?display:\s*none/);
-    expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?248px/);
+    expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?280px/);
     expect(ui).toMatch(/\.fieldFull\s*\{[\s\S]*?max-width:\s*none/);
     expect(shell).toMatch(/\.navIsCollapsed\s*\{[\s\S]*?width:\s*var\(--nav-width-collapsed\)/);
     expect(shell).not.toMatch(/@media \(min-width: 1280px\)/);

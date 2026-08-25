@@ -608,6 +608,34 @@
       "test_id": "src/components/chat-app.test.tsx"
     },
     {
+      "action_id": "ask.run_details",
+      "route": "/",
+      "label": "Run details",
+      "control_kind": "local-state",
+      "contract_owner": "frontend",
+      "contract": "opens Ask diagnostics sheet",
+      "role": "authenticated",
+      "success_state": "sheet",
+      "failure_state": "none",
+      "idempotency": "local",
+      "disposition": "keep",
+      "test_id": "src/components/chat-app.test.tsx"
+    },
+    {
+      "action_id": "ask.prompt_fill",
+      "route": "/",
+      "label": "Prompt chip",
+      "control_kind": "local-state",
+      "contract_owner": "frontend",
+      "contract": "fills the composer only; never submits",
+      "role": "authenticated",
+      "success_state": "composer draft",
+      "failure_state": "none",
+      "idempotency": "local",
+      "disposition": "keep",
+      "test_id": "src/components/chat-app.test.tsx"
+    },
+    {
       "action_id": "documents.import",
       "route": "/documents",
       "label": "Import source",

@@ -12,7 +12,17 @@ _GREETING = re.compile(
     re.IGNORECASE,
 )
 _PRODUCT_HELP = re.compile(
-    r"\b(how do i use this (app|product)|what can you do|help me use the (app|product))\b",
+    r"("
+    r"\bwho are you\b|"
+    r"\bwhat are you\b|"
+    r"\bwho am i (?:talking|speaking) to\b|"
+    r"\bwhat(?:'s| is) your name\b|"
+    r"\bhow can you help(?: me)?\b|"
+    r"\bwhat can you (?:do|help(?: me)?(?: with)?)\b|"
+    r"\bhow do i use this (?:app|product|assistant)\b|"
+    r"\bhelp me use (?:this |the )?(?:app|product|assistant)\b|"
+    r"\btell me about yourself\b"
+    r")",
     re.IGNORECASE,
 )
 _TRANSFORM = re.compile(
@@ -67,16 +77,35 @@ def is_greeting(query: str) -> bool:
 
 
 def is_product_help(query: str) -> bool:
-    """Return whether the user asks what the product can do.
+    """Return whether the user asks who the assistant is or what it can do.
+
+    Identity prompts such as “Who are you?” and capability prompts such as
+    “How can you help me?” are product help. They are not company-document
+    questions unless the same text also carries a company signal.
 
     Args:
         query: Original user text.
 
     Returns:
-        True when the message requests product usage or capability help.
+        True when the message requests identity, usage, or capability help.
     """
 
     return _PRODUCT_HELP.search(query.strip()) is not None
+
+
+def is_user_text_transform(query: str) -> bool:
+    """Return whether the user supplied text to rewrite, rephrase, or translate.
+
+    “Summarize our policies” is not a match. “Rewrite this paragraph: …” is.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        True when the message is a user-supplied-text transform.
+    """
+
+    return _TRANSFORM.search(query.strip()) is not None
 
 
 def is_no_retrieval(query: str) -> bool:
@@ -93,7 +122,7 @@ def is_no_retrieval(query: str) -> bool:
     return (
         is_greeting(stripped)
         or is_product_help(stripped)
-        or _TRANSFORM.search(stripped) is not None
+        or is_user_text_transform(stripped)
     )
 
 

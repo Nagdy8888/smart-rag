@@ -27,7 +27,7 @@ test("mobile Menu disclosure is keyboard accessible at 390px when signed in", as
   await signInLiveMember(page, request);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  const menu = page.getByText("Menu", { exact: true });
+  const menu = page.getByRole("button", { name: "Open navigation" });
   await expect(menu).toBeVisible();
   await menu.press("Enter");
   await expect(page.getByRole("link", { name: "Ask" })).toBeVisible();

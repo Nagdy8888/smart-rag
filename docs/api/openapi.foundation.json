@@ -189,6 +189,70 @@
         "title": "ConversationCreateRequest",
         "type": "object"
       },
+      "ConversationMessage": {
+        "description": "One creator-owned transcript message. Content is escaped untrusted text.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "message_id": {
+            "format": "uuid",
+            "title": "Message Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message_id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "ConversationMessage",
+        "type": "object"
+      },
+      "ConversationMessagesResponse": {
+        "description": "Keyset page of conversation messages, newest first.\n\n``next_before_id`` is the last item's id when the page is full (exactly\n``limit`` rows). Clients pass it as ``before`` to load older messages.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessage"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_before_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Id"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ConversationMessagesResponse",
+        "type": "object"
+      },
       "ConversationResponse": {
         "description": "Conversation JSON. Title is escaped untrusted text.",
         "properties": {
@@ -5638,6 +5702,173 @@
       }
     },
     "/conversations/{conversation_id}/messages": {
+      "get": {
+        "description": "List creator-owned user and assistant messages, newest first.\n\nAuthorization is creator-only. Missing, deleted, and foreign\nconversations return the same generic 404 as ``GET /conversations/{id}``.\nPagination is a keyset on ``before`` (a previous page's last\n``message_id``). ``limit`` is bounded to 1\u2013100; the SQL RPC also clamps\nto 100. ``next_before_id`` is set only when the page is full.\n\nArgs:\n    request: Active request for rate limits.\n    conversation_id: Conversation the caller must own.\n    caller: Authenticated caller.\n    service: Injected transcript service.\n    limit: Page size, default 50, maximum 100.\n    before: Optional keyset cursor from a prior ``next_before_id``.\n\nReturns:\n    Newest-first page of escaped message records.\n\nRaises:\n    HTTPException: 404 for missing, tombstoned, or foreign conversations.",
+        "operationId": "list_conversation_messages_route_conversations__conversation_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationMessagesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Conversation Messages Route",
+        "tags": [
+          "chat"
+        ]
+      },
       "post": {
         "description": "Admit Auto chat as Composite. Handshake runs before reservation.\n\nJSON Accept returns 202 ``{run_id, stream_path}``. ``text/event-stream``\nadmits then streams immediately. Duplicate idempotency keys reuse the\nexisting run and never reserve twice.\n\nArgs:\n    request: Active request.\n    conversation_id: Conversation the caller must own.\n    body: Message and optional idempotency key.\n    caller: Authenticated caller.\n    service: Injected query-run service.\n    sse: Persist-then-flush SSE service.\n    idempotency_key_header: ``Idempotency-Key`` header UUID when the body\n        omits the key.\n    x_client_version: Required client version for new paid submission.\n\nReturns:\n    JSON admission result or an SSE stream.\n\nRaises:\n    HTTPException: 400 when neither body nor header supplies a key.",
         "operationId": "submit_message_route_conversations__conversation_id__messages_post",

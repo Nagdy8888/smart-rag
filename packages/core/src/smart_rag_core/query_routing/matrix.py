@@ -23,6 +23,7 @@ from smart_rag_core.query_routing.envelope import (
     reject_production_manual_override,
 )
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
+from smart_rag_core.query_routing.knowledge_scope import no_retrieval_mode_for_scope
 from smart_rag_core.query_routing.models import (
     BranchKind,
     BranchSpec,
@@ -316,6 +317,8 @@ def compile_retrieval_plan(
         branch_concurrency=BRANCH_CONCURRENCY,
         max_subquestions=SUBQUESTION_CEILING,
         catalog_llm_call_count=0,
+        knowledge_scope=prep.knowledge_scope,
+        no_retrieval_answer_mode=no_retrieval_mode_for_scope(prep.knowledge_scope),
     )
 
 

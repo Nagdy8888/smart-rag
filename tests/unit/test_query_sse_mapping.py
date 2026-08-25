@@ -84,6 +84,63 @@ def test_mapper_holds_draft_until_verify_then_emits_token_delta() -> None:
     assert mapper.verified_text == "PUBLIC_FINAL_ANSWER"
 
 
+def test_mapper_emits_one_answer_origin_before_token_delta() -> None:
+    """Origin is emitted once before tokens when the payload has an origin."""
+
+    from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
+
+    mapper = QuerySseMapper()
+    payload = AnswerPayload(
+        answer_text="Paris is the capital of France.",
+        status="complete",
+        answer_origin=KnowledgeScope.GENERAL_KNOWLEDGE,
+    ).model_dump(mode="json")
+    events = mapper.consume_chunk(
+        {VERIFY_ANSWER_NODE: {"status": "verified", "answer": payload}}
+    )
+    types = [item[0] for item in events]
+    assert types.count("answer_origin") == 1
+    assert types.index("answer_origin") < types.index("token_delta")
+    assert events[types.index("answer_origin")][1] == {
+        "origin": "general_knowledge"
+    }
+    assert "citation_preview" not in types
+    historical = QuerySseMapper().consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified",
+                "answer": _payload("Older compatible answer"),
+            }
+        }
+    )
+    assert "answer_origin" not in [item[0] for item in historical]
+
+
+def test_mapper_emits_usage_from_verify_totals() -> None:
+    """Verified answers publish accumulated provider tokens before the terminal."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified",
+                "answer": _payload("Counted answer."),
+                "prompt_tokens": 12,
+                "completion_tokens": 7,
+            }
+        }
+    )
+    for event_type, payload in events:
+        assert_catalog_event(event_type, payload)
+    types = [item[0] for item in events]
+    assert types.count("usage") == 1
+    assert types.index("usage") < types.index("completed")
+    assert events[types.index("usage")][1] == {
+        "prompt_tokens": 12,
+        "completion_tokens": 7,
+    }
+
+
 def test_mapper_empty_verified_answer_is_error_not_completed() -> None:
     """A successful graph with blank answer_text cannot emit completed."""
 

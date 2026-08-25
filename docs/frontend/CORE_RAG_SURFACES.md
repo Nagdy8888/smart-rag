@@ -12,11 +12,13 @@ packet: P08-18
 Native Chat, Documents, Graph, and Tables mapped to FastAPI/SSE contracts.
 Stitch frames 04/05/06/07/09/10 are a **template, not a layout** (no extra
 frame routes). Their `screen.png` files are historical references only. Live
-composition is the light Precision Workspace in
-[STITCH_BRIEF.md](./STITCH_BRIEF.md) and [VISUAL_MAP.md](./VISUAL_MAP.md).
-This packet does not port HTML.
+composition is the Ink & Indigo console in
+[ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md)
+and [workspace-screens.md](./workspace-screens.md). This packet does not
+port HTML.
 
-Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
+Related: [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md) ·
+[AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) ·
@@ -33,13 +35,13 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 
 | Route | Surface |
 | --- | --- |
-| `/` | Ask workspace. Expandable Sessions rail, full-width answers and composer, citation drawers |
+| `/` | Ask workspace. 280px Sessions rail, persisted transcript, composer card, citation drawers |
 | `/documents` | Library, import/upload/crawl, keyset pagination, owner/admin delete |
 | `/documents/[documentId]` | Metadata, shared IngestionStatus timeline, graph seed, tables list |
 | `/graph` | Search → chips → Inspect graph; list-first plus optional React Flow |
 | `/tables` | Manifests + guided `TableQueryPlan` builder, display-only sort, cell provenance |
 
-Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). Tables live under `apps/frontend/src/components/tables/` (`tables-app.tsx`). Graph lives under `apps/frontend/src/components/graph/` (`graph-explorer.tsx`): search hits become chips; Inspect graph POSTs `/graph/inspect`. List is the default accessible view. Canvas is optional `@xyflow/react`. There is no custom SVG neighborhood and no relationship editor. List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations` and `GET /conversations/{id}`; prompt chips fill the composer only; verified `token_delta` arrives after Generating/Verifying progress; sources open in a drawer. There is no `app/admin`
+Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). Tables live under `apps/frontend/src/components/tables/` (`tables-app.tsx`). Graph lives under `apps/frontend/src/components/graph/` (`graph-explorer.tsx`): search hits become chips; Inspect graph POSTs `/graph/inspect`. List is the default accessible view. Canvas is optional `@xyflow/react`. There is no custom SVG neighborhood and no relationship editor. List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations`, `GET /conversations/{id}`, and creator-only `GET /conversations/{id}/messages` (newest-first keyset, rendered oldest-first; “Load earlier messages” when `next_before_id` is set). Prompt chips fill the composer only; verified `token_delta` arrives after the status line (Preparing/Retrieving/Generating/Verifying); sources open in a drawer. Draft state lives in the composer so typing does not re-render the rail. `/ops/ready` is fetched only for owner/admin; `ReadinessIndicator` owns the 15s poll. There is no `app/admin`
 folder. Team, tools, curation, usage, and profile are packet 4 native
 routes in [ADMINISTRATION.md](./ADMINISTRATION.md). Nav uses Next.js
 `Link`. `aria-current` follows the pathname. Nav is not authorization.
@@ -93,6 +95,8 @@ flowchart TD
   surface. `error` after tokens keeps the tokens and omits the generic
   banner. `error` with no tokens shows one “Something went wrong”
   reference and never echoes `run_failed`.
+- Ask shows this run’s prompt and completion tokens from SSE `usage` on
+  the live answer meta row. The line is omitted when both counts are 0.
 
 ## Failure modes
 

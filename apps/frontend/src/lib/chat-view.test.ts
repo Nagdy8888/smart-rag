@@ -34,6 +34,18 @@ describe("chat view", () => {
     expect(resumeAfterSequence(state)).toBe(4);
   });
 
+  it("records prompt and completion tokens from usage events", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: usage\nid: 2\ndata: {"prompt_tokens":1234,"completion_tokens":88}',
+      ),
+    );
+    expect(state.diagnostics.promptTokens).toBe(1234);
+    expect(state.diagnostics.completionTokens).toBe(88);
+  });
+
   it("logs unknown events and continues", () => {
     let state = createChatViewState("k");
     state = applySseFrame(state, parseSseBlock("event: future_metric\ndata: {}"));
@@ -220,6 +232,64 @@ describe("chat view", () => {
     expect(state.answerText).toBe("Hi!");
     expect(state.diagnostics.unknownEvents).toEqual(["future_metric"]);
     expect(state.terminal).toBeNull();
+  });
+
+  it("stores additive answer origin without inferring it from the route", () => {
+    let state = createChatViewState("k");
+    state = applyAdmission(state, {
+      run_id: "run-1",
+      reservation_id: "res-1",
+      route_family: "hybrid",
+      reconnect: false,
+    });
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: answer_origin\nid: 1\ndata: {"origin":"general_knowledge"}',
+      ),
+    );
+    expect(state.answerOrigin).toBe("general_knowledge");
+    expect(state.clarificationRequired).toBe(false);
+    expect(state.diagnostics.effectiveRoute).toBe("hybrid");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: answer_origin\nid: 2\ndata: {"origin":"ambiguous"}',
+      ),
+    );
+    expect(state.answerOrigin).toBe("ambiguous");
+    expect(state.clarificationRequired).toBe(true);
+  });
+
+  it("tolerates unknown origin payloads and isolates XSS text", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: answer_origin\nid: 1\ndata: {"origin":"<script>x</script>"}',
+      ),
+    );
+    expect(state.answerOrigin).toBe("<script>x</script>");
+    expect(state.clarificationRequired).toBe(false);
+    expect(state.terminal).toBeNull();
+  });
+
+  it("records hidden stray citations when origin is not company documents", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: citation_preview\nid: 1\ndata: {"citation_ids":["cite-1","cite-2"]}',
+      ),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: answer_origin\nid: 2\ndata: {"origin":"user_supplied_text"}',
+      ),
+    );
+    expect(state.diagnostics.citationIds).toEqual(["cite-1", "cite-2"]);
+    expect(state.diagnostics.strayCitationsHidden).toBe(2);
   });
 
   it("counts heartbeats and records cancelled as the terminal", () => {

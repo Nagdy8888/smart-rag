@@ -2,7 +2,7 @@
 title: Production console design system
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-25
 audience: frontend, reviewers
 packet: P08-01
 ---
@@ -10,15 +10,18 @@ packet: P08-01
 # Design system (Phase 8 packet 1)
 
 Build-time tokens and typed primitives for the production console shell.
-Canonical values are the token table in [STITCH_BRIEF.md](./STITCH_BRIEF.md)
-(Precision Workspace, 2026-08-24). Stitch `screen.png` files are historical
-references, not the live composition target. The Stitch export remains a
-**template, not a layout**: there is no `frame_00` route and no
-design-system gallery page. See
+Canonical hex, type, radius, and motion values are the Ink & Indigo refresh
+in [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md)
+(user-approved 2026-08-25). That ADR supersedes the Precision Workspace
+table in [STITCH_BRIEF.md](./STITCH_BRIEF.md). Stitch `screen.png` files
+are historical references, not the live composition target. The Stitch
+export remains a **template, not a layout**: there is no `frame_00` route
+and no design-system gallery page. See
 [VISUAL_MAP.md](./VISUAL_MAP.md) and
 [ADR-stitch-first-ux.md](../adr/ADR-stitch-first-ux.md).
 
-Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
+Related: [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md) ·
+[STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [VISUAL_MAP.md](./VISUAL_MAP.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
@@ -31,10 +34,10 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 
 | Layer | Role |
 | --- | --- |
-| `STITCH_BRIEF.md` token table | Canonical hex, radius, shadow, type, motion |
+| `ADR-ink-indigo-visual-refresh.md` | Accepted visual deviation from Precision Workspace |
 | `apps/frontend/src/app/globals.css` `:root` | CSS implementation |
 | `apps/frontend/src/lib/design-tokens.ts` | TypeScript copy for tests |
-| Tailwind `@theme` | Maps brief variables to utilities (`bg-page`, `text-brand`) |
+| Tailwind `@theme` | Maps variables to utilities (`bg-page`, `text-brand`) without a second hex table. Do not re-bind `--color-ink` here. |
 
 `DESIGN.md` YAML (`#faf8ff`, `#004ac6`), prose 10px radius, teal `#0F766E`
 as canvas/accent, and gallery `backdrop-filter` are **rejected**. Do not
@@ -44,34 +47,40 @@ reintroduce them.
 
 | Token | Value |
 | --- | --- |
-| `--color-bg` | `#F4F6F8` |
+| `--color-bg` | `#F6F7F9` |
 | `--color-surface` | `#FFFFFF` |
-| `--color-surface-muted` | `#F8FAFC` |
-| `--color-text` | `#182230` |
-| `--color-text-muted` | `#637083` |
-| `--color-border` | `#DDE3EA` |
-| `--color-accent` | `#4E5BD5` |
+| `--color-surface-muted` | `#F1F3F6` |
+| `--color-text` | `#101828` |
+| `--color-text-muted` | `#667085` |
+| `--color-border` | `#E4E7EC` |
+| `--color-accent` | `#4F46E5` |
 | `--color-accent-fg` | `#FFFFFF` |
+| `--color-ink` | `#0F1420` |
 | `--color-danger` | `#B91C1C` |
 | `--color-warning` | `#A16207` |
 | `--color-success` | `#166534` |
-| `--color-focus` | `#4E5BD5` (2px solid ring, offset 2px) |
-| `--radius-sm` | `8px` |
-| `--radius-md` | `12px` |
-| `--radius-lg` | `12px` |
+| `--color-focus` | `#4F46E5` (2px solid ring, offset 1px) |
+| `--radius-control` / `--radius-sm` | `10px` |
+| `--radius-card` / `--radius-md` | `14px` |
 | `--space` | `4px` grid |
-| `--shadow-1` | `0 1px 2px rgb(15 23 42 / 0.08)` |
-| `--shadow-2` | `0 8px 24px rgb(15 23 42 / 0.08)` |
+| `--shadow-1` | `0 1px 3px rgb(16 24 40 / 0.10)` |
+| `--shadow-2` | `0 12px 32px rgb(16 24 40 / 0.14)` |
+| `--shadow-composer` | `0 8px 24px rgb(16 24 40 / 0.12)` |
 | `--font-sans` | `"Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif` |
+| `--font-display` | `"Inter Display", Inter, "Segoe UI", sans-serif` |
 | `--font-mono` | `ui-monospace, "Cascadia Code", monospace` |
 | `--line-height-ar` | `1.75` |
 | `--line-height-en` | `1.5` |
 | `--nav-width` | `232px` |
 | `--row-height` | `48px` |
+| `--motion-fast` | `150ms ease-out` |
+| `--motion-drawer` | `200ms ease-out` |
 
 Light scheme only. Motion honors `prefers-reduced-motion`. Fonts are
-self-hosted Inter under `apps/frontend/public/fonts` plus the system
-Arabic fallbacks. No Google Fonts CDN and no `next/font/google`.
+self-hosted Inter plus Inter Display SemiBold under
+`apps/frontend/public/fonts`. No Google Fonts CDN and no `next/font/google`.
+`--gradient-brand` is allowed only on the auth brand panel, empty-state
+icon tile, and nav logo tile.
 
 ## Shell metrics
 

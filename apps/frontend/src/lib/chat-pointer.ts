@@ -42,6 +42,7 @@ export function parseChatRunPointer(raw: string | null): ChatRunPointer | null {
     if (
       typeof record.conversationId !== "string" ||
       record.conversationId === "" ||
+      record.conversationId === "undefined" ||
       typeof record.runId !== "string" ||
       record.runId === "" ||
       typeof record.lastSequence !== "number" ||

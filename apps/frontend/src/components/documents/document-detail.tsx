@@ -21,6 +21,7 @@ import { Sheet } from "../ui/sheet";
 import { Skeleton } from "../ui/skeleton";
 import { StatusBanner } from "../ui/status-banner";
 import { StatusPill } from "../ui/status-pill";
+import { formatVisibility } from "../../lib/format-visibility";
 import { UserText } from "../ui/user-text";
 import {
   deleteDocument,
@@ -200,7 +201,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
           <h1>
             <UserText value={record.title ?? record.document_id} />
           </h1>
-          <StatusPill status={record.visibility} />
+          <StatusPill status={formatVisibility(record.visibility)} />
           {versionPayload ? (
             <StatusPill status={statusLabel} />
           ) : null}
@@ -232,6 +233,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
               payload={versionPayload}
               layout="timeline"
               onRetry={(jobId) => retryMutation.mutate(jobId)}
+              retryPending={retryMutation.isPending}
             />
           ) : (
             <section className={styles.section} aria-label="Processing">
