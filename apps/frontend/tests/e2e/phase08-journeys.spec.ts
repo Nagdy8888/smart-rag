@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { handshakeBelowMinCopy } from "../../src/lib/handshake";
-import { OWNER_BOOTSTRAP_UNAVAILABLE } from "../../src/lib/auth/copy";
 
 const PUBLIC_AUTH_PATHS = [
   "/login",
@@ -25,6 +24,8 @@ const PROTECTED_PATHS = [
   "/curation",
   "/usage",
   "/profile",
+  "/admin",
+  "/account",
   "/invitations/accept",
 ] as const;
 

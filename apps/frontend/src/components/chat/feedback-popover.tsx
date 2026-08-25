@@ -70,7 +70,7 @@ export function FeedbackPopover({
             value={comment}
             onChange={(event) => onComment(event.target.value)}
           />
-          <Button type="button" onClick={onSubmit}>
+          <Button type="button" data-action-id="ask.feedback" onClick={onSubmit}>
             Submit feedback
           </Button>
         </div>

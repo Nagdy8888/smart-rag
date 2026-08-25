@@ -8,11 +8,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ProcessingTimeline } from "./processing-timeline";
 import {
   INGESTION_STATUS_POLL_MS,
+  IngestionStatus,
   ingestionStatusIsTerminal,
-} from "./ingestion-inspector";
+} from "./ingestion-status";
 import { Button } from "../ui/button";
 import { ErrorState } from "../ui/error-state";
 import { Icon } from "../ui/icon";
@@ -228,8 +228,9 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
       <div className={styles.detailGrid}>
         <div>
           {versionPayload ? (
-            <ProcessingTimeline
+            <IngestionStatus
               payload={versionPayload}
+              layout="timeline"
               onRetry={(jobId) => retryMutation.mutate(jobId)}
             />
           ) : (

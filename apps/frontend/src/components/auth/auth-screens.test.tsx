@@ -9,11 +9,8 @@ import "@testing-library/jest-dom/vitest";
 import { XSS_FILENAME } from "../../lib/hostile-text-fixtures";
 import { SIGN_IN_FAILED } from "../../lib/auth/copy";
 import { SessionProvider } from "../../lib/auth/session-provider";
-import {
-  SignInForm,
-  SignUpForm,
-  UnavailableGap,
-} from "./auth-screens";
+import { SignInForm, SignUpForm } from "./auth-screens";
+import { OWNER_BOOTSTRAP_UNAVAILABLE } from "../../lib/auth/copy";
 
 afterEach(() => {
   cleanup();
@@ -118,25 +115,18 @@ describe("SignInForm Google omission", () => {
   });
 });
 
-describe("Unavailable GAP-07-07", () => {
+describe("Auth omits unsupported recovery and bootstrap chrome", () => {
   it("has no recovery-code input that submits", () => {
-    renderAuth(<UnavailableGap gap="GAP-07-07" />);
-    expect(screen.getByRole("heading", { name: "Unavailable" })).toBeInTheDocument();
-    expect(screen.getAllByText(/GAP-07-07/).length).toBeGreaterThan(0);
+    renderAuth(<SignInForm />);
+    expect(screen.queryByRole("heading", { name: "Unavailable" })).toBeNull();
     expect(screen.queryByLabelText(/recovery/i)).toBeNull();
-    expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.queryByRole("button", { name: /recover|submit/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /recover/i })).toBeNull();
   });
-});
 
-describe("Unavailable GAP-07-08", () => {
   it("has no owner-bootstrap form", () => {
-    renderAuth(<UnavailableGap gap="GAP-07-08" />);
-    expect(screen.getByRole("heading", { name: "Unavailable" })).toBeInTheDocument();
-    expect(screen.getAllByText(/GAP-07-08/).length).toBeGreaterThan(0);
+    renderAuth(<SignInForm />);
+    expect(screen.queryByText(OWNER_BOOTSTRAP_UNAVAILABLE)).toBeNull();
     expect(screen.queryByLabelText(/company/i)).toBeNull();
-    expect(screen.queryByLabelText(/owner/i)).toBeNull();
-    expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("button", { name: /bootstrap|create company/i })).toBeNull();
   });
 });

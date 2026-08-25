@@ -177,10 +177,12 @@ enums on `GET /ingestion/versions/{id}/status`. The UI prints the server
 | --- | --- | --- | --- | --- |
 | Protected routes → `/login` | `tests/e2e/phase08-journeys.spec.ts` | unauthenticated shipped routes redirect to login except public auth pages | playwright-unauth | proven |
 | Login chrome | `tests/e2e/phase08-journeys.spec.ts` | login chrome has skip link, Sign in, and contract nav without Stitch frames | playwright-unauth | proven |
-| 280px desktop nav | `tests/e2e/design-system.spec.ts` | desktop navigation is 280px and skip link targets main | playwright-unauth | proven |
-| 390px mobile nav | `tests/e2e/design-system.spec.ts` | mobile navigation stacks above main | playwright-unauth | proven |
-| Reduced motion | `tests/e2e/design-system.spec.ts` | reduced motion disables spinner animation | playwright-unauth | proven |
+| 232px desktop nav | `tests/e2e/design-system.spec.ts` | authenticated desktop navigation is 232px when a session exists | playwright-live | proven |
+| 390px mobile nav | `tests/e2e/design-system.spec.ts` | authenticated mobile keeps compact brand and a menu control | playwright-live | proven |
+| Reduced motion | `tests/e2e/design-system.spec.ts` | reduced motion disables authored transitions | playwright-unauth | proven |
 | Skip link keyboard | `tests/e2e/a11y-security.spec.ts` | Tab order on login starts at the skip link and focuses main | playwright-unauth | proven |
+| Login geometry/overflow | `tests/e2e/quality-audit.spec.ts` | login geometry, overflow, and mapped Sign in at required viewports | playwright-unauth | proven |
+| Action inventory | `scripts/check_frontend_action_inventory.py` | unique keep IDs mapped to source and tests | python-unit | proven |
 | RTL ACME offsets 7–11 | `src/components/accessibility-security.test.tsx` | wraps ACME in a mark of text nodes for offsets 7–11 | vitest-component | proven |
 | XSS fixtures inert | `src/components/accessibility-security.test.tsx` | renders XSS, javascript URLs, bidi controls, and mixed text as text | vitest-component | proven |
 | CSP headers | `tests/e2e/phase08-journeys.spec.ts` | login response includes CSP without Tailwind CDN | playwright-unauth | proven |

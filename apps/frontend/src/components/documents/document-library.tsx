@@ -13,9 +13,9 @@ import { HandshakeBanner } from "../auth/auth-screens";
 import { DocumentList } from "./document-list";
 import {
   INGESTION_STATUS_POLL_MS,
-  IngestionInspector,
+  IngestionStatus,
   ingestionStatusIsTerminal,
-} from "./ingestion-inspector";
+} from "./ingestion-status";
 import {
   ImportSourceSheet,
   type ImportSourceTab,
@@ -489,8 +489,10 @@ export function DocumentLibrary() {
       ) : null}
 
       {inspectorOpen && statusVersionId !== null && versionQuery.data ? (
-        <IngestionInspector
+        <IngestionStatus
           payload={versionQuery.data}
+          layout="timeline"
+          asSheet
           onClose={() => setInspectorOpen(false)}
           onRetry={(jobId) => retryMutation.mutate(jobId)}
         />

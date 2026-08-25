@@ -48,7 +48,7 @@ export function ConversationRail({
       <div className={styles.railHeader}>
         <h2 className={styles.railTitle}>Sessions</h2>
         <div className={styles.row}>
-          <Button type="button" variant="primary" onClick={onCreate}>
+          <Button type="button" variant="primary" data-action-id="ask.new_session" onClick={onCreate}>
             New
           </Button>
           <Menu
@@ -59,6 +59,7 @@ export function ConversationRail({
                 id: "delete",
                 label: "Delete",
                 danger: true,
+                actionId: "ask.delete_session",
                 disabled: selectedId === null,
                 onSelect: onDelete,
               },

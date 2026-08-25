@@ -84,13 +84,19 @@ export function ChatComposer({
       </p>
       <div className={styles.composerActions}>
         {running ? (
-          <Button type="button" variant="secondary" onClick={onCancel}>
+          <Button
+            type="button"
+            variant="secondary"
+            data-action-id="ask.cancel"
+            onClick={onCancel}
+          >
             Stop
           </Button>
         ) : (
           <Button
             type="button"
             variant="primary"
+            data-action-id="ask.send"
             onClick={onSend}
             disabled={sendDisabled || !composerDraftIsSendable(value)}
             aria-describedby={sendBlockedReason ? "chat-send-reason" : undefined}
@@ -99,7 +105,7 @@ export function ChatComposer({
             Send
           </Button>
         )}
-        <Button type="button" variant="ghost" onClick={onReconnect}>
+        <Button type="button" variant="ghost" data-action-id="ask.reconnect" onClick={onReconnect}>
           {reconnectExhausted ? "Retry" : "Reconnect"}
         </Button>
       </div>

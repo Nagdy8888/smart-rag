@@ -247,6 +247,10 @@ class CheckRunner:
                     "Markdown links and Mermaid rendering",
                     docs_arguments,
                 ),
+                Command(
+                    "Frontend action inventory",
+                    (self._python, "scripts/check_frontend_action_inventory.py"),
+                ),
             ),
             "frontend": (
                 Command(

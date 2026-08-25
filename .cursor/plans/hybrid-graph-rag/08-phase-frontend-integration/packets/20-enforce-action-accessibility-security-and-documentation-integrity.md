@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 20
-status: pending
+status: complete
 title: "Enforce action, accessibility, security, and documentation integrity"
 requirement_ids: [P08-20]
 ---

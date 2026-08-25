@@ -1563,3 +1563,8 @@ are preserved:
   `completed`.
 
 Commands: `.\.venv\Scripts\pytest.exe tests/unit/test_sse_protocol.py tests/contract/test_sse_resume.py tests/contract/test_sse_heartbeat.py tests/unit/test_query_sse_mapping.py tests/unit/test_query_sse_executor.py -q` → 31 passed, 1 skipped.
+
+P08-20 documentation integrity: frontend action inventory and Phase 8
+docs now treat this co-owned SSE repair as closed. Do not restore empty
+`completed` success or typewriter streaming.
+

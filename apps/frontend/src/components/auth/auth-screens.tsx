@@ -16,7 +16,6 @@ import { fetchMeta, acceptInvitation } from "../../lib/api";
 import { createBrowserSupabase } from "../../lib/auth/browser";
 import {
   CALLBACK_FAILED,
-  OWNER_BOOTSTRAP_UNAVAILABLE,
   RESET_EMAIL_SENT,
   SIGN_IN_FAILED,
   SIGN_UP_SUCCESS,
@@ -172,6 +171,7 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
           variant="primary"
           className={authStyles.primaryWide}
           disabled={pending}
+          data-action-id="auth.sign_in"
           data-testid="auth-sign-in"
         >
           {pending ? "Signing in…" : "Sign in"}
@@ -268,6 +268,7 @@ export function SignUpForm() {
           revealable
         />
         <Button type="submit" variant="primary" className={authStyles.primaryWide}
+          data-action-id="auth.sign_up"
           data-testid="auth-sign-up">
           Sign up
         </Button>
@@ -325,6 +326,7 @@ export function ForgotPasswordForm() {
           required
         />
         <Button type="submit" variant="primary" className={authStyles.primaryWide}
+          data-action-id="auth.forgot_password"
           data-testid="auth-forgot-password">
           Send reset link
         </Button>
@@ -390,6 +392,7 @@ export function ResetPasswordForm() {
           revealable
         />
         <Button type="submit" variant="primary" className={authStyles.primaryWide}
+          data-action-id="auth.reset_password"
           data-testid="auth-reset-password">
           Update password
         </Button>
@@ -440,9 +443,6 @@ export function InvitationAcceptForm() {
       <p className={authStyles.lead}>
         Email comes from the signed-in account, not this form.
       </p>
-      <StatusBanner kind="info" role="status">
-        {OWNER_BOOTSTRAP_UNAVAILABLE}
-      </StatusBanner>
       <EnvMissingBanner />
       {accessToken === null ? (
         <StatusBanner kind="warning" role="status">
@@ -472,6 +472,7 @@ export function InvitationAcceptForm() {
           required
         />
         <Button type="submit" variant="primary" disabled={accessToken === null}
+          data-action-id="auth.accept_invitation"
           data-testid="auth-accept-invitation">
           Accept invitation
         </Button>
@@ -480,39 +481,6 @@ export function InvitationAcceptForm() {
         <Link href="/login">Sign in</Link>
       </p>
       {supabase === null ? <EnvMissingBanner /> : null}
-    </div>
-  );
-}
-
-const KNOWN_GAPS = {
-  "GAP-07-08": OWNER_BOOTSTRAP_UNAVAILABLE,
-} as const;
-
-export type KnownUnavailableGap = keyof typeof KNOWN_GAPS;
-
-/**
- * Honest Unavailable surface. No mocked HTTP, no recovery-code inputs.
- *
- * @param props - Gap id from the route.
- * @returns Gap copy only.
- */
-export function UnavailableGap({ gap }: { gap: string }) {
-  const copy =
-    gap in KNOWN_GAPS
-      ? KNOWN_GAPS[gap as KnownUnavailableGap]
-      : "This surface is unavailable. No mocked API is provided.";
-  return (
-    <div className={authStyles.card}>
-      <h1>Unavailable</h1>
-      <StatusBanner kind="warning" role="status">
-        {copy}
-      </StatusBanner>
-      <p className={authStyles.lead}>
-        Gap id: <CodeText value={gap} />
-      </p>
-      <p className={authStyles.links}>
-        <Link href="/login">Sign in</Link>
-      </p>
     </div>
   );
 }

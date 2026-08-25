@@ -56,8 +56,8 @@ reintroduce them.
 | `--color-warning` | `#A16207` |
 | `--color-success` | `#166534` |
 | `--color-focus` | `#4E5BD5` (2px solid ring, offset 2px) |
-| `--radius-sm` | `6px` |
-| `--radius-md` | `10px` |
+| `--radius-sm` | `8px` |
+| `--radius-md` | `12px` |
 | `--radius-lg` | `12px` |
 | `--space` | `4px` grid |
 | `--shadow-1` | `0 1px 2px rgb(15 23 42 / 0.08)` |
@@ -96,7 +96,8 @@ flowchart LR
   nav and the sign-in card fits the first viewport.
 - List and table rows: minimum `48px`. Mobile controls: minimum `44px`.
 
-Authenticated nav lists Chat through Profile. Hidden items are not HTTP 403.
+Authenticated nav lists Ask, Documents, Tables, Graph, optional Admin, and
+Account. Hidden items are not HTTP 403.
 See `CLIENT_NAV_IS_NOT_AUTHORIZATION` in
 `apps/frontend/src/lib/client-authorization.ts`. Public Auth routes use
 `(auth)` layout; console routes use `(console)` layout.

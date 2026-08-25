@@ -1847,3 +1847,92 @@ P08-19 Admin is complete. P08-20 may enforce action-inventory, accessibility,
 CSP, and documentation integrity without restoring MFA, bootstrap, budget,
 audit, or seed chrome.
 
+## P08-20 — Enforce action, accessibility, security, and documentation integrity
+
+Quoted requirement: apply the cross-cutting quality contract after all final
+surfaces and paths exist.
+
+### Acceptance checks
+
+- Unique `data-action-id` values match `docs/frontend/action-inventory.json`.
+- Keep actions name an existing test file and a failure/authorization state.
+- Removed-target IDs are absent from production source.
+- CSS-source geometry locks buttons, inputs, pills, dialogs, nav, topbar, and
+  table rows. Playwright measures login controls at 390/768/1024/1280 with no
+  page overflow.
+- GAP Unavailable pages, bootstrap chrome, and duplicate ingestion wrappers
+  are omitted rather than disabled.
+- Hostile text, CSP, and prohibited-pattern suites remain green.
+- Docs and Phase 6 P08-09 evidence stay synchronized.
+
+### Changed paths
+
+- `scripts/check_frontend_action_inventory.py`, `scripts/check.py` docs tier
+- `tests/unit/test_frontend_action_inventory.py`
+- `docs/frontend/action-inventory.json`
+- Action IDs on Auth, Ask, Documents, Admin, and shell skip link
+- Removed `UnavailableGap`, `readiness-panel.tsx`,
+  `ingestion-inspector.tsx`, `processing-timeline.tsx`
+- `apps/frontend/src/lib/geometry.test.ts`,
+  `apps/frontend/tests/e2e/quality-audit.spec.ts`,
+  `visual-routes.spec.ts`, `phase08-journeys.spec.ts`,
+  `prohibited-patterns.test.ts`
+- Docs: `A11Y_SECURITY_IMPLEMENTATION.md`, `AUTH_AND_STREAMING.md`,
+  `DESIGN_SYSTEM.md`, `PHASE8_JOURNEY_MATRIX.md`, `docs/README.md`,
+  `docs/development/phase-06-agent-intelligence-evidence.md`
+
+### Authorization / failure / fallback / idempotency
+
+- Inventory keep rows require a non-placeholder `failure_state` except
+  local-state controls.
+- Invitation accept no longer renders owner-bootstrap GAP copy.
+- `/unavailable/*` remains a 404. Auth tests prove recovery and bootstrap
+  chrome are absent on Sign in.
+
+### Verification
+
+```text
+py -3 scripts/check_frontend_action_inventory.py
+.\.venv\Scripts\pytest.exe tests/unit/test_frontend_action_inventory.py tests/unit/test_check_runner.py -q
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/auth src/components/chat src/components/admin src/components/documents src/components/ui/app-shell.tsx src/lib/geometry.test.ts src/lib/prohibited-patterns.test.ts
+.\.venv\Scripts\ruff.exe check scripts/check_frontend_action_inventory.py scripts/check.py tests/unit/test_frontend_action_inventory.py
+```
+
+Results:
+
+- Action inventory: verified (64 actions).
+- Pytest: inventory + check-runner passed.
+- Full frontend Vitest: 39 files, 260 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint and Ruff: 0 errors.
+
+### Unverified
+
+- Playwright `quality-audit.spec.ts` login geometry waits for P08-21
+  Chromium. Signed-in overflow still skips when FastAPI is down.
+- `uv run python scripts/check.py --tier docs` Mermaid rendering waits for
+  P08-21.
+
+### Deviations
+
+- Desktop nav remains the shipped `232px` token, not the historical 280px
+  Stitch column. Geometry tests lock the CSS variable and Playwright live
+  width together.
+- Login primary remains the 40px control height used by `Button`; Auth does
+  not switch to `buttonLarge` 44px.
+- Authenticated unmapped-action audit allows unlabeled overflow Menu/Actions
+  chrome; primary shipped submits use inventory IDs.
+
+### Rollback
+
+Revert this commit. Restoring `UnavailableGap` or ingestion wrapper files
+would reintroduce GAP chrome and duplicate status UI.
+
+### Handoff
+
+P08-20 quality integrity is complete. P08-21 may run deterministic release
+gates, including docs Mermaid and Playwright Chromium.
+
+

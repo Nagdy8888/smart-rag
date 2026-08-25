@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "packet": "P08-19",
-  "status": "admin-workspace",
+  "packet": "P08-20",
+  "status": "action-integrity",
   "generated_at": "2026-08-24",
-  "notes": "P08-19 consolidates Admin tabs team/tools/curation/usage with real mutations, Account four /me fields, redirects from /team|/tools|/curation|/usage|/profile, and no bootstrap/budget/audit/profile-editor chrome.",
+  "notes": "P08-20 unique data-action-id inventory with keep/local-state/removed/redirect rows, mapped tests, and no pending markers.",
   "actions": [
     {
       "action_id": "auth.sign_in",
@@ -17,7 +17,7 @@
       "failure_state": "generic auth error",
       "idempotency": "new session",
       "disposition": "keep",
-      "test_id": "auth-sign-in"
+      "test_id": "src/components/auth/auth-screens.test.tsx"
     },
     {
       "action_id": "auth.sign_up",
@@ -31,7 +31,7 @@
       "failure_state": "generic auth error",
       "idempotency": "provider unique email",
       "disposition": "keep",
-      "test_id": "auth-sign-up"
+      "test_id": "src/components/auth/auth-screens.test.tsx"
     },
     {
       "action_id": "auth.forgot_password",
@@ -45,7 +45,7 @@
       "failure_state": "generic auth error",
       "idempotency": "provider rate limit",
       "disposition": "keep",
-      "test_id": "auth-forgot-password"
+      "test_id": "src/components/auth/auth-screens.test.tsx"
     },
     {
       "action_id": "auth.reset_password",
@@ -59,7 +59,7 @@
       "failure_state": "generic auth error",
       "idempotency": "single recovery token",
       "disposition": "keep",
-      "test_id": "auth-reset-password"
+      "test_id": "src/components/auth/auth-screens.test.tsx"
     },
     {
       "action_id": "auth.accept_invitation",
@@ -73,7 +73,7 @@
       "failure_state": "generic auth or forbidden",
       "idempotency": "single-use token",
       "disposition": "keep",
-      "test_id": "auth-accept-invitation"
+      "test_id": "src/components/auth/auth-screens.test.tsx"
     },
     {
       "action_id": "auth.mfa_enroll",
@@ -129,7 +129,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "nav-ask"
+      "test_id": "src/components/ui/app-nav.test.tsx"
     },
     {
       "action_id": "nav.documents",
@@ -143,7 +143,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "nav-documents"
+      "test_id": "src/components/ui/app-nav.test.tsx"
     },
     {
       "action_id": "nav.tables",
@@ -157,7 +157,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "nav-tables"
+      "test_id": "src/components/ui/app-nav.test.tsx"
     },
     {
       "action_id": "nav.graph",
@@ -171,7 +171,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "nav-graph"
+      "test_id": "src/components/ui/app-nav.test.tsx"
     },
     {
       "action_id": "nav.admin",
@@ -185,7 +185,7 @@
       "failure_state": "server 403 on mutations",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "nav-admin"
+      "test_id": "src/components/ui/app-nav.test.tsx"
     },
     {
       "action_id": "nav.account",
@@ -199,7 +199,7 @@
       "failure_state": "auth redirect",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "nav-account"
+      "test_id": "src/components/ui/app-nav.test.tsx"
     },
     {
       "action_id": "shell.readiness",
@@ -213,7 +213,7 @@
       "failure_state": "Unavailable copy",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "shell-readiness"
+      "test_id": "src/components/ui/app-shell.test.tsx"
     },
     {
       "action_id": "shell.command",
@@ -227,7 +227,7 @@
       "failure_state": "none",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "shell-command"
+      "test_id": "src/lib/shell-navigation.test.ts"
     },
     {
       "action_id": "shell.menu",
@@ -241,7 +241,7 @@
       "failure_state": "none",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "shell-menu"
+      "test_id": "tests/e2e/a11y-security.spec.ts"
     },
     {
       "action_id": "nav.team",
@@ -325,7 +325,7 @@
       "failure_state": "generic error",
       "idempotency": "session revoke",
       "disposition": "keep",
-      "test_id": "command-sign-out"
+      "test_id": "src/components/ui/app-nav.test.tsx"
     },
     {
       "action_id": "ask.send",
@@ -339,7 +339,7 @@
       "failure_state": "visible typed error",
       "idempotency": "Idempotency-Key",
       "disposition": "keep",
-      "test_id": "chat-app.test.tsx"
+      "test_id": "src/components/chat-app.test.tsx"
     },
     {
       "action_id": "ask.cancel",
@@ -353,7 +353,7 @@
       "failure_state": "visible cancel failure",
       "idempotency": "run id",
       "disposition": "keep",
-      "test_id": "chat-app.test.tsx"
+      "test_id": "src/components/chat-app.test.tsx"
     },
     {
       "action_id": "ask.feedback",
@@ -367,7 +367,7 @@
       "failure_state": "Feedback could not be recorded. Try again.",
       "idempotency": "run id + tags",
       "disposition": "keep",
-      "test_id": "chat-app.test.tsx"
+      "test_id": "src/components/chat-app.test.tsx"
     },
     {
       "action_id": "documents.upload",
@@ -381,7 +381,7 @@
       "failure_state": "quota/capability/upload error",
       "idempotency": "operation key",
       "disposition": "keep",
-      "test_id": "document-library.test.tsx"
+      "test_id": "src/components/documents/document-library.test.tsx"
     },
     {
       "action_id": "documents.delete",
@@ -395,7 +395,7 @@
       "failure_state": "403/404/429",
       "idempotency": "document id",
       "disposition": "keep",
-      "test_id": "document-library.test.tsx"
+      "test_id": "src/components/documents/document-library.test.tsx"
     },
     {
       "action_id": "documents.preview",
@@ -423,7 +423,7 @@
       "failure_state": "422/403/404/429",
       "idempotency": "plan body",
       "disposition": "keep",
-      "test_id": "tables-app.test.tsx"
+      "test_id": "src/components/tables/tables-app.test.tsx"
     },
     {
       "action_id": "tables.export",
@@ -451,7 +451,7 @@
       "failure_state": "classified 403/422; pending/outage/ACL silence",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "graph-explorer.test.tsx"
+      "test_id": "src/components/graph/graph-explorer.test.tsx"
     },
     {
       "action_id": "admin.offboard",
@@ -465,7 +465,7 @@
       "failure_state": "403/404",
       "idempotency": "subject id",
       "disposition": "keep",
-      "test_id": "administration-surfaces.test.tsx"
+      "test_id": "src/components/administration-surfaces.test.tsx"
     },
     {
       "action_id": "gap.unavailable",
@@ -494,6 +494,412 @@
       "idempotency": "n/a",
       "disposition": "removed_target",
       "test_id": "retired-P08-14"
+    },
+    {
+      "action_id": "shell.skip",
+      "route": "shell",
+      "label": "Skip to main content",
+      "control_kind": "link",
+      "contract_owner": "frontend-shell",
+      "contract": "href #main",
+      "role": "any",
+      "success_state": "main landmark",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "tests/e2e/a11y-security.spec.ts"
+    },
+    {
+      "action_id": "shell.account",
+      "route": "shell",
+      "label": "Account menu",
+      "control_kind": "local-state",
+      "contract_owner": "frontend-shell",
+      "contract": "account menu",
+      "role": "authenticated",
+      "success_state": "menu",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/ui/app-nav.test.tsx"
+    },
+    {
+      "action_id": "ask.reconnect",
+      "route": "/",
+      "label": "Reconnect",
+      "control_kind": "button",
+      "contract_owner": "fastapi-sse",
+      "contract": "GET /runs/{id}/events resume",
+      "role": "authenticated",
+      "success_state": "resume stream",
+      "failure_state": "visible reconnect failure",
+      "idempotency": "Last-Event-ID",
+      "disposition": "keep",
+      "test_id": "src/components/chat-app.test.tsx"
+    },
+    {
+      "action_id": "ask.new_session",
+      "route": "/",
+      "label": "New",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "POST /conversations",
+      "role": "authenticated",
+      "success_state": "new conversation",
+      "failure_state": "visible create failure",
+      "idempotency": "create",
+      "disposition": "keep",
+      "test_id": "src/components/chat-app.test.tsx"
+    },
+    {
+      "action_id": "ask.delete_session",
+      "route": "/",
+      "label": "Delete",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "DELETE /conversations/{id}",
+      "role": "authenticated",
+      "success_state": "204",
+      "failure_state": "404/403",
+      "idempotency": "conversation id",
+      "disposition": "keep",
+      "test_id": "src/components/chat-app.test.tsx"
+    },
+    {
+      "action_id": "ask.sources",
+      "route": "/",
+      "label": "Sources",
+      "control_kind": "local-state",
+      "contract_owner": "fastapi",
+      "contract": "GET /runs/{id}/citations",
+      "role": "authenticated",
+      "success_state": "sources drawer",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/chat-app.test.tsx"
+    },
+    {
+      "action_id": "documents.import",
+      "route": "/documents",
+      "label": "Import source",
+      "control_kind": "local-state",
+      "contract_owner": "frontend",
+      "contract": "opens import sheet",
+      "role": "authenticated",
+      "success_state": "sheet",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/documents/document-library.test.tsx"
+    },
+    {
+      "action_id": "documents.crawl",
+      "route": "/documents",
+      "label": "Start crawl",
+      "control_kind": "submit",
+      "contract_owner": "fastapi",
+      "contract": "POST /ingestion/crawls",
+      "role": "owner-admin",
+      "success_state": "job accepted",
+      "failure_state": "403/422",
+      "idempotency": "idempotency_key",
+      "disposition": "keep",
+      "test_id": "src/components/documents/document-library.test.tsx"
+    },
+    {
+      "action_id": "documents.view",
+      "route": "/documents",
+      "label": "View details",
+      "control_kind": "link",
+      "contract_owner": "fastapi",
+      "contract": "GET /documents/{id}",
+      "role": "authenticated",
+      "success_state": "detail",
+      "failure_state": "404 no title",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/documents/document-library.test.tsx"
+    },
+    {
+      "action_id": "documents.status",
+      "route": "/documents",
+      "label": "Load status",
+      "control_kind": "local-state",
+      "contract_owner": "fastapi",
+      "contract": "GET /ingestion/versions/{id}/status",
+      "role": "authenticated",
+      "success_state": "status sheet",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/documents/document-library.test.tsx"
+    },
+    {
+      "action_id": "admin.tab.team",
+      "route": "/admin?tab=team",
+      "label": "Team & access",
+      "control_kind": "local-state",
+      "contract_owner": "frontend-shell",
+      "contract": "URL tab state",
+      "role": "authenticated",
+      "success_state": "selected tab",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.tab.tools",
+      "route": "/admin?tab=tools",
+      "label": "Tools",
+      "control_kind": "local-state",
+      "contract_owner": "frontend-shell",
+      "contract": "URL tab state",
+      "role": "authenticated",
+      "success_state": "selected tab",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.tab.curation",
+      "route": "/admin?tab=curation",
+      "label": "Curation",
+      "control_kind": "local-state",
+      "contract_owner": "frontend-shell",
+      "contract": "URL tab state",
+      "role": "authenticated",
+      "success_state": "selected tab",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.tab.usage",
+      "route": "/admin?tab=usage",
+      "label": "Usage",
+      "control_kind": "local-state",
+      "contract_owner": "frontend-shell",
+      "contract": "URL tab state",
+      "role": "authenticated",
+      "success_state": "selected tab",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.invite",
+      "route": "/admin?tab=team",
+      "label": "Send invitation",
+      "control_kind": "submit",
+      "contract_owner": "fastapi-auth-admin",
+      "contract": "POST /admin/invitations",
+      "role": "owner-admin",
+      "success_state": "invitation id and expiry",
+      "failure_state": "403",
+      "idempotency": "email",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.tools.search",
+      "route": "/admin?tab=tools",
+      "label": "Search",
+      "control_kind": "submit",
+      "contract_owner": "fastapi",
+      "contract": "GET /tools?q=",
+      "role": "authenticated",
+      "success_state": "filtered cards",
+      "failure_state": "classified error",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.tools.enable",
+      "route": "/admin?tab=tools",
+      "label": "Enable or Disable",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "POST /admin/tools/{key}/enable",
+      "role": "owner-admin",
+      "success_state": "active flag",
+      "failure_state": "403",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.tools.permissions",
+      "route": "/admin?tab=tools",
+      "label": "Save permission",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "POST /admin/tools/{key}/permissions",
+      "role": "owner-admin",
+      "success_state": "permission saved",
+      "failure_state": "403",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.tools.details",
+      "route": "/admin?tab=tools",
+      "label": "View details",
+      "control_kind": "local-state",
+      "contract_owner": "fastapi",
+      "contract": "drawer of catalog fields",
+      "role": "authenticated",
+      "success_state": "drawer",
+      "failure_state": "none",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.curation.glossary",
+      "route": "/admin?tab=curation",
+      "label": "Glossary",
+      "control_kind": "local-state",
+      "contract_owner": "fastapi",
+      "contract": "inner tab",
+      "role": "authenticated",
+      "success_state": "glossary panel",
+      "failure_state": "none",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.curation.rules",
+      "route": "/admin?tab=curation",
+      "label": "Entity rules",
+      "control_kind": "local-state",
+      "contract_owner": "fastapi",
+      "contract": "inner tab",
+      "role": "authenticated",
+      "success_state": "rules table",
+      "failure_state": "none",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.glossary.import",
+      "route": "/admin?tab=curation",
+      "label": "Import glossary",
+      "control_kind": "submit",
+      "contract_owner": "fastapi",
+      "contract": "POST /admin/glossary/imports",
+      "role": "owner-admin",
+      "success_state": "import id",
+      "failure_state": "403",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.glossary.approve",
+      "route": "/admin?tab=curation",
+      "label": "Approve",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "POST approve import",
+      "role": "owner-admin",
+      "success_state": "approved",
+      "failure_state": "403",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.glossary.rollback",
+      "route": "/admin?tab=curation",
+      "label": "Rollback",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "POST rollback import",
+      "role": "owner-admin",
+      "success_state": "rolled back",
+      "failure_state": "403",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.entity_rule.suggest",
+      "route": "/admin?tab=curation",
+      "label": "Suggest rule",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "POST /admin/graph/entity-rules/suggestions",
+      "role": "owner-admin",
+      "success_state": "candidate",
+      "failure_state": "403",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.entity_rule.edit",
+      "route": "/admin?tab=curation",
+      "label": "Save rule",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "PATCH entity-rules row_version",
+      "role": "owner-admin",
+      "success_state": "updated",
+      "failure_state": "409 stale_row_version",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.entity_rule.approve",
+      "route": "/admin?tab=curation",
+      "label": "Approve",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "POST approve rule",
+      "role": "owner-admin",
+      "success_state": "approved",
+      "failure_state": "409",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.entity_rule.revoke",
+      "route": "/admin?tab=curation",
+      "label": "Revoke",
+      "control_kind": "button",
+      "contract_owner": "fastapi",
+      "contract": "POST revoke rule",
+      "role": "owner-admin",
+      "success_state": "revoked",
+      "failure_state": "409",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
+    },
+    {
+      "action_id": "admin.entity_rule.reload",
+      "route": "/admin?tab=curation",
+      "label": "Reload rule",
+      "control_kind": "local-state",
+      "contract_owner": "fastapi",
+      "contract": "invalidate entity-rules query",
+      "role": "authenticated",
+      "success_state": "fresh row_version",
+      "failure_state": "none",
+      "idempotency": "request",
+      "disposition": "keep",
+      "test_id": "src/components/administration-surfaces.test.tsx"
     }
   ]
 }

@@ -705,7 +705,12 @@ export function ChatApp() {
         </p>
         ) : null}
         <div className={chatStyles.row}>
-          <Button type="button" variant="ghost" onClick={() => setSourcesOpen(true)}>
+          <Button
+            type="button"
+            variant="ghost"
+            data-action-id="ask.sources"
+            onClick={() => setSourcesOpen(true)}
+          >
             Sources ({String(citations.length)})
           </Button>
           <RunDetailsSheet

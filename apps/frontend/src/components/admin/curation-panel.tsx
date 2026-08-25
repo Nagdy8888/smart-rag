@@ -270,6 +270,7 @@ export function CurationPanel() {
           {STALE_ROW_VERSION_COPY}{" "}
           <Button
             type="button"
+            data-action-id="admin.entity_rule.reload"
             onClick={() => {
               setStaleConflict(false);
               void queryClient.invalidateQueries({ queryKey: keys.entityRules });
@@ -291,6 +292,7 @@ export function CurationPanel() {
           role="tab"
           aria-selected={inner === "glossary"}
           className={inner === "glossary" ? styles.tabCurrent : styles.tab}
+          data-action-id="admin.curation.glossary"
           onClick={() => setInner("glossary")}
         >
           Glossary
@@ -300,6 +302,7 @@ export function CurationPanel() {
           role="tab"
           aria-selected={inner === "rules"}
           className={inner === "rules" ? styles.tabCurrent : styles.tab}
+          data-action-id="admin.curation.rules"
           onClick={() => setInner("rules")}
         >
           Entity rules
@@ -336,6 +339,7 @@ export function CurationPanel() {
           </div>
           <PrimaryAction
             type="button"
+            data-action-id="admin.glossary.import"
             pending={importMutation.isPending}
             pendingLabel="Importing…"
             onClick={() => importMutation.mutate()}
@@ -347,10 +351,18 @@ export function CurationPanel() {
           </p>
           <Input label="import_id" value={importId} onChange={(event) => setImportId(event.target.value)} />
           <div className={styles.row}>
-            <Button type="button" onClick={() => approveImportMutation.mutate()}>
+            <Button
+              type="button"
+              data-action-id="admin.glossary.approve"
+              onClick={() => approveImportMutation.mutate()}
+            >
               Approve
             </Button>
-            <Button type="button" onClick={() => rollbackImportMutation.mutate()}>
+            <Button
+              type="button"
+              data-action-id="admin.glossary.rollback"
+              onClick={() => rollbackImportMutation.mutate()}
+            >
               Rollback
             </Button>
           </div>
@@ -359,7 +371,11 @@ export function CurationPanel() {
         <section className={styles.panel} aria-label="Entity rules">
           <div className={styles.row}>
             <h2>Entity rules</h2>
-            <Button type="button" onClick={() => setSuggestOpen(true)}>
+            <Button
+              type="button"
+              data-action-id="admin.entity_rule.suggest"
+              onClick={() => setSuggestOpen(true)}
+            >
               Suggest rule
             </Button>
           </div>
@@ -373,6 +389,7 @@ export function CurationPanel() {
           {suggestOpen ? (
             <PrimaryAction
               type="button"
+              data-action-id="admin.entity_rule.suggest"
               pending={suggestMutation.isPending}
               pendingLabel="Suggesting…"
               onClick={() => suggestMutation.mutate()}
@@ -383,6 +400,7 @@ export function CurationPanel() {
           {editRule ? (
             <PrimaryAction
               type="button"
+              data-action-id="admin.entity_rule.edit"
               pending={patchMutation.isPending}
               pendingLabel="Saving…"
               onClick={() => patchMutation.mutate(editRule)}
@@ -436,6 +454,7 @@ export function CurationPanel() {
                       {
                         id: "edit",
                         label: "Edit",
+                        actionId: "admin.entity_rule.edit",
                         onSelect: () => {
                           setEditRule(row);
                           setSuggestOpen(false);
@@ -447,12 +466,14 @@ export function CurationPanel() {
                       {
                         id: "approve",
                         label: "Approve",
+                        actionId: "admin.entity_rule.approve",
                         onSelect: () => approveRuleMutation.mutate(row),
                       },
                       {
                         id: "revoke",
                         label: "Revoke",
                         danger: true,
+                        actionId: "admin.entity_rule.revoke",
                         onSelect: () => revokeRuleMutation.mutate(row),
                       },
                     ]}

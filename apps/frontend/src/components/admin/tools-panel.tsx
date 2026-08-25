@@ -127,7 +127,7 @@ export function ToolsPanel() {
           leadingIcon="search"
           onChange={(event) => setDraft(event.target.value)}
         />
-        <Button type="submit">Search</Button>
+        <Button type="submit" data-action-id="admin.tools.search">Search</Button>
         <p className={styles.muted}>{String(cards.length)} tools</p>
       </form>
       <div className={styles.toolGrid}>
@@ -169,6 +169,7 @@ export function ToolsPanel() {
                 />
                 <Button
                   type="button"
+                  data-action-id="admin.tools.enable"
                   pending={enableMutation.isPending}
                   pendingLabel="Saving…"
                   onClick={() =>
@@ -180,7 +181,11 @@ export function ToolsPanel() {
                 >
                   {card.active ? "Disable" : "Enable"}
                 </Button>
-                <Button type="button" onClick={() => permissionMutation.mutate(card.tool_key)}>
+                <Button
+                  type="button"
+                  data-action-id="admin.tools.permissions"
+                  onClick={() => permissionMutation.mutate(card.tool_key)}
+                >
                   Save permission
                 </Button>
               </div>
@@ -188,6 +193,7 @@ export function ToolsPanel() {
             <Button
               ref={detailsRef}
               type="button"
+              data-action-id="admin.tools.details"
               onClick={() => setDetails(card)}
             >
               View details

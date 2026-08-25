@@ -2,7 +2,7 @@
 title: Auth and streaming frontend
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: engineering, frontend, security
 packet: P08-02
 ---

@@ -30,7 +30,7 @@ export type AppShellProps = {
 export function AppShell({ children }: AppShellProps) {
   return (
     <div className={styles.shell}>
-      <a className={styles.skipLink} href="#main">
+      <a className={styles.skipLink} href="#main" data-action-id="shell.skip">
         Skip to main content
       </a>
       <div className={styles.layout}>

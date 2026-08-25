@@ -77,7 +77,7 @@ test("authenticated product routes visual when a session exists", async ({
     { path: "/admin?tab=tools", name: "admin-tools", heading: "Tools" },
     { path: "/admin?tab=curation", name: "admin-curation", heading: "Curation" },
     { path: "/admin?tab=usage", name: "admin-usage", heading: /Usage/ },
-    { path: "/account", name: "account", heading: "Profile" },
+    { path: "/account", name: "account", heading: "Account." },
   ];
   for (const route of routes) {
     await page.setViewportSize(DESKTOP);

@@ -147,6 +147,7 @@ describe("prohibited production patterns", () => {
       expect.arrayContaining(["login", "signup", "auth", "invitations"]),
     );
     expect(names).not.toContain("mfa");
+    expect(names).not.toContain("unavailable");
   });
 
   it("does not embed service-role or privileged keys in frontend source", () => {
