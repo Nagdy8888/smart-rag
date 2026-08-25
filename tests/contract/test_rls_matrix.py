@@ -8,7 +8,11 @@ from collections.abc import Iterator
 import psycopg
 import pytest
 
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import (
+    refuse_hosted_destructive_dsn,
+    resolve_supabase_db_url,
+    try_connect,
+)
 
 
 def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) -> None:
@@ -237,9 +241,10 @@ def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
     url = resolve_supabase_db_url()
+    refuse_hosted_destructive_dsn(url)
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip("Local Supabase fixture unreachable")
     connection.autocommit = False
     yield connection
     connection.rollback()
@@ -912,9 +917,10 @@ def test_reused_connection_identity_is_bound_to_rpc_arguments() -> None:
     """Prove a stale session GUC cannot leak identity across transactions."""
 
     url = resolve_supabase_db_url()
+    refuse_hosted_destructive_dsn(url)
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip("Local Supabase fixture unreachable")
 
     user_a = uuid.uuid4()
     user_b = uuid.uuid4()

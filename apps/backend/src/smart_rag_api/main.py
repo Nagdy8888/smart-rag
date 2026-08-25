@@ -82,9 +82,9 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         without calling schema-admin ``initialize_storages``. Constructs Valkey
         clients without connecting. Starts a bounded ``ThreadPoolExecutor`` on
         ``application.state.offload_executor`` and shuts it down on exit.
-        Finalizes the adapter on shutdown. Gateway and retrieval adapters are
-        imported here so constructing ``create_app`` cannot form a retrieval
-        import cycle.
+        Closes a lazily created run-event database store and finalizes the
+        adapter on shutdown. Gateway and retrieval adapters are imported here
+        so constructing ``create_app`` cannot form a retrieval import cycle.
     """
 
     from smart_rag_core.gateways import block_openai_network, create_model_gateway
@@ -139,6 +139,11 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                 extra={"event": "backend.shutdown"},
             )
     finally:
+        run_event_store = getattr(application.state, "run_event_store", None)
+        close_run_event_store = getattr(run_event_store, "close", None)
+        if callable(close_run_event_store):
+            close_run_event_store()
+            application.state.run_event_store = None
         offload_executor.shutdown(wait=True, cancel_futures=True)
         application.state.offload_executor = None
         if adapter is not None:

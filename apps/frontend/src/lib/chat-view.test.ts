@@ -3,7 +3,9 @@ import {
   applyAdmission,
   applySseFrame,
   createChatViewState,
+  hasKeptAnswer,
   resumeAfterSequence,
+  shouldShowChatFailureBanner,
 } from "./chat-view";
 import { parseSseBlock } from "./sse";
 
@@ -138,6 +140,67 @@ describe("chat view", () => {
     ]);
     expect(state.stage).toBe("deadline");
     expect(state.terminal).toBe("partial");
+    expect(state.failure).toBeNull();
+    expect(shouldShowChatFailureBanner(state)).toBe(false);
+  });
+
+  it("keeps the first terminal when a later error arrives", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"Hi"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: partial\nid: 2\ndata: {"reason":"verified_partial"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: error\nid: 3\ndata: {"code":"run_failed"}'),
+    );
+    expect(state.answerText).toBe("Hi");
+    expect(state.terminal).toBe("partial");
+    expect(state.failure).toBeNull();
+    expect(hasKeptAnswer(state)).toBe(true);
+    expect(shouldShowChatFailureBanner(state)).toBe(false);
+  });
+
+  it("does not open a failure banner when error arrives after tokens", () => {
+    let state = createChatViewState("k");
+    state = applyAdmission(state, {
+      run_id: "1271314a-dc2a-46b7-bff1-b4c630d78415",
+      reservation_id: "res-1",
+      route_family: "hybrid",
+      reconnect: false,
+    });
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"Hi"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: error\nid: 2\ndata: {"code":"run_failed"}'),
+    );
+    expect(state.terminal).toBe("error");
+    expect(state.failure).toBeNull();
+    expect(shouldShowChatFailureBanner(state)).toBe(false);
+  });
+
+  it("opens a failure banner only when error has no kept tokens", () => {
+    let state = createChatViewState("k");
+    state = applyAdmission(state, {
+      run_id: "run-empty",
+      reservation_id: "res-1",
+      route_family: "hybrid",
+      reconnect: false,
+    });
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: error\nid: 1\ndata: {"code":"run_failed"}'),
+    );
+    expect(state.terminal).toBe("error");
+    expect(state.failure).toEqual({ kind: "protocol", detail: "run_failed" });
+    expect(shouldShowChatFailureBanner(state)).toBe(true);
   });
 
   it("keeps the answer when an unknown additive event is injected", () => {

@@ -6,7 +6,6 @@
 import { displayText } from "./safe-text";
 import {
   isKnownSseEvent,
-  isTerminalSseEvent,
   parseSsePayload,
   sequenceFromFrame,
   type SseFrame,
@@ -132,11 +131,35 @@ function stringList(value: unknown): string[] {
 }
 
 /**
+ * Return whether the run already has user-visible answer tokens.
+ *
+ * @param state - Current view.
+ * @returns True when trimmed `answerText` is non-empty.
+ */
+export function hasKeptAnswer(state: ChatViewState): boolean {
+  return state.answerText.trim() !== "";
+}
+
+/**
+ * Return whether Ask chrome should render the run-failure StatusBanner.
+ *
+ * Partial terminals and errors that already kept tokens use AnswerSurface
+ * only so the user sees exactly one alert.
+ *
+ * @param state - Current view.
+ * @returns True when a protocol/server failure has no kept answer.
+ */
+export function shouldShowChatFailureBanner(state: ChatViewState): boolean {
+  return state.failure !== null && !hasKeptAnswer(state);
+}
+
+/**
  * Apply one SSE frame. Unknown types are logged and skipped.
  *
  * @param state - Current view.
  * @param frame - Parsed SSE frame.
- * @returns Next view. Terminal frames freeze later token deltas.
+ * @returns Next view. The first terminal wins; later terminals and
+ *   token deltas are ignored.
  */
 export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewState {
   const payload = parseSsePayload(frame.data);
@@ -156,7 +179,7 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
     };
   }
 
-  if (state.terminal !== null && !isTerminalSseEvent(frame.event)) {
+  if (state.terminal !== null) {
     return { ...state, lastSequence };
   }
 
@@ -219,12 +242,17 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
     case "error":
     case "partial":
       next.terminal = frame.event;
-      if (frame.event === "error" || frame.event === "partial") {
+      if (frame.event === "partial") {
+        next.status = stringField(payload, "reason") ?? stringField(payload, "code");
+      }
+      if (frame.event === "error") {
         next.status = stringField(payload, "code") ?? stringField(payload, "reason");
-        next.failure = {
-          kind: "protocol",
-          detail: next.status ?? "run_error",
-        };
+        if (!hasKeptAnswer(state)) {
+          next.failure = {
+            kind: "protocol",
+            detail: next.status ?? "run_error",
+          };
+        }
       }
       if (frame.event === "completed") {
         const refusal = stringField(payload, "refusal");

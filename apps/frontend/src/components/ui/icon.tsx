@@ -22,6 +22,8 @@ import {
   Mail,
   Menu,
   MessageSquare,
+  PanelLeft,
+  PanelLeftClose,
   MoreHorizontal,
   Plus,
   Search,
@@ -64,7 +66,9 @@ export type IconName =
   | "chevron"
   | "more"
   | "logout"
-  | "command";
+  | "command"
+  | "panelExpand"
+  | "panelCollapse";
 
 export type IconProps = SVGProps<SVGSVGElement> & {
   /** Stable icon id from the typed set. */
@@ -100,6 +104,8 @@ const LUCIDE_BY_NAME: Record<Exclude<IconName, "google">, LucideIcon> = {
   more: MoreHorizontal,
   logout: LogOut,
   command: Command,
+  panelExpand: PanelLeft,
+  panelCollapse: PanelLeftClose,
 };
 
 /**

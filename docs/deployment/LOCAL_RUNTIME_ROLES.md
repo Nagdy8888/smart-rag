@@ -2,7 +2,7 @@
 title: Local runtime database roles
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering, ops
 ---
 
@@ -48,8 +48,9 @@ Run after `npx supabase db reset`. Do not commit the password. This is
 **not** a `supabase/migrations/` file so the CLI GRANT/NOLOGIN contract
 stays intact.
 
-`.\scripts\dev.ps1` and `.\scripts\reset.ps1 -ConfirmReset` run this
-script after Supabase is up so Compose is not left on a missing role.
+`.\scripts\ci\start_local_supabase_fixture.ps1` and
+`.\scripts\reset.ps1 -ConfirmReset` run this script after the local
+fixture is up. Daily `.\scripts\dev.ps1` does not start local Supabase.
 
 ```powershell
 uv run python scripts/ops/ensure_app_runtime_role.py
@@ -75,17 +76,15 @@ Reset drops this role. Re-run the script after every reset.
 
 | Variable | Service | Purpose |
 | --- | --- | --- |
-| `APP_RUNTIME_DB_PASSWORD` | api, worker | Password for `app_runtime` in the default DSN |
-| `API_SUPABASE_DB_URL` | api | Optional full DSN override (must still be non-superuser) |
-| `WORKER_SUPABASE_DB_URL` | worker | Optional full DSN override (must still be non-superuser) |
+| `API_SUPABASE_DB_URL` | api | Required hosted transaction-pooler DSN as `app_runtime` |
+| `WORKER_SUPABASE_DB_URL` | worker | Required hosted session/direct DSN as `app_runtime` |
+| `LANGGRAPH_CHECKPOINT_URL` | api, worker | Required hosted session/direct DSN |
+| `LIGHTRAG_DB_URL` | api, worker | Optional hosted session/direct DSN; unset keeps LightRAG idle |
 
-Default DSN (both services):
-
-`postgresql://app_runtime:${APP_RUNTIME_DB_PASSWORD}@host.docker.internal:54322/postgres`
-
-Do **not** set these to `postgresql://postgres:postgres@…`. Host pytest
-may still use the superuser DSN on the workstation; that DSN is for
-migration/reset tests, not Compose runtime.
+Compose fails closed if those required names are missing. Do **not** set
+them to `postgresql://postgres:postgres@…` or `host.docker.internal:54322`.
+Host pytest may still use the local fixture superuser DSN; that DSN is
+for destructive reset/RLS tests, not Compose runtime.
 
 ## Storage Admin is not on the worker PID
 
@@ -112,7 +111,7 @@ separate loader. Do not copy the secret back onto the worker service.
 
 | Case | Result |
 | --- | --- |
-| `APP_RUNTIME_DB_PASSWORD` unset and no DSN override | Compose interpolation fails before start |
+| Hosted DSN names unset | Compose interpolation fails before start |
 | Wrapper missing after `db reset` | Connect/auth fail; recreate `app_runtime` |
 | Superuser DSN copied from pytest `.env` | Forbidden; use `API_SUPABASE_DB_URL` / `WORKER_SUPABASE_DB_URL` instead of `SUPABASE_DB_URL` |
 | Storage Admin on worker env | Not present in Compose; keep it off that PID |

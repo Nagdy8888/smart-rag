@@ -98,6 +98,7 @@ def get_sse_stream_service(
     store = getattr(request.app.state, "run_event_store", None)
     if store is None:
         store = PostgresRunEventStore(postgres_url)
+        request.app.state.run_event_store = store
     executor = getattr(request.app.state, "query_run_executor", None)
     if executor is None:
         executor = default_executor_factory()

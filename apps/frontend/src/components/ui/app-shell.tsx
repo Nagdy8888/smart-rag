@@ -4,13 +4,23 @@
  * Navigation is not an authorization boundary. See `client-authorization.ts`.
  */
 
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
 import {
   CLIENT_NAV_IS_NOT_AUTHORIZATION,
   hiddenNavImpliesForbidden,
 } from "../../lib/client-authorization";
+import {
+  NAV_EXPANDED_STORAGE_KEY,
+  defaultNavExpanded,
+  readBooleanPreference,
+  writeBooleanPreference,
+} from "../../lib/layout-preferences";
 import { AppNav, ConsoleTopbar } from "./app-nav";
+import { Button } from "./button";
 import { Icon } from "./icon";
+import { Tooltip } from "./tooltip";
 import styles from "./app-shell.module.css";
 
 export type AppShellProps = {
@@ -21,13 +31,31 @@ export type AppShellProps = {
 /**
  * Render the light Precision Workspace chrome.
  *
- * @param props - Shell children. No fetch or auth side effects in this file.
+ * @param props - Shell children.
  * @returns Landmark structure with English LTR chrome.
  * @remarks
  * Security: omitting nav items does not imply HTTP 403.
- * `CLIENT_NAV_IS_NOT_AUTHORIZATION` is true. Errors: none. Idempotent render.
+ * `CLIENT_NAV_IS_NOT_AUTHORIZATION` is true. The desktop expand state is
+ * stored in localStorage. `data-expanded` may differ on hydrate.
  */
 export function AppShell({ children }: AppShellProps) {
+  const [navExpanded, setNavExpanded] = useState(() =>
+    readBooleanPreference(NAV_EXPANDED_STORAGE_KEY, defaultNavExpanded()),
+  );
+
+  /**
+   * Toggle the desktop console rail and persist the choice.
+   */
+  function toggleNavExpanded(): void {
+    setNavExpanded((current) => {
+      const next = !current;
+      writeBooleanPreference(NAV_EXPANDED_STORAGE_KEY, next);
+      return next;
+    });
+  }
+
+  const toggleLabel = navExpanded ? "Collapse navigation" : "Expand navigation";
+
   return (
     <div className={styles.shell}>
       <a className={styles.skipLink} href="#main" data-action-id="shell.skip">
@@ -38,6 +66,8 @@ export function AppShell({ children }: AppShellProps) {
           className={styles.nav}
           aria-label="Console"
           data-testid="app-shell-nav"
+          data-expanded={navExpanded ? "true" : "false"}
+          suppressHydrationWarning
         >
           <div className={styles.brand}>
             <span className={styles.brandMark} aria-hidden="true">
@@ -49,6 +79,20 @@ export function AppShell({ children }: AppShellProps) {
             </span>
           </div>
           <AppNav />
+          <Tooltip text={toggleLabel}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={styles.navToggle}
+              aria-label={toggleLabel}
+              aria-expanded={navExpanded}
+              data-action-id="shell.nav_toggle"
+              onClick={toggleNavExpanded}
+            >
+              <Icon name={navExpanded ? "panelCollapse" : "panelExpand"} />
+            </Button>
+          </Tooltip>
         </nav>
         <div className={styles.content}>
           <header className={styles.topbar}>

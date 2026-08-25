@@ -9,6 +9,7 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 #### `AppShell`
 
 - Desktop grid columns are `232px minmax(0, 1fr)`; collapsed mode is `72px minmax(0, 1fr)`.
+- At `>=1024px` a labeled “Collapse navigation” / “Expand navigation” control toggles those widths. The choice is stored in `localStorage`. Breakpoints remain the default before the first toggle.
 - Nav and topbar are white with border separators.
 - Main area uses canvas background and owns vertical scrolling.
 - Skip link is visually hidden until focused, then appears at top-left as a Primary-style link.
@@ -75,11 +76,38 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 
 #### Overall layout
 
-- Use available height below topbar: `min-height: calc(100dvh - 56px)`.
-- At `>=1280px`: 248px Sessions rail and `minmax(0, 1fr)` main workspace, 16px gap.
-- At `<1280px`: Sessions rail becomes a left Sheet opened by a “Sessions” Secondary button.
-- Main answer column max width is 880px and centered inside available space.
+- Use available height below topbar. The console shell is viewport-bounded (`100dvh`); non-Ask console pages still scroll inside `main`.
+- Ask fills the remaining height below the page header and banners. The Sessions list and the conversation body each own `overflow-y: auto`. The Sessions header (title, New, actions) and the composer stay outside those scrollports.
+- At `>=1280px`: 248px Sessions rail and `minmax(0, 1fr)` main workspace, 16px gap. A labeled “Collapse sessions” / “Expand sessions” control narrows the rail to 52px. The choice is stored in `localStorage`.
+- At `<1280px`: the desktop Sessions rail is omitted from the workspace grid. Sessions open in a left Sheet whose body remains the list scrollport. The conversation body still scrolls independently of the page.
+- The answer column and composer fill the remaining Ask width. Session titles come from the first question on `POST /conversations`. There is no title-update or LLM-title contract.
 - There is no permanent right sources/diagnostics column.
+
+```mermaid
+flowchart TB
+  subgraph shell [Console shell]
+    topbar[Topbar]
+    subgraph mainArea [main]
+      askHeader[Ask header]
+      subgraph workspace [Ask workspace]
+        subgraph sessionsRail [Sessions rail]
+          sessionsHeader[Sessions header]
+          sessionsList[Sessions list scroll]
+        end
+        subgraph answerColumn [Answer column]
+          stageHeader[Continue note]
+          conversation[Conversation scroll]
+          composer[Composer]
+        end
+      end
+    end
+  end
+  topbar --> mainArea
+  askHeader --> workspace
+  sessionsHeader --> sessionsList
+  stageHeader --> conversation
+  conversation --> composer
+```
 
 #### `SessionRail`
 

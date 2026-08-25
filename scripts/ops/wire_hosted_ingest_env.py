@@ -165,16 +165,31 @@ def main() -> int:
 
     compose_path = REPO_ROOT / ".env.compose"
     _upsert_env(compose_path, "SUPABASE_URL", supabase_url)
+    _upsert_env(compose_path, "NEXT_PUBLIC_SUPABASE_URL", supabase_url)
     _upsert_env(compose_path, "API_SUPABASE_DB_URL", api_dsn)
     _upsert_env(compose_path, "WORKER_SUPABASE_DB_URL", worker_dsn)
+    _upsert_env(compose_path, "LANGGRAPH_CHECKPOINT_URL", worker_dsn)
+    _upsert_env(compose_path, "LIGHTRAG_DB_URL", worker_dsn)
     _upsert_env(compose_path, "OPERATOR_SUPABASE_DB_URL", admin_dsn)
+    anon_key = (
+        local_env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+        or local_env.get("SUPABASE_ANON_KEY")
+        or compose_env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+        or ""
+    ).strip()
+    if anon_key:
+        _upsert_env(compose_path, "NEXT_PUBLIC_SUPABASE_ANON_KEY", anon_key)
     _upsert_env(compose_path, "APP_ENV", compose_env.get("APP_ENV", "local") or "local")
     _upsert_env(compose_path, "MOCK_MODEL_MODE", "false")
     _upsert_env(compose_path, "LANGSMITH_TRACING", "true")
     print("wrote=.env.compose")
     print("SUPABASE_URL=hosted")
+    print("NEXT_PUBLIC_SUPABASE_URL=hosted")
+    print("NEXT_PUBLIC_SUPABASE_ANON_KEY=" + ("present" if anon_key else "missing"))
     print("API_SUPABASE_DB_URL " + _classify(api_dsn))
     print("WORKER_SUPABASE_DB_URL " + _classify(worker_dsn))
+    print("LANGGRAPH_CHECKPOINT_URL " + _classify(worker_dsn))
+    print("LIGHTRAG_DB_URL " + _classify(worker_dsn))
     print("OPERATOR_SUPABASE_DB_URL user=postgres (operator only, not Compose)")
     return 0
 

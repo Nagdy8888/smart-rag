@@ -4,49 +4,49 @@ overview: Repair the broken production chat path first, then replace the over-ex
 todos:
   - id: p08-07-governance
     content: Record the approved remediation as canonical Phase 8 packets, create the feature branch, ADR, action inventory, and baseline evidence.
-    status: in_progress
+    status: completed
   - id: p08-08-runtime
     content: Repair LangGraph/LightRAG session DSN configuration, readiness semantics, clean Docker build inputs, and secret-safe deployment configuration.
-    status: pending
+    status: completed
   - id: p08-09-executor
     content: "Repair the Phase 6-owned executor contract: durable input, verified final answer SSE, one terminal, restart recovery, and reservation settlement."
-    status: pending
+    status: completed
   - id: p08-10-chat-protocol
     content: Harden frontend run/resume, readiness gating, idempotency, cancel, feedback, empty-completion, and visible error handling.
-    status: pending
+    status: completed
   - id: p08-11-remove-server-mfa
     content: Remove backend/database AAL2 enforcement additively while preserving roles, RLS, rate limits, revocation, audit, and compatibility.
-    status: pending
+    status: completed
   - id: p08-12-remove-frontend-mfa
     content: Remove frontend MFA/TOTP routes, helpers, states, tests, and provider configuration, then prove supported single-factor Auth.
-    status: pending
+    status: completed
   - id: p08-13-design-primitives
     content: Implement the exact theme tokens, typography, geometry, responsive foundation, and reusable UI primitives.
-    status: pending
+    status: completed
   - id: p08-14-shell
     content: Implement the streamlined role-aware shell, navigation, readiness, Account, command menu, redirects, and route removal.
-    status: pending
+    status: completed
   - id: p08-15-ask
     content: Rebuild Ask around verified final answer delivery, truthful sessions, sources, diagnostics, feedback, and accessible recovery.
-    status: pending
+    status: completed
   - id: p08-16-documents
     content: Unify document ingestion/status, add real deletion and frontend cursor pagination, and remove unsupported preview/gap UI.
-    status: pending
+    status: completed
   - id: p08-17-tables
     content: Rebuild deterministic table analysis, provenance, and document-context navigation while removing unwired Export UI.
-    status: pending
+    status: completed
   - id: p08-18-graph
     content: Rebuild bounded graph search, list, canvas, and evidence inspection while removing duplicate/unwired graph UI.
-    status: pending
+    status: completed
   - id: p08-19-admin
     content: Consolidate Team, Tools, Curation, Usage, and Account around real single-factor role-enforced contracts.
-    status: pending
+    status: completed
   - id: p08-20-quality
     content: Enforce action mapping, accessibility, responsive/bidi behavior, CSP/security, cleanup, and synchronized documentation.
-    status: pending
+    status: completed
   - id: p08-21-deterministic-verification
     content: Run all deterministic format, lint, type, unit, contract, docs, frontend, build, migration, and static security gates.
-    status: pending
+    status: completed
   - id: p08-22-live-verification
     content: Run clean Docker, local-stack, role Playwright, visual, reconnect, and bounded real-provider answer verification, then close evidence.
     status: pending
@@ -1115,7 +1115,7 @@ Implementation:
 
 - Preserve `SUPABASE_DB_URL` for short API transactions. Add explicit Compose injection for the already-defined `LANGGRAPH_CHECKPOINT_URL` and the existing `LIGHTRAG_DB_URL`; do not reuse a transaction-pooler DSN for long-lived LangGraph/LightRAG sessions.
 - Fail fast with a sanitized configuration error when a known transaction-pooler DSN is supplied to a session/direct-only integration. Do not “fix” this by disabling prepared statements and continuing on the wrong pool mode.
-- Keep local direct/session defaults compatible with the local Supabase port. Hosted values remain secret environment inputs; never commit hosts, usernames, passwords, or tokens.
+- Compose and startup fail closed without explicit hosted Auth/DSN values. Session/direct integrations never inherit a transaction-pooler URL. Hosted values remain secret environment inputs; never commit hosts, usernames, passwords, or tokens. Local Supabase ports remain fixture-only.
 - Add a bounded startup/readiness probe that opens the actual LangGraph saver/store connection, applies the correct role/schema, and closes cleanly. Readiness must distinguish core query availability from optional graph degradation.
 - `query_ready=true` when the core Hybrid query path, durable run store/checkpointer, and model gateway prerequisites are usable. Missing LightRAG may produce a typed degraded dependency and later Hybrid fallback; it must not falsely make all chat unusable if the approved Hybrid fallback is healthy.
 - Ensure frontend public configuration is passed explicitly at image build time. Add Docker build arguments for the public API base, Supabase URL, and publishable/anon key; runtime-only environment variables must not be assumed to rewrite already-built Next.js bundles.
@@ -1536,25 +1536,26 @@ Acceptance:
 
 ## Packet P08-22 — Run production-like stack, role, visual, and real-answer verification
 
-Purpose: prove the application works against the real local topology and one bounded provider call, with explicit prerequisites and no hidden “when available” pass.
+Purpose: prove the application works against hosted Supabase plus laptop Compose sidecars and one bounded provider call, with explicit prerequisites and no hidden “when available” pass.
 
 Prerequisites and stop conditions:
 
-- Required: Docker, repository-supported local Supabase/Compose tooling, sufficient disk/ports, approved synthetic fixtures, valid OpenAI credential, and available existing query budget.
-- Check prerequisites without printing credentials. If a credential, entitlement, Docker service, or budget is unavailable, record a blocked result and stop; P08-23 may not merge.
+- Required: Docker, hosted `smart-rag` Auth/Postgres values wired into ignored Compose env (transaction DSN for API SQL, session/direct DSN for worker/checkpoint/LightRAG), laptop ParadeDB/Valkey/crawl-proxy, sufficient disk/ports, approved synthetic fixtures, valid OpenAI credential, and available existing query budget.
+- Check prerequisites without printing credentials. If a credential, entitlement, Docker service, hosted project, or budget is unavailable, record a blocked result and stop; P08-23 may not merge.
 - This packet is expected to be long-running on Windows/PowerShell. Use repository commands and bounded health waits; do not replace checks with ad hoc shell behavior.
-- Never reset or destroy non-disposable data. Use only the repository’s isolated/disposable path when a reset is required.
+- Never reset or destroy hosted data. Local Supabase reset is a separately labelled destructive fixture only.
 
 Verification:
 
 - Build from a clean Docker context and prove no local `.env`, privileged key, token, `.next`, or host dependency entered an image layer.
-- Start local Supabase/Compose through repository scripts and health gates.
-- Prove live/meta/readiness, direct/session checkpoint/store connectivity, and optional graph degradation semantics.
+- Start laptop Compose through hosted-runtime scripts and health gates. Do not start local Supabase as the runtime target.
+- Prove live/meta/readiness, hosted JWKS, API SQL on the transaction pooler, checkpoint/store/LightRAG/worker on session mode, and optional graph degradation semantics.
 - Seed only approved synthetic users/documents for owner, admin, member, and viewer; never access the frozen holdout.
 - Run role-aware Playwright journeys for every retained route/action and capture intentional visual baselines at 390px and 1280px for the normative states.
 - Run one bounded real-provider browser query. It must show real Generating/Verifying progress, then a non-empty verified answer or grounded refusal, at least one durable compatibility `token_delta`, exactly one terminal, correct settlement, and citations when evidence exists.
+- Query hosted Supabase by `run_id` to prove conversation, user message, run, sequenced events, terminal, assistant message/refusal, citations when present, settlement, and checkpoints are durable there. Prove the same IDs are absent from local Supabase `:54322`.
 - Prove reconnect/resume with monotonic sequences and no duplicate provider call/cost. Test refresh, cancel, API/model/checkpoint error, BM25/graph degradation, 402, 403, 426, 429, and revoked session.
-- Tighten any test that treats generic `error` as a successful chat outcome.
+- Tighten any test that treats generic `error` as a successful chat outcome. User-visible chat alerts must not echo raw `run_failed`.
 
 Evidence closure:
 

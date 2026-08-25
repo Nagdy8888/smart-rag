@@ -44,8 +44,8 @@ Confirmed scope:
 - One company/team uses the application. Roles and ownership protect administration, mutations, private conversations, and runs. V1 LightRAG has one shared workspace, so only company-visible documents are graph-eligible; ACL-restricted documents remain available to authorized Hybrid searches but are never indexed into LightRAG.
 - Files: PDF, DOCX, PPTX, XLSX, CSV, HTML, Markdown, and text, including OCR for scanned PDFs.
 - V1 indexes text, OCR output, typed tables, and adjacent captions only. Answers whose material evidence exists only inside a figure, chart, diagram, or non-OCR image are a signed non-goal in [`docs/QUALITY_TARGETS.md`](../../../docs/QUALITY_TARGETS.md); the UI returns an explicit limitation notice instead of inventing an interpretation. [`docs/adr/ADR-vision-captioning.md`](../../../docs/adr/ADR-vision-captioning.md) records the evaluation/promotion trigger if the client later funds governed vision captioning.
-- The entire development and test stack runs on the developer machine with Docker: local Supabase, a private pinned ParadeDB/`pg_search` BM25 service, FastAPI, worker, separate Valkey limit/cache services, crawl proxy, and Next.js. LightRAG runs inside the backend/worker Python applications and stores its state in local Supabase. Development must not require AWS resources or AWS credentials.
-- Supabase provides canonical Auth, Postgres, Storage, RLS, pgvector/trigram/search-term indexes, private LightRAG PostgreSQL storage, conversation/application data, LangGraph checkpoints, durable BM25 outbox jobs, and all security state. A separate private ParadeDB service holds only a rebuildable BM25 projection keyed by canonical chunk/version IDs because managed Supabase does not expose the required `pg_search` extension. Development uses local Docker; isolated managed Supabase plus the same pinned private BM25 image are introduced during staging and production.
+- Daily runtime on the developer machine uses Docker sidecars only: private pinned ParadeDB/`pg_search`, FastAPI, worker, split Valkey, crawl proxy, and Next.js. Canonical Auth/Postgres/Storage, LightRAG tables, conversations, runs, citations, budgets, and LangGraph checkpoints persist to hosted Supabase project `smart-rag`. Local Docker Supabase is a labelled destructive-test fixture, not a runtime default. Development must not require AWS resources or AWS credentials.
+- Hosted Supabase provides canonical Auth, Postgres, Storage, RLS, pgvector/trigram/search-term indexes, private LightRAG PostgreSQL storage, conversation/application data, LangGraph checkpoints, durable BM25 outbox jobs, and all security state. A separate private ParadeDB service holds only a rebuildable BM25 projection keyed by canonical chunk/version IDs because managed Supabase does not expose the required `pg_search` extension. See [`docs/adr/ADR-hosted-runtime-local-test-fixture.md`](../../../docs/adr/ADR-hosted-runtime-local-test-fixture.md).
 - LightRAG is a replaceable graph engine behind an application-owned `GraphRetriever` interface. Use `PGTableGraphStorage`, not Apache AGE, so graph nodes/edges live in ordinary private Supabase PostgreSQL tables.
 - LangGraph orchestrates ingestion and query workflows; LangSmith handles tracing, prompt/evaluation workflows, and production feedback.
 - OpenAI supplies chat, extraction, accuracy-first bounded reranking with only a narrow trivial-lookup skip, and embedding models through one cost-controlled gateway.
@@ -121,45 +121,46 @@ The application does not fine-tune a model on company files. It stores/indexes f
 
 ## 2. Development and production architecture
 
-### Local Docker development
+### Laptop Compose plus hosted Supabase
 
 ```mermaid
 flowchart LR
     developer[DeveloperBrowser] --> frontendLocal[NextJsDocker]
-    frontendLocal -->|LocalAuth| supabaseLocal[LocalSupabaseDocker]
+    frontendLocal -->|HostedAuth| supabaseHosted[HostedSupabaseCanonical]
     frontendLocal -->|BearerJWTAndStream| apiLocal[FastAPIDocker]
-    apiLocal -->|CanonicalVectorTermAndAuthRecheck| supabaseLocal
+    apiLocal -->|CanonicalVectorTermAndAuthRecheck| supabaseHosted
     apiLocal -->|BM25Candidates| bm25Local[PrivateParadeDBDocker]
-    apiLocal -->|LightRAGContext| supabaseLocal
+    apiLocal -->|LightRAGContext| supabaseHosted
     apiLocal -->|RateLimits| valkeyLimitsLocal[ValkeyLimitsDocker]
     apiLocal -->|EphemeralCache| valkeyCacheLocal[ValkeyCacheDocker]
     apiLocal --> agentsLocal[LangGraphAgents]
-    workerLocal[WorkerDocker] --> supabaseLocal
+    workerLocal[WorkerDocker] --> supabaseHosted
     workerLocal -->|BM25ProjectionUpsertDelete| bm25Local
-    workerLocal -->|LightRAGIndexing| supabaseLocal
+    workerLocal -->|LightRAGIndexing| supabaseHosted
     workerLocal -->|ApprovedURLRequests| crawlProxyLocal[RestrictedCrawlProxyDocker]
     crawlProxyLocal --> publicWebLocal[PublicWeb]
     workerLocal --> openaiLocal[OpenAIExternal]
     agentsLocal --> openaiLocal
-    supabaseLocal --> inbucket[InbucketLocalMail]
+    fixtureLocal[LocalSupabaseTestFixture] -.->|"destructive CI only"| supabaseHosted
 ```
 
-Local development boundaries:
+Laptop runtime boundaries:
 
-- [`docker-compose.yml`](../../../docker-compose.yml) starts the backend, worker, a digest-pinned ParadeDB/`pg_search` service, separate Valkey rate-limit/cache instances, crawl-egress proxy, and frontend with health checks and hot-reload source mounts. The Supabase CLI starts local Postgres/pgvector, Auth, Storage, Studio, Inbucket, application migrations, private LightRAG tables, and durable BM25 projection jobs.
-- Local Supabase provides canonical Auth, Postgres/pgvector, Storage, RLS, LightRAG PostgreSQL storage, BM25 outbox state, and Inbucket email inspection. ParadeDB holds only the rebuildable lexical projection. No production Supabase project or SES account is required while developing.
+- [`docker-compose.yml`](../../../docker-compose.yml) starts the backend, worker, a digest-pinned ParadeDB/`pg_search` service, separate Valkey rate-limit/cache instances, crawl-egress proxy, and frontend. It fails closed unless hosted `SUPABASE_URL`, transaction/session DSNs, and browser-safe public keys are supplied. It does not start local Supabase.
+- Hosted Supabase is the only runtime Auth/Postgres/Storage target. API SQL may use the transaction pooler; worker, LangGraph checkpoint/store, and LightRAG require session/direct DSNs. ParadeDB remains a private derived BM25 index.
+- Local Docker Supabase is started only by explicitly test-named fixture/CI scripts for destructive reset, RLS, and schema-determinism work. Those suites refuse `*.supabase.co`.
 - ParadeDB and both Valkey instances remain on private Docker networks with distinct least-privilege credentials and hard memory limits; ParadeDB exposes no browser/public port, and LightRAG has no public server endpoint.
 - Local files use development-only values in ignored env files. OpenAI and optional LangSmith are the only external services needed for real-model development; tests default to mocks/frozen fixtures.
-- The same Docker images and migrations that pass locally are promoted later, avoiding a separate AWS-specific application implementation.
-- Windows development uses Docker Desktop's WSL2 backend. Minimum supported resources are 16 GB RAM, four CPU cores, and 40 GB free SSD; 32 GB RAM, eight cores, and 80 GB free are recommended for local Supabase, OCR, and Playwright together. If bind-mount/file-watch performance is poor, keep the repository in the WSL2 ext4 filesystem and run the helper scripts through WSL.
+- The same Docker images and migrations that pass on the laptop are promoted later, avoiding a separate AWS-specific application implementation.
+- Windows development uses Docker Desktop's WSL2 backend. Minimum supported resources are 16 GB RAM, four CPU cores, and 40 GB free SSD; 32 GB RAM, eight cores, and 80 GB free are recommended for ParadeDB, OCR, Playwright, and the optional local fixture together. If bind-mount/file-watch performance is poor, keep the repository in the WSL2 ext4 filesystem and run the helper scripts through WSL.
 
 Expected daily Windows/Docker Desktop workflow:
 
-1. Copy [`.env.example`](../../../.env.example) to an ignored local env file and add a development OpenAI key; LangSmith remains optional.
-2. Run a PowerShell helper such as [`scripts/dev.ps1`](../../../scripts/dev.ps1), which starts local Supabase and `docker compose up --build`.
-3. Open the frontend, FastAPI `/docs`, Supabase Studio, and Inbucket using the URLs printed by the startup script.
+1. Copy [`.env.hosted-ingest.example`](../../../.env.hosted-ingest.example) guidance into ignored `.env` / `.env.compose` and run [`scripts/ops/wire_hosted_ingest_env.py`](../../../scripts/ops/wire_hosted_ingest_env.py) so Compose receives hosted Auth plus separate transaction/session DSNs. Never commit values.
+2. Run [`scripts/dev.ps1`](../../../scripts/dev.ps1), which starts laptop Compose sidecars only. It must not start or reset local Supabase.
+3. Open the frontend and FastAPI `/docs` / `/health/live` using the URLs printed by the startup script. Inspect chat rows in hosted Studio, not local `:54322`.
 4. Use a mock-LLM profile for fast tests with no OpenAI cost, or the real-model profile for manual RAG evaluation.
-5. Run [`scripts/stop.ps1`](../../../scripts/stop.ps1) to stop containers without deleting persistent development volumes; a separate reset command intentionally clears local data.
+5. Run [`scripts/stop.ps1`](../../../scripts/stop.ps1) to stop Compose without touching the local test fixture. Destructive local reset remains [`scripts/reset.ps1`](../../../scripts/reset.ps1) `-ConfirmReset` plus the fixture starter.
 
 ### Final production target
 
@@ -213,7 +214,7 @@ The custom Hybrid RAG, derived BM25 projection, and LightRAG have different resp
 ## 16. Implementation sequence
 
 1. Foundation: initialize the repo, scaffold the Section 3 uv/pnpm workspace and import boundaries, configuration, WSL2/local Compose including private digest-pinned ParadeDB plus split Valkey/crawl proxy, document same-host TLS/licensing/availability decisions, tiered CI, C4 skeleton, risk register, and obtain sign-off on quality/cost/capacity/RTO/availability-trigger targets.
-2. Identity/data: local Supabase plus private ParadeDB bootstrap, migrations/outbox, per-deployable Supabase and BM25 roles, connection-budget/workload-isolation proof, asymmetric signing/JWKS rollover, Storage/Auth/upload-MFA/invitations/RLS/graph-eligibility, disjoint Arabic/mixed embedding bake-off plus model/dimension memory ADR, protected migration credentials, retention/audit-chain foundations, and Inbucket tests.
+2. Identity/data: hosted Supabase runtime plus private ParadeDB bootstrap, migrations/outbox, per-deployable Supabase and BM25 roles, connection-budget/workload-isolation proof, asymmetric signing/JWKS rollover, Storage/Auth/upload-MFA/invitations/RLS/graph-eligibility, disjoint Arabic/mixed embedding bake-off plus model/dimension memory ADR, protected migration credentials, retention/audit-chain foundations, and a local Supabase fixture for destructive RLS/reset tests.
 3. Core ingestion: leased queue, budget/backpressure, pinned ClamAV engine with fresh signatures, data-category gate, no-secret parser sandbox/accepted-risk ADR, approved crawl/egress boundary, typed element extraction, deterministic boilerplate cleaning, structure-aware 200–400-token passages/parents, exact/fuzzy deduplication, typed tables, embeddings, idempotent BM25 projection, checkpoints, deletion, and status APIs.
 4. Hybrid RAG: immutable held-out dataset; seeded SME glossary/codes/aliases; lightweight contextual vectors; versioned Arabic/mixed normalization plus private ParadeDB BM25 with 75 candidates; filtered-HNSW iterative scans with 100 dense candidates; 30 exact/trigram candidates; max-normalized query variants; RRF; bounded temporal multipliers; accuracy-first top-20 OpenAI reranking/counterfactuals; per-field profile and per-query-class tuning; calibrated coverage/refusal; structured tables; benchmarks; and citations.
 5. GraphRAG: pin LightRAG, single-writer indexing, precomputed profile keywords, internal-chunk/graph-object-to-canonical passage maps, entity curation, atomic version visibility, global steering, deletion/ACL cleanup, bounded inspection, and graph tests.

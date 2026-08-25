@@ -2211,3 +2211,72 @@ a PR but must not merge. Next owner: identify the 14 ms
 (first LangGraph `astream` tick), then repeat one bounded Ask query
 until Generating/Verifying, a verified answer or grounded refusal,
 `token_delta`, and one non-error terminal are durable on local `54322`.
+
+## P08-22 hosted-runtime amendment (2026-08-25)
+
+Historical evidence above used a local `54322` overlay and remains a
+test-fixture record. It is not the current operator path.
+
+Accepted ADR:
+[ADR-hosted-runtime-local-test-fixture.md](../adr/ADR-hosted-runtime-local-test-fixture.md).
+
+Binding contract language now requires hosted `smart-rag` for runtime
+Auth/Postgres/Storage. Local Supabase is a labelled destructive-test
+fixture only. P08-22 live proof is hosted Auth/Postgres plus laptop
+Compose sidecars. Chat rows must be durable on hosted Postgres and
+absent from local `:54322`.
+
+Implementation in this change:
+
+- Compose interpolation fails closed without hosted `SUPABASE_URL`,
+  `API_SUPABASE_DB_URL`, `WORKER_SUPABASE_DB_URL`,
+  `LANGGRAPH_CHECKPOINT_URL`, and frontend public Auth values.
+- `scripts/dev.ps1` no longer starts or resets local Supabase.
+- Query `astream` uses `AsyncPostgresSaver`; ingestion keeps the sync
+  saver.
+- Chat `run_failed` renders one generic alert plus at most one run
+  reference.
+
+Wrapper item 22 stays unchecked until the hosted browser proof below
+records live Generating/Verifying, a durable `token_delta`, exactly one
+terminal, hosted settlement, and absence of those IDs on local
+`:54322`.
+
+### Hosted proof actuals (2026-08-25)
+
+Hosted project `smart-rag` (`qsjivtwtmlmtksufqjik`) was missing
+`app.append_query_message` and `app.messages.run_id`. Applied existing
+repo migration `query_run_messages_runtime_v1` via Supabase MCP
+`apply_migration` (one apply, no parallel). `messages.run_id` and the
+four query-message RPCs are now present.
+
+Runtime topology (redacted): Auth `*.supabase.co`; API SQL transaction
+pooler `:6543`; worker/checkpoint/LightRAG session `:5432`.
+`GET /health/ready` 200 `query_ready=true`. Worker parser-sandbox
+restart is separate; chat runs in the API process.
+
+| Probe | Result |
+| --- | --- |
+| API admit `POST /messages` | 202; SSE 200 |
+| Hosted API run `ddefe043-eae1-46ef-9eb8-14c55e2246c2` | conversations=1 messages=2 (user+assistant) runs=1 status=`partial` events=22 `token_delta`=1 checkpoints=13 |
+| Hosted browser run `78f354b6-dd57-4ebf-b5ff-8b2b3dcfda8f` | status=`partial` `token_delta`=1 events include `token_delta,deadline,partial` |
+| Local `:54322` for both run IDs | conversations=0 messages=0 runs=0 events=0 checkpoints=0 |
+| Reservation | `remaining_usd` changed vs amount (true-up). `app.llm_usage` rows=0 |
+| Browser `http://127.0.0.1:3000` | Hosted password grant 200; Ask signed in; Service readiness Ready |
+| Live pipeline | `li[data-active="true"]` **Generating** observed. Stage `generate_answer / verified_partial`. Heartbeats 6. No user-visible `run_failed` |
+| Verifying `data-active` | **Not observed.** UI stayed on Generating through `verified_partial` |
+| Terminals | Protocol emits `deadline` then `partial` (mapper `_emit_verified`). Two catalog terminal types, one close sequence |
+
+Remaining P08-22 blocks (do not check wrapper item 22):
+
+1. Live Verifying `data-active="true"` was not captured.
+2. `app.llm_usage` settlement rows stay 0.
+3. UI `Terminal` can remain `running` after hosted `partial` is durable.
+4. Hosted schema still lacks later repo names
+   (`ingestion_status_acl_v1` through `lightrag_chunk_map_vendor_chunk_uq_v1`,
+   `remove_mfa_aal2_enforcement_v1`).
+
+Executor repairs proven on this path: async query checkpointer (13
+checkpoints), temporal `SET ROLE app_api` (hosted pooler cannot become
+`postgres`), idle context-loader for `retrieval_transaction`, generate
+timeout from run deadline not model-call count.

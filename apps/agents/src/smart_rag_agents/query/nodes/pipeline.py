@@ -853,7 +853,7 @@ def generate_answer_node(
                 query=str(state.get("user_query") or ""),
                 fusion=fusion,
                 tables=tables.records,
-                remaining=remaining,
+                context=context,
             )
 
         try:
@@ -972,7 +972,10 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         except ValueError:
             plan = None
     checked, failures = deterministic_check_answer(
-        payload, fusion=fusion, tables=tables.records
+        payload,
+        fusion=fusion,
+        tables=tables.records,
+        evidence_required=_route_needs_retrieval(plan),
     )
     remaining = state["remaining_model_calls"]
     verifier_calls = state.get("verifier_call_count") or 0
@@ -996,7 +999,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     links=links,
                     fusion=fusion,
                     tables=tables.records,
-                    remaining=remaining,
+                    context=_runtime(state),
                 )
 
             caller = _verifier_caller
@@ -1128,13 +1131,34 @@ def _tables_from_state(raw: object) -> TableComposition:
     return TableComposition.model_validate(raw)
 
 
+def _gateway_timeout_seconds(
+    context: AuthorizedRuntimeContext | None,
+) -> float:
+    """Bound one answer or verifier call to remaining run deadline seconds.
+
+    Model-call remaining counts are not seconds. Using them as the OpenAI
+    timeout fails closed on hosted live generate after retrieve.
+
+    Args:
+        context: Admitted run context, or None in isolated unit tests.
+
+    Returns:
+        Timeout seconds clipped to ``0.1``-``45``.
+    """
+
+    if context is None:
+        return 20.0
+    remaining = (context.deadline_at - datetime.now(UTC)).total_seconds()
+    return max(0.1, min(45.0, remaining))
+
+
 def _gateway_answer(
     deps: QueryGraphDeps,
     *,
     query: str,
     fusion: FusionResult,
     tables: tuple[object, ...],
-    remaining: int,
+    context: AuthorizedRuntimeContext | None,
 ) -> AnswerPayload:
     """Run one async gateway answer call from the sync graph.
 
@@ -1143,7 +1167,7 @@ def _gateway_answer(
         query: User query.
         fusion: Canonical evidence.
         tables: Table records.
-        remaining: Remaining model calls, unused except as a timeout proxy.
+        context: Admitted run context used for the live deadline timeout.
 
     Returns:
         Parsed answer payload.
@@ -1166,6 +1190,7 @@ def _gateway_answer(
         for item in tables
     )
     records = assemble_source_records(fusion, typed_tables)
+    timeout_seconds = _gateway_timeout_seconds(context)
     request = AnswerModelRequest(
         query=query or "query",
         prompt_version=ANSWER_PROMPT_VERSION,
@@ -1174,7 +1199,7 @@ def _gateway_answer(
         source_records=records or " ",
         chunk_ids=tuple(item.chunk_id for item in fusion.evidence),
         table_ids=tuple(item.table_id for item in typed_tables),
-        remaining_deadline_seconds=max(0.1, min(45.0, float(remaining or 1))),
+        remaining_deadline_seconds=timeout_seconds,
     )
     gateway = deps.model_gateway
     if gateway is None:
@@ -1197,7 +1222,7 @@ def _gateway_verifier(
     links: tuple[AtomicLink, ...],
     fusion: FusionResult,
     tables: tuple[object, ...],
-    remaining: int,
+    context: AuthorizedRuntimeContext | None,
 ) -> VerifierPayload:
     """Run one async gateway verifier call from the sync graph.
 
@@ -1206,7 +1231,7 @@ def _gateway_verifier(
         links: At most six atomic links.
         fusion: Canonical evidence.
         tables: Table records.
-        remaining: Remaining model calls, unused except as a timeout proxy.
+        context: Admitted run context used for the live deadline timeout.
 
     Returns:
         ``VerifierPayload``.
@@ -1229,6 +1254,7 @@ def _gateway_verifier(
         for item in tables
     )
     records = assemble_source_records(fusion, typed_tables)
+    timeout_seconds = _gateway_timeout_seconds(context)
     request = VerifierModelRequest(
         prompt_version=VERIFIER_PROMPT_VERSION,
         prompt_sha256=VERIFIER_PROMPT_SHA256,
@@ -1237,7 +1263,7 @@ def _gateway_verifier(
         links=tuple(
             cast(dict[str, object], item.model_dump(mode="json")) for item in links
         ),
-        remaining_deadline_seconds=max(0.1, min(45.0, float(remaining or 1))),
+        remaining_deadline_seconds=timeout_seconds,
     )
     gateway = deps.model_gateway
     if gateway is None:
@@ -1286,7 +1312,29 @@ def _run_coro(
     except RuntimeError:
         produced = factory()
         if asyncio.iscoroutine(produced):
-            return asyncio.run(produced)
+            async def _await_with_timeout() -> object:
+                """Await the worker coroutine within the configured deadline.
+
+                Returns:
+                    Gateway result produced before the timeout.
+
+                Raises:
+                    TimeoutError: When the gateway exceeds the bounded wait.
+                """
+
+                return await asyncio.wait_for(
+                    produced,
+                    timeout=max(0.1, timeout_seconds),
+                )
+
+            try:
+                return asyncio.run(_await_with_timeout())
+            except AnswerError:
+                raise
+            except TimeoutError as exc:
+                raise AnswerError("deadline_exhausted") from exc
+            except Exception as exc:
+                raise AnswerError("gateway_failed") from exc
         return produced
 
     if cancel_check is not None and cancel_check():

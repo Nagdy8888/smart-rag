@@ -38,6 +38,7 @@ from smart_rag_core.query_routing.preparation import (
     prepare_query,
 )
 from smart_rag_core.query_routing.serde import preparation_from_state
+from smart_rag_core.query_routing.signals import is_no_retrieval
 from smart_rag_core.retrieval.frozen_profile import (
     COVERAGE_SCORE_BASELINE,
     coverage_threshold_for,
@@ -326,6 +327,13 @@ def test_no_retrieval_forbids_company_claim() -> None:
         RetrievalPlan.model_validate(
             {**plan.model_dump(), "company_claim_forbidden": False}
         )
+
+
+def test_greeting_prefix_does_not_hide_company_question() -> None:
+    """A polite greeting prefix must not disable document retrieval."""
+
+    assert is_no_retrieval("Hi!") is True
+    assert is_no_retrieval("Hi, what is the documented refund policy?") is False
 
 
 def test_graph_only_is_inspection_not_answer() -> None:

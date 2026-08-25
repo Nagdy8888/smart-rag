@@ -8,6 +8,12 @@
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { conversationTitleFromPrompt } from "../../lib/conversation-title";
+import {
+  SESSIONS_EXPANDED_STORAGE_KEY,
+  readBooleanPreference,
+  writeBooleanPreference,
+} from "../../lib/layout-preferences";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { Button } from "../ui/button";
 import { Drawer } from "../ui/drawer";
@@ -43,6 +49,7 @@ import {
 import {
   applyAdmission,
   createChatViewState,
+  shouldShowChatFailureBanner,
   type ChatViewState,
 } from "../../lib/chat-view";
 import {
@@ -56,7 +63,11 @@ import {
   evaluatePaidHandshake,
   paidSendBlockReason,
 } from "../../lib/handshake";
-import { apiFailureBanner, GENERIC_PRODUCTION_ERROR } from "../../lib/failure-copy";
+import {
+  apiFailureBanner,
+  chatRunFailureBanner,
+  GENERIC_PRODUCTION_ERROR,
+} from "../../lib/failure-copy";
 import {
   isGraphOnlyInspectionRoute,
   limitationCopy,
@@ -71,7 +82,7 @@ import {
   shouldStopReconnect,
   waitForReconnectDelay,
 } from "../../lib/stream-reconnect";
-import { FEEDBACK_TAGS, type CitationResponse, type FeedbackTag } from "../../lib/types";
+import { FEEDBACK_TAGS, type CitationResponse, type ConversationResponse, type FeedbackTag } from "../../lib/types";
 import { AnswerSurface } from "./answer-surface";
 import { ChatComposer } from "./chat-composer";
 import { ChatWorkspace } from "./chat-workspace";
@@ -146,7 +157,9 @@ export function CitationDrawer({
 /**
  * Ask: sessions, composer, transcript, diagnostics, feedback.
  *
- * @returns Chat surface.
+ * @returns Chat surface. The Sessions list and conversation body scroll
+ *   independently; the Sessions header and composer stay pinned. New
+ *   sessions take their title from the first prompt.
  */
 export function ChatApp() {
   const queryClient = useQueryClient();
@@ -169,6 +182,9 @@ export function ChatApp() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [conversationsOpen, setSessionsOpen] = useState(false);
+  const [sessionsExpanded, setSessionsExpanded] = useState(() =>
+    readBooleanPreference(SESSIONS_EXPANDED_STORAGE_KEY, true),
+  );
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const sendLockRef = useRef(false);
@@ -225,13 +241,33 @@ export function ChatApp() {
     enabled: auth !== null && chat.runId !== null && chat.terminal !== null,
   });
 
-  const createMutation = useMutation({
-    mutationFn: () => createConversation(auth as ApiAuth, "Chat"),
-    onSuccess: (created) => {
-      setConversationId(created.conversation_id);
-      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
-    },
-  });
+  const resetClientChat = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    clearChatRunPointer();
+    sendLockRef.current = false;
+    idempotencyRef.current = newIdempotencyKey();
+    setConversationId(null);
+    setDraft("");
+    setChat(createChatViewState(idempotencyRef.current));
+    setFailure(null);
+    setLastUserMessage("");
+    setDisconnected(false);
+    setReconnectAttempt(0);
+    setReconnectExhausted(false);
+    setNextRetryMs(null);
+  }, []);
+
+  /**
+   * Toggle the desktop Sessions column and persist the choice.
+   */
+  function toggleSessionsExpanded(): void {
+    setSessionsExpanded((current) => {
+      const next = !current;
+      writeBooleanPreference(SESSIONS_EXPANDED_STORAGE_KEY, next);
+      return next;
+    });
+  }
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -242,9 +278,7 @@ export function ChatApp() {
     },
     onSuccess: (ok) => {
       if (ok) {
-        setConversationId(null);
-        idempotencyRef.current = newIdempotencyKey();
-        setChat(createChatViewState(idempotencyRef.current));
+        resetClientChat();
         void queryClient.invalidateQueries({ queryKey: ["conversations"] });
       }
     },
@@ -272,7 +306,10 @@ export function ChatApp() {
     let activeConversationId = conversationId;
     if (activeConversationId === null) {
       try {
-        const created = await createConversation(auth, "Chat");
+        const created = await createConversation(
+          auth,
+          conversationTitleFromPrompt(draft),
+        );
         activeConversationId = created.conversation_id;
         setConversationId(created.conversation_id);
         void queryClient.invalidateQueries({ queryKey: ["conversations"] });
@@ -284,6 +321,9 @@ export function ChatApp() {
     }
     setLastUserMessage(draft.trim());
     setDisconnected(false);
+    setReconnectAttempt(0);
+    setReconnectExhausted(false);
+    setNextRetryMs(null);
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -423,6 +463,9 @@ export function ChatApp() {
           latest = resumed;
           if (latest.terminal !== null) {
             setDisconnected(false);
+            setReconnectAttempt(0);
+            setReconnectExhausted(false);
+            setNextRetryMs(null);
             return;
           }
         } catch (error) {
@@ -472,11 +515,11 @@ export function ChatApp() {
     void (async () => {
       try {
         const conversation = await fetchConversation(auth, pointer.conversationId);
-        if (cancelled) {
+        if (cancelled || controller.signal.aborted) {
           return;
         }
         const run = await fetchRun(auth, pointer.runId);
-        if (cancelled) {
+        if (cancelled || controller.signal.aborted) {
           return;
         }
         if (run.conversation_id !== conversation.conversation_id) {
@@ -504,10 +547,10 @@ export function ChatApp() {
           void autoResumeRef.current?.(resumed, controller);
         }
       } catch (error) {
-        clearChatRunPointer();
-        if (cancelled) {
+        if (cancelled || controller.signal.aborted) {
           return;
         }
+        clearChatRunPointer();
         if (isClassifiedApiError(error)) {
           setFailure(error.failure);
         }
@@ -608,11 +651,12 @@ export function ChatApp() {
   const bm25Limitation =
     chat.diagnostics.limitationCodes.includes("bm25_unavailable");
 
+  const showChatFailureBanner = shouldShowChatFailureBanner(chat);
   const assertiveCopy = (() => {
     if (failure?.kind === "upgrade" || failure?.kind === "budget") {
       return apiFailureBanner(failure);
     }
-    if (chat.terminal === "error") {
+    if (showChatFailureBanner) {
       return GENERIC_PRODUCTION_ERROR;
     }
     return "";
@@ -667,34 +711,29 @@ export function ChatApp() {
   const citations = citationsQuery.data ?? [];
   const companyUsd = String(usageQuery.data?.cost_usd ?? "—");
 
-  const rail = (
-    <ConversationRail
-      conversations={conversationsQuery.data ?? []}
-      selectedId={conversationId}
-      loading={conversationsQuery.isPending}
-      onCreate={() => createMutation.mutate()}
-      onSelect={(item) => {
-        if (auth === null) {
-          return;
-        }
-        void fetchConversation(auth, item.conversation_id).then(
-          (confirmed) => {
-            setConversationId(confirmed.conversation_id);
-            idempotencyRef.current = newIdempotencyKey();
-            setChat(createChatViewState(idempotencyRef.current));
-            setFailure(null);
-            setLastUserMessage("");
-          },
-          (error: unknown) => {
-            if (isClassifiedApiError(error)) {
-              setFailure(error.failure);
-            }
-          },
-        );
-      }}
-      onDelete={() => deleteMutation.mutate()}
-    />
-  );
+  const railProps = {
+    conversations: conversationsQuery.data ?? [],
+    selectedId: conversationId,
+    loading: conversationsQuery.isPending,
+    onCreate: resetClientChat,
+    onSelect: (item: ConversationResponse) => {
+      if (auth === null) {
+        return;
+      }
+      resetClientChat();
+      void fetchConversation(auth, item.conversation_id).then(
+        (confirmed) => {
+          setConversationId(confirmed.conversation_id);
+        },
+        (error: unknown) => {
+          if (isClassifiedApiError(error)) {
+            setFailure(error.failure);
+          }
+        },
+      );
+    },
+    onDelete: () => deleteMutation.mutate(),
+  };
 
   const stage = (
     <section className={chatStyles.stage} aria-label="Answer">
@@ -722,68 +761,75 @@ export function ChatApp() {
           />
         </div>
       </div>
-      <RunProgress chat={chat} />
-      <AnswerSurface
-        question={lastUserMessage}
-        answer={chat.answerText}
-        citations={citations}
-        terminal={chat.terminal}
-        hrefForCitation={(citation) => citationChipHref(citation.provenance.url) ?? undefined}
-        onSelectCitation={(citation, trigger) => {
-          citationTriggerRef.current = trigger;
-          setSelectedCitation(citation);
-        }}
-      />
-      {isGraphOnlyInspectionRoute(
-        chat.diagnostics.effectiveRoute ?? chat.routeFamily,
-      ) ? (
-        <LimitationCallout tone="warning">
-          Graph-only inspection is not an answering mode. Final answers use
-          Hybrid evidence.
-        </LimitationCallout>
-      ) : null}
-      {chat.diagnostics.limitationCodes.map((code) => (
-        <LimitationCallout key={code} tone={limitationTone(code)}>
-          {limitationCopy(code)}
-        </LimitationCallout>
-      ))}
-      {paradeDbDown ? (
-        <LimitationCallout tone="warning">
-          {limitationCopy("bm25_unavailable")}
-        </LimitationCallout>
-      ) : null}
-      {paradeDbDown && bm25Limitation ? (
-        <p className={chatStyles.muted}>
-          Search is degraded. Keyword retrieval is not claimed healthy.
-        </p>
-      ) : null}
-      {lastUserMessage === "" && chat.answerText === "" ? (
-        <div className={chatStyles.emptyPrompts}>
-          {PROMPT_CHIPS.map((chip) => (
-            <Button
-              key={chip}
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setDraft(chip);
-              }}
-            >
-              {chip}
-            </Button>
-          ))}
-        </div>
-      ) : null}
-      {chat.terminal !== null && chat.answerText !== "" ? (
-      <FeedbackPopover
-        thumbsUp={thumbsUp}
-        onThumbs={setThumbsUp}
-        tag={feedbackTag}
-        onTag={setFeedbackTag}
-        comment={feedbackComment}
-        onComment={setFeedbackComment}
-        onSubmit={() => void sendFeedback()}
-      />
-      ) : null}
+      <div
+        className={chatStyles.conversation}
+        role="region"
+        aria-label="Conversation"
+        tabIndex={0}
+      >
+        <RunProgress chat={chat} />
+        <AnswerSurface
+          question={lastUserMessage}
+          answer={chat.answerText}
+          citations={citations}
+          terminal={chat.terminal}
+          hrefForCitation={(citation) => citationChipHref(citation.provenance.url) ?? undefined}
+          onSelectCitation={(citation, trigger) => {
+            citationTriggerRef.current = trigger;
+            setSelectedCitation(citation);
+          }}
+        />
+        {isGraphOnlyInspectionRoute(
+          chat.diagnostics.effectiveRoute ?? chat.routeFamily,
+        ) ? (
+          <LimitationCallout tone="warning">
+            Graph-only inspection is not an answering mode. Final answers use
+            Hybrid evidence.
+          </LimitationCallout>
+        ) : null}
+        {chat.diagnostics.limitationCodes.map((code) => (
+          <LimitationCallout key={code} tone={limitationTone(code)}>
+            {limitationCopy(code)}
+          </LimitationCallout>
+        ))}
+        {paradeDbDown ? (
+          <LimitationCallout tone="warning">
+            {limitationCopy("bm25_unavailable")}
+          </LimitationCallout>
+        ) : null}
+        {paradeDbDown && bm25Limitation ? (
+          <p className={chatStyles.muted}>
+            Search is degraded. Keyword retrieval is not claimed healthy.
+          </p>
+        ) : null}
+        {lastUserMessage === "" && chat.answerText === "" ? (
+          <div className={chatStyles.emptyPrompts}>
+            {PROMPT_CHIPS.map((chip) => (
+              <Button
+                key={chip}
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setDraft(chip);
+                }}
+              >
+                {chip}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+        {chat.terminal !== null && chat.answerText !== "" ? (
+          <FeedbackPopover
+            thumbsUp={thumbsUp}
+            onThumbs={setThumbsUp}
+            tag={feedbackTag}
+            onTag={setFeedbackTag}
+            comment={feedbackComment}
+            onComment={setFeedbackComment}
+            onSubmit={() => void sendFeedback()}
+          />
+        ) : null}
+      </div>
       <ChatComposer
         value={draft}
         onChange={setDraft}
@@ -824,11 +870,9 @@ export function ChatApp() {
         </StatusBanner>
       ) : null}
 
-      {chat.failure !== null ? (
+      {chat.failure !== null && showChatFailureBanner ? (
         <StatusBanner kind="error" role="alert">
-          {apiFailureBanner(chat.failure)}
-          {chat.runId ? ` Run ${chat.runId}.` : ""}
-          {chat.status ? ` (${chat.status})` : ""}
+          {chatRunFailureBanner(chat.failure, chat.runId)}
         </StatusBanner>
       ) : null}
 
@@ -871,13 +915,21 @@ export function ChatApp() {
       </div>
 
       <ChatWorkspace
-        rail={rail}
+        rail={
+          <ConversationRail
+            {...railProps}
+            expanded={sessionsExpanded}
+            onToggleExpanded={toggleSessionsExpanded}
+            showCollapseToggle
+          />
+        }
         stage={stage}
+        sessionsExpanded={sessionsExpanded}
       />
 
       {conversationsOpen ? (
         <Sheet title="Sessions" side="left" onClose={() => setSessionsOpen(false)}>
-          {rail}
+          <ConversationRail {...railProps} />
         </Sheet>
       ) : null}
 

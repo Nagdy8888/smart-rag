@@ -8,7 +8,7 @@ from smart_rag_core.evaluation.schema import QueryType
 from smart_rag_core.query_profile.extract import DeterministicExtract
 
 _GREETING = re.compile(
-    r"^(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening))\b",
+    r"^(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening))[!.,?]*$",
     re.IGNORECASE,
 )
 _PRODUCT_HELP = re.compile(
@@ -49,6 +49,36 @@ _LOW_CONF_REL = re.compile(
 _CAPTION_OCR = re.compile(r"\b(caption|ocr text|alt text)\b", re.IGNORECASE)
 
 
+def is_greeting(query: str) -> bool:
+    """Return whether the complete message is a conversational greeting.
+
+    A greeting prefix on a substantive company question is intentionally not a
+    match, so text such as ``"Hi, what is the refund policy?"`` still reaches
+    retrieval.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        True only when the complete trimmed message is a greeting or thanks.
+    """
+
+    return _GREETING.fullmatch(query.strip()) is not None
+
+
+def is_product_help(query: str) -> bool:
+    """Return whether the user asks what the product can do.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        True when the message requests product usage or capability help.
+    """
+
+    return _PRODUCT_HELP.search(query.strip()) is not None
+
+
 def is_no_retrieval(query: str) -> bool:
     """Return whether the query is greeting, product help, or user-text transform.
 
@@ -61,8 +91,8 @@ def is_no_retrieval(query: str) -> bool:
 
     stripped = query.strip()
     return (
-        _GREETING.search(stripped) is not None
-        or _PRODUCT_HELP.search(stripped) is not None
+        is_greeting(stripped)
+        or is_product_help(stripped)
         or _TRANSFORM.search(stripped) is not None
     )
 

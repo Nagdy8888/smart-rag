@@ -31,6 +31,40 @@ export type AnswerSurfaceProps = {
 };
 
 /**
+ * Return the answer-column terminal note, or null when chrome owns the alert.
+ *
+ * Empty `error` terminals omit the note so Ask shows one StatusBanner
+ * only. Kept tokens stay on this surface and never stack a second banner.
+ *
+ * @param terminal - Catalog terminal or null.
+ * @param answer - Tokens already shown.
+ * @returns One sentence, or null.
+ */
+export function answerTerminalNote(
+  terminal: string | null,
+  answer: string,
+): string | null {
+  if (terminal === "partial") {
+    return "Partial answer. Verified tokens are kept.";
+  }
+  if (terminal === "cancelled") {
+    return "Cancelled. Received tokens are kept.";
+  }
+  if (terminal === "deadline") {
+    return "Deadline reached. This run is not complete.";
+  }
+  if (terminal === "error") {
+    return answer.trim() === ""
+      ? null
+      : "The run ended in an error. Received tokens are kept.";
+  }
+  if (terminal) {
+    return "Answer ready.";
+  }
+  return null;
+}
+
+/**
  * Render the question block and editorial answer.
  *
  * @param props - Controlled transcript data.
@@ -44,6 +78,7 @@ export function AnswerSurface({
   onSelectCitation,
   terminal,
 }: AnswerSurfaceProps) {
+  const note = answerTerminalNote(terminal, answer);
   const terminalClass =
     terminal === "partial"
       ? styles.terminalPartial
@@ -98,18 +133,8 @@ export function AnswerSurface({
           ))}
         </ul>
       ) : null}
-      {terminal ? (
-        <p className={`${styles.terminalNote} ${terminalClass}`}>
-          {terminal === "partial"
-            ? "Partial answer. Verified tokens are kept."
-            : terminal === "cancelled"
-              ? "Cancelled. Received tokens are kept."
-              : terminal === "deadline"
-                ? "Deadline reached. This run is not complete."
-                : terminal === "error"
-                  ? "The run ended in an error. Received tokens are kept."
-                  : "Answer ready."}
-        </p>
+      {note !== null ? (
+        <p className={`${styles.terminalNote} ${terminalClass}`}>{note}</p>
       ) : null}
     </div>
   );

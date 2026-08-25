@@ -30,6 +30,7 @@ def configure_hosted_backend_env(
     """
 
     monkeypatch.setenv("APP_ENV", app_env)
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("MOCK_MODEL_MODE", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-unit-fixture-not-real")
     monkeypatch.setenv("VALKEY_LIMITS_URL", "redis://:unit@127.0.0.1:6379/0")
@@ -73,6 +74,30 @@ def test_backend_settings_load_documented_environment_aliases(
         settings.openai_api_key.get_secret_value() == "sk-this-value-must-remain-secret"
     )
     assert "sk-this-value" not in repr(settings)
+
+
+def test_local_backend_requires_explicit_supabase_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Laptop runtime fails closed when ``SUPABASE_URL`` is omitted."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    with pytest.raises(SettingsValidationError) as caught:
+        load_backend_settings()
+    assert "127.0.0.1" not in str(caught.value)
+    assert "supabase.co" not in str(caught.value)
+
+
+def test_test_env_injects_local_supabase_fixture_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``APP_ENV=test`` may omit ``SUPABASE_URL`` and uses the local fixture."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    settings = load_backend_settings()
+    assert str(settings.supabase_url).rstrip("/") == "http://127.0.0.1:54321"
 
 
 def test_wildcard_cors_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

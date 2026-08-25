@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from threading import Lock
+from threading import Lock, RLock
 from typing import NoReturn, Protocol
 from uuid import UUID
 
@@ -389,6 +391,53 @@ class PostgresRunEventStore:
         """
 
         self._postgres_url = postgres_url
+        self._connection: psycopg.Connection | None = None
+        self._connection_lock = RLock()
+
+    @contextmanager
+    def _transaction(self) -> Iterator[psycopg.Connection]:
+        """Yield one serialized transaction on a reusable database session.
+
+        Reusing the API session avoids a TLS and hosted-pooler handshake for
+        every SSE frame. Automatic prepared statements remain disabled because
+        the configured Supabase transaction pooler can switch server sessions.
+        The lock prevents concurrent executor, heartbeat, and replay operations
+        from sharing a Psycopg transaction.
+
+        Yields:
+            Open connection with ``app_api`` selected for this transaction.
+
+        Raises:
+            psycopg.Error: Connection, role, RPC, commit, or rollback failure.
+        """
+
+        with self._connection_lock:
+            if self._connection is None or self._connection.closed:
+                self._connection = psycopg.connect(
+                    self._postgres_url,
+                    prepare_threshold=None,
+                )
+            connection = self._connection
+            try:
+                connection.execute("SET ROLE app_api")
+                yield connection
+                connection.commit()
+            except BaseException:
+                connection.rollback()
+                raise
+
+    def close(self) -> None:
+        """Close the reusable database session.
+
+        Side Effects:
+            Waits for an active store transaction, then closes its connection.
+            Calling this method more than once is safe.
+        """
+
+        with self._connection_lock:
+            if self._connection is not None:
+                self._connection.close()
+                self._connection = None
 
     def register_run(
         self,
@@ -429,10 +478,8 @@ class PostgresRunEventStore:
 
         from smart_rag_core.query_admission.service import heartbeat_query_run
 
-        with psycopg.connect(self._postgres_url) as connection:
-            connection.execute("SET ROLE app_api")
+        with self._transaction() as connection:
             heartbeat_query_run(connection, caller=caller, run_id=run_id)
-            connection.commit()
 
     def get_authorized_run(
         self, caller: CallerContext, *, run_id: UUID
@@ -452,8 +499,7 @@ class PostgresRunEventStore:
 
         from smart_rag_core.query_admission.service import get_query_run
 
-        with psycopg.connect(self._postgres_url) as connection:
-            connection.execute("SET ROLE app_api")
+        with self._transaction() as connection:
             return get_query_run(connection, caller=caller, run_id=run_id)
 
     def append(
@@ -482,8 +528,7 @@ class PostgresRunEventStore:
 
         validated = validate_sse_payload(event_type, payload)
         try:
-            with psycopg.connect(self._postgres_url) as connection:
-                connection.execute("SET ROLE app_api")
+            with self._transaction() as connection:
                 row = connection.execute(
                     """
                     SELECT run_id, sequence, event_type, payload, created_at
@@ -500,7 +545,6 @@ class PostgresRunEventStore:
                         Json(validated),
                     ),
                 ).fetchone()
-                connection.commit()
         except psycopg.Error as exc:
             _raise_store_error(exc)
         if row is None:
@@ -531,8 +575,7 @@ class PostgresRunEventStore:
         """
 
         try:
-            with psycopg.connect(self._postgres_url) as connection:
-                connection.execute("SET ROLE app_api")
+            with self._transaction() as connection:
                 rows = connection.execute(
                     """
                     SELECT run_id, sequence, event_type, payload, created_at

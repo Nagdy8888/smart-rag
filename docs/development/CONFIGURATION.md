@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-25
 audience: developers, operators
 ---
 
@@ -83,13 +83,13 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | --- | --- | --- | --- |
 | `API_BIND_HOST` | non-empty string; `0.0.0.0` | public | Uvicorn bind address used only by the console entrypoint |
 | `API_BIND_PORT` | integer 1–65,535; `8000` | public | Uvicorn container port |
-| `SUPABASE_URL` | HTTP origin; `http://127.0.0.1:54321` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. See local `iss` aliases below. |
+| `SUPABASE_URL` | HTTP origin; required except `APP_ENV=test` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Runtime Compose requires a hosted origin. `APP_ENV=test` injects the local fixture origin when unset. See local `iss` aliases below. |
 | `SUPABASE_JWT_AUDIENCE` | non-empty string; `authenticated` | public | Required JWT `aud` claim |
 | `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
 | `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api`. Compose API/worker must not use the postgres superuser DSN; see `APP_RUNTIME_DB_PASSWORD`. May be a transaction pooler for short API work. |
 | `APP_RUNTIME_DB_PASSWORD` | secret; required for local Compose | secret | Password for LOGIN wrapper `app_runtime`. `app_api` is NOLOGIN. See [LOCAL_RUNTIME_ROLES.md](../deployment/LOCAL_RUNTIME_ROLES.md) |
-| `API_SUPABASE_DB_URL` | optional secret URL | secret | Compose API DSN override. Must be non-superuser |
-| `WORKER_SUPABASE_DB_URL` | optional secret URL | secret | Compose worker DSN override. Must be non-superuser |
+| `API_SUPABASE_DB_URL` | required secret URL for Compose | secret | Compose API transaction-pooler DSN as `app_runtime`. Interpolation fails closed if unset |
+| `WORKER_SUPABASE_DB_URL` | required secret URL for Compose | secret | Compose worker session/direct DSN as `app_runtime`. Interpolation fails closed if unset |
 | `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Session/direct checkpointer/store DSN. Falls back to `SUPABASE_DB_URL` only when that fallback is also session/direct. Port `6543` and `pgbouncer=true` fail closed. Role `app_checkpointer`, schema `langgraph`. Runtime never auto-migrates. |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Session/direct only. Unset = unconfigured. Never schema-admin. |
 | `CORS_ALLOW_ORIGINS` | comma-separated exact origins; `http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010` | public | Wildcards forbidden. Never pair `*` with credentials. `:3010` is the Playwright developer-console origin so tests do not reuse Compose `:3000` |
@@ -102,18 +102,20 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |
 | `RATE_LIMIT_RETRY_AFTER_SECONDS` | 1–3600; `60` | public | `Retry-After` on limiter 429/503 |
 
-Host `.env` sets `SUPABASE_URL=http://127.0.0.1:54321`. Compose API and worker
-interpolate `${SUPABASE_URL:-http://host.docker.internal:54321}` so a gitignored
-hosted-ingest env file can point JWKS at hosted Auth. The default remains
-local Docker GoTrue. When `APP_ENV=local` and `SUPABASE_URL` is one of
-those two local origins, FastAPI accepts `iss`
+Runtime Compose interpolates `${SUPABASE_URL:?set hosted SUPABASE_URL}`.
+There is no `host.docker.internal:54321` fallback. Wire hosted Auth with
+[`scripts/ops/wire_hosted_ingest_env.py`](../../scripts/ops/wire_hosted_ingest_env.py).
+`APP_ENV=test` may omit `SUPABASE_URL` and receives the local fixture
+origin. When `APP_ENV=local` and `SUPABASE_URL` is one of the two local
+fixture origins, FastAPI accepts `iss`
 `http://127.0.0.1:54321/auth/v1` or
 `http://host.docker.internal:54321/auth/v1`. Signature, `kid`, and `alg`
-still verify against the configured JWKS URL. Hosted demo ingest uses the
-hosted origin (no local `iss` alias). Staging and production never
+still verify against the configured JWKS URL. Hosted laptop runtime uses
+the hosted origin (no local `iss` alias). Staging and production never
 expand aliases. Do not mutate `GOTRUE_JWT_ISSUER` to paper over this split.
-See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md) and
-[demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md).
+See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md),
+[ADR-hosted-runtime-local-test-fixture.md](../adr/ADR-hosted-runtime-local-test-fixture.md),
+and [demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md).
 
 `X-Client-Version` is a request header, not an environment variable. New paid
 `POST /conversations/{conversation_id}/messages` must send a semver-like value

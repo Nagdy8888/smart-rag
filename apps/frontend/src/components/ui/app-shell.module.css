@@ -1,11 +1,14 @@
 /**
  * AppShell layout: 232px rail, 72px collapsed rail, 56px top bar, mobile sheet.
+ * The shell is viewport-bounded; `main` owns page scrolling for non-Ask routes.
  */
 
 .shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
@@ -34,7 +37,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 100vh;
+  min-height: 0;
 }
 
 .nav {
@@ -43,6 +46,12 @@
   background: var(--color-surface);
   border-inline-end: 1px solid var(--color-border);
   padding: calc(var(--space) * 4);
+}
+
+.navToggle {
+  display: none;
+  margin-top: auto;
+  align-self: flex-start;
 }
 
 .brand,
@@ -180,8 +189,10 @@
 .content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .topbar {
@@ -224,6 +235,11 @@
 .main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: calc(var(--space) * 4);
 }
 
@@ -259,6 +275,10 @@
     overflow: auto;
   }
 
+  .navToggle {
+    display: inline-flex;
+  }
+
   .menuButton,
   .menuButton,
   .topbarBrand,
@@ -274,6 +294,48 @@
   .profileLink {
     justify-content: center;
     padding-inline: 0;
+  }
+
+  .nav[data-expanded="true"] {
+    width: var(--nav-width);
+    flex: 0 0 var(--nav-width);
+  }
+
+  .nav[data-expanded="true"] .navLabel,
+  .nav[data-expanded="true"] .brandText,
+  .nav[data-expanded="true"] .navGroupLabel,
+  .nav[data-expanded="true"] .userEmail,
+  .nav[data-expanded="true"] .userMeta {
+    display: revert;
+  }
+
+  .nav[data-expanded="true"] .navRow a,
+  .nav[data-expanded="true"] .profileLink {
+    justify-content: flex-start;
+    padding-inline: calc(var(--space) * 3);
+  }
+
+  .nav[data-expanded="false"] {
+    width: var(--nav-width-collapsed);
+    flex: 0 0 var(--nav-width-collapsed);
+  }
+
+  .nav[data-expanded="false"] .navLabel,
+  .nav[data-expanded="false"] .brandText,
+  .nav[data-expanded="false"] .navGroupLabel,
+  .nav[data-expanded="false"] .userEmail,
+  .nav[data-expanded="false"] .userMeta {
+    display: none;
+  }
+
+  .nav[data-expanded="false"] .navRow a,
+  .nav[data-expanded="false"] .profileLink {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .nav[data-expanded="false"] .navToggle {
+    align-self: center;
   }
 }
 

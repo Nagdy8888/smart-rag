@@ -143,11 +143,12 @@ class LangGraphQueryRunExecutor:
         Side Effects:
             None at construction. First ``execute`` may open a Postgres pool
             and construct process Hybrid/gateway bindings.
-            ``PostgresSaver.setup()`` and ``PostgresStore.setup()`` are never
-            called.
+            ``PostgresSaver.setup()``, ``AsyncPostgresSaver.setup()``, and
+            ``PostgresStore.setup()`` are never called.
         """
 
         self._holder = None
+        self._async_holder = None
         self._store = None
         self._bindings = None
 
@@ -186,18 +187,17 @@ class LangGraphQueryRunExecutor:
             ``(store_get, store_put)`` callables, or ``(None, None)``.
 
         Side Effects:
-            Opens a checkpointer pool and memory store on first use.
+            Opens a memory store on first use. The async checkpointer is
+            opened separately.
         """
 
         resolved = getattr(settings, "resolved_checkpoint_dsn", None)
         dsn = resolved() if callable(resolved) else None
-        if dsn is None:
+        if not isinstance(dsn, str) or not dsn:
             return None, None
-        if self._holder is None:
-            from smart_rag_agents.query.checkpointer import open_query_checkpointer
+        if self._store is None:
             from smart_rag_agents.query.store import open_query_memory_store
 
-            self._holder = open_query_checkpointer(dsn)
             self._store = open_query_memory_store(dsn)
         memory_store = self._store
         if memory_store is None:
@@ -220,6 +220,32 @@ class LangGraphQueryRunExecutor:
 
         return memory_store.get_compact, _bind_put
 
+    async def _ensure_async_checkpointer(self, settings: object):
+        """Open the compact async query checkpointer once per process.
+
+        Args:
+            settings: Backend settings with the checkpoint DSN.
+
+        Returns:
+            ``CompactAsyncPostgresSaver`` or ``None`` when no DSN is
+            configured.
+
+        Side Effects:
+            Opens an async checkpointer pool on first use. Never calls
+            ``setup()``.
+        """
+
+        if self._async_holder is not None:
+            return self._async_holder.saver
+        resolved = getattr(settings, "resolved_checkpoint_dsn", None)
+        dsn = resolved() if callable(resolved) else None
+        if not isinstance(dsn, str) or not dsn:
+            return None
+        from smart_rag_agents.query.checkpointer import open_query_async_checkpointer
+
+        self._async_holder = await open_query_async_checkpointer(dsn)
+        return self._async_holder.saver
+
     async def execute(
         self,
         *,
@@ -236,7 +262,8 @@ class LangGraphQueryRunExecutor:
 
         Yields:
             Status events and at most one terminal. Retrieved source text is
-            never copied into payloads.
+            never copied into payloads. Summary or assistant persist after
+            ``completed``/``partial`` cannot replace that terminal.
 
         Raises:
             asyncio.CancelledError: When the wrapping task is cancelled.
@@ -299,7 +326,11 @@ class LangGraphQueryRunExecutor:
         try:
             bindings = self._process_bindings(settings)
             connection = open_run_app_api_connection(bindings.supabase_dsn)
-            store_get, store_put = self._bind_memory_store(settings)
+            store_binding = self._bind_memory_store(settings)
+            if inspect.isawaitable(store_binding):
+                store_get, store_put = await store_binding
+            else:
+                store_get, store_put = store_binding
             deps = build_query_graph_deps(
                 bindings=bindings,
                 connection=connection,
@@ -307,7 +338,7 @@ class LangGraphQueryRunExecutor:
                 store_get=store_get,
                 store_put=store_put,
             )
-            checkpointer = self._holder.saver if self._holder is not None else None
+            checkpointer = await self._ensure_async_checkpointer(settings)
             compiled = compile_query_graph(deps, checkpointer=checkpointer)
             state = pending_query_state(
                 authorized_runtime=context.model_dump(mode="json"),
@@ -330,6 +361,11 @@ class LangGraphQueryRunExecutor:
                 },
             )
             async for raw_chunk in stream_iter:
+                # A completed node may have consumed a reservation and written
+                # usage on this connection. Commit before the separate event
+                # store appends its status, otherwise both writers deadlock on
+                # the same run/reservation transaction.
+                connection.commit()
                 if cancel_event.is_set():
                     return
                 if isinstance(raw_chunk, dict):
@@ -345,25 +381,25 @@ class LangGraphQueryRunExecutor:
                     assert_catalog_event(event_type, payload)
                     yield (event_type, payload)
                     if event_type in {"completed", "partial", "error", "cancelled"}:
-                        if event_type != "error":
-                            self._maybe_summarize(
+                        if event_type in {"completed", "partial"}:
+                            self._commit_successful_terminal(
                                 context,
+                                mapper,
                                 remaining_model_calls=last_remaining_calls,
                                 terminal_status=last_status,
                             )
-                            self._persist_assistant_answer(context, mapper)
                         return
             if not cancel_event.is_set():
                 for event_type, payload in mapper.finish():
                     assert_catalog_event(event_type, payload)
+                    yield (event_type, payload)
                     if event_type in {"completed", "partial"}:
-                        self._maybe_summarize(
+                        self._commit_successful_terminal(
                             context,
+                            mapper,
                             remaining_model_calls=last_remaining_calls,
                             terminal_status=last_status,
                         )
-                        self._persist_assistant_answer(context, mapper)
-                    yield (event_type, payload)
         except QueryGraphRuntimeError as exc:
             yield ("error", {"code": exc.reason})
         finally:
@@ -374,6 +410,59 @@ class LangGraphQueryRunExecutor:
                 closed = close()
                 if inspect.isawaitable(closed):
                     await closed
+
+    def _commit_successful_terminal(
+        self,
+        context: AuthorizedRuntimeContext,
+        mapper: QuerySseMapper,
+        *,
+        remaining_model_calls: int,
+        terminal_status: str,
+    ) -> None:
+        """Write summary and assistant text after a non-error terminal.
+
+        The caller must already have yielded ``completed`` or ``partial``.
+        Persist failures stay off the SSE log so they cannot overwrite that
+        terminal with ``error``.
+
+        Args:
+            context: Authorized run context.
+            mapper: Mapper that emitted the verified terminal.
+            remaining_model_calls: Remaining counted calls after the graph.
+            terminal_status: Last node status.
+
+        Side Effects:
+            May consume ``usage_kind=summary`` and insert one assistant
+            ``app.messages`` row. Logs ``error_type`` only when a write
+            fails.
+        """
+
+        try:
+            self._maybe_summarize(
+                context,
+                remaining_model_calls=remaining_model_calls,
+                terminal_status=terminal_status,
+            )
+        except Exception as exc:
+            LOGGER.info(
+                "query summary skipped",
+                extra={
+                    "event": "query.sse.summary_failed",
+                    "error_type": type(exc).__name__,
+                    "run_id": str(context.run_id),
+                },
+            )
+        try:
+            self._persist_assistant_answer(context, mapper)
+        except Exception as exc:
+            LOGGER.info(
+                "assistant message persist skipped",
+                extra={
+                    "event": "query.sse.assistant_persist_failed",
+                    "error_type": type(exc).__name__,
+                    "run_id": str(context.run_id),
+                },
+            )
 
     def _maybe_summarize(
         self,

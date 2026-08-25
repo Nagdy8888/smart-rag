@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-25
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -33,7 +33,7 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 
 | Route | Surface |
 | --- | --- |
-| `/` | Ask workspace. Sessions rail, verified-final answers, citation drawers |
+| `/` | Ask workspace. Expandable Sessions rail, full-width answers, citation drawers |
 | `/documents` | Library, import/upload/crawl, keyset pagination, owner/admin delete |
 | `/documents/[documentId]` | Metadata, shared IngestionStatus timeline, graph seed, tables list |
 | `/graph` | Search → chips → Inspect graph; list-first plus optional React Flow |
@@ -89,6 +89,10 @@ flowchart TD
   Optional-tool export remains a chat-run disclosure concern, not this page.
 - Graph inspect has no edge list, so the canvas does not invent edges. Empty inspect copy is “No authorized graph evidence matched this inspection.”
 - Production UI never sends `X-Test-User-Id` or `X-Test-Role`.
+- Ask shows exactly one run-failure alert. `partial` stays on the answer
+  surface. `error` after tokens keeps the tokens and omits the generic
+  banner. `error` with no tokens shows one “Something went wrong”
+  reference and never echoes `run_failed`.
 
 ## Failure modes
 
@@ -106,6 +110,9 @@ flowchart TD
 | Empty inspect | No authorized graph evidence matched this inspection. |
 | Table unknown column / SQL | Rejected before POST; Analyze is not sent |
 | Table analyze 403/422/429 | Classified banner; draft and submitted plan stay |
+| Chat `partial` | Answer note only; no protocol-failure banner |
+| Chat `error` after tokens | One “tokens are kept” note; no stacked generic banner |
+| Chat `error` with no tokens | One “Something went wrong” banner plus run reference |
 
 ## Verification
 

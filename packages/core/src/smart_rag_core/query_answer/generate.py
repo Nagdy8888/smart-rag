@@ -19,6 +19,7 @@ from smart_rag_core.query_answer.models import (
 from smart_rag_core.query_answer.versions import MAX_ANSWER_GENERATIONS
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.models import TableEvidenceRecord
+from smart_rag_core.query_routing.signals import is_greeting, is_product_help
 
 AnswerCaller = Callable[
     [str, FusionResult, tuple[TableEvidenceRecord, ...]], AnswerPayload
@@ -35,7 +36,7 @@ def generate_answer(
     company_claim_forbidden: bool,
     graph_as_answer_forbidden: bool,
 ) -> AnswerPayload:
-    """Generate exactly one answer from canonical evidence.
+    """Generate one evidence answer or a safe no-retrieval chat response.
 
     Args:
         fusion: Combined or Hybrid-effective evidence.
@@ -43,15 +44,17 @@ def generate_answer(
         user_query: Original user text. Untrusted.
         caller: Structured answer adapter. None uses the extractive mock.
         already_generated: Existing answer count. A second call fails.
-        company_claim_forbidden: True for NoRetrieval.
+        company_claim_forbidden: True for NoRetrieval. Greetings and product
+            help receive deterministic non-company responses; other requests
+            are refused.
         graph_as_answer_forbidden: True for graph-only inspection.
 
     Returns:
-        Structured answer citing only supplied IDs.
+        Structured answer citing only supplied IDs, or an uncited
+        non-company response for supported NoRetrieval chat intents.
 
     Raises:
-        AnswerError: Second answer generation, graph-only answering, or
-            company claims on NoRetrieval.
+        AnswerError: A second answer generation was requested.
     """
 
     if already_generated >= MAX_ANSWER_GENERATIONS:
@@ -62,6 +65,22 @@ def generate_answer(
             status="refused",
         )
     if company_claim_forbidden:
+        if is_greeting(user_query):
+            return AnswerPayload(
+                answer_text=(
+                    "Hi! I'm ready to help. Ask me a question about your uploaded "
+                    "documents, and I'll answer from the authorized evidence."
+                ),
+                status="complete",
+            )
+        if is_product_help(user_query):
+            return AnswerPayload(
+                answer_text=(
+                    "I can answer questions about your authorized documents, "
+                    "compare documented facts, and show the supporting sources."
+                ),
+                status="complete",
+            )
         return AnswerPayload(
             answer_text="No company-knowledge claim is authorized for this query.",
             status="refused",

@@ -16,7 +16,7 @@ P08-21 deterministic gates passed. Docker and credentials are checked without pr
 
 ## Allowed outputs
 
-Clean Docker build, local stack health, role Playwright, visual baselines, one bounded real-provider answer, reconnect/settlement proof, evidence closure.
+Clean Docker build, hosted-Supabase plus laptop-sidecar health, role Playwright, visual baselines, one bounded real-provider answer persisted on hosted Postgres, reconnect/settlement proof, evidence closure.
 
 ## Forbidden outputs
 
@@ -28,25 +28,26 @@ Implement the following packet body from the approved overhaul plan. Do not summ
 
 ## Packet P08-22 — Run production-like stack, role, visual, and real-answer verification
 
-Purpose: prove the application works against the real local topology and one bounded provider call, with explicit prerequisites and no hidden “when available” pass.
+Purpose: prove the application works against hosted Supabase plus laptop Compose sidecars and one bounded provider call, with explicit prerequisites and no hidden “when available” pass.
 
 Prerequisites and stop conditions:
 
-- Required: Docker, repository-supported local Supabase/Compose tooling, sufficient disk/ports, approved synthetic fixtures, valid OpenAI credential, and available existing query budget.
-- Check prerequisites without printing credentials. If a credential, entitlement, Docker service, or budget is unavailable, record a blocked result and stop; P08-23 may not merge.
+- Required: Docker, hosted `smart-rag` Auth/Postgres values wired into ignored Compose env (transaction DSN for API SQL, session/direct DSN for worker/checkpoint/LightRAG), laptop ParadeDB/Valkey/crawl-proxy, sufficient disk/ports, approved synthetic fixtures, valid OpenAI credential, and available existing query budget.
+- Check prerequisites without printing credentials. If a credential, entitlement, Docker service, hosted project, or budget is unavailable, record a blocked result and stop; P08-23 may not merge.
 - This packet is expected to be long-running on Windows/PowerShell. Use repository commands and bounded health waits; do not replace checks with ad hoc shell behavior.
-- Never reset or destroy non-disposable data. Use only the repository’s isolated/disposable path when a reset is required.
+- Never reset or destroy hosted data. Local Supabase reset is a separately labelled destructive fixture only.
 
 Verification:
 
 - Build from a clean Docker context and prove no local `.env`, privileged key, token, `.next`, or host dependency entered an image layer.
-- Start local Supabase/Compose through repository scripts and health gates.
-- Prove live/meta/readiness, direct/session checkpoint/store connectivity, and optional graph degradation semantics.
+- Start laptop Compose through hosted-runtime scripts and health gates. Do not start local Supabase as the runtime target.
+- Prove live/meta/readiness, hosted JWKS, API SQL on the transaction pooler, checkpoint/store/LightRAG/worker on session mode, and optional graph degradation semantics.
 - Seed only approved synthetic users/documents for owner, admin, member, and viewer; never access the frozen holdout.
 - Run role-aware Playwright journeys for every retained route/action and capture intentional visual baselines at 390px and 1280px for the normative states.
 - Run one bounded real-provider browser query. It must show real Generating/Verifying progress, then a non-empty verified answer or grounded refusal, at least one durable compatibility `token_delta`, exactly one terminal, correct settlement, and citations when evidence exists.
+- Query hosted Supabase by `run_id` to prove conversation, user message, run, sequenced events, terminal, assistant message/refusal, citations when present, settlement, and checkpoints are durable there. Prove the same IDs are absent from local Supabase `:54322`.
 - Prove reconnect/resume with monotonic sequences and no duplicate provider call/cost. Test refresh, cancel, API/model/checkpoint error, BM25/graph degradation, 402, 403, 426, 429, and revoked session.
-- Tighten any test that treats generic `error` as a successful chat outcome.
+- Tighten any test that treats generic `error` as a successful chat outcome. User-visible chat alerts must not echo raw `run_failed`.
 
 Evidence closure:
 

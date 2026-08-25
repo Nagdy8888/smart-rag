@@ -25,6 +25,10 @@ const shell = readFileSync(
   path.join(here, "../components/ui/app-shell.module.css"),
   "utf8",
 );
+const chat = readFileSync(
+  path.join(here, "../components/chat/chat.module.css"),
+  "utf8",
+);
 
 describe("primitive geometry source lock", () => {
   it("keeps 40px controls, 8px control radius, 12px cards, 48px rows, and 2px/2px focus", () => {
@@ -67,5 +71,18 @@ describe("primitive geometry source lock", () => {
     expect(ui).not.toMatch(/#4E5BD5/i);
     expect(ui).not.toMatch(/#F4F6F8/i);
     expect(ui.split(".srOnly {").length).toBe(2);
+  });
+});
+
+describe("Ask independent scroll source lock", () => {
+  it("bounds the shell and splits Sessions list from conversation overflow", () => {
+    expect(shell).toMatch(/\.shell\s*\{[\s\S]*?height:\s*100dvh/);
+    expect(shell).toMatch(/\.main\s*\{[\s\S]*?overflow-y:\s*auto/);
+    expect(chat).toMatch(/\.page\s*\{[\s\S]*?overflow:\s*hidden/);
+    expect(chat).toMatch(/\.railList\s*\{[\s\S]*?overflow-y:\s*auto/);
+    expect(chat).toMatch(/\.conversation\s*\{[\s\S]*?overflow-y:\s*auto/);
+    expect(chat).toMatch(/\.composer\s*\{[\s\S]*?flex-shrink:\s*0/);
+    expect(chat).not.toMatch(/\.answer\s*\{[\s\S]*?overflow:\s*auto/);
+    expect(chat).not.toMatch(/\.stage\s*\{[\s\S]*?max-width:\s*880px/);
   });
 });

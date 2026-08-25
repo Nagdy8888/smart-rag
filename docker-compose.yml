@@ -170,12 +170,13 @@ services:
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-smart-rag}
-      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
+      # Hosted Auth JWKS origin. No local Docker GoTrue fallback.
+      SUPABASE_URL: ${SUPABASE_URL:?set hosted SUPABASE_URL}
       # app_api is NOLOGIN. Use LOGIN wrapper app_runtime (SET ROLE app_api).
-      # Never postgresql://postgres:postgres. See docs/deployment/LOCAL_RUNTIME_ROLES.md.
-      SUPABASE_DB_URL: "${API_SUPABASE_DB_URL:-postgresql://app_runtime:${APP_RUNTIME_DB_PASSWORD:?set APP_RUNTIME_DB_PASSWORD}@host.docker.internal:54322/postgres}"
-      # Session/direct only (local 54322). Never transaction pooler port 6543.
-      LANGGRAPH_CHECKPOINT_URL: "${LANGGRAPH_CHECKPOINT_URL:-postgresql://app_runtime:${APP_RUNTIME_DB_PASSWORD:?set APP_RUNTIME_DB_PASSWORD}@host.docker.internal:54322/postgres}"
+      # Transaction pooler is allowed for short API SQL. Never postgres superuser.
+      SUPABASE_DB_URL: "${API_SUPABASE_DB_URL:?set API_SUPABASE_DB_URL}"
+      # Session/direct only. Never transaction pooler port 6543.
+      LANGGRAPH_CHECKPOINT_URL: "${LANGGRAPH_CHECKPOINT_URL:?set LANGGRAPH_CHECKPOINT_URL}"
       LIGHTRAG_DB_URL: "${LIGHTRAG_DB_URL:-}"
       CORS_ALLOW_ORIGINS: http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010
       VALKEY_LIMITS_URL: redis://:${VALKEY_LIMITS_PASSWORD}@valkey-limits:6379/0
@@ -228,8 +229,8 @@ services:
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-smart-rag}
       # app_worker is NOLOGIN. Same LOGIN wrapper; runtime SET ROLE app_worker.
       # Do not reuse host pytest SUPABASE_DB_URL when that DSN is postgres superuser.
-      SUPABASE_DB_URL: "${WORKER_SUPABASE_DB_URL:-postgresql://app_runtime:${APP_RUNTIME_DB_PASSWORD:?set APP_RUNTIME_DB_PASSWORD}@host.docker.internal:54322/postgres}"
-      LANGGRAPH_CHECKPOINT_URL: "${LANGGRAPH_CHECKPOINT_URL:-postgresql://app_runtime:${APP_RUNTIME_DB_PASSWORD:?set APP_RUNTIME_DB_PASSWORD}@host.docker.internal:54322/postgres}"
+      SUPABASE_DB_URL: "${WORKER_SUPABASE_DB_URL:?set WORKER_SUPABASE_DB_URL}"
+      LANGGRAPH_CHECKPOINT_URL: "${LANGGRAPH_CHECKPOINT_URL:?set LANGGRAPH_CHECKPOINT_URL}"
       LIGHTRAG_DB_URL: "${LIGHTRAG_DB_URL:-}"
       WORKER_INSTANCE_ID: ${WORKER_INSTANCE_ID:-worker-local}
       JOB_LEASE_SECONDS: ${JOB_LEASE_SECONDS:-300}
@@ -241,7 +242,7 @@ services:
       VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
       PARADEDB_URL: postgresql://${PARADEDB_WRITER_USER:-paradedb_writer}:${PARADEDB_WRITER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
       CRAWL_PROXY_URL: http://crawl-proxy:8080
-      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
+      SUPABASE_URL: ${SUPABASE_URL:?set hosted SUPABASE_URL}
       # Storage Admin must not live on this PID. Local scan/promote uses
       # scripts/ops/_run_scan_node.py with SUPABASE_STORAGE_ADMIN_SECRET in
       # that process only (no scan-promote sidecar in this Compose file).
@@ -281,8 +282,8 @@ services:
       dockerfile: apps/frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:${API_HOST_PORT:-8000}
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://127.0.0.1:54321}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?set NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?set NEXT_PUBLIC_SUPABASE_ANON_KEY}
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:${API_HOST_PORT:-8000}

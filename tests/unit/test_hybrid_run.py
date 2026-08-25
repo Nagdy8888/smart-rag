@@ -739,6 +739,83 @@ def test_channel_supabase_opens_dedicated_connection_from_full_dsn(
     assert closed == [1]
 
 
+def test_load_temporal_records_uses_app_api_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Hosted pooler logins cannot become postgres; temporal reads use app_api."""
+
+    roles: list[str] = []
+    version_id = uuid4()
+
+    class _Cursor:
+        """Return one version row then close."""
+
+        def __enter__(self) -> _Cursor:
+            """Open the cursor."""
+
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            """Close the cursor."""
+
+            return None
+
+        def execute(self, _sql: str, _params: object) -> None:
+            """Ignore the SELECT."""
+
+            return None
+
+        def fetchall(self) -> list[tuple[UUID, None]]:
+            """Return one undated version."""
+
+            return [(version_id, None)]
+
+    class _Conn:
+        """Record SET ROLE and yield a cursor."""
+
+        def execute(self, sql: str) -> None:
+            """Record the role statement.
+
+            Args:
+                sql: Executed SQL. Never logged by callers.
+            """
+
+            roles.append(sql)
+
+        def cursor(self) -> _Cursor:
+            """Return the stub cursor."""
+
+            return _Cursor()
+
+        def close(self) -> None:
+            """No-op close."""
+
+            return None
+
+    def _connect(_dsn: str, **_kwargs: object) -> _Conn:
+        """Return the stub connection."""
+
+        return _Conn()
+
+    monkeypatch.setattr(
+        "smart_rag_core.retrieval.hybrid_run.psycopg.connect",
+        _connect,
+    )
+    retriever = HybridRetriever(
+        embedding_gateway=EmbeddingGateway(
+            MockEmbeddingAdapter(fixture_id="hybrid-run-temporal")
+        ),
+        supabase_dsn="postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    )
+    loader = module_attr(retriever, "_load_temporal_records")
+    if not callable(loader):
+        raise TypeError("HybridRetriever._load_temporal_records must be callable")
+    records = loader((_candidate(version_id=version_id),))
+    assert roles == ["SET ROLE app_api"]
+    assert "SET ROLE postgres" not in roles
+    assert len(records) == 1
+
+
 def test_locators_from_provenance_round_trip_sheet_and_url() -> None:
     """Sheet, range, and URL are parsed from locator_to_dict provenance."""
 

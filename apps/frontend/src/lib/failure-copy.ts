@@ -50,9 +50,13 @@ export function apiFailureBanner(failure: ApiFailure): string {
     case "validation":
       return `Request invalid (${displayText(failure.detail)}).`;
     case "protocol":
-      return failure.detail === "empty_answer"
-        ? "The run completed without an answer."
-        : `Run error (${displayText(failure.detail)}).`;
+      if (failure.detail === "empty_answer") {
+        return "The run completed without an answer.";
+      }
+      if (failure.detail === "run_failed") {
+        return GENERIC_PRODUCTION_ERROR;
+      }
+      return `Run error (${displayText(failure.detail)}).`;
     case "server":
       return GENERIC_PRODUCTION_ERROR;
     default: {
@@ -85,4 +89,23 @@ export function mutationFailureBanner(error: Error): string {
     default:
       return GENERIC_PRODUCTION_ERROR;
   }
+}
+
+/**
+ * Render one chat-run alert. The run ID appears at most once as a support
+ * reference. Internal status codes such as `run_failed` stay out of chrome.
+ *
+ * @param failure - Classified chat failure.
+ * @param runId - Durable run identifier, or null.
+ * @returns Single banner body.
+ */
+export function chatRunFailureBanner(
+  failure: ApiFailure,
+  runId: string | null,
+): string {
+  const body = apiFailureBanner(failure);
+  if (runId === null || runId === "") {
+    return body;
+  }
+  return `${body} Reference ${runId}.`;
 }

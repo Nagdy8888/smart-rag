@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import psycopg
 from schema_fingerprint import (
@@ -34,6 +35,22 @@ GENERATED_TYPES = (
 )
 LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 TYPE_SCHEMAS = "app,public,storage,auth"
+
+
+def _refuse_hosted_destructive_dsn(url: str) -> None:
+    """Refuse destructive resets against hosted Supabase.
+
+    Args:
+        url: Candidate Postgres DSN. Never logged.
+
+    Raises:
+        RuntimeError: If the host is hosted Supabase. The message never
+            includes the DSN.
+    """
+
+    host = (urlparse(url).hostname or "").casefold()
+    if host.endswith(".supabase.co") or host.endswith("pooler.supabase.com"):
+        raise RuntimeError("destructive_tests_refuse_hosted_supabase")
 
 
 def _required_executable(name: str) -> str:
@@ -246,6 +263,7 @@ def main() -> int:
     """
 
     try:
+        _refuse_hosted_destructive_dsn(LOCAL_DB_URL)
         pnpm = _required_executable("pnpm")
         pytest = _required_executable("pytest")
         committed_types = normalize_generated_types(

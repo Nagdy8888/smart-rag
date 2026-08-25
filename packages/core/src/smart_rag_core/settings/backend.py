@@ -49,8 +49,11 @@ class BackendSettings(SharedSettings):
         bind_port: HTTP bind port from ``API_BIND_PORT``. Public, default
             ``8000``.
         supabase_url: Supabase project URL from ``SUPABASE_URL``. Public.
-            JWKS fetch uses this origin. Local ``APP_ENV`` may accept the
-            documented ``127.0.0.1`` / ``host.docker.internal`` ``iss`` pair.
+            JWKS fetch uses this origin. Required for ``local``, ``staging``,
+            and ``production``. ``APP_ENV=test`` injects the local fixture
+            origin when unset. Local ``APP_ENV`` may accept the documented
+            ``127.0.0.1`` / ``host.docker.internal`` ``iss`` pair only when
+            that origin is supplied explicitly.
         supabase_jwt_audience: Required JWT audience from
             ``SUPABASE_JWT_AUDIENCE``. Default ``authenticated``.
         jwks_cache_seconds: JWKS cache TTL from ``JWKS_CACHE_SECONDS``; max
@@ -102,13 +105,14 @@ class BackendSettings(SharedSettings):
         description="Backend HTTP bind port.",
         json_schema_extra={"security": "public"},
     )
-    supabase_url: AnyHttpUrl = Field(
-        default=AnyHttpUrl("http://127.0.0.1:54321"),
+    supabase_url: AnyHttpUrl | None = Field(
+        default=None,
         validation_alias="SUPABASE_URL",
         description=(
-            "Supabase project URL for JWKS discovery. When APP_ENV=local and "
-            "the origin is 127.0.0.1:54321 or host.docker.internal:54321, "
-            "iss may use either hostname."
+            "Supabase project URL for JWKS discovery. Required except "
+            "APP_ENV=test, which injects the local fixture origin. When "
+            "APP_ENV=local and the origin is 127.0.0.1:54321 or "
+            "host.docker.internal:54321, iss may use either hostname."
         ),
         json_schema_extra={"security": "public"},
     )
@@ -251,6 +255,31 @@ class BackendSettings(SharedSettings):
         if any(origin == "*" for origin in origins):
             raise ValueError("CORS wildcard origins are forbidden")
         return value
+
+    @model_validator(mode="after")
+    def require_supabase_url_for_runtime(self) -> Self:
+        """Require hosted/runtime ``SUPABASE_URL`` except the test fixture.
+
+        ``APP_ENV=test`` may omit the variable and receives the local
+        destructive-test fixture origin. Laptop Compose (``local``) and
+        hosted environments fail closed when the origin is missing.
+
+        Returns:
+            This settings instance with ``supabase_url`` populated.
+
+        Raises:
+            ValueError: If ``APP_ENV`` is not ``test`` and ``SUPABASE_URL``
+                is unset.
+        """
+
+        if self.supabase_url is None:
+            if self.app_env is Environment.TEST:
+                self.supabase_url = AnyHttpUrl("http://127.0.0.1:54321")
+            else:
+                raise ValueError(
+                    "SUPABASE_URL is required when APP_ENV is not test"
+                )
+        return self
 
     @model_validator(mode="after")
     def require_exact_cors_origins(self) -> Self:

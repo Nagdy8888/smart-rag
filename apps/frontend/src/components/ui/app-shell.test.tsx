@@ -111,6 +111,9 @@ describe("AppShell", () => {
     expect(screen.queryByText(/mfa_enrolled/i)).not.toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
     expect(screen.getByTestId("app-shell-nav")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Collapse navigation" }),
+    ).toHaveAttribute("data-action-id", "shell.nav_toggle");
     expect(CLIENT_NAV_IS_NOT_AUTHORIZATION).toBe(true);
     expect(screen.queryByRole("link", { name: /Stitch/i })).not.toBeInTheDocument();
   });

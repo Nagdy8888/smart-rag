@@ -3,17 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 from inspect import signature
 from pathlib import Path
+from types import SimpleNamespace
+from uuid import uuid4
 
+import pytest
 import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from smart_rag_agents.prompts import answer_prompt_text, verifier_prompt_text
 from smart_rag_agents.query.checkpointer import (
     QUERY_CHECKPOINTER_POOL_MAX_SIZE,
+    open_query_async_checkpointer,
     open_query_checkpointer,
 )
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.nodes.pipeline import (
+    _gateway_timeout_seconds,
     _run_coro,
     generate_answer_node,
     verify_answer_node,
@@ -21,6 +30,7 @@ from smart_rag_agents.query.nodes.pipeline import (
 from smart_rag_agents.query.state import pending_query_state
 from smart_rag_api.services.query_graph_runtime import (
     QueryGraphRuntimeError,
+    _context_loader,
     build_query_graph_deps,
     build_query_process_bindings,
 )
@@ -37,6 +47,7 @@ from smart_rag_core.query_fusion.models import (
     PassageOrigin,
     ScoredPassage,
 )
+from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.settings import SharedSettings
 
 _FAKE_DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -92,6 +103,18 @@ def test_query_checkpointer_pool_covers_signed_concurrency() -> None:
     assert QUERY_CHECKPOINTER_POOL_MAX_SIZE >= 5
     default = signature(open_query_checkpointer).parameters["max_size"].default
     assert default == QUERY_CHECKPOINTER_POOL_MAX_SIZE
+    async_default = signature(open_query_async_checkpointer).parameters[
+        "max_size"
+    ].default
+    assert async_default == QUERY_CHECKPOINTER_POOL_MAX_SIZE
+    assert AsyncPostgresSaver.aget_tuple is not BaseCheckpointSaver.aget_tuple
+    assert PostgresSaver.aget_tuple is BaseCheckpointSaver.aget_tuple
+    with pytest.raises(ValueError, match="LANGGRAPH_CHECKPOINT_URL"):
+        asyncio.run(
+            open_query_async_checkpointer(
+                "postgresql://unit:secret@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+            )
+        )
 
 
 def test_default_process_bindings_have_hybrid_and_gateway() -> None:
@@ -137,6 +160,94 @@ def test_sse_execute_does_not_continue_without_app_api_connection() -> None:
     )
     assert "open_run_app_api_connection(bindings.supabase_dsn)" in source
     assert 'yield ("error", {"code": exc.reason})' in source
+
+
+def test_context_loader_keeps_connection_idle_for_retrieval_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Context fetch must not SET ROLE before retrieval_transaction.
+
+    Hosted transaction-pooler and local Postgres both start a transaction on
+    the first ``SET ROLE``. ``retrieval_transaction`` then raises
+    ``retrieval_requires_idle_connection``.
+    """
+
+    executed: list[str] = []
+
+    class _Conn:
+        """Record execute() so the test can prove the loader stays idle."""
+
+        def execute(self, sql: str) -> None:
+            """Record SQL issued on the fresh connection.
+
+            Args:
+                sql: Statement text.
+            """
+
+            executed.append(sql)
+
+        def close(self) -> None:
+            """Close the stub connection."""
+
+            return None
+
+        def __enter__(self) -> _Conn:
+            """Enter the connect context."""
+
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            """Exit the connect context."""
+
+            return None
+
+    def _connect(_dsn: str, **_kwargs: object) -> _Conn:
+        """Return the stub connection."""
+
+        return _Conn()
+
+    fetched: list[object] = []
+
+    def _fetch(
+        connection: object,
+        *,
+        caller: CallerContext,
+        chunk_ids: tuple[object, ...],
+    ) -> tuple[()]:
+        """Capture the idle connection and return no rows.
+
+        Args:
+            connection: Connection passed by the loader.
+            caller: Retrieve caller.
+            chunk_ids: Requested IDs.
+
+        Returns:
+            Empty authorized context.
+        """
+
+        del caller, chunk_ids
+        fetched.append(connection)
+        return ()
+
+    monkeypatch.setattr(
+        "smart_rag_api.services.query_graph_runtime.psycopg.connect",
+        _connect,
+    )
+    monkeypatch.setattr(
+        "smart_rag_api.services.query_graph_runtime.fetch_authorized_chunk_context",
+        _fetch,
+    )
+    loader = _context_loader(
+        _FAKE_DSN,
+        CallerContext(
+            user_id=str(uuid4()),
+            role=UserRole.MEMBER,
+            authorization_version=1,
+        ),
+    )
+    assert loader((uuid4(),)) == ()
+    assert executed == []
+    assert len(fetched) == 1
 
 
 def test_missing_supabase_dsn_fails_closed() -> None:
@@ -318,6 +429,58 @@ def test_run_coro_honors_cancel_check() -> None:
         assert exc.reason == "cancelled"
     else:
         raise AssertionError("expected cancelled")
+
+
+def test_gateway_timeout_uses_run_deadline_not_model_call_count() -> None:
+    """Hosted live OpenAI must not treat remaining model calls as seconds."""
+
+    assert _gateway_timeout_seconds(None) == 20.0
+    far = SimpleNamespace(deadline_at=datetime.now(UTC) + timedelta(seconds=30))
+    timeout = _gateway_timeout_seconds(far)  # type: ignore[arg-type]
+    assert 20.0 <= timeout <= 30.0
+    near = SimpleNamespace(deadline_at=datetime.now(UTC) + timedelta(seconds=2))
+    assert 0.1 <= _gateway_timeout_seconds(near) <= 2.0  # type: ignore[arg-type]
+
+
+def test_run_coro_wraps_provider_errors_without_a_running_loop() -> None:
+    """Sync graph threads must surface AnswerError, not raw provider types."""
+
+    async def _boom() -> str:
+        """Raise a provider-shaped failure.
+
+        Returns:
+            Unreachable token.
+        """
+
+        raise RuntimeError("answer_timeout")
+
+    try:
+        _run_coro(lambda: _boom())
+    except AnswerError as exc:
+        assert exc.reason == "gateway_failed"
+    else:
+        raise AssertionError("expected gateway_failed")
+
+
+def test_run_coro_times_out_without_a_running_loop() -> None:
+    """Sync LangGraph workers must bound an unresponsive async gateway."""
+
+    async def _slow() -> str:
+        """Sleep beyond the configured gateway deadline.
+
+        Returns:
+            Unreachable token.
+        """
+
+        await asyncio.sleep(30)
+        return "late"
+
+    try:
+        _run_coro(lambda: _slow(), timeout_seconds=0.01)
+    except AnswerError as exc:
+        assert exc.reason == "deadline_exhausted"
+    else:
+        raise AssertionError("expected deadline_exhausted")
 
 
 def test_mock_answer_is_not_used_as_verified_success() -> None:

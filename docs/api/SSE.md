@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering, frontend
 ---
 
@@ -87,6 +87,8 @@ tracebacks, secrets, source HTML, or passages.
 | `error` | Sanitized `{code}`. |
 
 Exactly one terminal among `completed`, `cancelled`, `error`, `partial`.
+Conversation summary and assistant-message persist run only after that
+terminal is yielded. Those writes must not emit a second `error`.
 
 Live `LangGraphQueryRunExecutor` compiles **per execute** with
 `build_query_graph_deps`: Hybrid (DSN-based, ParadeDB optional), counted

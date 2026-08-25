@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import TypeVar, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import psycopg
 import pytest
@@ -77,6 +77,22 @@ def resolve_supabase_db_url() -> str:
     """
 
     return read_process_env("SUPABASE_DB_URL") or DEFAULT_SUPABASE_DB_URL
+
+
+def refuse_hosted_destructive_dsn(url: str) -> None:
+    """Refuse destructive suites against hosted Supabase.
+
+    Args:
+        url: Candidate Postgres DSN. Never logged.
+
+    Raises:
+        RuntimeError: If the host is ``*.supabase.co`` or a Supabase
+            pooler hostname. The message never includes the DSN.
+    """
+
+    host = (urlparse(url).hostname or "").casefold()
+    if host.endswith(".supabase.co") or host.endswith("pooler.supabase.com"):
+        raise RuntimeError("destructive_tests_refuse_hosted_supabase")
 
 
 def local_supabase_status() -> dict[str, str]:

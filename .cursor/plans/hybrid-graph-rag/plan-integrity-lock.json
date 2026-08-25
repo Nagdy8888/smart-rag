@@ -1,6 +1,6 @@
 {
   "files": {
-    ".cursor/plans/hybrid-graph-rag/00-global-contracts.md": "36d248c5b2d656b5583b26fffe44b12f7b94d47eab19b455d3ef6e568072b1c4",
+    ".cursor/plans/hybrid-graph-rag/00-global-contracts.md": "b30fbd5f3e456dfe24be9db99d985ec5ace9440a58dd29c5ef12f06a762fbc3c",
     ".cursor/plans/hybrid-graph-rag/01-phase-foundation.md": "79f528c1ea8c929406406ece5442fdc2e05252e69b99e63feaf33e3a3bb191a8",
     ".cursor/plans/hybrid-graph-rag/02-phase-identity-data.md": "f62d9b9bdf3e0ae6eda0d9a773f3f2983fb62744ee27259065da3b0e7225329c",
     ".cursor/plans/hybrid-graph-rag/03-phase-ingestion.md": "d1ea7fbcbe19178026c222906fe4c9863f30fa9b67832500fa32ab89c9657528",
@@ -48,7 +48,7 @@
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/19-consolidate-admin-and-supported-account-operations.md": "648ad6d88792ebe7441c2676cdca3d44ca09fb5945a4fda1ddf0bdb7d8eec5c9",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/20-enforce-action-accessibility-security-and-documentation-integrity.md": "7796d82dfec4679632e09b29f0f388399eaac951a43fefb4274017ca62f329f1",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/21-run-deterministic-release-gates.md": "8049a2938e9060bd50816f81e5cc637b49dac29bdc51bd9acb4579cc7e7ccf69",
-    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/22-run-production-like-stack-role-visual-and-real-answer-verification.md": "4c1cfa29e24895aa43c77b4e1ca56eeda5dc714b28d52fd8f94e14bddf5768dc",
+    ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/22-run-production-like-stack-role-visual-and-real-answer-verification.md": "4aa04b2b5460a3d856d9e417d9f6f8499df1441da5b053fca926e29934e71d96",
     ".cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/23-final-review-pull-request-and-normal-merge.md": "729ea594ecfbfe43547b8f299b6ca27a0109559d01e85237f7d48741e8cc0143",
     ".cursor/plans/hybrid-graph-rag/09-phase-local-release-candidate.md": "108ff1a5a900fe1c7cf8c198363eadb5905cd304493a6aa0ebf17b3e5fa4ce64",
     ".cursor/plans/hybrid-graph-rag/09-phase-local-release-candidate/00-shared-contracts.md": "0d01f14edc059446e090d77fe53bf2b07fb8eab353df55252d3e41427fb3bf9a",
@@ -101,6 +101,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-08-25T11:27:43.704540+00:00",
+  "generated_at": "2026-08-25T12:28:41.541623+00:00",
   "schema_version": 1
 }

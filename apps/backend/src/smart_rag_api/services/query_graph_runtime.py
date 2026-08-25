@@ -426,7 +426,12 @@ def _context_loader(
     """
 
     def load(chunk_ids: tuple[UUID, ...]) -> tuple[ChunkContext, ...]:
-        """Load authorized chunk context on a fresh ``app_api`` connection.
+        """Load authorized chunk context on a fresh idle login connection.
+
+        ``fetch_authorized_chunk_context`` starts ``retrieval_transaction``,
+        which requires an idle connection and applies ``SET LOCAL ROLE
+        app_api``. Pre-setting the role would leave the connection
+        in-transaction and fail closed on hosted pooler and local Postgres.
 
         Args:
             chunk_ids: Canonical IDs.
@@ -436,7 +441,6 @@ def _context_loader(
         """
 
         with psycopg.connect(supabase_dsn) as connection:
-            connection.execute("SET ROLE app_api")
             return fetch_authorized_chunk_context(
                 connection,
                 caller=caller,

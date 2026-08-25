@@ -18,6 +18,7 @@ import {
 } from "../lib/api";
 import { SESSION_REVOKED_BANNER } from "../lib/auth/copy";
 import { SessionProvider } from "../lib/auth/session-provider";
+import { CHAT_RUN_POINTER_KEY } from "../lib/chat-pointer";
 import { handshakeBelowMinCopy } from "../lib/handshake";
 import { limitationCopy } from "../lib/limitations";
 
@@ -120,10 +121,20 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   sessionStorage.clear();
+  window.localStorage.clear();
   vi.mocked(fetchMeta).mockResolvedValue(defaultMeta);
   vi.mocked(listConversations).mockResolvedValue([]);
   vi.mocked(listCitations).mockResolvedValue([]);
   vi.mocked(createConversation).mockClear();
+  vi.mocked(fetchConversation).mockClear();
+  vi.mocked(fetchConversation).mockImplementation(
+    async (_auth: unknown, conversationId: string) => ({
+      conversation_id: conversationId,
+      creator_user_id: "u1",
+      title: "Chat",
+      created_at: "2026-08-17T00:00:00Z",
+    }),
+  );
   vi.mocked(loadConsoleReadiness).mockResolvedValue({
     status: "degraded",
     query_ready: false,
@@ -449,6 +460,38 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     });
   });
 
+  it("New clears an active run and its reconnect state", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(createConversation).mockResolvedValue({
+      conversation_id: "conv-new",
+      creator_user_id: "u1",
+      title: "Chat",
+      created_at: "2026-08-17T00:00:00Z",
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events: "event: heartbeat\nid: 1\ndata: {}\n\n",
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.type(screen.getByLabelText("Message"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findAllByText(/Reconnecting/)).not.toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "New" }));
+
+    await waitFor(() => {
+      expect(createConversation).not.toHaveBeenCalled();
+      expect(screen.queryAllByText(/Reconnecting/)).toHaveLength(0);
+    });
+    expect(screen.getByLabelText("Message")).toHaveValue("");
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+
   it("Delete conversation issues DELETE and shows deleted copy", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
@@ -509,6 +552,10 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => {
       expect(createConversation).toHaveBeenCalledTimes(1);
+      expect(createConversation).toHaveBeenCalledWith(
+        { accessToken: "jwt-token" },
+        "hello",
+      );
     });
     await waitFor(() => {
       expect(messagePosts).toEqual([
@@ -548,6 +595,69 @@ describe("ChatApp query_ready gate", () => {
 });
 
 describe("ChatApp Ask workspace", () => {
+  it("exposes labeled Sessions and Conversation regions", async () => {
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    renderChat(<ChatApp />);
+    expect(
+      await screen.findByRole("complementary", { name: "Sessions" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Conversation" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Answer" })).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "Sessions" })).toBeInTheDocument();
+  });
+
+  it("collapses the Sessions list without deleting conversations", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    renderChat(<ChatApp />);
+    expect(await screen.findByRole("option", { name: "Chat" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collapse sessions" }));
+    expect(screen.queryByRole("option", { name: "Chat" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Expand sessions" }));
+    expect(screen.getByRole("option", { name: "Chat" })).toBeInTheDocument();
+  });
+
+  it("New prevents a delayed reload recovery from restoring the old run", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(createConversation).mockResolvedValue({
+      conversation_id: "conv-new",
+      creator_user_id: "u1",
+      title: "Chat",
+      created_at: "2026-08-17T00:00:00Z",
+    });
+    let resolveOldConversation:
+      | ((value: typeof CONVERSATION) => void)
+      | undefined;
+    vi.mocked(fetchConversation).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveOldConversation = resolve;
+        }),
+    );
+    sessionStorage.setItem(
+      CHAT_RUN_POINTER_KEY,
+      JSON.stringify({
+        conversationId: CONVERSATION.conversation_id,
+        runId: "run-old",
+        lastSequence: 4,
+      }),
+    );
+    renderChat(<ChatApp />);
+    await waitFor(() => {
+      expect(fetchConversation).toHaveBeenCalled();
+    });
+
+    await user.click(await screen.findByRole("button", { name: "New" }));
+    resolveOldConversation?.(CONVERSATION);
+
+    await waitFor(() => {
+      expect(createConversation).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+    });
+    expect(sessionStorage.getItem(CHAT_RUN_POINTER_KEY)).toBeNull();
+  });
+
   it("fills the composer from a prompt chip without sending", async () => {
     const user = userEvent.setup();
     renderChat(<ChatApp />);
@@ -654,5 +764,90 @@ describe("ChatApp Ask workspace", () => {
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Inspect" })).toBeNull();
+  });
+
+  it("shows one kept-token note when the stream errors after tokens", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events:
+          'event: token_delta\nid: 1\ndata: {"delta":"Hi there."}\n\nevent: error\nid: 2\ndata: {"code":"run_failed"}\n\n',
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.type(screen.getByLabelText("Message"), "hi");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(
+      await screen.findByText("The run ended in an error. Received tokens are kept."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Hi there.")).toBeInTheDocument();
+    expect(screen.queryByText(/Something went wrong/)).toBeNull();
+  });
+
+  it("shows one generic reference when the stream errors with no tokens", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events: 'event: error\nid: 1\ndata: {"code":"run_failed"}\n\n',
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.type(screen.getByLabelText("Message"), "hi");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(
+      await screen.findByText("Something went wrong. Reference run-1."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Received tokens are kept/)).toBeNull();
+  });
+
+  it("does not treat a partial terminal as a protocol failure banner", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events:
+          'event: token_delta\nid: 1\ndata: {"delta":"Hello."}\n\nevent: partial\nid: 2\ndata: {"reason":"verified_partial"}\n\n',
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.type(screen.getByLabelText("Message"), "hi");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(
+      await screen.findByText("Partial answer. Verified tokens are kept."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Run error/)).toBeNull();
+    expect(screen.queryByText(/Something went wrong/)).toBeNull();
   });
 });

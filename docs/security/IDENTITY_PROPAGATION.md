@@ -2,7 +2,7 @@
 title: Identity propagation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-25
 audience: engineering, security, reviewers
 ---
 
@@ -51,9 +51,10 @@ FastAPI dependency: `apps/backend/src/smart_rag_api/dependencies/identity.py`.
 - Reads `Authorization: Bearer` and verifies through
   `packages/core/src/smart_rag_core/security/jwks.py`.
   JWKS is always fetched from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`.
-  When `APP_ENV=local` and `SUPABASE_URL` is `http://127.0.0.1:54321` or
-  `http://host.docker.internal:54321`, `iss` may be either
-  `http://127.0.0.1:54321/auth/v1` or
+  Daily laptop runtime supplies a hosted `SUPABASE_URL` and therefore does
+  not expand those aliases. When `APP_ENV=local` and `SUPABASE_URL` is
+  `http://127.0.0.1:54321` or `http://host.docker.internal:54321` (local
+  fixture only), `iss` may be either `http://127.0.0.1:54321/auth/v1` or
   `http://host.docker.internal:54321/auth/v1`. Other environments require
   `iss` to equal `{SUPABASE_URL}/auth/v1`. HS256 remains forbidden. Arbitrary
   issuers are rejected. The JWT `role` claim must be `authenticated`;

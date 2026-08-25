@@ -488,8 +488,8 @@ def test_empty_graph_citation_text_cannot_pass_complete() -> None:
     assert checked.status != "complete"
 
 
-def test_graph_inspection_and_noretrieval_refuse_company_claims() -> None:
-    """Graph-only inspection and NoRetrieval cannot answer from graph leads."""
+def test_graph_inspection_refuses_but_greeting_is_safe_chat() -> None:
+    """Graph-only refuses while a greeting returns no company claim."""
 
     fusion = _fusion(_passage(1, text="secret"))
     graph_only = generate_answer(
@@ -502,7 +502,7 @@ def test_graph_inspection_and_noretrieval_refuse_company_claims() -> None:
         graph_as_answer_forbidden=True,
     )
     assert graph_only.status == "refused"
-    none = generate_answer(
+    greeting = generate_answer(
         fusion=_fusion(),
         tables=(),
         user_query="hello",
@@ -511,7 +511,26 @@ def test_graph_inspection_and_noretrieval_refuse_company_claims() -> None:
         company_claim_forbidden=True,
         graph_as_answer_forbidden=False,
     )
-    assert none.status == "refused"
+    assert greeting.status == "complete"
+    assert "uploaded documents" in greeting.answer_text
+    checked_greeting, greeting_failures = deterministic_check_answer(
+        greeting,
+        fusion=_fusion(),
+        tables=(),
+        evidence_required=False,
+    )
+    assert checked_greeting.status == "complete"
+    assert greeting_failures == ()
+    transform = generate_answer(
+        fusion=_fusion(),
+        tables=(),
+        user_query="rewrite this paragraph",
+        caller=None,
+        already_generated=0,
+        company_claim_forbidden=True,
+        graph_as_answer_forbidden=False,
+    )
+    assert transform.status == "refused"
 
 
 def test_citation_provenance_uses_existing_jsonb() -> None:

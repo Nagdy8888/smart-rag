@@ -12,23 +12,30 @@ export type ChatWorkspaceProps = {
   stage: ReactNode;
   /** Compact Sessions trigger for narrow viewports. */
   toolbar?: ReactNode;
+  /** Desktop Sessions column visibility. */
+  sessionsExpanded?: boolean;
 };
 
 /**
  * Render the Ask grid.
  *
  * @param props - Rail, stage, optional sources and toolbar.
- * @returns Workspace grid.
+ * @returns Height-bounded workspace whose Sessions list and conversation
+ *   scroll independently.
  */
 export function ChatWorkspace({
   rail,
   stage,
   toolbar,
+  sessionsExpanded = true,
 }: ChatWorkspaceProps) {
   return (
-    <div>
+    <div className={styles.workspaceHost}>
       {toolbar}
-      <div className={styles.workspace}>
+      <div
+        className={styles.workspace}
+        data-sessions-expanded={sessionsExpanded ? "true" : "false"}
+      >
         {rail}
         {stage}
       </div>

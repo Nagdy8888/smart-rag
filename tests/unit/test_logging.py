@@ -48,6 +48,25 @@ def test_json_logs_include_required_metadata_and_redact_secrets() -> None:
     assert "db-password" not in serialized
 
 
+def test_json_logs_include_allowlisted_error_type() -> None:
+    """Executor extras may name the exception class without a traceback."""
+
+    stream = StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonLogFormatter(service="backend", environment="test"))
+    logger = logging.getLogger("tests.error-type")
+    logger.handlers = [handler]
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+    logger.info(
+        "query executor failed",
+        extra={"event": "sse.executor_failed", "error_type": "NotImplementedError"},
+    )
+    payload = cast(dict[str, str], json.loads(stream.getvalue()))
+    assert payload["error_type"] == "NotImplementedError"
+    assert payload["event"] == "sse.executor_failed"
+
+
 def test_exception_logs_omit_exception_message_and_private_source() -> None:
     """Exception metadata exposes only type plus a fixed redacted message."""
 

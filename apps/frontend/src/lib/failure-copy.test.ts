@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { classifyApiError } from "./api";
 import {
   apiFailureBanner,
+  chatRunFailureBanner,
   GENERIC_PRODUCTION_ERROR,
   mutationFailureBanner,
 } from "./failure-copy";
@@ -70,6 +71,19 @@ describe("approved HTTP failure copy", () => {
   it("maps empty completion protocol failure without traces", () => {
     expect(apiFailureBanner({ kind: "protocol", detail: "empty_answer" })).toBe(
       "The run completed without an answer.",
+    );
+  });
+
+  it("maps run_failed to one generic alert without the internal code", () => {
+    const failure = { kind: "protocol" as const, detail: "run_failed" };
+    expect(apiFailureBanner(failure)).toBe(GENERIC_PRODUCTION_ERROR);
+    expect(apiFailureBanner(failure)).not.toMatch(/run_failed/);
+    expect(
+      chatRunFailureBanner(failure, "62fc0f7e-61be-4e77-800e-8dae342b7884"),
+    ).toBe("Something went wrong. Reference 62fc0f7e-61be-4e77-800e-8dae342b7884.");
+    expect(chatRunFailureBanner(failure, null)).toBe(GENERIC_PRODUCTION_ERROR);
+    expect(chatRunFailureBanner(failure, "62fc0f7e-61be-4e77-800e-8dae342b7884")).not.toMatch(
+      /run_failed/,
     );
   });
 });
