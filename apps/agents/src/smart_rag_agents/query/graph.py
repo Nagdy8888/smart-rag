@@ -12,7 +12,7 @@ from langgraph.graph import END, START, StateGraph
 
 # isort: off
 # hybrid_run must finish before query_admission package init (ceilings cycle).
-import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 # isort: on
 
@@ -221,14 +221,18 @@ def build_query_graph(
 
     bound = deps or QueryGraphDeps()
     input_schema: type[QueryGraphState] | type[object] = QueryGraphState
+    state_schema: type[QueryGraphState] | type[object] = QueryGraphState
+    output_schema: type[QueryGraphState] | type[object] = QueryGraphState
     if studio_local:
-        from smart_rag_agents.query.studio import StudioQueryInput
+        from smart_rag_agents.query.studio import StudioQueryInput, StudioQueryState
 
         input_schema = StudioQueryInput
+        state_schema = StudioQueryState
+        output_schema = StudioQueryState
     builder: QueryStateGraph = StateGraph(  # pyright: ignore[reportAssignmentType]
-        QueryGraphState,
+        state_schema,
         input_schema=input_schema,  # pyright: ignore[reportArgumentType]
-        output_schema=QueryGraphState,
+        output_schema=output_schema,  # pyright: ignore[reportArgumentType]
     )
 
     def load_memory(state: QueryGraphState) -> QueryGraphState:
@@ -355,18 +359,27 @@ def build_query_graph(
         "enforce_admission",
         enforce_admission,
     )
+    terminal_target = END
     if studio_local:
-        from smart_rag_agents.query.studio import seed_studio_runtime
+        from smart_rag_agents.query.studio import (
+            emit_studio_response,
+            seed_studio_runtime,
+        )
 
         builder.add_node(  # pyright: ignore[reportUnknownMemberType]
             "seed_studio_runtime",
             seed_studio_runtime,
         )
+        builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+            "emit_studio_response",
+            emit_studio_response,
+        )
+        terminal_target = "emit_studio_response"
         builder.add_edge(START, "seed_studio_runtime")
         builder.add_conditional_edges(
             "seed_studio_runtime",
             _route_after_studio_seed,
-            {"enforce_admission": "enforce_admission", "end": END},
+            {"enforce_admission": "enforce_admission", "end": terminal_target},
         )
     else:
         builder.add_edge(START, "enforce_admission")
@@ -413,26 +426,28 @@ def build_query_graph(
     builder.add_conditional_edges(
         "enforce_admission",
         _route_after_admission,
-        {"load_memory": "load_memory", "end": END},
+        {"load_memory": "load_memory", "end": terminal_target},
     )
     builder.add_edge("load_memory", "prepare_query")
     builder.add_conditional_edges(
         "prepare_query",
         _route_after_prepare,
-        {"compile_plan": "compile_plan", "end": END},
+        {"compile_plan": "compile_plan", "end": terminal_target},
     )
     builder.add_edge("compile_plan", "execute_branches")
     builder.add_edge("execute_branches", "apply_correction")
     builder.add_conditional_edges(
         "apply_correction",
         _route_after_correction,
-        {"fuse_evidence": "fuse_evidence", "end": END},
+        {"fuse_evidence": "fuse_evidence", "end": terminal_target},
     )
     builder.add_edge("fuse_evidence", "compose_tables")
     builder.add_edge("compose_tables", "disclose_optional_tools")
     builder.add_edge("disclose_optional_tools", "generate_answer")
     builder.add_edge("generate_answer", "verify_answer")
-    builder.add_edge("verify_answer", END)
+    builder.add_edge("verify_answer", terminal_target)
+    if studio_local:
+        builder.add_edge("emit_studio_response", END)
     return builder
 
 

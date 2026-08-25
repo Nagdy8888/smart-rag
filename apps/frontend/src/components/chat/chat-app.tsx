@@ -16,6 +16,7 @@ import {
 } from "../../lib/layout-preferences";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { Button } from "../ui/button";
+import { Icon } from "../ui/icon";
 import { Drawer } from "../ui/drawer";
 import { LimitationCallout } from "../ui/limitation-callout";
 import { LiveRegion } from "../ui/live-region";
@@ -744,6 +745,18 @@ export function ChatApp() {
         </p>
         ) : null}
         <div className={chatStyles.row}>
+          {!sessionsExpanded ? (
+            <Button
+              type="button"
+              variant="secondary"
+              aria-expanded={false}
+              data-action-id="ask.sessions_toggle"
+              onClick={toggleSessionsExpanded}
+            >
+              <Icon name="panelExpand" />
+              Expand sessions
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"

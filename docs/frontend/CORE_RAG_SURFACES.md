@@ -33,7 +33,7 @@ Related: [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 
 | Route | Surface |
 | --- | --- |
-| `/` | Ask workspace. Expandable Sessions rail, full-width answers, citation drawers |
+| `/` | Ask workspace. Expandable Sessions rail, full-width answers and composer, citation drawers |
 | `/documents` | Library, import/upload/crawl, keyset pagination, owner/admin delete |
 | `/documents/[documentId]` | Metadata, shared IngestionStatus timeline, graph seed, tables list |
 | `/graph` | Search → chips → Inspect graph; list-first plus optional React Flow |

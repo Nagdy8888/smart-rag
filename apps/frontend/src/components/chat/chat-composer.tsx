@@ -63,6 +63,7 @@ export function ChatComposer({
     <div className={styles.composer}>
       <Textarea
         label="Message"
+        fullWidth
         rows={3}
         maxLength={COMPOSER_MAX_CHARS}
         value={value}

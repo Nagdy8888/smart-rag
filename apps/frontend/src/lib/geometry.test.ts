@@ -84,5 +84,11 @@ describe("Ask independent scroll source lock", () => {
     expect(chat).toMatch(/\.composer\s*\{[\s\S]*?flex-shrink:\s*0/);
     expect(chat).not.toMatch(/\.answer\s*\{[\s\S]*?overflow:\s*auto/);
     expect(chat).not.toMatch(/\.stage\s*\{[\s\S]*?max-width:\s*880px/);
+    expect(chat).toMatch(/\.composer\s*\{[\s\S]*?width:\s*100%/);
+    expect(chat).toMatch(/\.railBody\[hidden\]\s*\{[\s\S]*?display:\s*none/);
+    expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?248px/);
+    expect(ui).toMatch(/\.fieldFull\s*\{[\s\S]*?max-width:\s*none/);
+    expect(shell).toMatch(/\.navIsCollapsed\s*\{[\s\S]*?width:\s*var\(--nav-width-collapsed\)/);
+    expect(shell).not.toMatch(/@media \(min-width: 1280px\)/);
   });
 });

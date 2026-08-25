@@ -9,7 +9,7 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 #### `AppShell`
 
 - Desktop grid columns are `232px minmax(0, 1fr)`; collapsed mode is `72px minmax(0, 1fr)`.
-- At `>=1024px` a labeled “Collapse navigation” / “Expand navigation” control toggles those widths. The choice is stored in `localStorage`. Breakpoints remain the default before the first toggle.
+- At `>=1024px` a labeled “Collapse navigation” control in the rail narrows it. “Expand navigation” then appears in the top bar so the click is not covered by a tooltip. The choice is stored in `localStorage`. Breakpoints remain the default before the first toggle. A later `1280px` rule must not force the expanded width; collapsed classes win at every desktop width.
 - Nav and topbar are white with border separators.
 - Main area uses canvas background and owns vertical scrolling.
 - Skip link is visually hidden until focused, then appears at top-left as a Primary-style link.
@@ -78,9 +78,9 @@ Canonical values are copied from [.cursor/plans/hybrid-graph-rag/08-phase-fronte
 
 - Use available height below topbar. The console shell is viewport-bounded (`100dvh`); non-Ask console pages still scroll inside `main`.
 - Ask fills the remaining height below the page header and banners. The Sessions list and the conversation body each own `overflow-y: auto`. The Sessions header (title, New, actions) and the composer stay outside those scrollports.
-- At `>=1280px`: 248px Sessions rail and `minmax(0, 1fr)` main workspace, 16px gap. A labeled “Collapse sessions” / “Expand sessions” control narrows the rail to 52px. The choice is stored in `localStorage`.
+- At `>=1280px`: 248px Sessions rail and `minmax(0, 1fr)` main workspace, 16px gap. A labeled “Collapse sessions” control narrows the rail to 52px. “Expand sessions” then appears in the answer header and restores the same mounted list. The choice is stored in `localStorage`.
 - At `<1280px`: the desktop Sessions rail is omitted from the workspace grid. Sessions open in a left Sheet whose body remains the list scrollport. The conversation body still scrolls independently of the page.
-- The answer column and composer fill the remaining Ask width. Session titles come from the first question on `POST /conversations`. There is no title-update or LLM-title contract.
+- The answer column and composer fill the remaining Ask width. The Message field opts out of the 520px form-field cap. Session titles come from the first question on `POST /conversations`. There is no title-update or LLM-title contract.
 - There is no permanent right sources/diagnostics column.
 
 ```mermaid

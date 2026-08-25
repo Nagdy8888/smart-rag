@@ -33,7 +33,12 @@ export function ChatWorkspace({
     <div className={styles.workspaceHost}>
       {toolbar}
       <div
-        className={styles.workspace}
+        className={[
+          styles.workspace,
+          sessionsExpanded
+            ? styles.workspaceSessionsExpanded
+            : styles.workspaceSessionsCollapsed,
+        ].join(" ")}
         data-sessions-expanded={sessionsExpanded ? "true" : "false"}
       >
         {rail}

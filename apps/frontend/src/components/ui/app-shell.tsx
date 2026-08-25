@@ -20,7 +20,6 @@ import {
 import { AppNav, ConsoleTopbar } from "./app-nav";
 import { Button } from "./button";
 import { Icon } from "./icon";
-import { Tooltip } from "./tooltip";
 import styles from "./app-shell.module.css";
 
 export type AppShellProps = {
@@ -36,7 +35,8 @@ export type AppShellProps = {
  * @remarks
  * Security: omitting nav items does not imply HTTP 403.
  * `CLIENT_NAV_IS_NOT_AUTHORIZATION` is true. The desktop expand state is
- * stored in localStorage. `data-expanded` may differ on hydrate.
+ * stored in localStorage. `data-expanded` and the expanded/collapsed
+ * classes may differ on hydrate.
  */
 export function AppShell({ children }: AppShellProps) {
   const [navExpanded, setNavExpanded] = useState(() =>
@@ -63,7 +63,10 @@ export function AppShell({ children }: AppShellProps) {
       </a>
       <div className={styles.layout}>
         <nav
-          className={styles.nav}
+          className={[
+            styles.nav,
+            navExpanded ? styles.navIsExpanded : styles.navIsCollapsed,
+          ].join(" ")}
           aria-label="Console"
           data-testid="app-shell-nav"
           data-expanded={navExpanded ? "true" : "false"}
@@ -78,25 +81,27 @@ export function AppShell({ children }: AppShellProps) {
               <p className={styles.brandSub}>Company knowledge</p>
             </span>
           </div>
-          <AppNav />
-          <Tooltip text={toggleLabel}>
+          {navExpanded ? (
             <Button
               type="button"
-              variant="ghost"
-              size="icon"
+              variant="secondary"
               className={styles.navToggle}
-              aria-label={toggleLabel}
               aria-expanded={navExpanded}
               data-action-id="shell.nav_toggle"
               onClick={toggleNavExpanded}
             >
-              <Icon name={navExpanded ? "panelCollapse" : "panelExpand"} />
+              <Icon name="panelCollapse" />
+              {toggleLabel}
             </Button>
-          </Tooltip>
+          ) : null}
+          <AppNav />
         </nav>
         <div className={styles.content}>
           <header className={styles.topbar}>
-            <ConsoleTopbar />
+            <ConsoleTopbar
+              navExpanded={navExpanded}
+              onExpandNav={toggleNavExpanded}
+            />
           </header>
           <main id="main" className={styles.main} tabIndex={-1}>
             {children}

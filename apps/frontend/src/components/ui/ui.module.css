@@ -198,6 +198,11 @@
   color: var(--color-text);
 }
 
+.fieldFull {
+  max-width: none;
+  width: 100%;
+}
+
 .labelRow {
   display: flex;
   align-items: baseline;
@@ -670,6 +675,7 @@
   padding: calc(var(--space) * 1) calc(var(--space) * 2);
   font-size: 0.75rem;
   color: var(--color-text);
+  pointer-events: none;
 }
 
 .menuItem,

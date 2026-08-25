@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from langchain_core.messages import HumanMessage
 from smart_rag_agents.query.state import pending_query_state
 from smart_rag_agents.query.studio import (
     query_text_from_studio_input,
@@ -44,6 +45,21 @@ def test_query_text_reads_last_human_message() -> None:
     )
 
 
+def test_query_text_reads_langchain_human_message() -> None:
+    """Studio's message reducer may convert chat input to message objects."""
+
+    assert (
+        query_text_from_studio_input(
+            {
+                "messages": [
+                    HumanMessage(content="What is the invoice status?"),
+                ]
+            }
+        )
+        == "What is the invoice status?"
+    )
+
+
 def test_studio_runtime_uses_envelope_ceilings_and_local_status() -> None:
     """Synthetic context copies Hybrid ceilings and is labeled studio_local."""
 
@@ -71,7 +87,11 @@ def test_seed_studio_runtime_rejects_unknown_family_without_context() -> None:
     """Unknown Studio families fail closed and do not mint authorized_runtime."""
 
     seeded = seed_studio_runtime(
-        {**pending_query_state(user_query="hello"), "route_family": "not-a-family"},
+        {
+            **pending_query_state(user_query="hello"),
+            "route_family": "not-a-family",
+            "messages": [],
+        },
         {"configurable": {"thread_id": str(uuid4())}},
     )
     assert seeded["status"] == "admission_rejected"

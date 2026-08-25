@@ -172,12 +172,23 @@ export function AccountMenu() {
   );
 }
 
+export type ConsoleTopbarProps = {
+  /** Desktop console rail visibility. */
+  navExpanded?: boolean;
+  /** Restore the desktop rail. Shown in the topbar while the rail is collapsed. */
+  onExpandNav?: () => void;
+};
+
 /**
  * Render the 56px console top bar: menu, title, readiness, command, account.
  *
+ * @param props - Optional desktop nav expand control.
  * @returns Header contents and overlays.
  */
-export function ConsoleTopbar() {
+export function ConsoleTopbar({
+  navExpanded = true,
+  onExpandNav,
+}: ConsoleTopbarProps) {
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandEpoch, setCommandEpoch] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -225,6 +236,19 @@ export function ConsoleTopbar() {
           <Icon name="menu" />
           <span className={styles.srOnly}>Menu</span>
         </Button>
+        {onExpandNav && !navExpanded ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className={styles.navExpand}
+            aria-expanded={false}
+            data-action-id="shell.nav_toggle"
+            onClick={onExpandNav}
+          >
+            <Icon name="panelExpand" />
+            Expand navigation
+          </Button>
+        ) : null}
         <h1 className={styles.topbarTitle}>{consolePageTitle(pathname)}</h1>
       </div>
       <div className={styles.topbarEnd}>

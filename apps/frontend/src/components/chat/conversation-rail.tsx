@@ -11,7 +11,6 @@ import { Icon } from "../ui/icon";
 import { Menu } from "../ui/menu";
 import { RovingList } from "../ui/roving-list";
 import { Skeleton } from "../ui/skeleton";
-import { Tooltip } from "../ui/tooltip";
 import { UserText } from "../ui/user-text";
 import styles from "./chat.module.css";
 
@@ -42,7 +41,8 @@ export type ConversationRailProps = {
  * @param props - Controlled list data and callbacks.
  * @returns Aside whose session list scrolls independently of the header.
  * @remarks Mutations stay in ChatApp. The header stays outside the list
- *   scrollport so New and Delete remain visible.
+ *   scrollport so New and Delete remain visible. The list stays mounted
+ *   while collapsed so Expand restores the same rows immediately.
  */
 export function ConversationRail({
   conversations,
@@ -58,80 +58,77 @@ export function ConversationRail({
   const toggleLabel = expanded ? "Collapse sessions" : "Expand sessions";
   return (
     <aside
-      className={styles.rail}
+      className={[styles.rail, expanded ? undefined : styles.railIsCollapsed]
+        .filter(Boolean)
+        .join(" ")}
       aria-label="Sessions"
       data-expanded={expanded ? "true" : "false"}
     >
-      <div className={styles.railHeader}>
-        {showCollapseToggle && onToggleExpanded ? (
-          <Tooltip text={toggleLabel}>
+      <div hidden={!expanded} className={styles.railBody}>
+        <div className={styles.railHeader}>
+          {showCollapseToggle && onToggleExpanded ? (
             <Button
               type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={toggleLabel}
+              variant="secondary"
               aria-expanded={expanded}
               data-action-id="ask.sessions_toggle"
               onClick={onToggleExpanded}
             >
-              <Icon name={expanded ? "panelCollapse" : "panelExpand"} />
+              <Icon name="panelCollapse" />
+              {toggleLabel}
             </Button>
-          </Tooltip>
-        ) : null}
-        <h2 className={styles.railTitle}>Sessions</h2>
-        <div className={styles.railActions}>
-          <Button type="button" variant="primary" data-action-id="ask.new_session" onClick={onCreate}>
-            New
-          </Button>
-          <Menu
-            label="Conversation actions"
-            trigger={<Icon name="more" />}
-            items={[
-              {
-                id: "delete",
-                label: "Delete",
-                danger: true,
-                actionId: "ask.delete_session",
-                disabled: selectedId === null,
-                onSelect: onDelete,
-              },
-            ]}
-          />
-        </div>
-      </div>
-      {expanded ? (
-        <>
-          {loading ? <Skeleton label="Loading conversations" width="100%" /> : null}
-          {conversations.length === 0 && !loading ? (
-            <EmptyState title="No sessions yet. Ask a question to create one.">
-              Earlier messages are not loaded in this client.
-            </EmptyState>
           ) : null}
-          <RovingList
-            className={styles.railList}
-            aria-label="Sessions"
-            selectedId={selectedId}
-            items={conversations.map((item) => ({
-              id: item.conversation_id,
-              item,
-            }))}
-            onSelect={onSelect}
-          >
-            {(item) => (
-              <span className={styles.conversationButton}>
-                <span className={styles.conversationTitle}>
-                  <UserText value={item.title ?? item.conversation_id} />
-                </span>
-                {item.created_at ? (
-                  <span className={styles.muted} aria-hidden="true">
-                    {new Date(item.created_at).toLocaleString()}
-                  </span>
-                ) : null}
+          <h2 className={styles.railTitle}>Sessions</h2>
+          <div className={styles.railActions}>
+            <Button type="button" variant="primary" data-action-id="ask.new_session" onClick={onCreate}>
+              New
+            </Button>
+            <Menu
+              label="Conversation actions"
+              trigger={<Icon name="more" />}
+              items={[
+                {
+                  id: "delete",
+                  label: "Delete",
+                  danger: true,
+                  actionId: "ask.delete_session",
+                  disabled: selectedId === null,
+                  onSelect: onDelete,
+                },
+              ]}
+            />
+          </div>
+        </div>
+        {loading ? <Skeleton label="Loading conversations" width="100%" /> : null}
+        {conversations.length === 0 && !loading ? (
+          <EmptyState title="No sessions yet. Ask a question to create one.">
+            Earlier messages are not loaded in this client.
+          </EmptyState>
+        ) : null}
+        <RovingList
+          className={styles.railList}
+          aria-label="Sessions"
+          selectedId={selectedId}
+          items={conversations.map((item) => ({
+            id: item.conversation_id,
+            item,
+          }))}
+          onSelect={onSelect}
+        >
+          {(item) => (
+            <span className={styles.conversationButton}>
+              <span className={styles.conversationTitle}>
+                <UserText value={item.title ?? item.conversation_id} />
               </span>
-            )}
-          </RovingList>
-        </>
-      ) : null}
+              {item.created_at ? (
+                <span className={styles.muted} aria-hidden="true">
+                  {new Date(item.created_at).toLocaleString()}
+                </span>
+              ) : null}
+            </span>
+          )}
+        </RovingList>
+      </div>
     </aside>
   );
 }

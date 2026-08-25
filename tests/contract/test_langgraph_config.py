@@ -133,7 +133,13 @@ def test_langgraph_graph_exports_load_without_business_success_claim() -> None:
 def test_query_studio_graph_runs_from_user_query_without_fastapi_admit() -> None:
     """Studio seed injects synthetic context and still does not claim paid admit."""
 
+    from langchain_core.messages import AIMessage, HumanMessage
     from smart_rag_agents.query.studio import graph as studio_graph
+
+    input_schema = json.dumps(studio_graph.get_input_jsonschema())
+    output_schema = json.dumps(studio_graph.get_output_jsonschema())
+    assert "HumanMessage" in input_schema
+    assert "AIMessage" in output_schema
 
     empty = studio_graph.invoke({"user_query": ""})  # pyright: ignore[reportUnknownMemberType]
     assert empty["status"] == "routing_rejected"
@@ -151,11 +157,13 @@ def test_query_studio_graph_runs_from_user_query_without_fastapi_admit() -> None
     from_messages = studio_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
         {
             "messages": [
-                {"role": "human", "content": "What is the status of INV-SR-1001?"}
+                HumanMessage(content="What is the status of INV-SR-1001?")
             ]
         }
     )
     assert from_messages["user_query"] == "What is the status of INV-SR-1001?"
+    assert isinstance(from_messages["messages"][0], HumanMessage)
+    assert isinstance(from_messages["messages"][-1], AIMessage)
     assert from_messages["status"] in {
         "verified",
         "verified_partial",
@@ -163,6 +171,7 @@ def test_query_studio_graph_runs_from_user_query_without_fastapi_admit() -> None
         "refused",
     }
     assert from_messages["answer_call_count"] == 0
+    assert from_messages["messages"][-1].content == "Insufficient authorized evidence."
     seeded = from_messages["authorized_runtime"]
     assert isinstance(seeded, dict)
     assert seeded["status"] == "studio_local"

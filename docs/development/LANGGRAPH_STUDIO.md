@@ -26,7 +26,7 @@ three checkpointer-free graphs:
 
 | Graph ID | Export | Use in Studio |
 | --- | --- | --- |
-| `query_studio` | `query/studio.py:graph` | Type a query and step through nodes |
+| `query_studio` | `query/studio.py:graph` | Type a query, chat, and step through nodes |
 | `query` | `query/graph.py:graph` | Inspect the production-shaped graph. Invoking it without `authorized_runtime` ends at `admission_rejected` |
 | `ingestion` | `ingestion/graph.py:graph` | Probe lease graph only. Invalid lease without worker config |
 
@@ -51,6 +51,13 @@ no OpenAI client, mock/deterministic node behavior. A non-empty query walks
 prepare → plan → branches → correction → fusion → answer → verify. Expect
 `answer_call_count=0` unless you later bind a live gateway. This does not
 prove retrieval quality against canonical evidence.
+
+`query_studio` exposes LangGraph's standard typed `messages` channel with the
+`add_messages` reducer. A Studio human turn is copied into `user_query`, and a
+Studio-only terminal node appends one assistant turn from the verified answer
+or the existing safe refusal/status. The adapter does not write production
+conversation memory, admit a paid run, or turn an unbound retriever into
+successful evidence.
 
 ## Prerequisites
 
@@ -105,8 +112,12 @@ Open Studio, select graph **`query_studio`**, and submit:
 }
 ```
 
-The Studio chat box also works: the seed node reads the last human
-`messages[].content` when `user_query` is empty.
+The Studio **Chat** view also works: the seed node reads the last human
+`messages[].content` when `user_query` is empty, and the terminal adapter
+returns an assistant message. Because the local graph is intentionally
+unbound, document questions return `Insufficient authorized evidence.` until
+live retrieval dependencies are explicitly bound; greetings and supported
+product-help prompts use deterministic local responses.
 
 Optional fields: `routing_surface` (`production` or `diagnostic`),
 `requested_manual_route` (diagnostic only). Unknown `route_family` values

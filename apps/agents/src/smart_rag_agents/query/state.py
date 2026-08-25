@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, NotRequired, TypeAlias
+from typing import Literal, TypeAlias
 
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -55,8 +55,6 @@ class QueryGraphState(TypedDict):
         verifier_call_count: Must be 0 or 1.
         selected_algorithm: Fusion or naive union.
         fusion_config_hash: Frozen configuration digest.
-        messages: Optional Studio chat messages. Production FastAPI omits this
-            key. The Studio seed copies the last human text into ``user_query``.
     """
 
     status: Literal[
@@ -119,7 +117,6 @@ class QueryGraphState(TypedDict):
     verifier_call_count: int
     selected_algorithm: str | None
     fusion_config_hash: str | None
-    messages: NotRequired[list[dict[str, object]]]
 
 
 QueryStateGraph: TypeAlias = StateGraph[

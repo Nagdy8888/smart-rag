@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import "@testing-library/jest-dom/vitest";
@@ -73,6 +74,7 @@ vi.mock("next/link", () => ({
 
 afterEach(() => {
   cleanup();
+  window.localStorage.removeItem("smart-rag.nav-expanded");
 });
 
 describe("AppShell", () => {
@@ -116,5 +118,30 @@ describe("AppShell", () => {
     ).toHaveAttribute("data-action-id", "shell.nav_toggle");
     expect(CLIENT_NAV_IS_NOT_AUTHORIZATION).toBe(true);
     expect(screen.queryByRole("link", { name: /Stitch/i })).not.toBeInTheDocument();
+  });
+
+  it("narrows the console rail when Collapse navigation is pressed", async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <SessionProvider>
+          <AppShell>
+            <p>Console body</p>
+          </AppShell>
+        </SessionProvider>
+      </QueryClientProvider>,
+    );
+    const nav = screen.getByTestId("app-shell-nav");
+    expect(nav).toHaveAttribute("data-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "Collapse navigation" }));
+    expect(nav).toHaveAttribute("data-expanded", "false");
+    await user.click(screen.getByRole("button", { name: "Expand navigation" }));
+    expect(nav).toHaveAttribute("data-expanded", "true");
+    expect(
+      screen.getByRole("button", { name: "Collapse navigation" }),
+    ).toHaveAttribute("data-action-id", "shell.nav_toggle");
   });
 });

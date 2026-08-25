@@ -48,10 +48,14 @@
   padding: calc(var(--space) * 4);
 }
 
-.navToggle {
+.navToggle,
+.navExpand {
   display: none;
-  margin-top: auto;
-  align-self: flex-start;
+}
+
+.navToggle {
+  margin-bottom: calc(var(--space) * 3);
+  align-self: stretch;
 }
 
 .brand,
@@ -275,7 +279,8 @@
     overflow: auto;
   }
 
-  .navToggle {
+  .navToggle,
+  .navExpand {
     display: inline-flex;
   }
 
@@ -296,67 +301,52 @@
     padding-inline: 0;
   }
 
-  .nav[data-expanded="true"] {
+  .navIsExpanded {
     width: var(--nav-width);
     flex: 0 0 var(--nav-width);
   }
 
-  .nav[data-expanded="true"] .navLabel,
-  .nav[data-expanded="true"] .brandText,
-  .nav[data-expanded="true"] .navGroupLabel,
-  .nav[data-expanded="true"] .userEmail,
-  .nav[data-expanded="true"] .userMeta {
-    display: revert;
+  .navIsExpanded .navLabel {
+    display: inline;
   }
 
-  .nav[data-expanded="true"] .navRow a,
-  .nav[data-expanded="true"] .profileLink {
+  .navIsExpanded .brandText {
+    display: flex;
+  }
+
+  .navIsExpanded .navGroupLabel,
+  .navIsExpanded .userEmail,
+  .navIsExpanded .userMeta {
+    display: block;
+  }
+
+  .navIsExpanded .navRow a,
+  .navIsExpanded .profileLink {
     justify-content: flex-start;
     padding-inline: calc(var(--space) * 3);
   }
 
-  .nav[data-expanded="false"] {
+  .navIsCollapsed {
     width: var(--nav-width-collapsed);
     flex: 0 0 var(--nav-width-collapsed);
   }
 
-  .nav[data-expanded="false"] .navLabel,
-  .nav[data-expanded="false"] .brandText,
-  .nav[data-expanded="false"] .navGroupLabel,
-  .nav[data-expanded="false"] .userEmail,
-  .nav[data-expanded="false"] .userMeta {
+  .navIsCollapsed .navLabel,
+  .navIsCollapsed .brandText,
+  .navIsCollapsed .navGroupLabel,
+  .navIsCollapsed .userEmail,
+  .navIsCollapsed .userMeta {
     display: none;
   }
 
-  .nav[data-expanded="false"] .navRow a,
-  .nav[data-expanded="false"] .profileLink {
+  .navIsCollapsed .navRow a,
+  .navIsCollapsed .profileLink {
     justify-content: center;
     padding-inline: 0;
   }
 
-  .nav[data-expanded="false"] .navToggle {
+  .navIsCollapsed .navToggle {
     align-self: center;
-  }
-}
-
-@media (min-width: 1280px) {
-  .nav {
-    width: var(--nav-width);
-    flex: 0 0 var(--nav-width);
-  }
-
-  .navLabel,
-  .brandText,
-  .navGroupLabel,
-  .userEmail,
-  .userMeta {
-    display: revert;
-  }
-
-  .navRow a,
-  .profileLink {
-    justify-content: flex-start;
-    padding-inline: calc(var(--space) * 3);
   }
 }
 

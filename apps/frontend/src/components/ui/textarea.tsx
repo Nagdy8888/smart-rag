@@ -10,12 +10,15 @@ export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label: ReactNode;
   /** Optional error text. */
   error?: string;
+  /** Drop the 520px field cap so the control can fill its parent. */
+  fullWidth?: boolean;
 };
 
 /**
  * Render a labeled multiline control.
  *
- * @param props - Native textarea attributes plus `label`.
+ * @param props - Native textarea attributes plus `label` and optional
+ *   `fullWidth` to fill the parent instead of the 520px field cap.
  * @returns Label wrapping the control. No custom bidi editor.
  */
 export function Textarea({
@@ -23,6 +26,7 @@ export function Textarea({
   error,
   id,
   className,
+  fullWidth = false,
   ...rest
 }: TextareaProps) {
   const inputId =
@@ -31,8 +35,11 @@ export function Textarea({
   const combined = [styles.control, styles.textarea, className]
     .filter(Boolean)
     .join(" ");
+  const fieldClass = [styles.field, fullWidth ? styles.fieldFull : undefined]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <label className={styles.field} htmlFor={inputId}>
+    <label className={fieldClass} htmlFor={inputId}>
       {label}
       <textarea
         id={inputId}
