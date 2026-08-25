@@ -2082,3 +2082,132 @@ item 21 may be checked. Item 7 stays unchecked. Items 1-6 stay checked.
 P08-22 owns live contract repair, signed-in Playwright, visual
 baselines, and one bounded real-provider answer. Do not claim
 production-like verification from this packet.
+
+## P08-22 — Run production-like stack, role, visual, and real-answer verification
+
+**Status: BLOCKED.** Wrapper item 22 stays unchecked. Packet YAML stays
+`pending`. P08-23 may not merge.
+
+Quoted requirement: prove the application against the real local topology
+and one bounded provider call. Required: Docker, local Supabase/Compose,
+valid OpenAI credential, and available query budget. The query must show
+real Generating/Verifying, then a non-empty verified answer or grounded
+refusal, at least one durable `token_delta`, exactly one terminal, and
+correct settlement.
+
+### Acceptance checks
+
+- Live Generating/Verifying (`li.pipelineStep[data-active="true"]`), not
+  the static pipeline labels.
+- Non-empty verified answer or grounded refusal.
+- Durable `token_delta`, exactly one terminal, correct settlement.
+- Role journeys pass, or the packet stays explicitly blocked.
+
+### Prerequisite checks (no secret values)
+
+| Check | Result |
+| --- | --- |
+| Docker Engine | 29.6.1, up |
+| Process `OPENAI_API_KEY` | Not required; compose/API key length 164, not `sk-unit` |
+| `MOCK_MODEL_MODE` in API container | `false` |
+| Holdout | `SMART_RAG_HOLDOUT_ACCESS` absent |
+| Local budget | Member profile monthly 200 USD; month spend 0 |
+| Corpus | 0 documents; grounded refusal would have been acceptable |
+
+### Topology
+
+`.env.compose` still points documented compose interpolation at hosted
+Supabase and a `:6543` pooler. Files were not rewritten. API/worker were
+rebuilt from HEAD `218ee48` and recreated with process-env local session
+DSNs (`host.docker.internal:54321` / `:54322` as `app_runtime`). In-container
+DSN hosts after recreate:
+
+- `SUPABASE_URL` host `host.docker.internal` port `54321`
+- `SUPABASE_DB_URL` / checkpoint / LightRAG host `host.docker.internal` port `54322`
+- Never `:6543` after the pin
+
+The first running image still contained the literal `MFA required` in
+`identity.py`. Host source does not. Rebuild was required before admit.
+
+`GET /health/live` 200 `live`. `GET /health/ready` 200
+`query_ready=true`. `GET /api/meta` 200 handshake `0.1.0` / `1` / `0.1.0`.
+Member `GET /ops/ready` 403.
+
+Rebuilt worker is unhealthy: `parser_sandbox_docker_required`. Ask
+execution is API-side; ingestion is not proven.
+
+### Admit reproduce (local JWT)
+
+`_tmp_p08_22_admit.py` (not committed): admin create 200, password grant
+200, `POST /conversations` 201, `POST /messages` 202, `run_id` present,
+`route_family=composite`, `reconnect=false`. Local `127.0.0.1:54322`
+counts: conversations 1, messages 1, runs 1, `run_by_id` 1.
+
+### Bounded browser query
+
+Frontend `http://127.0.0.1:3010` with local `NEXT_PUBLIC_*`. Member
+`p08-22-browser-8d480fb455@example.com`. Ready. New session. Question:
+`What documents are in the corpus?`
+
+| Step | Result |
+| --- | --- |
+| `POST /conversations` | 201 `29a65e3f-c8e5-44c0-b334-e74df8127aa1` |
+| `POST .../messages` | 202 `run_id=952d26fd-4c19-4fab-bcac-4c135854c772` |
+| `GET /runs/.../events?after=0` | 200 |
+| UI terminal | `error` / `run_failed` |
+| UI copy | generic “Something went wrong.” |
+| Pipeline `data-active` Generating/Verifying | Not observed; collapsed “Run status” after error |
+| Local `token_delta` | 0 |
+| Local terminals | 1 (`error`) |
+| `app.run_events` types | `schema,error` |
+| `app.llm_usage` | 0 rows, 0 tokens, 0 USD |
+
+API log: `query.sse.started` then `sse.executor_failed` 14 ms later.
+Persisted payload `{"code":"run_failed"}` (sanitized; exception type is
+not in the public event). Treating 202/SSE 200/generic error as a
+successful chat outcome is forbidden.
+
+### Authorization / failure / fallback
+
+- Member `/ops/ready` 403. Proven.
+- Public `/health/ready` omits named dependencies. Proven.
+- Empty-success 202 without a local run is no longer the defect after
+  rebuild+pin. The remaining defect is immediate production-executor
+  failure after durable admit.
+- Worker parser-sandbox crash does not explain the 14 ms API executor
+  failure by itself.
+
+### Unverified / not run
+
+- Role Playwright journeys and 390/1280 visual baselines.
+- Reconnect/resume, cancel, 402/403/426/429, revoked session,
+  BM25/graph degradation.
+- Clean image-layer secret inspection beyond `test_dockerignore.py`
+  (already recorded in P08-21).
+- Exception type/message for `sse.executor_failed` (logger extra
+  `error_type` is not present in the JSON line).
+- Live contract 8 failures and Playwright 28/7 from P08-21.
+
+### Deviations
+
+- Did not rewrite `.env.compose`. Used process-env local overlay.
+- Did not `reset.ps1`.
+- Rebuilt api/worker because the previous image still enforced MFA.
+- One bounded browser query after the pin. No second provider retry.
+- Host `:3010` used for Ask; compose frontend `:3000` was not the
+  signed-in surface.
+
+### Rollback
+
+Leave local Supabase and Compose up. Recreating api/worker without the
+local process-env overlay returns them to hosted `:6543`. Do not attach
+LightRAG to the hosted pooler. Do not check wrapper item 22.
+
+### Handoff
+
+P08-22 is **BLOCKED**. Do not mark the packet complete. P08-23 may open
+a PR but must not merge. Next owner: identify the 14 ms
+`sse.executor_failed` after `query.sse.started` on the rebuilt API
+(first LangGraph `astream` tick), then repeat one bounded Ask query
+until Generating/Verifying, a verified answer or grounded refusal,
+`token_delta`, and one non-error terminal are durable on local `54322`.

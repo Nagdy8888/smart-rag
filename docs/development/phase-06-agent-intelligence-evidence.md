@@ -1567,3 +1567,12 @@ Commands: `.\.venv\Scripts\pytest.exe tests/unit/test_sse_protocol.py tests/cont
 P08-20 documentation integrity: frontend action inventory and Phase 8
 docs now treat this co-owned SSE repair as closed. Do not restore empty
 `completed` success or typewriter streaming.
+
+P08-22 live stack (2026-08-25): local admit now inserts `app.runs` after
+the API image was rebuilt past MFA removal and pinned to
+`host.docker.internal:54322`. One bounded browser Composite run
+(`952d26fd-4c19-4fab-bcac-4c135854c772`) persisted `schema` then
+sanitized `error`/`run_failed` 14 ms after `query.sse.started`, with
+zero `token_delta` and zero usage. That is not verified-final delivery.
+Details are in
+[`phase-08-frontend-integration-evidence.md`](./phase-08-frontend-integration-evidence.md).
