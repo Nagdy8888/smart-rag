@@ -2,7 +2,7 @@
 title: Phase 8 frontend integration evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: engineering, reviewers, client-approver
 ---
 
@@ -2428,3 +2428,116 @@ Browser re-audit (Playwright MCP on `http://127.0.0.1:3000`, plus the :3010 Play
 - `createConversation` now throws on non-OK so a 401 cannot produce `GET /conversations/undefined/messages`.
 
 Completion: P2–P8 are implemented on this branch. P1 transcript API remains the only API-surface change. Visual snapshots under `apps/frontend/tests/e2e/visual-routes.spec.ts-snapshots/` were regenerated.
+
+## P08-07 — Canonical remediation amendment and baseline (reconcile)
+
+**Status:** PASS — 2026-08-26 reconciliation.
+
+Existing 2026-08-24 evidence in this file already records packets 07–23, the
+functional-overhaul ADR, action inventory, visual contract, and no
+application-source edits. Wrapper checkbox 7 was still open after P08-08
+through P08-21 completed. This reconcile checks P08-07 and sets packet 07
+`status: complete` without rewriting history.
+
+## P08-24 — Canonical streaming overhaul amendment and policy ADR
+
+**Status:** PASS — 2026-08-26.
+
+Integrity: `uv run python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py --update` then verify → exit 0, 172 canonical files.
+
+### Requirement quoted
+
+> Authorize the streaming/modularization suite without pretending the draft
+> plan is canonical. Write the paced-reveal ADR, amend Phase 6/8 contracts,
+> add P06-16, and promote additive P08 packets. No application code.
+
+### Changed paths
+
+- `docs/adr/ADR-verified-answer-paced-reveal.md`
+- `.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/16-sse-custom-progress.md`
+- `.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/24-*.md` through `87-*.md`
+- Phase 6/8 wrappers, shared/visual contracts, P08-09/P08-15 superseding notes
+- `docs/frontend/workspace-screens.md`, docs indexes, coverage manifest
+
+### Acceptance
+
+- [PASS] P08-07 reconciled and checked.
+- [PASS] ADR supersedes no-artificial-delay presentation only.
+- [PASS] One coding sibling is not activated by this documentation packet;
+  P08-25 (SEC-01) is the next application-code packet.
+- [UNVERIFIED] Integrity verifier — recorded immediately after this amendment.
+- [PASS] No application runtime source changed in this packet.
+
+### Rollback
+
+Revert the additive packet files and contract notes. Do not renumber
+P08-22/P08-23. Do not uncheck completed historical packets.
+
+## Streaming overhaul suite — GOV through VER (2026-08-26)
+
+**Status:** PARTIAL
+
+### Requirement and acceptance
+- [PASS] Same-origin auth callback (`safeNextPath`); no open redirect.
+- [PASS] Backend SSE path split under `services/sse/`; extra-forbid catalog with optional `status.phase` and `tool_progress`.
+- [PASS] Frontend god-file extraction: ChatApp ≤300; table-plan/admin-bodies barrels ≤100; AnalysisPlan ≤200; document-library/curation/auth/graph under packet budgets.
+- [PASS] Progress-only before verification; paced verified reveal ≤2.5s / ≤90 publications; skip and reduced motion.
+- [PASS] Conversation rail does not re-render on `token_delta`.
+- [PASS] Session query keys use JWT `sub`; revoked session stays latched.
+- [PASS] `consumeSse` publishes one React state per `reader.read()` batch; heartbeat-only updates cursor only.
+- [PASS] Hydration-stable nav preference via `useSyncExternalStore`; 390px topbar hides duplicate brand.
+- [PASS] Tables list pending/error/empty are mutually exclusive.
+- [BLOCKED] P08-22 hosted live Verifying, `app.llm_usage` settlement, durable-terminal UI, hosted schema — no hosted write approval.
+- [UNVERIFIED] Playwright `tests/e2e/sse-progress-fixture.spec.ts` against a live local stack.
+- [UNVERIFIED] Full root `frontend` / `docs` / `unit` tiers in this run.
+
+### Changed paths
+- `apps/frontend/src/lib/table-plan/` — draft/validate/compile/results owners
+- `apps/frontend/src/lib/admin-bodies/` — invitation/glossary/entity-rule builders
+- `apps/frontend/src/lib/hooks/use-console-readiness.ts` — one readiness query per session-role
+- `apps/frontend/src/lib/hooks/use-layout-preference.ts` — hydration-stable localStorage
+- `apps/frontend/src/components/tables/analysis-plan/` — presentation sections
+- `apps/frontend/src/components/{documents,admin,auth,graph}/` extracted controllers
+- `apps/frontend/src/components/ui/styles/` and chat/shell/admin CSS modules
+- `apps/frontend/tests/fixtures/sse/` — synthetic route fixtures
+- `docs/api/SSE.md`, `docs/frontend/workspace-screens.md`, `docs/frontend/action-inventory.json`
+
+### Commands
+| Command | Exit | Duration | Counts/result |
+|---|---:|---:|---|
+| `pnpm --filter smart-rag-frontend exec vitest run` focused chat/tables/lib suites | 0 | ~14s | 136 passed |
+| surface/geometry/admin/auth/graph suites | 0 | ~10s | 77 passed |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 | ~13s | clean |
+| `pnpm --filter smart-rag-frontend lint` | 0 | ~19s | clean |
+| action inventory | 0 | | verified |
+
+### Runtime proof
+- profile: local deterministic fixtures; hosted P08-22 remains BLOCKED
+- leakage marker: `SYNTHETIC_NO_LEAK_MARKER`
+
+### Architecture
+- ChatApp 300 → 300 composition-only
+- table-plan.ts 504 → ≤100 barrel
+- analysis-plan.tsx 589 → ≤200
+- document-library.tsx 541 → 189
+- curation-panel.tsx 499 → 91
+- auth-screens.tsx 493 → 12
+- graph-explorer.tsx 340 → 206
+- leftover allow-list: `design-tokens.ts` token table; `chat-view.ts` / `answer-surface.tsx` still over 300
+
+### Security, authorization, replay, fallback
+- Redirect matrix stays same-origin.
+- Cache keys never store the raw JWT.
+- Resume/cancel remain first-terminal-wins; reconnect does not start a second paid POST.
+
+### Unverified or blocked
+- Hosted settlement, live Verifying paint, durable partial vs UI running.
+- Full Playwright visual baselines after 390px CSS split.
+- Integrity lock `--update` not run in this close.
+
+### ADR/deviation
+- Presentation delay remains ADR-verified-answer-paced-reveal only.
+- P08-22/P08-23 not renumbered or checked.
+
+### Rollback
+- Revert the frontend/backend modularization and presentation owners. Keep Phase 6 graph-node dirty-tree work untouched.

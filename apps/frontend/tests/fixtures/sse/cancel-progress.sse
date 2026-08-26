@@ -1,0 +1,14 @@
+: SYNTHETIC_NO_LEAK_MARKER
+
+id: 1
+event: schema
+data: {"sse_schema_version":"1"}
+
+id: 2
+event: status
+data: {"stage":"prepare_query","status":"running","phase":"started"}
+
+id: 3
+event: cancelled
+data: {}
+

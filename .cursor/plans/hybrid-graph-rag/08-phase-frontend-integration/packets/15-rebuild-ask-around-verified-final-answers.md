@@ -45,7 +45,7 @@ Implementation:
 - Prompt chips place text in the composer and never submit paid work.
 - The sticky auto-resizing composer respects the server message limit and exposes one Send/Stop control.
 - Show only real stages: connecting, queued, retrieving, generating, verifying, reconnecting, partial, complete, cancelled, and failed.
-- During Generating/Verifying show progress, not a caret or fake typewriter. Insert the verified final SSE chunks immediately without artificial delay and announce the completed answer once.
+- During Generating/Verifying show progress, not a caret or fake typewriter. Insert the verified final SSE chunks immediately into authoritative state and announce the completed answer once. Visual pacing after verification is owned by P08-24 / ADR-verified-answer-paced-reveal and must not delay this packet’s protocol contract.
 - Render answer text as safe text with `dir="auto"`. Preserve already delivered verified text on later transport failure/cancel.
 - Show citation chips only for real IDs; open one provenance drawer without fabricated preview/download text.
 - Keep route/BM25/cache/coverage/tool diagnostics collapsed. Remove manual Hybrid/Combined/Table/Inspect send controls and unsupported nDCG/TTFB fields.
@@ -110,6 +110,7 @@ Acceptance tests:
 - Header row: spark icon, “Answer,” route StatusPill when real, and overflow with real actions only.
 - Answer text 15px/24px for reading comfort.
 - Do not show a streaming caret or typewriter animation. Show the real Generating/Verifying progress state, then insert verified final answer text without artificial delay.
+- Superseded for presentation only by P08-24 / ADR-verified-answer-paced-reveal: authoritative insert stays immediate; visual reveal may be paced after verification. This completed packet is not unchecked.
 - Partial/cancelled/error retains existing text and adds a StatusBanner below.
 - Footer order: citations, feedback, then “Run details” disclosure.
 

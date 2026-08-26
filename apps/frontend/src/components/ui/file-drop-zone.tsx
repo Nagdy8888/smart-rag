@@ -6,7 +6,7 @@
 
 import { useCallback, useId, useState, type DragEvent, type KeyboardEvent } from "react";
 import { UserText } from "./user-text";
-import styles from "./ui.module.css";
+import styles from "./styles/controls.module.css";
 
 export type FileDropZoneProps = {
   /** English instructions. */

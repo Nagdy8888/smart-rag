@@ -9,7 +9,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover } from "../ui/popover";
 import { Select } from "../ui/select";
-import styles from "./chat.module.css";
+import styles from "./chat-transcript.module.css";
 
 export type FeedbackPopoverProps = {
   /** Thumbs up selected. */

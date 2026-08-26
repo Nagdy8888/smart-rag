@@ -6,17 +6,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import psycopg
-
-# isort: off
-# hybrid_run must finish before query_admission package init (ceilings cycle).
-import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
+from smart_rag_core.query_profile.versions import PROFILE_MODEL_ID
 from smart_rag_core.query_routing.branches import (
     GraphRetrieveLike,
     HybridRetrieveLike,
     TableExecuteLike,
 )
-
-# isort: on
 from smart_rag_core.query_routing.preparation import PrepModelCaller
 from smart_rag_core.security.identity import UserRole
 from smart_rag_core.tools.compare import RUNTIME_SELECTION_POLICY
@@ -41,6 +36,9 @@ class QueryGraphDeps:
         model_caller: One structured rewrite-plus-profile adapter.
         force_model: Spend the one prep call even when deterministic.
         cancel_check: Cooperative cancellation probe.
+        query_profile_prompt_text: Pinned ``query_profile_v1`` body when a
+            live or mock profile adapter runs.
+        profile_model_id: Provider model id recorded on profile usage.
         answer_prompt_text: Pinned ``answer_v1`` body when a live adapter runs.
         general_chat_prompt_text: Pinned ``general_chat_v1`` body when a live
             general-chat adapter runs.
@@ -63,6 +61,8 @@ class QueryGraphDeps:
     model_caller: PrepModelCaller | None = None
     force_model: bool = False
     cancel_check: Callable[[], bool] | None = None
+    query_profile_prompt_text: str | None = None
+    profile_model_id: str = PROFILE_MODEL_ID
     answer_prompt_text: str | None = None
     general_chat_prompt_text: str | None = None
     verifier_prompt_text: str | None = None
@@ -79,3 +79,36 @@ class QueryGraphDeps:
     store_put: Callable[[tuple[str, str, str], str, dict[str, object]], None] | None = (
         None
     )
+
+
+@dataclass(slots=True)
+class QueryGraphContext:
+    """Per-invocation LangGraph runtime context. Never compiled into topology.
+
+    Attributes:
+        deps: Run-local adapters, connection, and cancellation probe.
+    """
+
+    deps: QueryGraphDeps
+
+
+def deps_from_runtime(runtime: object, fallback: QueryGraphDeps) -> QueryGraphDeps:
+    """Read run-scoped deps from LangGraph ``Runtime.context``.
+
+    Args:
+        runtime: Injected ``langgraph.runtime.Runtime`` or any object with
+            an optional ``context.deps`` attribute.
+        fallback: Topology-compile default. Must be empty for a process
+            cache; tests may pass bound deps when they invoke without
+            ``context=``.
+
+    Returns:
+        The invocation's ``QueryGraphDeps`` when present, otherwise
+        ``fallback``. Never a prior run's captured object.
+    """
+
+    context = getattr(runtime, "context", None)
+    deps = getattr(context, "deps", None) if context is not None else None
+    if isinstance(deps, QueryGraphDeps):
+        return deps
+    return fallback

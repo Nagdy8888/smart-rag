@@ -15,6 +15,7 @@ import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
 import { PageHeader } from "../ui/page-header";
 import { Select } from "../ui/select";
+import { Skeleton } from "../ui/skeleton";
 import { StatusBanner } from "../ui/status-banner";
 import { UserText } from "../ui/user-text";
 import {
@@ -156,7 +157,20 @@ export function TablesApp() {
       <div className={styles.layout}>
         <aside className={styles.sidebar} aria-label="Available tables">
           <h2>Available tables</h2>
-          {manifests.length === 0 ? (
+          {tablesQuery.isPending && tablesQuery.data === undefined ? (
+            <Skeleton label="Loading tables" width="100%" />
+          ) : listError ? (
+            <Button
+              type="button"
+              variant="secondary"
+              data-action-id="tables.retry"
+              onClick={() => {
+                void tablesQuery.refetch();
+              }}
+            >
+              Retry
+            </Button>
+          ) : manifests.length === 0 ? (
             <EmptyState title={EMPTY_MANIFESTS_COPY} />
           ) : (
             <ul className={styles.manifestList}>
@@ -200,7 +214,9 @@ export function TablesApp() {
               options={tableOptions}
               onChange={(event) => setUserSelectedId(event.target.value)}
             />
-            {manifests.length === 0 ? (
+            {tablesQuery.isPending && tablesQuery.data === undefined ? (
+              <Skeleton label="Loading tables" width="100%" />
+            ) : listError ? null : manifests.length === 0 ? (
               <EmptyState title={EMPTY_MANIFESTS_COPY} />
             ) : null}
           </div>

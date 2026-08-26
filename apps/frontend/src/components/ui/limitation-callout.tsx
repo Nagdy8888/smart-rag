@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 import { displayText } from "../../lib/safe-text";
-import styles from "./ui.module.css";
+import styles from "./styles/data-display.module.css";
 
 export type LimitationCalloutProps = {
   /** Signed copy or React nodes already passed through `displayText`. */

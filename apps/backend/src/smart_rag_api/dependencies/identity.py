@@ -235,7 +235,7 @@ def resolve_caller_context(
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session revoked",
+            detail="session_revoked",
         )
 
     return build_caller_context(

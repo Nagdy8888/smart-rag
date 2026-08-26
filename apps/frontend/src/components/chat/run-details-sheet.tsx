@@ -11,7 +11,7 @@ import { displayText } from "../../lib/safe-text";
 import { Button } from "../ui/button";
 import { Sheet } from "../ui/sheet";
 import { UserText } from "../ui/user-text";
-import styles from "./chat.module.css";
+import styles from "./chat-transcript.module.css";
 
 export type RunDetailsSheetProps = {
   /** Whether the sheet is open. */

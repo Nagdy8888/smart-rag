@@ -4,7 +4,7 @@
  */
 
 import { UserText } from "./user-text";
-import styles from "./ui.module.css";
+import styles from "./styles/data-display.module.css";
 
 export type StatusTone = "neutral" | "success" | "warning" | "danger";
 

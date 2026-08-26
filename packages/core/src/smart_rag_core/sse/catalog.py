@@ -14,6 +14,7 @@ ALLOWED_SSE_EVENT_TYPES: Final[frozenset[str]] = frozenset(
     {
         "schema",
         "status",
+        "tool_progress",
         "heartbeat",
         "route_correction",
         "limitation",
@@ -56,9 +57,13 @@ FORBIDDEN_PAYLOAD_KEYS: Final[frozenset[str]] = frozenset(
     }
 )
 
+SseProgressPhase = Literal["started", "completed", "failed"]
+
+
 SseEventType = Literal[
     "schema",
     "status",
+    "tool_progress",
     "heartbeat",
     "route_correction",
     "limitation",
@@ -90,10 +95,21 @@ class SchemaPayload(_SsePayload):
 
 
 class StatusPayload(_SsePayload):
-    """Stage/status without retrieved text."""
+    """Stage/status without retrieved text.
+
+    ``phase`` is optional so persisted legacy rows without it still replay.
+    """
 
     stage: str = Field(min_length=1, max_length=64)
     status: str = Field(min_length=1, max_length=64)
+    phase: SseProgressPhase | None = None
+
+
+class ToolProgressPayload(_SsePayload):
+    """Optional-tool progress without args, results, or display text."""
+
+    tool_key: str = Field(min_length=1, max_length=64)
+    phase: SseProgressPhase
 
 
 class HeartbeatPayload(_SsePayload):
@@ -187,6 +203,7 @@ class ErrorPayload(_SsePayload):
 PAYLOAD_MODELS: Final[dict[str, type[BaseModel]]] = {
     "schema": SchemaPayload,
     "status": StatusPayload,
+    "tool_progress": ToolProgressPayload,
     "heartbeat": HeartbeatPayload,
     "route_correction": RouteCorrectionPayload,
     "limitation": LimitationPayload,

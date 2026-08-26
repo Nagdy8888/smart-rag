@@ -7,7 +7,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "./button";
-import styles from "./ui.module.css";
+import styles from "./styles/overlays.module.css";
 
 export type PopoverProps = {
   /** Accessible name for the trigger. */

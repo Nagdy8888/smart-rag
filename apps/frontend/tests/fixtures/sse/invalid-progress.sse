@@ -1,0 +1,50 @@
+: SYNTHETIC_NO_LEAK_MARKER
+
+id: 1
+event: schema
+data: {"sse_schema_version":"1"}
+
+id: 2
+event: status
+data: {"stage":"enforce_admission","status":"running","phase":"started"}
+
+id: 3
+event: status
+data: {"stage":"enforce_admission","status":"admitted","phase":"completed"}
+
+id: 4
+event: status
+data: {"stage":"load_memory","status":"running","phase":"started"}
+
+id: 5
+event: status
+data: {"stage":"load_memory","status":"loaded","phase":"completed"}
+
+id: 6
+event: status
+data: {"stage":"prepare_query","status":"running","phase":"started"}
+
+id: 7
+event: status
+data: {"stage":"prepare_query","status":"prepared","phase":"completed"}
+
+id: 8
+event: status
+data: {"stage":"compile_plan","status":"running","phase":"started"}
+
+id: 9
+event: status
+data: {"stage":"compile_plan","status":"planned","phase":"completed"}
+
+id: 10
+event: status
+data: {"stage":"invalid_scope","status":"running","phase":"started"}
+
+id: 11
+event: status
+data: {"stage":"invalid_scope","status":"routing_rejected","phase":"failed"}
+
+id: 12
+event: error
+data: {"code":"routing_rejected"}
+

@@ -1,0 +1,79 @@
+/**
+ * Ask composer card, field, and send control.
+ */
+
+.composer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  min-width: 0;
+  gap: calc(var(--space) * 2);
+  padding-top: calc(var(--space) * 3);
+}
+
+.composerCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-composer);
+  padding: 12px;
+}
+
+.composerField {
+  border: 0;
+  box-shadow: none;
+  min-height: 22px;
+  max-height: calc(22px * 8);
+}
+
+.composerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space) * 2);
+}
+
+.composerHint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.composerSend {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-pill);
+}
+
+.composerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1279px) {
+  .composer {
+    max-width: none;
+    margin-inline: 12px;
+    width: calc(100% - 24px);
+  }
+}
+
+@media (max-width: 479px) {
+  .composerHint {
+    display: none;
+  }
+}

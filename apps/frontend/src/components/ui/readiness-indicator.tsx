@@ -5,10 +5,7 @@
 
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { fetchMe, loadConsoleReadiness } from "../../lib/api";
-import { useSession } from "../../lib/auth/session-provider";
-import { publicQueryKeys, sessionQueryKeys } from "../../lib/query-keys";
+import { useConsoleReadiness } from "../../lib/hooks/use-console-readiness";
 import {
   readinessBlockingCopy,
   readinessCapabilities,
@@ -16,7 +13,10 @@ import {
 } from "../../lib/shell-navigation";
 import { Popover } from "./popover";
 import { StatusPill } from "./status-pill";
-import styles from "./app-shell.module.css";
+import layoutStyles from "./app-shell.module.css";
+import topbarStyles from "./app-topbar.module.css";
+
+const styles = { ...layoutStyles, ...topbarStyles };
 
 const TONE: Record<
   ReturnType<typeof readinessHeadline>,
@@ -34,36 +34,23 @@ const TONE: Record<
  * @returns Popover button. Side effects: health fetches.
  */
 export function ReadinessIndicator() {
-  const session = useSession();
-  const token = session.accessToken;
-  const auth = token === null ? null : { accessToken: token };
-  const meQuery = useQuery({
-    queryKey: sessionQueryKeys(token).me,
-    queryFn: () => fetchMe(auth!),
-    enabled: auth !== null && session.ready,
-  });
-  const role = meQuery.data?.role ?? null;
-  const query = useQuery({
-    queryKey:
-      token === null
-        ? publicQueryKeys.ready
-        : [...sessionQueryKeys(token).consoleReady, role],
-    queryFn: () => loadConsoleReadiness(auth, role),
-    enabled: session.ready && (auth === null || meQuery.isFetched),
-    staleTime: 30_000,
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: false,
-  });
-  const ready = query.isPending && query.data === undefined ? undefined : query.data ?? null;
-  const headline = readinessHeadline(ready);
-  const capabilities = ready === null || ready === undefined ? [] : readinessCapabilities(ready);
+  const { ready, readyPending } = useConsoleReadiness();
+  const resolved = readyPending && ready === null ? undefined : ready;
+  const headline = readinessHeadline(resolved);
+  const capabilities =
+    resolved === null || resolved === undefined ? [] : readinessCapabilities(resolved);
 
   return (
     <span data-action-id="shell.readiness" data-testid="shell-readiness">
       <Popover
         label="Service readiness"
         actionId="shell.readiness"
-        trigger={<StatusPill status={headline} tone={TONE[headline]} />}
+        trigger={
+          <>
+            <StatusPill status={headline} tone={TONE[headline]} />
+            <span className={styles.srOnly}>Service readiness: {headline}</span>
+          </>
+        }
       >
         <div className={styles.readinessPopover}>
           {headline === "Unavailable" ? <p>{readinessBlockingCopy()}</p> : null}

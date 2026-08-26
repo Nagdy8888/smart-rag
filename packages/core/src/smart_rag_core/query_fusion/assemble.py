@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from smart_rag_core.query_fusion.config_hash import fusion_config_hash
 from smart_rag_core.query_fusion.constants import (
@@ -30,7 +30,10 @@ from smart_rag_core.query_fusion.ranking import (
     score_resolved_path_fusion,
 )
 from smart_rag_core.query_fusion.union import score_naive_union
-from smart_rag_core.query_routing.models import BranchKind, BranchResult
+from smart_rag_core.query_routing.models.plan import BranchKind
+
+if TYPE_CHECKING:
+    from smart_rag_core.query_routing.models.results import BranchResult
 
 
 def fuse_evidence(

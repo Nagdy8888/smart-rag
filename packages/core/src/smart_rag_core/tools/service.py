@@ -33,6 +33,11 @@ from smart_rag_core.tools.models import (
     ToolDefinition,
 )
 from smart_rag_core.tools.permissions import visible_tools
+from smart_rag_core.tools.progress import (
+    ToolProgressReporter,
+    report_phase,
+    report_selected,
+)
 from smart_rag_core.tools.ranking import Embedder
 from smart_rag_core.tools.telemetry import build_telemetry
 
@@ -81,6 +86,7 @@ def resolve_optional_tools(
     current_caller: CallerContext | None = None,
     idempotency_key: str = "optional-run-1",
     comparison_metrics: ComparisonMetrics | None = None,
+    progress: ToolProgressReporter | None = None,
 ) -> tuple[
     SelectionPolicy,
     str,
@@ -123,6 +129,7 @@ def resolve_optional_tools(
         current_caller: Live caller for executor recheck. Defaults to ``caller``.
         idempotency_key: Key for write tools.
         comparison_metrics: Optional metrics for unjustified-discovery checks.
+        progress: Optional observer for selected keys and execution phases.
 
     Returns:
         Selection mode, prompt capture, bound tool names, execution result,
@@ -317,6 +324,8 @@ def resolve_optional_tools(
     result: ExecutionResult | None
     remaining_tools = remaining_tool_calls
     remaining_side = remaining_side_effects
+    report_selected(progress, selected_keys)
+    report_phase(progress, selected_keys[0], "started")
     try:
         result = execute_optional_tool(
             planned,
@@ -332,10 +341,12 @@ def resolve_optional_tools(
         useful = 1 if result.status in {"ok", "replayed"} else 0
         remaining_tools = result.remaining_tool_calls
         remaining_side = result.remaining_side_effects
+        report_phase(progress, selected_keys[0], "completed")
     except ToolError:
         called = 1
         rejected = 1
         result = None
+        report_phase(progress, selected_keys[0], "failed")
         telemetry = build_telemetry(
             discovery_latency_ms=latency,
             tools_searched=searched,

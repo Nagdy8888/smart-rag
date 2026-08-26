@@ -262,12 +262,26 @@ User approval on 2026-08-24: remove MFA, TOTP enrollment/challenge/recovery, and
 
 ## Approved planned deviation: general-chat strict split
 
-User approval on 2026-08-25: the production Ask surface and a separate live LangSmith Studio graph may answer general questions from OpenAI world knowledge, while company/document questions remain citation-required RAG with no world-knowledge fallback. Mixed or uncertain scope must ask for clarification instead of blending sources.
+User approval on 2026-08-25; 2026-08-26 remediation drafted and pending explicit user acceptance: the production Ask surface and a separate live LangSmith Studio graph may answer general questions from OpenAI world knowledge, while company/document questions remain citation-required RAG with no world-knowledge fallback. Only a genuine conflict between company and general signals asks for clarification; unavailable, malformed, or low-confidence profile inference records a typed degradation reason and may produce an honest company-claim-forbidden general answer that explicitly states company documents were not searched.
 
 - Recorded in `docs/adr/ADR-general-chat-strict-split.md`.
 - Implementation is additive Phase 6 packets P06-09 through P06-15. P06-14 is a Phase 6/Phase 8 co-owned UI amendment. Do not uncheck historical completed Phase 6 packets or Phase 8 packets 1–21, and do not renumber active P08-22/P08-23.
 - Keep `query_studio` deterministic and unbound. Live document access uses only `query_studio_live` with a real developer JWT from a gitignored environment variable.
 - Never synthesize a live identity or use a service-role key for Studio document access.
 - Never fall back from insufficient company evidence to world knowledge. Never emit canonical citations on a general/user-text/clarification answer.
-- General and user-text model calls consume the existing durable `usage_kind="answer"` reservation and immutable usage rows.
-- Rollback disables general scope and removes the live graph registration without changing document RAG.
+- The production preparation path may consume one live counted `usage_kind="profile"` call under the existing profile and route ceilings. General, greeting, degraded, and user-text model calls consume the existing durable `usage_kind="answer"` reservation and immutable usage rows. No new usage kind or migration is authorized.
+- Pure greetings and bounded small talk are profile-model classified and general-model answered; deterministic company signals still settle before the model. A live pure greeting normally costs one profile plus one answer call.
+- Keep the five existing `KnowledgeScope` values and route families. The degradation reason is server-derived, never accepted from model output, and cannot authorize evidence.
+- Validated `RetrievalPlan` selects explicit company, general, mixed, or fail-closed graph paths after plan compilation. Direct paths skip retrieval/correction/fusion/table/tool/verifier-model work but still run deterministic verification.
+- Rollback disables general scope, restores the former post-plan linear edge, and removes the live graph registration without changing document RAG or durable usage history.
+
+## Approved planned deviation: paced verified-answer reveal and custom progress
+
+User approval on 2026-08-26: keep progress-only before verification, then progressively reveal already-verified answer text so it does not appear as one bulk block.
+
+- Recorded in `docs/adr/ADR-verified-answer-paced-reveal.md`.
+- Implementation is additive Phase 6 packet P06-16 and Phase 8 packets P08-24 through P08-87. Do not uncheck historical completed packets or renumber P08-22/P08-23.
+- Authoritative verified-text ingestion, persistence, settlement, citations, and the resume cursor remain immediate.
+- Presentation pacing is frontend-only, at most 2.5 seconds and 90 publications, with skip and reduced-motion bypass.
+- Production LangGraph streaming may use `stream_mode=["updates", "custom"]` and `version="v2"` after the pinned 1.2.11 contract test. Custom payloads carry only safe node/tool keys.
+- No pre-verification draft prose. A future pre-verification reversal requires another ADR.

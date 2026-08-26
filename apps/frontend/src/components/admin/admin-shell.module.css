@@ -1,0 +1,247 @@
+/**
+ * Admin page, tabs, and unused console-layout leftovers.
+ */
+
+.shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  line-height: var(--line-height-en);
+}
+
+.shell h1,
+.shell h2 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(var(--space) * 3);
+}
+
+.pageLead {
+  margin: calc(var(--space) * 1) 0 0;
+  color: var(--color-text-muted);
+  max-width: 40rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+  gap: calc(var(--space) * 4);
+  align-items: stretch;
+}
+
+.chatWorkspace {
+  display: grid;
+  grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr) minmax(16rem, 20rem);
+  gap: calc(var(--space) * 4);
+  min-height: calc(100vh - 8rem);
+}
+
+.chatStage {
+  display: flex;
+  flex-direction: column;
+  min-height: 28rem;
+  min-width: 0;
+}
+
+.chatTranscript {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+  padding: calc(var(--space) * 2);
+  overflow: auto;
+}
+
+.composerDock {
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  background: var(--color-bg);
+  padding-top: calc(var(--space) * 3);
+}
+
+.bubbleUser {
+  align-self: flex-end;
+  max-width: 36rem;
+  background: var(--color-accent-muted);
+  border: 1px solid var(--color-accent-soft);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space) * 3) calc(var(--space) * 4);
+}
+
+.bubbleAssistant {
+  align-self: stretch;
+  max-width: 42rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space) * 4);
+  box-shadow: var(--shadow-1);
+}
+
+.pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pipelineStep {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 calc(var(--space) * 2);
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.pipelineDone {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.pipelineActive {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+  font-weight: 600;
+}
+
+.routeChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 calc(var(--space) * 3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.routeChipActive {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .chatWorkspace {
+    grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr);
+  }
+
+  .chatWorkspace .diagnostics {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 800px) {
+  .grid,
+  .chatWorkspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.muted {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.diagnostics {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space) * 3) calc(var(--space) * 4);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+}
+
+.diagnostics summary {
+  cursor: pointer;
+  min-height: var(--row-height);
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+}
+
+.shell dl {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: calc(var(--space) * 1) calc(var(--space) * 3);
+}
+
+.shell dt {
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.shell select {
+  font: inherit;
+  min-height: var(--control-height);
+  padding: calc(var(--space) * 2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.tabList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab,
+.tabCurrent {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.tabCurrent {
+  color: var(--color-accent);
+  background: var(--color-accent-muted);
+  font-weight: 600;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+  max-width: 1120px;
+  color: var(--color-text);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+}
+
+.tabPanel {
+  min-width: 0;
+}

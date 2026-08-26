@@ -13,7 +13,7 @@ from smart_rag_core.query_routing.preparation import prepare_query
 from smart_rag_core.retrieval.context_loader import ChunkContext
 from smart_rag_core.security.identity import CallerContext
 
-from tests.unit.test_query_routing_matrix import _runtime
+from tests.support.query_runtime import authorized_runtime as _runtime
 
 
 def _context(

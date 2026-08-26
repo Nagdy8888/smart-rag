@@ -269,7 +269,7 @@ def test_live_adapter_keyword_does_not_call_openai() -> None:
         """Invoke the keyword callback."""
 
         with patch(
-            "smart_rag_core.gateways.model.execute_openai_lightrag_llm"
+            "smart_rag_core.gateways.openai_adapter.execute_openai_lightrag_llm"
         ) as mocked:
             response = await adapter.generate_lightrag_llm(
                 LightRagLlmRequest(role="keyword", prompt="unused")
@@ -290,7 +290,7 @@ def test_live_adapter_extract_calls_openai() -> None:
         """Invoke the extract callback."""
 
         with patch(
-            "smart_rag_core.gateways.model.execute_openai_lightrag_llm",
+            "smart_rag_core.gateways.openai_adapter.execute_openai_lightrag_llm",
             return_value=(
                 "entity-row\n<|COMPLETE|>",
                 "resp_1",

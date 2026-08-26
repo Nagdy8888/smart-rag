@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
 from typing import cast
@@ -26,7 +27,7 @@ from smart_rag_core.observability.query_run_trace import (
 )
 from smart_rag_core.settings import AgentSettings
 
-from tests.unit.test_langsmith_tracing import RecordingLangSmithClient
+from tests.support.langsmith import RecordingLangSmithClient
 from tests.unit.typed_attrs import module_attr
 
 CANARY_PASSAGE = "SECRET_COMPANY_PASSAGE_DO_NOT_EXPORT"
@@ -249,7 +250,9 @@ def test_completed_sse_parent_omits_canaries() -> None:
     result = asyncio.run(_run())
     assert captured["ran"] == "1"
     assert result["termination_reason"] == "completed"
-    assert result["usage_metadata"]["total_tokens"] == 50
+    usage = result["usage_metadata"]
+    assert isinstance(usage, dict)
+    assert usage["total_tokens"] == 50
     names = [item["name"] for item in recorder.created]
     assert QUERY_RUN_SSE_SPAN in names
     parent = next(
@@ -271,6 +274,64 @@ def test_completed_sse_parent_omits_canaries() -> None:
     assert redacted["estimated_cost_usd"] == pytest.approx(
         float(estimate_traced_chat_cost_usd(input_tokens=40, output_tokens=10))
     )
+
+
+def test_sse_parent_does_not_wait_for_langsmith_flush(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A completed run returns before any telemetry queue drain."""
+
+    from smart_rag_core.observability.query_trace import sse as sse_trace
+
+    recorder = RecordingLangSmithClient()
+    settings = AgentSettings()
+
+    def _slow_flush(*, timeout_seconds: float) -> None:
+        """Model the exporter stall that must stay off the request path.
+
+        Args:
+            timeout_seconds: Unused simulated drain bound.
+        """
+
+        del timeout_seconds
+        time.sleep(0.5)
+
+    async def _thunk() -> Mapping[str, object]:
+        """Return one completed summary.
+
+        Returns:
+            Successful terminal metadata.
+        """
+
+        return _summary(reason="completed", event_type="completed", exhausted=True)
+
+    async def _run() -> Mapping[str, object]:
+        """Invoke the traced parent with the slow-drain trap installed.
+
+        Returns:
+            Completed query-run summary.
+        """
+
+        with _tracing_context(enabled=True, client=recorder):
+            return await invoke_traced_query_run_sse(
+                _thunk,
+                settings=settings,
+                run_id=uuid4(),
+                user_id=uuid4(),
+                requested_route="hybrid",
+            )
+
+    monkeypatch.setattr(
+        sse_trace,
+        "flush_langsmith_traces",
+        _slow_flush,
+        raising=False,
+    )
+    started = time.monotonic()
+    result = asyncio.run(_run())
+    elapsed = time.monotonic() - started
+    assert result["termination_reason"] == "completed"
+    assert elapsed < 0.3
 
 
 def test_cancelled_sse_parent_keeps_cancelled_reason() -> None:

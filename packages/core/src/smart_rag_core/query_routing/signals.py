@@ -7,8 +7,23 @@ import re
 from smart_rag_core.evaluation.schema import QueryType
 from smart_rag_core.query_profile.extract import DeterministicExtract
 
+_TRAILING = r"[\s!.,?\u061F]*" + r"(?:[\U0001F300-\U0001FAFF\u2600-\u27BF])*"
 _GREETING = re.compile(
-    r"^(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening))[!.,?]*$",
+    r"^(?:(?:oh|ah|well)\s+)?"
+    r"(?:hi|hello|hey|salam|salaam|greetings|yo|howdy|"
+    r"good\s+(?:morning|afternoon|evening|day)|"
+    r"thanks|thank\s+you|"
+    r"مرحبا|السلام\s+عليكم|اهلا|أهلا)"
+    r"(?:\s+(?:there|my\s+friend|friend|buddy|team|everyone))?"
+    r"(?:\s+(?:a\s+lot|so\s+much|very\s+much))?"
+    rf"{_TRAILING}$",
+    re.IGNORECASE,
+)
+_SMALL_TALK = re.compile(
+    r"^(?:how are you|how're you|how's it going|how is it going|"
+    r"what's up|whats up|what is up|"
+    r"nice to meet you|good to see you)"
+    rf"{_TRAILING}$",
     re.IGNORECASE,
 )
 _PRODUCT_HELP = re.compile(
@@ -76,6 +91,22 @@ def is_greeting(query: str) -> bool:
     return _GREETING.fullmatch(query.strip()) is not None
 
 
+def is_small_talk(query: str) -> bool:
+    """Return whether the complete message is bounded small talk.
+
+    Used by the mock profile heuristic and the memory-follow-up guard. It
+    never settles live scope without the one preparation call.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        True only when the complete trimmed message is small talk.
+    """
+
+    return _SMALL_TALK.fullmatch(query.strip()) is not None
+
+
 def is_product_help(query: str) -> bool:
     """Return whether the user asks who the assistant is or what it can do.
 
@@ -109,7 +140,7 @@ def is_user_text_transform(query: str) -> bool:
 
 
 def is_no_retrieval(query: str) -> bool:
-    """Return whether the query is greeting, product help, or user-text transform.
+    """Return whether the query is greeting, small talk, help, or user text.
 
     Args:
         query: Original user text.
@@ -121,6 +152,7 @@ def is_no_retrieval(query: str) -> bool:
     stripped = query.strip()
     return (
         is_greeting(stripped)
+        or is_small_talk(stripped)
         or is_product_help(stripped)
         or is_user_text_transform(stripped)
     )

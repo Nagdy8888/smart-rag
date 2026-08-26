@@ -1,0 +1,306 @@
+"""Post-plan scope routing for company, general, mixed, and invalid paths."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from types import SimpleNamespace
+from uuid import UUID, uuid4
+
+from smart_rag_agents.query.deps import QueryGraphDeps
+from smart_rag_agents.query.graph import _route_after_plan, build_query_graph
+from smart_rag_agents.query.nodes.topology import route_after_plan
+from smart_rag_agents.query.state import pending_query_state
+from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.query_routing.matrix import compile_retrieval_plan
+from smart_rag_core.query_routing.preparation import prepare_query
+from smart_rag_core.security.identity import CallerContext, UserRole
+
+_COMPANY_ONLY_NODES = {
+    "company_scope",
+    "apply_correction",
+    "fuse_evidence",
+    "compose_tables",
+    "disclose_optional_tools",
+    "generate_answer",
+}
+
+
+class _SpyHybrid:
+    """Record Hybrid retrieve calls and return empty authorized evidence."""
+
+    def __init__(self) -> None:
+        """Create a zero-call Hybrid spy."""
+
+        self.calls = 0
+
+    def retrieve(
+        self,
+        *,
+        query: str,
+        caller: CallerContext,
+        profile: object | None = None,
+        deadline_seconds: float | None = None,
+    ) -> object:
+        """Count one retrieve and return an empty Hybrid payload.
+
+        Args:
+            query: Unused.
+            caller: Unused.
+            profile: Unused.
+            deadline_seconds: Unused.
+
+        Returns:
+            Namespace matching Hybrid fields used by branch execution.
+        """
+
+        del query, caller, profile, deadline_seconds
+        self.calls += 1
+        return SimpleNamespace(
+            ranked_ids=(UUID("00000000-0000-0000-0000-000000000001"),),
+            evidence=(),
+            coverage=SimpleNamespace(
+                coverage_score=0.80,
+                uncovered_headings=(),
+                signal="ok",
+                notes=(),
+            ),
+            fallback_reason="none",
+        )
+
+
+def _visit_nodes(query: str, *, hybrid: _SpyHybrid | None = None) -> list[str]:
+    """Compile and stream one admitted run, returning visited node names.
+
+    Args:
+        query: Original user text.
+        hybrid: Optional Hybrid spy. ``None`` proves the path never needs it.
+
+    Returns:
+        Node names emitted by LangGraph ``updates`` stream mode.
+    """
+
+    deps = QueryGraphDeps(hybrid_retriever=hybrid)
+    compiled = build_query_graph(deps).compile()
+    state = pending_query_state(_runtime().model_dump(mode="json"), user_query=query)
+    visited: list[str] = []
+    for chunk in compiled.stream(state, stream_mode="updates"):
+        if isinstance(chunk, dict):
+            visited.extend(str(name) for name in chunk)
+    return visited
+
+
+def _runtime() -> AuthorizedRuntimeContext:
+    """Return a Composite admission envelope for routing tests.
+
+    Returns:
+        Frozen authorized runtime context.
+    """
+
+    now = datetime.now(UTC)
+    return AuthorizedRuntimeContext(
+        user_id=uuid4(),
+        role=UserRole.MEMBER,
+        authorization_version=1,
+        conversation_id=uuid4(),
+        run_id=uuid4(),
+        reservation_id=uuid4(),
+        reconnect=False,
+        route_family=Phase6RouteFamily.COMPOSITE,
+        deadline_at=now + timedelta(seconds=50),
+        recursion_limit=24,
+        correction_ceiling=1,
+        subquestion_ceiling=3,
+        model_call_ceiling=9,
+        tool_ceiling=5,
+        discovery_ceiling=1,
+        manifest_ceiling=3,
+        side_effect_ceiling=1,
+        reserved_amount_usd=Decimal("3.60"),
+        remaining_usd=Decimal("3.60"),
+        remaining_prompt_tokens=72000,
+        remaining_completion_tokens=18000,
+        optimistic_version=1,
+        heartbeat_at=now,
+        payload_hash="b" * 64,
+        status="pending",
+    )
+
+
+def _planned_state(query: str) -> dict[str, object]:
+    """Compile a retrieval plan and store it on pending graph state.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        Planned query-graph state mapping.
+    """
+
+    runtime = _runtime()
+    prep = prepare_query(query, runtime=runtime)
+    plan = compile_retrieval_plan(prep, runtime)
+    state = pending_query_state(user_query=query)
+    state["status"] = "planned"
+    state["retrieval_plan"] = plan.model_dump(mode="json")
+    return state
+
+
+def test_query_graph_registers_explicit_scope_nodes() -> None:
+    """The compiled topology exposes scope nodes and drops execute_branches."""
+
+    compiled = build_query_graph().compile()
+    names = set(compiled.get_graph().nodes)
+    assert "company_scope" in names
+    assert "general_scope" in names
+    assert "mixed_scope" in names
+    assert "invalid_scope" in names
+    assert "generate_answer" in names
+    assert "verify_answer" in names
+    assert "execute_branches" not in names
+
+
+def test_greeting_and_general_plan_route_to_general_scope() -> None:
+    """Greetings and world-knowledge plans skip company retrieval."""
+
+    assert _route_after_plan(_planned_state("Hello")) == "general_scope"
+    assert _route_after_plan(_planned_state("hi friend")) == "general_scope"
+    assert (
+        _route_after_plan(_planned_state("What is the capital of France?"))
+        == "general_scope"
+    )
+    assert (
+        _route_after_plan(_planned_state("Rewrite this paragraph: The sky is blue."))
+        == "general_scope"
+    )
+
+
+def test_mixed_plan_routes_to_mixed_scope() -> None:
+    """Genuine mixed conflict uses the clarification node."""
+
+    query = "What is the capital of France and what is our refund period?"
+    assert _route_after_plan(_planned_state(query)) == "mixed_scope"
+
+
+def test_company_plan_routes_to_company_scope() -> None:
+    """Document questions still enter the retrieval path."""
+
+    assert (
+        _route_after_plan(_planned_state("What is our refund period?")) == "company_scope"
+    )
+
+
+def test_missing_plan_is_invalid_scope() -> None:
+    """A missing compiled plan fails closed instead of answering."""
+
+    state = pending_query_state(user_query="Hello")
+    state["status"] = "planned"
+    assert _route_after_plan(state) == "invalid_scope"
+    assert route_after_plan(state) == "invalid_scope"
+
+
+def test_graph_inspection_and_scoped_refusal_remain_company() -> None:
+    """Inspection and scoped refusal still enter the company retrieve path."""
+
+    assert (
+        _route_after_plan(_planned_state("Inspect the current graph workspace"))
+        == "company_scope"
+    )
+    assert (
+        _route_after_plan(_planned_state("Describe the unlabeled chart in the figure"))
+        == "company_scope"
+    )
+
+
+def test_general_and_mixed_paths_skip_retrievers_and_company_nodes() -> None:
+    """Direct paths never call Hybrid or visit company-only nodes."""
+
+    hybrid = _SpyHybrid()
+    general_nodes = _visit_nodes("Hello", hybrid=hybrid)
+    assert hybrid.calls == 0
+    assert "general_scope" in general_nodes
+    assert "verify_answer" in general_nodes
+    assert _COMPANY_ONLY_NODES.isdisjoint(general_nodes)
+
+    mixed_nodes = _visit_nodes(
+        "What is the capital of France and what is our refund period?",
+        hybrid=hybrid,
+    )
+    assert hybrid.calls == 0
+    assert "mixed_scope" in mixed_nodes
+    assert "verify_answer" in mixed_nodes
+    assert _COMPANY_ONLY_NODES.isdisjoint(mixed_nodes)
+
+
+def test_mixed_scope_leaves_usage_counters_unchanged() -> None:
+    """Genuine mixed clarification spends no answer or verifier calls."""
+
+    runtime = _runtime()
+    compiled = build_query_graph(QueryGraphDeps()).compile()
+    query = "What is the capital of France and what is our refund period?"
+    out = compiled.invoke(
+        pending_query_state(runtime.model_dump(mode="json"), user_query=query)
+    )
+    assert out["status"] in {"verified", "verified_partial", "refused"}
+    assert out["answer_call_count"] == 0
+    assert out["verifier_call_count"] == 0
+    assert out["keyword_extract_count"] == 0
+    assert out["catalog_llm_call_count"] == 0
+    assert out["remaining_model_calls"] == runtime.model_call_ceiling
+
+
+def test_successful_direct_paths_reach_verification() -> None:
+    """General and mixed drafts still pass through verify_answer."""
+
+    assert "verify_answer" in _visit_nodes("What is the capital of France?")
+    assert "verify_answer" in _visit_nodes(
+        "What is the capital of France and what is our refund period?"
+    )
+
+
+def test_company_path_visits_retrieve_then_verify() -> None:
+    """Company plans still run retrieve, correction, and verification."""
+
+    hybrid = _SpyHybrid()
+    nodes = _visit_nodes("What is our refund period?", hybrid=hybrid)
+    assert hybrid.calls >= 1
+    assert "company_scope" in nodes
+    assert "apply_correction" in nodes
+    assert "verify_answer" in nodes
+
+
+def test_studio_graphs_use_the_same_post_plan_router() -> None:
+    """Local and live Studio compile the same scope edges as production."""
+
+    production = set(build_query_graph().compile().get_graph().nodes)
+    local = set(build_query_graph(studio_local=True).compile().get_graph().nodes)
+    live = set(build_query_graph(studio_live=True).compile().get_graph().nodes)
+    for names in (production, local, live):
+        assert "company_scope" in names
+        assert "general_scope" in names
+        assert "mixed_scope" in names
+        assert "invalid_scope" in names
+        assert "execute_branches" not in names
+    assert "seed_studio_runtime" in local
+    assert "seed_studio_live_runtime" in live
+
+
+def test_pipeline_module_is_removed() -> None:
+    """Packet 2 deletes the node monolith instead of leaving a shim."""
+
+    from importlib import util
+    from pathlib import Path
+
+    pipeline = (
+        Path(__file__).resolve().parents[2]
+        / "apps"
+        / "agents"
+        / "src"
+        / "smart_rag_agents"
+        / "query"
+        / "nodes"
+        / "pipeline.py"
+    )
+    assert pipeline.exists() is False
+    assert util.find_spec("smart_rag_agents.query.nodes.pipeline") is None

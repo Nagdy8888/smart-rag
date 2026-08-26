@@ -86,7 +86,8 @@ Heartbeat interval is **15** seconds. Forbidden payload keys include
 | Event | Payload fields | Terminal |
 | --- | --- | --- |
 | `schema` | `sse_schema_version` | no |
-| `status` | `stage`, `status` | no |
+| `status` | `stage`, `status`, optional `phase` | no |
+| `tool_progress` | `tool_key`, `phase` | no |
 | `heartbeat` | empty | no |
 | `route_correction` | `from_route?`, `to_route?`, `reason?` | no |
 | `limitation` | `code` | no |

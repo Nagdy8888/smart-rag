@@ -17,9 +17,12 @@ import { fetchMe } from "../../lib/api";
 import { useSession } from "../../lib/auth/session-provider";
 import { sessionQueryKeys } from "../../lib/query-keys";
 import { commandDestinations } from "../../lib/shell-navigation";
+import { lockBodyScroll } from "./body-scroll-lock";
 import { Button } from "./button";
+import { isEditableKeyboardTarget, trapFocus } from "./focus-trap";
 import { Icon } from "./icon";
-import styles from "./ui.module.css";
+import controlStyles from "./styles/controls.module.css";
+import overlayStyles from "./styles/overlays.module.css";
 
 export type CommandMenuProps = {
   /** Whether the dialog is open. */
@@ -48,6 +51,7 @@ export function CommandMenu({ open, onClose }: CommandMenuProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (needle === "") {
@@ -57,9 +61,18 @@ export function CommandMenu({ open, onClose }: CommandMenuProps) {
   }, [destinations, query]);
 
   useEffect(() => {
-    if (open) {
-      inputRef.current?.focus();
+    if (!open || rootRef.current === null) {
+      return;
     }
+    const unlock = lockBodyScroll();
+    const release = trapFocus(rootRef.current, {
+      returnFocus: document.getElementById("shell-command"),
+      initialFocus: inputRef.current,
+    });
+    return () => {
+      release();
+      unlock();
+    };
   }, [open]);
 
   if (!open) {
@@ -107,25 +120,25 @@ export function CommandMenu({ open, onClose }: CommandMenuProps) {
   }
 
   return (
-    <div className={styles.commandRoot} data-action-id="shell.command">
+    <div ref={rootRef} className={overlayStyles.commandRoot} data-action-id="shell.command">
       <button
         type="button"
-        className={styles.commandBackdrop}
+        className={overlayStyles.commandBackdrop}
         aria-label="Close command menu"
         onClick={onClose}
       />
       <div
-        className={styles.commandPanel}
+        className={overlayStyles.commandPanel}
         role="dialog"
         aria-modal="true"
         aria-label="Go to"
       >
-        <label className={styles.field} htmlFor="command-menu-query">
+        <label className={controlStyles.field} htmlFor="command-menu-query">
           Filter pages
           <input
             ref={inputRef}
             id="command-menu-query"
-            className={styles.control}
+            className={controlStyles.control}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -135,7 +148,7 @@ export function CommandMenu({ open, onClose }: CommandMenuProps) {
             autoComplete="off"
           />
         </label>
-        <ul className={styles.commandList}>
+        <ul className={overlayStyles.commandList}>
           {matches.map((item, index) => (
             <li key={item.href}>
               <Button
@@ -184,11 +197,14 @@ export function CommandMenu({ open, onClose }: CommandMenuProps) {
 export function useCommandMenuShortcut(onOpen: () => void): void {
   useEffect(() => {
     /**
-     * Open on Ctrl/Cmd+K.
+     * Open on Ctrl/Cmd+K unless the user is typing in an editable control.
      *
      * @param event - Window keyboard event.
      */
     function onKeyDown(event: KeyboardEvent): void {
+      if (isEditableKeyboardTarget(event.target)) {
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         onOpen();

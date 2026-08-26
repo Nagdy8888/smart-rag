@@ -1,0 +1,32 @@
+{
+  "schema_version": "online-agent-eval-suite-v1",
+  "project": "smart-rag-agent-eval-online",
+  "trace_schema_version": "agent-online-eval-v1",
+  "root_run_name": "query.agent.eval.online.v1",
+  "redaction_class": "synthetic",
+  "split": "development",
+  "holdout_opened": false,
+  "max_cases": 20,
+  "case_ids": [
+    "p4-exact_code-0003",
+    "p4-alias-0003",
+    "p4-typo-0003",
+    "p4-semantic_factual-0003",
+    "p4-arabic_mixed-0003",
+    "p4-selective_metadata_filter-0003",
+    "p4-latest_as_of-0003",
+    "p4-multi_part-0003",
+    "p4-relationship-0003",
+    "p4-multi_hop-0003",
+    "p4-broad_synthesis-0003",
+    "p4-tabular_aggregation-0003",
+    "p4-insufficient_refusal-0003",
+    "p4-graph_mapping-0003",
+    "p4-acl_negative-0003",
+    "p4-negation-0003",
+    "p4-document_summary-0003",
+    "p4-mixed_locale_temporal-0003",
+    "p4-media_limitation-0003",
+    "p4-prompt_injection-0003"
+  ]
+}

@@ -19,15 +19,37 @@ import {
 } from "./design-tokens";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Join CSS module sources so geometry locks survive owner splits.
+ *
+ * @param relativePaths - Paths under `apps/frontend/src`.
+ * @returns Concatenated file text.
+ */
+function readCss(...relativePaths: string[]): string {
+  return relativePaths
+    .map((relative) => readFileSync(path.join(here, relative), "utf8"))
+    .join("\n");
+}
+
 const globals = readFileSync(path.join(here, "../app/globals.css"), "utf8");
-const ui = readFileSync(path.join(here, "../components/ui/ui.module.css"), "utf8");
-const shell = readFileSync(
-  path.join(here, "../components/ui/app-shell.module.css"),
-  "utf8",
+const ui = readCss(
+  "../components/ui/ui.module.css",
+  "../components/ui/styles/controls.module.css",
+  "../components/ui/styles/data-display.module.css",
+  "../components/ui/styles/overlays.module.css",
 );
-const chat = readFileSync(
-  path.join(here, "../components/chat/chat.module.css"),
-  "utf8",
+const shell = readCss(
+  "../components/ui/app-shell.module.css",
+  "../components/ui/app-nav.module.css",
+  "../components/ui/app-topbar.module.css",
+);
+const chat = readCss(
+  "../components/chat/chat.module.css",
+  "../components/chat/chat-rail.module.css",
+  "../components/chat/chat-transcript.module.css",
+  "../components/chat/chat-composer.module.css",
+  "../components/chat/run-progress-timeline.module.css",
 );
 
 describe("primitive geometry source lock", () => {
@@ -51,7 +73,7 @@ describe("primitive geometry source lock", () => {
     expect(globals).toMatch(/outline-offset:\s*2px/);
     expect(ui).toMatch(/\.button\s*\{[\s\S]*?height:\s*var\(--control-height\)/);
     expect(ui).toMatch(/\.control\s*\{[\s\S]*?height:\s*var\(--control-height\)/);
-    expect(ui).toMatch(/\.button\s*\{[\s\S]*?border-radius:\s*var\(--radius-sm\)/);
+    expect(ui).toMatch(/\.button\s*\{[\s\S]*?border-radius:\s*var\(--radius-control\)/);
     expect(ui).toMatch(/\.pill\s*\{[\s\S]*?height:\s*24px/);
     expect(ui).toMatch(/\.confirmPanel\s*\{[\s\S]*?border-radius:\s*var\(--radius-lg\)/);
     expect(ui).toMatch(/\.table th,\s*\n\.table td\s*\{[\s\S]*?height:\s*var\(--row-height\)/);
@@ -80,15 +102,11 @@ describe("primitive geometry source lock", () => {
     expect(chat).toMatch(/\.conversationButton\s*\{[\s\S]*?appearance:\s*none/);
     expect(ui).toMatch(/\.rovingList\s*\{[\s\S]*?display:\s*block/);
     expect(ui).toMatch(/\.rovingList > li\s*\{[\s\S]*?flex-shrink:\s*0/);
-    expect(chat).toMatch(
-      /\.railList > li,\s*\n\.railList \[role="option"\]\s*\{[^}]*flex-shrink:\s*0/,
-    );
+    expect(chat).toMatch(/\.railList > li\s*\{[^}]*flex-shrink:\s*0/);
     expect(chat).toMatch(/\.conversationButton\s*\{[\s\S]*?min-height:\s*56px/);
     expect(chat).toMatch(/\.conversationTitle\s*\{[\s\S]*?line-height:\s*20px/);
     expect(chat).toMatch(/\.conversationTime\s*\{[\s\S]*?line-height:\s*16px/);
-    expect(chat).not.toMatch(
-      /\.railList > li,\s*\n\.railList \[role="option"\]\s*\{[^}]*min-height:\s*0/,
-    );
+    expect(chat).not.toMatch(/\.railList > li\s*\{[^}]*min-height:\s*0/);
   });
 
   it("does not declare a second hex palette in primitive CSS", () => {

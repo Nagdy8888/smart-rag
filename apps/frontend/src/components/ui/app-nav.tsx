@@ -29,7 +29,11 @@ import { ReadinessIndicator } from "./readiness-indicator";
 import { Sheet } from "./sheet";
 import { Tooltip } from "./tooltip";
 import { UserText } from "./user-text";
-import styles from "./app-shell.module.css";
+import navStyles from "./app-nav.module.css";
+import layoutStyles from "./app-shell.module.css";
+import topbarStyles from "./app-topbar.module.css";
+
+const styles = { ...layoutStyles, ...navStyles, ...topbarStyles };
 
 export { navItemIsCurrent, consolePageTitle };
 
@@ -257,6 +261,7 @@ export function ConsoleTopbar() {
             type="button"
             variant="ghost"
             size="icon"
+            id="shell-command"
             className={styles.commandButton}
             aria-label="Open command menu"
             data-action-id="shell.command"

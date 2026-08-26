@@ -4,7 +4,7 @@
 
 import type { HTMLAttributes } from "react";
 import { UserText } from "./user-text";
-import styles from "./ui.module.css";
+import styles from "./styles/data-display.module.css";
 
 export type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
   /** Untrusted label. Rendered through `displayText`. */

@@ -3,7 +3,7 @@
  */
 
 import type { SelectHTMLAttributes } from "react";
-import styles from "./ui.module.css";
+import styles from "./styles/controls.module.css";
 
 export type SelectOption = {
   /** Option value submitted with the form. */

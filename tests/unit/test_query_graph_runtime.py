@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import UTC, datetime, timedelta
 from inspect import signature
 from pathlib import Path
@@ -10,7 +11,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -21,12 +21,12 @@ from smart_rag_agents.query.checkpointer import (
     open_query_checkpointer,
 )
 from smart_rag_agents.query.deps import QueryGraphDeps
-from smart_rag_agents.query.nodes.pipeline import (
-    _gateway_timeout_seconds,
-    _run_coro,
-    generate_answer_node,
-    verify_answer_node,
+from smart_rag_agents.query.gateway.sync_bridge import (
+    gateway_timeout_seconds,
+    run_coro,
 )
+from smart_rag_agents.query.nodes.answer import generate_answer_node
+from smart_rag_agents.query.nodes.verify import verify_answer_node
 from smart_rag_agents.query.state import pending_query_state
 from smart_rag_api.services.query_graph_runtime import (
     QueryGraphRuntimeError,
@@ -133,9 +133,9 @@ def test_query_checkpointer_pool_covers_signed_concurrency() -> None:
     assert QUERY_CHECKPOINTER_POOL_MAX_SIZE >= 5
     default = signature(open_query_checkpointer).parameters["max_size"].default
     assert default == QUERY_CHECKPOINTER_POOL_MAX_SIZE
-    async_default = signature(open_query_async_checkpointer).parameters[
-        "max_size"
-    ].default
+    async_default = (
+        signature(open_query_async_checkpointer).parameters["max_size"].default
+    )
     assert async_default == QUERY_CHECKPOINTER_POOL_MAX_SIZE
     assert AsyncPostgresSaver.aget_tuple is not BaseCheckpointSaver.aget_tuple
     assert PostgresSaver.aget_tuple is BaseCheckpointSaver.aget_tuple
@@ -175,21 +175,35 @@ def test_default_process_bindings_have_hybrid_and_gateway() -> None:
 def test_sse_execute_does_not_continue_without_app_api_connection() -> None:
     """Failed ``app_api`` connect must surface as SSE error, not ``connection=None``."""
 
-    source = (
+    runtime_source = (
         Path(__file__).resolve().parents[2]
         / "apps"
         / "backend"
         / "src"
         / "smart_rag_api"
         / "services"
-        / "sse_stream.py"
+        / "sse"
+        / "langgraph_runtime.py"
+    ).read_text(encoding="utf-8")
+    executor_source = (
+        Path(__file__).resolve().parents[2]
+        / "apps"
+        / "backend"
+        / "src"
+        / "smart_rag_api"
+        / "services"
+        / "sse"
+        / "langgraph_executor.py"
     ).read_text(encoding="utf-8")
     assert (
         "except QueryGraphRuntimeError:\n                connection = None"
-        not in source
+        not in runtime_source
     )
-    assert "open_run_app_api_connection(bindings.supabase_dsn)" in source
-    assert 'yield ("error", {"code": exc.reason})' in source
+    assert "except QueryGraphRuntimeError:\n                connection = None" not in (
+        executor_source
+    )
+    assert "open_run_app_api_connection(bindings.supabase_dsn)" in runtime_source
+    assert 'yield ("error", {"code": exc.reason})' in executor_source
 
 
 def test_context_loader_keeps_connection_idle_for_retrieval_transaction(
@@ -260,11 +274,11 @@ def test_context_loader_keeps_connection_idle_for_retrieval_transaction(
         return ()
 
     monkeypatch.setattr(
-        "smart_rag_agents.query.live_runtime.psycopg.connect",
+        "smart_rag_agents.query.runtime.adapters.psycopg.connect",
         _connect,
     )
     monkeypatch.setattr(
-        "smart_rag_agents.query.live_runtime.fetch_authorized_chunk_context",
+        "smart_rag_agents.query.runtime.adapters.fetch_authorized_chunk_context",
         _fetch,
     )
     loader = _context_loader(
@@ -452,9 +466,43 @@ def test_run_coro_from_running_loop_does_not_raise() -> None:
             Worker-thread gateway result.
         """
 
-        return _run_coro(lambda: _inner())
+        return run_coro(lambda: _inner())
 
     assert asyncio.run(_outer()) == "ok"
+
+
+def test_run_coro_does_not_wait_for_langsmith_flush(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Telemetry draining is forbidden on the post-model answer path."""
+
+    from smart_rag_core.observability import langsmith_tracing as tracing
+
+    def _slow_flush(*, timeout_seconds: float) -> None:
+        """Model the blocking exporter that caused the production latency.
+
+        Args:
+            timeout_seconds: Unused simulated drain bound.
+        """
+
+        del timeout_seconds
+        time.sleep(0.5)
+
+    async def _answer() -> str:
+        """Return one completed model result.
+
+        Returns:
+            Fixed answer token.
+        """
+
+        return "ready"
+
+    monkeypatch.setattr(tracing, "flush_langsmith_traces", _slow_flush)
+    started = time.monotonic()
+    result = run_coro(lambda: _answer(), timeout_seconds=1.0)
+    elapsed = time.monotonic() - started
+    assert result == "ready"
+    assert elapsed < 0.3
 
 
 def test_run_coro_honors_cancel_check() -> None:
@@ -473,7 +521,7 @@ def test_run_coro_honors_cancel_check() -> None:
     async def _outer() -> None:
         """Start ``_run_coro`` on the running loop and cancel immediately."""
 
-        _run_coro(lambda: _slow(), cancel_check=lambda: True, timeout_seconds=5)
+        run_coro(lambda: _slow(), cancel_check=lambda: True, timeout_seconds=5)
 
     try:
         asyncio.run(_outer())
@@ -486,12 +534,12 @@ def test_run_coro_honors_cancel_check() -> None:
 def test_gateway_timeout_uses_run_deadline_not_model_call_count() -> None:
     """Hosted live OpenAI must not treat remaining model calls as seconds."""
 
-    assert _gateway_timeout_seconds(None) == 20.0
+    assert gateway_timeout_seconds(None) == 20.0
     far = SimpleNamespace(deadline_at=datetime.now(UTC) + timedelta(seconds=30))
-    timeout = _gateway_timeout_seconds(far)  # type: ignore[arg-type]
+    timeout = gateway_timeout_seconds(far)  # type: ignore[arg-type]
     assert 20.0 <= timeout <= 30.0
     near = SimpleNamespace(deadline_at=datetime.now(UTC) + timedelta(seconds=2))
-    assert 0.1 <= _gateway_timeout_seconds(near) <= 2.0  # type: ignore[arg-type]
+    assert 0.1 <= gateway_timeout_seconds(near) <= 2.0  # type: ignore[arg-type]
 
 
 def test_run_coro_wraps_provider_errors_without_a_running_loop() -> None:
@@ -507,7 +555,7 @@ def test_run_coro_wraps_provider_errors_without_a_running_loop() -> None:
         raise RuntimeError("answer_timeout")
 
     try:
-        _run_coro(lambda: _boom())
+        run_coro(lambda: _boom())
     except AnswerError as exc:
         assert exc.reason == "gateway_failed"
     else:
@@ -528,7 +576,7 @@ def test_run_coro_times_out_without_a_running_loop() -> None:
         return "late"
 
     try:
-        _run_coro(lambda: _slow(), timeout_seconds=0.01)
+        run_coro(lambda: _slow(), timeout_seconds=0.01)
     except AnswerError as exc:
         assert exc.reason == "deadline_exhausted"
     else:

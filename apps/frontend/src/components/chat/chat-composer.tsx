@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import { Icon } from "../ui/icon";
 import { StatusBanner } from "../ui/status-banner";
 import { Textarea } from "../ui/textarea";
-import styles from "./chat.module.css";
+import styles from "./chat-composer.module.css";
 
 export type ChatComposerProps = {
   /** Submit the current draft. Return false to keep the text. */

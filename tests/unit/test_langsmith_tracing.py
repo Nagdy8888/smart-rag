@@ -1,4 +1,4 @@
-"""Unit tests for redacted LangSmith tracing of every model call."""
+"""LangSmith gateway tracing, redaction, and production call-site scans."""
 
 from __future__ import annotations
 
@@ -6,13 +6,9 @@ import ast
 import asyncio
 import json
 import os
-from collections.abc import Callable
-from contextlib import AbstractContextManager
-from pathlib import Path
-from typing import Any, cast
+from inspect import signature
 from uuid import uuid4
 
-import langsmith
 import pytest
 from smart_rag_core.gateways.embedding import EmbeddingRequest, create_embedding_gateway
 from smart_rag_core.gateways.model import ModelRequest, create_model_gateway
@@ -24,8 +20,10 @@ from smart_rag_core.observability.langsmith_tracing import (
     LANGSMITH_TRACING_ENV,
     configure_langsmith,
     flush_langsmith_traces,
+    general_chat_responses_traceable,
     payload_contains_forbidden_text,
     redact_gateway_inputs,
+    redact_rerank_call_outputs,
     short_content_hash,
 )
 from smart_rag_core.observability.logging import correlation_context
@@ -35,134 +33,19 @@ from smart_rag_core.settings import (
     load_backend_settings,
 )
 
-from tests.unit.typed_attrs import module_attr
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-_ALLOWED_OPENAI_CTOR = {
-    Path("packages/core/src/smart_rag_core/observability/langsmith_tracing.py"),
-}
-_ALLOWED_RESPONSES_CREATE = {
-    Path("packages/core/src/smart_rag_core/gateways/openai_rerank.py"),
-    Path("packages/core/src/smart_rag_core/gateways/openai_answer.py"),
-    Path("packages/core/src/smart_rag_core/gateways/openai_lightrag.py"),
-    Path("packages/core/src/smart_rag_core/gateways/openai_general_chat.py"),
-}
-_ALLOWED_EMBEDDINGS_CREATE = {
-    Path("packages/core/src/smart_rag_core/observability/langsmith_tracing.py"),
-}
-_SCAN_ROOTS = (
-    Path("packages"),
-    Path("apps"),
-    Path("scripts"),
+from tests.support.langsmith import RecordingLangSmithClient
+from tests.support.langsmith_scan import (
+    _ALLOWED_EMBEDDINGS_CREATE,
+    _ALLOWED_OPENAI_CTOR,
+    _ALLOWED_RESPONSES_CREATE,
+    CANARY_EMAIL,
+    CANARY_PASSAGE,
+    CANARY_TOKEN,
+    REPO_ROOT,
+    _call_name,
+    _python_files,
+    _tracing_context,
 )
-
-CANARY_TOKEN = "sk-canarysecretFORBID123456"  # noqa: S105 - inert leak canary
-CANARY_EMAIL = "canary.user@example.com"
-CANARY_PASSAGE = "SECRET_COMPANY_PASSAGE_DO_NOT_EXPORT"
-
-
-def _tracing_context(
-    *, enabled: bool, client: object
-) -> AbstractContextManager[object]:
-    """Return LangSmith ``tracing_context`` with a known callable type.
-
-    Args:
-        enabled: Whether tracing is enabled for the block.
-        client: Recording client used by the unit tests.
-
-    Returns:
-        Context manager from ``langsmith.tracing_context``.
-    """
-
-    factory = cast(
-        Callable[..., AbstractContextManager[object]],
-        module_attr(langsmith, "tracing_context"),
-    )
-    return factory(enabled=enabled, client=client)
-
-
-class RecordingLangSmithClient:
-    """In-memory LangSmith client that never opens a network connection."""
-
-    def __init__(self) -> None:
-        """Initialize empty create/update buffers."""
-
-        self.created: list[dict[str, Any]] = []
-        self.updated: list[dict[str, Any]] = []
-
-    def create_run(
-        self,
-        name: str,
-        inputs: dict[str, Any],
-        run_type: str = "chain",
-        **kwargs: Any,
-    ) -> None:
-        """Record one create_run payload.
-
-        Args:
-            name: Run name.
-            inputs: Run inputs after process_inputs.
-            run_type: LangSmith run type.
-            **kwargs: Additional SDK fields including outputs.
-        """
-
-        self.created.append(
-            {
-                "name": name,
-                "inputs": inputs,
-                "run_type": run_type,
-                "kwargs": kwargs,
-            }
-        )
-
-    def update_run(self, run_id: object, **kwargs: Any) -> None:
-        """Record one update_run payload.
-
-        Args:
-            run_id: Run identifier.
-            **kwargs: Output/end fields.
-        """
-
-        self.updated.append({"run_id": run_id, **kwargs})
-
-    def __getattr__(self, name: str) -> Any:
-        """Ignore unused Client methods used by RunTree internals.
-
-        Args:
-            name: Attribute requested by the SDK.
-
-        Returns:
-            A no-op callable.
-        """
-
-        def _ignored(*args: Any, **kwargs: Any) -> None:
-            """Swallow unused SDK calls.
-
-            Args:
-                *args: Positional SDK arguments.
-                **kwargs: Keyword SDK arguments.
-            """
-
-            return None
-
-        return _ignored
-
-
-def _python_files() -> tuple[Path, ...]:
-    """Return authored production Python files under packages, apps, and scripts.
-
-    Returns:
-        Sorted relative paths.
-    """
-
-    files: list[Path] = []
-    for root in _SCAN_ROOTS:
-        files.extend(
-            path.relative_to(REPO_ROOT)
-            for path in (REPO_ROOT / root).rglob("*.py")
-            if "__pycache__" not in path.parts
-        )
-    return tuple(sorted(files))
 
 
 def test_tracing_requires_langsmith_key(
@@ -229,7 +112,142 @@ def test_flush_langsmith_traces_skips_without_key(
     """Flush is a no-op when unit tests have no LangSmith credential."""
 
     monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
-    flush_langsmith_traces()
+    flush_langsmith_traces(timeout_seconds=0.1)
+
+
+def test_pinned_langsmith_flush_exposes_timeout_contract() -> None:
+    """The pinned SDK keeps the finite timeout needed by bounded shutdown."""
+
+    from langsmith import Client
+
+    timeout = signature(Client.flush).parameters["timeout"]
+    assert timeout.default is None
+
+
+def test_flush_langsmith_traces_zero_timeout_never_resolves_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A non-positive drain budget cannot touch LangSmith on a hot path."""
+
+    from smart_rag_core.observability import langsmith_tracing as tracing
+
+    def _unexpected_run_lookup() -> object:
+        """Fail if a zero-budget drain tries to resolve a client.
+
+        Raises:
+            AssertionError: Always, because no lookup is permitted.
+        """
+
+        raise AssertionError("zero_timeout_resolved_langsmith_client")
+
+    monkeypatch.setenv("LANGSMITH_API_KEY", "lsv2_inert_test_key")
+    monkeypatch.setattr(tracing, "tracing_is_enabled", lambda: True)
+    monkeypatch.setattr(tracing, "get_current_run_tree", _unexpected_run_lookup)
+    flush_langsmith_traces(timeout_seconds=0.0)
+
+
+def test_flush_langsmith_traces_uses_explicit_client_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lifecycle drain forwards a finite timeout to the active trace client."""
+
+    from smart_rag_core.observability import langsmith_tracing as tracing
+
+    calls: list[float | None] = []
+
+    class _Client:
+        """Record the timeout passed to the pinned client contract."""
+
+        def flush(self, timeout: float | None = None) -> None:
+            """Record one bounded flush request.
+
+            Args:
+                timeout: Maximum queue-drain wait in seconds.
+            """
+
+            calls.append(timeout)
+
+    class _Run:
+        """Expose the recording client through the current run tree."""
+
+        def __init__(self) -> None:
+            """Bind one recording client."""
+
+            self.client = _Client()
+
+    monkeypatch.setenv("LANGSMITH_API_KEY", "lsv2_inert_test_key")
+    monkeypatch.setattr(tracing, "tracing_is_enabled", lambda: True)
+    monkeypatch.setattr(tracing, "get_current_run_tree", _Run)
+    flush_langsmith_traces(timeout_seconds=0.25)
+    assert calls == [0.25]
+
+
+def test_flush_langsmith_traces_uses_process_cached_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Shutdown drains the same cached client used by default traceable spans."""
+
+    from langsmith import run_trees
+    from smart_rag_core.observability import langsmith_tracing as tracing
+
+    calls: list[float | None] = []
+
+    class _Client:
+        """Record the process-cached client drain."""
+
+        def flush(self, timeout: float | None = None) -> None:
+            """Record the bounded shutdown wait.
+
+            Args:
+                timeout: Maximum queue-drain wait in seconds.
+            """
+
+            calls.append(timeout)
+
+    client = _Client()
+    monkeypatch.setenv("LANGSMITH_API_KEY", "lsv2_inert_test_key")
+    monkeypatch.setattr(tracing, "tracing_is_enabled", lambda: True)
+    monkeypatch.setattr(tracing, "get_current_run_tree", lambda: None)
+    monkeypatch.setattr(run_trees, "get_cached_client", lambda: client)
+    flush_langsmith_traces(timeout_seconds=0.5)
+    assert calls == [0.5]
+
+
+def test_flush_langsmith_traces_never_breaks_shutdown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A LangSmith drain error is telemetry loss, not an application error."""
+
+    from smart_rag_core.observability import langsmith_tracing as tracing
+
+    class _Client:
+        """Raise the simulated provider-side drain failure."""
+
+        def flush(self, timeout: float | None = None) -> None:
+            """Fail one bounded drain.
+
+            Args:
+                timeout: Maximum queue-drain wait in seconds.
+
+            Raises:
+                RuntimeError: Always, to model an unavailable exporter.
+            """
+
+            del timeout
+            raise RuntimeError("langsmith_unavailable")
+
+    class _Run:
+        """Expose the failing client through the current run tree."""
+
+        def __init__(self) -> None:
+            """Bind one failing client."""
+
+            self.client = _Client()
+
+    monkeypatch.setenv("LANGSMITH_API_KEY", "lsv2_inert_test_key")
+    monkeypatch.setattr(tracing, "tracing_is_enabled", lambda: True)
+    monkeypatch.setattr(tracing, "get_current_run_tree", _Run)
+    flush_langsmith_traces(timeout_seconds=0.1)
 
 
 def test_redact_gateway_inputs_omits_query_and_excerpts() -> None:
@@ -337,29 +355,6 @@ def test_redact_embedding_request_exports_timeout_not_text() -> None:
     assert not payload_contains_forbidden_text(payload, CANARY_PASSAGE)
 
 
-def _call_name(node: ast.AST) -> str | None:
-    """Return a dotted call name when the callee is a Name or Attribute.
-
-    Args:
-        node: AST node, expected to be ``ast.Call``.
-
-    Returns:
-        Dotted name such as ``OpenAI`` or ``client.embeddings.create``.
-    """
-
-    if not isinstance(node, ast.Call):
-        return None
-    func = node.func
-    parts: list[str] = []
-    while isinstance(func, ast.Attribute):
-        parts.append(func.attr)
-        func = func.value
-    if isinstance(func, ast.Name):
-        parts.append(func.id)
-        return ".".join(reversed(parts))
-    return None
-
-
 def test_production_openai_calls_use_traced_helpers() -> None:
     """Packages, apps, and scripts construct OpenAI only through the traced factory."""
 
@@ -440,6 +435,101 @@ def test_redact_gateway_outputs_accepts_embedding_response() -> None:
     assert payload["vector_count"] == 1
     assert payload["vector_dimensions"] == 2
     assert payload["request_id"] == "req-1"
+
+
+def test_responses_redactor_accepts_raw_general_chat_tuple() -> None:
+    """Pinned LangSmith passes the function's tuple directly to process_outputs."""
+
+    outputs = (
+        {"status": "complete", "answer_text": CANARY_PASSAGE},
+        "resp-general-1",
+        258,
+        17,
+    )
+    payload = redact_rerank_call_outputs(outputs)
+    assert payload == {
+        "payload_keys": ["answer_text", "status"],
+        "request_id": "resp-general-1",
+        "input_tokens": 258,
+        "output_tokens": 17,
+    }
+    assert CANARY_PASSAGE not in json.dumps(payload)
+
+
+def test_responses_redactor_accepts_mapping_wrapper() -> None:
+    """The redactor remains compatible with explicit SDK-style output wrappers."""
+
+    payload = redact_rerank_call_outputs(
+        {
+            "output": (
+                {"rankings": [{"chunk_id": "private-id"}]},
+                "resp-rerank-1",
+                12,
+                3,
+            )
+        }
+    )
+    assert payload == {
+        "payload_keys": ["rankings"],
+        "request_id": "resp-rerank-1",
+        "input_tokens": 12,
+        "output_tokens": 3,
+    }
+    assert "private-id" not in json.dumps(payload)
+
+
+@pytest.mark.parametrize("outputs", [None, "text", (), (1, 2, 3)])
+def test_responses_redactor_ignores_malformed_shapes(outputs: object) -> None:
+    """Malformed trace output cannot prevent the LangSmith span from ending."""
+
+    assert redact_rerank_call_outputs(outputs) == {}
+
+
+def test_responses_redactor_omits_invalid_token_counts() -> None:
+    """Invalid usage fields produce safe partial metadata instead of an exception."""
+
+    payload = redact_rerank_call_outputs(
+        ({"status": "complete"}, "resp-invalid-usage", "bad", object())
+    )
+    assert payload == {
+        "payload_keys": ["status"],
+        "request_id": "resp-invalid-usage",
+    }
+
+
+def test_general_chat_trace_closes_for_raw_tuple_output() -> None:
+    """The pinned traceable processor records an end update for general chat."""
+
+    recorder = RecordingLangSmithClient()
+
+    @general_chat_responses_traceable
+    def _general_chat() -> tuple[dict[str, str], str, int, int]:
+        """Return the exact four-item adapter result shape.
+
+        Returns:
+            General-chat payload, provider request id, and token counts.
+        """
+
+        return (
+            {"status": "complete", "answer_text": CANARY_PASSAGE},
+            "resp-general-trace",
+            20,
+            4,
+        )
+
+    with _tracing_context(enabled=True, client=recorder):
+        result = _general_chat()
+
+    assert result[1] == "resp-general-trace"
+    completed = [
+        item
+        for item in recorder.updated
+        if isinstance(item.get("outputs"), dict)
+        and item["outputs"].get("request_id") == "resp-general-trace"
+    ]
+    assert len(completed) == 1
+    assert completed[0].get("end_time") is not None
+    assert CANARY_PASSAGE not in json.dumps(completed, default=str)
 
 
 def test_usage_metadata_is_attached_without_model_content(
@@ -608,75 +698,3 @@ def test_lightrag_trace_exports_usage_cost_without_extract_text() -> None:
         CANARY_EMAIL,
         CANARY_PASSAGE,
     )
-
-
-def test_query_run_trace_metadata_is_hashes_and_counts_only() -> None:
-    """Query-run traces never copy canary secrets, emails, or passages."""
-
-    from smart_rag_core.observability.query_run_trace import query_run_trace_metadata
-
-    user_id = uuid4()
-    run_id = uuid4()
-    payload = query_run_trace_metadata(
-        run_id=run_id,
-        user_id=user_id,
-        requested_route="hybrid",
-        effective_route="combined",
-        corrected_route="hybrid",
-        model_versions={"answer": "gpt-4o-mini"},
-        prompt_versions={"answer": "answer_v1"},
-        disclosed_tools=("structured_table",),
-        candidate_counts={"hybrid": 20, "graph": 4},
-        bm25_index="search.chunks_v1",
-        bm25_version="v1",
-        bm25_lag_seconds=3,
-        bm25_recheck_count=20,
-        bm25_fallback="none",
-        latency_ms=1200,
-        input_tokens=100,
-        output_tokens=40,
-        cache_hit=False,
-        cost_usd="0.12",
-    )
-    rendered = json.dumps(payload)
-    assert str(user_id) not in rendered
-    assert payload["user_id_sha256"] == short_content_hash(str(user_id))
-    assert payload["run_id"] == str(run_id)
-    assert payload["disclosed_tool_count"] == 1
-    assert payload["candidate_counts"]["hybrid"] == 20
-    assert not payload_contains_forbidden_text(
-        payload, CANARY_TOKEN, CANARY_EMAIL, CANARY_PASSAGE
-    )
-
-
-def test_langsmith_real_content_is_blocked_until_matrix_verified() -> None:
-    """Unknown/unverified real-company flows cannot export to LangSmith."""
-
-    from smart_rag_core.observability.governance_gate import (
-        ExternalFlowBlockedError,
-        assert_langsmith_export_permitted,
-        assert_vercel_metadata_has_no_private_payload,
-    )
-    from smart_rag_core.security.external_processing import ContentClass
-
-    assert_langsmith_export_permitted(
-        tracing_enabled=True,
-        content_class=ContentClass.SYNTHETIC,
-        provider_settings_verified=False,
-    )
-    assert_langsmith_export_permitted(
-        tracing_enabled=True,
-        content_class=ContentClass.REAL_COMPANY,
-        provider_settings_verified=False,
-        local_unsigned_waiver=True,
-    )
-    with pytest.raises(
-        ExternalFlowBlockedError, match="langsmith_real_content_unverified"
-    ):
-        assert_langsmith_export_permitted(
-            tracing_enabled=True,
-            content_class=ContentClass.REAL_COMPANY,
-            provider_settings_verified=False,
-        )
-    with pytest.raises(ExternalFlowBlockedError, match="vercel_private_payload"):
-        assert_vercel_metadata_has_no_private_payload({"snippet": CANARY_PASSAGE})

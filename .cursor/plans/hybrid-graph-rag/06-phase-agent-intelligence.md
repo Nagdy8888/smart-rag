@@ -55,23 +55,27 @@ Complete these in order. A checked box requires committed implementation evidenc
 7. [x] [Implement Supabase checkpoints/store memory, idempotency/run-event GC, full governance enforcement, trace redaction, prompt versions, usage accounting, feedback, and immediate conversation deletion.](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md)
 8. [x] [Ship the thin authenticated developer UI and prove route, fallback, injection, idempotency, budget, outage, event-loop, and privacy gates.](./06-phase-agent-intelligence/packets/08-thin-developer-ui.md)
 
-Packets P06-09 through P06-15 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23.
+Packets P06-09 through P06-16 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract.
 
 9. [ ] [Canonical amendment for general-chat strict-split, ADR, and packets P06-10 through P06-15.](./06-phase-agent-intelligence/packets/09-canonical-general-chat-amendment.md)
-10. [ ] [Implement typed knowledge-scope classification and deterministic NoRetrieval route compilation.](./06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md)
+10. [ ] [Implement typed knowledge-scope classification, the live profile gateway, and deterministic route compilation.](./06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md)
 11. [ ] [Drain successful LangGraph streams and classify expected cancellation without hiding real trace errors.](./06-phase-agent-intelligence/packets/11-sse-stream-lifecycle-tracing.md)
 12. [ ] [Implement bounded, budgeted general and user-text model answers without weakening document grounding.](./06-phase-agent-intelligence/packets/12-general-chat-execution.md)
 13. [ ] [Add authenticated query_studio_live with per-run resources and normal ACL, admission, and budget controls.](./06-phase-agent-intelligence/packets/13-authenticated-studio-live.md)
 14. [ ] [Add answer-origin, clarification, and citation-safe behavior to the main chat UI.](./06-phase-agent-intelligence/packets/14-chat-origin-ux.md)
 15. [ ] [Run all deterministic and live gates, inspect LangSmith traces, and update evidence and runbooks.](./06-phase-agent-intelligence/packets/15-integrated-verification.md)
+16. [ ] [Add LangGraph custom SSE progress and paced verified-answer presentation contract.](./06-phase-agent-intelligence/packets/16-sse-custom-progress.md)
 
 ## Approved planned deviation: general-chat strict split
 
-User approval on 2026-08-25: add a strict dual-mode assistant to the production Ask path and a separate live LangSmith Studio graph. General questions may use OpenAI world knowledge. Company/document questions remain citation-required RAG. Mixed or uncertain scope returns clarification. Never fall back from insufficient company evidence to world knowledge.
+User approval on 2026-08-25; 2026-08-26 remediation drafted and pending explicit user acceptance: add a strict dual-mode assistant to the production Ask path and a separate live LangSmith Studio graph. General questions may use OpenAI world knowledge. Company/document questions remain citation-required RAG. Genuine mixed scope returns clarification. Failed or low-confidence profile inference records typed degradation and may return an honest general answer that explicitly says company documents were not searched. Never fall back from insufficient company evidence to world knowledge.
 
 - Recorded in [`docs/adr/ADR-general-chat-strict-split.md`](../../../docs/adr/ADR-general-chat-strict-split.md).
 - Preserve `query_studio` as the deterministic, unbound, no-cost graph. Live retrieval uses only `query_studio_live` with a real developer JWT.
 - No service-role key or synthetic live identity is permitted.
+- The production query path may spend one counted `profile` call under existing caps. Pure greetings/small talk are profile-model classified and general-model answered, normally consuming one profile plus one answer call.
+- Keep existing scope values and route families. Deterministic company signals override model output; a server-derived degradation reason never authorizes evidence.
+- After plan compilation, validated plans select explicit company, general, mixed, or fail-closed nodes. Direct paths skip retrieval/correction/fusion/table/tool/verifier-model work and still receive deterministic verification.
 - P06-10 is the first coding packet after this markdown amendment.
 
 ## Phase sequence requirement
@@ -106,7 +110,7 @@ Do not set `status: complete` until every `Done when` item below is proven.
 
 ## Canonical detailed requirements
 
-The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
+The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Additive packet P06-16 records the co-owned LangGraph custom SSE progress and paced verified-answer presentation contract. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
 
 ### Phase 6 runtime Hybrid dependency contract
 
@@ -126,7 +130,7 @@ See [packet 4](./06-phase-agent-intelligence/packets/04-optional-tools.md).
 
 ### 10. FastAPI contract, streaming, and security
 
-See [packet 1](./06-phase-agent-intelligence/packets/01-admission-budgets.md), [packet 5](./06-phase-agent-intelligence/packets/05-fastapi-security.md), [packet 6](./06-phase-agent-intelligence/packets/06-sse-compatibility-resume.md), and [packet 7](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md).
+See [packet 1](./06-phase-agent-intelligence/packets/01-admission-budgets.md), [packet 5](./06-phase-agent-intelligence/packets/05-fastapi-security.md), [packet 6](./06-phase-agent-intelligence/packets/06-sse-compatibility-resume.md), [packet 7](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md), and [packet 16](./06-phase-agent-intelligence/packets/16-sse-custom-progress.md).
 
 ### 11. LangSmith, prompts, cost, and evaluation
 

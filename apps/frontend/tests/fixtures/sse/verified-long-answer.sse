@@ -1,0 +1,66 @@
+: SYNTHETIC_NO_LEAK_MARKER
+
+id: 1
+event: schema
+data: {"sse_schema_version":"1"}
+
+id: 2
+event: status
+data: {"stage":"enforce_admission","status":"running","phase":"started"}
+
+id: 3
+event: status
+data: {"stage":"enforce_admission","status":"admitted","phase":"completed"}
+
+id: 4
+event: status
+data: {"stage":"load_memory","status":"running","phase":"started"}
+
+id: 5
+event: status
+data: {"stage":"load_memory","status":"loaded","phase":"completed"}
+
+id: 6
+event: status
+data: {"stage":"prepare_query","status":"running","phase":"started"}
+
+id: 7
+event: status
+data: {"stage":"prepare_query","status":"prepared","phase":"completed"}
+
+id: 8
+event: status
+data: {"stage":"compile_plan","status":"running","phase":"started"}
+
+id: 9
+event: status
+data: {"stage":"compile_plan","status":"planned","phase":"completed"}
+
+id: 10
+event: status
+data: {"stage":"general_scope","status":"running","phase":"started"}
+
+id: 11
+event: status
+data: {"stage":"general_scope","status":"drafted","phase":"completed"}
+
+id: 12
+event: status
+data: {"stage":"verify_answer","status":"running","phase":"started"}
+
+id: 13
+event: status
+data: {"stage":"verify_answer","status":"verified","phase":"completed"}
+
+id: 14
+event: token_delta
+data: {"delta":"PUBLIC_FINAL_xxxxxxxxxxxxxxxxxxxxxxxxxxx"}
+
+id: 15
+event: token_delta
+data: {"delta":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}
+
+id: 16
+event: completed
+data: {}
+

@@ -12,12 +12,12 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { lockBodyScroll } from "./body-scroll-lock";
 import { Button } from "./button";
+import { trapFocus } from "./focus-trap";
 import { Icon } from "./icon";
-import styles from "./ui.module.css";
-
-const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+import overlayStyles from "./styles/overlays.module.css";
+import leftoverStyles from "./ui.module.css";
 
 export type SheetSide = "left" | "right";
 
@@ -33,18 +33,6 @@ export type SheetProps = {
   /** Element that opened the sheet; focus returns here. */
   returnFocusRef?: RefObject<HTMLElement | null>;
 };
-
-/**
- * List currently focusable elements inside a container.
- *
- * @param root - Sheet node.
- * @returns Focusable HTMLElements in DOM order.
- */
-function focusableElements(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (node) => !node.hasAttribute("disabled"),
-  );
-}
 
 /**
  * Render a modal side panel.
@@ -63,20 +51,23 @@ export function Sheet({
   const titleId = useId();
 
   useEffect(() => {
-    const previouslyFocused = returnFocusRef?.current ?? (document.activeElement as HTMLElement | null);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const root = panelRef.current;
-    const first = root ? focusableElements(root)[0] : undefined;
-    first?.focus();
+    if (root === null) {
+      return;
+    }
+    const unlock = lockBodyScroll();
+    const release = trapFocus(root, {
+      returnFocus:
+        returnFocusRef?.current ?? (document.activeElement as HTMLElement | null),
+    });
     return () => {
-      document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus();
+      release();
+      unlock();
     };
   }, [returnFocusRef]);
 
   /**
-   * Trap Tab and handle Escape.
+   * Close on Escape. Tab wrap lives in `trapFocus`.
    *
    * @param event - Keyboard event from the dialog.
    */
@@ -84,55 +75,35 @@ export function Sheet({
     if (event.key === "Escape") {
       event.preventDefault();
       onClose();
-      return;
-    }
-    if (event.key !== "Tab" || panelRef.current === null) {
-      return;
-    }
-    const nodes = focusableElements(panelRef.current);
-    if (nodes.length === 0) {
-      return;
-    }
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-    if (first === undefined || last === undefined) {
-      return;
-    }
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-      return;
-    }
-    if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
     }
   }
 
   return (
-    <div className={styles.sheetRoot}>
+    <div className={overlayStyles.sheetRoot}>
       <button
         type="button"
-        className={styles.sheetBackdrop}
+        className={overlayStyles.sheetBackdrop}
         aria-label="Close"
         onClick={onClose}
       />
       <div
         ref={panelRef}
-        className={side === "left" ? styles.sheetPanelLeft : styles.sheetPanelRight}
+        className={
+          side === "left" ? overlayStyles.sheetPanelLeft : overlayStyles.sheetPanelRight
+        }
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={onKeyDown}
       >
-        <div className={styles.sheetHeader}>
+        <div className={overlayStyles.sheetHeader}>
           <h2 id={titleId}>{title}</h2>
           <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <Icon name="close" />
-            <span className={styles.srOnly}>Close</span>
+            <span className={leftoverStyles.srOnly}>Close</span>
           </Button>
         </div>
-        <div className={styles.sheetBody}>{children}</div>
+        <div className={overlayStyles.sheetBody}>{children}</div>
       </div>
     </div>
   );

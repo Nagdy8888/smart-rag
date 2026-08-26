@@ -93,6 +93,14 @@ describe("classifyApiError", () => {
     });
   });
 
+  it("aliases the historical Session revoked sentence", () => {
+    expect(classifyApiError(401, { detail: "Session revoked" })).toEqual({
+      kind: "auth",
+      status: 401,
+      detail: "session_revoked",
+    });
+  });
+
   it("maps 503 to limiter fail-closed", () => {
     expect(classifyApiError(503, { detail: "limiter_unavailable" })).toEqual({
       kind: "fail_closed",

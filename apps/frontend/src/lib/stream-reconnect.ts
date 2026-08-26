@@ -45,6 +45,7 @@ export function shouldStopReconnect(input: {
   signedOut: boolean;
   runDeleted: boolean;
   unmounted: boolean;
+  unauthorized?: boolean;
 }): ReconnectStopReason | null {
   if (input.unmounted) {
     return "unmounted";
@@ -53,6 +54,9 @@ export function shouldStopReconnect(input: {
     return "cancelled";
   }
   if (input.signedOut) {
+    return "signed_out";
+  }
+  if (input.unauthorized === true) {
     return "signed_out";
   }
   if (input.runDeleted) {

@@ -46,12 +46,16 @@ describe("frameBelongsToCurrentRun", () => {
 describe("consumeSse", () => {
   it("does not apply token deltas from a different query_run_id", async () => {
     const body = [
-      "event: token_delta",
+      "event: status",
       "id: 1",
-      `data: ${JSON.stringify({ query_run_id: "run-other", delta: "SECRET" })}`,
+      `data: ${JSON.stringify({ stage: "verify_answer", status: "verified", phase: "completed" })}`,
       "",
       "event: token_delta",
       "id: 2",
+      `data: ${JSON.stringify({ query_run_id: "run-other", delta: "SECRET" })}`,
+      "",
+      "event: token_delta",
+      "id: 3",
       `data: ${JSON.stringify({ query_run_id: "run-current", delta: "Hi" })}`,
       "",
       "",
@@ -95,5 +99,70 @@ describe("consumeSse", () => {
       () => undefined,
     );
     expect(final.answerText).toBe("");
+  });
+
+  it("publishes once per read batch and keeps heartbeat-only updates off React state", async () => {
+    const body = [
+      "event: heartbeat",
+      "id: 1",
+      "data: {}",
+      "",
+      "event: status",
+      "id: 2",
+      `data: ${JSON.stringify({ stage: "verify_answer", status: "verified", phase: "completed" })}`,
+      "",
+      "event: token_delta",
+      "id: 3",
+      `data: ${JSON.stringify({ delta: "Hello" })}`,
+      "",
+      "",
+    ].join("\n");
+    const publications: string[] = [];
+    const cursors: number[] = [];
+    const final = await consumeSse(
+      new Response(body, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+      {
+        ...createChatViewState("33333333-3333-4333-8333-333333333333"),
+        runId: "run-current",
+      },
+      new AbortController().signal,
+      (state) => {
+        publications.push(state.answerText);
+      },
+      (sequence) => {
+        cursors.push(sequence);
+      },
+    );
+    expect(final.answerText).toBe("Hello");
+    expect(publications).toEqual(["Hello"]);
+    expect(cursors.at(-1)).toBe(3);
+  });
+
+  it("advances the cursor on a heartbeat-only batch without publishing state", async () => {
+    const publications: number[] = [];
+    const cursors: number[] = [];
+    await consumeSse(
+      new Response("event: heartbeat\nid: 4\ndata: {}\n\n", {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+      {
+        ...createChatViewState("33333333-3333-4333-8333-333333333333"),
+        runId: "run-current",
+        lastSequence: 3,
+      },
+      new AbortController().signal,
+      () => {
+        publications.push(1);
+      },
+      (sequence) => {
+        cursors.push(sequence);
+      },
+    );
+    expect(publications).toEqual([]);
+    expect(cursors).toEqual([4]);
   });
 });

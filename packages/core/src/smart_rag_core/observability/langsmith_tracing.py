@@ -65,9 +65,11 @@ _SENSITIVE_KEYS = frozenset(
         "prompt",
         "prompt_text",
         "query",
+        "recent_memory",
         "system_prompt",
         "self",
         "text",
+        "user_query",
         "vectors",
     }
 )
@@ -169,26 +171,42 @@ def configure_langsmith(settings: SharedSettings) -> dict[str, str]:
     return settings.apply_langsmith_sdk_flags()
 
 
-def flush_langsmith_traces() -> None:
-    """Submit buffered LangSmith runs before a short-lived thread exits.
+def flush_langsmith_traces(*, timeout_seconds: float) -> None:
+    """Drain the process LangSmith client within an explicit lifecycle bound.
 
-    Returns:
-        None.
+    Per-request and per-model-call code must not call this function. LangSmith
+    exports through its background queue during the process lifetime; a
+    synchronous drain belongs only at process shutdown.
+
+    Args:
+        timeout_seconds: Maximum seconds to wait for queued trace operations.
+            Non-positive values return immediately. ``None`` is deliberately
+            unsupported because the pinned SDK interprets it as an unbounded
+            queue wait.
 
     Side Effects:
-        Calls the pinned SDK ``Client.flush`` when tracing is on and a key
-        is configured. No-op for unit tests that inject a recording client
-        without ``LANGSMITH_API_KEY``. Never logs the API key.
+        Flushes the active run's client, or the pinned SDK's process-cached
+        client, when tracing and a key are configured. Trace export failures
+        are logged without exposing the key and never propagate.
     """
 
+    timeout = max(0.0, float(timeout_seconds))
+    if timeout == 0.0:
+        return
     if not tracing_is_enabled():
         return
     if not os.environ.get("LANGSMITH_API_KEY"):
         return
     try:
-        from langsmith import Client
+        run = get_current_run_tree()
+        client = getattr(run, "client", None)
+        if client is None:
+            from langsmith.run_trees import get_cached_client
 
-        Client().flush()
+            client = get_cached_client()
+        flush = getattr(client, "flush", None)
+        if callable(flush):
+            cast(Any, flush)(timeout=timeout)
     except Exception:
         LOGGER.info(
             "LangSmith flush failed",
@@ -308,6 +326,12 @@ def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
         payload["prompt_text_chars"] = len(prompt_text)
         if export_io:
             payload["prompt_text"] = prompt_text
+    recent_memory = getattr(request, "recent_memory", None)
+    if isinstance(recent_memory, str) and recent_memory:
+        payload["recent_memory_sha256"] = short_content_hash(recent_memory)
+        payload["recent_memory_chars"] = len(recent_memory)
+        if export_io:
+            payload["recent_memory"] = recent_memory
     excerpts = getattr(request, "excerpts", None)
     if excerpts is not None:
         excerpt_list = tuple(str(item) for item in excerpts)
@@ -418,8 +442,9 @@ def redact_openai_call_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     """Redact keyword arguments for a traced OpenAI SDK call.
 
     Args:
-        inputs: Traceable arguments. ``api_key``, ``query``, ``excerpts``,
-            and ``prompt_text`` are never copied.
+        inputs: Traceable arguments. ``api_key``, ``query``, ``user_query``,
+            ``recent_memory``, ``excerpts``, and ``prompt_text`` are never
+            copied.
 
     Returns:
         Counts, hashes, model id, and timeout only.
@@ -462,18 +487,25 @@ def redact_openai_call_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def redact_rerank_call_outputs(outputs: Mapping[str, Any]) -> dict[str, Any]:
-    """Export rerank usage without ranking bodies.
+def redact_rerank_call_outputs(outputs: object) -> dict[str, Any]:
+    """Export Responses usage without response bodies.
+
+    LangSmith passes ``process_outputs`` the traced function's raw return
+    value. The pinned rerank, query-profile, and general-chat adapters return
+    a four-item tuple, while direct redactor tests may provide the SDK-style
+    ``{"output": tuple}`` wrapper.
 
     Args:
-        outputs: Traceable return wrapper around
+        outputs: Raw return value or traceable wrapper around
             ``(payload, request_id, input_tokens, output_tokens)``.
 
     Returns:
-        Request id, token counts, and payload key names.
+        Request id, valid token counts, and payload key names. Malformed
+        values return safe partial metadata or an empty mapping and never
+        expose the response body.
     """
 
-    raw: object = outputs.get("output", outputs)
+    raw = _traced_output_value(outputs)
     if not isinstance(raw, tuple):
         return {}
     items = list(cast(Sequence[object], raw))
@@ -485,15 +517,21 @@ def redact_rerank_call_outputs(outputs: Mapping[str, Any]) -> dict[str, Any]:
         items[2],
         items[3],
     )
-    payload_keys: list[str] = []
-    if isinstance(loaded, dict):
-        payload_keys = sorted(cast(dict[str, object], loaded))
-    return {
-        "request_id": str(request_id),
-        "input_tokens": _as_int(input_tokens),
-        "output_tokens": _as_int(output_tokens),
-        "payload_keys": payload_keys,
-    }
+    payload: dict[str, Any] = {"payload_keys": []}
+    if isinstance(loaded, Mapping):
+        typed_loaded = cast(Mapping[object, object], loaded)
+        payload["payload_keys"] = sorted(str(key) for key in typed_loaded)
+    if request_id is not None:
+        payload["request_id"] = str(request_id)
+    for field, value in (
+        ("input_tokens", input_tokens),
+        ("output_tokens", output_tokens),
+    ):
+        try:
+            payload[field] = _as_int(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return payload
 
 
 def redact_lightrag_llm_call_outputs(outputs: object) -> dict[str, Any]:
@@ -909,6 +947,24 @@ def general_chat_responses_traceable(func: Any) -> Any:
 
     return traceable(
         name="openai.responses.general_chat",
+        run_type="llm",
+        process_inputs=redact_openai_call_inputs,
+        process_outputs=redact_rerank_call_outputs,
+    )(func)
+
+
+def query_profile_responses_traceable(func: Any) -> Any:
+    """Apply the redacted Responses query-profile span decorator.
+
+    Args:
+        func: ``execute_openai_query_profile`` implementation.
+
+    Returns:
+        Traceable wrapper that hashes prompt/query/memory and omits API keys.
+    """
+
+    return traceable(
+        name="openai.responses.query_profile",
         run_type="llm",
         process_inputs=redact_openai_call_inputs,
         process_outputs=redact_rerank_call_outputs,

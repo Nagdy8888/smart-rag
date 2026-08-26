@@ -22,7 +22,7 @@ from smart_rag_core.observability.langsmith_tracing import (
 )
 from smart_rag_core.settings import AgentSettings
 
-from tests.unit.test_langsmith_tracing import RecordingLangSmithClient
+from tests.support.langsmith import RecordingLangSmithClient
 from tests.unit.typed_attrs import module_attr
 
 CANARY_PASSAGE = "SECRET_COMPANY_PASSAGE_DO_NOT_EXPORT"

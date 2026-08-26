@@ -22,6 +22,7 @@ from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
     KnowledgeScopeDecision,
     NoRetrievalAnswerMode,
+    ScopeDegradationReason,
     classify_knowledge_scope,
 )
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
@@ -72,6 +73,7 @@ __all__ = [
     "QueryRoutingError",
     "RetrievalPlan",
     "RoutingSurface",
+    "ScopeDegradationReason",
     "TableEvidenceRecord",
     "apply_correction_to_plan",
     "assert_preparation_schema",

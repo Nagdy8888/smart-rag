@@ -6,7 +6,7 @@
 
 import { useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { Icon, type IconName } from "./icon";
-import styles from "./ui.module.css";
+import styles from "./styles/controls.module.css";
 
 export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   /** Visible English label. */

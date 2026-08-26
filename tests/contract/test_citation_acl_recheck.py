@@ -10,7 +10,7 @@ import pytest
 from smart_rag_core.query_admission.service import list_run_citations
 
 from tests.contract.integration_support import resolve_supabase_db_url, try_connect
-from tests.contract.test_query_run_admission import (
+from tests.support.query_postgres import (
     admit,
     authorization_version,
     caller_context,

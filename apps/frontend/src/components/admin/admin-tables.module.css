@@ -1,0 +1,250 @@
+/**
+ * Admin panels, cards, forms, meters, and tool/usage grids.
+ */
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space) * 5);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 3);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+}
+
+.panel h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.list > li,
+.list button {
+  min-height: var(--row-height);
+}
+
+.list button {
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 0 calc(var(--space) * 2);
+  border-radius: var(--radius-sm);
+}
+
+.list button:hover {
+  background: var(--color-bg);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+  min-height: var(--row-height);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: calc(var(--space) * 3);
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space) * 4);
+  min-height: var(--row-height);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+
+.drawer {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space) * 3);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: minmax(12rem, 18rem) minmax(12rem, 1fr) minmax(12rem, 18rem);
+  gap: calc(var(--space) * 3);
+}
+
+@media (max-width: 800px) {
+  .panes {
+    grid-template-columns: 1fr;
+  }
+}
+
+.svgWrap {
+  overflow: auto;
+  min-height: 16rem;
+  max-height: 28rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(var(--color-border) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, var(--color-border) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--color-bg);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: calc(var(--space) * 3);
+}
+
+.meterList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+
+.meterRow {
+  display: grid;
+  grid-template-columns: 10rem 1fr auto;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+  min-height: var(--row-height);
+}
+
+.meterTrack {
+  height: 0.5rem;
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  width: 55%;
+  background: var(--color-accent);
+  border-radius: var(--radius-md);
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: calc(var(--space) * 3);
+}
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+}
+
+.progressTrack {
+  height: 0.4rem;
+  width: 8rem;
+  background: var(--color-accent-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.unavailableCard {
+  border: 1px dashed var(--color-border);
+  background: var(--color-bg);
+}
+
+.citationRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  align-items: end;
+}
+
+.toolGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--space) * 3);
+}
+
+.usageRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--space) * 3);
+}
+
+.metricCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space) * 4);
+  background: var(--color-surface);
+}
+
+.metricValue {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricLabel {
+  margin: calc(var(--space) * 2) 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.dangerPanel {
+  border-color: var(--color-danger);
+}
+
+.checkRow {
+  display: flex;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+  min-height: var(--row-height);
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: calc(var(--space) * 2);
+  margin: 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 800px) {
+  .toolGrid,
+  .usageRow {
+    grid-template-columns: 1fr;
+  }
+}

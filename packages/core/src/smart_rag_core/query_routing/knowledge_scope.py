@@ -2,7 +2,8 @@
 
 The preparation model may classify remaining natural-language scope only. It
 never selects Hybrid/Combined/Table or authorizes evidence. Company signals
-always override a model result of general knowledge.
+always override a model result of general knowledge. Failed or low-confidence
+profile inference is typed degradation, not mixed-scope ambiguity.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from collections.abc import Sequence
 from enum import StrEnum
 from typing import Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from smart_rag_core.evaluation.schema import QueryType
 from smart_rag_core.query_profile.extract import (
@@ -27,12 +28,13 @@ from smart_rag_core.query_routing.signals import (
     is_historical_relationship,
     is_low_confidence_relationship,
     is_product_help,
+    is_small_talk,
     is_user_text_transform,
     is_whole_document_summary,
 )
 
 SCOPE_CONFIDENCE_THRESHOLD = 0.80
-"""Minimum accepted model confidence for a non-ambiguous scope."""
+"""Minimum accepted model confidence for a non-degraded scope."""
 
 _COMPANY_PHRASES = (
     "my company",
@@ -79,6 +81,14 @@ class KnowledgeScope(StrEnum):
     AMBIGUOUS = "ambiguous"
 
 
+class ScopeDegradationReason(StrEnum):
+    """Why scope classification safely degraded without claiming ambiguity."""
+
+    PROFILE_UNAVAILABLE = "profile_unavailable"
+    PROFILE_MALFORMED = "profile_malformed"
+    PROFILE_LOW_CONFIDENCE = "profile_low_confidence"
+
+
 class NoRetrievalAnswerMode(StrEnum):
     """How a NoRetrieval plan must answer without company retrieval."""
 
@@ -94,9 +104,11 @@ class KnowledgeScopeDecision(BaseModel):
     Attributes:
         knowledge_scope: Selected scope. Company signals always win.
         confidence: Closed unit interval. Model values below 0.80 become
-            ``AMBIGUOUS``.
+            typed general degradation, not ``AMBIGUOUS``.
         company_signal: Deterministic company/document evidence.
         general_signal: Deterministic general-knowledge evidence.
+        scope_degradation_reason: Server-derived failed-inference reason.
+            Never accepted from model JSON. Null for genuine mixed scope.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -105,6 +117,27 @@ class KnowledgeScopeDecision(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     company_signal: bool
     general_signal: bool
+    scope_degradation_reason: ScopeDegradationReason | None = None
+
+    @model_validator(mode="after")
+    def _degradation_matches_scope(self) -> KnowledgeScopeDecision:
+        """Reject a degradation reason on a non-general or company decision.
+
+        Returns:
+            This decision.
+
+        Raises:
+            ValueError: If a reason is set on company, user-text,
+                deterministic, or ambiguous scope, or with a company signal.
+        """
+
+        if self.scope_degradation_reason is None:
+            return self
+        if self.knowledge_scope is not KnowledgeScope.GENERAL_KNOWLEDGE:
+            raise ValueError("scope_degradation_scope_mismatch")
+        if self.company_signal:
+            raise ValueError("scope_degradation_company_signal")
+        return self
 
 
 def has_company_followup_memory(memory: Sequence[MemoryLike]) -> bool:
@@ -187,7 +220,10 @@ def company_intent_signal(query: str, extract: DeterministicExtract) -> bool:
         return True
     if extract.table_intent or extract.query_type is QueryType.STRUCTURED_TABULAR:
         return True
-    if extract.relationship_intent or extract.query_type is QueryType.RELATIONSHIP_MULTI_HOP:
+    if (
+        extract.relationship_intent
+        or extract.query_type is QueryType.RELATIONSHIP_MULTI_HOP
+    ):
         return True
     if is_current_relationship(query, extract) or is_historical_relationship(
         query, extract
@@ -205,7 +241,9 @@ def company_intent_signal(query: str, extract: DeterministicExtract) -> bool:
         query, extract
     ):
         return True
-    if extract.query_type is QueryType.MULTI_PART or query.lower().startswith("compare "):
+    if extract.query_type is QueryType.MULTI_PART or query.lower().startswith(
+        "compare "
+    ):
         return True
     if extract.query_type is QueryType.EXACT_IDENTIFIER:
         return True
@@ -217,14 +255,23 @@ def company_intent_signal(query: str, extract: DeterministicExtract) -> bool:
 def general_intent_signal(query: str) -> bool:
     """Return whether the query has a deterministic general-knowledge signal.
 
+    Greetings and small talk count as general signals for mixed-scope and
+    mock-heuristic use. They do not settle live scope without the profile
+    call.
+
     Args:
         query: Original user text.
 
     Returns:
-        True for greetings, product-help, or the mock general fixtures.
+        True for greetings, small talk, product-help, or mock fixtures.
     """
 
-    return is_greeting(query) or is_product_help(query) or has_general_fixture(query)
+    return (
+        is_greeting(query)
+        or is_small_talk(query)
+        or is_product_help(query)
+        or has_general_fixture(query)
+    )
 
 
 def parse_model_knowledge_scope(raw: str | None) -> KnowledgeScope | None:
@@ -245,6 +292,19 @@ def parse_model_knowledge_scope(raw: str | None) -> KnowledgeScope | None:
         return None
 
 
+def _social_opener(query: str) -> bool:
+    """Return whether the whole message is a greeting or small talk.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        True for a whole-message greeting or bounded small-talk phrase.
+    """
+
+    return is_greeting(query) or is_small_talk(query)
+
+
 def scope_requires_model(
     query: str,
     *,
@@ -258,16 +318,18 @@ def scope_requires_model(
 
     Returns:
         True when deterministic rules and fixtures do not settle scope.
+        Pure greetings and small talk require the one profile call.
     """
 
     extract = extract_deterministic(query)
     query_company = company_intent_signal(query, extract)
-    memory_company = has_company_followup_memory(memory)
+    social = _social_opener(query)
+    memory_company = has_company_followup_memory(memory) and not social
     general = general_intent_signal(query)
     if query_company and general:
         return False
-    if is_greeting(query):
-        return False
+    if social and not query_company:
+        return True
     if is_product_help(query) and not query_company:
         return False
     if query_company or (memory_company and not general):
@@ -286,6 +348,7 @@ def classify_knowledge_scope(
     model_scope: str | None = None,
     model_confidence: float | None = None,
     model_available: bool = False,
+    forced_degradation: ScopeDegradationReason | None = None,
 ) -> KnowledgeScopeDecision:
     """Classify knowledge scope with the approved strict-split priority.
 
@@ -295,26 +358,30 @@ def classify_knowledge_scope(
         model_scope: Optional scope from the single preparation payload.
         model_confidence: Optional confidence from that same payload.
         model_available: True when the one preparation call returned a payload.
+        forced_degradation: Server-derived reason when the caller failed
+            before a usable payload. Ignored when a payload is present.
 
     Returns:
         Frozen scope decision. Company signals override model output.
-        Standalone greetings are ``general_knowledge``.
+        Unavailable, malformed, or low-confidence profile output degrades
+        to company-claim-forbidden general knowledge. Model-emitted
+        ``ambiguous`` is not mixed unless deterministic company and
+        general signals already conflicted. A standalone greeting or
+        small-talk opener stays general even when the profile model
+        emits ``ambiguous`` or ``company_documents``.
+
+    Raises:
+        ValueError: If a constructed decision violates degradation rules.
     """
 
     extract = extract_deterministic(query)
     query_company = company_intent_signal(query, extract)
-    memory_company = has_company_followup_memory(memory)
+    social = _social_opener(query)
+    memory_company = has_company_followup_memory(memory) and not social
     company = query_company or memory_company
     general = general_intent_signal(query)
     user_text = is_user_text_transform(query)
 
-    if is_greeting(query):
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
-            confidence=1.0,
-            company_signal=query_company,
-            general_signal=True,
-        )
     if is_product_help(query) and not query_company:
         return KnowledgeScopeDecision(
             knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
@@ -351,20 +418,38 @@ def classify_knowledge_scope(
             general_signal=True,
         )
     if not model_available:
+        reason = forced_degradation or ScopeDegradationReason.PROFILE_UNAVAILABLE
         return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.AMBIGUOUS,
+            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
             confidence=0.0,
             company_signal=False,
-            general_signal=False,
+            general_signal=general,
+            scope_degradation_reason=reason,
         )
     parsed = parse_model_knowledge_scope(model_scope)
     confidence = 0.0 if model_confidence is None else model_confidence
-    if parsed is None or confidence < SCOPE_CONFIDENCE_THRESHOLD:
+    if parsed is None:
         return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.AMBIGUOUS,
+            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
             confidence=confidence,
             company_signal=False,
-            general_signal=False,
+            general_signal=general,
+            scope_degradation_reason=ScopeDegradationReason.PROFILE_MALFORMED,
+        )
+    if confidence < SCOPE_CONFIDENCE_THRESHOLD:
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
+            confidence=confidence,
+            company_signal=False,
+            general_signal=general,
+            scope_degradation_reason=ScopeDegradationReason.PROFILE_LOW_CONFIDENCE,
+        )
+    if social and not query_company:
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
+            confidence=confidence,
+            company_signal=False,
+            general_signal=True,
         )
     if parsed is KnowledgeScope.GENERAL_KNOWLEDGE and company:
         return KnowledgeScopeDecision(
@@ -373,12 +458,49 @@ def classify_knowledge_scope(
             company_signal=True,
             general_signal=True,
         )
+    if parsed is KnowledgeScope.AMBIGUOUS:
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
+            confidence=confidence,
+            company_signal=False,
+            general_signal=general,
+            scope_degradation_reason=ScopeDegradationReason.PROFILE_MALFORMED,
+        )
     return KnowledgeScopeDecision(
         knowledge_scope=parsed,
         confidence=confidence,
         company_signal=company,
-        general_signal=parsed is KnowledgeScope.GENERAL_KNOWLEDGE,
+        general_signal=parsed is KnowledgeScope.GENERAL_KNOWLEDGE or general,
     )
+
+
+def mock_profile_knowledge_scope(query: str) -> tuple[KnowledgeScope, float]:
+    """Return the no-network mock profile scope and confidence.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        Scope and confidence used by ``MockModelAdapter``. Greetings and
+        small talk are ``general_knowledge`` at ``0.95``. Ordinary
+        interrogatives with no company signal are ``general_knowledge`` at
+        ``0.85``.
+    """
+
+    extract = extract_deterministic(query)
+    company = company_intent_signal(query, extract)
+    general = general_intent_signal(query)
+    if _social_opener(query):
+        return KnowledgeScope.GENERAL_KNOWLEDGE, 0.95
+    if company and general:
+        return KnowledgeScope.AMBIGUOUS, 1.0
+    if company:
+        return KnowledgeScope.COMPANY_DOCUMENTS, 1.0
+    if is_user_text_transform(query):
+        return KnowledgeScope.USER_SUPPLIED_TEXT, 1.0
+    if has_general_fixture(query):
+        return KnowledgeScope.GENERAL_KNOWLEDGE, 1.0
+    return KnowledgeScope.GENERAL_KNOWLEDGE, 0.85
 
 
 def no_retrieval_mode_for_scope(scope: KnowledgeScope) -> NoRetrievalAnswerMode | None:
@@ -389,11 +511,12 @@ def no_retrieval_mode_for_scope(scope: KnowledgeScope) -> NoRetrievalAnswerMode 
 
     Returns:
         A NoRetrieval mode, or ``None`` when company documents require
-        citations and the existing retrieval matrix.
+        citations and the existing retrieval matrix. Defensive
+        ``DETERMINISTIC`` model output maps to ``GENERAL_MODEL``.
     """
 
     mapping = {
-        KnowledgeScope.DETERMINISTIC: NoRetrievalAnswerMode.DETERMINISTIC_CHAT,
+        KnowledgeScope.DETERMINISTIC: NoRetrievalAnswerMode.GENERAL_MODEL,
         KnowledgeScope.GENERAL_KNOWLEDGE: NoRetrievalAnswerMode.GENERAL_MODEL,
         KnowledgeScope.USER_SUPPLIED_TEXT: NoRetrievalAnswerMode.USER_TEXT_MODEL,
         KnowledgeScope.AMBIGUOUS: NoRetrievalAnswerMode.CLARIFICATION,

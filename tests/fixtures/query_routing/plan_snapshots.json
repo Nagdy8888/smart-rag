@@ -1,0 +1,4290 @@
+{
+  "combined_current_relationship": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "hyb-rel",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "relationship_multi_hop"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "hybrid",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Which team owns INV-SR-1001 related to procurement?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "graph-local",
+          "family": "combined",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "relationship_multi_hop"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "graph_local",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Which team owns INV-SR-1001 related to procurement?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "cite-0",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "relationship_multi_hop"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "citation_lookup",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 1,
+          "query_text": "Which team owns INV-SR-1001 related to procurement?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "combined",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": true,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [
+        "INV-SR-1001"
+      ],
+      "entity_fidelity": 1.0,
+      "exact_terms": [
+        "INV-SR-1001"
+      ],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "relationship_multi_hop"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "INV-SR-1001"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "Which team owns INV-SR-1001 related to procurement?",
+      "original_fallback_variant": "Which team owns INV-SR-1001 related to procurement?",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": "inv-sr-v1",
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "relationship_multi_hop"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "Which team owns INV-SR-1001 related to procurement?",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "relationship_multi_hop"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": true
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "relationship_multi_hop",
+      "relationship_intent": true,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "Which team owns INV-SR-1001 related to procurement?"
+  },
+  "composite_table_and_hybrid": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "tbl-cmp",
+          "family": "structured_table",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "structured_tabular_aggregation"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "structured_table",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Compare INV-SR-1001 policy and sum the Q1 sheet",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "hyb-cmp-0",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "structured_tabular_aggregation"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "hybrid",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 1,
+          "query_text": "Compare INV-SR-1001 policy and sum the Q1 sheet",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "cite-0",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "structured_tabular_aggregation"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "citation_lookup",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 2,
+          "query_text": "Compare INV-SR-1001 policy and sum the Q1 sheet",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "composite",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": true,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [
+        "INV-SR-1001"
+      ],
+      "entity_fidelity": 1.0,
+      "exact_terms": [
+        "INV-SR-1001"
+      ],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "structured_tabular_aggregation"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "INV-SR-1001"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "Compare INV-SR-1001 policy and sum the Q1 sheet",
+      "original_fallback_variant": "Compare INV-SR-1001 policy and sum the Q1 sheet",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": "inv-sr-v1",
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "structured_tabular_aggregation"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "Compare INV-SR-1001 policy and sum the Q1 sheet",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "structured_tabular_aggregation"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": true
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "sum"
+          ]
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "structured_tabular_aggregation",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": true,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "Compare INV-SR-1001 policy and sum the Q1 sheet"
+  },
+  "envelope_cannot_enlarge": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "hyb-rel",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "relationship_multi_hop"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "hybrid",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Which team owns INV-SR-1001 related to procurement?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "cite-0",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "relationship_multi_hop"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "citation_lookup",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 1,
+          "query_text": "Which team owns INV-SR-1001 related to procurement?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "hybrid",
+      "fallback_reason": "envelope_cannot_enlarge",
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [
+        "envelope_cannot_enlarge"
+      ],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": true,
+      "requested_route": "hybrid",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [
+        "INV-SR-1001"
+      ],
+      "entity_fidelity": 1.0,
+      "exact_terms": [
+        "INV-SR-1001"
+      ],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "relationship_multi_hop"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "INV-SR-1001"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "Which team owns INV-SR-1001 related to procurement?",
+      "original_fallback_variant": "Which team owns INV-SR-1001 related to procurement?",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": "inv-sr-v1",
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "relationship_multi_hop"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "Which team owns INV-SR-1001 related to procurement?",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "relationship_multi_hop"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": true
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "relationship_multi_hop",
+      "relationship_intent": true,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "Which team owns INV-SR-1001 related to procurement?"
+  },
+  "global_steering": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "hyb-theme",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "factual"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "hybrid",
+          "ll_keywords": [
+            "What"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "What is the corpus-wide landscape of safety themes?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "steer-0",
+          "family": "combined",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "factual"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "graph_global_steering",
+          "ll_keywords": [
+            "What"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "What is the corpus-wide landscape of safety themes?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "cite-0",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "factual"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "citation_lookup",
+          "ll_keywords": [
+            "What"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 1,
+          "query_text": "What is the corpus-wide landscape of safety themes?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "combined",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [
+        "global_steering_only"
+      ],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": true,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [],
+      "entity_fidelity": 1.0,
+      "exact_terms": [],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "factual"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "What"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "What is the corpus-wide landscape of safety themes?",
+      "original_fallback_variant": "What is the corpus-wide landscape of safety themes?",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "factual"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "What"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "What is the corpus-wide landscape of safety themes?",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "factual"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "factual",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "What is the corpus-wide landscape of safety themes?"
+  },
+  "graph_inspection": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "insp-0",
+          "family": "graph_inspection",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "factual"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "graph_inspection",
+          "ll_keywords": [
+            "Inspect"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Inspect the current graph workspace",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "graph_inspection",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": true,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [
+        "graph_inspection_only"
+      ],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [],
+      "entity_fidelity": 1.0,
+      "exact_terms": [],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "factual"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "Inspect"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "Inspect the current graph workspace",
+      "original_fallback_variant": "Inspect the current graph workspace",
+      "page_scope": "none",
+      "phase6_extension": "graph_inspection",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "effective_at"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "factual"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "Inspect"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "Inspect the current graph workspace",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "factual"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "current"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "factual",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "current",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "Inspect the current graph workspace"
+  },
+  "historical_relationship_hybrid": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "hyb-hist",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "relationship_multi_hop"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "hybrid",
+          "ll_keywords": [
+            "Which"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Which team owns the widget after the handoff as of 2020-01-01?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "cite-0",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "relationship_multi_hop"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "citation_lookup",
+          "ll_keywords": [
+            "Which"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 1,
+          "query_text": "Which team owns the widget after the handoff as of 2020-01-01?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "hybrid",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": true,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [
+        "temporal_graph_limitation"
+      ],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": true,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [
+        "2020-01-01"
+      ],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [],
+      "entity_fidelity": 1.0,
+      "exact_terms": [],
+      "fallback_reason": "not_needed",
+      "historical_relationship": true,
+      "hl_keywords": [
+        "relationship_multi_hop"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "Which"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "Which team owns the widget after the handoff as of 2020-01-01?",
+      "original_fallback_variant": "Which team owns the widget after the handoff as of 2020-01-01?",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "effective_at"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "2020-01-01"
+          ]
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": true
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "relationship_multi_hop"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "Which"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "Which team owns the widget after the handoff as of 2020-01-01?",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "relationship_multi_hop"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": true
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "2020-01-01"
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "as_of"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "relationship_multi_hop",
+      "relationship_intent": true,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "as_of",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "Which team owns the widget after the handoff as of 2020-01-01?"
+  },
+  "hybrid_direct": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "hyb-0",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "exact_identifier"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "hybrid",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "What is the status of INV-SR-1001?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        },
+        {
+          "branch_id": "cite-0",
+          "family": "hybrid",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "exact_identifier"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "citation_lookup",
+          "ll_keywords": [
+            "INV-SR-1001"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 1,
+          "query_text": "What is the status of INV-SR-1001?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "hybrid",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [
+        "INV-SR-1001"
+      ],
+      "entity_fidelity": 1.0,
+      "exact_terms": [
+        "INV-SR-1001"
+      ],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "exact_identifier"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "INV-SR-1001"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "What is the status of INV-SR-1001?",
+      "original_fallback_variant": "What is the status of INV-SR-1001?",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": "inv-sr-v1",
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "exact_identifier"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "INV-SR-1001"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "What is the status of INV-SR-1001?",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "exact_identifier"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "exact_identifier",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "What is the status of INV-SR-1001?"
+  },
+  "media_scoped_refusal": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "media-0",
+          "family": "scoped_refusal",
+          "graph_as_evidence": false,
+          "hl_keywords": [],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "scoped_refusal",
+          "ll_keywords": [],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Describe the unlabeled chart in the figure",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "scoped_refusal",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [
+        "media_limitation"
+      ],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": true,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [],
+      "entity_fidelity": 1.0,
+      "exact_terms": [],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "factual"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "Describe"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": true,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "Describe the unlabeled chart in the figure",
+      "original_fallback_variant": "Describe the unlabeled chart in the figure",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "factual"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "Describe"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": true
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "Describe the unlabeled chart in the figure",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "factual"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "factual",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "Describe the unlabeled chart in the figure"
+  },
+  "noretrieval_clarification": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "none-0",
+          "family": "no_retrieval",
+          "graph_as_evidence": false,
+          "hl_keywords": [],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "no_retrieval",
+          "ll_keywords": [],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "What is the capital of France and what is our refund period?",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": true,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "no_retrieval",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "ambiguous",
+      "limitations": [
+        "no_retrieval"
+      ],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": "clarification",
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [],
+      "entity_fidelity": 1.0,
+      "exact_terms": [],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "factual"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "ambiguous",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "What"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "What is the capital of France and what is our refund period?",
+      "original_fallback_variant": "What is the capital of France and what is our refund period?",
+      "page_scope": "none",
+      "phase6_extension": "no_retrieval",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "factual"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "What"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "What is the capital of France and what is our refund period?",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "factual"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "factual",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "What is the capital of France and what is our refund period?"
+  },
+  "noretrieval_general": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "none-0",
+          "family": "no_retrieval",
+          "graph_as_evidence": false,
+          "hl_keywords": [],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "no_retrieval",
+          "ll_keywords": [],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Hello",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": true,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "no_retrieval",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "general_knowledge",
+      "limitations": [
+        "no_retrieval"
+      ],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": "general_model",
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": "profile_unavailable",
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [],
+      "entity_fidelity": 1.0,
+      "exact_terms": [],
+      "fallback_reason": "profile_budget_denied",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "factual"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "general_knowledge",
+      "knowledge_scope_confidence": 0.0,
+      "language": "en",
+      "ll_keywords": [
+        "Hello"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "Hello",
+      "original_fallback_variant": "Hello",
+      "page_scope": "none",
+      "phase6_extension": "no_retrieval",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "factual"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "Hello"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "Hello",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "factual"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "factual",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": "profile_unavailable",
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "Hello"
+  },
+  "structured_table": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "tbl-0",
+          "family": "structured_table",
+          "graph_as_evidence": false,
+          "hl_keywords": [
+            "structured_tabular_aggregation"
+          ],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "structured_table",
+          "ll_keywords": [
+            "sum"
+          ],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "sum the Q1 sheet totals",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "structured_table",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": false
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "none",
+      "entities": [],
+      "entity_fidelity": 1.0,
+      "exact_terms": [],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "structured_tabular_aggregation"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "sum"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "sum the Q1 sheet totals",
+      "original_fallback_variant": "sum the Q1 sheet totals",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "structured_tabular_aggregation"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "sum"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "sum the Q1 sheet totals",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "structured_tabular_aggregation"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": true
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "sum"
+          ]
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "structured_tabular_aggregation",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": true,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": false
+    },
+    "query": "sum the Q1 sheet totals"
+  },
+  "whole_document_insufficient": {
+    "plan": {
+      "branch_concurrency": 2,
+      "branches": [
+        {
+          "branch_id": "sum-refuse",
+          "family": "scoped_refusal",
+          "graph_as_evidence": false,
+          "hl_keywords": [],
+          "inherit_reservation": true,
+          "inherit_run_id": true,
+          "kind": "scoped_refusal",
+          "ll_keywords": [],
+          "max_graph_expansions": 3,
+          "parallel_group": 0,
+          "query_text": "Summarize document p4-src-0001",
+          "reuse_hybrid_ranked_ids": [],
+          "table_plan": null
+        }
+      ],
+      "catalog_llm_call_count": 0,
+      "company_claim_forbidden": false,
+      "corrected_route": null,
+      "coverage_threshold": 0.65,
+      "effective_route": "scoped_refusal",
+      "fallback_reason": null,
+      "graph_as_answer_forbidden": false,
+      "historical_relationship": false,
+      "hybrid_prose_composition": false,
+      "knowledge_scope": "company_documents",
+      "limitations": [
+        "scoped_summary",
+        "section_coverage_below_1"
+      ],
+      "manual_mode": false,
+      "max_subquestions": 3,
+      "media_answer_forbidden": false,
+      "no_retrieval_answer_mode": null,
+      "prove_complement": false,
+      "relationship_signal_retained": false,
+      "requested_route": "composite",
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_coverage_required": 1.0,
+      "temporal_graph_limitation": false,
+      "whole_document_summary": true
+    },
+    "preparation": {
+      "approved_aliases": [],
+      "comparison": false,
+      "confidence": 1.0,
+      "corpus_wide_theme": false,
+      "dates": [],
+      "decomposition": [],
+      "document_scope": "document:p4-src-0001",
+      "entities": [],
+      "entity_fidelity": 1.0,
+      "exact_terms": [],
+      "fallback_reason": "not_needed",
+      "historical_relationship": false,
+      "hl_keywords": [
+        "broad_summary"
+      ],
+      "intent_fidelity": 1.0,
+      "knowledge_scope": "company_documents",
+      "knowledge_scope_confidence": 1.0,
+      "language": "en",
+      "ll_keywords": [
+        "Summarize"
+      ],
+      "low_confidence_relationship": false,
+      "manual_mode": false,
+      "media_intent": false,
+      "metadata_filters": [],
+      "model_calls": 0,
+      "negation_confidence": 1.0,
+      "negation_scope": "none",
+      "numbers": [],
+      "original": "Summarize document p4-src-0001",
+      "original_fallback_variant": "Summarize document p4-src-0001",
+      "page_scope": "none",
+      "phase6_extension": "none",
+      "profile": {
+        "approved_aliases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "authoritative_date_field": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "codes": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "date_parser_version": "gregorian_v1",
+        "dates": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "document_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "document:p4-src-0001"
+        },
+        "entities": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "exact_terms": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "historical_relationship": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "hl_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "broad_summary"
+          ]
+        },
+        "language": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": "en",
+          "value": "en"
+        },
+        "ll_keywords": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": [
+            "Summarize"
+          ]
+        },
+        "locale_configuration": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "en-US"
+        },
+        "media_dependence": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "metadata_filters": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "model_version": "query-profile-mock-v1",
+        "negation_scope": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "normalizer_version": "arabic_norm_v1",
+        "numbers": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "original_query": "Summarize document p4-src-0001",
+        "prompt_version": "query_profile_v1",
+        "query_type": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "broad_summary"
+        },
+        "quoted_phrases": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "relationship_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "requested_sources": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "retrieval_profile_id": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "hybrid_default_v1"
+        },
+        "rewrite_justified": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "subquestions": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "table_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": false
+        },
+        "table_operation_hints": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        },
+        "target_date": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": null
+        },
+        "temporal_intent": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "none"
+        },
+        "timezone": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": "UTC"
+        },
+        "variants": {
+          "alias_id": null,
+          "confidence": 1.0,
+          "provenance": "deterministic",
+          "rule_id": null,
+          "source_span": null,
+          "value": []
+        }
+      },
+      "query_type": "broad_summary",
+      "relationship_intent": false,
+      "rewrite": null,
+      "routing_surface": "production",
+      "scope_degradation_reason": null,
+      "section_scope": "none",
+      "table_intent": false,
+      "temporal_intent": "none",
+      "timezone": "UTC",
+      "whole_document_summary": true
+    },
+    "query": "Summarize document p4-src-0001"
+  }
+}

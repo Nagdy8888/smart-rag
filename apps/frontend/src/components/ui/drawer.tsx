@@ -1,5 +1,5 @@
 /**
- * Modal drawer with Escape-to-close, focus trap, and restore-trigger.
+ * Modal drawer with backdrop, Escape, focus trap, scroll lock, and restore.
  */
 
 "use client";
@@ -12,16 +12,15 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { lockBodyScroll } from "./body-scroll-lock";
 import { Button } from "./button";
-import styles from "./ui.module.css";
-
-const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+import { trapFocus } from "./focus-trap";
+import styles from "./styles/overlays.module.css";
 
 export type DrawerProps = {
   /** Accessible title. */
   title: string;
-  /** Close handler. Escape and the Close button call this. */
+  /** Close handler. Escape, backdrop, and Close call this. */
   onClose: () => void;
   /** Drawer body. */
   children: ReactNode;
@@ -30,42 +29,35 @@ export type DrawerProps = {
 };
 
 /**
- * List currently focusable elements inside a container.
- *
- * @param root - Drawer node.
- * @returns Focusable HTMLElements in DOM order.
- */
-function focusableElements(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (node) => !node.hasAttribute("disabled"),
-  );
-}
-
-/**
- * Render a dialog with a simple focus trap.
+ * Render a dialog with a visible backdrop and a simple focus trap.
  *
  * @param props - Title, close handler, optional return-focus ref.
- * @returns `role="dialog"` aside.
+ * @returns Overlay dialog. Side effects: scroll lock, trap, restore.
  * @remarks
- * Side effects: focuses the first control on mount and restores the
- * trigger on unmount. Escape closes. Tab cycles inside the drawer.
+ * Backdrop click and Escape close. Tab cycles inside the panel. Body scroll
+ * is locked while mounted and released exactly once on unmount.
  */
 export function Drawer({ title, onClose, children, returnFocusRef }: DrawerProps) {
   const containerRef = useRef<HTMLElement>(null);
   const titleId = useId();
 
   useEffect(() => {
-    const previouslyFocused = returnFocusRef?.current ?? null;
     const root = containerRef.current;
-    const first = root ? focusableElements(root)[0] : undefined;
-    first?.focus();
+    if (root === null) {
+      return;
+    }
+    const unlock = lockBodyScroll();
+    const release = trapFocus(root, {
+      returnFocus: returnFocusRef?.current ?? null,
+    });
     return () => {
-      previouslyFocused?.focus();
+      release();
+      unlock();
     };
   }, [returnFocusRef]);
 
   /**
-   * Trap Tab and handle Escape.
+   * Close on Escape. Tab wrap lives in `trapFocus`.
    *
    * @param event - Keyboard event from the dialog.
    */
@@ -73,47 +65,33 @@ export function Drawer({ title, onClose, children, returnFocusRef }: DrawerProps
     if (event.key === "Escape") {
       event.preventDefault();
       onClose();
-      return;
-    }
-    if (event.key !== "Tab" || containerRef.current === null) {
-      return;
-    }
-    const nodes = focusableElements(containerRef.current);
-    if (nodes.length === 0) {
-      return;
-    }
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-    if (first === undefined || last === undefined) {
-      return;
-    }
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-      return;
-    }
-    if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
     }
   }
 
   return (
-    <aside
-      ref={containerRef}
-      className={styles.drawer}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      onKeyDown={onKeyDown}
-    >
-      <div className={styles.drawerHeader}>
-        <h3 id={titleId}>{title}</h3>
-        <Button type="button" onClick={onClose}>
-          Close
-        </Button>
-      </div>
-      {children}
-    </aside>
+    <div className={styles.drawerRoot}>
+      <button
+        type="button"
+        className={styles.drawerBackdrop}
+        aria-label="Dismiss drawer"
+        onClick={onClose}
+      />
+      <aside
+        ref={containerRef}
+        className={styles.drawer}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={onKeyDown}
+      >
+        <div className={styles.drawerHeader}>
+          <h3 id={titleId}>{title}</h3>
+          <Button type="button" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+        {children}
+      </aside>
+    </div>
   );
 }

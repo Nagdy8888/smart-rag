@@ -6,6 +6,7 @@ import pytest
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import (
     CLARIFICATION_TEXT,
+    DEGRADED_NO_COMPANY_SEARCH,
     GREETING_TEXT,
     generate_answer,
 )
@@ -20,6 +21,7 @@ from smart_rag_core.query_fusion.models import (
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
     NoRetrievalAnswerMode,
+    ScopeDegradationReason,
 )
 
 
@@ -112,26 +114,27 @@ def _generate(
     )
 
 
-def test_explicit_deterministic_chat_keeps_canned_text() -> None:
-    """Forced deterministic_chat still uses the canned line and no model."""
+def test_deterministic_scope_uses_general_model_not_canned_text() -> None:
+    """Defensive deterministic output is answered by the general model."""
 
     calls: list[str] = []
 
     def _caller(query: str, memory: str, scope: KnowledgeScope) -> AnswerPayload:
-        """Record an unexpected general-chat call.
+        """Return a conversational greeting.
 
         Args:
             query: User text.
             memory: Unused memory.
-            scope: Unused scope.
+            scope: Routed origin.
 
         Returns:
-            Should never be used.
+            General-chat payload.
         """
 
-        del memory, scope
+        del memory
         calls.append(query)
-        return AnswerPayload(answer_text="model", status="complete")
+        assert scope is KnowledgeScope.GENERAL_KNOWLEDGE
+        return AnswerPayload(answer_text="Hello from the model.", status="complete")
 
     payload = _generate(
         "Hi",
@@ -139,10 +142,11 @@ def test_explicit_deterministic_chat_keeps_canned_text() -> None:
         mode=NoRetrievalAnswerMode.DETERMINISTIC_CHAT,
         general_caller=_caller,
     )
-    assert payload.answer_text == GREETING_TEXT
-    assert payload.answer_origin is KnowledgeScope.DETERMINISTIC
+    assert payload.answer_text == "Hello from the model."
+    assert payload.answer_origin is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert GREETING_TEXT not in payload.answer_text
     assert payload.citations == ()
-    assert calls == []
+    assert calls == ["Hi"]
 
 
 def test_greeting_uses_one_general_call() -> None:
@@ -386,14 +390,54 @@ def test_general_gateway_failure_does_not_fabricate() -> None:
         )
 
 
+def test_degraded_scope_uses_no_company_search_framing() -> None:
+    """Failed profile inference prefixes explicit no-company-search wording."""
+
+    def _caller(query: str, memory: str, scope: KnowledgeScope) -> AnswerPayload:
+        """Return a general world-knowledge answer.
+
+        Args:
+            query: Unused.
+            memory: Unused.
+            scope: Unused.
+
+        Returns:
+            General payload.
+        """
+
+        del query, memory, scope
+        return AnswerPayload(
+            answer_text="Paris is the capital of France.",
+            status="complete",
+        )
+
+    payload = generate_answer(
+        fusion=_fusion(),
+        tables=(),
+        user_query="What is the capital of France?",
+        caller=None,
+        already_generated=0,
+        company_claim_forbidden=True,
+        graph_as_answer_forbidden=False,
+        knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
+        no_retrieval_answer_mode=NoRetrievalAnswerMode.GENERAL_MODEL,
+        general_caller=_caller,
+        scope_degradation_reason=ScopeDegradationReason.PROFILE_UNAVAILABLE,
+    )
+    assert payload.answer_origin is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert DEGRADED_NO_COMPANY_SEARCH in payload.answer_text
+    assert "Paris" in payload.answer_text
+    assert payload.citations == ()
+
+
 def test_second_generation_still_fails_closed() -> None:
     """A second generation remains the existing error."""
 
-    first = _generate("Hi", mode=NoRetrievalAnswerMode.DETERMINISTIC_CHAT)
+    first = _generate("Hi", mode=NoRetrievalAnswerMode.GENERAL_MODEL)
     assert first.status == "complete"
     with pytest.raises(AnswerError, match="second_answer_generation"):
         _generate(
             "Hi",
-            mode=NoRetrievalAnswerMode.DETERMINISTIC_CHAT,
+            mode=NoRetrievalAnswerMode.GENERAL_MODEL,
             already_generated=1,
         )

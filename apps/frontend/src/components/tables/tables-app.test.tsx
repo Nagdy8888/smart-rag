@@ -302,7 +302,8 @@ describe("TablesApp", () => {
     );
     renderSurface(<TablesApp />);
     expect(await screen.findByText(FORBIDDEN_MUTATION_COPY)).toBeInTheDocument();
-    expect(screen.getAllByText(EMPTY_MANIFESTS_COPY).length).toBeGreaterThan(0);
+    expect(screen.queryByText(EMPTY_MANIFESTS_COPY)).toBeNull();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
   it("keeps the submitted plan when display sort changes", async () => {

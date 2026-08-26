@@ -4,7 +4,7 @@
 
 import { displayText } from "../../lib/safe-text";
 import { UserText } from "./user-text";
-import styles from "./ui.module.css";
+import styles from "./styles/data-display.module.css";
 
 export type CitationChipProps = {
   /** 1-based or server `citation_index`. */

@@ -26,10 +26,13 @@ Related: [CONFIGURATION.md](./CONFIGURATION.md) ·
 Exported fields are limited to:
 
 - Stable run names (`model.generate`, `model.query_profile`, `model.rerank`,
-  `embedding.embed`, `openai.responses.rerank`, `openai.embeddings`)
+  `embedding.embed`, `openai.responses.rerank`,
+  `openai.responses.query_profile`, `openai.responses.general_chat`,
+  `openai.embeddings`)
 - Operation, model id, prompt version, prompt SHA-256, candidate/excerpt
   counts, character counts
-- SHA-256 prefixes of query/prompt/excerpt/input text (16 hex chars)
+- SHA-256 prefixes of query/prompt/excerpt/input text (16 hex chars),
+  including profile `user_query` and `recent_memory` hashes
 - Token usage, provider request id, mode, ranking count
 - LightRAG extract `input_tokens`, `cached_input_tokens`, `output_tokens`,
   `total_tokens`, and `estimated_cost_usd`. The estimate uses the pinned
@@ -75,6 +78,12 @@ Raw query, answer, passages, JWTs, and emails stay out unless local
 `LANGSMITH_EXPORT_IO=true`, which attaches the user message as `input`
 and the assistant reply plus usage as `output`.
 
+Request, graph-node, and gateway paths never call `Client.flush()`.
+LangSmith's process background queue exports completed spans independently
+of answer delivery. The backend calls the process-cached client's
+`flush(timeout=2.0)` only during application shutdown; a tracing outage
+there is logged and never raised.
+
 `assert_langsmith_export_permitted` with `ContentClass.REAL_COMPANY`
 must pass before company-document content can be traced. A denied gate
 is a hard stop, not a silent untraced success.
@@ -92,7 +101,7 @@ Live LangSmith UI inspection that completed runs no longer surface
 `GeneratorExit` as intended success remains **blocked** until
 `LANGSMITH_TRACING=true` is used with a real key. Unit/contract proof
 lives in `tests/unit/test_query_run_sse_trace.py` and
-`tests/unit/test_query_sse_executor.py`.
+`tests/unit/test_query_sse_verified_final.py`.
 
 ## Runtime flow
 
@@ -117,8 +126,9 @@ sequenceDiagram
   Gateway->>LangSmith: redacted span start
   Gateway->>OpenAI: Responses or embeddings
   OpenAI-->>Gateway: usage plus payload
-  Gateway->>LangSmith: tokens, estimated USD, redacted I/O
-  Gateway-->>Caller: typed response
+  Gateway->>LangSmith: enqueue tokens, estimated USD, redacted I/O
+  Gateway-->>Caller: typed response without queue drain
+  LangSmith-->>LangSmith: background export
 ```
 
 ## Enablement
@@ -136,8 +146,12 @@ sequenceDiagram
    `query.run.sse` (LLM run) and on gateway spans even when the I/O flag
    stays false.
 3. Startup also writes `LANGCHAIN_TRACING_V2` and `LANGCHAIN_PROJECT` so
-   LangGraph node runs export to the same project. Gateway threads flush
-   buffered spans before they exit.
+   LangGraph node runs export to the same project. Gateway and SSE threads
+   never synchronously drain traces. The long-lived SDK background queue
+   exports them, and backend shutdown receives one bounded two-second drain.
+   A 120-second greeting stall after model return is a run-row lock between
+   uncommitted `llm_usage` and heartbeat `append_run_event`, not a
+   LangSmith node-end HTTP flush. See [SSE.md](../api/SSE.md).
 4. Local default is still `MOCK_MODEL_MODE=true` (zero OpenAI cost). The
    operator may set `MOCK_MODEL_MODE=false` in gitignored `.env` and
    `.env.compose` to use a live OpenAI key **without org-matrix verification**.
@@ -169,7 +183,8 @@ sequenceDiagram
 | --- | --- |
 | Tracing off (default) | No LangSmith export. Model calls still go through the gateway. |
 | Tracing on, missing key | Settings validation fails at process start. |
-| LangSmith unreachable | SDK records a local tracing error; the OpenAI call is not retried for tracing. **unverified** live network failure until a key is used. |
+| LangSmith unreachable | SDK records a local tracing error; the OpenAI call is not retried or delayed for tracing. Shutdown waits at most two seconds. |
+| Trace output is a raw tuple | The redactor accepts the pinned adapter tuple directly, exports only request/usage/key metadata, and lets the span close. |
 | `wrap_openai` child span | I/O hidden by forced env flags; parent span has hashes/counts only. |
 | Local `LANGSMITH_EXPORT_IO=true` | Hide flags off; gateway spans include prompt/completion text and `query.run.sse` includes user message / assistant reply. Staging/production fail startup. |
 | Direct `OpenAI()` in packages/apps/scripts | Unit AST test fails. Use `traced_openai_client`. |
@@ -221,11 +236,100 @@ local Supabase, an active synthetic member, and ingested synthetic corpus.
 `--llm-judge` requires `--live-agent`. ParadeDB absence fails unless
 `--allow-bm25-degraded`.
 
+## Dedicated online workspace evaluators
+
+Hosted evaluators attach only to tracing project
+`smart-rag-agent-eval-online` (Tracing → project → Evaluators). They do
+**not** attach to the normal `smart-rag` project or to any dataset.
+
+| Resource | Stable name |
+| --- | --- |
+| Tracing project | `smart-rag-agent-eval-online` |
+| Code evaluator | `smart-rag-agent-online-hard-metrics-v1` |
+| LLM evaluator | `smart-rag-agent-online-judge-v1` |
+| Prompt handle | `smart-rag-eval-judge-v1` |
+| Prompt tag | `agent-online-eval-v1` |
+| Root run | `query.agent.eval.online.v1` |
+| Envelope schema | `agent-online-eval-v1` |
+
+The dedicated root may export a Pydantic-validated synthetic envelope:
+`case_id`, question, language, query class, bounded answer, routes,
+citation ids, at most 12 evidence excerpts (≤600 chars), remaining
+counters, and the frozen reference. Normal `query.agent.eval` and
+`query.run.sse` parents stay redacted. JWTs, API keys, DSNs, emails,
+signed URLs, file bytes, BM25 snippets, graph prose, and real-company
+content are rejected before export.
+
+Rule contract: `sampling_rate=1.0`, filter
+`eq(name, "query.agent.eval.online.v1")` so child spans are not scored,
+no backfill, weekly USD 2.00 spend cap on the hosted judge. The local
+`--llm-judge` flag is forbidden on `--online-only`; the hosted judge is
+the sole judge for this path.
+
+```mermaid
+sequenceDiagram
+  participant CLI as eval_query_agent_langsmith
+  participant Graph as AdmittedQueryGraph
+  participant Online as smart-rag-agent-eval-online
+  participant App as smart-rag
+  CLI->>CLI: load frozen suite max 20
+  loop each case concurrency 1
+    CLI->>Graph: admit invoke persist settle
+    Graph->>Online: query.agent.eval.online.v1 envelope
+  end
+  Online->>Online: code plus hosted gpt-4o-mini judge
+  App-->>App: no evaluator rule
+```
+
+```powershell
+uv run python scripts/eval_query_agent_langsmith.py --online-only --dry-run
+.\scripts\langsmith\setup_online_agent_evaluators.ps1 -ModelConfigurationId <existing-gpt-4o-mini-id>
+uv run python scripts/eval_query_agent_langsmith.py --online-only --allow-bm25-degraded
+uv run python scripts/langsmith/verify_online_agent_feedback.py --expected-roots 20 --timeout-seconds 600
+```
+
+Dry-run validates the frozen suite, dedicated project name, envelope
+schema, holdout denial, and USD 2 cap with zero LangSmith, database,
+agent, or provider writes. Live online emission requires `APP_ENV=local`,
+`LANGSMITH_TRACING=true`, a real key/profile, the synthetic fixture
+corpus plus mapped sidecar, an authorized fixture user, and ParadeDB
+unless `--allow-bm25-degraded`.
+
+Rollback: disable or delete only the two dedicated-project rules, then
+delete the two evaluator resources if no other rule references them.
+Never delete `smart-rag` traces/projects or shared prompts without an
+explicit reference check.
+
+Measured live setup IDs, prompt commit, model-configuration id, emitted
+trace count, feedback completion, and evaluator spend are recorded in
+[phase-06-agent-intelligence-evidence.md](./phase-06-agent-intelligence-evidence.md)
+when a workspace run completes. Creation of evaluators alone is not
+success.
+
+2026-08-26: both evaluators are attached only to
+`smart-rag-agent-eval-online` (`0be241df-90e1-4f96-bfa0-2be48b38ac9b`).
+They will **not** appear on `smart-rag-demo-3`. Open **Tracing →
+smart-rag-agent-eval-online → Evaluators**.
+
+| Resource | ID |
+| --- | --- |
+| Code evaluator `smart-rag-agent-online-hard-metrics-v1` | `f726fe1c-14e8-40ee-bb4f-1be6d2f3e73b` |
+| LLM evaluator `smart-rag-agent-online-judge-v1` | `eae1c165-f195-4dd4-abbb-5fa9d65d7b16` |
+| Code rule | `615e3385-a3a8-41f3-89b6-ef008be64587` |
+| LLM rule | `4e579da2-0155-46c0-bfa1-99b06b9aafe0` |
+| Model configuration `smart-rag-eval-gpt-4o-mini` | `279906e1-2c03-4080-8511-aa194c663073` |
+
+The model configuration references the existing workspace secret name
+`OPENAI_API_KEY`. No provider key was uploaded. The org cannot enforce
+the weekly USD 2 spend cap (`spend_limit` 422). Filter stays
+`eq(name, "query.agent.eval.online.v1")`. Live trace emission remains
+unverified.
+
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_query_run_sse_trace.py tests/unit/test_query_sse_executor.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_openai_rerank.py tests/unit/test_openai_lightrag.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
-uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/openai_lightrag.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py apps/backend/src/smart_rag_api/services/sse_stream.py tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_query_run_sse_trace.py tests/unit/test_query_sse_executor.py tests/unit/test_openai_lightrag.py
+uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_query_graph_runtime.py tests/unit/test_query_run_sse_trace.py tests/unit/test_async_bridge.py tests/unit/test_langsmith_query_trace.py tests/unit/test_ingest_trace.py tests/unit/test_query_sse_verified_final.py tests/unit/test_query_sse_lifecycle.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_openai_rerank.py tests/unit/test_openai_lightrag.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
+uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/runtime/async_bridge.py packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/openai_lightrag.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py apps/agents/src/smart_rag_agents/query/gateway apps/backend/src/smart_rag_api/main.py apps/backend/src/smart_rag_api/services/sse_stream.py tests/unit/test_langsmith_tracing.py tests/unit/test_langsmith_query_trace.py tests/unit/test_ingest_trace.py tests/unit/test_query_run_sse_trace.py tests/unit/test_query_sse_verified_final.py tests/unit/test_openai_lightrag.py tests/unit/test_async_bridge.py
 ```
 
 Live LangSmith project visibility is **unverified** until

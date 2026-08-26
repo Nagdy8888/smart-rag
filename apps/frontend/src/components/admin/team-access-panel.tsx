@@ -29,7 +29,10 @@ import {
   type InviteRole,
   type OffboardResponse,
 } from "../../lib/types";
-import styles from "./admin.module.css";
+import shellStyles from "./admin-shell.module.css";
+import tableStyles from "./admin-tables.module.css";
+
+const styles = { ...shellStyles, ...tableStyles };
 
 const ROLE_OPTIONS = INVITE_ROLES.map((item) => ({ value: item, label: item }));
 

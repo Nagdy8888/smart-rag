@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: engineering, frontend
 ---
 
@@ -70,7 +70,8 @@ tracebacks, secrets, source HTML, or passages.
 | Type | Role |
 | --- | --- |
 | `schema` | First event on a new stream. Carries `sse_schema_version`. |
-| `status` | Stage/status. |
+| `status` | Stage/status. Optional additive `phase` (`started`/`completed`/`failed`) for live progress; omitted on legacy rows. |
+| `tool_progress` | Optional-tool progress. `tool_key` and `phase` only. No args, results, or display text. |
 | `heartbeat` | Every 15 seconds, persisted, while the run is non-terminal. |
 | `route_correction` | Single-correction diagnostic. |
 | `limitation` | Named limitation code. |
@@ -106,6 +107,32 @@ does not continue with `connection=None`. Concurrent Combined retrieves
 serialize `query_budget` onto the shared LightRAG adapter. Studio's
 module-level `graph` stays unbound.
 
+## Progress, verify, then tokens
+
+Live LangGraph uses `stream_mode=["updates","custom"]` version `v2`.
+Custom node-start writer events may arrive before the matching updates
+completion. The mapper emits `status.phase` and optional `tool_progress`.
+`token_delta` is held until `verify_answer` completes. Replay is
+monotonic and first-terminal-wins. `deadline` is diagnostic; `partial`
+is the terminal.
+
+```mermaid
+sequenceDiagram
+  participant Node as GraphNode
+  participant Writer as stream_writer
+  participant Mapper as SSEMapper
+  participant Client as AskClient
+  Node->>Writer: custom started
+  Writer->>Mapper: custom StreamPart
+  Mapper->>Client: status phase started
+  Node->>Mapper: updates completed
+  Mapper->>Client: status phase completed
+  Note over Mapper,Client: no token_delta before verify_answer
+  Node->>Mapper: verify completed
+  Mapper->>Client: token_delta then terminal
+  Client->>Client: paced reveal or skip
+```
+
 ## Sanitization and reconnect
 
 - Exception messages are discarded. Retrieved source text is never stored
@@ -119,6 +146,50 @@ module-level `graph` stays unbound.
   (that unique terminal would block the owning replica from appending
   `completed`). `worker_unavailable` is only for a true orphan: `pending`
   with no startable input on this process.
+
+## Persist offload and run-row locks
+
+```mermaid
+sequenceDiagram
+  participant EventLoop as AsyncioLoop
+  participant Worker as AppendThread
+  participant Graph as GraphTxn
+  participant Store as RunEvents
+  EventLoop->>Worker: "to_thread append heartbeat"
+  Graph->>Graph: "uncommitted llm_usage KEY SHARE"
+  Worker->>Store: "append_run_event FOR UPDATE"
+  alt lock held
+    Store-->>Worker: "lock_timeout 2s"
+    Worker-->>EventLoop: "log and skip heartbeat"
+  else lock free
+    Store-->>Worker: "sequenced event"
+    Worker-->>EventLoop: "persist then continue"
+  end
+  EventLoop->>Graph: "astream yield then commit"
+```
+
+Heartbeat and executor appends run in `asyncio.to_thread` so a synchronous
+Postgres wait cannot freeze the SSE event loop or LangGraph `astream`.
+Sequence order is unchanged: each append is awaited before the next event.
+Exactly one terminal remains required.
+
+`PostgresRunEventStore` keeps autocommit off. After `SET ROLE app_api` each
+transaction applies `SET LOCAL lock_timeout TO '2s'`. That matches the
+intended `app_api` GUC. Hosted login-role sessions do not always inherit
+role timeouts after `SET ROLE`, so the store must set the limit itself.
+
+`app.append_run_event` takes `SELECT … FROM app.runs FOR UPDATE`. An
+uncommitted `llm_usage` insert on the graph `app_api` connection holds
+KEY SHARE on the same row until the executor commits after an `astream`
+yield. A heartbeat that hits that lock must fail in two seconds, not sit
+until the 120-second statement timeout. Heartbeat failures are logged and
+skipped. Status and terminal append failures keep the previous None-return
+path so the executor can persist a sanitized `error`. Logs include
+`run_id`, `sse_event_type`, SQLSTATE or reason, and elapsed seconds.
+They never include DSNs, JWTs, payload bodies, or exception text.
+
+This is the c31e50dc stall class. Disabling LangSmith tracing is not the
+fix. Authenticated live timing after this repair is still unverified.
 
 ## Retention (packet 7)
 

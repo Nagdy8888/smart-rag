@@ -194,8 +194,8 @@ That banner does not mean traces failed. Do not treat it as a missing key.
 ## Verification
 
 ```powershell
-uv run pytest tests/contract/test_langgraph_config.py tests/unit/test_query_studio.py tests/unit/test_query_studio_live.py -q
-uv run ruff check apps/agents/src/smart_rag_agents/query/studio.py apps/agents/src/smart_rag_agents/query/studio_live.py apps/agents/src/smart_rag_agents/query/graph.py tests/contract/test_langgraph_config.py tests/unit/test_query_studio.py tests/unit/test_query_studio_live.py
+uv run pytest tests/contract/test_langgraph_config.py tests/unit/test_query_studio.py tests/unit/test_query_studio_auth.py tests/unit/test_query_studio_admission.py tests/unit/test_query_studio_execution.py tests/unit/test_query_studio_introspection.py -q
+uv run ruff check apps/agents/src/smart_rag_agents/query/studio.py apps/agents/src/smart_rag_agents/query/studio_live.py apps/agents/src/smart_rag_agents/query/graph.py tests/contract/test_langgraph_config.py tests/unit/test_query_studio.py tests/unit/test_query_studio_auth.py tests/unit/test_query_studio_admission.py tests/unit/test_query_studio_execution.py tests/unit/test_query_studio_introspection.py
 $env:PYTHONUTF8 = "1"; uv run langgraph --help
 ```
 

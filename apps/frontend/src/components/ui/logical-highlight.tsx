@@ -4,7 +4,7 @@
 
 import { highlightLogicalRange } from "../../lib/highlight-logical-range";
 import { displayText } from "../../lib/safe-text";
-import styles from "./ui.module.css";
+import styles from "./styles/data-display.module.css";
 
 export type LogicalHighlightProps = {
   /** Canonical logical text. Never HTML. */

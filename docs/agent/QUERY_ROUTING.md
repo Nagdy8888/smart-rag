@@ -2,7 +2,7 @@
 title: Query routing matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 2
 ---
@@ -39,29 +39,43 @@ Related: [QUERY_ADMISSION.md](./QUERY_ADMISSION.md) ·
 ## Strict-split knowledge scope
 
 Every preparation records `knowledge_scope` before the route matrix.
-Company/document signals always win. Mixed or low-confidence scope is
-`ambiguous` and never retrieves. World knowledge is allowed only on
-`general_knowledge` and `user_supplied_text`. Company routes never fall
-back to world knowledge when evidence is missing; they refuse.
+Company/document signals always win. Genuine company/general conflict is
+`ambiguous` and never retrieves. Profile unavailable, malformed, or below the
+scope-confidence threshold records a server-derived degradation reason and
+uses a company-claim-forbidden general path that explicitly says company
+documents were not searched. World knowledge is allowed only on
+`general_knowledge` and `user_supplied_text`. Company routes never fall back to
+world knowledge when evidence is missing; they refuse.
 
 | Scope | Effective family | Model | Citations / `answer_origin` |
 | --- | --- | --- | --- |
-| `deterministic` | `NoRetrieval` / `deterministic_chat` | 0 | none / `deterministic` |
+| `deterministic` | `NoRetrieval` / `general_model` | one `usage_kind=answer` | none / `general_knowledge` |
 | `general_knowledge` | `NoRetrieval` / `general_model` | one `usage_kind=answer` | none / `general_knowledge` |
-
-Standalone greetings such as “Hi” and “Hello” are `general_knowledge`.
-They use one general-chat model call. They do not use the canned
-document-help line. A greeting prefix on a company question, such as
-“Hi, what is our refund period?”, still stays on documents.
 | `user_supplied_text` | `NoRetrieval` / `user_text_model` | one `usage_kind=answer` | none / `user_supplied_text` |
 | `ambiguous` | `NoRetrieval` / `clarification` | 0 | none / `ambiguous` |
 | `company_documents` | Hybrid / Combined / table / inspection as before | existing RAG | cited or refusal / `company_documents` |
+
+Standalone greetings such as “Hi”, “Hello”, and “hi friend” are
+`general_knowledge`. They use the one structured profile call plus one
+general-chat model call in live mode. They do not use the canned
+document-help line or the mixed-scope clarification. A profile payload that
+emits `ambiguous` or `company_documents` for a standalone greeting is
+ignored; only a genuine company-plus-general conflict on the same turn is
+mixed. A greeting prefix on a company question, such as “Hi, what is our
+refund period?”, still stays on documents and deterministic company signals
+settle before the profile model.
+Degraded general scope keeps `company_claim_forbidden=True` and records
+`scope_degradation_reason` as `profile_unavailable`, `profile_malformed`, or
+`profile_low_confidence`. That reason is server-derived and is never accepted
+from model JSON. Genuine mixed scope has no degradation reason. Live
+FastAPI/Studio records the actual profile model id `gpt-4o-mini` on
+`usage_kind=profile`. Local `query_studio` stays unbound.
 
 Follow-up turns stay `company_documents` when recent assistant memory
 contains citation or source-id evidence, unless the user clearly switches
 to a general-only or user-text-only request. Identity and capability
 prompts such as “Who are you?” and “How can you help me?”, and
-standalone greetings such as “Hi”, are that switch: they stay
+standalone greetings such as “Hi” and “hi friend”, are that switch: they stay
 `general_knowledge` and do not ask for mixed-scope clarification. Prompt-injection text cannot force company claims onto
 the general path or force a world-knowledge fallback onto the company
 path.
@@ -102,8 +116,8 @@ override is rejected.
 ```mermaid
 flowchart TD
   start[QueryPreparation] --> scope{Knowledge scope}
-  scope -->|deterministic general or user-text| none[NoRetrieval no company claims]
-  scope -->|ambiguous| clarify[NoRetrieval clarification no retrieval]
+  scope -->|deterministic general user-text or degraded| none[NoRetrieval no company claims]
+  scope -->|genuine mixed conflict| clarify[NoRetrieval clarification no retrieval]
   scope -->|company| gi{Explicit graph inspection?}
   gi -->|yes| inspect[GraphOnlyInspection not an answer]
   gi -->|no| media{Media-only without caption or OCR?}
@@ -147,6 +161,7 @@ sequenceDiagram
   participant Mem as load_memory
   participant Prep as prepare_query
   participant Plan as compile_plan
+  participant Scope as scope node
   participant Br as execute_branches
   participant Corr as apply_correction
   participant Fuse as fuse_evidence
@@ -164,20 +179,29 @@ sequenceDiagram
   end
   Prep->>Plan: QueryPreparation
   Plan->>Plan: matrix plus envelope clamp
-  Plan->>Br: at most 3 subquestions concurrency 2
-  Br->>Br: Hybrid GraphRetriever table citation IDs
-  Br->>Corr: coverage_score and relationship signal
-  alt coverage below 0.65 and relationship retained
-    Corr->>Corr: one Hybrid to Combined reuse Hybrid IDs
-  else coverage below 0.65 no relationship
-    Corr->>Corr: one same-route retry
-  else exhausted
-    Corr->>Corr: insufficient_evidence END
-  else continue
-    Corr->>Fuse: Hybrid ranks and resolved paths
-    Fuse->>Tables: canonical evidence
-    Tables->>Ans: one counted answer call
-    Ans->>Ver: deterministic checks then one six-link verifier
+  alt general greeting user-text or degraded
+    Plan->>Scope: direct answer
+    Scope->>Ver: deterministic verification
+  else genuine mixed conflict
+    Plan->>Scope: deterministic clarification
+    Scope->>Ver: deterministic verification
+  else company documents
+    Plan->>Scope: company path
+    Scope->>Br: at most 3 subquestions concurrency 2
+    Br->>Br: Hybrid GraphRetriever table citation IDs
+    Br->>Corr: coverage_score and relationship signal
+    alt coverage below 0.65 and relationship retained
+      Corr->>Corr: one Hybrid to Combined reuse Hybrid IDs
+    else coverage below 0.65 no relationship
+      Corr->>Corr: one same-route retry
+    else exhausted
+      Corr->>Corr: insufficient_evidence END
+    else continue
+      Corr->>Fuse: Hybrid ranks and resolved paths
+      Fuse->>Tables: canonical evidence
+      Tables->>Ans: one counted answer call
+      Ans->>Ver: deterministic checks then one six-link verifier
+    end
   end
 ```
 
@@ -190,10 +214,18 @@ blindness counts are disclosed only on the authorized visibility path.
 
 ## LangGraph
 
-`enforce_admission` → `load_memory` → `prepare_query` → `compile_plan` →
-`execute_branches` → `apply_correction` → (`insufficient_evidence` END) or
-`fuse_evidence` → `compose_tables` → `disclose_optional_tools` →
-`generate_answer` → `verify_answer` → END.
+`enforce_admission` → `load_memory` → `prepare_query` → `compile_plan` then
+validated `RetrievalPlan` selects exactly one path:
+
+- company → `company_scope` → `apply_correction` →
+  (`insufficient_evidence` END) or `fuse_evidence` → `compose_tables` →
+  `disclose_optional_tools` → `generate_answer` → `verify_answer` → END;
+- general/greeting/user text/degraded → `general_scope` → `verify_answer` → END;
+- genuine mixed conflict → `mixed_scope` → `verify_answer` → END;
+- inconsistent plan/scope → fail-closed routing rejection.
+
+Direct paths never run retrieval, correction, fusion, table composition,
+optional tools, or a verifier model.
 
 Studio's module-level `graph` stays checkpointer-free and unbound. Local
 LangGraph Studio uses two graphs
@@ -210,3 +242,23 @@ Live FastAPI SSE compiles per run via
 `query_graph_runtime.build_query_graph_deps` with Hybrid, counted
 gateway, prompts, optional LightRAG, and a per-run `app_api` connection.
 Missing Hybrid or gateway fails closed.
+
+## Query-agent module map
+
+Post-cleanup ownership (compatibility facades re-export the same public names):
+
+- Graph topology and compile: `smart_rag_agents.query.graph`,
+  `query/nodes/*.py` (one node body per module; `execute_branches_node` is
+  an alias of `company_scope_node`).
+- Routing contracts: `smart_rag_core.query_routing` (`matrix.py` facade,
+  `matrix_rules.py`, `models/`).
+- Admission: `query_admission/repository/` plus `envelopes.py`,
+  `retrieve_budget.py`, `usage_caps.py`.
+- Hybrid retrieve: `retrieval/hybrid_run/` (`HybridRetriever.retrieve`
+  remains the orchestration entry).
+- SSE: `smart_rag_api.services.sse` (`sse_stream.py` facade).
+- Tracing: `observability/query_trace/` (`query_run_trace.py` facade).
+- Agent eval: `evaluation/agent_eval/` and
+  `evaluation/langsmith_agent_runner/`.
+- CLI: `scripts/eval_query_agent_langsmith.py` →
+  `scripts/agent_eval_cli`.

@@ -511,15 +511,16 @@ Exact pages:
 - Full-width transparent surface with a 3px evidence-colored left border and 16px left padding.
 - Header row: spark icon, “Answer,” route StatusPill when real, and overflow with real actions only.
 - Answer text 15px/24px for reading comfort.
-- Do not show a streaming caret or typewriter animation. Show the real Generating/Verifying progress state, then insert verified final answer text without artificial delay.
+- Do not show a streaming caret or a pre-verification typewriter. Show only server-originated node/tool progress until verification completes. After verification, append verified text immediately to authoritative state and progressively reveal it under ADR-verified-answer-paced-reveal (≤2.5s, ≤90 publications, skip and reduced-motion bypass). Historical messages never replay the animation.
 - Partial/cancelled/error retains existing text and adds a StatusBanner below.
 - Footer order: citations, feedback, then “Run details” disclosure.
 
 #### `RunProgress`
 
-- Compact horizontal/vertical step list using real status events.
-- Known stage labels map to: “Preparing,” “Retrieving,” “Generating,” “Verifying.”
+- Compact horizontal/vertical step list using real started/completed/failed status and tool_progress events only.
+- Known stage labels map to: “Preparing,” “Retrieving,” “Generating,” “Verifying,” plus authorized tool keys when executed.
 - Unknown stage renders safe neutral exact stage text in details, not as a new primary phase.
+- After verification, paced reveal uses “Verified — displaying answer”; it never implies the model is still generating.
 - Current stage uses info style; completed stages success; failure danger.
 - Do not show percentages.
 

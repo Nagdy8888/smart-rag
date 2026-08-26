@@ -94,7 +94,7 @@ PHASE6_EVAL_REGISTRY: dict[str, EvalCategoryMapping] = {
     ),
     "citation_faithfulness": EvalCategoryMapping(
         category_id="citation_faithfulness",
-        command="uv run python -m pytest tests/unit/test_answer_verifier.py tests/unit/test_structured_table.py -q",
+        command="uv run python -m pytest tests/unit/test_answer_verifier.py tests/unit/test_answer_verifier_integration.py tests/unit/test_answer_verifier_scope.py tests/unit/test_structured_table.py -q",
         evidence_doc="docs/agent/ANSWER_VERIFICATION.md",
         status="mapped",
         notes="Faithfulness, table correctness, citation checks.",
@@ -150,7 +150,7 @@ PHASE6_EVAL_REGISTRY: dict[str, EvalCategoryMapping] = {
     ),
     "acl_blindness": EvalCategoryMapping(
         category_id="acl_blindness",
-        command="uv run python -m pytest tests/unit/test_query_routing_matrix.py::test_unauthorized_blindness_suppressed tests/unit/test_hybrid_coverage.py::test_acl_negative_is_authorization_not_ranking tests/unit/test_phase4_ranked_ids.py::test_acl_negative_gold_uuid_is_a_leak -q",
+        command="uv run python -m pytest tests/unit/test_query_routing_preparation.py::test_unauthorized_blindness_suppressed tests/unit/test_hybrid_coverage.py::test_acl_negative_is_authorization_not_ranking tests/unit/test_phase4_ranked_ids.py::test_acl_negative_gold_uuid_is_a_leak -q",
         evidence_doc="docs/security/AUTHORIZATION_MODEL.md",
         status="mapped",
         notes="Authorized ACL-blindness; zero unauthorized disclosure.",
@@ -185,10 +185,10 @@ PHASE6_EVAL_REGISTRY: dict[str, EvalCategoryMapping] = {
     ),
     "online_eval_bounded": EvalCategoryMapping(
         category_id="online_eval_bounded",
-        command="uv run python -m pytest tests/unit/test_agent_eval.py tests/unit/test_langsmith_agent_runner.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_phase6_eval_registry.py -q",
+        command="uv run python -m pytest tests/unit/test_agent_eval.py tests/unit/test_langsmith_agent_runner.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_langsmith_online_envelope.py tests/unit/test_langsmith_online_scoring.py tests/unit/test_langsmith_online_provision.py tests/unit/test_phase6_eval_registry.py -q",
         evidence_doc="docs/evaluation/PHASE6_EVAL_REGISTRY.md",
         status="mapped",
-        notes="Mock-mode default; sample ≤20; USD ≤2.00; no unlimited OpenAI. scripts/eval_query_agent_langsmith.py --dry-run --limit 3. Holdout stays sealed. QT-EVAL-009 remains unverified.",
+        notes="Mock-mode default; sample ≤20; USD ≤2.00; no unlimited OpenAI. Offline: scripts/eval_query_agent_langsmith.py --dry-run --limit 3. Online: scripts/eval_query_agent_langsmith.py --online-only --dry-run on smart-rag-agent-eval-online only. Holdout stays sealed. QT-EVAL-009 remains unverified.",
     ),
     "qt_eval_009_combined_plus_10pp": EvalCategoryMapping(
         category_id="qt_eval_009_combined_plus_10pp",
@@ -199,21 +199,21 @@ PHASE6_EVAL_REGISTRY: dict[str, EvalCategoryMapping] = {
     ),
     "rewrite_correction_mapping_idempotency": EvalCategoryMapping(
         category_id="rewrite_correction_mapping_idempotency",
-        command="uv run python -m pytest tests/unit/test_query_correction.py tests/contract/test_query_run_admission.py tests/unit/test_graph_mapping.py -q",
+        command="uv run python -m pytest tests/unit/test_query_correction.py tests/contract/test_query_admission_idempotency.py tests/contract/test_query_admission_authorization.py tests/unit/test_graph_mapping.py -q",
         evidence_doc="docs/agent/QUERY_ADMISSION.md",
         status="mapped",
         notes="One correction, mapping, admit idempotency/reconnect.",
     ),
     "conversation_deletion": EvalCategoryMapping(
         category_id="conversation_deletion",
-        command="uv run python -m pytest tests/unit/test_conversation_deletion.py tests/contract/test_query_memory_reaper.py -q",
+        command="uv run python -m pytest tests/unit/test_conversation_deletion.py tests/contract/test_query_memory_deletion.py -q",
         evidence_doc="docs/agent/MEMORY_DELETION.md",
         status="mapped",
         notes="Immediate tombstone, lingering-ID search, 204/404.",
     ),
     "langsmith_retry_redaction": EvalCategoryMapping(
         category_id="langsmith_retry_redaction",
-        command="uv run python -m pytest tests/unit/test_langsmith_tracing.py tests/contract/test_query_memory_reaper.py -q",
+        command="uv run python -m pytest tests/unit/test_langsmith_tracing.py tests/unit/test_langsmith_query_trace.py tests/contract/test_query_memory_langsmith.py -q",
         evidence_doc="docs/development/LANGSMITH_TRACING.md",
         status="mapped",
         notes="Canary redaction; durable deletion request + 24h retry. Cloud delete not claimed.",

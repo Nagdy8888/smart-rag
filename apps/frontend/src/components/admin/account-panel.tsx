@@ -11,7 +11,10 @@ import { CodeText, UserText } from "../ui/user-text";
 import { fetchMe, type ApiAuth } from "../../lib/api";
 import { useSession } from "../../lib/auth/session-provider";
 import { sessionQueryKeys } from "../../lib/query-keys";
-import styles from "./admin.module.css";
+import shellStyles from "./admin-shell.module.css";
+import tableStyles from "./admin-tables.module.css";
+
+const styles = { ...shellStyles, ...tableStyles };
 
 /**
  * Show the signed-in `/me` fields.
