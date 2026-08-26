@@ -6,22 +6,19 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 
-from smart_rag_api.services.query_sse_mapping import (
-    QuerySseMapper,
-    assert_catalog_event,
-)
+from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 from smart_rag_api.services.sse.answer_persistence import AnswerPersistenceMixin
-from smart_rag_api.services.sse.chunks import (
-    token_counts_from_update,
-    updates_mapping_from_chunk,
-)
 from smart_rag_api.services.sse.langgraph_runtime import (
     LangGraphRuntimeFactory,
     open_langgraph_astream,
+)
+from smart_rag_api.services.sse.langgraph_stream_consume import (
+    MappedStreamResult,
+    iter_mapped_langgraph_updates,
 )
 from smart_rag_api.services.sse.stream_lifecycle import StreamLifecycleMixin
 
@@ -165,7 +162,6 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
             terminal_event_type=None,
             stream_exhausted=False,
         )
-
         if datetime.now(tz=UTC) >= context.deadline_at:
             self._set_termination(reason="deadline", terminal_event_type="partial")
             yield ("deadline", {"route_family": context.route_family.value})
@@ -179,10 +175,6 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
         stream_iter: AsyncIterator[object] | None = None
         stream_exhausted = False
         stream_aclose_called = False
-        terminal_yielded = False
-        successful_terminal_committed = False
-        last_remaining_calls = context.model_call_ceiling
-        last_status = "running"
         last_prompt_tokens: int | None = None
         last_completion_tokens: int | None = None
 
@@ -209,121 +201,41 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
             mapper = QuerySseMapper()
             LOGGER.info(
                 "query sse stream started",
-                extra={
-                    "event": "query.sse.started",
-                    "run_id": str(context.run_id),
-                },
+                extra={"event": "query.sse.started", "run_id": str(context.run_id)},
             )
-            async for raw_chunk in stream_iter:
-                connection.commit()
-                if cancel_event.is_set():
-                    self._set_termination(
-                        reason="cancelled",
-                        terminal_event_type="cancelled",
-                        stream_exhausted=False,
-                    )
-                    break
-                typed_chunk = updates_mapping_from_chunk(raw_chunk)
-                if typed_chunk is not None:
-                    for node_update in typed_chunk.values():
-                        if isinstance(node_update, dict):
-                            typed_update = {
-                                str(key): value
-                                for key, value in cast(
-                                    dict[object, object], node_update
-                                ).items()
-                            }
-                            remaining = typed_update.get("remaining_model_calls")
-                            if isinstance(remaining, int):
-                                last_remaining_calls = remaining
-                            raw_status = typed_update.get("status")
-                            if isinstance(raw_status, str) and raw_status:
-                                last_status = raw_status[:64]
-                            prompt_tokens, completion_tokens = token_counts_from_update(
-                                typed_update
-                            )
-                            if prompt_tokens is not None:
-                                last_prompt_tokens = prompt_tokens
-                            if completion_tokens is not None:
-                                last_completion_tokens = completion_tokens
-                for event_type, payload in mapper.consume_chunk(
-                    typed_chunk if typed_chunk is not None else cast(object, raw_chunk)
-                ):
-                    assert_catalog_event(event_type, payload)
-                    if event_type == "usage":
-                        event_prompt, event_completion = token_counts_from_update(
-                            payload
-                        )
-                        if event_prompt is not None:
-                            last_prompt_tokens = event_prompt
-                        if event_completion is not None:
-                            last_completion_tokens = event_completion
-                    yield (event_type, payload)
-                    if event_type in {"completed", "partial", "error", "cancelled"}:
-                        if not terminal_yielded:
-                            terminal_yielded = True
-                            reason = (
-                                "error"
-                                if event_type == "error"
-                                else (
-                                    "cancelled"
-                                    if event_type == "cancelled"
-                                    else event_type
-                                )
-                            )
-                            self._set_termination(
-                                reason=reason,
-                                terminal_event_type=event_type,
-                            )
-                        if (
-                            event_type in {"completed", "partial"}
-                            and not successful_terminal_committed
-                        ):
-                            successful_terminal_committed = True
-                            self._commit_successful_terminal(
-                                context,
-                                mapper,
-                                settings,
-                                remaining_model_calls=last_remaining_calls,
-                                terminal_status=last_status,
-                            )
-            else:
-                stream_exhausted = True
-                self._set_termination(
-                    reason=str(self.termination_summary.get("termination_reason")),
-                    terminal_event_type=(
-                        str(self.termination_summary["terminal_event_type"])
-                        if isinstance(
-                            self.termination_summary.get("terminal_event_type"),
-                            str,
-                        )
-                        else None
-                    ),
-                    stream_exhausted=True,
-                )
-            if stream_exhausted and not cancel_event.is_set():
-                for event_type, payload in mapper.finish():
-                    assert_catalog_event(event_type, payload)
-                    yield (event_type, payload)
-                    if event_type in {"completed", "partial", "error", "cancelled"}:
-                        terminal_yielded = True
+            async for item in iter_mapped_langgraph_updates(
+                stream_iter=stream_iter,
+                mapper=mapper,
+                context=context,
+                settings=settings,
+                cancel_event=cancel_event,
+                connection=connection,
+                commit_successful_terminal=self._commit_successful_terminal,
+                set_termination=self._set_termination,
+                last_remaining_calls=context.model_call_ceiling,
+                last_status="running",
+            ):
+                if isinstance(item, MappedStreamResult):
+                    stream_exhausted = item.stream_exhausted
+                    last_prompt_tokens = item.last_prompt_tokens
+                    last_completion_tokens = item.last_completion_tokens
+                    if stream_exhausted:
                         self._set_termination(
-                            reason=("error" if event_type == "error" else event_type),
-                            terminal_event_type=event_type,
+                            reason=str(
+                                self.termination_summary.get("termination_reason")
+                            ),
+                            terminal_event_type=(
+                                str(self.termination_summary["terminal_event_type"])
+                                if isinstance(
+                                    self.termination_summary.get("terminal_event_type"),
+                                    str,
+                                )
+                                else None
+                            ),
                             stream_exhausted=True,
                         )
-                    if (
-                        event_type in {"completed", "partial"}
-                        and not successful_terminal_committed
-                    ):
-                        successful_terminal_committed = True
-                        self._commit_successful_terminal(
-                            context,
-                            mapper,
-                            settings,
-                            remaining_model_calls=last_remaining_calls,
-                            terminal_status=last_status,
-                        )
+                    continue
+                yield item
         except QueryGraphRuntimeError as exc:
             self._set_termination(reason="error", terminal_event_type="error")
             yield ("error", {"code": exc.reason})
