@@ -58,6 +58,9 @@ class StreamLifecycleMixin:
         Args:
             input_tokens: Latest graph ``prompt_tokens`` total.
             output_tokens: Latest graph ``completion_tokens`` total.
+
+        Side Effects:
+            Updates ``termination_summary`` usage fields. Does not log text.
         """
 
         if input_tokens is None and output_tokens is None:

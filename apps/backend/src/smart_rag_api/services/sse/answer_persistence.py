@@ -57,6 +57,11 @@ class AnswerPersistenceMixin:
         Persist failures stay off the SSE log so they cannot overwrite that
         terminal with ``error``.
 
+        Side Effects:
+            May consume ``usage_kind=summary`` and insert one assistant
+            ``app.messages`` row. Logs ``error_type`` only when a write
+            fails.
+
         Args:
             context: Authorized run context.
             mapper: Mapper that emitted the verified terminal.
