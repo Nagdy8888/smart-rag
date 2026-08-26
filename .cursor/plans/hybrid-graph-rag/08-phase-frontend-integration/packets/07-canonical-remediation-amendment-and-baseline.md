@@ -1,7 +1,7 @@
 ---
 phase: 8
 packet: 7
-status: pending
+status: complete
 title: "Canonical remediation amendment and baseline"
 requirement_ids: [P08-07]
 ---

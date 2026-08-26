@@ -18,7 +18,9 @@ and
 ## Preconditions
 
 - Packet 10 typed `KnowledgeScope` / `NoRetrievalAnswerMode` fields exist on
-  preparation, plan, and graph state.
+  preparation, plan, and graph state; live/mock profile classification is
+  bound, and typed degradation distinguishes failed inference from true mixed
+  scope.
 - Existing answer model ID allow-list, prompt registry, counted model-call
   helper, and `usage_kind="answer"` reservation are inspectable.
 - Do not add a new usage kind or migration. Do not hardcode a new model name.
@@ -33,6 +35,9 @@ and
 - Additive `answer_origin: KnowledgeScope | None = None` on `QueryAnswer`.
 - Generate-path, graph-node, runtime-binding, and additive SSE
   `answer_origin` event updates listed in Ordered actions.
+- Typed degraded general-answer behavior derived from
+  `ScopeDegradationReason`, and explicit company/general/mixed/fail-closed
+  graph nodes selected from validated `RetrievalPlan`.
 - Tests named in Acceptance checks.
 
 ## Forbidden outputs
@@ -65,18 +70,20 @@ and
    adapter: schema validation, bounded timeout, zero hidden retry,
    `store=False`, and redacted tracing.
 3. Set `answer_origin` on every newly generated answer/refusal:
-   greetings → `DETERMINISTIC`; product help/general facts →
+   greetings/small talk/product help/general facts →
    `GENERAL_KNOWLEDGE`; user text transform → `USER_SUPPLIED_TEXT`;
    clarification → `AMBIGUOUS`; grounded Hybrid/Combined/Table answers and
    grounded refusals → `COMPANY_DOCUMENTS`. Emit no `answer_origin` event for
    a historical/null payload.
 4. Refactor `query_answer/generate.py`:
-   - pure greeting such as “Hi” remains a short deterministic response with
-     zero model calls;
+   - pure greeting such as “Hi” uses `GENERAL_MODEL`; together with amended
+     P06-10 it normally consumes one profile plus one answer call;
    - product help such as “How can you help me?” uses `GENERAL_MODEL`;
    - general facts and user-text transforms use one general-chat model call;
    - ambiguous/mixed scope returns deterministic clarification with zero
      model calls;
+   - unavailable/malformed/low-confidence profile output is degraded general,
+     not ambiguous, and explicitly says company documents were not searched;
    - document paths are unchanged and still pass through
      `filter_invented_ids`;
    - no-retrieval outputs always have empty citations, atomic links, table
@@ -107,17 +114,29 @@ and
    general/user-text/clarification. Keep deterministic verifier checks with
    `evidence_required=False`. Only map refused/empty output to
    `insufficient_evidence` when `knowledge_scope == COMPANY_DOCUMENTS`.
-6. Add additive SSE event `answer_origin` after origin is known and before
+6. Map defensive `KnowledgeScope.DETERMINISTIC` output to `GENERAL_MODEL`.
+   Retire `GREETING_TEXT` / `DETERMINISTIC_CHAT` from the live path.
+   `CLARIFICATION_TEXT` is valid only for genuine mixed scope; degraded scope
+   uses explicit no-company-search framing and rejects document-access claims.
+7. After `compile_plan`, select explicit nodes from validated `RetrievalPlan`:
+   company executes retrieval/correction/fusion/tables/tools/RAG answer;
+   general/greeting/user-text/degraded answers directly; genuine mixed
+   clarifies directly; inconsistent state fails closed. All successful direct
+   paths converge on deterministic verification and never a verifier model.
+8. Add additive SSE event `answer_origin` after origin is known and before
    `token_delta`/terminal. Do not bump the major SSE version.
 
 ## Acceptance checks
 
-- “Hi” → deterministic origin, zero model/retrieval/verifier calls.
+- “Hi” → general origin, one profile plus one answer call, zero
+  retrieval/verifier calls.
 - “How can you help me?” → useful general response, one answer usage call,
   zero retrieval/citations.
 - Capital of France → general origin, one call, no citations.
 - Rewrite supplied text → user-text origin, one call, no retrieval.
 - Mixed query → clarification origin, zero calls.
+- Profile unavailable/malformed/low confidence → degraded general origin,
+  explicit no-company-search framing, no retrieval/citations.
 - Company query with no evidence → refusal/insufficient evidence, never
   general.
 - Company query with evidence → existing cited answer and verifier unchanged.
@@ -126,6 +145,8 @@ and
 - Second generation raises the existing second-generation error.
 - Mock mode performs no network.
 - One `answer_origin` event precedes terminal and no duplicate appears.
+- Direct paths skip correction/fusion/tables/optional tools and still run
+  deterministic verification.
 
 ```powershell
 uv run pytest tests/unit/test_general_chat_gateway.py tests/unit/test_general_chat_generate.py tests/unit/test_answer_verifier.py tests/unit/test_query_graph_runtime.py tests/unit/test_query_sse_mapping.py tests/unit/test_prompt_registry.py -q
@@ -138,8 +159,9 @@ packet.
 
 ## Negative tests
 
-- Reusing `answer_v1.md` with empty evidence, a general answer with
-  citations, a company no-evidence fallback to world knowledge, a second
+- Reusing `answer_v1.md` with empty evidence, a general answer with citations,
+  canned/zero-call live greeting, false mixed clarification for profile
+  failure, a company no-evidence fallback to world knowledge, a second
   generation call, mapping general failure to `insufficient_evidence`, or
   emitting `answer_origin` for a null historical payload fails the packet.
 
@@ -154,6 +176,6 @@ packet.
 
 - Append to
   [`phase-06-agent-intelligence-evidence.md`](../../../../../docs/development/phase-06-agent-intelligence-evidence.md):
-  prompt hash/version, gateway mock/live safety, origin matrix, usage-kind
-  proof, SSE event proof, exact commands/exit codes, rollback, and P06-13
-  handoff.
+  prompt hash/version, gateway mock/live safety, origin/degradation matrix,
+  greeting profile+answer usage proof, explicit graph-path/SSE proof, exact
+  commands/exit codes, rollback, and P06-13 handoff.

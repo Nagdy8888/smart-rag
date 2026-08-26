@@ -18,6 +18,10 @@ This packet names no implementation skill. It edits Markdown only.
 - The user approved the general-chat strict-split product contract on
   2026-08-25, including a separate live Studio graph and preservation of
   deterministic `query_studio`.
+- The 2026-08-26 remediation amendment is drafted in this packet and remains
+  pending explicit user acceptance: one counted live profile call,
+  model-classified/model-answered greetings, typed honest degradation instead
+  of false ambiguity, and explicit post-plan scope nodes.
 
 ## Allowed outputs
 
@@ -33,6 +37,8 @@ This packet names no implementation skill. It edits Markdown only.
 - Plan-integrity lock update after structural checks pass.
 - Evidence handoff in
   [`phase-06-agent-intelligence-evidence.md`](../../../../../docs/development/phase-06-agent-intelligence-evidence.md).
+- Remediation amendments to P06-10 and P06-12 acceptance/negative/rollback
+  contracts. This packet still changes no application behavior.
 
 ## Forbidden outputs
 
@@ -65,6 +71,15 @@ This packet names no implementation skill. It edits Markdown only.
    structural checks pass.
 7. Append P06-09 evidence. Do not mark this packet complete until the user
    accepts the amendment.
+8. Record the 2026-08-26 remediation decisions without adding a scope value,
+   route family, usage kind, migration, or weaker company-grounding rule.
+9. Amend P06-10 so profile failure/low confidence is typed degradation rather
+   than `AMBIGUOUS`, and greetings use the one structured profile call.
+10. Amend P06-12 so greetings use `GENERAL_MODEL`, degraded direct answers
+    disclose that company documents were not searched, and only genuine mixed
+    scope receives zero-call clarification.
+11. Authorize deterministic `RetrievalPlan`-based company/general/mixed/
+    fail-closed graph nodes while retaining NoRetrieval as the durable family.
 
 ## Acceptance checks
 
@@ -73,6 +88,10 @@ This packet names no implementation skill. It edits Markdown only.
   reciprocal references agree.
 - P06-10 is the next and only coding packet.
 - Markdown links and plan-integrity tests pass.
+- The ADR records the bounded cost increase and explicit rollback.
+- Active contracts contain no zero-cost greeting or blanket profile-failure
+  ambiguity requirement.
+- Company insufficient evidence still never falls back to general knowledge.
 
 ## Negative tests
 

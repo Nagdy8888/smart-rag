@@ -2,7 +2,7 @@
 name: hybrid-graph-rag-source-coverage
 status: verified-at-split-amended-current-locked
 original_monolith_sha256: 41e3ee603ddb25d985b3636f13969e942cb8f53d0ab9c0753234f71fe46bb8ab
-last_amended: 2026-08-25
+last_amended: 2026-08-26
 current_integrity_lock: ./plan-integrity-lock.json
 ---
 
@@ -21,7 +21,7 @@ The original monolith SHA-256 proves only the source read by the one-time split.
 - **Section 5:** Phase 3 owns ingestion through verified canonical vector/term plus BM25 projection `Hybrid Ready`/`Graph Pending`; Phase 5 owns graph mutation, `Graph Ready`, version switching, and graph cleanup. _The former mixed lifecycle text is now phase-scoped._
 - **Section 6:** Phase 4 owns Supabase vector/term plus private ParadeDB BM25 retrieval/fusion/tuning; Phase 6 embeds a short frozen runtime Hybrid contract. _Phase 6 does not need to load Phase 4 or retune it._
 - **Section 7:** Phase 5. _GraphRAG owner._
-- **Sections 8–10:** Phase 6 wrapper and [`06-phase-agent-intelligence/`](./06-phase-agent-intelligence/). _Agent, tools, and API/security requirements are redistributed across one shared contract and eight historical packets, plus additive P06-09 through P06-15 for the approved general-chat strict split._
+- **Sections 8–10:** Phase 6 wrapper and [`06-phase-agent-intelligence/`](./06-phase-agent-intelligence/). _Agent, tools, and API/security requirements are redistributed across one shared contract and eight historical packets, plus additive P06-09 through P06-15 for the approved general-chat strict split and P06-16 for custom SSE progress / paced verified-answer presentation._
 - **Section 11:** Phase 3 owns signed OpenAI governance; Phase 4 owns dataset/retrieval evaluation; Phase 6 owns prompts, production tracing, agent/API evaluation, and feedback wiring. _Later phases consume rather than recreate earlier artifacts._
 - **Section 12:** Phase 6 owns the thin UI, Phase 7 owns complete Stitch/API specifications and design decision, and Phase 8 owns implementation/E2E. _The shared [`stitch-nextjs-contract.md`](./shared/frontend/stitch-nextjs-contract.md) records the consumer boundary; Phase 7/8 actions remain in their own packet files._
 - **Section 13:** Phase 1 owns CI tiers, Phase 9 owns only local release gates, and Phase 10 owns managed OIDC/CDN/KMS/IaC gates. _Canonical local and managed release concerns are split under [`shared/release/`](./shared/release/) and consumed only by the owning packets._
@@ -57,6 +57,8 @@ Do not use `--update` merely to hide an unexplained mismatch.
 - **2026-08-12 — BM25 lexical amendment:** replaced PostgreSQL `ts_rank_cd` FTS as the Hybrid lexical channel with a private digest-pinned ParadeDB/`pg_search` BM25 projection in local Docker and EC2. Supabase remains canonical for text, authorization, current-version state, durable projection jobs, vector/term retrieval, and final evidence; every bounded BM25 candidate is batch-rechecked in Supabase. Added projection versioning/replay/purge, Arabic Unicode normalization parity, dense+term outage degradation, private reader/writer roles, resource/split triggers, rebuild-from-Supabase recovery, telemetry/UI states, security/load/quality gates, and production handoff requirements.
 - **2026-08-12 — Lean Phase 6–11 expansion:** retained Phases 1–5 inline and converted Phases 6–11 to thin wrappers plus canonical phase-shared and one-packet-per-file contracts. Single-sourced the Phase 7/8 frontend contract and Phase 9–11 release concerns, updated model loading rules, and extended integrity validation to discover, validate, navigate, and hash every packet/shared source.
 - **2026-08-15 — Phase 4 engineering-close amendment:** added inline Packet 9 for open-split ranked-ID close after Packet 8 no-go; split Phase 4 retrieval-slice latency from Phase 6 answer-token/faithfulness/25s run deadline; froze BM25 as one top-300; named HybridRetriever/heading-inventory/fallback enums; mapped Phase 4 QueryType to Phase 6 route families; counted batched query embeddings in the Hybrid call ceiling; recorded SME-holdout waiver for engineering-complete Phase 4 in ADR-phase4-engineering-close without opening the synthetic holdout.
+- **2026-08-26 — Query-agent brain-repair amendment (pending user acceptance):** drafted P06-09/P06-10/P06-12 and ADR wording to permit one counted live profile call, model-classified/model-answered greetings, typed honest degradation instead of false ambiguity, and validated post-plan company/general/mixed/fail-closed graph paths without weakening company grounding or adding a route family/usage kind.
+- **2026-08-26 — Streaming overhaul amendment:** added P06-16 and P08-24 through P08-87, ADR-verified-answer-paced-reveal, and superseding notes for P08-09/P08-15 updates-only / no-artificial-delay presentation rules. P08-07 evidence was reconciled and checked. Do not renumber P08-22/P08-23.
 
 ## Preserved split evidence
 

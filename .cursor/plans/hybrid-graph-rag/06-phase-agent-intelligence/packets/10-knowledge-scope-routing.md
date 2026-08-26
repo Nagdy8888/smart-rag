@@ -2,11 +2,11 @@
 phase: 6
 packet: 10
 status: pending
-title: "Implement typed knowledge-scope classification and deterministic NoRetrieval route compilation."
+title: "Implement typed knowledge-scope classification, the live profile gateway, and deterministic route compilation."
 requirement_ids: [P06-10]
 ---
 
-# Packet 10 — Implement typed knowledge-scope classification and deterministic NoRetrieval route compilation.
+# Packet 10 — Implement typed knowledge-scope classification, the live profile gateway, and deterministic route compilation.
 
 Read and enforce [`../00-shared-contracts.md`](../00-shared-contracts.md).
 
@@ -37,11 +37,19 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
     preparation payload supports an additive field.
 - Tests in `tests/unit/test_knowledge_scope.py` plus updates to existing
   routing/preparation contract suites.
+- Additive query-profile gateway request/response/schema/version fields,
+  `gateways/openai_profile.py`, deterministic mock profile behavior, redacted
+  profile tracing, agent runtime/dependency bindings, and their tests.
+- Additive `ScopeDegradationReason` on the scope decision, preparation, plan,
+  and graph state. The reason is server-derived and never model-supplied.
+- Later explicit graph topology/node files required to execute the compiled
+  company/general/mixed/fail-closed paths; route-family semantics stay here.
 
 ## Forbidden outputs
 
-- Answer generation, OpenAI adapters, Studio live, SSE lifecycle, or frontend
-  code.
+- General answer generation, Studio-live authentication/admission, SSE
+  lifecycle, or frontend code. The dedicated OpenAI profile adapter and
+  profile runtime binding are permitted.
 - A new `GeneralChat` route family.
 - A second preparation model call.
 - Treating the isolated word `policy` as a company signal.
@@ -52,11 +60,17 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
 1. Add `KnowledgeScope`, `NoRetrievalAnswerMode`, and:
 
    ```python
+   class ScopeDegradationReason(StrEnum):
+       PROFILE_UNAVAILABLE = "profile_unavailable"
+       PROFILE_MALFORMED = "profile_malformed"
+       PROFILE_LOW_CONFIDENCE = "profile_low_confidence"
+
    class KnowledgeScopeDecision(BaseModel):
        knowledge_scope: KnowledgeScope
        confidence: float = Field(ge=0.0, le=1.0)
        company_signal: bool
        general_signal: bool
+       scope_degradation_reason: ScopeDegradationReason | None = None
    ```
 
 2. Implement `classify_knowledge_scope(...)` with this exact priority:
@@ -71,7 +85,9 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
    2. Compute deterministic user-text transform only when the user supplied
       the text to transform. “Summarize our policies” is company scope;
       “Rewrite this paragraph: …” is user-supplied text.
-   3. A full-message greeting is `DETERMINISTIC`.
+3. A full-message greeting or bounded small-talk message requires the existing
+   one structured preparation call; it is not settled by a canned
+   deterministic response.
    4. Product-help prompts such as “What can you do?” are general-model
       prompts, not the old repeated greeting template.
    5. If both company and general signals exist, return `AMBIGUOUS`.
@@ -83,8 +99,10 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
       to the existing preparation schema and prompt. Extend `_needs_model`
       so unresolved scope requires that same one preparation call even when
       no rewrite/decomposition is needed.
-   9. If the preparation model is unavailable, invalid, or has confidence
-      below `0.80`, return `AMBIGUOUS`, not general knowledge.
+9. If the preparation model is unavailable, invalid, or has confidence below
+      `0.80`, return `GENERAL_KNOWLEDGE` with a server-derived
+      `ScopeDegradationReason` and confidence/provenance retained where valid.
+      This is not ambiguity and cannot authorize company evidence.
    10. In deterministic mock mode, use fixed fixtures/heuristics for
        “What is the capital of France?” and “Explain photosynthesis” →
        `GENERAL_KNOWLEDGE`; “What is the status of INV-SR-1001?” and
@@ -95,7 +113,7 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
      `phase6_extension` is `NONE` or `GRAPH_INSPECTION`;
      `no_retrieval_answer_mode=None`; citations/evidence remain required.
    - `DETERMINISTIC`: `Phase6Extension.NO_RETRIEVAL` and
-     `NoRetrievalAnswerMode.DETERMINISTIC_CHAT`.
+     `NoRetrievalAnswerMode.GENERAL_MODEL`.
    - `GENERAL_KNOWLEDGE`: `Phase6Extension.NO_RETRIEVAL` and
      `NoRetrievalAnswerMode.GENERAL_MODEL`.
    - `USER_SUPPLIED_TEXT`: `Phase6Extension.NO_RETRIEVAL` and
@@ -111,19 +129,38 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
    ```python
    QueryPreparation.knowledge_scope: KnowledgeScope
    QueryPreparation.knowledge_scope_confidence: float
+   QueryPreparation.scope_degradation_reason: ScopeDegradationReason | None
    RetrievalPlan.knowledge_scope: KnowledgeScope
    RetrievalPlan.no_retrieval_answer_mode: NoRetrievalAnswerMode | None
+   RetrievalPlan.scope_degradation_reason: ScopeDegradationReason | None
    QueryGraphState.knowledge_scope: str | None
    QueryGraphState.no_retrieval_answer_mode: str | None
+   QueryGraphState.scope_degradation_reason: str | None
    ```
 
-   Initialize the two graph-state fields to `None` in `pending_query_state()`
+   Initialize the three graph-state fields to `None` in `pending_query_state()`
    and copy them from preparation/plan in existing nodes.
-6. Write the required unit and contract tests listed in Acceptance checks.
+6. Add strict query-profile transport for all `PreparationModelPayload` fields.
+   Requests carry pinned prompt text/model ID, bounded remaining deadline, and
+   bounded delimited memory. Responses carry one JSON payload, request ID,
+   non-negative token counts, `model_calls=1`, and
+   `retrieval_performed=False`. JSON Schema uses
+   `additionalProperties=false`, existing enum values, and max-three bounds.
+7. Add the live OpenAI profile adapter with prompt SHA/version verification,
+   model allow-list, bounded timeout, `max_retries=0`, `store=False`, strict
+   schema response, no tools, typed failures, and redacted tracing. Reuse the
+   approved profile model ID; do not add a model or usage kind.
+8. Make the mock profile adapter return a deterministic schema-valid payload
+   and prove no DNS/provider construction.
+9. Bind `model_caller`, profile prompt text, and actual profile model ID in
+   production FastAPI/live Studio dependencies while local `query_studio`
+   stays unbound. Malformed payload raises so preparation records
+   `profile_malformed`; no fabricated profile is allowed.
+10. Write the required unit and contract tests listed in Acceptance checks.
 
 ## Acceptance checks
 
-- Full greeting → `DETERMINISTIC`.
+- Full greeting/small talk → one profile call and a usable general scope result.
 - “What can you do?” → `GENERAL_KNOWLEDGE`.
 - Capital of France / photosynthesis → `GENERAL_KNOWLEDGE`.
 - Rewrite with supplied text → `USER_SUPPLIED_TEXT`.
@@ -131,11 +168,16 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
   inspection → `COMPANY_DOCUMENTS`.
 - Greeting prefix plus company question → `COMPANY_DOCUMENTS`.
 - Mixed general+company question → `AMBIGUOUS`.
-- Low-confidence, invalid, or unavailable scope output → `AMBIGUOUS`.
+- Low-confidence, invalid, or unavailable scope output → typed degraded
+  `GENERAL_KNOWLEDGE`, never `AMBIGUOUS`.
 - Company guard overrides a malicious model result of `GENERAL_KNOWLEDGE`.
 - No second preparation model call.
 - General/ambiguous plans have no retrieval branches.
 - All existing Hybrid/Combined/Table route rows remain unchanged.
+- Query-profile live/mock adapters satisfy prompt/model/schema/timeout/retry/
+  storage/network/redaction controls and record the actual model ID.
+- A genuine mixed decision has no degradation reason; degraded scope has one
+  and keeps `company_claim_forbidden=True`.
 
 Run at minimum:
 
@@ -150,7 +192,8 @@ Also run every existing routing/profile contract suite named by inspection.
 ## Negative tests
 
 - Isolated `policy` classified as company scope, a second preparation call,
-  company questions routed to `GENERAL_MODEL`, NoRetrieval without
+  company questions routed to `GENERAL_MODEL`, profile failure labelled
+  `AMBIGUOUS`, model-supplied degradation reason, NoRetrieval without
   `company_claim_forbidden`, a new route family, or mutation of
   `StudioQueryState.messages` fails the packet.
 
@@ -160,10 +203,14 @@ Also run every existing routing/profile contract suite named by inspection.
   field without a second model call, or if existing Hybrid/Combined/Table
   matrix rows would have to change to compile NoRetrieval modes.
 - Do not invent a new route family or weaken `company_claim_forbidden`.
+- Stop if the profile gateway cannot remain one counted call under existing
+  `usage_kind="profile"` caps, strict schema, zero hidden retry, `store=False`,
+  and redacted tracing.
 
 ## Required evidence
 
 - Append to
   [`phase-06-agent-intelligence-evidence.md`](../../../../../docs/development/phase-06-agent-intelligence-evidence.md):
-  classification fixtures, model-call counts, unchanged Hybrid/Combined/Table
-  rows, exact commands/exit codes, deviations, rollback, and P06-11 handoff.
+  classification fixtures, degradation reasons, profile adapter/runtime safety,
+  model-call counts, actual model ID, unchanged Hybrid/Combined/Table rows,
+  exact commands/exit codes, deviations, rollback, and P06-11 handoff.
