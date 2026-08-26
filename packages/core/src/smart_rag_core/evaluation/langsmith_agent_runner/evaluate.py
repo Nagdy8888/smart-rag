@@ -1,20 +1,10 @@
-"""Drift-safe LangSmith dataset sync and bounded ``Client.evaluate`` execution.
-
-This module never imports backend or agent packages. Callers inject the
-admitted-graph target. Holdout stays sealed. Dataset identity is the selected
-development subset.
-"""
+"""Bounded evaluate execution and local dry-run planning."""
 
 from __future__ import annotations
 
-import contextlib
-import subprocess
-from collections.abc import Callable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
-from pathlib import Path
-from typing import Any, Protocol, cast
-from uuid import UUID
+from typing import Any, cast
 
 from smart_rag_core.evaluation.agent_eval import (
     AGENT_EVAL_SCHEMA_VERSION,
@@ -24,8 +14,6 @@ from smart_rag_core.evaluation.agent_eval import (
     AgentEvalSelection,
     AgentEvalSummary,
     AgentJudgeResult,
-    case_to_example_metadata,
-    case_to_input,
     case_to_reference,
     decimal_sum,
     deterministic_evaluators,
@@ -40,6 +28,15 @@ from smart_rag_core.evaluation.agent_eval import (
     select_development_cases,
 )
 from smart_rag_core.evaluation.holdout import HoldoutAccess
+from smart_rag_core.evaluation.langsmith_agent_runner.dataset import (
+    experiment_git_metadata,
+    sync_langsmith_dataset,
+)
+from smart_rag_core.evaluation.langsmith_agent_runner.types import (
+    ALLOWED_EVALUATOR_KEYS,
+    AdmittedEvalRun,
+    OncePerCaseJudge,
+)
 from smart_rag_core.evaluation.online import (
     ONLINE_EVAL_MAX_USD,
     ONLINE_EVAL_MOCK_DEFAULT,
@@ -49,216 +46,7 @@ from smart_rag_core.evaluation.schema import (
     DATASET_SCHEMA_VERSION,
     DEFAULT_RETRIEVAL_PROFILE_ID,
     LABEL_REVISION,
-    DatasetSplit,
-    EvaluationCase,
 )
-
-REPO_ROOT = Path(__file__).resolve().parents[5]
-ALLOWED_EVALUATOR_KEYS = frozenset(
-    {
-        "route_correct",
-        "refusal_correct",
-        "citation_precision",
-        "citation_recall",
-        "acl_leak_free",
-        "profile_fields_correct",
-        "bounds_respected",
-        "answer_reference_overlap",
-        "target_completed",
-        "judge_correctness",
-        "judge_groundedness",
-        "judge_refusal_quality",
-    }
-)
-_DATASET_METADATA_KEYS = (
-    "schema_version",
-    "label_revision",
-    "split",
-    "manifest_hash",
-    "agent_eval_schema_version",
-    "redaction_class",
-    "holdout_opened",
-)
-
-
-class LangSmithEvalClient(Protocol):
-    """Subset of LangSmith ``Client`` used by this runner."""
-
-    def has_dataset(self, *, dataset_name: str) -> bool:
-        """Return whether the named dataset exists."""
-
-        ...
-
-    def create_dataset(
-        self,
-        dataset_name: str,
-        *,
-        description: str | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> object:
-        """Create one dataset with exact identity metadata."""
-
-        ...
-
-    def read_dataset(self, *, dataset_name: str) -> object:
-        """Read one dataset including metadata."""
-
-        ...
-
-    def list_examples(self, *, dataset_name: str) -> Iterator[object]:
-        """List examples in one dataset."""
-
-        ...
-
-    def create_examples(
-        self,
-        *,
-        dataset_name: str,
-        examples: Sequence[Mapping[str, Any]],
-        max_concurrency: int = 1,
-    ) -> object:
-        """Create missing examples. HTTP 409 is not success by itself."""
-
-        ...
-
-    def evaluate(
-        self,
-        target: Callable[[dict[str, Any]], dict[str, Any]],
-        /,
-        data: str | None = None,
-        evaluators: Sequence[Callable[..., Any]] | None = None,
-        metadata: dict[str, Any] | None = None,
-        experiment_prefix: str | None = None,
-        description: str | None = None,
-        max_concurrency: int | None = 0,
-        num_repetitions: int = 1,
-        blocking: bool = True,
-        upload_results: bool = True,
-        error_handling: str = "log",
-    ) -> object:
-        """Run one bounded experiment."""
-
-        ...
-
-
-@dataclass
-class AdmittedEvalRun:
-    """Admitted-run handles used by the reservation lifecycle.
-
-    Attributes:
-        case_id: Synthetic case identifier.
-        run_id: Application run id.
-        conversation_id: Conversation id.
-        reservation_id: Budget reservation id.
-        user_id: Authenticated subject id.
-        authorized_runtime: JSON dump of authorized runtime context.
-        query: Synthetic user query.
-    """
-
-    case_id: str
-    run_id: str
-    conversation_id: str
-    reservation_id: str
-    user_id: str
-    authorized_runtime: dict[str, object]
-    query: str
-
-
-@dataclass
-class ReservationLifecycle:
-    """Admit, invoke, persist, and always true-up one evaluation case."""
-
-    admit: Callable[[Mapping[str, Any]], AdmittedEvalRun]
-    invoke: Callable[[AdmittedEvalRun], object]
-    persist: Callable[[AdmittedEvalRun, AgentEvalOutput], None]
-    settle: Callable[[AdmittedEvalRun], None]
-
-    def run(self, inputs: Mapping[str, Any]) -> dict[str, Any]:
-        """Execute one case and always settle the reservation.
-
-        Args:
-            inputs: LangSmith example inputs containing ``case_id``.
-
-        Returns:
-            JSON-compatible ``AgentEvalOutput``. Infrastructure failures still
-            produce a scored failed row.
-        """
-
-        case_id = str(inputs.get("case_id") or "unknown")
-        admitted: AdmittedEvalRun | None = None
-        try:
-            admitted = self.admit(inputs)
-            raw = self.invoke(admitted)
-            output = _coerce_output(case_id, admitted, raw)
-            self.persist(admitted, output)
-            return output.model_dump(mode="json")
-        except Exception:
-            failed = failed_target_output(case_id, failure_kind="target_invoke_failed")
-            if admitted is not None:
-                with contextlib.suppress(Exception):
-                    self.persist(admitted, failed)
-            return failed.model_dump(mode="json")
-        finally:
-            if admitted is not None:
-                self.settle(admitted)
-
-
-@dataclass
-class OncePerCaseJudge:
-    """Ensure at most one judge provider call per case."""
-
-    inner: Callable[[AgentEvalOutput, AgentEvalReference], AgentJudgeResult]
-    remaining_usd: Decimal
-    calls: int = 0
-    results: dict[str, AgentJudgeResult] = field(
-        default_factory=lambda: dict[str, AgentJudgeResult]()
-    )
-    stopped: bool = False
-
-    def __call__(
-        self, output: AgentEvalOutput, reference: AgentEvalReference
-    ) -> AgentJudgeResult:
-        """Return a cached judge result, or invoke once when budget remains.
-
-        Args:
-            output: Target output.
-            reference: Frozen reference.
-
-        Returns:
-            Typed judge result. Budget exhaustion is a named failure.
-        """
-
-        cached = self.results.get(output.case_id)
-        if cached is not None:
-            return cached
-        if output.case_id not in self.results:
-            try:
-                agent_cost = Decimal(output.agent_cost_usd)
-            except (ArithmeticError, ValueError):
-                agent_cost = Decimal("0")
-            if agent_cost > 0:
-                self.remaining_usd = max(Decimal("0"), self.remaining_usd - agent_cost)
-        if self.stopped or self.remaining_usd <= 0:
-            self.stopped = True
-            result = AgentJudgeResult(
-                correctness=0.0,
-                groundedness=0.0,
-                refusal_quality=0.0,
-                rationale="",
-                cost_usd="0",
-                failed=True,
-                failure_kind="judge_budget_exhausted",
-            )
-            self.results[output.case_id] = result
-            return result
-        result = self.inner(output, reference)
-        self.calls += 1
-        cost = Decimal(result.cost_usd)
-        if cost > self.remaining_usd:
-            self.stopped = True
-        self.remaining_usd = max(Decimal("0"), self.remaining_usd - cost)
-        self.results[output.case_id] = result
-        return result
 
 
 def assert_agent_eval_execution_bounds(
@@ -301,126 +89,6 @@ def assert_agent_eval_execution_bounds(
         holdout_access=HoldoutAccess.denied(),
         unlimited_openai=unlimited_openai,
     )
-
-
-def dataset_identity_metadata(selection: AgentEvalSelection) -> dict[str, object]:
-    """Return LangSmith dataset metadata that must match on every rerun.
-
-    Args:
-        selection: Validated development selection.
-
-    Returns:
-        Identity metadata. Extra evaluator bindings are omitted on purpose.
-    """
-
-    return {
-        "schema_version": DATASET_SCHEMA_VERSION,
-        "label_revision": LABEL_REVISION,
-        "split": DatasetSplit.DEVELOPMENT.value,
-        "manifest_hash": selection.manifest_hash,
-        "agent_eval_schema_version": AGENT_EVAL_SCHEMA_VERSION,
-        "redaction_class": "synthetic",
-        "holdout_opened": False,
-    }
-
-
-def experiment_git_metadata(*, repo_root: Path | None = None) -> dict[str, object]:
-    """Capture git commit and dirty-tree state without printing secrets.
-
-    Args:
-        repo_root: Repository root. Defaults to this file's repo.
-
-    Returns:
-        ``git_commit`` hex and ``git_dirty`` boolean. Unknown git is dirty.
-    """
-
-    root = repo_root if repo_root is not None else REPO_ROOT
-    try:
-        commit = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],  # noqa: S607
-            cwd=root,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        ).strip()
-        dirty_text = subprocess.check_output(
-            ["git", "status", "--porcelain"],  # noqa: S607
-            cwd=root,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return {"git_commit": "unknown", "git_dirty": True}
-    return {"git_commit": commit, "git_dirty": bool(dirty_text.strip())}
-
-
-def sync_langsmith_dataset(
-    client: LangSmithEvalClient,
-    selection: AgentEvalSelection,
-) -> None:
-    """Create or verify the versioned dataset. Extra remote IDs fail closed.
-
-    Args:
-        client: LangSmith client subset.
-        selection: Validated development selection.
-
-    Raises:
-        AgentEvalError: Metadata drift, extra examples, hash mismatch,
-            unbudgeted dataset evaluators, or unverified 409 conflict.
-    """
-
-    metadata = dataset_identity_metadata(selection)
-    name = selection.dataset_name
-    if not client.has_dataset(dataset_name=name):
-        client.create_dataset(
-            name,
-            description=(
-                "Synthetic development agent-eval cases. Holdout sealed. "
-                "Not a quality claim."
-            ),
-            metadata=dict(metadata),
-        )
-    existing = client.read_dataset(dataset_name=name)
-    remote_meta = _object_mapping(getattr(existing, "metadata", None))
-    for key in _DATASET_METADATA_KEYS:
-        if remote_meta.get(key) != metadata[key]:
-            raise AgentEvalError("langsmith_dataset_drift")
-    _assert_no_unbudgeted_evaluators(remote_meta)
-    desired = {
-        str(selection.example_ids[case.case_id]): selection.case_hashes[case.case_id]
-        for case in selection.cases
-    }
-    remote_by_id = _index_remote_examples(client.list_examples(dataset_name=name))
-    extra = set(remote_by_id) - set(desired)
-    if extra:
-        raise AgentEvalError("langsmith_dataset_drift")
-    for example_id, case_hash in desired.items():
-        remote = remote_by_id.get(example_id)
-        if remote is None:
-            continue
-        if remote != case_hash:
-            raise AgentEvalError("langsmith_dataset_drift")
-    missing_ids = [item for item in desired if item not in remote_by_id]
-    if not missing_ids:
-        return
-    examples = [
-        _example_create_payload(selection, case)
-        for case in selection.cases
-        if str(selection.example_ids[case.case_id]) in missing_ids
-    ]
-    try:
-        client.create_examples(dataset_name=name, examples=examples, max_concurrency=1)
-    except Exception as exc:
-        if not _is_conflict(exc):
-            raise
-        reread = _index_remote_examples(client.list_examples(dataset_name=name))
-        for example_id, case_hash in desired.items():
-            if reread.get(example_id) != case_hash:
-                raise AgentEvalError("langsmith_dataset_drift") from exc
-        return
-    verified = _index_remote_examples(client.list_examples(dataset_name=name))
-    for example_id, case_hash in desired.items():
-        if verified.get(example_id) != case_hash:
-            raise AgentEvalError("langsmith_dataset_drift")
 
 
 def run_bounded_evaluate(
@@ -721,91 +389,6 @@ def build_local_summary(
     )
 
 
-def _example_create_payload(
-    selection: AgentEvalSelection, case: EvaluationCase
-) -> dict[str, Any]:
-    """Build one LangSmith ``create_examples`` payload.
-
-    Args:
-        selection: Validated selection.
-        case: Development case.
-
-    Returns:
-        Example mapping with stable id, inputs, reference outputs, metadata.
-    """
-
-    case_hash = selection.case_hashes[case.case_id]
-    return {
-        "id": str(selection.example_ids[case.case_id]),
-        "inputs": case_to_input(case).model_dump(mode="json"),
-        "outputs": case_to_reference(case).model_dump(mode="json"),
-        "metadata": case_to_example_metadata(
-            case, case_hash=case_hash, manifest_hash=selection.manifest_hash
-        ),
-    }
-
-
-def _index_remote_examples(examples: Iterator[object]) -> dict[str, str]:
-    """Index remote examples by id to case-content hash.
-
-    Args:
-        examples: LangSmith examples.
-
-    Returns:
-        Mapping of example id string to ``case_content_hash``.
-    """
-
-    indexed: dict[str, str] = {}
-    for example in examples:
-        example_id = _example_id(example)
-        metadata = _object_mapping(getattr(example, "metadata", None))
-        if not metadata and isinstance(example, Mapping):
-            example_map = cast(Mapping[object, object], example)
-            metadata = _object_mapping(example_map.get("metadata"))
-            if not example_id:
-                example_id = str(example_map.get("id") or "")
-        hashed = str(metadata.get("case_content_hash") or "")
-        if example_id:
-            indexed[example_id] = hashed
-    return indexed
-
-
-def _example_id(example: object) -> str:
-    """Return the example id as a string.
-
-    Args:
-        example: LangSmith example.
-
-    Returns:
-        UUID string, or empty.
-    """
-
-    raw: object = getattr(example, "id", None)
-    if raw is None and isinstance(example, Mapping):
-        raw = cast(Mapping[object, object], example).get("id")
-    if raw is None:
-        return ""
-    if isinstance(raw, UUID):
-        return str(raw)
-    return str(raw)
-
-
-def _object_mapping(value: object) -> dict[str, Any]:
-    """Coerce dataset or example metadata to a string-keyed dict.
-
-    Args:
-        value: Mapping or None.
-
-    Returns:
-        Dict copy.
-    """
-
-    if isinstance(value, Mapping):
-        typed = cast(Mapping[object, object], value)
-        return {str(key): item for key, item in typed.items()}
-    return {}
-
-
 def _assert_no_unbudgeted_evaluators(metadata: Mapping[str, Any]) -> None:
     """Fail when the dataset binds unknown extra evaluators.
 
@@ -826,26 +409,6 @@ def _assert_no_unbudgeted_evaluators(metadata: Mapping[str, Any]) -> None:
     unknown = [item for item in bound if item not in ALLOWED_EVALUATOR_KEYS]
     if unknown:
         raise AgentEvalError("unbudgeted_dataset_evaluators")
-
-
-def _is_conflict(exc: BaseException) -> bool:
-    """Return whether an exception represents HTTP 409.
-
-    Args:
-        exc: Raised error.
-
-    Returns:
-        True when status 409 or a conflict message is present.
-    """
-
-    status = getattr(exc, "status_code", None)
-    response = getattr(exc, "response", None)
-    if status is None and response is not None:
-        status = getattr(response, "status_code", None)
-    if status == 409:
-        return True
-    text = str(exc).lower()
-    return "409" in text or "conflict" in text
 
 
 def _ordered_classes(selection: AgentEvalSelection) -> tuple[str, ...]:
