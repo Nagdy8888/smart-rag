@@ -87,11 +87,14 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         clients without connecting. Starts a bounded ``ThreadPoolExecutor`` on
         ``application.state.offload_executor`` and shuts it down on exit.
         Closes a lazily created run-event database store and finalizes the
-        adapter on shutdown. Gateway and retrieval adapters are imported here
-        so constructing ``create_app`` cannot form a retrieval import cycle.
+        adapter on shutdown, then gives the process-cached LangSmith client at
+        most two seconds to drain. Gateway and retrieval adapters are imported
+        here so constructing ``create_app`` cannot form a retrieval import
+        cycle.
     """
 
     from smart_rag_core.gateways import block_openai_network, create_model_gateway
+    from smart_rag_core.observability.langsmith_tracing import flush_langsmith_traces
     from smart_rag_core.retrieval.lightrag_adapter import bind_process_runtime_adapter
     from smart_rag_core.security.jwks import JwksVerifier
 
@@ -160,6 +163,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         if adapter is not None:
             await adapter.finalize()
             application.state.lightrag_adapter = None
+        flush_langsmith_traces(timeout_seconds=2.0)
 
 
 async def add_correlation_context(

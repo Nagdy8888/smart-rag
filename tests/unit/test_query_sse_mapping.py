@@ -9,7 +9,9 @@ from langgraph.graph import END, START, StateGraph
 from smart_rag_agents.query.graph import compile_query_graph
 from smart_rag_agents.query.state import pending_query_state
 from smart_rag_api.services.query_sse_mapping import (
+    GENERAL_SCOPE_NODE,
     GENERATE_ANSWER_NODE,
+    MIXED_SCOPE_NODE,
     TOKEN_DELTA_LIMIT,
     VERIFY_ANSWER_NODE,
     QuerySseMapper,
@@ -153,6 +155,38 @@ def test_mapper_empty_verified_answer_is_error_not_completed() -> None:
     )
     assert events[-1] == ("error", {"code": "empty_answer"})
     assert "completed" not in {item[0] for item in events}
+
+
+def test_mapper_holds_general_and_mixed_scope_drafts() -> None:
+    """Direct scope nodes hold draft text until verify_answer."""
+
+    for node_name in (GENERAL_SCOPE_NODE, MIXED_SCOPE_NODE):
+        mapper = QuerySseMapper()
+        draft_events = mapper.consume_chunk(
+            {
+                node_name: {
+                    "status": "answered",
+                    "answer": _payload("SCOPE_DRAFT_SECRET"),
+                }
+            }
+        )
+        assert "token_delta" not in [item[0] for item in draft_events]
+        assert "SCOPE_DRAFT_SECRET" not in str(draft_events)
+        final_events = mapper.consume_chunk(
+            {
+                VERIFY_ANSWER_NODE: {
+                    "status": "verified",
+                    "answer": _payload("SCOPE_PUBLIC_FINAL"),
+                }
+            }
+        )
+        deltas = [
+            payload["delta"]
+            for event_type, payload in final_events
+            if event_type == "token_delta"
+        ]
+        assert deltas == ["SCOPE_PUBLIC_FINAL"]
+        assert final_events[-1][0] == "completed"
 
 
 def test_mapper_unverified_draft_at_finish_is_error() -> None:

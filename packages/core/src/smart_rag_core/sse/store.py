@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -20,6 +20,29 @@ from smart_rag_core.sse.catalog import TERMINAL_SSE_EVENT_TYPES
 from smart_rag_core.sse.sanitize import as_json_object, validate_sse_payload
 
 _REASON_PREFIX = "query_admission:"
+EVENT_STORE_LOCK_TIMEOUT = "2s"
+EVENT_STORE_LOCK_TIMEOUT_SQL = "SET LOCAL lock_timeout TO '2s'"
+
+
+def sqlstate_of(exc: BaseException) -> str | None:
+    """Return the first Postgres SQLSTATE on ``exc`` or its cause chain.
+
+    Args:
+        exc: Driver, admission, or wrapper error.
+
+    Returns:
+        Five-character SQLSTATE, or None when the chain has none.
+    """
+
+    current: BaseException | None = exc
+    seen = 0
+    while current is not None and seen < 6:
+        sqlstate = getattr(current, "sqlstate", None)
+        if isinstance(sqlstate, str) and len(sqlstate) == 5:
+            return sqlstate
+        current = current.__cause__ or current.__context__
+        seen += 1
+    return None
 
 
 def _raise_store_error(exc: BaseException) -> NoReturn:
@@ -29,7 +52,8 @@ def _raise_store_error(exc: BaseException) -> NoReturn:
         exc: Driver or database error.
 
     Raises:
-        QueryAdmissionError: Always.
+        QueryAdmissionError: Always. ``55P03`` becomes ``lock_timeout`` and
+            ``57014`` becomes ``statement_timeout``.
     """
 
     message = str(exc)
@@ -38,6 +62,11 @@ def _raise_store_error(exc: BaseException) -> NoReturn:
         start = message.find(_REASON_PREFIX) + len(_REASON_PREFIX)
         tail = message[start:].split()[0].strip("\"'")
         reason = tail.split("\n")[0]
+    sqlstate = sqlstate_of(exc)
+    if sqlstate == "55P03":
+        reason = "lock_timeout"
+    elif sqlstate == "57014":
+        reason = "statement_timeout"
     raise QueryAdmissionError(reason) from exc
 
 
@@ -395,14 +424,17 @@ class PostgresRunEventStore:
         self._connection_lock = RLock()
 
     @contextmanager
-    def _transaction(self) -> Iterator[psycopg.Connection]:
+    def _transaction(self) -> Generator[psycopg.Connection, None, None]:
         """Yield one serialized transaction on a reusable database session.
 
         Reusing the API session avoids a TLS and hosted-pooler handshake for
         every SSE frame. Automatic prepared statements remain disabled because
         the configured Supabase transaction pooler can switch server sessions.
         The lock prevents concurrent executor, heartbeat, and replay operations
-        from sharing a Psycopg transaction.
+        from sharing a Psycopg transaction. Each transaction sets
+        ``lock_timeout`` to two seconds after ``SET ROLE app_api`` so a
+        run-row lock wait fails closed instead of sitting until the login
+        role's 120-second statement timeout. Autocommit stays off.
 
         Yields:
             Open connection with ``app_api`` selected for this transaction.
@@ -420,6 +452,7 @@ class PostgresRunEventStore:
             connection = self._connection
             try:
                 connection.execute("SET ROLE app_api")
+                connection.execute(EVENT_STORE_LOCK_TIMEOUT_SQL)
                 yield connection
                 connection.commit()
             except BaseException:

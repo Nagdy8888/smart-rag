@@ -3,24 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from typing import cast
 from uuid import UUID, uuid4
 
 import httpx
 import psycopg
 import pytest
-import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_api.services.sse_stream import FixtureQueryRunExecutor, QueryRunRegistry
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
-from smart_rag_core.query_admission.service import QueryAdmissionResult
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.sse.framing import iter_known_sse_events
 from smart_rag_core.sse.store import MemoryRunEventStore, PostgresRunEventStore
 
-from tests.contract import test_query_run_admission as admission_mod
-from tests.contract.integration_support import typed_module_attr
 from tests.contract.sse_http_support import (
     MEMBER_ID,
     OWNER_ID,
@@ -33,6 +27,15 @@ from tests.contract.sse_http_support import (
     sse_headers,
     sse_openapi_client,
     sse_test_client,
+)
+from tests.support.query_postgres import (
+    admit,
+    authorization_version,
+    caller_context,
+    ensure_local_postgres,
+    insert_conversation,
+    insert_user_profile,
+    retire_committed_query_run,
 )
 from tests.unit.typed_openapi import as_openapi_client, json_object
 
@@ -420,47 +423,11 @@ def db_url() -> str:
         Postgres URL when local Supabase is reachable.
     """
 
-    ensure_local_postgres = typed_module_attr(
-        admission_mod,
-        "_ensure_local_postgres",
-        cast("Callable[[], str]", None),
-    )
     return ensure_local_postgres()
 
 
 def test_postgres_append_is_monotonic_and_tombstone_denies(db_url: str) -> None:
     """Postgres sequences increase and tombstoned conversations 404."""
-
-    insert_user_profile = typed_module_attr(
-        admission_mod,
-        "_insert_user_profile",
-        cast("Callable[..., None]", None),
-    )
-    insert_conversation = typed_module_attr(
-        admission_mod,
-        "_insert_conversation",
-        cast("Callable[..., UUID]", None),
-    )
-    authorization_version = typed_module_attr(
-        admission_mod,
-        "_authorization_version",
-        cast("Callable[..., int]", None),
-    )
-    caller_factory = typed_module_attr(
-        admission_mod,
-        "_caller",
-        cast("Callable[..., CallerContext]", None),
-    )
-    admit_run = typed_module_attr(
-        admission_mod,
-        "_admit",
-        cast("Callable[..., tuple[QueryAdmissionResult, UUID]]", None),
-    )
-    retire_committed = typed_module_attr(
-        admission_mod,
-        "_retire_committed_query_run",
-        cast("Callable[..., None]", None),
-    )
 
     owner = uuid4()
     stranger = uuid4()
@@ -471,9 +438,9 @@ def test_postgres_append_is_monotonic_and_tombstone_denies(db_url: str) -> None:
         insert_user_profile(cursor, user_id=stranger, role="member")
         conversation_id = insert_conversation(cursor, user_id=owner)
         version = authorization_version(cursor)
-        caller = caller_factory(owner, "owner", version)
-        foreign = caller_factory(stranger, "member", version)
-        result, _key = admit_run(
+        caller = caller_context(owner, "owner", version)
+        foreign = caller_context(stranger, "member", version)
+        result, _key = admit(
             connection,
             caller=caller,
             conversation_id=conversation_id,
@@ -524,7 +491,7 @@ def test_postgres_append_is_monotonic_and_tombstone_denies(db_url: str) -> None:
                     (run_id,),
                 )
         connection.rollback()
-        retire_committed(
+        retire_committed_query_run(
             db_url,
             run_id=run_id,
             reservation_id=result.context.reservation_id,

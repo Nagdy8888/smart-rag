@@ -6,7 +6,6 @@ import logging
 from uuid import uuid4
 
 import pytest
-import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_api.main import create_app
 from smart_rag_api.services.sse_stream import FixtureQueryRunExecutor
 from smart_rag_core.sse.catalog import HEARTBEAT_INTERVAL_SECONDS
