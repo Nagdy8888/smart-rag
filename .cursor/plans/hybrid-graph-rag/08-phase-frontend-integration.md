@@ -55,6 +55,29 @@ Complete these in order. A checked box requires committed implementation evidenc
 5. [x] [Apply strict escaping, CSP/security headers, WCAG AA behavior, Arabic RTL/bidirectional text, keyboard navigation, responsive layouts, and generic production errors. Treat the lack of RTL/mobile-specific Stitch frames as missing design evidence, not a waiver: add reviewed Arabic/mixed-direction fixtures, logical citation highlighting, responsive breakpoints, focus/live-region behavior, reduced-motion behavior, and security tests while rejecting every prohibited generated-HTML pattern above.](./08-phase-frontend-integration/packets/05-apply-accessibility-and-security.md)
 6. [x] [Run complete Playwright journeys for roles, routing/limitation families, reconnect, API/deploy versioning, fallbacks, table provenance, curation, and graph evidence. Add stable visual/interaction regression coverage keyed to each delivered frame surface, plus explicit journeys for delivered gallery states and required Stitch gaps including MFA recovery, API skew, BM25 degradation, rate limits, Graph Pending/ACL blindness, RTL citations, and restricted evidence audit.](./08-phase-frontend-integration/packets/06-run-frontend-verification.md)
 
+
+Remediation packets P08-07 through P08-23 are additive. Do not uncheck packets 1-6. Frontend visual packets must also read [`08-phase-frontend-integration/00-visual-contract.md`](./08-phase-frontend-integration/00-visual-contract.md).
+
+7. [ ] [Canonical remediation amendment and baseline](./08-phase-frontend-integration/packets/07-canonical-remediation-amendment-and-baseline.md)
+8. [x] [Restore query runtime connectivity and deterministic readiness](./08-phase-frontend-integration/packets/08-restore-query-runtime-connectivity-and-readiness.md)
+9. [x] [Repair Phase 6 execution durability and verified answer delivery](./08-phase-frontend-integration/packets/09-repair-phase-6-execution-durability-and-verified-answers.md)
+10. [x] [Harden the frontend chat protocol and recovery state](./08-phase-frontend-integration/packets/10-harden-frontend-chat-protocol-and-recovery.md)
+11. [x] [Remove backend and database MFA/AAL2 enforcement](./08-phase-frontend-integration/packets/11-remove-backend-and-database-mfa-aal2-enforcement.md)
+12. [x] [Remove frontend/provider MFA and finish single-factor Auth](./08-phase-frontend-integration/packets/12-remove-frontend-provider-mfa-and-finish-single-factor-auth.md)
+13. [x] [Implement exact design tokens and reusable primitives](./08-phase-frontend-integration/packets/13-implement-exact-design-tokens-and-reusable-primitives.md)
+14. [x] [Build the streamlined role-aware shell and routes](./08-phase-frontend-integration/packets/14-build-the-streamlined-role-aware-shell-and-routes.md)
+15. [x] [Rebuild Ask around verified final answers](./08-phase-frontend-integration/packets/15-rebuild-ask-around-verified-final-answers.md)
+16. [x] [Rebuild Documents as one complete ingestion workflow](./08-phase-frontend-integration/packets/16-rebuild-documents-as-one-complete-ingestion-workflow.md)
+17. [x] [Rebuild deterministic Tables](./08-phase-frontend-integration/packets/17-rebuild-deterministic-tables.md)
+18. [x] [Rebuild bounded Graph inspection](./08-phase-frontend-integration/packets/18-rebuild-bounded-graph-inspection.md)
+19. [x] [Consolidate Admin and supported Account operations](./08-phase-frontend-integration/packets/19-consolidate-admin-and-supported-account-operations.md)
+20. [x] [Enforce action, accessibility, security, and documentation integrity](./08-phase-frontend-integration/packets/20-enforce-action-accessibility-security-and-documentation-integrity.md)
+21. [x] [Run deterministic release gates](./08-phase-frontend-integration/packets/21-run-deterministic-release-gates.md)
+22. [ ] [Run production-like stack, role, visual, and real-answer verification](./08-phase-frontend-integration/packets/22-run-production-like-stack-role-visual-and-real-answer-verification.md)
+23. [ ] [Final review, pull request, and normal merge](./08-phase-frontend-integration/packets/23-final-review-pull-request-and-normal-merge.md)
+
+Additive Phase 6/Phase 8 co-owned UI amendment: [P06-14](./06-phase-agent-intelligence/packets/14-chat-origin-ux.md) records answer-origin, clarification, and citation-safe Ask behavior. Do not uncheck historical completed Phase 8 packets or renumber P08-22/P08-23.
+
 ## Phase sequence requirement
 
 Phase 8 implements the approved Stitch output, auth, chat test bench, documents, graph explorer, tools, settings, accessibility, and E2E tests.
@@ -88,7 +111,7 @@ Do not set `status: complete` until every `Done when` item below is proven.
 
 ## Canonical detailed requirements
 
-Detailed requirements are redistributed by link: the phase execution and template-not-layout contract is [`08-phase-frontend-integration/00-shared-contracts.md`](./08-phase-frontend-integration/00-shared-contracts.md), and canonical legacy Section 12 requirements are owned once in [`shared/frontend/stitch-nextjs-contract.md`](./shared/frontend/stitch-nextjs-contract.md). Phase 7 [`STITCH_REVIEW.md`](../../../docs/frontend/STITCH_REVIEW.md) round 2 supersedes packet titles that still mention Stitch frames: do not add those frames as screens.
+Detailed requirements are redistributed by link: the phase execution and template-not-layout contract is [`08-phase-frontend-integration/00-shared-contracts.md`](./08-phase-frontend-integration/00-shared-contracts.md), the visual brief is [`08-phase-frontend-integration/00-visual-contract.md`](./08-phase-frontend-integration/00-visual-contract.md), and canonical legacy Section 12 requirements are owned once in [`shared/frontend/stitch-nextjs-contract.md`](./shared/frontend/stitch-nextjs-contract.md). Phase 7 [`STITCH_REVIEW.md`](../../../docs/frontend/STITCH_REVIEW.md) round 2 supersedes packet titles that still mention Stitch frames: do not add those frames as screens. Remediation packets P08-07 through P08-23 are redistributed into packet files in this directory; P08-09 also amends Phase 6-owned durability/SSE contracts without unchecking completed Phase 6 packets. After P08-11 and P08-12 evidence pass, MFA/TOTP/AAL2 product requirements in the historical done gate are superseded by the approved complete-removal deviation.
 
 ## Phase deliver, review, and done gate
 

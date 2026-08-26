@@ -8,11 +8,21 @@ from smart_rag_core.evaluation.schema import QueryType
 from smart_rag_core.query_profile.extract import DeterministicExtract
 
 _GREETING = re.compile(
-    r"^(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening))\b",
+    r"^(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening))[!.,?]*$",
     re.IGNORECASE,
 )
 _PRODUCT_HELP = re.compile(
-    r"\b(how do i use this (app|product)|what can you do|help me use the (app|product))\b",
+    r"("
+    r"\bwho are you\b|"
+    r"\bwhat are you\b|"
+    r"\bwho am i (?:talking|speaking) to\b|"
+    r"\bwhat(?:'s| is) your name\b|"
+    r"\bhow can you help(?: me)?\b|"
+    r"\bwhat can you (?:do|help(?: me)?(?: with)?)\b|"
+    r"\bhow do i use this (?:app|product|assistant)\b|"
+    r"\bhelp me use (?:this |the )?(?:app|product|assistant)\b|"
+    r"\btell me about yourself\b"
+    r")",
     re.IGNORECASE,
 )
 _TRANSFORM = re.compile(
@@ -49,6 +59,55 @@ _LOW_CONF_REL = re.compile(
 _CAPTION_OCR = re.compile(r"\b(caption|ocr text|alt text)\b", re.IGNORECASE)
 
 
+def is_greeting(query: str) -> bool:
+    """Return whether the complete message is a conversational greeting.
+
+    A greeting prefix on a substantive company question is intentionally not a
+    match, so text such as ``"Hi, what is the refund policy?"`` still reaches
+    retrieval.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        True only when the complete trimmed message is a greeting or thanks.
+    """
+
+    return _GREETING.fullmatch(query.strip()) is not None
+
+
+def is_product_help(query: str) -> bool:
+    """Return whether the user asks who the assistant is or what it can do.
+
+    Identity prompts such as “Who are you?” and capability prompts such as
+    “How can you help me?” are product help. They are not company-document
+    questions unless the same text also carries a company signal.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        True when the message requests identity, usage, or capability help.
+    """
+
+    return _PRODUCT_HELP.search(query.strip()) is not None
+
+
+def is_user_text_transform(query: str) -> bool:
+    """Return whether the user supplied text to rewrite, rephrase, or translate.
+
+    “Summarize our policies” is not a match. “Rewrite this paragraph: …” is.
+
+    Args:
+        query: Original user text.
+
+    Returns:
+        True when the message is a user-supplied-text transform.
+    """
+
+    return _TRANSFORM.search(query.strip()) is not None
+
+
 def is_no_retrieval(query: str) -> bool:
     """Return whether the query is greeting, product help, or user-text transform.
 
@@ -61,9 +120,9 @@ def is_no_retrieval(query: str) -> bool:
 
     stripped = query.strip()
     return (
-        _GREETING.search(stripped) is not None
-        or _PRODUCT_HELP.search(stripped) is not None
-        or _TRANSFORM.search(stripped) is not None
+        is_greeting(stripped)
+        or is_product_help(stripped)
+        or is_user_text_transform(stripped)
     )
 
 

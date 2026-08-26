@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  compactIngestionPills,
   formatBm25Summary,
   formatGraphHandoffSummary,
   ingestionStatusLabel,
@@ -53,5 +54,15 @@ describe("ingestionStatusLabel", () => {
     expect(ingestionStatusLabel("abandoned")).toBe("abandoned");
     expect(ingestionStatusLabel("expired")).toBe("expired");
     expect(ingestionStatusLabel("oversize")).toBe("oversize");
+  });
+
+  it("maps compact list pills without inventing Graph Ready from upload", () => {
+    expect(compactIngestionPills("uploaded")).toEqual({
+      search: { label: "Uploaded", tone: "warning" },
+      graph: null,
+    });
+    expect(compactIngestionPills("hybrid_ready").search?.label).toBe("Search ready");
+    expect(compactIngestionPills("hybrid_ready").graph).toBeNull();
+    expect(compactIngestionPills("graph_ready").graph?.label).toBe("Graph Ready");
   });
 });

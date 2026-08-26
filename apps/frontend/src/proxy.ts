@@ -10,6 +10,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { isPublicAuthPath } from "./lib/auth/paths";
+import { isRetiredProductPath } from "./lib/shell-navigation";
 import { AUTH_CLAIMS_TIMEOUT_MS, raceTimeout } from "./lib/auth/timeout";
 
 /**
@@ -69,6 +70,10 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     signedIn = false;
   }
   const { pathname } = request.nextUrl;
+
+  if (isRetiredProductPath(pathname)) {
+    return supabaseResponse;
+  }
 
   if (!signedIn && !isPublicAuthPath(pathname)) {
     const login = request.nextUrl.clone();

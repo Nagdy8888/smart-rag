@@ -42,10 +42,7 @@ def test_graph_ready_invariants_require_active_pointer_maps() -> None:
         "version_status": "graph_pending",
         "job_status": "completed",
     }
-    assert (
-        graph_ready_failed_invariant(leftover_live)
-        == "version_status:graph_pending"
-    )
+    assert graph_ready_failed_invariant(leftover_live) == "version_status:graph_pending"
     mixed_count = {
         **ready,
         "chunk_map_count": 87 + EXPECTED_PASSAGE_COUNT,

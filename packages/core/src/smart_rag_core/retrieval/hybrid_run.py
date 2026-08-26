@@ -866,7 +866,8 @@ class HybridRetriever:
 
         ``as_of`` / ``latest`` policies skip undated rows. Eval compact sources
         must stamp ``document_versions.effective_at`` or those classes empty
-        the fused list.
+        the fused list. Uses ``app_api`` because hosted transaction-pooler
+        logins cannot ``SET ROLE postgres``.
 
         Args:
             candidates: Dense, BM25, and term candidates before fusion.
@@ -880,7 +881,7 @@ class HybridRetriever:
             return {}
         by_version: dict[UUID, datetime | None] = {}
         with self._channel_supabase() as connection:
-            connection.execute("SET ROLE postgres")
+            connection.execute("SET ROLE app_api")
             with connection.cursor() as cursor:
                 cursor.execute(
                     """

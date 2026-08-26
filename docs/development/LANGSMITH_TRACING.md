@@ -2,7 +2,7 @@
 title: LangSmith tracing for model and embedding calls
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-26
 audience: engineering, operators, security
 ---
 
@@ -34,22 +34,65 @@ Exported fields are limited to:
 - LightRAG extract `input_tokens`, `cached_input_tokens`, `output_tokens`,
   `total_tokens`, and `estimated_cost_usd`. The estimate uses the pinned
   standard API list price and is not a replacement for the OpenAI invoice.
-- Live `openai.embeddings` spans attach LangSmith-recognized
-  `usage_metadata` with input/total tokens and the pinned estimated USD cost.
-  Usage metadata remains visible and aggregatable while raw span I/O stays
-  hidden.
+- Live `openai.embeddings` and model-gateway spans attach LangSmith-recognized
+  `usage_metadata` with input/output/total tokens and the pinned estimated
+  USD cost. Usage metadata remains visible and aggregatable while raw span
+  I/O stays hidden unless local I/O export is on.
+- `query.run.sse` parents are LLM runs (`ls_provider=openai`,
+  `ls_model_name=gpt-4o-mini`) so LangSmith Usage/Cost can render. They
+  attach `usage_metadata` (`input_tokens`, `output_tokens`, `total_tokens`,
+  `input_cost`, `output_cost`, `total_cost`) for the whole Ask turn. With
+  local I/O export the Output panel is `{text, input_tokens, output_tokens,
+  total_tokens, estimated_cost_usd}` rather than a bare assistant string.
 - Correlation ids (`request_id`, `run_id`, `job_id`) when bound
 - Embedding `timeout_seconds` (numeric bound only; never input text)
 - Ingest parent names (`ingestion.scan`, `ingestion.parse`,
   `ingestion.index`, `ingestion.graph`) with hashed document/version ids
 
-Never exported: raw prompts, user queries, canonical excerpts, embedding
-vectors, API keys, JWTs, emails, signed URLs, file bytes, or plot text.
+Never exported by default: raw prompts, user queries, canonical excerpts,
+embedding vectors, API keys, JWTs, emails, signed URLs, file bytes, or plot
+text.
 
 `LANGSMITH_HIDE_INPUTS` and `LANGSMITH_HIDE_OUTPUTS` are forced `true` at
 startup so `wrap_openai` child spans cannot send Responses `input` /
 `instructions` bodies. Application `process_inputs` / `process_outputs`
 hooks are the first control; hide flags are the second.
+
+Local debug exception: `LANGSMITH_EXPORT_IO=true` with `APP_ENV=local` and
+`LANGSMITH_TRACING=true` clears the hide flags and attaches prompt /
+completion text on gateway spans plus the user message (`input`) and
+assistant reply (`output`) on the `query.run.sse` parent. Staging and
+production reject the flag. API keys, JWTs, and embedding vectors stay
+omitted. This is not org-matrix verification. See
+[ADR-local-langsmith-export-io.md](../adr/ADR-local-langsmith-export-io.md).
+
+## Query-run SSE parent and `GeneratorExit`
+
+Successful FastAPI chats wrap executor consumption in a redacted LLM
+parent named `query.run.sse`. Exported fields are correlation IDs, hashed
+user/conversation IDs, routes, token counts, estimated USD, and hashes.
+Raw query, answer, passages, JWTs, and emails stay out unless local
+`LANGSMITH_EXPORT_IO=true`, which attaches the user message as `input`
+and the assistant reply plus usage as `output`.
+
+`assert_langsmith_export_permitted` with `ContentClass.REAL_COMPANY`
+must pass before company-document content can be traced. A denied gate
+is a hard stop, not a silent untraced success.
+
+Interpret stream close this way:
+
+| Signal | Meaning |
+| --- | --- |
+| Natural `astream` exhaustion plus catalog terminal | Success. Do not treat later generator teardown as an error. |
+| Client cancel / `CancelledError` after drain | Expected cancellation. Persist `cancelled`. |
+| `GeneratorExit` on a completed run that already emitted a success terminal | Lifecycle artifact from closing the iterator. P06-11 drains first and does not convert this into `error`. |
+| `GeneratorExit` or exception before a catalog terminal | Real failure. Persist sanitized `error`. Never hide it. |
+
+Live LangSmith UI inspection that completed runs no longer surface
+`GeneratorExit` as intended success remains **blocked** until
+`LANGSMITH_TRACING=true` is used with a real key. Unit/contract proof
+lives in `tests/unit/test_query_run_sse_trace.py` and
+`tests/unit/test_query_sse_executor.py`.
 
 ## Runtime flow
 
@@ -74,7 +117,7 @@ sequenceDiagram
   Gateway->>LangSmith: redacted span start
   Gateway->>OpenAI: Responses or embeddings
   OpenAI-->>Gateway: usage plus payload
-  Gateway->>LangSmith: redacted span end
+  Gateway->>LangSmith: tokens, estimated USD, redacted I/O
   Gateway-->>Caller: typed response
 ```
 
@@ -83,20 +126,31 @@ sequenceDiagram
 1. Set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in the ignored env
    file. Startup fails if tracing is true without a key.
 2. Optional: `LANGSMITH_PROJECT` (default `smart-rag`) and
-   `LANGSMITH_ENDPOINT` for a non-default API URL.
-3. Local default is still `MOCK_MODEL_MODE=true` (zero OpenAI cost). The
+   `LANGSMITH_ENDPOINT` for a non-default API URL. Open the LangSmith UI
+   on that exact project name. Local compose uses `.env.compose`; a host
+   leftover `LANGSMITH_TRACING=false` from pytest no longer overrides it.
+   To see the user message, assistant reply, prompt, and completion text on
+   the laptop only, also set `LANGSMITH_EXPORT_IO=true` and restart
+   API/worker. A new Ask run is required; old traces stay redacted. Token
+   counts and estimated USD appear in LangSmith Usage/Cost on
+   `query.run.sse` (LLM run) and on gateway spans even when the I/O flag
+   stays false.
+3. Startup also writes `LANGCHAIN_TRACING_V2` and `LANGCHAIN_PROJECT` so
+   LangGraph node runs export to the same project. Gateway threads flush
+   buffered spans before they exit.
+4. Local default is still `MOCK_MODEL_MODE=true` (zero OpenAI cost). The
    operator may set `MOCK_MODEL_MODE=false` in gitignored `.env` and
    `.env.compose` to use a live OpenAI key **without org-matrix verification**.
-   That is a local unsigned waiver (`APP_ENV=local` only). Compose interpolates
-   `${MOCK_MODEL_MODE:-true}` and passes `OPENAI_API_KEY` into api/worker.
-4. Org rows in
+   That is a local unsigned waiver (`APP_ENV=local` only). Local Compose
+   loads those flags from `.env.compose` rather than host interpolation.
+5. Org rows in
    [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) and
    [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) stay
    `unverified` until a console/DPA review. Do not set
    `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true` to fake that review.
    Staging/production still require it. Do not ingest real company files into
    a hosted environment on this waiver.
-5. Laptop **ingest** demo (Phase A): set `LANGSMITH_TRACING=true` on the
+6. Laptop **ingest** demo (Phase A): set `LANGSMITH_TRACING=true` on the
    **worker** (not the EC2 API). After a plot-slice upload, open project
    `LANGSMITH_PROJECT` and filter `ingestion.index` / `embedding.embed`.
    The 200-line graph file must also show `ingestion.graph` and
@@ -117,6 +171,7 @@ sequenceDiagram
 | Tracing on, missing key | Settings validation fails at process start. |
 | LangSmith unreachable | SDK records a local tracing error; the OpenAI call is not retried for tracing. **unverified** live network failure until a key is used. |
 | `wrap_openai` child span | I/O hidden by forced env flags; parent span has hashes/counts only. |
+| Local `LANGSMITH_EXPORT_IO=true` | Hide flags off; gateway spans include prompt/completion text and `query.run.sse` includes user message / assistant reply. Staging/production fail startup. |
 | Direct `OpenAI()` in packages/apps/scripts | Unit AST test fails. Use `traced_openai_client`. |
 
 `block_openai_network` still denies only `api.openai.com`. It does not block
@@ -169,10 +224,9 @@ local Supabase, an active synthetic member, and ingested synthetic corpus.
 ## Verification
 
 ```powershell
-uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_openai_rerank.py tests/unit/test_openai_lightrag.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
-uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/openai_lightrag.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_openai_lightrag.py
+uv run pytest tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_query_run_sse_trace.py tests/unit/test_query_sse_executor.py tests/unit/test_query_agent_eval_trace.py tests/unit/test_openai_rerank.py tests/unit/test_openai_lightrag.py tests/unit/test_model_gateway.py tests/unit/test_settings.py -q
+uv run ruff check packages/core/src/smart_rag_core/observability packages/core/src/smart_rag_core/gateways/openai_rerank.py packages/core/src/smart_rag_core/gateways/openai_lightrag.py packages/core/src/smart_rag_core/gateways/model.py packages/core/src/smart_rag_core/gateways/embedding.py packages/core/src/smart_rag_core/settings/base.py apps/backend/src/smart_rag_api/services/sse_stream.py tests/unit/test_langsmith_tracing.py tests/unit/test_ingest_trace.py tests/unit/test_query_run_sse_trace.py tests/unit/test_query_sse_executor.py tests/unit/test_openai_lightrag.py
 ```
-
 
 Live LangSmith project visibility is **unverified** until
 `LANGSMITH_TRACING=true` is used with a real key.

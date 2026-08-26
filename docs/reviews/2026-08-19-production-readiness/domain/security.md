@@ -37,7 +37,7 @@ sequenceDiagram
   Browser->>FastAPI: Authorization Bearer
   FastAPI->>JWKS: ES256/RS256 verify
   FastAPI->>Postgres: load_profile_snapshot subject
-  FastAPI->>Postgres: RPCs with caller.rpc_authorization_version()
+  FastAPI->>Postgres: "RPCs with caller rpc_authorization_version"
   Note over Postgres: Recheck ACL current-version deletion
 ```
 

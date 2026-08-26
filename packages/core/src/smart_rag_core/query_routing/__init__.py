@@ -18,6 +18,12 @@ from smart_rag_core.query_routing.correction import (
     refuse_second_correction,
 )
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
+from smart_rag_core.query_routing.knowledge_scope import (
+    KnowledgeScope,
+    KnowledgeScopeDecision,
+    NoRetrievalAnswerMode,
+    classify_knowledge_scope,
+)
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.memory import load_authorized_memory
 from smart_rag_core.query_routing.models import (
@@ -57,7 +63,10 @@ __all__ = [
     "BranchSpec",
     "CorrectionDecision",
     "CorrectionKind",
+    "KnowledgeScope",
+    "KnowledgeScopeDecision",
     "MemoryRecord",
+    "NoRetrievalAnswerMode",
     "PreparationModelPayload",
     "QueryPreparation",
     "QueryRoutingError",
@@ -67,6 +76,7 @@ __all__ = [
     "apply_correction_to_plan",
     "assert_preparation_schema",
     "branch_results_from_state",
+    "classify_knowledge_scope",
     "compile_retrieval_plan",
     "decide_correction",
     "disclose_acl_blindness",

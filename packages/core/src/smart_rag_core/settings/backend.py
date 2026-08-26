@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
 
 from smart_rag_core.settings.base import Environment, SharedSettings, load_settings
+from smart_rag_core.settings.postgres_dsn import require_session_postgres_dsn
 
 _HOSTED_ENVIRONMENTS = frozenset({Environment.STAGING, Environment.PRODUCTION})
 _LOOPBACK_HOST_NAMES = frozenset({"localhost", "localhost.localdomain"})
@@ -48,8 +49,11 @@ class BackendSettings(SharedSettings):
         bind_port: HTTP bind port from ``API_BIND_PORT``. Public, default
             ``8000``.
         supabase_url: Supabase project URL from ``SUPABASE_URL``. Public.
-            JWKS fetch uses this origin. Local ``APP_ENV`` may accept the
-            documented ``127.0.0.1`` / ``host.docker.internal`` ``iss`` pair.
+            JWKS fetch uses this origin. Required for ``local``, ``staging``,
+            and ``production``. ``APP_ENV=test`` injects the local fixture
+            origin when unset. Local ``APP_ENV`` may accept the documented
+            ``127.0.0.1`` / ``host.docker.internal`` ``iss`` pair only when
+            that origin is supplied explicitly.
         supabase_jwt_audience: Required JWT audience from
             ``SUPABASE_JWT_AUDIENCE``. Default ``authenticated``.
         jwks_cache_seconds: JWKS cache TTL from ``JWKS_CACHE_SECONDS``; max
@@ -101,13 +105,14 @@ class BackendSettings(SharedSettings):
         description="Backend HTTP bind port.",
         json_schema_extra={"security": "public"},
     )
-    supabase_url: AnyHttpUrl = Field(
-        default=AnyHttpUrl("http://127.0.0.1:54321"),
+    supabase_url: AnyHttpUrl | None = Field(
+        default=None,
         validation_alias="SUPABASE_URL",
         description=(
-            "Supabase project URL for JWKS discovery. When APP_ENV=local and "
-            "the origin is 127.0.0.1:54321 or host.docker.internal:54321, "
-            "iss may use either hostname."
+            "Supabase project URL for JWKS discovery. Required except "
+            "APP_ENV=test, which injects the local fixture origin. When "
+            "APP_ENV=local and the origin is 127.0.0.1:54321 or "
+            "host.docker.internal:54321, iss may use either hostname."
         ),
         json_schema_extra={"security": "public"},
     )
@@ -252,6 +257,31 @@ class BackendSettings(SharedSettings):
         return value
 
     @model_validator(mode="after")
+    def require_supabase_url_for_runtime(self) -> Self:
+        """Require hosted/runtime ``SUPABASE_URL`` except the test fixture.
+
+        ``APP_ENV=test`` may omit the variable and receives the local
+        destructive-test fixture origin. Laptop Compose (``local``) and
+        hosted environments fail closed when the origin is missing.
+
+        Returns:
+            This settings instance with ``supabase_url`` populated.
+
+        Raises:
+            ValueError: If ``APP_ENV`` is not ``test`` and ``SUPABASE_URL``
+                is unset.
+        """
+
+        if self.supabase_url is None:
+            if self.app_env is Environment.TEST:
+                self.supabase_url = AnyHttpUrl("http://127.0.0.1:54321")
+            else:
+                raise ValueError(
+                    "SUPABASE_URL is required when APP_ENV is not test"
+                )
+        return self
+
+    @model_validator(mode="after")
     def require_exact_cors_origins(self) -> Self:
         """Require parsed origins to remain exact HTTP(S) origins.
 
@@ -325,18 +355,59 @@ class BackendSettings(SharedSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def reject_transaction_pooler_session_dsns(self) -> Self:
+        """Reject transaction-pooler URLs for LangGraph and LightRAG.
+
+        ``SUPABASE_DB_URL`` may remain a transaction pooler for short API
+        work. The resolved checkpoint DSN and ``LIGHTRAG_DB_URL`` must be
+        session/direct. Prepared statements are not disabled as a workaround.
+
+        Returns:
+            This settings instance.
+
+        Raises:
+            ValueError: If a session/direct integration is given a known
+                transaction-pooler DSN. The message never includes the URL.
+        """
+
+        if self.langgraph_checkpoint_url is not None:
+            require_session_postgres_dsn(
+                self.langgraph_checkpoint_url.get_secret_value(),
+                setting_name="LANGGRAPH_CHECKPOINT_URL",
+            )
+        elif self.supabase_db_url is not None:
+            require_session_postgres_dsn(
+                self.supabase_db_url.get_secret_value(),
+                setting_name="LANGGRAPH_CHECKPOINT_URL",
+            )
+        if self.lightrag_db_url is not None:
+            require_session_postgres_dsn(
+                self.lightrag_db_url.get_secret_value(),
+                setting_name="LIGHTRAG_DB_URL",
+            )
+        return self
+
     def resolved_checkpoint_dsn(self) -> str | None:
         """Return the query checkpointer/store DSN.
 
         Returns:
             ``LANGGRAPH_CHECKPOINT_URL`` when set, otherwise
-            ``SUPABASE_DB_URL``, or ``None`` when both are unset.
+            ``SUPABASE_DB_URL``, or ``None`` when both are unset. The
+            returned URL is a session/direct DSN.
+
+        Raises:
+            ValueError: If the resolved URL is a transaction pooler. The
+                message never includes the URL.
         """
 
         secret = self.langgraph_checkpoint_url or self.supabase_db_url
         if secret is None:
             return None
-        return secret.get_secret_value()
+        return require_session_postgres_dsn(
+            secret.get_secret_value(),
+            setting_name="LANGGRAPH_CHECKPOINT_URL",
+        )
 
     def parsed_cors_origins(self) -> tuple[str, ...]:
         """Return exact CORS origins with no wildcard credentials pairing.

@@ -1,7 +1,7 @@
 /**
  * Chat composer bounds from the FastAPI message ceiling.
  *
- * `smart_rag_core.settings` pins the user-message maximum at 16384 characters.
+ * Shared backend settings pin the user-message maximum at 16384 characters.
  */
 
 /** Maximum composer length. Matches the backend user-message ceiling. */

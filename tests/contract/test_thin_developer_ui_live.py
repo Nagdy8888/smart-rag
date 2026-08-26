@@ -588,26 +588,31 @@ def test_thin_ui_live_five_composite_streams(live_member: dict[str, str]) -> Non
             )
 
 
-def test_upload_enabled_aal1_is_mfa_required(live_stack: dict[str, str]) -> None:
-    """Upload-enabled password JWTs stay aal1 and must not look like success."""
+def test_upload_enabled_aal1_can_reserve_without_mfa(
+    live_stack: dict[str, str],
+) -> None:
+    """Upload-enabled password JWTs stay aal1 and may reserve without TOTP."""
 
     created = _create_password_user(live_stack)
     assert _jwt_aal(created["access_token"]) == "aal1"
-    _upsert_profile(created["user_id"], upload_enabled=True, mfa_enrolled=True)
+    _upsert_profile(created["user_id"], upload_enabled=True, mfa_enrolled=False)
     api = created["fastapi_url"]
     token = created["access_token"]
     with httpx.Client(timeout=15.0) as client:
         me = client.get(f"{api}/me", headers={"Authorization": f"Bearer {token}"})
-        assert me.status_code == 403
-        assert _json_object(me.json()).get("detail") == "MFA required"
+        assert me.status_code == 200, me.text
+        me_body = _json_object(me.json())
+        assert me_body.get("upload_enabled") is True
+        assert me_body.get("mfa_enrolled") is False
         upload_key = f"upload-{uuid4()}"
         reserved = client.post(
             f"{api}/documents/uploads",
             headers=_paid_headers(token, idempotency_key=upload_key),
             json={"declared_bytes": 1024, "idempotency_key": upload_key},
         )
-        assert reserved.status_code == 403
-        assert _json_object(reserved.json()).get("detail") == "MFA required"
+        assert reserved.status_code == 200, reserved.text
+        body = _json_object(reserved.json())
+        assert body.get("reservation_id")
 
 
 def test_mfa_aal2_upload_reserve_signed_url_is_null(
@@ -639,6 +644,7 @@ def test_mfa_aal2_upload_reserve_signed_url_is_null(
         assert me.status_code == 200, me.text
         me_body = _json_object(me.json())
         assert me_body.get("upload_enabled") is True
+        assert me_body.get("mfa_enrolled") is False
         reserved = client.post(
             f"{api}/documents/uploads",
             headers=_paid_headers(aal2_token, idempotency_key=upload_key),

@@ -1339,6 +1339,3 @@ Pro Supabase, SES verified, 50s CDN SSE, Packet 2 OIDC assume, Phase 11.
 
 Wrapper stays `pending`. Packet 1 checkbox is **checked**. Packets 2-7 stay
 unchecked. Phase 11 stays **no-go**.
-
-
-

@@ -5,6 +5,7 @@ This module compiles without sockets or OpenAI clients.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -12,7 +13,7 @@ from langgraph.graph import END, START, StateGraph
 
 # isort: off
 # hybrid_run must finish before query_admission package init (ceilings cycle).
-import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
+import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 # isort: on
 
@@ -193,6 +194,8 @@ def build_query_graph(
     deps: QueryGraphDeps | None = None,
     *,
     studio_local: bool = False,
+    studio_live: bool = False,
+    studio_live_seed: Callable[..., QueryGraphState] | None = None,
 ) -> QueryStateGraph:
     """Construct the packet 2 query ``StateGraph`` (not yet compiled).
 
@@ -202,15 +205,20 @@ def build_query_graph(
         studio_local: When true, prepend ``seed_studio_runtime`` and accept
             ``StudioQueryInput``. FastAPI must not set this. The seed does
             not admit a paid run or open Postgres.
+        studio_live: When true, prepend the authenticated live seed and
+            accept ``StudioQueryInput``. Mutually exclusive with
+            ``studio_local``. FastAPI must not set this.
+        studio_live_seed: Optional live seed closure. The unbound default
+            rejects and never mints ``studio_local``.
 
     Returns:
         An uncompiled graph: admission → memory → prepare → plan →
         branches → one correction → fuse → tables → optional tools →
-        answer → verify → END. Studio adds a local seed before admission.
+        answer → verify → END. Studio adds a seed before admission.
 
     Notes:
         State inputs: ``QueryGraphState``, or ``StudioQueryInput`` when
-            ``studio_local``.
+            ``studio_local`` or ``studio_live``.
         State outputs: fused evidence, one answer, and layered verification.
         Persistence writes: counted prep/answer/verifier consume when used.
         External/model calls: at most one prep, one answer, one verifier.
@@ -219,16 +227,22 @@ def build_query_graph(
             / ``insufficient_evidence`` / ``verified_partial`` then END.
     """
 
+    if studio_local and studio_live:
+        raise ValueError("studio_local and studio_live are mutually exclusive")
     bound = deps or QueryGraphDeps()
     input_schema: type[QueryGraphState] | type[object] = QueryGraphState
-    if studio_local:
-        from smart_rag_agents.query.studio import StudioQueryInput
+    state_schema: type[QueryGraphState] | type[object] = QueryGraphState
+    output_schema: type[QueryGraphState] | type[object] = QueryGraphState
+    if studio_local or studio_live:
+        from smart_rag_agents.query.studio import StudioQueryInput, StudioQueryState
 
         input_schema = StudioQueryInput
+        state_schema = StudioQueryState
+        output_schema = StudioQueryState
     builder: QueryStateGraph = StateGraph(  # pyright: ignore[reportAssignmentType]
-        QueryGraphState,
+        state_schema,
         input_schema=input_schema,  # pyright: ignore[reportArgumentType]
-        output_schema=QueryGraphState,
+        output_schema=output_schema,  # pyright: ignore[reportArgumentType]
     )
 
     def load_memory(state: QueryGraphState) -> QueryGraphState:
@@ -355,18 +369,35 @@ def build_query_graph(
         "enforce_admission",
         enforce_admission,
     )
-    if studio_local:
-        from smart_rag_agents.query.studio import seed_studio_runtime
+    terminal_target = END
+    if studio_local or studio_live:
+        from smart_rag_agents.query.studio import emit_studio_response
+
+        if studio_local:
+            from smart_rag_agents.query.studio import seed_studio_runtime
+
+            seed_node = seed_studio_runtime
+            seed_name = "seed_studio_runtime"
+        else:
+            from smart_rag_agents.query.studio_live import seed_studio_live_unbound
+
+            seed_node = studio_live_seed or seed_studio_live_unbound
+            seed_name = "seed_studio_live_runtime"
 
         builder.add_node(  # pyright: ignore[reportUnknownMemberType]
-            "seed_studio_runtime",
-            seed_studio_runtime,
+            seed_name,
+            seed_node,
         )
-        builder.add_edge(START, "seed_studio_runtime")
+        builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+            "emit_studio_response",
+            emit_studio_response,
+        )
+        terminal_target = "emit_studio_response"
+        builder.add_edge(START, seed_name)
         builder.add_conditional_edges(
-            "seed_studio_runtime",
+            seed_name,
             _route_after_studio_seed,
-            {"enforce_admission": "enforce_admission", "end": END},
+            {"enforce_admission": "enforce_admission", "end": terminal_target},
         )
     else:
         builder.add_edge(START, "enforce_admission")
@@ -413,26 +444,28 @@ def build_query_graph(
     builder.add_conditional_edges(
         "enforce_admission",
         _route_after_admission,
-        {"load_memory": "load_memory", "end": END},
+        {"load_memory": "load_memory", "end": terminal_target},
     )
     builder.add_edge("load_memory", "prepare_query")
     builder.add_conditional_edges(
         "prepare_query",
         _route_after_prepare,
-        {"compile_plan": "compile_plan", "end": END},
+        {"compile_plan": "compile_plan", "end": terminal_target},
     )
     builder.add_edge("compile_plan", "execute_branches")
     builder.add_edge("execute_branches", "apply_correction")
     builder.add_conditional_edges(
         "apply_correction",
         _route_after_correction,
-        {"fuse_evidence": "fuse_evidence", "end": END},
+        {"fuse_evidence": "fuse_evidence", "end": terminal_target},
     )
     builder.add_edge("fuse_evidence", "compose_tables")
     builder.add_edge("compose_tables", "disclose_optional_tools")
     builder.add_edge("disclose_optional_tools", "generate_answer")
     builder.add_edge("generate_answer", "verify_answer")
-    builder.add_edge("verify_answer", END)
+    builder.add_edge("verify_answer", terminal_target)
+    if studio_local or studio_live:
+        builder.add_edge("emit_studio_response", END)
     return builder
 
 

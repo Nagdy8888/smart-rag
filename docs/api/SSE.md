@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering, frontend
 ---
 
@@ -80,13 +80,20 @@ tracebacks, secrets, source HTML, or passages.
 | `coverage` | Coverage score without passage text. |
 | `optional_tool_disclosure` | Selected optional tool keys. |
 | `citation_preview` | Citation IDs and ranks. No passage text. |
+| `answer_origin` | Additive origin (`origin` only). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
 | `token_delta` | Generated token delta. Never retrieved source. |
-| `usage` | Token counts without prompts. |
+| `usage` | Accumulated provider prompt and completion tokens for the run. Emitted after verify, before the terminal. Counts are 0 when no model ran. No prompts. |
 | `completed` | Success terminal. |
 | `cancelled` | Cancel terminal. |
 | `error` | Sanitized `{code}`. |
 
+Ask never infers origin from `route_family`. Citation chips render only
+for `company_documents` or a missing legacy origin. General, user-text,
+deterministic, ambiguous, and unknown origins hide chips.
+
 Exactly one terminal among `completed`, `cancelled`, `error`, `partial`.
+Conversation summary and assistant-message persist run only after that
+terminal is yielded. Those writes must not emit a second `error`.
 
 Live `LangGraphQueryRunExecutor` compiles **per execute** with
 `build_query_graph_deps`: Hybrid (DSN-based, ParadeDB optional), counted

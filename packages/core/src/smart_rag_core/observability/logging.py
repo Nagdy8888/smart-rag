@@ -117,6 +117,11 @@ class JsonLogFormatter(logging.Formatter):
         ):
             if value is not None:
                 payload[field] = redact_text(value, max_length=128)
+        raw_error_type = record.__dict__.get("error_type")
+        if isinstance(raw_error_type, str) and raw_error_type:
+            identifier = raw_error_type.strip()
+            if identifier.isidentifier() and len(identifier) <= 128:
+                payload["error_type"] = identifier
         if record.exc_info is not None and record.exc_info[1] is not None:
             payload["exception_type"] = type(record.exc_info[1]).__name__
             payload["exception_message"] = "[REDACTED]"

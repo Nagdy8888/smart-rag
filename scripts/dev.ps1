@@ -1,44 +1,72 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Start local Smart RAG foundation services (Supabase CLI if present + Compose).
+  Start hosted-runtime laptop Compose sidecars. Does not start local Supabase.
 .DESCRIPTION
-  Starts digest-pinned ParadeDB, split Valkey, crawl-proxy, api, worker, and frontend
-  in mock-model mode. Does not require AWS or a live OpenAI key.
+  Requires a pre-wired ignored Compose env with hosted Auth and separate
+  transaction/session DSNs. Starts ParadeDB, Valkey, crawl-proxy, api, worker,
+  and frontend. Local Supabase remains a destructive-test fixture only.
 #>
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
-$EnvFile = if (Test-Path "$Root\.env.compose") {
-  "$Root\.env.compose"
-} elseif (Test-Path "$Root\.env") {
-  "$Root\.env"
-} else {
-  Copy-Item "$Root\.env.example" "$Root\.env.compose"
-  Write-Host "Created .env.compose from .env.example; update passwords before shared use."
-  "$Root\.env.compose"
+if (-not (Test-Path "$Root\.env.compose")) {
+  throw "Missing .env.compose. Wire hosted Supabase with scripts/ops/wire_hosted_ingest_env.py before starting Compose."
+}
+$EnvFile = "$Root\.env.compose"
+
+$required = @(
+  "SUPABASE_URL",
+  "API_SUPABASE_DB_URL",
+  "WORKER_SUPABASE_DB_URL",
+  "LANGGRAPH_CHECKPOINT_URL",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+)
+$present = @{}
+Get-Content $EnvFile | ForEach-Object {
+  if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$') {
+    $name = $Matches[1]
+    $value = $Matches[2].Trim().Trim('"').Trim("'")
+    if ($value -ne "") {
+      $present[$name] = $true
+    }
+  }
+}
+$missing = $required | Where-Object { -not $present.ContainsKey($_) }
+if ($missing.Count -gt 0) {
+  throw ("Hosted Compose env is incomplete. Missing names: {0}" -f ($missing -join ", "))
 }
 
-$SupabaseCli = "$Root\node_modules\.bin\supabase.cmd"
-if (-not (Test-Path $SupabaseCli)) {
-  throw "Pinned Supabase CLI is unavailable. Run pnpm install --frozen-lockfile first."
+# Process env wins Compose interpolation. Project `.env` often keeps the
+# local fixture SUPABASE_URL; without this export the API verifies hosted
+# browser JWTs against local GoTrue and Ask returns 401 unauthorized.
+Get-Content $EnvFile | ForEach-Object {
+  $line = $_.Trim()
+  if (-not $line -or $line.StartsWith("#")) {
+    return
+  }
+  $parts = $line.Split("=", 2)
+  if ($parts.Count -ne 2) {
+    return
+  }
+  $name = $parts[0].Trim()
+  $value = $parts[1].Trim().Trim('"').Trim("'")
+  if ($name) {
+    Set-Item -Path ("Env:{0}" -f $name) -Value $value
+  }
 }
 
-Write-Host "Starting local Supabase with the workspace-pinned CLI..."
-& pnpm exec supabase start | Out-Null
-if ($LASTEXITCODE -ne 0) {
-  throw "Supabase CLI failed to start the local stack."
-}
-
-Write-Host "Ensuring LOGIN wrapper app_runtime (app_api is NOLOGIN)..."
-uv run python "$Root\scripts\ops\ensure_app_runtime_role.py"
-if ($LASTEXITCODE -ne 0) {
-  throw "app_runtime LOGIN wrapper is missing. Compose API/worker cannot use the postgres superuser."
-}
-
-Write-Host "Starting Docker Compose foundation stack with $EnvFile ..."
+Write-Host "Starting hosted-runtime Docker Compose stack with .env.compose ..."
 docker compose --env-file $EnvFile up --build -d
+
+$authHost = docker compose --env-file $EnvFile exec -T api python -c "import os; from urllib.parse import urlparse; print(urlparse(os.environ.get('SUPABASE_URL','')).hostname or '')"
+$authHost = "$authHost".Trim()
+if ($authHost -in @("127.0.0.1", "localhost", "host.docker.internal")) {
+  throw ("API SUPABASE_URL host is the local fixture ({0}). Hosted browser sessions will 401. Recreate with .env.compose loaded into the process." -f $authHost)
+}
+Write-Host "API Auth JWKS host: $authHost"
 
 Write-Host ""
 Write-Host "Developer endpoints (when healthy):"
@@ -48,5 +76,7 @@ Write-Host "  Frontend:  http://localhost:$fePort"
 Write-Host "  API docs:  http://localhost:$apiPort/docs"
 Write-Host "  API live:  http://localhost:$apiPort/health/live"
 Write-Host "Private (no host ports): paradedb, valkey-limits, valkey-cache, crawl-proxy"
+Write-Host "Canonical data: hosted Supabase (not local :54322)"
 Write-Host "Stop with:  .\scripts\stop.ps1"
-Write-Host "Reset data: .\scripts\reset.ps1 -ConfirmReset"
+Write-Host "Local fixture only: .\scripts\ci\start_local_supabase_fixture.ps1"
+Write-Host "Destructive fixture reset: .\scripts\reset.ps1 -ConfirmReset"

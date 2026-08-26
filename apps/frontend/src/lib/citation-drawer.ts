@@ -13,10 +13,6 @@ export const SOURCE_PREVIEW_UNAVAILABLE =
 export const INFERENCE_LINKS_UNAVAILABLE =
   "Inference-chain details are not part of this stream. Citation chips show authorized identifiers only.";
 
-/** Document delete HTTP does not exist. */
-export const DOCUMENT_DELETE_UNAVAILABLE =
-  "Document deletion is not available in this console.";
-
 /** 404 / IDOR copy. Never interpolates a title. */
 export const DOCUMENT_NOT_FOUND_COPY = "Not found.";
 

@@ -55,13 +55,11 @@ def _require_active_recovery_actor(
         The authoritative owner/admin role.
 
     Raises:
-        MfaRecoveryError: If the actor is disabled, unprivileged, stale/forged,
-            or not authenticated at AAL2.
+        MfaRecoveryError: If the actor is disabled, unprivileged, or stale/forged.
+            ``assurance_level`` is retained and ignored.
     """
 
-    if assurance_level != "aal2":
-        raise MfaRecoveryError("MFA recovery actor must use an AAL2 session")
-
+    _ = assurance_level
     cursor.execute(
         """
         SELECT role::text

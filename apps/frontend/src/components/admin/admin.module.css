@@ -382,3 +382,114 @@
   margin: 0;
   padding: 0;
 }
+
+.tabList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab,
+.tabCurrent {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.tabCurrent {
+  color: var(--color-accent);
+  background: var(--color-accent-muted);
+  font-weight: 600;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+  max-width: 1120px;
+  color: var(--color-text);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+}
+
+.tabPanel {
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  align-items: end;
+}
+
+.toolGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--space) * 3);
+}
+
+.usageRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--space) * 3);
+}
+
+.metricCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space) * 4);
+  background: var(--color-surface);
+}
+
+.metricValue {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricLabel {
+  margin: calc(var(--space) * 2) 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.dangerPanel {
+  border-color: var(--color-danger);
+}
+
+.checkRow {
+  display: flex;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+  min-height: var(--row-height);
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: calc(var(--space) * 2);
+  margin: 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 800px) {
+  .toolGrid,
+  .usageRow {
+    grid-template-columns: 1fr;
+  }
+}

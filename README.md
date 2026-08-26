@@ -6,7 +6,8 @@ Greenfield monorepo for an authorized company RAG system: Hybrid retrieval (Supa
 
 - Windows 10/11 with Docker Desktop (WSL2 backend recommended): 16 GB RAM / 4 cores / 40 GB free minimum
 - [uv](https://docs.astral.sh/uv/) 0.11+, Node.js 20+, pnpm 9.15+
-- The workspace-pinned [Supabase CLI](https://supabase.com/docs/guides/local-development), installed by pnpm
+- Hosted Supabase project `smart-rag` for runtime Auth/Postgres/Storage
+- The workspace-pinned [Supabase CLI](https://supabase.com/docs/guides/local-development), installed by pnpm (destructive-test fixture only)
 - OpenAI key only for real-model evaluation; mock-model mode needs none
 
 ## Quick start
@@ -14,7 +15,8 @@ Greenfield monorepo for an authorized company RAG system: Hybrid retrieval (Supa
 ```powershell
 uv sync --all-packages --group dev --python 3.11 --frozen
 pnpm install --frozen-lockfile
-Copy-Item .env.example .env.compose   # if no KEY=VALUE Compose env exists
+# Wire hosted Auth + transaction/session DSNs into ignored .env.compose
+uv run python scripts/ops/wire_hosted_ingest_env.py
 .\scripts\dev.ps1
 .\scripts\verify-local.ps1
 ```
@@ -25,8 +27,9 @@ Developer endpoints (when healthy):
 - API docs: http://localhost:8000/docs
 - API live: http://localhost:8000/health/live
 
-Stop (preserve volumes): `.\scripts\stop.ps1`  
-Destructive reset: `.\scripts\reset.ps1 -ConfirmReset`
+Stop Compose (preserve volumes): `.\scripts\stop.ps1`  
+Local destructive-test fixture: `.\scripts\ci\start_local_supabase_fixture.ps1`  
+Destructive fixture reset: `.\scripts\reset.ps1 -ConfirmReset`
 
 ## Common commands
 

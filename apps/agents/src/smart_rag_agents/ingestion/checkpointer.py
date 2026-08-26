@@ -20,6 +20,7 @@ from langgraph.typing import ContextT, InputT, OutputT, StateT
 from psycopg import Connection
 from psycopg.rows import DictRow, dict_row
 from psycopg_pool import ConnectionPool
+from smart_rag_core.settings.postgres_dsn import require_session_postgres_dsn
 
 CheckpointerConnection: TypeAlias = Connection[DictRow]
 CheckpointerPool: TypeAlias = ConnectionPool[CheckpointerConnection]
@@ -136,8 +137,13 @@ def open_ingestion_checkpointer(
 
     Side Effects:
         Opens a ``psycopg_pool.ConnectionPool``. Does not auto-migrate.
+
+    Raises:
+        ValueError: If ``dsn`` is a known transaction-pooler URL. The
+            message never includes the DSN.
     """
 
+    require_session_postgres_dsn(dsn, setting_name="LANGGRAPH_CHECKPOINT_URL")
     pool = ConnectionPool[CheckpointerConnection](
         conninfo=dsn,
         min_size=1,

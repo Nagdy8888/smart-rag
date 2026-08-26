@@ -15,6 +15,7 @@ from smart_rag_core.memory.payload import (
     StorePayloadError,
     validate_memory_store_payload,
 )
+from smart_rag_core.settings.postgres_dsn import require_session_postgres_dsn
 
 StoreConnection: TypeAlias = Connection[DictRow]
 StorePool: TypeAlias = ConnectionPool[StoreConnection]
@@ -148,12 +149,15 @@ def open_query_memory_store(dsn: str, *, max_size: int = 4) -> QueryMemoryStore:
 
     Raises:
         StoreSchemaError: When store migrations 0-3 are not present.
+        ValueError: If ``dsn`` is a known transaction-pooler URL. The
+            message never includes the DSN.
 
     Side Effects:
         Opens a connection pool. Does not auto-migrate. Does not apply
         ``VECTOR_MIGRATIONS``.
     """
 
+    require_session_postgres_dsn(dsn, setting_name="LANGGRAPH_CHECKPOINT_URL")
     pool = ConnectionPool[StoreConnection](
         conninfo=dsn,
         min_size=1,

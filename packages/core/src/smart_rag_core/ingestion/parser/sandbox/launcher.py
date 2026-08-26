@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import tempfile
@@ -30,6 +29,7 @@ from smart_rag_core.ingestion.parser.limits import (
     PARSER_SANDBOX_PIDS_LIMIT,
 )
 from smart_rag_core.ingestion.parser.types import ParseDisposition, ParseResult
+from smart_rag_core.settings.base import get_process_environ
 
 
 @dataclass(frozen=True, slots=True)
@@ -360,8 +360,8 @@ def inprocess_parser_permitted() -> bool:
         rely on this path.
     """
 
-    flag = os.environ.get("ALLOW_INPROCESS_PARSER", "").strip().lower()
-    env = os.environ.get("APP_ENV", "").strip().lower()
+    flag = (get_process_environ("ALLOW_INPROCESS_PARSER", "") or "").strip().lower()
+    env = (get_process_environ("APP_ENV", "") or "").strip().lower()
     return flag in {"1", "true", "yes"} and env == "test"
 
 

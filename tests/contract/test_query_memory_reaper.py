@@ -384,6 +384,14 @@ def test_summary_counts_as_model_call(
         key: str,
         payload: dict[str, object],
     ) -> None:
+        """Record one store write for later assertions.
+
+        Args:
+            namespace: Store namespace tuple.
+            key: Item key.
+            payload: JSON-compatible value.
+        """
+
         stored.append((namespace, key, payload))
 
     db_connection.execute("SET ROLE app_api")
@@ -581,6 +589,8 @@ def test_concurrent_read_during_delete_is_denied(
     seen: list[str] = []
 
     def _read() -> None:
+        """Attempt a concurrent conversation read while delete holds a lock."""
+
         reader = psycopg.connect(db_url)
         reader.autocommit = False
         try:

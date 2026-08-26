@@ -46,4 +46,5 @@ Procedures are **not** written for systems that do not exist yet. Each row is a 
 [instance-rebuild.md](./instance-rebuild.md) ·
 [phase10-staging-secrets.md](./phase10-staging-secrets.md) ·
 [demo-local-ingest-aws-ask.md](./demo-local-ingest-aws-ask.md) ·
+[managed-auth-totp-residue.md](./managed-auth-totp-residue.md) ·
 [docs index](../README.md)

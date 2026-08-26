@@ -50,7 +50,9 @@ def run_worker_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
     Does not apply POSIX rlimits. Those are applied only by ``main`` in the
     isolated worker process so in-process callers, including unit tests,
-    keep the parent process limits.
+    keep the parent process limits. The authorized Parquet is loaded with
+    DuckDB ``read_parquet`` on the hash-verified path so the worker does
+    not import PyArrow during the 3-second process deadline.
 
     Args:
         payload: Trusted JSON from the parent executor. Must include
@@ -92,17 +94,20 @@ def run_worker_payload(payload: dict[str, Any]) -> dict[str, Any]:
         TABLE_MAX_OUTPUT_BYTES,
     )
     duck = cast(Any, duckdb)
+    connect_config = dict(DUCKDB_CONNECT_CONFIG)
+    connect_config["enable_external_access"] = "true"
     connection = duck.connect(
         database=":memory:",
         read_only=False,
-        config=DUCKDB_CONNECT_CONFIG,
+        config=connect_config,
     )
     try:
         connection.execute(f"SET TimeZone='{TIMEZONE}'")
-        import pyarrow.parquet as pq
-
-        arrow = cast(Any, pq).read_table(parquet_path)
-        connection.register(ALLOWED_TABLE, arrow)
+        artifact = parquet_path.as_posix().replace("'", "''")
+        connection.execute(
+            f"CREATE TABLE {ALLOWED_TABLE} AS SELECT * FROM read_parquet('{artifact}')"  # noqa: S608
+        )
+        connection.execute("SET enable_external_access=false")
         connection.execute("SET lock_configuration=true")
         try:
             connection.execute("SET enable_external_access=true")
@@ -254,8 +259,10 @@ def main() -> int:
         result = run_worker_payload(payload)
     except Exception as exc:
         sys.stdout.write(json.dumps({"ok": False, "error": str(exc)}))
+        sys.stdout.flush()
         return 1
     sys.stdout.write(json.dumps(result))
+    sys.stdout.flush()
     return 0
 
 

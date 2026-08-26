@@ -2,7 +2,7 @@
 title: Query run admission
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering, security
 phase_packet: Phase 6 Packet 1
 ---
@@ -98,8 +98,10 @@ not throttle hosted Supabase Auth.
 JSON Accept returns `{run_id, stream_path}` where `stream_path` is
 `/runs/{run_id}/events`. `Accept: text/event-stream` streams immediately.
 See [SSE.md](../api/SSE.md). Public `GET /health/ready` never sets
-`query_ready` in mock mode. Named ParadeDB/Valkey/LightRAG probes stay on
-authenticated `GET /ops/ready`.
+`query_ready` in mock mode. A stale `rate_limit_degraded` latch also
+clears `query_ready` until Valkey recovers; readiness probes and a later
+successful limits `INCR` clear that latch. Named ParadeDB/Valkey/LightRAG
+probes stay on authenticated `GET /ops/ready`.
 
 See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 

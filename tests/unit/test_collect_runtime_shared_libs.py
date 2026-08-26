@@ -55,7 +55,10 @@ def test_should_copy_lib_skips_cpython_and_glibc() -> None:
     assert module.should_copy_lib(Path("/usr/local/lib/libpython3.11.so.1.0")) is False
     assert module.should_copy_lib(Path("/lib/x86_64-linux-gnu/libc.so.6")) is False
     assert module.should_copy_lib(Path("/usr/lib/x86_64-linux-gnu/libffi.so.8")) is True
-    assert module.should_copy_lib(Path("/app/.venv/lib/python3.11/site-packages/x.so")) is False
+    assert (
+        module.should_copy_lib(Path("/app/.venv/lib/python3.11/site-packages/x.so"))
+        is False
+    )
 
 
 def test_destination_relative_merges_lib_into_usr() -> None:

@@ -89,8 +89,8 @@ class AuthTeamService:
             caller: Authenticated caller.
             raw_token: One-time invitation secret.
             email: Verified JWT/test email, never a client-trusted identity.
-            assurance_level: JWT ``aal`` claim. Privileged/upload upgrades
-                require AAL2.
+            assurance_level: Deprecated JWT ``aal`` claim. Ignored; retained
+                for the additive RPC signature.
 
         Returns:
             Invitation id.
@@ -130,7 +130,7 @@ class AuthTeamService:
         subject_user_id: UUID,
         assurance_level: str,
     ) -> CompletedOffboarding:
-        """Disable and revoke sessions for one subject. Owner/admin AAL2.
+        """Disable and revoke sessions for one subject. Owner/admin only.
 
         Args:
             caller: Authenticated caller.

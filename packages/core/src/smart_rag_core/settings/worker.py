@@ -13,6 +13,7 @@ from smart_rag_core.jobs.limits import (
     DEFAULT_WORKER_CONCURRENCY,
 )
 from smart_rag_core.settings.base import Environment, SharedSettings, load_settings
+from smart_rag_core.settings.postgres_dsn import require_session_postgres_dsn
 
 
 class WorkerSettings(SharedSettings):
@@ -156,18 +157,54 @@ class WorkerSettings(SharedSettings):
             raise ValueError("ALLOW_INPROCESS_PARSER is only valid when APP_ENV=test")
         return self
 
+    @model_validator(mode="after")
+    def reject_transaction_pooler_session_dsns(self) -> Self:
+        """Reject transaction-pooler URLs for LangGraph and LightRAG.
+
+        Returns:
+            This settings instance.
+
+        Raises:
+            ValueError: If a session/direct integration is given a known
+                transaction-pooler DSN. The message never includes the URL.
+        """
+
+        if self.langgraph_checkpoint_url is not None:
+            require_session_postgres_dsn(
+                self.langgraph_checkpoint_url.get_secret_value(),
+                setting_name="LANGGRAPH_CHECKPOINT_URL",
+            )
+        elif self.supabase_db_url is not None:
+            require_session_postgres_dsn(
+                self.supabase_db_url.get_secret_value(),
+                setting_name="LANGGRAPH_CHECKPOINT_URL",
+            )
+        if self.lightrag_db_url is not None:
+            require_session_postgres_dsn(
+                self.lightrag_db_url.get_secret_value(),
+                setting_name="LIGHTRAG_DB_URL",
+            )
+        return self
+
     def resolved_checkpoint_dsn(self) -> str | None:
         """Return the checkpointer DSN, falling back to the worker database URL.
 
         Returns:
             Postgres URL string, or ``None`` when both checkpoint and worker
-            database URLs are unset (idle worker).
+            database URLs are unset (idle worker). The URL is session/direct.
+
+        Raises:
+            ValueError: If the resolved URL is a transaction pooler. The
+                message never includes the URL.
         """
 
         secret = self.langgraph_checkpoint_url or self.supabase_db_url
         if secret is None:
             return None
-        return secret.get_secret_value()
+        return require_session_postgres_dsn(
+            secret.get_secret_value(),
+            setting_name="LANGGRAPH_CHECKPOINT_URL",
+        )
 
 
 def load_worker_settings() -> WorkerSettings:

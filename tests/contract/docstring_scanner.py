@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -33,7 +34,10 @@ def _is_excluded(path: Path) -> bool:
 
     if any(part in _EXCLUDED_PARTS for part in path.parts):
         return True
-    return any(part.startswith(".tmp") for part in (*path.parts, path.name))
+    return any(
+        part.startswith(".tmp") or part.startswith("_tmp")
+        for part in (*path.parts, path.name)
+    )
 
 
 @dataclass(frozen=True)
@@ -61,10 +65,33 @@ def iter_authored_python_files(repo_root: Path) -> list[Path]:
 
     Returns:
         Python source paths excluding caches, build output, historical review
-        artifacts, vendor directories, and local ``.tmp*`` scratch files.
+        artifacts, vendor directories, and local ``.tmp*`` / ``_tmp*``
+        scratch files.
+        Excluded directory names are pruned during ``os.walk`` so Windows
+        ``node_modules`` junctions cannot raise ``FileNotFoundError``.
     """
 
-    return sorted(path for path in repo_root.rglob("*.py") if not _is_excluded(path))
+    found: list[Path] = []
+    for current, dirnames, filenames in os.walk(repo_root, followlinks=False):
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if (
+                name not in _EXCLUDED_PARTS
+                and not name.startswith(".tmp")
+                and not name.startswith("_tmp")
+            )
+        ]
+        current_path = Path(current)
+        if _is_excluded(current_path):
+            continue
+        for filename in filenames:
+            if not filename.endswith(".py"):
+                continue
+            path = current_path / filename
+            if not _is_excluded(path):
+                found.append(path)
+    return sorted(found)
 
 
 def scan_source_for_docstrings(source: str, path: Path) -> list[DocstringViolation]:

@@ -24,50 +24,110 @@
   src: url("/fonts/inter-latin-600-normal.woff2") format("woff2");
 }
 
+@font-face {
+  font-family: "Inter Display";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/InterDisplay-SemiBold.woff2") format("woff2");
+}
+
 /*
- * Canonical tokens: docs/frontend/STITCH_BRIEF.md Precision Workspace
- * (not DESIGN.md YAML, not lavender #faf8ff, not #004ac6, not teal
- * #0F766E canvas/accent, not blur). CSS variables here plus
- * src/lib/design-tokens.ts are the implementation source of truth.
+ * Canonical tokens: Ink & Indigo refresh (UI/UX overhaul P2).
+ * CSS variables here plus src/lib/design-tokens.ts are the implementation
+ * source of truth. No lavender canvas, teal accent-as-canvas, or blur.
+ * --gradient-brand is reserved for the auth brand panel, empty-state icon
+ * tile, and nav brand logo tile only.
  */
 :root {
-  --color-bg: #F4F6F8;
+  --color-bg: #F6F7F9;
   --color-surface: #FFFFFF;
-  --color-surface-muted: #F8FAFC;
-  --color-text: #182230;
-  --color-text-muted: #637083;
-  --color-border: #DDE3EA;
-  --color-accent: #4E5BD5;
+  --color-surface-muted: #F1F3F6;
+  --color-surface-hover: #EDEFF4;
+  --color-surface-selected: #EEF2FF;
+  --color-text: #101828;
+  --color-text-secondary: #475467;
+  --color-text-muted: #667085;
+  --color-text-disabled: #98A2B3;
+  --color-border: #E4E7EC;
+  --color-border-strong: #CBD5E1;
+  --color-accent: #4F46E5;
+  --color-accent-hover: #4338CA;
+  --color-accent-pressed: #3730A3;
   --color-accent-fg: #FFFFFF;
-  --color-accent-muted: #EEF0FF;
-  --color-accent-soft: #EEF0FF;
+  --color-accent-muted: #EEF2FF;
+  --color-accent-soft: #EEF2FF;
+  --color-accent-border: #C7D2FE;
+  --color-ink: #0F1420;
+  --color-ink-raised: #1A2132;
+  --color-ink-border: #232B3E;
+  --color-ink-text: #E2E6EF;
+  --color-ink-text-muted: #8E97AB;
+  --gradient-brand: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
   --color-evidence: #0E8584;
-  --color-danger: #B91C1C;
-  --color-warning: #A16207;
+  --color-evidence-hover: #0A6F6E;
+  --color-evidence-muted: #ECFDFC;
   --color-success: #166534;
-  --color-focus: #4E5BD5;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
+  --color-success-bg: #F0FDF4;
+  --color-success-border: #BBF7D0;
+  --color-warning: #A16207;
+  --color-warning-bg: #FFFBEB;
+  --color-warning-border: #FDE68A;
+  --color-danger: #B91C1C;
+  --color-danger-hover: #991B1B;
+  --color-danger-bg: #FEF2F2;
+  --color-danger-border: #FECACA;
+  --color-info: #1D4ED8;
+  --color-info-bg: #EFF6FF;
+  --color-info-border: #BFDBFE;
+  --color-focus: #4F46E5;
+  --color-overlay: rgb(15 23 42 / 0.42);
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
   --space: 4px;
-  --shadow-1: 0 1px 2px rgb(15 23 42 / 0.08);
-  --shadow-2: 0 8px 24px rgb(15 23 42 / 0.08);
+  --shadow-1: 0 1px 3px rgb(16 24 40 / 0.10);
+  --shadow-2: 0 12px 32px rgb(16 24 40 / 0.14);
+  --shadow-composer: 0 8px 24px rgb(16 24 40 / 0.12);
   --font-sans: "Inter", "Segoe UI", "IBM Plex Sans Arabic", "Noto Naskh Arabic", sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", monospace;
+  --font-display: "Inter Display", Inter, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   --line-height-ar: 1.75;
   --line-height-en: 1.5;
   --nav-width: 232px;
   --nav-width-collapsed: 72px;
   --row-height: 48px;
   --topbar-height: 56px;
-  --control-height: 44px;
-  --control-height: 44px;
+  --control-height: 40px;
+  --control-height-compact: 32px;
+  --control-height-lg: 44px;
+  --icon-button-size: 36px;
+  --text-hero-size: 32px;
+  --text-hero-height: 40px;
+  --text-page-title-size: 24px;
+  --text-page-title-height: 32px;
+  --text-section-size: 18px;
+  --text-section-height: 26px;
+  --text-card-title-size: 15px;
+  --text-card-title-height: 22px;
+  --text-body-size: 14px;
+  --text-body-height: 22px;
+  --text-label-size: 13px;
+  --text-label-height: 18px;
+  --text-meta-size: 12px;
+  --text-meta-height: 16px;
+  --motion-fast: 150ms ease-out;
+  --motion-drawer: 200ms ease-out;
+  --motion-panel: 200ms ease-out;
 }
 
 @theme {
   --color-page: var(--color-bg);
   --color-card: var(--color-surface);
-  --color-ink: var(--color-text);
+  --color-fg: var(--color-text);
   --color-muted: var(--color-text-muted);
   --color-line: var(--color-border);
   --color-brand: var(--color-accent);
@@ -76,9 +136,9 @@
   --color-warning-text: var(--color-warning);
   --color-success-text: var(--color-success);
   --color-focus-ring: var(--color-focus);
-  --radius-chip: var(--radius-sm);
-  --radius-control: var(--radius-md);
-  --radius-card: var(--radius-lg);
+  --radius-chip: var(--radius-pill);
+  --radius-control: var(--radius-sm);
+  --radius-card: var(--radius-md);
   --shadow-elevation-1: var(--shadow-1);
   --shadow-elevation-2: var(--shadow-2);
   --font-console: var(--font-sans);
@@ -89,13 +149,18 @@
 
 html {
   height: 100%;
-  color-scheme: light;
+  /* `only` keeps Windows / Edge native widgets on the light palette. */
+  color-scheme: only light;
+  overflow-x: clip;
+  accent-color: var(--color-accent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) var(--color-surface-muted);
 }
 
 html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+  /* 100vw includes the classic Edge scrollbar and shifts the layout. */
+  max-width: 100%;
 }
 
 body {
@@ -105,9 +170,70 @@ body {
   color: var(--color-text);
   background: var(--color-bg);
   font-family: var(--font-sans);
-  line-height: var(--line-height-en);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-height);
+  /* DirectWrite already hints Inter. Antialiased thins glyphs on Windows. */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  color-scheme: only light;
+}
+
+button,
+textarea,
+select,
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
+  appearance: none;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-accent);
+}
+
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--color-text);
+  caret-color: var(--color-text);
+  box-shadow: inset 0 0 0 1000px var(--color-surface);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border: 2px solid var(--color-surface-muted);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+::selection {
+  background: var(--color-accent-muted);
+  color: var(--color-text);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
 * {
@@ -125,6 +251,35 @@ body {
 
 [dir="ltr"].code-isolate {
   unicode-bidi: isolate;
+}
+
+.type-hero {
+  font-family: var(--font-display);
+  font-size: var(--text-hero-size);
+  line-height: var(--text-hero-height);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.type-page-title {
+  font-family: var(--font-display);
+  font-size: var(--text-page-title-size);
+  line-height: var(--text-page-title-height);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.type-section {
+  font-family: var(--font-display);
+  font-size: var(--text-section-size);
+  line-height: var(--text-section-height);
+  font-weight: 600;
+}
+
+.type-label {
+  font-size: var(--text-label-size);
+  line-height: var(--text-label-height);
+  font-weight: 600;
 }
 
 @media (prefers-reduced-motion: reduce) {

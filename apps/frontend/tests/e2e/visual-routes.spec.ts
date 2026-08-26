@@ -35,8 +35,6 @@ const PUBLIC_VISUAL: Array<{
   { path: "/login", name: "login", heading: "Sign in" },
   { path: "/signup", name: "signup", heading: "Sign up" },
   { path: "/forgot-password", name: "forgot-password", heading: "Forgot password" },
-  { path: "/mfa/challenge", name: "mfa-challenge", heading: "MFA challenge" },
-  { path: "/unavailable/GAP-07-07", name: "unavailable-mfa", heading: "Unavailable" },
 ];
 
 test("public auth visual desktop and mobile", async ({ page }) => {
@@ -71,15 +69,15 @@ test("authenticated product routes visual when a session exists", async ({
 }) => {
   await signInLiveMember(page, request);
   const routes: Array<{ path: string; name: string; heading: string | RegExp }> = [
-    { path: "/", name: "chat", heading: "Auto chat" },
+    { path: "/", name: "chat", heading: "Ask" },
     { path: "/documents", name: "documents", heading: /Document/ },
     { path: "/graph", name: "graph", heading: /Graph/ },
     { path: "/tables", name: "tables", heading: /table/i },
-    { path: "/team", name: "team", heading: "Team" },
-    { path: "/tools", name: "tools", heading: "Tools" },
-    { path: "/curation", name: "curation", heading: "Curation" },
-    { path: "/usage", name: "usage", heading: /Usage/ },
-    { path: "/profile", name: "profile", heading: "Profile" },
+    { path: "/admin?tab=team", name: "admin-team", heading: "Admin" },
+    { path: "/admin?tab=tools", name: "admin-tools", heading: "Admin" },
+    { path: "/admin?tab=curation", name: "admin-curation", heading: "Admin" },
+    { path: "/admin?tab=usage", name: "admin-usage", heading: "Admin" },
+    { path: "/account", name: "account", heading: "Account" },
   ];
   for (const route of routes) {
     await page.setViewportSize(DESKTOP);

@@ -27,12 +27,17 @@ from smart_rag_api.dependencies.services import (
 )
 from smart_rag_api.schemas.fastapi_security import (
     ConversationCreateRequest,
+    ConversationMessage,
+    ConversationMessagesResponse,
     ConversationResponse,
     SubmitMessageRequest,
     SubmitMessageResponse,
 )
 from smart_rag_api.services.auth_rate_limits import RateLimitKind
 from smart_rag_api.services.client_handshake import enforce_client_handshake
+from smart_rag_api.services.conversation_transcript import (
+    ConversationTranscriptService,
+)
 from smart_rag_api.services.conversations import (
     ConversationService,
 )
@@ -60,6 +65,21 @@ def get_conversation_service(
     """
 
     return ConversationService(postgres_url)
+
+
+def get_conversation_transcript_service(
+    postgres_url: Annotated[str, Depends(get_postgres_url)],
+) -> ConversationTranscriptService:
+    """Factory for conversation transcript service.
+
+    Args:
+        postgres_url: Injected DSN.
+
+    Returns:
+        Transcript service.
+    """
+
+    return ConversationTranscriptService(postgres_url)
 
 
 def get_query_run_service(
@@ -198,6 +218,71 @@ def get_conversation_route(
         title=record.title,
         created_at=record.created_at,
     )
+
+
+@router.get(
+    "/{conversation_id}/messages",
+    response_model=ConversationMessagesResponse,
+)
+def list_conversation_messages_route(
+    request: Request,
+    conversation_id: UUID,
+    caller: CallerContextDep,
+    service: Annotated[
+        ConversationTranscriptService, Depends(get_conversation_transcript_service)
+    ],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    before: Annotated[UUID | None, Query()] = None,
+) -> ConversationMessagesResponse:
+    """List creator-owned user and assistant messages, newest first.
+
+    Authorization is creator-only. Missing, deleted, and foreign
+    conversations return the same generic 404 as ``GET /conversations/{id}``.
+    Pagination is a keyset on ``before`` (a previous page's last
+    ``message_id``). ``limit`` is bounded to 1-100; the SQL RPC also clamps
+    to 100. ``next_before_id`` is set only when the page is full.
+
+    Args:
+        request: Active request for rate limits.
+        conversation_id: Conversation the caller must own.
+        caller: Authenticated caller.
+        service: Injected transcript service.
+        limit: Page size, default 50, maximum 100.
+        before: Optional keyset cursor from a prior ``next_before_id``.
+
+    Returns:
+        Newest-first page of escaped message records.
+
+    Raises:
+        HTTPException: 404 for missing, tombstoned, or foreign conversations.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"chat-read:{caller.user_id}",
+        kind=RateLimitKind.LOW_RISK_READ,
+        max_attempts=120,
+    )
+    try:
+        records = service.list(
+            caller,
+            conversation_id=conversation_id,
+            limit=limit,
+            before_id=before,
+        )
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    items = [
+        ConversationMessage(
+            message_id=item.message_id,
+            role=item.role,
+            content=item.content,
+            created_at=item.created_at,
+        )
+        for item in records
+    ]
+    next_before_id = items[-1].message_id if len(items) == limit else None
+    return ConversationMessagesResponse(items=items, next_before_id=next_before_id)
 
 
 @router.delete(

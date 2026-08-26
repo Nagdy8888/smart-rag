@@ -1,7 +1,10 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Stop local Compose services while preserving volumes.
+  Stop laptop Compose services while preserving volumes.
+.DESCRIPTION
+  Stops hosted-runtime Compose sidecars. Does not start, stop, or reset
+  local Supabase; that stack is a separately labelled test fixture.
 #>
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -15,13 +18,5 @@ $EnvFile = if (Test-Path "$Root\.env.compose") {
   throw "No Compose environment file found. Run .\scripts\dev.ps1 first."
 }
 
-$SupabaseCli = "$Root\node_modules\.bin\supabase.cmd"
-if (-not (Test-Path $SupabaseCli)) {
-  throw "Pinned Supabase CLI is unavailable. Run pnpm install --frozen-lockfile first."
-}
-
 docker compose --env-file $EnvFile stop
-Write-Host "Compose services stopped. Volumes preserved."
-
-& pnpm exec supabase stop
-Write-Host "Local Supabase stopped (data retained unless you reset)."
+Write-Host "Compose services stopped. Volumes preserved. Local Supabase fixture was not touched."

@@ -117,9 +117,7 @@ def execute_openai_lightrag_llm(
     input_details = getattr(usage, "input_tokens_details", None)
     cached_input_tokens = 0
     if input_details is not None:
-        cached_input_tokens = int(
-            getattr(input_details, "cached_tokens", 0) or 0
-        )
+        cached_input_tokens = int(getattr(input_details, "cached_tokens", 0) or 0)
     cached_input_tokens = min(max(cached_input_tokens, 0), input_tokens)
     output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
     text = getattr(response, "output_text", "") or ""
@@ -170,12 +168,10 @@ def estimate_lightrag_llm_cost(
     uncached_input_tokens = input_tokens - cached_input_tokens
     one_million = Decimal(1_000_000)
     return (
-        Decimal(uncached_input_tokens)
-        * Decimal(LIGHTRAG_LLM_INPUT_USD_PER_MILLION)
+        Decimal(uncached_input_tokens) * Decimal(LIGHTRAG_LLM_INPUT_USD_PER_MILLION)
         + Decimal(cached_input_tokens)
         * Decimal(LIGHTRAG_LLM_CACHED_INPUT_USD_PER_MILLION)
-        + Decimal(output_tokens)
-        * Decimal(LIGHTRAG_LLM_OUTPUT_USD_PER_MILLION)
+        + Decimal(output_tokens) * Decimal(LIGHTRAG_LLM_OUTPUT_USD_PER_MILLION)
     ) / one_million
 
 

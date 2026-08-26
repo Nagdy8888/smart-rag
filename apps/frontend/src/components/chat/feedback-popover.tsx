@@ -26,6 +26,8 @@ export type FeedbackPopoverProps = {
   onComment: (value: string) => void;
   /** Submit existing catalog payload. */
   onSubmit: () => void;
+  /** True while submit is in flight. */
+  pending?: boolean;
 };
 
 /**
@@ -42,21 +44,24 @@ export function FeedbackPopover({
   comment,
   onComment,
   onSubmit,
+  pending = false,
 }: FeedbackPopoverProps) {
   return (
     <div className={styles.answerFooter}>
-      <Button type="button" variant={thumbsUp ? "primary" : "ghost"} onClick={() => onThumbs(true)}>
-        Thumbs up
-      </Button>
-      <Button
-        type="button"
-        variant={!thumbsUp ? "primary" : "ghost"}
-        onClick={() => onThumbs(false)}
-      >
-        Thumbs down
-      </Button>
-      <Popover label="Feedback details" trigger="Add details">
+      <Popover label="Give feedback" trigger="Give feedback">
         <div className={styles.feedbackForm}>
+          <div className={styles.row}>
+            <Button type="button" variant={thumbsUp ? "primary" : "ghost"} onClick={() => onThumbs(true)}>
+              Thumbs up
+            </Button>
+            <Button
+              type="button"
+              variant={!thumbsUp ? "primary" : "ghost"}
+              onClick={() => onThumbs(false)}
+            >
+              Thumbs down
+            </Button>
+          </div>
           <Select
             label="Tag"
             value={tag}
@@ -68,7 +73,13 @@ export function FeedbackPopover({
             value={comment}
             onChange={(event) => onComment(event.target.value)}
           />
-          <Button type="button" onClick={onSubmit}>
+          <Button
+            type="button"
+            data-action-id="ask.feedback"
+            pending={pending}
+            pendingLabel="Submitting…"
+            onClick={onSubmit}
+          >
             Submit feedback
           </Button>
         </div>

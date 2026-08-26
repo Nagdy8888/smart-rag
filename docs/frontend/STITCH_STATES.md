@@ -2,7 +2,7 @@
 title: Visible UI state matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: design, frontend, reviewers
 packet: P07-03
 ---
@@ -25,7 +25,7 @@ Copy uses signed sentences. Production never shows exception text. BM25
 degrade and Graph Pending are **warning**, not danger. Graph-only is never a
 success answering state.
 
-Live-region: `polite` for progress/tokens; `assertive` for MFA, 426, 402,
+Live-region: `polite` for progress/tokens; `assertive` for 426, 402,
 terminal `error`.
 
 ## Shared HTTP banners
@@ -41,7 +41,7 @@ terminal `error`.
 | Limiter fail-closed | 503 `limiter_unavailable` | Service cannot admit this action safely. | retry later | mutations |
 | Budget exhausted | 402 `budget_exhausted` | Company or user query budget is exhausted. | owner funds/wait; no hidden retry spend | all paid |
 | Concurrency | 429 `concurrency_limit` | Five query runs are already active. | wait/cancel | chat |
-| MFA required | 403 `MFA required` | Multi-factor authentication is required. | Auth-direct TOTP; Sign out | privileged |
+| MFA required | removed P08-12 | MFA is not a product gate. Single-factor Auth. | none | none |
 | Authz deny | 403 `forbidden` | You cannot perform this action. | none | convenience hide + server deny |
 | Not found / IDOR / tombstone | 404 `not_found` | Not found. | leave | no existence leak |
 | Idempotency conflict | 409 `idempotency_conflict` | This request does not match the original. | new key | chat/upload |
@@ -63,7 +63,7 @@ challenge. Those failures are Auth-provider generic copy only.
 | Success | session + `GET /me` 200 | app shell | none |
 | Sign-in failed | Auth error | Sign in failed | retry |
 | Env missing | no `NEXT_PUBLIC_SUPABASE_*` | Public Auth configuration is missing | set env |
-| Google disabled | `enabled=false` | Google OAuth is not enabled on this project | GAP-07-04 |
+| Google omitted | `enabled=false` | No Google button is rendered | GAP-07-04 |
 | Sign-up | Auth `signUp` | invitation may still be required | accept invite |
 | Reset sent | Auth reset | Check your email (Inbucket locally) | none |
 | Callback loading | `/auth/callback` | Completing sign-in | none |
@@ -84,8 +84,8 @@ challenge. Those failures are Auth-provider generic copy only.
 | Invite forbidden | 403 | You cannot invite | none |
 | Accept loading | POST accept | Accepting | none |
 | Accept success | invitation_id | Continue to chat | none |
-| Offboard | AAL2 owner/admin | irreversible | POST offboard |
-| Member directory | no list API | No member directory API | GAP noted in brief |
+| Offboard | owner/admin Bearer | irreversible; no MFA | POST offboard |
+| Member directory | no list API | omitted; no directory chrome | identify by user_id |
 | Viewer | GET /me role viewer | hide invite/offboard (convenience) | server still denies |
 
 ## Chat and diagnostics
@@ -168,7 +168,8 @@ is read-only (GAP-07-01).
 
 | State | Signal | Copy / UI |
 | --- | --- | --- |
-| Empty search | no q | prompt for q |
+| Empty search | trimmed q length 0 | Search disabled |
+| Empty inspect | nodes empty after inspect | No authorized graph evidence matched this inspection. |
 | Loading | GET search / POST inspect | Loading |
 | Success | nodes ≤200 | authorized graph |
 | Empty authorized | `graph_empty` | No authorized graph objects |
@@ -179,16 +180,20 @@ is read-only (GAP-07-01).
 | Outage | `graph_outage` | Graph inspection unavailable |
 | Seed required | 422 inspect_seed_required | Provide entity or document |
 | ETA | none | Unavailable GAP-07-10; show handoff counts only |
+| Relationship edit | no mutation API | omitted, not a disabled control |
+| Custom SVG neighborhood | removed | React Flow canvas only |
 
 ## Tables
 
 | State | Signal | Copy / UI |
 | --- | --- | --- |
-| Empty | GET /tables `[]` | No authorized tables |
-| Analyze success | rows + source_ranges | deterministic table; separate from commentary |
+| Empty | GET /tables `[]` | No structured tables are available. |
+| Analyze success | rows + source_ranges | deterministic table; display-only sort; Cell provenance drawer |
+| Empty success | rows `[]` | The analysis returned no rows. |
 | 404 parquet | not_found | Table artifact unavailable |
-| Forbidden extra field | 422 | Plan rejected |
-| Export | only after optional tool disclosure | else no button |
+| Forbidden extra field | 422 | Plan rejected; draft preserved |
+| Unknown column / SQL | client compile | rejected before POST |
+| Export | none | removed; no standalone export contract |
 
 ## Tools, glossary, entity rules
 
@@ -206,10 +211,10 @@ is read-only (GAP-07-01).
 | --- | --- | --- |
 | Usage me | GET /usage/me | cost_usd, tokens, rows |
 | Usage company | GET /usage/company or 403 | owner/admin only |
-| Budget editor | none | Unavailable GAP-07-11 |
-| Audit | none | Unavailable GAP-07-12 |
-| Profile | GET /me | five fields only |
-| Company settings | none | Unavailable GAP-07-13 |
+| Budget editor | none | omitted GAP-07-11; 402 classified only |
+| Audit | none | omitted GAP-07-12; no panel |
+| Account | GET /me | four fields only |
+| Company settings | none | omitted GAP-07-13; no save |
 
 ## Negative scenarios (must not look like success)
 

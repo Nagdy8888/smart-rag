@@ -141,9 +141,7 @@ def prepare_hybrid_replays(
                 (operation_key, replay.ingestion_job_id),
             ).fetchone()
             if job is None:
-                raise RuntimeError(
-                    f"missing_demo_hybrid_job:{replay.ingestion_job_id}"
-                )
+                raise RuntimeError(f"missing_demo_hybrid_job:{replay.ingestion_job_id}")
             snapshots.append(
                 {
                     "job_id": job[0],

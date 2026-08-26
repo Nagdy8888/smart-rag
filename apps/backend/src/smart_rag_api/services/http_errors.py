@@ -34,6 +34,7 @@ _ADMISSION_STATUS: dict[str, int] = {
     "invalid_cursor": status.HTTP_400_BAD_REQUEST,
     "database_rejected": status.HTTP_503_SERVICE_UNAVAILABLE,
     "conversation_create_failed": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "message_persist_failed": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

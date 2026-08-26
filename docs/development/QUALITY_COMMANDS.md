@@ -2,7 +2,7 @@
 title: Quality commands
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-25
 audience: engineering
 ---
 
@@ -62,7 +62,7 @@ uv run python scripts/ci/check_schema_determinism.py
 The ordinary contract and fast tiers may skip live integration checks when their
 local Supabase or ParadeDB prerequisites are unavailable, which keeps
 dependency-only CI deterministic. The Phase 2 integration gate requires or
-starts local Supabase and the private ParadeDB service, then runs the mandatory
+starts the local Supabase destructive-test fixture and the private ParadeDB service, then runs the mandatory
 schema/RLS/Auth/Storage/audit/BM25 suite. Any skipped mandatory test fails the
 gate. Managed pgvector and JWKS rollover checks are deliberately reported as
 separate, not silently skipped as local proof:

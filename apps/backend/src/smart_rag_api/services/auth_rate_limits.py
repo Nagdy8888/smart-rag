@@ -220,6 +220,7 @@ def check_auth_rate_limit(
     valkey_client: ValkeyClient | None = None,
     kind: RateLimitKind = RateLimitKind.AUTH_ADJACENT,
     on_degraded: Callable[[], None] | None = None,
+    on_recovered: Callable[[], None] | None = None,
     retry_after_seconds: int = DEFAULT_RETRY_AFTER_SECONDS,
 ) -> RateLimitDecision:
     """Enforce FastAPI-owned limits. Never claims to throttle hosted Auth.
@@ -230,7 +231,8 @@ def check_auth_rate_limit(
           never skip the limiter (fail closed).
         * ``low_risk_read``: Valkey when available; on Valkey loss use the
           emergency process limiter, emit ``rate_limit_degraded``, and allow
-          the conservative local cap.
+          the conservative local cap. A later successful Valkey consume
+          emits ``on_recovered`` so readiness can clear the latch.
 
     Args:
         bucket_key: Normalized limit bucket key.
@@ -242,6 +244,7 @@ def check_auth_rate_limit(
         valkey_client: Optional live/fake Valkey limits client.
         kind: Endpoint class selecting fail-closed vs emergency policy.
         on_degraded: Optional callback when the emergency limiter is used.
+        on_recovered: Optional callback when Valkey consume succeeds again.
         retry_after_seconds: Hint returned on deny/unavailable.
 
     Returns:
@@ -267,6 +270,8 @@ def check_auth_rate_limit(
                 bucket_key=bucket_key,
                 retry_after_seconds=retry_after_seconds,
             )
+            if on_recovered is not None:
+                on_recovered()
             if not allowed:
                 raise AuthRateLimitExceededError(bucket_key)
             return decision

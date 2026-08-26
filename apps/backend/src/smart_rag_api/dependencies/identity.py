@@ -157,14 +157,15 @@ def resolve_caller_context(
         x_test_role: Test-only role bypass when test identity is permitted.
         x_test_authorization_version: Test-only authorization snapshot bypass.
         x_test_email: Test-only email used by invitation accept.
-        x_test_aal: Test-only assurance level for offboarding (``aal1``/``aal2``).
+        x_test_aal: Deprecated test-only assurance claim. Stored on the request
+            for compatibility and ignored by authorization.
 
     Returns:
         Frozen ``CallerContext`` for RPC argument binding.
 
     Raises:
         HTTPException: When auth fails verification, profile is missing/disabled,
-            session is revoked, or MFA is required but absent.
+            or the session is revoked. MFA/AAL2 is not an authorization gate.
     """
 
     settings: BackendSettings = request.app.state.settings
@@ -237,18 +238,12 @@ def resolve_caller_context(
             detail="Session revoked",
         )
 
-    try:
-        return build_caller_context(
-            snapshot,
-            session_id=verified.session_id,
-            assurance_level=verified.assurance_level,
-            authentication_methods=verified.authentication_methods,
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="MFA required",
-        ) from exc
+    return build_caller_context(
+        snapshot,
+        session_id=verified.session_id,
+        assurance_level=verified.assurance_level,
+        authentication_methods=verified.authentication_methods,
+    )
 
 
 CallerContextDep = Annotated[CallerContext, Depends(resolve_caller_context)]

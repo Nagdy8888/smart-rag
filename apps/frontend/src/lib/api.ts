@@ -7,6 +7,8 @@ import { CLIENT_VERSION } from "./client-version";
 import { apiBaseUrl } from "./env";
 import type {
   CitationResponse,
+  ConversationMessage,
+  ConversationMessagesResponse,
   ConversationResponse,
   CurrentUserResponse,
   AcceptInvitationResponse,
@@ -21,6 +23,7 @@ import type {
   EntityRuleMutationResponse,
   EntityRuleSource,
   EntityRuleStatus,
+  EntityRuleSuggestRequest,
   EntityRuleUpsertRequest,
   FeedbackTag,
   FinalizeUploadHttpRequest,
@@ -37,6 +40,8 @@ import type {
   RetryIngestionJobResponse,
   SignedUploadResponse,
   SubmitMessageResponse,
+  RunResponse,
+  FeedbackResponse,
   TableAnalyzeResponse,
   TableManifestResponse,
   TableQueryPlan,
@@ -49,6 +54,7 @@ import type {
 } from "./types";
 import {
   buildEntityRuleConcurrencyBody,
+  buildEntityRuleSuggestBody,
   buildEntityRuleUpsertBody,
   buildGlossaryImportBody,
   buildInvitationCreateBody,
@@ -147,11 +153,6 @@ export type AuthFailure = {
   detail: string;
 };
 
-export type MfaFailure = {
-  kind: "mfa";
-  detail: string;
-};
-
 export type FailClosedFailure = {
   kind: "fail_closed";
   status: number;
@@ -173,6 +174,21 @@ export type DeletedFailure = {
   kind: "deleted";
 };
 
+export type ConflictFailure = {
+  kind: "conflict";
+  detail: string;
+};
+
+export type ValidationFailure = {
+  kind: "validation";
+  detail: string;
+};
+
+export type ProtocolFailure = {
+  kind: "protocol";
+  detail: string;
+};
+
 export type ServerFailure = {
   kind: "server";
   status: number;
@@ -181,24 +197,50 @@ export type ServerFailure = {
 export type ApiFailure =
   | HandshakeFailure
   | AuthFailure
-  | MfaFailure
   | FailClosedFailure
   | BudgetFailure
   | RateFailure
   | DeletedFailure
+  | ConflictFailure
+  | ValidationFailure
+  | ProtocolFailure
   | ServerFailure;
+
+/**
+ * Typed HTTP failure thrown by chat mutations. Callers must not treat this as
+ * success.
+ */
+export class ClassifiedApiError extends Error {
+  readonly failure: ApiFailure;
+
+  /**
+   * @param failure - Classified FastAPI failure.
+   */
+  constructor(failure: ApiFailure) {
+    super(failure.kind);
+    this.name = "ClassifiedApiError";
+    this.failure = failure;
+  }
+}
+
+/**
+ * Return whether an unknown thrown value is a classified API failure.
+ *
+ * @param error - Caught value.
+ * @returns True when `error` is `ClassifiedApiError`.
+ */
+export function isClassifiedApiError(error: unknown): error is ClassifiedApiError {
+  return error instanceof ClassifiedApiError;
+}
 
 /**
  * Return whether a FastAPI `detail` looks like a short code, not a trace.
  *
  * @param value - Candidate detail.
- * @returns True for `snake_case` / `MFA required` codes at most 64 chars.
+ * @returns True for `snake_case` codes at most 64 chars.
  */
 export function isSafeDetailCode(value: string): boolean {
   const trimmed = value.trim();
-  if (trimmed === "MFA required") {
-    return true;
-  }
   return /^[a-z][a-z0-9_]{0,63}$/i.test(trimmed);
 }
 
@@ -263,9 +305,6 @@ export function classifyApiError(
       sseSchemaVersion: schema,
     };
   }
-  if (status === 403 && body.detail === "MFA required") {
-    return { kind: "mfa", detail: "MFA required" };
-  }
   if (status === 401 || status === 403) {
     return {
       kind: "auth",
@@ -296,6 +335,18 @@ export function classifyApiError(
   if (status === 404) {
     return { kind: "deleted" };
   }
+  if (status === 409) {
+    return {
+      kind: "conflict",
+      detail: sanitizedDetail(body, "conflict"),
+    };
+  }
+  if (status === 422) {
+    return {
+      kind: "validation",
+      detail: sanitizedDetail(body, "validation_error"),
+    };
+  }
   if (status >= 500) {
     return { kind: "server", status };
   }
@@ -319,6 +370,60 @@ export function classifiedOrGenericFailure(
 }
 
 /**
+ * Throw a classified error when a mutation or fetch is not successful.
+ *
+ * @param response - Fetch response.
+ * @param body - Parsed JSON object, or empty.
+ * @throws ClassifiedApiError
+ */
+export function throwIfNotOk(
+  response: Response,
+  body: Record<string, unknown>,
+): void {
+  if (response.ok) {
+    return;
+  }
+  throw new ClassifiedApiError(
+    classifiedOrGenericFailure(response.status, body, response.headers),
+  );
+}
+
+/**
+ * Parse an owned run JSON body.
+ *
+ * @param body - FastAPI object.
+ * @returns Run identifiers only. No transcript fields.
+ */
+export function parseRunResponse(body: Record<string, unknown>): RunResponse {
+  return {
+    run_id: String(body.run_id ?? ""),
+    conversation_id: String(body.conversation_id ?? ""),
+    creator_user_id: String(body.creator_user_id ?? ""),
+    status: String(body.status ?? ""),
+    reservation_id:
+      body.reservation_id === null || body.reservation_id === undefined
+        ? null
+        : String(body.reservation_id),
+    created_at:
+      body.created_at === null || body.created_at === undefined
+        ? null
+        : String(body.created_at),
+  };
+}
+
+/**
+ * Parse a 201 feedback body.
+ *
+ * @param body - FastAPI object.
+ * @returns Feedback id.
+ */
+export function parseFeedbackResponse(
+  body: Record<string, unknown>,
+): FeedbackResponse {
+  return { feedback_id: String(body.feedback_id ?? "") };
+}
+
+/**
  * JSON headers for AUTH_ADJACENT administration POSTs.
  *
  * Handshake `X-Client-Version` is reserved for paid chat/upload. These
@@ -337,13 +442,12 @@ export function adminMutationHeaders(auth: ApiAuth): Record<string, string> {
 /**
  * Map a non-OK administration response to a thrown Error code.
  *
- * 404 is not treated as conversation deletion. 403 MFA required stays
- * distinct from forbidden.
+ * 404 is not treated as conversation deletion. 403 is authorization, not MFA.
  *
  * @param status - HTTP status.
  * @param body - JSON-ish object.
  * @param headers - Optional headers for 429 Retry-After classification.
- * @throws Error with `mfa_required`, `forbidden`, `budget_exhausted`,
+ * @throws Error with `forbidden`, `budget_exhausted`,
  *   `rate_limited`, `stale_row_version`, or a sanitized detail.
  */
 export function throwClassifiedAdminError(
@@ -352,9 +456,6 @@ export function throwClassifiedAdminError(
   headers?: Headers | Record<string, string>,
 ): never {
   const classified = classifyApiError(status, body, headers);
-  if (classified?.kind === "mfa") {
-    throw new Error("mfa_required");
-  }
   if (classified?.kind === "budget") {
     throw new Error("budget_exhausted");
   }
@@ -389,6 +490,9 @@ async function readJsonObject(response: Response): Promise<Record<string, unknow
   return {};
 }
 
+/** Browser abort budget for public/operator readiness probes, in milliseconds. */
+export const HEALTH_READY_TIMEOUT_MS = 8000;
+
 /**
  * GET `/health/ready` without authentication.
  *
@@ -402,7 +506,7 @@ export async function fetchReady(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ReadinessResponse | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3000);
+  const timer = setTimeout(() => controller.abort(), HEALTH_READY_TIMEOUT_MS);
   try {
     const response = await fetchImpl(apiUrl("/health/ready"), {
       signal: controller.signal,
@@ -437,7 +541,7 @@ export async function fetchOperatorReady(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ReadinessResponse | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3000);
+  const timer = setTimeout(() => controller.abort(), HEALTH_READY_TIMEOUT_MS);
   try {
     const response = await fetchImpl(apiUrl("/ops/ready"), {
       signal: controller.signal,
@@ -504,15 +608,20 @@ export function mergeReadiness(
  * Public ready plus owner/admin named probes when the Bearer is allowed.
  *
  * @param auth - Access token, or null on the signed-out login page.
+ * @param role - `/me` role. Operator probes run only for `owner` or `admin`.
  * @param fetchImpl - Injected fetch.
  * @returns Merged console readiness, or null when FastAPI is unreachable.
  */
 export async function loadConsoleReadiness(
   auth: ApiAuth | null,
+  role?: string | null,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ReadinessResponse | null> {
   const publicReady = await fetchReady(fetchImpl);
   if (publicReady === null || auth === null) {
+    return publicReady;
+  }
+  if (role !== "owner" && role !== "admin") {
     return publicReady;
   }
   const operatorReady = await fetchOperatorReady(auth, fetchImpl);
@@ -553,6 +662,9 @@ export async function fetchMeta(
  * @param auth - Access token.
  * @param fetchImpl - Injected fetch.
  * @returns Server-derived caller snapshot.
+ * @throws Error `session_revoked` when FastAPI returns that detail.
+ * @throws ClassifiedApiError on other 401/403 bodies so Ask can show the
+ *   session-rejected banner. Other failures stay `me_failed`.
  */
 export async function fetchMe(
   auth: ApiAuth,
@@ -564,11 +676,11 @@ export async function fetchMe(
   const body = await readJsonObject(response);
   if (!response.ok) {
     const classified = classifyApiError(response.status, body);
-    if (classified?.kind === "mfa") {
-      throw new Error("mfa_required");
-    }
     if (classified?.kind === "auth" && classified.detail === "session_revoked") {
       throw new Error("session_revoked");
+    }
+    if (classified?.kind === "auth") {
+      throw new ClassifiedApiError(classified);
     }
     throw new Error("me_failed");
   }
@@ -577,7 +689,6 @@ export async function fetchMe(
     role: String(body.role ?? ""),
     authorization_version: Number(body.authorization_version ?? 0),
     upload_enabled: Boolean(body.upload_enabled),
-    mfa_enrolled: Boolean(body.mfa_enrolled),
   };
 }
 
@@ -609,6 +720,7 @@ export async function listConversations(
  * @param title - Optional title.
  * @param fetchImpl - Injected fetch.
  * @returns Created conversation.
+ * @throws ClassifiedApiError on non-OK responses.
  */
 export async function createConversation(
   auth: ApiAuth,
@@ -620,7 +732,101 @@ export async function createConversation(
     headers: paidMutationHeaders(auth),
     body: JSON.stringify(title ? { title } : {}),
   });
-  return (await response.json()) as ConversationResponse;
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return {
+    conversation_id: String(body.conversation_id ?? ""),
+    creator_user_id: String(body.creator_user_id ?? ""),
+    title:
+      body.title === null || body.title === undefined
+        ? null
+        : String(body.title),
+    created_at:
+      body.created_at === null || body.created_at === undefined
+        ? null
+        : String(body.created_at),
+  };
+}
+
+/**
+ * Fetch one owned conversation. Foreign or tombstoned ids are 404.
+ *
+ * @param auth - Access token.
+ * @param conversationId - Conversation UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Conversation row.
+ * @throws ClassifiedApiError on non-OK responses.
+ */
+export async function fetchConversation(
+  auth: ApiAuth,
+  conversationId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ConversationResponse> {
+  const response = await fetchImpl(apiUrl(`/conversations/${conversationId}`), {
+    headers: resumeHeaders(auth),
+  });
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return body as unknown as ConversationResponse;
+}
+
+/**
+ * Load one page of persisted user/assistant messages, newest first.
+ *
+ * @param auth - Access token.
+ * @param conversationId - Conversation UUID.
+ * @param options - Page size (1–100) and optional keyset cursor.
+ * @param fetchImpl - Injected fetch.
+ * @returns Escaped transcript items and the next older cursor.
+ * @throws ClassifiedApiError on non-OK responses.
+ */
+export async function fetchConversationMessages(
+  auth: ApiAuth,
+  conversationId: string,
+  options: { limit?: number; before?: string | null } = {},
+  fetchImpl: typeof fetch = fetch,
+): Promise<ConversationMessagesResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", String(options.limit ?? 50));
+  if (options.before) {
+    params.set("before", options.before);
+  }
+  const response = await fetchImpl(
+    apiUrl(`/conversations/${conversationId}/messages?${params.toString()}`),
+    { headers: resumeHeaders(auth) },
+  );
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  const items = Array.isArray(body.items)
+    ? (body.items as ConversationMessage[])
+    : [];
+  const next =
+    body.next_before_id === null || body.next_before_id === undefined
+      ? null
+      : String(body.next_before_id);
+  return { items, next_before_id: next };
+}
+
+/**
+ * Fetch one owned run. Foreign runs are 404.
+ *
+ * @param auth - Access token.
+ * @param runId - Run UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Run identifiers. No answer or citation text.
+ * @throws ClassifiedApiError on non-OK responses.
+ */
+export async function fetchRun(
+  auth: ApiAuth,
+  runId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RunResponse> {
+  const response = await fetchImpl(apiUrl(`/runs/${runId}`), {
+    headers: resumeHeaders(auth),
+  });
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return parseRunResponse(body);
 }
 
 /**
@@ -643,25 +849,83 @@ export async function deleteConversation(
   return response.status === 204;
 }
 
+/** Default `GET /documents` page size. Has-more when a page is full. */
+export const DOCUMENT_LIST_PAGE_SIZE = 50;
+
 /**
- * List visible documents.
+ * Map one FastAPI document object. Includes existing `created_at`.
+ *
+ * @param body - JSON object.
+ * @returns Typed document row.
+ */
+export function parseDocumentResponse(body: Record<string, unknown>): DocumentResponse {
+  return {
+    document_id: String(body.document_id ?? ""),
+    title: typeof body.title === "string" ? body.title : null,
+    visibility: String(body.visibility ?? ""),
+    current_version_id:
+      typeof body.current_version_id === "string" ? body.current_version_id : null,
+    visibility_generation: Number(body.visibility_generation ?? 0),
+    created_at: typeof body.created_at === "string" ? body.created_at : null,
+  };
+}
+
+/**
+ * List ACL-visible documents with bounded `created_at,id` keyset pagination.
+ *
+ * Continuation is inferred from page length. This client never invents
+ * `next_cursor`.
  *
  * @param auth - Access token.
+ * @param options - Optional keyset cursor and page size.
  * @param fetchImpl - Injected fetch.
- * @returns Document summaries.
+ * @returns One page of documents, newest first.
  */
 export async function listDocuments(
   auth: ApiAuth,
+  options: { cursor?: string | null; limit?: number } = {},
   fetchImpl: typeof fetch = fetch,
 ): Promise<DocumentResponse[]> {
-  const response = await fetchImpl(apiUrl("/documents"), {
+  const limit = options.limit ?? DOCUMENT_LIST_PAGE_SIZE;
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
+  }
+  const response = await fetchImpl(apiUrl(`/documents?${params.toString()}`), {
     headers: resumeHeaders(auth),
   });
+  if (!response.ok) {
+    const failureBody = await readJsonObject(response);
+    throwIfNotOk(response, failureBody);
+  }
   const parsed: unknown = await response.json();
   if (!Array.isArray(parsed)) {
     return [];
   }
-  return parsed as DocumentResponse[];
+  return parsed
+    .filter((row): row is Record<string, unknown> => row !== null && typeof row === "object")
+    .map(parseDocumentResponse);
+}
+
+/**
+ * Build the next `created_at,id` cursor from the last row of a full page.
+ *
+ * @param page - Current page.
+ * @param limit - Requested page size.
+ * @returns Cursor string, or null when the page is short or `created_at` is missing.
+ */
+export function nextDocumentCursor(
+  page: DocumentResponse[],
+  limit: number = DOCUMENT_LIST_PAGE_SIZE,
+): string | null {
+  if (page.length < limit) {
+    return null;
+  }
+  const last = page[page.length - 1];
+  if (last === undefined || last.created_at === null || last.created_at === "") {
+    return null;
+  }
+  return `${last.created_at},${last.document_id}`;
 }
 
 /**
@@ -688,11 +952,7 @@ export async function reserveUpload(
     }),
   });
   if (!response.ok) {
-    const body = await readJsonObject(response);
-    const classified = classifyApiError(response.status, body);
-    if (classified?.kind === "mfa") {
-      throw new Error("mfa_required");
-    }
+    await readJsonObject(response);
     throw new Error("upload_reserve_failed");
   }
   return (await response.json()) as SignedUploadResponse;
@@ -787,17 +1047,32 @@ export async function fetchDocument(
   const body = await readJsonObject(response);
   return {
     ok: true,
-    document: {
-      document_id: String(body.document_id ?? ""),
-      title: typeof body.title === "string" ? body.title : null,
-      visibility: String(body.visibility ?? ""),
-      current_version_id:
-        typeof body.current_version_id === "string"
-          ? body.current_version_id
-          : null,
-      visibility_generation: Number(body.visibility_generation ?? 0),
-    },
+    document: parseDocumentResponse(body),
   };
+}
+
+/**
+ * DELETE `/documents/{document_id}`. Owner/admin only. 204 is success.
+ *
+ * @param auth - Access token.
+ * @param documentId - Document UUID.
+ * @param fetchImpl - Injected fetch.
+ * @throws ClassifiedApiError on 403/404/429/5xx.
+ */
+export async function deleteDocument(
+  auth: ApiAuth,
+  documentId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const response = await fetchImpl(apiUrl(`/documents/${documentId}`), {
+    method: "DELETE",
+    headers: paidMutationHeaders(auth),
+  });
+  if (response.status === 204) {
+    return;
+  }
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
 }
 
 /**
@@ -835,10 +1110,6 @@ export async function finalizeUpload(
   });
   if (!response.ok) {
     const errorBody = await readJsonObject(response);
-    const classified = classifyApiError(response.status, errorBody);
-    if (classified?.kind === "mfa") {
-      throw new Error("mfa_required");
-    }
     throw new Error(sanitizedDetail(errorBody, "upload_finalize_rejected"));
   }
   const parsed = await readJsonObject(response);
@@ -885,11 +1156,7 @@ export async function enqueueWebsiteCrawl(
   });
   const parsed = await readJsonObject(response);
   if (!response.ok) {
-    const classified = classifyApiError(response.status, parsed);
-    if (classified?.kind === "auth") {
-      throw new Error("forbidden");
-    }
-    throw new Error(sanitizedDetail(parsed, "crawl_enqueue_rejected"));
+    throwIfNotOk(response, parsed);
   }
   return {
     document_id: String(parsed.document_id ?? ""),
@@ -948,7 +1215,14 @@ export async function searchGraphEntities(
     `/graph/entities/search?q=${encodeURIComponent(query)}&limit=${String(capped)}`,
   );
   const response = await fetchImpl(url, { headers: resumeHeaders(auth) });
-  const parsed: unknown = await response.json();
+  const parsed: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const body =
+      parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    throwIfNotOk(response, body);
+  }
   if (!Array.isArray(parsed)) {
     return [];
   }
@@ -1002,9 +1276,13 @@ export async function inspectGraph(
     body: JSON.stringify(payload),
   });
   const parsed = await readJsonObject(response);
-  if (!response.ok) {
-    throw new Error(sanitizedDetail(parsed, "inspect_rejected"));
+  if (response.status === 400) {
+    throw new ClassifiedApiError({
+      kind: "validation",
+      detail: sanitizedDetail(parsed, "inspect_rejected"),
+    });
   }
+  throwIfNotOk(response, parsed);
   const nodesRaw = Array.isArray(parsed.nodes) ? parsed.nodes : [];
   const locatorsRaw = Array.isArray(parsed.locators) ? parsed.locators : [];
   const limitationsRaw = Array.isArray(parsed.limitations)
@@ -1055,6 +1333,7 @@ export async function inspectGraph(
  * @param auth - Access token.
  * @param fetchImpl - Injected fetch.
  * @returns Manifests.
+ * @throws ClassifiedApiError on 401/403/429/5xx.
  */
 export async function listTables(
   auth: ApiAuth,
@@ -1063,7 +1342,14 @@ export async function listTables(
   const response = await fetchImpl(apiUrl("/tables"), {
     headers: resumeHeaders(auth),
   });
-  const parsed: unknown = await response.json();
+  const parsed: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const body =
+      parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    throwIfNotOk(response, body);
+  }
   if (!Array.isArray(parsed)) {
     return [];
   }
@@ -1088,6 +1374,7 @@ export async function listTables(
  * @param plan - Declarative plan.
  * @param fetchImpl - Injected fetch.
  * @returns Deterministic rows and source_ranges.
+ * @throws ClassifiedApiError on 400/401/403/404/422/429/5xx.
  */
 export async function analyzeTable(
   auth: ApiAuth,
@@ -1100,9 +1387,13 @@ export async function analyzeTable(
     body: JSON.stringify(tableAnalyzeBody(plan)),
   });
   const parsed = await readJsonObject(response);
-  if (!response.ok) {
-    throw new Error(sanitizedDetail(parsed, "table_plan_rejected"));
+  if (response.status === 400) {
+    throw new ClassifiedApiError({
+      kind: "validation",
+      detail: sanitizedDetail(parsed, "table_plan_rejected"),
+    });
   }
+  throwIfNotOk(response, parsed);
   const rowsRaw = Array.isArray(parsed.rows) ? parsed.rows : [];
   const rangesRaw = Array.isArray(parsed.source_ranges)
     ? parsed.source_ranges
@@ -1210,7 +1501,7 @@ export async function submitFeedback(
   tag: FeedbackTag,
   comment: string | null,
   fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
+): Promise<FeedbackResponse> {
   const response = await fetchImpl(apiUrl(`/runs/${runId}/feedback`), {
     method: "POST",
     headers: paidMutationHeaders(auth),
@@ -1220,7 +1511,13 @@ export async function submitFeedback(
       comment,
     }),
   });
-  return response.ok;
+  const body = await readJsonObject(response);
+  if (response.status !== 201) {
+    throw new ClassifiedApiError(
+      classifiedOrGenericFailure(response.status, body, response.headers),
+    );
+  }
+  return parseFeedbackResponse(body);
 }
 
 /**
@@ -1235,12 +1532,14 @@ export async function cancelRun(
   auth: ApiAuth,
   runId: string,
   fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
+): Promise<RunResponse> {
   const response = await fetchImpl(apiUrl(`/runs/${runId}/cancel`), {
     method: "POST",
     headers: resumeHeaders(auth),
   });
-  return response.ok;
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return parseRunResponse(body);
 }
 
 /**
@@ -1313,7 +1612,7 @@ export async function fetchUsageCompany(
  * @param token - Raw invitation secret.
  * @param fetchImpl - Injected fetch.
  * @returns Accepted invitation id.
- * @throws Error when FastAPI rejects the call. MFA maps to `mfa_required`.
+ * @throws Error when FastAPI rejects the call.
  */
 export async function acceptInvitation(
   auth: ApiAuth,
@@ -1331,9 +1630,6 @@ export async function acceptInvitation(
   const body = await readJsonObject(response);
   if (!response.ok) {
     const classified = classifyApiError(response.status, body, response.headers);
-    if (classified?.kind === "mfa") {
-      throw new Error("mfa_required");
-    }
     if (classified?.kind === "auth" && classified.detail === "session_revoked") {
       throw new Error("session_revoked");
     }
@@ -1353,7 +1649,7 @@ export async function acceptInvitation(
  * @param input - Invitee email, role, and upload flag.
  * @param fetchImpl - Injected fetch.
  * @returns Invitation identifiers without the mail token.
- * @throws Error `forbidden`, `mfa_required`, `budget_exhausted`, or `rate_limited`.
+ * @throws Error `forbidden`, `budget_exhausted`, or `rate_limited`.
  */
 export async function createInvitation(
   auth: ApiAuth,
@@ -1386,7 +1682,7 @@ export async function createInvitation(
  * @param userId - Subject user UUID from `GET /me` (no member directory).
  * @param fetchImpl - Injected fetch.
  * @returns Completed identifiers.
- * @throws Error `forbidden` or `mfa_required` on 403.
+ * @throws Error `forbidden` on 403.
  */
 export async function offboardUser(
   auth: ApiAuth,
@@ -1809,6 +2105,64 @@ export async function revokeEntityRule(
       body: JSON.stringify(buildEntityRuleConcurrencyBody(rowVersion)),
     },
   );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseEntityRuleMutation(body);
+}
+
+/**
+ * PATCH one entity rule including `row_version`.
+ *
+ * @param auth - Access token.
+ * @param ruleId - Rule UUID.
+ * @param input - Upsert fields plus concurrency token.
+ * @param fetchImpl - Injected fetch.
+ * @returns Mutation identifiers.
+ * @throws Error `stale_row_version` on 409.
+ */
+export async function patchEntityRule(
+  auth: ApiAuth,
+  ruleId: string,
+  input: EntityRuleUpsertRequest & Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EntityRuleMutationResponse> {
+  const payload = buildEntityRuleUpsertBody(input);
+  const response = await fetchImpl(
+    apiUrl(`/admin/graph/entity-rules/${ruleId}`),
+    {
+      method: "PATCH",
+      headers: adminMutationHeaders(auth),
+      body: JSON.stringify(payload),
+    },
+  );
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  return parseEntityRuleMutation(body);
+}
+
+/**
+ * Store an inactive suggestion. Never auto-approves.
+ *
+ * @param auth - Access token.
+ * @param input - Suggestion payload.
+ * @param fetchImpl - Injected fetch.
+ * @returns Mutation identifiers with `invalidated=false` on success.
+ */
+export async function suggestEntityRule(
+  auth: ApiAuth,
+  input: EntityRuleSuggestRequest & Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<EntityRuleMutationResponse> {
+  const payload = buildEntityRuleSuggestBody(input);
+  const response = await fetchImpl(apiUrl("/admin/graph/entity-rules/suggestions"), {
+    method: "POST",
+    headers: adminMutationHeaders(auth),
+    body: JSON.stringify(payload),
+  });
   const body = await readJsonObject(response);
   if (!response.ok) {
     throwClassifiedAdminError(response.status, body, response.headers);

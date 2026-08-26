@@ -1,13 +1,13 @@
 /**
- * Team invitations and offboarding.
+ * Bookmark redirect from `/team` to `/admin?tab=team`.
  */
-import { TeamApp } from "../../../components/team-app";
+import { redirect } from "next/navigation";
 
 /**
- * Render invite create, offboard by user_id, and honest unavailable bootstrap.
+ * Send legacy Team bookmarks to the P08-14 destination.
  *
- * @returns Team surface.
+ * @returns Never. `redirect` throws.
  */
-export default function TeamPage() {
-  return <TeamApp />;
+export default function TeamRedirectPage() {
+  redirect("/admin?tab=team");
 }

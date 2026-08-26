@@ -2,7 +2,7 @@
 title: Demo local ingest and AWS ask later
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-25
 audience: engineering, ops
 ---
 
@@ -212,8 +212,10 @@ See
    stays `pending` forever and LangSmith shows no `ingestion.graph` runs.
    Startup prints `lightrag_db_url_set=true` (never the DSN).
 
-   Do not run `.\scripts\dev.ps1` for this demo (it starts local Docker
-   Supabase). Filter logs from the host worker process, not `docker compose logs worker`.
+   Daily `.\scripts\dev.ps1` starts hosted-runtime Compose sidecars and does
+   not start local Supabase. This demo's host-worker ingest path is still
+   separate from Compose worker logs. Filter logs from the host worker
+   process, not `docker compose logs worker`.
 2. Upload `plot_summaries.hybrid-800.txt` through the local UI. Leave
    `graph_eligible` false (upload default). Wait for `[hybrid]` through
    `hybrid_ready` (public status `graph_ineligible`).

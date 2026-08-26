@@ -331,8 +331,7 @@ def require_map_only_extract(
         checkpoint_ids = set(parse_processed_source_ids(payload))
         if checkpoint_ids != set(expected):
             raise RuntimeError(
-                "map_only_checkpoint_mismatch:"
-                f"{len(checkpoint_ids)}/{len(expected)}"
+                f"map_only_checkpoint_mismatch:{len(checkpoint_ids)}/{len(expected)}"
             )
         if payload.get("isolate_candidate") is not True:
             raise RuntimeError("map_only_isolate_candidate_required")
@@ -647,7 +646,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         asyncio.set_event_loop(None)
     failure_context = {
         "map_only": args.map_only,
-        "preflight": {key: value for key, value in preflight.items() if key != "source_ids"},
+        "preflight": {
+            key: value for key, value in preflight.items() if key != "source_ids"
+        },
         "map_only_extract": map_only_snapshot,
     }
     if not claimed:
@@ -700,7 +701,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "ok": True,
                 "map_only": args.map_only,
                 "preflight": {
-                    key: value for key, value in preflight.items() if key != "source_ids"
+                    key: value
+                    for key, value in preflight.items()
+                    if key != "source_ids"
                 },
                 "map_only_extract": map_only_snapshot,
                 "requeue": requeue,

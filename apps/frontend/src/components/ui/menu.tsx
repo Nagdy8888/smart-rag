@@ -26,6 +26,8 @@ export type MenuItem = {
   danger?: boolean;
   /** Skip in arrow-key movement. */
   disabled?: boolean;
+  /** Stable `data-action-id` when the row is an inventory action. */
+  actionId?: string;
 };
 
 export type MenuProps = {
@@ -35,6 +37,8 @@ export type MenuProps = {
   trigger: ReactNode;
   /** Action rows. */
   items: readonly MenuItem[];
+  /** Inventory id on the trigger button. */
+  triggerActionId?: string;
 };
 
 /**
@@ -43,7 +47,7 @@ export type MenuProps = {
  * @param props - Label, trigger node, and items.
  * @returns Menu widget. Side effects: focus restore on close.
  */
-export function Menu({ label, trigger, items }: MenuProps) {
+export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -106,6 +110,7 @@ export function Menu({ label, trigger, items }: MenuProps) {
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-label={label}
+        data-action-id={triggerActionId}
         onClick={() => {
           setOpen((value) => !value);
         }}
@@ -127,6 +132,7 @@ export function Menu({ label, trigger, items }: MenuProps) {
               role="menuitem"
               className={item.danger ? styles.menuItemDanger : styles.menuItem}
               disabled={item.disabled}
+              data-action-id={item.actionId}
               onClick={() => {
                 item.onSelect();
                 setOpen(false);

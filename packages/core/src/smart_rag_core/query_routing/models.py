@@ -22,6 +22,10 @@ from smart_rag_core.query_routing.constants import (
     SUBQUESTION_CEILING,
     WHOLE_DOCUMENT_SECTION_COVERAGE,
 )
+from smart_rag_core.query_routing.knowledge_scope import (
+    KnowledgeScope,
+    NoRetrievalAnswerMode,
+)
 from smart_rag_core.tables.plan import TableQueryPlan
 
 
@@ -96,6 +100,10 @@ class PreparationModelPayload(BaseModel):
         metadata_filters: Allow-listed filters.
         confidence: Closed unit interval.
         relationship_intent: Optional relationship signal from the model.
+        knowledge_scope: Additive scope classification. Invalid values are
+            ignored by ``classify_knowledge_scope``.
+        knowledge_scope_confidence: Optional scope confidence from the same
+            call. Values below 0.80 become ``AMBIGUOUS``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -110,6 +118,8 @@ class PreparationModelPayload(BaseModel):
     metadata_filters: tuple[str, ...] = Field(default_factory=tuple, max_length=8)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     relationship_intent: bool | None = None
+    knowledge_scope: str | None = Field(default=None, max_length=64)
+    knowledge_scope_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
     @model_validator(mode="after")
     def _bound_lists(self) -> PreparationModelPayload:
@@ -171,6 +181,8 @@ class QueryPreparation(BaseModel):
         whole_document_summary: Single-document full summary request.
         routing_surface: Production or diagnostic.
         manual_mode: True only when diagnostic manual routing was recorded.
+        knowledge_scope: Strict-split answer origin.
+        knowledge_scope_confidence: Confidence for ``knowledge_scope``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -213,6 +225,8 @@ class QueryPreparation(BaseModel):
     whole_document_summary: bool
     routing_surface: RoutingSurface
     manual_mode: bool
+    knowledge_scope: KnowledgeScope
+    knowledge_scope_confidence: float = Field(ge=0.0, le=1.0)
 
     @model_validator(mode="after")
     def _original_preserved(self) -> QueryPreparation:
@@ -311,6 +325,9 @@ class RetrievalPlan(BaseModel):
         branch_concurrency: Server cap, default 2.
         max_subquestions: Server cap, default 3.
         catalog_llm_call_count: Must stay 0.
+        knowledge_scope: Strict-split answer origin copied from preparation.
+        no_retrieval_answer_mode: Required for NoRetrieval; None for company
+            document routes.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -337,6 +354,8 @@ class RetrievalPlan(BaseModel):
     branch_concurrency: int = Field(default=BRANCH_CONCURRENCY, ge=1, le=2)
     max_subquestions: int = Field(default=SUBQUESTION_CEILING, ge=1, le=3)
     catalog_llm_call_count: Literal[0] = 0
+    knowledge_scope: KnowledgeScope
+    no_retrieval_answer_mode: NoRetrievalAnswerMode | None = None
 
     @model_validator(mode="after")
     def _invariants(self) -> RetrievalPlan:

@@ -22,7 +22,7 @@ Related: [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.m
 | Artifact | Value |
 | --- | --- |
 | Prompt | `query_profile_v1` |
-| Prompt SHA-256 | `01f33dfbb98720b3cb08a89fdd7d8d8be48941e834e15deb53a8e8142ae20693` |
+| Prompt SHA-256 | `5a969a9d83d8716c6033fc1a7c5a773e5e63896953af3847d4e85216425e9e1f` |
 | Model (mock) | `query-profile-mock-v1` |
 | Normalizer | `arabic_norm_v1` |
 | Date parser | `gregorian_v1` |

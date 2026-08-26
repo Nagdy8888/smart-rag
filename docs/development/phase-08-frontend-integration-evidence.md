@@ -2,7 +2,7 @@
 title: Phase 8 frontend integration evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-08-25
 audience: engineering, reviewers, client-approver
 ---
 
@@ -811,3 +811,1620 @@ module. Live composition is the light Precision Workspace in
 `screen.png` files. New runtime UI dependencies: `lucide-react` and
 `@xyflow/react` (graph canvas only, dynamically imported). Authenticated
 visual snapshots remain **unverified-live**.
+
+## Packet 7 — Canonical remediation amendment and baseline
+
+### Requirement (quoted)
+
+> Record this approved overhaul as additive Phase 8 packets P08-07 through
+> P08-23, create `feat/frontend-functional-overhaul`, ADR, action inventory,
+> visual contract, and baseline evidence. Do not edit application source,
+> migrations, dependencies, or runtime config. Do not uncheck packets 1–6.
+> Wrapper status stays pending.
+
+### Concrete acceptance checks
+
+- Plan integrity structural validation passes before `--update`.
+- Wrapper `status` remains `pending`.
+- Next coding packet is P08-08.
+- No application/runtime files changed in this packet.
+
+### Baseline defects (repository inspection, 2026-08-24)
+
+- `packages/core/src/smart_rag_core/settings/backend.py`
+  `resolved_checkpoint_dsn()` falls back from `LANGGRAPH_CHECKPOINT_URL` to
+  `SUPABASE_DB_URL`.
+- `docker-compose.yml` `api` service does not inject
+  `LANGGRAPH_CHECKPOINT_URL` or `LIGHTRAG_DB_URL`.
+- `apps/backend/src/smart_rag_api/services/sse_stream.py` uses
+  `stream_mode="updates"` and can yield `completed` with no `token_delta`.
+- Frontend chat can render an empty answer; cancel/feedback helpers currently
+  collapse HTTP failure into booleans.
+- MFA enroll/challenge routes and AAL2 checks still exist; complete removal is
+  an approved planned deviation (P08-11 then P08-12).
+
+### Files in this packet
+
+- Additive Phase 8 packet files 07–23 and `00-visual-contract.md`
+- ADR `docs/adr/ADR-frontend-functional-overhaul.md`
+- `docs/frontend/action-inventory.json` (baseline dispositions)
+- Maintained visual docs under `docs/frontend/`
+- Global/Phase 8 contract amendments for MFA deviation, verified-final
+  delivery, and P08-09 Phase 6 co-ownership
+
+### Verification
+
+Plan integrity is run after these files land. Application tests are not in
+scope for P08-07.
+
+### Unverified
+
+Live `/health/ready` against a running stack was not re-probed in this
+documentation packet. Historical empty-answer/reservation symptoms remain
+the baseline until P08-08/P08-09.
+
+## Packet 8 — Restore query runtime connectivity and deterministic readiness
+
+### Requirement (quoted)
+
+> Fail fast with a sanitized configuration error when a known
+> transaction-pooler DSN is supplied to a session/direct-only
+> integration. Do not “fix” this by disabling prepared statements.
+> `query_ready=true` when the core Hybrid query path, durable run
+> store/checkpointer, and model gateway prerequisites are usable.
+> Missing LightRAG may produce a typed degraded dependency.
+
+### Concrete acceptance checks
+
+- Transaction-pooler checkpoint DSN fails closed without leaking the DSN.
+- Direct/session DSN is accepted; factories refuse pooler URLs before connect.
+- `/health/ready` stays bounded (1s connect probes; browser abort 8000ms).
+- Core healthy plus LightRAG unavailable is degraded-but-query-capable.
+- `.dockerignore` excludes `.env.local`; frontend image build-args exist.
+- Compose injects `LANGGRAPH_CHECKPOINT_URL` and `LIGHTRAG_DB_URL`.
+
+### Files in this packet
+
+- `packages/core/src/smart_rag_core/settings/postgres_dsn.py`
+- `packages/core/src/smart_rag_core/settings/backend.py`
+- `packages/core/src/smart_rag_core/settings/worker.py`
+- `apps/agents/src/smart_rag_agents/ingestion/checkpointer.py`
+- `apps/agents/src/smart_rag_agents/query/store.py`
+- `apps/agents/src/smart_rag_agents/query/checkpointer.py`
+- `apps/backend/src/smart_rag_api/services/readiness.py`
+- `docker-compose.yml`
+- `apps/frontend/Dockerfile`
+- `.dockerignore`
+- `.env.example`
+- `apps/frontend/src/lib/api.ts` (`HEALTH_READY_TIMEOUT_MS = 8000`)
+- `docs/development/CONFIGURATION.md`
+- `docs/frontend/THIN_DEVELOPER_UI.md`
+- `docs/api/FASTAPI_SECURITY.md`
+- unit/contract tests listed below
+
+### Authorization / failure / fallback
+
+- Pooler DSN (`:6543` or `pgbouncer=true`) raises `TransactionPoolerDsnError`
+  / `SettingsValidationError` with setting name only. Password and host are
+  absent from the exception text.
+- Session-mode pooler hosts on port `5432` and local `54322` remain accepted.
+- Prepared-statement threshold is unchanged (`prepare_threshold=0`, meaning
+  prepare immediately, not disable).
+- `query_ready` no longer requires LightRAG attach. Missing LightRAG is
+  `status=degraded` with `query_ready=true` when Hybrid, checkpointer,
+  Valkey, and real models are healthy. Public `/health/ready` still omits
+  named dependencies.
+- Checkpointer probe opens `PostgresSaver` and `PostgresStore` without
+  `setup()`, applies `app_checkpointer` / `langgraph`, and closes.
+
+### Verification
+
+```text
+.\.venv\Scripts\pytest.exe tests/unit/test_postgres_dsn.py tests/unit/test_settings.py tests/unit/test_readiness.py tests/unit/test_dockerignore.py tests/unit/test_fastapi_security.py tests/unit/test_package_imports.py tests/unit/test_backend_middleware.py tests/contract/test_checkpoint_postgres.py::test_checkpointer_factory_never_calls_setup tests/contract/test_checkpoint_postgres.py::test_session_dsn_opens_pinned_saver_and_store -q
+```
+
+Result: passing unit/contract tests; live saver/store open skipped when local
+Postgres is unreachable (`s`). Ruff on the touched Python files is clean.
+
+### Unverified
+
+- Clean `docker compose build frontend` was not executed in this packet
+  (Docker daemon not used). Source tests prove `.dockerignore` and Dockerfile
+  ARG/ENV wiring.
+- Image layer inspection was not run. Operators should rotate any Vercel
+  token that may have lived in an ignored local env file.
+- Live `/health/ready` against Compose was not re-probed.
+
+### Rollback
+
+Revert this commit. Hosted processes that already used a session DSN keep
+working. Processes that only had a transaction-pooler `SUPABASE_DB_URL` as
+the checkpoint fallback will fail closed until `LANGGRAPH_CHECKPOINT_URL` is
+set to a session/direct URL.
+
+## Packet 9 — Repair Phase 6 execution durability and verified answer delivery
+
+### Requirement (quoted)
+
+> Persist the admitted user message in existing `app.messages` before
+> returning a successful 202. Process memory may cache execution handles
+> but must not be the only copy of paid input.
+> Consume LangGraph `stream_mode="updates"` as node-keyed envelopes.
+> Do not emit the answer node’s draft `answer_text`. Hold the typed
+> candidate until the actual verification node completes.
+> Emit `completed` only after a non-empty answer/refusal payload has been
+> emitted. A successful graph with no answer becomes a safe typed `error`.
+> On every terminal path, call the existing reservation true-up/release
+> service exactly once.
+
+### Concrete acceptance checks
+
+- Production executor emits status events, at least one non-empty
+  `token_delta` after `verify_answer`, then exactly one terminal.
+- Draft `answer_text` from `generate_answer` never appears in SSE payloads.
+- Empty verified prose becomes `error` `{code: empty_answer}`, never
+  `completed`.
+- Fixture executors that themselves yield `completed` remain valid.
+- Missing process input without a durable loader still emits
+  `worker_unavailable` (Phase 6 resume contract).
+- Reservation true-up runs at most once per run in-process; dummy test DSNs
+  fail closed without crashing the stream.
+
+### Files in this packet
+
+- `supabase/migrations/20260824130000_query_run_messages_runtime_v1.sql`
+- `packages/core/src/smart_rag_core/query_admission/messages.py`
+- `packages/core/src/smart_rag_core/query_admission/service.py`
+  (`fail_query_run`, `load_query_run_runtime`)
+- `packages/core/src/smart_rag_core/query_admission/__init__.py`
+- `apps/backend/src/smart_rag_api/services/query_sse_mapping.py`
+- `apps/backend/src/smart_rag_api/services/sse_stream.py`
+- `apps/backend/src/smart_rag_api/services/query_runs.py`
+- `apps/backend/src/smart_rag_api/services/http_errors.py`
+- `apps/backend/src/smart_rag_api/dependencies/services.py`
+- `tests/unit/test_query_sse_mapping.py`
+- `tests/unit/test_query_sse_executor.py`
+- this evidence file and Phase 6 evidence
+
+### Authorization / failure / fallback / idempotency
+
+- User-message persist uses `app.append_query_message` under `SET ROLE app_api`.
+  Failure after admit calls `fail_query_run` (settles the reservation) and
+  maps `message_persist_failed` to HTTP 503.
+- Reconnect persist is idempotent per `(run_id, role)` unique indexes.
+- Resume reconstructs input via `app.load_query_run_runtime`; missing durable
+  input stays `worker_unavailable`. Foreign runs remain 404 via existing store
+  authorization.
+- Executor logs `run_id` only. Answer text is never logged.
+- Fallthrough when a production executor emits no terminal is `error`
+  `{code: run_failed}`, not synthesized `completed`.
+
+### Verification
+
+```text
+.\.venv\Scripts\pytest.exe tests/unit/test_query_sse_mapping.py tests/unit/test_query_sse_executor.py tests/unit/test_sse_protocol.py tests/contract/test_sse_resume.py tests/contract/test_sse_heartbeat.py -q
+```
+
+Result: 31 passed, 1 skipped. Ruff `--fix` on the touched stream/test import
+blocks is clean. `from smart_rag_core.query_admission import fail_query_run,
+load_query_run_runtime, append_query_message` imports.
+
+### Unverified
+
+- Live Postgres RPC round-trip for `append_query_message` /
+  `load_query_run_runtime` / `true_up_query_reservation` on a running
+  local stack was not executed in this packet.
+- Live OpenAI/LangGraph answer generation remains mock-gated.
+
+### Rollback
+
+Revert this commit. SSE resume tests stay on in-memory stores. Applied
+migration `20260824130000_query_run_messages_runtime_v1.sql` is additive
+(`run_id` on `app.messages` plus RPCs); reverse only with a new down
+migration if a follow-up packet requires it.
+
+## Packet 10 — Harden the frontend chat protocol and recovery state
+
+### Requirement (quoted)
+
+> Change mutation helpers such as cancel and feedback from ambiguous
+> booleans to typed success payloads or classified thrown errors.
+> Store only `{conversationId, runId, lastSequence}` for the active run
+> in `sessionStorage`.
+> On page reload, fetch the owned run, resume from the durable sequence
+> if running, and clear the pointer when terminal/deleted/foreign.
+> Treat `completed` without answer/refusal content as a protocol failure.
+> Gate paid send on compatible handshake and core `query_ready`.
+> Fix caller usage labeling from “Company total” to “Your usage.”
+
+### Concrete acceptance checks
+
+- `cancelRun` / `submitFeedback` return typed JSON or throw
+  `ClassifiedApiError`; callers never mark success on HTTP failure.
+- Reload reads `GET /runs/{id}` and `GET /conversations/{id}` and resumes
+  GET `/runs/{id}/events` without a second paid POST.
+- Empty `completed` SSE becomes `terminal=error` with
+  `{ kind: "protocol", detail: "empty_answer" }`.
+- Terminal SSE `error` / protocol failure banners render in the main
+  workspace with run id.
+- New Send is blocked when `query_ready` is false; ParadeDB-down Hybrid
+  still allows Send.
+- Reconnect chrome shows attempt count, next delay, Cancel, and Retry
+  after the automatic ceiling.
+- Usage strip says “Your usage”, not “Company total”.
+
+### Files in this packet
+
+- `apps/frontend/src/lib/types.ts`
+- `apps/frontend/src/lib/api.ts`
+- `apps/frontend/src/lib/api.test.ts`
+- `apps/frontend/src/lib/handshake.ts`
+- `apps/frontend/src/lib/handshake.test.ts`
+- `apps/frontend/src/lib/failure-copy.ts`
+- `apps/frontend/src/lib/failure-copy.test.ts`
+- `apps/frontend/src/lib/chat-view.ts`
+- `apps/frontend/src/lib/chat-view.test.ts`
+- `apps/frontend/src/lib/chat-pointer.ts`
+- `apps/frontend/src/lib/chat-pointer.test.ts`
+- `apps/frontend/src/components/chat-app.tsx`
+- `apps/frontend/src/components/chat-app.test.tsx`
+- `apps/frontend/src/components/chat/chat-composer.tsx`
+- `apps/frontend/src/components/chat/run-details-sheet.tsx`
+- this evidence file
+
+### Authorization / failure / fallback / idempotency
+
+- Foreign or missing run/conversation GET is 404 → `deleted`; pointer is
+  cleared; no transcript fields are invented.
+- Cancel/feedback 403/404/422 throw classified errors; feedback form
+  values are preserved on failure.
+- `402` / `403` / `404` / `409` / `422` / `426` / `429`+Retry-After /
+  `503` map to approved banners without traces.
+- Idempotency key stays stable until a durable terminal, then rotates.
+- sessionStorage pointer never includes tokens, evidence, or answer text.
+- Optional BM25/graph degradation does not block Hybrid Send.
+
+### Verification
+
+```text
+pnpm test
+pnpm typecheck
+```
+
+Result (from `apps/frontend`): 33 files, 197 tests passed. `tsc --noEmit`
+is clean.
+
+### Unverified
+
+- Browser reload against a live FastAPI/SSE stack was not exercised in
+  this packet.
+- Real 429 Retry-After from a production limiter was not observed live.
+
+### Rollback
+
+Revert this commit. Chat returns to boolean cancel/feedback helpers and
+does not persist a sessionStorage run pointer.
+
+## Packet 11 — Remove backend and database MFA/AAL2 enforcement
+
+### Requirement (quoted)
+
+> Remove every live backend check that requires `aal2`, `mfa_enrolled`, an
+> enrolled factor, or an `MFA required` error for upload reserve/finalize,
+> offboarding, document administration, or any other route.
+> Keep owner/admin/member/viewer roles, upload capability,
+> authorization-version reloads, JWT verification, revoked/disabled sessions,
+> RLS, rate limits, audit events, destructive confirmations, and IDOR-safe
+> errors unchanged.
+> Replace AAL2-gated database functions/policies with additive versions or
+> compatibility wrappers that preserve existing signatures during the current
+> API major while removing only the AAL2 rejection.
+> Remove MFA from `GET /me` product semantics. If deleting `mfa_enrolled`
+> would break additive API evolution, retain it only as a deprecated
+> compatibility field fixed to `false`; no authorization decision may read it.
+> This packet may leave the old optional MFA frontend visible for one
+> feature-branch commit, but it may not be merged or followed by surface work.
+> P08-12 is the mandatory next packet.
+
+### Concrete acceptance checks
+
+- Owner/admin at ordinary authenticated assurance can upload and offboard when
+  all non-MFA checks pass.
+- Member/viewer forged upload/admin/offboard requests still fail with the same
+  403/404 semantics.
+- No live backend path emits `MFA required`, checks `aal2`, or authorizes from
+  `mfa_enrolled`.
+- Existing JWT, revoked-session, role, capability, RLS, rate-limit, audit,
+  IDOR, upload, and offboarding tests remain green after updating MFA-positive
+  assertions.
+- OpenAPI, current types, schema tests, RLS matrix, migration checks, security
+  docs, and plan integrity pass.
+- Evidence explicitly marks P08-12 as required before any UI packet or merge.
+
+### Files in this packet
+
+- `supabase/migrations/20260824140000_remove_mfa_aal2_enforcement_v1.sql`
+- `apps/backend/src/smart_rag_api/services/profile_loader.py`
+- `apps/backend/src/smart_rag_api/dependencies/identity.py`
+- `apps/backend/src/smart_rag_api/auth_admin/offboarding.py`
+- `apps/backend/src/smart_rag_api/auth_admin/mfa_recovery.py`
+- `apps/backend/src/smart_rag_api/services/auth_team.py`
+- `apps/backend/src/smart_rag_api/routers/auth_team.py`
+- `apps/backend/src/smart_rag_api/schemas/fastapi_security.py`
+- `packages/core/src/smart_rag_core/security/identity.py`
+- `tests/unit/test_profile_loader.py`
+- `tests/contract/test_mfa_aal2_removed.py`
+- `tests/contract/test_invitations_auth.py`
+- `tests/contract/test_upload_quota.py`
+- `tests/contract/test_auth_lifecycle.py`
+- `tests/contract/test_thin_developer_ui_live.py`
+- `docs/api/openapi.foundation.json`
+- security/API/admin docs and this evidence file
+
+### Authorization / failure / fallback / idempotency
+
+- `GET /me` always returns `mfa_enrolled: false`. Callers at aal1 with
+  `upload_enabled` receive 200, not 403 `MFA required`.
+- `app.reserve_upload_quota` still rejects viewers and members without
+  `upload_enabled`, still enforces quota, and no longer raises MFA exceptions.
+- `app.accept_invitation` still refuses demotion, still revokes sessions on
+  privileged/upload upgrades, and ignores deprecated `p_assurance_level`.
+- Offboarding still requires an active owner/admin whose asserted role matches
+  the live profile; AAL2 is ignored. Members cannot offboard.
+- JWT verification, revoked/disabled sessions, RLS, rate limits, audit events,
+  and IDOR-safe errors are unchanged.
+- Historical applied migrations were not edited. The new migration is additive
+  `CREATE OR REPLACE` of the same signatures.
+
+### Verification
+
+```text
+py -m ruff check apps/backend/src/smart_rag_api/services/profile_loader.py apps/backend/src/smart_rag_api/dependencies/identity.py apps/backend/src/smart_rag_api/auth_admin/offboarding.py apps/backend/src/smart_rag_api/auth_admin/mfa_recovery.py tests/unit/test_profile_loader.py tests/contract/test_mfa_aal2_removed.py
+py -m pytest tests/unit/test_profile_loader.py tests/contract/test_mfa_aal2_removed.py tests/contract/test_invitations_auth.py tests/contract/test_upload_quota.py tests/contract/test_auth_lifecycle.py tests/unit/test_auth_admin_boundaries.py -q
+py scripts/ci/check_openapi.py
+py .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py
+```
+
+Results:
+
+- `ruff check` on the listed backend/core/test modules: all checks passed.
+- `pytest` unit: `tests/unit/test_profile_loader.py` and
+  `tests/unit/test_auth_admin_boundaries.py` — 7 passed.
+- `scripts/ci/check_openapi.py`: snapshot matched after committing the
+  `mfa_enrolled` deprecation description.
+- Contract tests targeting the new SQL (`test_mfa_aal2_removed`,
+  invitations, upload quota, auth lifecycle) skipped: local Supabase
+  Postgres is not bound on `127.0.0.1:54322` (`supabase start` failed
+  because Windows reserved the port). SQL behavior is implemented in
+  `20260824140000_remove_mfa_aal2_enforcement_v1.sql` and covered by
+  those tests when the local database is available.
+
+### Unverified
+
+- Live GoTrue TOTP enroll is no longer required for upload; the remaining live
+  reserve test still accepts an aal2 token as a non-blocking extra path when
+  TOTP is configured.
+- Frontend MFA screens remain visible until P08-12. This packet must not merge
+  without P08-12.
+- Local Supabase was not running (port 54322 reserved by Windows), so SQL
+  contract tests skipped. Re-run them after a successful supabase start.
+
+### Rollback
+
+Revert this commit. Recreate MFA/AAL2 only with a new additive migration; do
+not edit `20260824140000_remove_mfa_aal2_enforcement_v1.sql` after apply.
+
+### Handoff blocker
+
+P08-12 is mandatory next. Do not start UI surface packets and do not merge this
+feature branch until frontend/provider MFA is removed.
+
+## Packet 12 — Remove frontend/provider MFA and finish single-factor Auth
+
+### Requirement (quoted)
+
+> Remove `/mfa/enroll` and `/mfa/challenge` routes, forms, QR generation, challenge
+> verification, recovery helpers/copy, navigation, callbacks, and unavailable-gap
+> routing. Omit Google OAuth while disabled; do not render a disabled button.
+> Disable TOTP enrollment/challenge in local Supabase configuration only through
+> a documented supported setting. For managed Supabase, write a dry-run-first
+> operator procedure using only documented provider settings/admin APIs.
+
+### Concrete acceptance checks
+
+- Sign-in, sign-up, reset/callback, invitation accept, revoked-session return,
+  and sign-out have no MFA route or challenge.
+- No production import expects TOTP/MFA product behavior.
+- Google chrome is omitted (helper remains, `enabled=false`).
+- Local `supabase/config.toml` sets `[auth.mfa.totp] enroll_enabled=false` and
+  `verify_enabled=false` (documented CLI keys).
+- Managed residue uses Auth Admin `mfa.listFactors` / `mfa.deleteFactor` only;
+  SQL against `auth.mfa_factors` is forbidden. Limits are stated honestly.
+- Invitation accept lives under the Auth layout at `/invitations/accept` and
+  stays authenticated (`isPublicAuthPath` is false).
+
+### Files in this packet
+
+- `supabase/config.toml`
+- deleted `apps/frontend/src/app/(auth)/mfa/enroll/page.tsx`
+- deleted `apps/frontend/src/app/(auth)/mfa/challenge/page.tsx`
+- deleted `apps/frontend/src/lib/auth/totp-qr.ts`
+- deleted `apps/frontend/src/lib/auth/mfa-recovery.ts`
+- `apps/frontend/src/app/(auth)/invitations/accept/page.tsx` (moved from console)
+- `apps/frontend/src/components/auth/auth-screens.tsx`
+- `apps/frontend/src/components/chat-app.tsx`
+- `apps/frontend/src/components/profile-app.tsx`
+- `apps/frontend/src/components/documents/import-source-sheet.tsx`
+- `apps/frontend/src/lib/api.ts`, `types.ts`, `failure-copy.ts`, `auth/copy.ts`,
+  `auth/paths.ts`, `auth/google.ts`
+- Auth/API/chat/e2e tests and visual MFA snapshots removed
+- `docs/frontend/action-inventory.json`
+- `docs/runbooks/managed-auth-totp-residue.md`
+- Auth/frontend docs, ADR note, skills, this evidence file
+
+### Authorization / failure / fallback / idempotency
+
+- `classifyApiError` no longer has an `mfa` kind. Leftover `403 MFA required`
+  sanitizes to generic `auth` / `unauthorized`.
+- `fetchMe` ignores deprecated `mfa_enrolled`. Profile UI does not render it.
+- Upload 403 is generic rejection copy, not TOTP challenge.
+- Chat has no MFA gate, `/mfa/challenge`, or `/mfa/enroll` links.
+- Sign-in omits Google. `maybeSignInWithGoogle(false, ...)` still does not
+  call `signInWithOAuth`.
+- `/mfa/*` is not a public Auth path; unauthenticated visits redirect to login.
+- GAP-07-07 remains a generic Unavailable page without recovery-code controls.
+- Compensating controls (JWT verify, revoked sessions, RLS, quotas, role
+  checks) stay server-side from P08-11.
+
+### Verification
+
+```text
+npm test -- src/lib/api.test.ts src/lib/auth/auth.test.ts src/components/auth/auth-screens.test.tsx src/components/chat-app.test.tsx src/lib/prohibited-patterns.test.ts src/lib/handshake.test.ts
+```
+
+Results:
+
+- Vitest: 6 files, 87 passed (Auth/API/chat/handshake/prohibited-patterns).
+- Local `auth.mfa.totp.enroll_enabled` / `verify_enabled` are false.
+- TOTP QR/recovery modules deleted; no remaining production import.
+
+### Unverified
+
+- Playwright e2e not re-run in this packet (no MFA snapshots remain; login
+  spec now asserts `/mfa/challenge` redirects and Google count is 0).
+- Hosted Auth Admin `listFactors`/`deleteFactor` not executed against a live
+  project; the runbook is dry-run-first and forbids SQL deletion.
+- Local Supabase still not bound on `127.0.0.1:54322` (Windows reserved
+  port). P08-11 SQL contract tests remain skipped until `supabase start`.
+- `npx tsc --noEmit` after `npx next typegen`: passed (stale .next validators for deleted MFA routes were regenerated).
+- Full frontend Vitest: 33 files, 195 passed.
+- `tests/unit/test_phase07_stitch_states.py` and brief: 7 passed.
+- `verify_plan_integrity.py --update`: 100 canonical files.
+
+### Rollback
+
+Revert this commit. Restoring TOTP UI without restoring backend AAL2 gates
+(P08-11) would be a product lie. Do not SQL-delete factors as a rollback.
+
+### Handoff
+
+P08-11 + P08-12 MFA removal is complete. UI surface packets P08-13+ may start.
+Do not merge this branch until remaining Phase 8 remediation packets finish.
+
+## Packet 13 — Implement exact design tokens and reusable primitives
+
+### Requirement (quoted)
+
+> Implement the exact styling architecture, color, typography, spacing, geometry,
+> elevation, focus, motion, and responsive values in the normative UI/UX
+> specification. Do not approximate or substitute framework defaults. Extend
+> existing primitives before creating alternatives. Add `PageHeader`,
+> `PrimaryAction`, `AsyncButton`, and `ConfirmDialog` only where an equivalent
+> does not exist. Do not edit app navigation, routes, or feature-page
+> composition in this packet.
+
+### Concrete acceptance checks
+
+- `:root` in `apps/frontend/src/app/globals.css` and
+  `apps/frontend/src/lib/design-tokens.ts` carry the visual-contract palette,
+  40px controls, 8px control radius, 12px card radius, 48px rows, Inter stack,
+  and 2px/2px focus ring.
+- CSS-source geometry tests lock those values (jsdom does not apply CSS modules).
+- `Button` pending/disabledReason blocks duplicate submits; `ConfirmDialog`
+  traps focus, focuses Cancel for danger, and ignores Escape while pending.
+- No second token table, Google Fonts CDN, or overlay blur.
+
+### Files in this packet
+
+- `apps/frontend/src/app/globals.css`
+- `apps/frontend/src/lib/design-tokens.ts`
+- `apps/frontend/src/lib/design-tokens.test.ts`
+- `apps/frontend/src/lib/geometry.test.ts`
+- `apps/frontend/src/lib/contrast.test.ts` (existing AA pairs re-run)
+- `apps/frontend/src/components/ui/ui.module.css`
+- `apps/frontend/src/components/ui/button.tsx`
+- `apps/frontend/src/components/ui/page-header.tsx`
+- `apps/frontend/src/components/ui/confirm-dialog.tsx`
+- `apps/frontend/src/components/ui/index.ts`
+- `apps/frontend/src/components/ui/primitives.test.tsx`
+- `docs/frontend/design-tokens-and-primitives.md`
+- this evidence file
+
+### Authorization / failure / fallback / idempotency
+
+- Disabled/pending is visual only; it is not an authorization boundary.
+- Pending confirm blocks overlay click, Escape, and a second confirm.
+- Hostile fixtures in primitives tests remain React text nodes.
+- No route/nav rewrite; no invented API.
+
+### Verification
+
+```text
+npx vitest run src/lib/design-tokens.test.ts src/lib/geometry.test.ts src/lib/contrast.test.ts src/components/ui/primitives.test.tsx
+npx vitest run
+npx tsc --noEmit
+```
+
+Results:
+
+- Targeted Vitest: 4 files, 14 passed.
+- Full frontend Vitest: 34 files, 200 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on touched TS/TSX: 0 errors (pre-existing unused `ReactElement` warning in primitives tests).
+
+### Unverified
+
+- jsdom `getComputedStyle` does not apply CSS modules; geometry is locked from
+  stylesheet source rather than computed pixels in the unit runner.
+- Playwright visual snapshots and 390/1280 layout proof wait for P08-21/22.
+- Live browser contrast at 390px/1280px was not re-measured with a meter;
+  token hex pairs still meet WCAG AA in `contrast.test.ts`.
+
+### Rollback
+
+Revert this commit. Feature packets must not reintroduce a second palette,
+lavender canvas, teal-as-canvas, overlay blur, or Google Fonts CDN.
+
+### Handoff
+
+P08-13 tokens and primitive extensions are complete. P08-14 may compose the
+streamlined shell on top of these primitives without mixing Ask/Documents
+body rewrites into that packet.
+
+## P08-14 — Build the streamlined role-aware shell and routes
+
+Quoted requirement: compose the final information architecture on top of
+P08-13 without mixing Ask/Documents/Tables/Graph body rewrites into the
+shell packet.
+
+### Acceptance checks
+
+- One shell: 232px desktop rail, 72px collapsed rail, 56px topbar, mobile nav sheet.
+- Primary nav order Ask, Documents, Tables, Graph.
+- One Admin item only when live `GET /me.role` is owner/admin (convenience).
+- Account in one topbar menu: live `/me` fields, upload state, Sign out; never `mfa_enrolled`.
+- `Link`/router only; no internal `window.location.assign`.
+- Command menu: supported routes plus Sign out.
+- One shell readiness popover; retired `/review-fixtures` and `/unavailable/*` 404.
+- `/team|/tools|/curation|/usage` redirect to `/admin?tab=...`; `/profile` to `/account`.
+
+### Changed paths
+
+- `apps/frontend/src/lib/shell-navigation.ts` (+ test)
+- `apps/frontend/src/components/ui/app-nav.tsx` (+ test)
+- `apps/frontend/src/components/ui/app-shell.tsx` / `app-shell.module.css` / `app-shell.test.tsx`
+- `apps/frontend/src/components/ui/command-menu.tsx`, `menu.tsx`, `readiness-indicator.tsx`
+- `apps/frontend/src/components/admin-workspace.tsx`
+- `apps/frontend/src/app/(console)/admin/page.tsx`, `account/page.tsx`
+- Redirect pages: `team`, `tools`, `curation`, `usage`, `profile`
+- Deleted: `(auth)/review-fixtures`, `(auth)/unavailable/[gap]`
+- `apps/frontend/src/proxy.ts`, `lib/auth/paths.ts`
+- e2e specs, `docs/frontend/action-inventory.json`, AUTH/ADMINISTRATION docs
+
+### Authorization / failure / fallback / idempotency
+
+- Admin nav uses live `GET /me.role` via `isOwnerOrAdmin`. Members do not see Admin.
+- Forged member clients can still open `/admin`; FastAPI remains the denial boundary.
+- Retired product paths skip the login redirect so they 404 instead of bouncing to `/login`.
+- Account menu never renders `mfa_enrolled`.
+- `window.location.assign` is absent from `apps/frontend/src`.
+- Command palette remounts on each open so filter/active index reset without setState-in-effect.
+
+### Verification
+
+```text
+npx vitest run src/lib/shell-navigation.test.ts src/lib/auth/auth.test.ts src/components/ui/app-shell.test.tsx src/components/ui/app-nav.test.tsx
+npx vitest run
+npx next typegen
+npx tsc --noEmit
+npx eslint src/components/ui/command-menu.tsx src/components/ui/app-nav.tsx
+```
+
+Results:
+
+- Targeted Vitest: 4 files, 8 passed.
+- Full frontend Vitest: 36 files, 206 passed.
+- `npx next typegen`: types generated.
+- `npx tsc --noEmit`: passed.
+- ESLint on command menu/nav after remount fix: 0 errors.
+
+### Unverified
+
+- Playwright journeys in this packet were updated but not executed here (P08-21/22).
+- 390/768/1024/1280 keyboard proof in a real browser waits for P08-21/22.
+- Live owner-vs-member Admin visibility against a running API waits for P08-22.
+
+### Deviations
+
+- Readiness popover blocking copy uses the visual-contract sentence rather than
+  `QUERY_NOT_READY_COPY` (handshake still uses the latter for Ask send gating).
+- `ReadinessPanel` remains in the tree as an unmounted helper; only the
+  review-fixtures route that mounted it was removed.
+
+### Rollback
+
+Revert this commit. Restore `/review-fixtures` and `/unavailable/[gap]` only if
+a later packet proves those routes are still required contracts.
+
+### Handoff
+
+P08-14 shell and routes are complete. P08-15 may rebuild Ask without changing
+the rail/topbar IA. Do not reintroduce Team/Tools/Curation/Usage/Profile as
+primary nav items.
+
+## P08-15 — Rebuild Ask around verified final answers
+
+Quoted requirement: produce a focused RAG workspace using only real
+conversation/run/SSE contracts and the explicit verified-final-delivery
+decision.
+
+### Acceptance checks
+
+- Two-region desktop layout: 248px Sessions rail at `>=1280px`; mobile Sessions sheet; no permanent sources column.
+- Sessions use `GET /conversations`. New, Continue (`GET /conversations/{id}`), and Delete are real. Continue clears local transcript and states prior messages are unavailable.
+- Prompt chips fill the composer only and never POST.
+- Sticky composer with one Send/Stop control, Enter to send, Shift+Enter newline, IME-safe.
+- Real stages only. Generating then Verifying, then immediate verified `token_delta` insertion. No caret/typewriter.
+- Safe text with `dir="auto"`. Delivered text kept on later failure/cancel.
+- Citation chips for real IDs; one provenance drawer; no fake preview/download.
+- Diagnostics collapsed in Run details. No Hybrid/Combined/Table/Inspect send controls and no nDCG/TTFB.
+- Feedback only after a terminal non-empty answer, using the server tag catalog.
+- Polite live regions for progress/answer; assertive banners for blocking errors.
+
+### Changed paths
+
+- Moved `apps/frontend/src/components/chat-app.tsx` once to `apps/frontend/src/components/chat/chat-app.tsx`
+- `apps/frontend/src/components/chat/answer-surface.tsx`, `chat-composer.tsx`, `conversation-rail.tsx`, `feedback-popover.tsx`, `run-progress.tsx`, `chat-workspace.tsx`, `chat.module.css`
+- `apps/frontend/src/components/chat-app.test.tsx`, `core-rag-surfaces.test.tsx`
+- `apps/frontend/src/app/(console)/page.tsx`
+- e2e heading updates: `core-rag-surfaces.spec.ts`, `visual-routes.spec.ts`
+- `docs/frontend/CORE_RAG_SURFACES.md`, `AUTH_AND_STREAMING.md`, `PHASE8_JOURNEY_MATRIX.md`, `action-inventory.json`
+
+### Authorization / failure / fallback / idempotency
+
+- Continue validates `GET /conversations/{id}` before selecting the session; classified API failures surface in the existing failure banner.
+- Send remains handshake/`query_ready` gated. Draft clears only after successful admission.
+- Stop posts `POST /runs/{id}/cancel` without `X-Client-Version`.
+- Empty-success `completed` still maps to the protocol `empty_answer` error in `chat-view`.
+- Feedback is hidden until a terminal answer with text; submit uses the existing ten-tag catalog.
+
+### Verification
+
+```text
+npx vitest run src/components/chat-app.test.tsx
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/chat src/components/chat-app.test.tsx
+```
+
+Results:
+
+- Targeted Vitest: 1 file, 14 passed (chip fill, Continue GET, Generating then Verifying then verified answer, Stop cancel, no Hybrid/Combined/Inspect send).
+- Full frontend Vitest: 36 files, 209 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on Ask components/tests: 0 errors.
+
+### Unverified
+
+- Playwright journeys were retargeted from "Auto chat" to "Ask" but not executed here (P08-21/22).
+- Live Generating/Verifying against a running executor waits for P08-22.
+- 390/1280 visual snapshots of Ask empty/generating/verifying/completed wait for P08-21/22.
+
+### Deviations
+
+- `GET /conversations` returns a single page with no cursor, so Sessions has no Load more control.
+- Shared `CitationChip` still labels `Citation {n}` rather than `[n] Source`; chips still open the real sources drawer.
+- Give feedback is the post-terminal trigger; thumbs/tag/comment live inside that popover instead of always-visible footer thumbs.
+
+### Rollback
+
+Revert this commit. Restore `apps/frontend/src/components/chat-app.tsx` only if a later packet proves the unscoped path is still required.
+
+### Handoff
+
+P08-15 Ask is complete. P08-16 may rebuild Documents without changing the shell IA or Ask body.
+
+## P08-16 — Rebuild Documents as one complete ingestion workflow
+
+Quoted requirement: make document ingestion, status, pagination, and
+deletion understandable and fully backed by existing APIs.
+
+### Acceptance checks
+
+- One responsive list/table with name, visibility, search/graph status, created, and overflow actions.
+- Frontend `DocumentResponse` includes existing FastAPI `created_at`. No backend schema/router edit.
+- Keyset pagination uses the real `created_at,id` cursor and page-length continuation. No invented `next_cursor`.
+- Local filter is labeled as filtering loaded rows.
+- `IngestionStatus` is shared: compact pills on the list (after Load status), timeline on detail.
+- Upload remains reserve → Storage JWT → finalize with one stable idempotency key until success. Stages are real; no simulated percentages.
+- Website crawl is owner/admin convenience, keeps one retry key, and exposes current API depth/pages.
+- Retry is shown only when `retry_allowed`.
+- `DELETE /documents/{id}` is wired behind “Delete document?” confirmation; 204/403/404/429 handled; list/detail invalidated; detail navigates safely.
+- `DOCUMENT_DELETE_UNAVAILABLE`, source preview/download, and unsupported GAP panels are removed from Documents.
+
+### Changed paths
+
+- Moved `apps/frontend/src/components/document-library.tsx` and `document-detail.tsx` once under `apps/frontend/src/components/documents/`
+- `apps/frontend/src/components/documents/document-list.tsx`, `ingestion-status.tsx`, `ingestion-inspector.tsx`, `processing-timeline.tsx`, `import-source-sheet.tsx`, `documents.module.css`, `document-library.test.tsx`
+- `apps/frontend/src/lib/api.ts`, `types.ts`, `ingestion-status.ts`, `citation-drawer.ts`
+- Tests: `api.test.ts`, `core-rag-surfaces.test.tsx`, `core-rag-helpers.test.ts`, `prohibited-patterns.test.ts`, `ingestion-status.test.ts`
+- Docs: `CORE_RAG_SURFACES.md`, `PHASE8_JOURNEY_MATRIX.md`, `API_UI_MAPPING.md`, `action-inventory.json`
+
+### Authorization / failure / fallback / idempotency
+
+- Delete is owner/admin convenience only. Member list has no Delete item. Server 403 maps to “You cannot delete this document.” 404 maps to “Document not found.” or safe navigation from detail. 429 maps to retry copy.
+- Upload is handshake-gated. Duplicate submit is pending-blocked; the same idempotency key is reused until success.
+- Crawl 403/422/429 are classified `ClassifiedApiError` kinds `auth` / `validation` / `rate`. Members still do not see the Website tab.
+- Pagination appends unique `document_id`s and hides Load more when the page is short or `created_at` is missing.
+- Version polling stops when the inspector is closed, the tab is hidden, the status is terminal, or the tree unmounts.
+
+### Verification
+
+```text
+npx vitest run src/components/documents/document-library.test.tsx src/components/core-rag-surfaces.test.tsx src/lib/api.test.ts src/lib/ingestion-status.test.ts
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/documents src/lib/api.ts src/lib/ingestion-status.ts src/lib/citation-drawer.ts src/components/core-rag-surfaces.test.tsx
+```
+
+Results:
+
+- Targeted Vitest: 4 files, 81 passed (upload idempotency, handshake-disabled Upload, crawl 403, delete 204/403, keyset append, detail graph seed, 404 navigation).
+- Full frontend Vitest: 37 files, 226 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on Documents/API files: 0 errors.
+
+### Unverified
+
+- Playwright Documents populated / Import source / Document detail snapshots wait for P08-21/22.
+- Live reserve → Storage JWT → finalize against a running stack waits for P08-22.
+
+### Deviations
+
+- List search/graph pills stay em dash until `GET /ingestion/versions/{id}/status` is loaded. The list HTTP body has no status fields; Ready is never inferred from upload.
+- Compact pills keep the last loaded version after the inspector closes so polling can stop without inventing a list-status API.
+- Import empty-state and header both expose “Import source” when import is allowed.
+
+### Rollback
+
+Revert this commit. Restore the previous Documents GAP copy only if a later packet reverts `DELETE /documents/{id}` wiring.
+
+### Handoff
+
+P08-16 Documents is complete. P08-17 may rebuild Tables without changing Documents contracts.
+
+## P08-17 — Rebuild deterministic Tables
+
+Quoted requirement: retain bounded structured-table analysis while removing
+unsupported controls and isolating this surface from Graph work.
+
+### Acceptance checks
+
+- URL `tableId` / `documentId` preselects only a manifest returned by `GET /tables`.
+- Guided `TableQueryPlan` covers columns, filters, aggregations, group by, sort, and comparison. No SQL editor.
+- One Analyze primary action. The exact posted plan stays visible on 403/422/429/server failure.
+- Deterministic rows render first. Display sort is labeled as not changing the submitted plan.
+- Provenance drawer lists document/version/table/sheet/range. No fake source link.
+- Export/Save/Share are absent. Unknown columns and SQL-shaped values are rejected before POST.
+- Empty manifests: “No structured tables are available.” Empty success: “The analysis returned no rows.”
+- Graph files were not edited.
+
+### Changed paths
+
+- Moved `apps/frontend/src/components/tables-app.tsx` once to `apps/frontend/src/components/tables/tables-app.tsx`
+- `apps/frontend/src/components/tables/analysis-plan.tsx`, `analysis-results.tsx`, `tables.module.css`, `tables-app.test.tsx`
+- `apps/frontend/src/app/(console)/tables/page.tsx`
+- `apps/frontend/src/lib/table-plan.ts`, `table-plan.test.ts`, `api.ts`
+- `apps/frontend/src/components/ui/data-table.tsx` optional numeric `align`
+- Document Open tables href seeds `?documentId=`
+- Tests: `core-rag-surfaces.test.tsx`, `api.test.ts`, `document-library.test.tsx`
+- Docs: `CORE_RAG_SURFACES.md`, `PHASE8_JOURNEY_MATRIX.md`, `API_UI_MAPPING.md`, `STITCH_BRIEF.md`, `STITCH_STATES.md`, `action-inventory.json`
+
+### Authorization / failure / fallback / idempotency
+
+- `listTables` and `analyzeTable` throw `ClassifiedApiError`. 400 `table_plan_rejected` maps to `validation`.
+- Inaccessible `tableId` stays unselected even when `documentId` matches another row.
+- Client compile rejects unknown column ids and SQL/path-shaped values before fetch.
+- Result keys that are not internal identifiers are omitted.
+- Analyze POST body remains `{ plan }` with extra SQL keys omitted. Duplicate submit is pending-blocked.
+- `/tables` never renders Export.
+
+### Verification
+
+```text
+npx vitest run src/components/tables/tables-app.test.tsx src/lib/table-plan.test.ts src/components/core-rag-surfaces.test.tsx src/lib/api.test.ts src/components/documents/document-library.test.tsx
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/tables src/lib/table-plan.ts src/lib/api.ts src/components/ui/data-table.tsx src/components/core-rag-surfaces.test.tsx
+```
+
+Results:
+
+- Targeted Vitest: 5 files, 99 passed (URL preselect, unknown column/SQL before POST, 403 plan preservation, provenance drawer, no Export, empty manifests, list 403).
+- Full frontend Vitest: 38 files, 245 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on Tables/API files: 0 errors.
+
+### Unverified
+
+- Playwright Tables snapshots wait for P08-21/22.
+- Live `POST /tables/analyze` against a running stack waits for P08-22.
+
+### Deviations
+
+- `GET /tables` has no column schema. Allow-listed columns are internal identifier regex plus operator/aggregation enums, not workbook headers.
+- Manifest picker Select is shown below 1024px; the sidebar stays in the DOM and is hidden with CSS.
+- Chat prompt-chip test now waits for the chip instead of the Ask heading so it does not match the restoring-session chrome.
+
+### Rollback
+
+Revert this commit. Restore `apps/frontend/src/components/tables-app.tsx` only if a later packet proves the unscoped path is still required.
+
+### Handoff
+
+P08-17 Tables is complete. P08-18 may rebuild Graph without changing Tables contracts.
+
+## P08-18 — Rebuild bounded Graph inspection
+
+Quoted requirement: retain graph evidence inspection while removing the
+duplicate custom SVG and unsupported relationship editing.
+
+### Acceptance checks
+
+- Entity search submits only when trimmed `q` length is at least 1.
+- Selecting a search hit adds a chip; Inspect graph is a separate POST.
+- URL `?documentId=` seeds inspect without requiring chips.
+- Depth Select is 1/2/3. Entity chips cap at 12 with helper copy. Results cap at 200.
+- List is the default. Canvas is optional `@xyflow/react`. The custom SVG neighborhood is gone.
+- Inspector shows Type, Object ID, Document ID, Version ID, Chunk ID, Hop, Support, locators, and signed limitation copy. ACL blindness ignores `count`.
+- Empty inspect: “No authorized graph evidence matched this inspection.”
+- No Edit, Add relationship, Export, or Save. Mixed-direction labels render as text.
+- Tables files were not edited in this packet.
+
+### Changed paths
+
+- Moved `apps/frontend/src/components/graph-explorer.tsx` once to `apps/frontend/src/components/graph/graph-explorer.tsx`
+- `apps/frontend/src/components/graph/entity-search.tsx`, `graph-list-fallback.tsx`, `graph-inspector.tsx`, `graph-canvas.tsx`, `graph.module.css`, `graph-explorer.test.tsx`
+- `apps/frontend/src/app/(console)/graph/page.tsx`
+- `apps/frontend/src/lib/graph-client.ts`, `graph-client.test.ts`, `api.ts`, `api.test.ts`
+- Tests: `core-rag-surfaces.test.tsx`
+- Docs: `CORE_RAG_SURFACES.md`, `PHASE8_JOURNEY_MATRIX.md`, `API_UI_MAPPING.md`, `STITCH_BRIEF.md`, `STITCH_STATES.md`, `action-inventory.json`
+
+### Authorization / failure / fallback / idempotency
+
+- `searchGraphEntities` and `inspectGraph` throw `ClassifiedApiError`. Inspect 400 maps to `validation`; 403 is `auth`.
+- Inspect 403 keeps selected chips and shows classified copy.
+- ACL blindness never interpolates unauthorized counts. Graph outage is distinct from Graph Pending.
+- Inspect POST is pending-blocked. Duplicate SVG and relationship-edit chrome are absent rather than disabled.
+- Canvas is not an editor (`nodesConnectable={false}`, `deleteKeyCode={null}`). No MiniMap.
+
+### Verification
+
+```text
+npx vitest run src/components/graph/graph-explorer.test.tsx src/lib/graph-client.test.ts src/components/core-rag-surfaces.test.tsx src/lib/api.test.ts
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/graph src/lib/graph-client.ts src/lib/api.ts src/components/core-rag-surfaces.test.tsx
+```
+
+Results:
+
+- Targeted Graph Vitest: 8 GraphExplorer tests passed; graph-client and API inspect 403 passed.
+- Full frontend Vitest: 39 files, 254 passed.
+- `npx tsc --noEmit`: passed after `BackgroundVariant.Dots`.
+- ESLint on Graph/API files: 0 errors.
+
+### Unverified
+
+- Playwright Graph snapshots wait for P08-21/22.
+- Live `POST /graph/inspect` against a running stack waits for P08-22.
+- React Flow canvas rendering in jsdom is not asserted; Canvas tab is toggled and the duplicate SVG is proven absent.
+
+### Deviations
+
+- Inspect payloads have no edge list. The canvas does not invent edges; hop/support stay on nodes.
+- Fit lives with labeled zoom controls on the canvas, not as a third toolbar button beside List/Canvas.
+- Compact inspector uses `matchMedia("(max-width: 1279px)")` so jsdom (no `matchMedia`) keeps the dock only and avoids duplicate inspector copy in tests.
+
+### Rollback
+
+Revert this commit. Restore `apps/frontend/src/components/graph-explorer.tsx` only if a later packet proves the unscoped path is still required.
+
+### Handoff
+
+P08-18 Graph is complete. P08-19 may consolidate Admin without changing Graph contracts.
+
+## P08-19 — Consolidate Admin and supported Account operations
+
+Quoted requirement: replace four top-level management routes and dead settings
+panels with one compact role-aware admin workspace after the final
+single-factor model.
+
+### Acceptance checks
+
+- `/admin` tabs are Team & access, Tools, Curation, and Usage. Tabs update
+  `?tab=` and remain keyboard-operable.
+- Owner/admin invite, offboard, tool enable/permissions, glossary, and
+  entity-rule mutations run without MFA/AAL2 copy.
+- Member/viewer never see Admin in nav. Direct `/admin` confirms with
+  `GET /admin/graph/entity-rules` and shows “You don’t have access.” on 403.
+- Stale entity-rule PATCH `row_version` shows recoverable 409 and Reload rule.
+- `listTools` URL-encodes `q`. Ordinary Tools UI has no seed form.
+- Usage shows caller/company totals only. No budget slider, audit panel, or
+  `*-unavailable` GAP chrome.
+- Account renders four `/me` fields. No profile editor, locale editor, or
+  company-settings save.
+- Hostile invitation email remains an input text value, not HTML.
+
+### Changed paths
+
+- Moved once: `admin-workspace.tsx` → `apps/frontend/src/components/admin/admin-app.tsx`;
+  `team-app.tsx` → `admin/team-access-panel.tsx`; `tools-app.tsx` →
+  `admin/tools-panel.tsx`; `curation-app.tsx` → `admin/curation-panel.tsx`;
+  `usage-app.tsx` → `admin/usage-panel.tsx`; `profile-app.tsx` →
+  `admin/account-panel.tsx`
+- `apps/frontend/src/app/(console)/admin/page.tsx`, `account/page.tsx`
+- `apps/frontend/src/lib/api.ts`, `api.test.ts`, `types.ts`, `query-keys.ts`,
+  `admin-bodies.ts`
+- Tests: `administration-surfaces.test.tsx`,
+  `apps/frontend/tests/e2e/administration-surfaces.spec.ts`
+- Docs: `ADMINISTRATION.md`, `PHASE8_JOURNEY_MATRIX.md`, `API_UI_MAPPING.md`,
+  `STITCH_BRIEF.md`, `STITCH_STATES.md`, `admin-and-auth-screens.md`,
+  `action-inventory.json`, `docs/README.md`
+
+### Authorization / failure / fallback / idempotency
+
+- Admin gate is a real 403 from `listEntityRules`, not client-only hiding.
+- `createInvitation` / `offboardUser` / `enableTool` remain callable; FastAPI
+  still 403s forged roles. Offboard posts Bearer only (no MFA step).
+- `patchEntityRule` classifies 409 `stale_row_version`. UI offers Reload rule.
+- Tool search uses `encodeURIComponent` on `q`.
+- Unsupported bootstrap, budget, audit, profile-editor, company-settings, and
+  member-directory chrome are omitted, not permanent-disabled Unavailable
+  panels.
+
+### Verification
+
+```text
+npx vitest run src/components/administration-surfaces.test.tsx src/lib/api.test.ts src/lib/admin-bodies.test.ts src/lib/shell-navigation.test.ts
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/admin "src/app/(console)/admin/page.tsx" "src/app/(console)/account/page.tsx" src/lib/api.ts src/lib/query-keys.ts src/lib/types.ts src/lib/admin-bodies.ts src/components/administration-surfaces.test.tsx src/lib/api.test.ts
+```
+
+Results:
+
+- Targeted Admin Vitest: 4 files, 83 passed (12 administration-surfaces).
+- Full frontend Vitest: 39 files, 260 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint on Admin/API files: 0 errors.
+
+### Unverified
+
+- Playwright Admin snapshots and live owner mutations wait for P08-21/22.
+- Keyboard Home/End on Admin tabs is implemented; a dedicated keydown case
+  is not asserted beyond URL tab clicks.
+
+### Deviations
+
+- Admin access is confirmed with `GET /admin/graph/entity-rules` because that
+  list is already owner/admin-only. Members hitting `/usage` or `/tools`
+  bookmarks redirect into `/admin` and receive the same 403 ErrorState.
+- `GET /me` may still emit deprecated `mfa_enrolled=false`. Account does not
+  render it.
+- `POST /admin/tools` seed remains an API helper; the Tools tab has no seed
+  form.
+
+### Rollback
+
+Revert this commit. Restore unscoped `*-app.tsx` files only if a later packet
+proves those paths are still required.
+
+### Handoff
+
+P08-19 Admin is complete. P08-20 may enforce action-inventory, accessibility,
+CSP, and documentation integrity without restoring MFA, bootstrap, budget,
+audit, or seed chrome.
+
+## P08-20 — Enforce action, accessibility, security, and documentation integrity
+
+Quoted requirement: apply the cross-cutting quality contract after all final
+surfaces and paths exist.
+
+### Acceptance checks
+
+- Unique `data-action-id` values match `docs/frontend/action-inventory.json`.
+- Keep actions name an existing test file and a failure/authorization state.
+- Removed-target IDs are absent from production source.
+- CSS-source geometry locks buttons, inputs, pills, dialogs, nav, topbar, and
+  table rows. Playwright measures login controls at 390/768/1024/1280 with no
+  page overflow.
+- GAP Unavailable pages, bootstrap chrome, and duplicate ingestion wrappers
+  are omitted rather than disabled.
+- Hostile text, CSP, and prohibited-pattern suites remain green.
+- Docs and Phase 6 P08-09 evidence stay synchronized.
+
+### Changed paths
+
+- `scripts/check_frontend_action_inventory.py`, `scripts/check.py` docs tier
+- `tests/unit/test_frontend_action_inventory.py`
+- `docs/frontend/action-inventory.json`
+- Action IDs on Auth, Ask, Documents, Admin, and shell skip link
+- Removed `UnavailableGap`, `readiness-panel.tsx`,
+  `ingestion-inspector.tsx`, `processing-timeline.tsx`
+- `apps/frontend/src/lib/geometry.test.ts`,
+  `apps/frontend/tests/e2e/quality-audit.spec.ts`,
+  `visual-routes.spec.ts`, `phase08-journeys.spec.ts`,
+  `prohibited-patterns.test.ts`
+- Docs: `A11Y_SECURITY_IMPLEMENTATION.md`, `AUTH_AND_STREAMING.md`,
+  `DESIGN_SYSTEM.md`, `PHASE8_JOURNEY_MATRIX.md`, `docs/README.md`,
+  `docs/development/phase-06-agent-intelligence-evidence.md`
+
+### Authorization / failure / fallback / idempotency
+
+- Inventory keep rows require a non-placeholder `failure_state` except
+  local-state controls.
+- Invitation accept no longer renders owner-bootstrap GAP copy.
+- `/unavailable/*` remains a 404. Auth tests prove recovery and bootstrap
+  chrome are absent on Sign in.
+
+### Verification
+
+```text
+py -3 scripts/check_frontend_action_inventory.py
+.\.venv\Scripts\pytest.exe tests/unit/test_frontend_action_inventory.py tests/unit/test_check_runner.py -q
+npx vitest run
+npx tsc --noEmit
+npx eslint src/components/auth src/components/chat src/components/admin src/components/documents src/components/ui/app-shell.tsx src/lib/geometry.test.ts src/lib/prohibited-patterns.test.ts
+.\.venv\Scripts\ruff.exe check scripts/check_frontend_action_inventory.py scripts/check.py tests/unit/test_frontend_action_inventory.py
+```
+
+Results:
+
+- Action inventory: verified (64 actions).
+- Pytest: inventory + check-runner passed.
+- Full frontend Vitest: 39 files, 260 passed.
+- `npx tsc --noEmit`: passed.
+- ESLint and Ruff: 0 errors.
+
+### Unverified
+
+- Playwright `quality-audit.spec.ts` login geometry waits for P08-21
+  Chromium. Signed-in overflow still skips when FastAPI is down.
+- `uv run python scripts/check.py --tier docs` Mermaid rendering waits for
+  P08-21.
+
+### Deviations
+
+- Desktop nav remains the shipped `232px` token, not the historical 280px
+  Stitch column. Geometry tests lock the CSS variable and Playwright live
+  width together.
+- Login primary remains the 40px control height used by `Button`; Auth does
+  not switch to `buttonLarge` 44px.
+- Authenticated unmapped-action audit allows unlabeled overflow Menu/Actions
+  chrome; primary shipped submits use inventory IDs.
+
+### Rollback
+
+Revert this commit. Restoring `UnavailableGap` or ingestion wrapper files
+would reintroduce GAP chrome and duplicate status UI.
+
+### Handoff
+
+P08-20 quality integrity is complete. P08-21 may run deterministic release
+gates, including docs Mermaid and Playwright Chromium.
+
+## P08-21 — Run deterministic release gates
+
+Quoted requirement: isolate repeatable CPU and local checks from
+credentialed stack verification so failures are attributable and the
+weak-model run remains bounded.
+
+### Acceptance checks
+
+- Production executor test binds
+  `create_model_gateway(mock_model_mode=True)` and maps generate/verify
+  node output. An SSE fixture that injects `token_delta` events is
+  insufficient.
+- Record command, exit code, duration, and test count for every listed
+  gate.
+- Do not run the real OpenAI provider.
+- Do not claim production-like verification.
+
+### Changed paths
+
+- Production executor proof:
+  `tests/unit/test_query_graph_runtime.py`
+  (`test_bound_mock_gateway_drives_sse_without_token_injection`)
+- Windows table sandbox start:
+  `packages/core/src/smart_rag_core/tables/limits.py`
+  (`TABLE_WORKER_WINDOWS_STARTUP_SECONDS = 7.0`),
+  `executor.py`, `sandbox_worker.py` (DuckDB parquet load),
+  `tables/__init__.py` (lazy exports)
+- Windows walk isolation:
+  `tests/contract/docstring_scanner.py`,
+  `tests/contract/boundary_scanner.py`,
+  `tests/unit/test_collect_runtime_shared_libs.py`
+  (skip `node_modules` / undici junctions)
+- Environment-boundary reads via `get_process_environ` in agents,
+  parser launcher, and hybrid/BM25 release helpers
+- Migrations allowlist:
+  `scripts/ci/check_migrations.py` adds
+  `20260824130000_query_run_messages_runtime_v1.sql` and
+  `20260824140000_remove_mfa_aal2_enforcement_v1.sql`
+- Frontend build: Suspense around `useSearchParams` on
+  `documents/page.tsx` and `tables/page.tsx`
+- Playwright local reuse of an existing `:3010` Next process when `CI`
+  is unset; Auth skip link `data-action-id="shell.skip"`;
+  live sign-in uses `getByRole("textbox", { name: "Password" })`
+- Docs lint and Mermaid quote/reserved-id fixes under `docs/`
+- Nested helper docstrings required by the contract scanner
+
+### Authorization / failure / idempotency / fallback
+
+- `test_bound_mock_gateway_drives_sse_without_token_injection` constructs
+  `QueryGraphDeps.model_gateway` from `create_model_gateway` with
+  `mock_model_mode=True`, runs `generate_answer_node` and
+  `verify_answer_node`, then maps real chunk output through
+  `QuerySseMapper`. Token events are not injected by the test fixture.
+- Unbound Hybrid stays `insufficient_evidence`. Unbound gateway with
+  Hybrid stays `verified_partial` / `model_gateway_unbound`.
+- Table `statement_deadline` is still 3.0s on Linux. Windows only adds
+  process-start allowance; the two structured-table unit tests passed
+  in the recorded unit tier and in an isolated file run (6429 ms).
+- Local Playwright reuses `:3010` only when `CI` is unset so a leftover
+  developer-console Next process does not fail the frontend tier. CI
+  still starts a fresh server.
+
+### Verification
+
+Host: Windows PowerShell, repo root, `.\.venv\Scripts\python.exe`.
+`MOCK_MODEL_MODE=true` for unit and contract. No real OpenAI calls.
+
+| Gate | Command | Exit | Duration (ms) | Counts |
+| --- | --- | --- | --- | --- |
+| format | `.\.venv\Scripts\python.exe scripts/check.py --tier format` | 0 | 642 | 778 files already formatted |
+| lint | `.\.venv\Scripts\python.exe scripts/check.py --tier lint` | 0 | 643 | Ruff all checks passed |
+| types | `.\.venv\Scripts\python.exe scripts/check.py --tier types` | 1 | 35926 | Pyright ratchet 0 to 340 (+340). Documented pre-existing deviation. Second pyright command did not run after ratchet fail. |
+| unit | `$env:MOCK_MODEL_MODE='true'; .\.venv\Scripts\python.exe scripts/check.py --tier unit` | 0 | 44444 | 1038 passed, 3 skipped, 7 warnings. Isolated `test_structured_table.py` 6429 ms, exit 0. |
+| contract | `$env:MOCK_MODEL_MODE='true'; .\.venv\Scripts\python.exe scripts/check.py --tier contract` | 1 | 590769 | 8 failed, 415 passed, 21 skipped, 7 warnings. Live stack failures, not CPU fixtures. |
+| docs | `.\.venv\Scripts\python.exe scripts/check.py --tier docs` | 0 | 313491 | markdownlint 0 issues in 186 files; Mermaid and links OK; action inventory verified |
+| frontend | `.\.venv\Scripts\python.exe scripts/check.py --tier frontend` | 1 | 90402 | ESLint 0 errors; typegen OK; `tsc --noEmit` OK; Vitest 39 files / 260 passed; `next build` 20 routes. Playwright then failed because `:3010` was already bound (`reuseExistingServer` was false). |
+| frontend Playwright retry | `pnpm --filter smart-rag-frontend exec playwright test` with `CI` unset | 1 | 25935 | 28 passed, 7 failed of 35. Signed-in and visual journeys remain P08-22. |
+| OpenAPI | `.\.venv\Scripts\python.exe scripts/ci/check_openapi.py` | 0 | 3334 | snapshot matches |
+| migrations | `.\.venv\Scripts\python.exe scripts/ci/check_migrations.py` | 0 | 163 | 63 reviewed files after allowlisting the two P08-09/11 migrations |
+| git diff --check | `git diff --check` | 0 | 155 | CRLF warnings only; no conflict markers |
+| secret scan | `docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f detect --source=/repo --config=/repo/.gitleaks.toml --no-banner --redact` | 1 | 1160247 | 134 commits, ~158.66 MB in 19m19s. 7 `generic-api-key` findings. Values not printed. |
+
+Contract failures (live Postgres/API, hand off to P08-22):
+
+- `tests/contract/test_bm25_reconcile.py::test_reconcile_upsert_verify_fail_does_not_complete_outbox`
+- `tests/contract/test_hybrid_fusion.py::test_live_bm25_recheck_drops_restricted_before_fusion`
+- `tests/contract/test_hybrid_retrieval.py::test_bm25_typed_query_and_injection`
+- `tests/contract/test_query_run_admission.py::test_over_budget_and_concurrency_cap_reject_without_reservation`
+- `tests/contract/test_rls_matrix.py::test_runtime_roles_are_non_privileged_and_schema_isolated`
+- `tests/contract/test_schema_reset.py::test_schema_fingerprint_covers_reset_determinism_contract`
+- `tests/contract/test_thin_developer_ui_live.py::test_upload_enabled_aal1_can_reserve_without_mfa`
+- `tests/contract/test_thin_developer_ui_live.py::test_live_public_ready_omits_named_dependencies`
+
+Playwright failures after the locator and skip-link fixes (not claimed as
+production-like):
+
+- visual `login-desktop` pixel ratio 0.04 greater than 0.03; authenticated
+  route snapshots are absent on this host
+- signed-in mobile menu, usage 403 copy, Ask heading strict mode, Ask
+  unmapped-action audit, compact brand visibility
+
+### Unverified
+
+- Full-repo Pyright remains red (340 errors vs baseline 0 recorded
+  2026-08-16 on 417 files). Phase 5 already records this as a standing
+  types-tier deviation. This packet did not treat the 340 as a new
+  overhaul regression and did not raise the baseline.
+- Eight live contract tests failed against the partial local stack. The
+  database was not reset or migrated in this packet.
+- Playwright Chromium signed-in and visual journeys failed. This is not
+  production-like stack, role, or real-answer proof.
+- Real OpenAI was not invoked.
+- Secret scan exit 1 with 7 `generic-api-key` hits, all in historical
+  commits: two inert `sk-canarysecretFORBID` unit canaries (same family
+  as the existing LangSmith allowlist; paths now allowlisted), one empty
+  example env key name, one Phase 10 capability token name, and three
+  Phase 9 image-digest JSON lines. No live provider values were printed.
+  A follow-up redacted scan after allowlist edits was not re-run (19 min
+  Windows bind-mount). Do not treat the repository as secret-clean.
+
+### Deviations
+
+- Types tier exit 1 is an approved documented pre-existing deviation,
+  not a P08-21 waiver of `FAST_TIERS` membership or of the zero
+  baseline file.
+- Contract and frontend Playwright exits are recorded as failed, not
+  skipped. They belong to P08-22 credentialed/visual verification.
+- `TABLE_WORKER_WINDOWS_STARTUP_SECONDS` is 7.0. The Linux 3.0s SQL
+  bound is unchanged.
+- Local Playwright `reuseExistingServer` is `!process.env.CI`.
+- Secret scan exit 1 is recorded, not waived. Two inert canary paths were
+  added to `.gitleaks.toml`. The other five hits are historical
+  example/digest/name matches. The 19-minute scan was not repeated.
+
+### Rollback
+
+Revert this commit. Restoring token-injecting SSE fixtures as the
+production-executor proof, or removing the Windows table start
+allowance without a replacement, would break the P08-21 attribution
+split.
+
+### Handoff
+
+P08-21 deterministic CPU and local static gates are recorded. Wrapper
+item 21 may be checked. Item 7 stays unchecked. Items 1-6 stay checked.
+P08-22 owns live contract repair, signed-in Playwright, visual
+baselines, and one bounded real-provider answer. Do not claim
+production-like verification from this packet.
+
+## P08-22 — Run production-like stack, role, visual, and real-answer verification
+
+**Status: BLOCKED.** Wrapper item 22 stays unchecked. Packet YAML stays
+`pending`. P08-23 may not merge.
+
+Quoted requirement: prove the application against the real local topology
+and one bounded provider call. Required: Docker, local Supabase/Compose,
+valid OpenAI credential, and available query budget. The query must show
+real Generating/Verifying, then a non-empty verified answer or grounded
+refusal, at least one durable `token_delta`, exactly one terminal, and
+correct settlement.
+
+### Acceptance checks
+
+- Live Generating/Verifying (`li.pipelineStep[data-active="true"]`), not
+  the static pipeline labels.
+- Non-empty verified answer or grounded refusal.
+- Durable `token_delta`, exactly one terminal, correct settlement.
+- Role journeys pass, or the packet stays explicitly blocked.
+
+### Prerequisite checks (no secret values)
+
+| Check | Result |
+| --- | --- |
+| Docker Engine | 29.6.1, up |
+| Process `OPENAI_API_KEY` | Not required; compose/API key length 164, not `sk-unit` |
+| `MOCK_MODEL_MODE` in API container | `false` |
+| Holdout | `SMART_RAG_HOLDOUT_ACCESS` absent |
+| Local budget | Member profile monthly 200 USD; month spend 0 |
+| Corpus | 0 documents; grounded refusal would have been acceptable |
+
+### Topology
+
+`.env.compose` still points documented compose interpolation at hosted
+Supabase and a `:6543` pooler. Files were not rewritten. API/worker were
+rebuilt from HEAD `218ee48` and recreated with process-env local session
+DSNs (`host.docker.internal:54321` / `:54322` as `app_runtime`). In-container
+DSN hosts after recreate:
+
+- `SUPABASE_URL` host `host.docker.internal` port `54321`
+- `SUPABASE_DB_URL` / checkpoint / LightRAG host `host.docker.internal` port `54322`
+- Never `:6543` after the pin
+
+The first running image still contained the literal `MFA required` in
+`identity.py`. Host source does not. Rebuild was required before admit.
+
+`GET /health/live` 200 `live`. `GET /health/ready` 200
+`query_ready=true`. `GET /api/meta` 200 handshake `0.1.0` / `1` / `0.1.0`.
+Member `GET /ops/ready` 403.
+
+Rebuilt worker is unhealthy: `parser_sandbox_docker_required`. Ask
+execution is API-side; ingestion is not proven.
+
+### Admit reproduce (local JWT)
+
+`_tmp_p08_22_admit.py` (not committed): admin create 200, password grant
+200, `POST /conversations` 201, `POST /messages` 202, `run_id` present,
+`route_family=composite`, `reconnect=false`. Local `127.0.0.1:54322`
+counts: conversations 1, messages 1, runs 1, `run_by_id` 1.
+
+### Bounded browser query
+
+Frontend `http://127.0.0.1:3010` with local `NEXT_PUBLIC_*`. Member
+`p08-22-browser-8d480fb455@example.com`. Ready. New session. Question:
+`What documents are in the corpus?`
+
+| Step | Result |
+| --- | --- |
+| `POST /conversations` | 201 `29a65e3f-c8e5-44c0-b334-e74df8127aa1` |
+| `POST .../messages` | 202 `run_id=952d26fd-4c19-4fab-bcac-4c135854c772` |
+| `GET /runs/.../events?after=0` | 200 |
+| UI terminal | `error` / `run_failed` |
+| UI copy | generic “Something went wrong.” |
+| Pipeline `data-active` Generating/Verifying | Not observed; collapsed “Run status” after error |
+| Local `token_delta` | 0 |
+| Local terminals | 1 (`error`) |
+| `app.run_events` types | `schema,error` |
+| `app.llm_usage` | 0 rows, 0 tokens, 0 USD |
+
+API log: `query.sse.started` then `sse.executor_failed` 14 ms later.
+Persisted payload `{"code":"run_failed"}` (sanitized; exception type is
+not in the public event). Treating 202/SSE 200/generic error as a
+successful chat outcome is forbidden.
+
+### Authorization / failure / fallback
+
+- Member `/ops/ready` 403. Proven.
+- Public `/health/ready` omits named dependencies. Proven.
+- Empty-success 202 without a local run is no longer the defect after
+  rebuild+pin. The remaining defect is immediate production-executor
+  failure after durable admit.
+- Worker parser-sandbox crash does not explain the 14 ms API executor
+  failure by itself.
+
+### Unverified / not run
+
+- Role Playwright journeys and 390/1280 visual baselines.
+- Reconnect/resume, cancel, 402/403/426/429, revoked session,
+  BM25/graph degradation.
+- Clean image-layer secret inspection beyond `test_dockerignore.py`
+  (already recorded in P08-21).
+- Exception type/message for `sse.executor_failed` (logger extra
+  `error_type` is not present in the JSON line).
+- Live contract 8 failures and Playwright 28/7 from P08-21.
+
+### Deviations
+
+- Did not rewrite `.env.compose`. Used process-env local overlay.
+- Did not `reset.ps1`.
+- Rebuilt api/worker because the previous image still enforced MFA.
+- One bounded browser query after the pin. No second provider retry.
+- Host `:3010` used for Ask; compose frontend `:3000` was not the
+  signed-in surface.
+
+### Rollback
+
+Leave local Supabase and Compose up. Recreating api/worker without the
+local process-env overlay returns them to hosted `:6543`. Do not attach
+LightRAG to the hosted pooler. Do not check wrapper item 22.
+
+### Handoff
+
+P08-22 is **BLOCKED**. Do not mark the packet complete. P08-23 may open
+a PR but must not merge. Next owner: identify the 14 ms
+`sse.executor_failed` after `query.sse.started` on the rebuilt API
+(first LangGraph `astream` tick), then repeat one bounded Ask query
+until Generating/Verifying, a verified answer or grounded refusal,
+`token_delta`, and one non-error terminal are durable on local `54322`.
+
+## P08-22 hosted-runtime amendment (2026-08-25)
+
+Historical evidence above used a local `54322` overlay and remains a
+test-fixture record. It is not the current operator path.
+
+Accepted ADR:
+[ADR-hosted-runtime-local-test-fixture.md](../adr/ADR-hosted-runtime-local-test-fixture.md).
+
+Binding contract language now requires hosted `smart-rag` for runtime
+Auth/Postgres/Storage. Local Supabase is a labelled destructive-test
+fixture only. P08-22 live proof is hosted Auth/Postgres plus laptop
+Compose sidecars. Chat rows must be durable on hosted Postgres and
+absent from local `:54322`.
+
+Implementation in this change:
+
+- Compose interpolation fails closed without hosted `SUPABASE_URL`,
+  `API_SUPABASE_DB_URL`, `WORKER_SUPABASE_DB_URL`,
+  `LANGGRAPH_CHECKPOINT_URL`, and frontend public Auth values.
+- `scripts/dev.ps1` no longer starts or resets local Supabase.
+- Query `astream` uses `AsyncPostgresSaver`; ingestion keeps the sync
+  saver.
+- Chat `run_failed` renders one generic alert plus at most one run
+  reference.
+
+Wrapper item 22 stays unchecked until the hosted browser proof below
+records live Generating/Verifying, a durable `token_delta`, exactly one
+terminal, hosted settlement, and absence of those IDs on local
+`:54322`.
+
+### Hosted proof actuals (2026-08-25)
+
+Hosted project `smart-rag` (`qsjivtwtmlmtksufqjik`) was missing
+`app.append_query_message` and `app.messages.run_id`. Applied existing
+repo migration `query_run_messages_runtime_v1` via Supabase MCP
+`apply_migration` (one apply, no parallel). `messages.run_id` and the
+four query-message RPCs are now present.
+
+Runtime topology (redacted): Auth `*.supabase.co`; API SQL transaction
+pooler `:6543`; worker/checkpoint/LightRAG session `:5432`.
+`GET /health/ready` 200 `query_ready=true`. Worker parser-sandbox
+restart is separate; chat runs in the API process.
+
+| Probe | Result |
+| --- | --- |
+| API admit `POST /messages` | 202; SSE 200 |
+| Hosted API run `ddefe043-eae1-46ef-9eb8-14c55e2246c2` | conversations=1 messages=2 (user+assistant) runs=1 status=`partial` events=22 `token_delta`=1 checkpoints=13 |
+| Hosted browser run `78f354b6-dd57-4ebf-b5ff-8b2b3dcfda8f` | status=`partial` `token_delta`=1 events include `token_delta,deadline,partial` |
+| Local `:54322` for both run IDs | conversations=0 messages=0 runs=0 events=0 checkpoints=0 |
+| Reservation | `remaining_usd` changed vs amount (true-up). `app.llm_usage` rows=0 |
+| Browser `http://127.0.0.1:3000` | Hosted password grant 200; Ask signed in; Service readiness Ready |
+| Live pipeline | `li[data-active="true"]` **Generating** observed. Stage `generate_answer / verified_partial`. Heartbeats 6. No user-visible `run_failed` |
+| Verifying `data-active` | **Not observed.** UI stayed on Generating through `verified_partial` |
+| Terminals | Protocol emits `deadline` then `partial` (mapper `_emit_verified`). Two catalog terminal types, one close sequence |
+
+Remaining P08-22 blocks (do not check wrapper item 22):
+
+1. Live Verifying `data-active="true"` was not captured.
+2. `app.llm_usage` settlement rows stay 0.
+3. UI `Terminal` can remain `running` after hosted `partial` is durable.
+4. Hosted schema still lacks later repo names
+   (`ingestion_status_acl_v1` through `lightrag_chunk_map_vendor_chunk_uq_v1`,
+   `remove_mfa_aal2_enforcement_v1`).
+
+Executor repairs proven on this path: async query checkpointer (13
+checkpoints), temporal `SET ROLE app_api` (hosted pooler cannot become
+`postgres`), idle context-loader for `retrieval_transaction`, generate
+timeout from run deadline not model-call count.
+
+## P06-14 — Ask origin and citation-safe chrome (2026-08-25)
+
+Phase 6/Phase 8 co-owned additive UI. Does not uncheck historical Phase
+8 packets or renumber P08-22/P08-23.
+
+Ask now stores `answerOrigin` from additive `answer_origin` SSE frames.
+`AnswerSurface` renders a `Badge` (`data-testid="answer-origin"`) beside
+the existing route `StatusPill` (`data-testid="answer-route"`). Citation
+chips and Sources count use `shouldShowCitations`: only
+`company_documents` or a null/empty legacy origin may show chips.
+Ambiguous origin shows the existing `LimitationCallout` with the
+generator clarification sentence. Empty-state title/body in
+[workspace-screens.md](../frontend/workspace-screens.md) match the
+surface.
+
+Negative fixtures: origin is not inferred from admission `route_family`
+(`composite` / Hybrid). XSS origin strings render as text through
+`UserText` / `displayText`; no `img`/`script` nodes.
+
+Playwright Ask journey **skipped**: local GoTrue `:54321` and API `:8000`
+were not available; Playwright is configured for those URLs, not hosted
+Auth.
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend test` | 0 (298 passed) |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+
+Rollback: revert origin helpers and Ask header/citation visibility.
+Auth/reconnect/idempotency contracts stay on the prior Phase 8 path.
+
+## P06-15 — Frontend verification note (2026-08-25)
+
+Phase 6 packet 15 re-ran Ask chrome gates after origin UX:
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend test` | 0 (298 passed) |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+
+Playwright Ask journey remains **skipped** (local GoTrue `:54321` / API
+`:8000` not the hosted operator path). P08-22 wrapper item 22 stays
+unchecked. Origin badges and citation hiding are additive and do not
+change handshake, reconnect, or verified-final holding.
+
+## UI/UX overhaul P1
+
+Creator-only `GET /conversations/{conversation_id}/messages` plus
+`app.list_conversation_messages`. User/assistant rows only, full escaped
+content, `limit` 1-100, `before` keyset, generic 404 for foreign/deleted.
+
+| Command | Exit |
+| --- | --- |
+| `.\.venv\Scripts\python.exe -m pytest tests/contract/test_conversation_transcript.py -q` | 0 (7 passed, 1 skipped: live RPC until migration apply) |
+| `.\.venv\Scripts\python.exe scripts/ci/check_openapi.py` | 0 after snapshot regenerate |
+| `.\.venv\Scripts\python.exe scripts/ci/check_migrations.py` | 0 (64 reviewed files) |
+| `.\.venv\Scripts\python.exe scripts/check.py --tier unit` | 0 for P1 tests; full unit tier in this shell needs `APP_ENV=test` because `SUPABASE_URL` is unset at collection. First full run under `APP_ENV=test` was 1103 passed / 4 failed from leaked process `APP_ENV=test` on settings/CORS tests, not from the transcript route. |
+
+## UI/UX overhaul P2
+
+Ink & Indigo tokens in `globals.css` / `design-tokens.ts`, self-hosted
+Inter Display SemiBold, restyled primitives, `EmptyState`, and
+[ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh.md).
+`@theme` no longer rebinds `--color-ink` onto body text.
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (47 files, 317 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+
+## UI/UX overhaul P3
+
+Ink nav rail (232/72, no width animation, 3px accent bar, collapse at
+rail bottom). Topbar is the only `h1`. `loadConsoleReadiness(auth, role)`
+calls `/ops/ready` only for `owner`/`admin`. ChatApp readiness has
+`staleTime: 30_000` and no interval. `ReadinessIndicator` polls every
+15s with `refetchIntervalInBackground: false`. Account menu shows `··`
+while `/me` loads.
+
+## UI/UX overhaul P4
+
+Composer owns draft. `ConversationRail`, `AnswerSurface`, and
+`ChatComposer` are memoized. Run-pointer writes are throttled to 1/s
+with flush on terminal/unmount. Send uses `pending`/`Sending…`. Delete
+uses mutation pending. Session restore renders the workspace plus
+skeletons. Isolation tests cover typing, `token_delta`, and Send pending.
+
+## UI/UX overhaul P5
+
+`GET /conversations/{id}/messages` renders oldest-first with “Load
+earlier messages”. Sessions rail is 280px with “New chat”, relative
+time, and “Untitled chat”. Composer card copy is exact. Reconnect only
+when a disconnected run exists. Status line replaces the permanent
+stepper. Run details skip “—” rows.
+
+## UI/UX overhaul P6
+
+`SignInForm` calls `router.replace("/")` and `router.refresh()` on a
+real session. Auth layout is 45/55 brand/form at `>=1024px` with
+`--gradient-brand` and “Grounded answers from your company's knowledge.”
+Skip link stays visually hidden until focus.
+
+## UI/UX overhaul P7
+
+Headings drop trailing periods. Documents filter uses “Filter by name…”
+and “Filters apply to loaded documents only.” Tables hide the plan
+builder until a table is selected. Graph cap sentence renders once.
+Visibility/absent status use `formatVisibility` / `absentStatusLabel`.
+Async actions use `pending`/`pendingLabel` or a disabled visible label.
+
+## UI/UX overhaul P8
+
+Quality gates for the Ink & Indigo overhaul. Docs updated:
+[workspace-screens.md](../frontend/workspace-screens.md),
+[CORE_RAG_SURFACES.md](../frontend/CORE_RAG_SURFACES.md),
+[DESIGN_SYSTEM.md](../frontend/DESIGN_SYSTEM.md),
+[design-tokens-and-primitives.md](../frontend/design-tokens-and-primitives.md),
+[admin-and-auth-screens.md](../frontend/admin-and-auth-screens.md).
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0 (47 files, 322 passed) |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+| `.\.venv\Scripts\python.exe scripts/check.py --tier unit` | 0 (1114 passed, 3 skipped). Collection needs `SUPABASE_URL=http://127.0.0.1:54321` and `MOCK_MODEL_MODE=true`; do not load the full host `.env` (`LANGSMITH_TRACING`) and do not set `APP_ENV=test`. |
+| `.\.venv\Scripts\python.exe scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 (189 markdown files; links + Mermaid + action inventory) |
+| `.\.venv\Scripts\python.exe scripts/check.py --tier contract` (`MOCK_MODEL_MODE=true`) | 1 (12 failed, 424 passed, 22 skipped in 675s). Failures are live-stack / fixture inventory, not this UI packet: BM25 reconcile/recheck/injection, environment-boundary, Phase 9 applied-migration inventory (includes the new transcript migration until applied), query admission concurrency cap, RLS/runtime roles, schema fingerprint, thin-UI live JWT chat/streams/upload/ready. `test_conversation_transcript.py` is not in the failed list. |
+| `pnpm exec playwright test tests/e2e/visual-routes.spec.ts --update-snapshots` | 0 after locator updates (admin tabs assert topbar `Admin`; Account heading has no trailing period) |
+| `pnpm exec playwright test` (full suite from `apps/frontend`) | 0 (36 passed) |
+
+Browser re-audit (Playwright MCP on `http://127.0.0.1:3000`, plus the :3010 Playwright suite against current source):
+
+- 1440 Ask: ink rail 232px, collapse control at the rail bottom, single `h1` Ask, Sessions complementary 280px, skip link off-screen until focus, no permanent Reconnect.
+- 1024 Graph: same rail + single `h1` Graph; topbar readiness/account unclipped.
+- 390 Graph: desktop rail omitted; `Open navigation` + page `h1`; command control hidden; readiness and Account remain.
+- Documents / Tables / Graph: no duplicate page titles.
+- Network: `/health/ready` 200 only. No `/ops/ready` 403s. Console 401s on this :3000 session were a stale Bearer against local FastAPI (`/me`, `/conversations`), not readiness spam.
+- `createConversation` now throws on non-OK so a 401 cannot produce `GET /conversations/undefined/messages`.
+
+Completion: P2–P8 are implemented on this branch. P1 transcript API remains the only API-surface change. Visual snapshots under `apps/frontend/tests/e2e/visual-routes.spec.ts-snapshots/` were regenerated.

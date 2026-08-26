@@ -2,12 +2,12 @@
 title: Accessibility and security implementation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: frontend, security, reviewers
-packet: P08-05
+packet: P08-20
 ---
 
-# Accessibility and security implementation (Phase 8 packet 5)
+# Accessibility and security implementation (Phase 8 packet 5, integrity P08-20)
 
 Phase 8 consumption of [STITCH_A11Y_SECURITY.md](./STITCH_A11Y_SECURITY.md).
 Missing Stitch RTL and mobile frames are a gap fill, not a waiver.
@@ -106,4 +106,7 @@ pnpm exec playwright test
 uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json
 ```
 
-Playwright from `apps/frontend`. Packet 6 owns full role journeys.
+Playwright from `apps/frontend`. Packet 6 owns full role journeys. P08-20 adds
+`scripts/check_frontend_action_inventory.py` and `tests/e2e/quality-audit.spec.ts`
+for unique `data-action-id` mapping, viewport overflow, and computed control
+geometry. Production has no `/unavailable/*` GAP pages.

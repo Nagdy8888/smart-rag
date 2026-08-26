@@ -22,7 +22,7 @@ Phase 6 first delivers a thin developer UI for sign-in, upload/status including 
 
 ## Required states
 
-Cover first load, loading, empty, success, partial, permission denied, MFA-required upload, pending URL approval, data-category attestation/review, stale scan/quarantine, graph unavailable/ineligible/backlog, rate-limit degraded, budget limit, upload/ingestion progress, malformed file, stream reconnect, cancellation, conversation deletion, anomaly alert, and server error.
+Cover first load, loading, empty, success, partial, permission denied, pending URL approval, data-category attestation/review, stale scan/quarantine, graph unavailable/ineligible/backlog, rate-limit degraded, budget limit, upload/ingestion progress, malformed file, stream reconnect, cancellation, conversation deletion, anomaly alert, and server error.
 
 ## Verification
 

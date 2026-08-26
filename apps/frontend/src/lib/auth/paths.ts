@@ -6,14 +6,11 @@ const PUBLIC_EXACT = new Set([
   "/login",
   "/signup",
   "/forgot-password",
-  "/review-fixtures",
 ]);
 
 const PUBLIC_PREFIXES = [
   "/auth/callback",
   "/auth/reset",
-  "/mfa/",
-  "/unavailable/",
   "/fonts/",
 ];
 
@@ -21,7 +18,7 @@ const PUBLIC_PREFIXES = [
  * Return whether a path may render without a session cookie.
  *
  * @param pathname - Request path.
- * @returns True for Auth-direct, Unavailable, and self-hosted `/fonts` files.
+ * @returns True for Auth-direct routes and self-hosted `/fonts` files.
  */
 export function isPublicAuthPath(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) {

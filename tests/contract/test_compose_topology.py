@@ -102,6 +102,58 @@ def test_private_services_have_no_host_ports() -> None:
         assert "ports" not in _service(name)
 
 
+def _env_file_paths(service: dict[str, object]) -> list[str]:
+    """Return Compose env_file paths declared on one service.
+
+    Args:
+        service: Parsed Compose service mapping.
+
+    Returns:
+        Relative env-file paths. Empty when the service has no env_file.
+    """
+
+    raw = service.get("env_file")
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [raw]
+    if not isinstance(raw, list):
+        raise TypeError("Expected Compose env_file list")
+    paths: list[str] = []
+    for item in cast(list[object], raw):
+        if isinstance(item, str):
+            paths.append(item)
+            continue
+        if isinstance(item, dict):
+            path = item.get("path")
+            if isinstance(path, str) and path:
+                paths.append(path)
+            continue
+        raise TypeError("Expected Compose env_file path or mapping")
+    return paths
+
+
+def test_api_and_worker_load_compose_env_file_for_tracing() -> None:
+    """LangSmith flags come from .env.compose, not host-interpolated defaults.
+
+    Host leftover ``LANGSMITH_TRACING=false`` from pytest must not override
+    the operator compose file. Those keys stay out of ``environment:``.
+    """
+
+    for name in ("api", "worker"):
+        service = _service(name)
+        assert ".env.compose" in _env_file_paths(service)
+        environment = _mapping(service["environment"])
+        for key in (
+            "LANGSMITH_TRACING",
+            "LANGSMITH_API_KEY",
+            "LANGSMITH_PROJECT",
+            "MOCK_MODEL_MODE",
+            "OPENAI_API_KEY",
+        ):
+            assert key not in environment, f"{name} interpolates {key} from the host"
+
+
 def test_developer_endpoints_are_explicit() -> None:
     """Only api and frontend may publish documented developer ports."""
 
@@ -177,31 +229,69 @@ def test_crawl_proxy_denies_by_default() -> None:
 
 
 def test_api_and_worker_use_app_runtime_not_superuser() -> None:
-    """Compose API/worker DSN must be the LOGIN wrapper, not postgres."""
+    """Compose API/worker DSNs fail closed on explicit hosted mappings."""
 
     api_env = _mapping(_service("api")["environment"])
     worker_env = _mapping(_service("worker")["environment"])
     api_dsn = api_env["SUPABASE_DB_URL"]
     worker_dsn = worker_env["SUPABASE_DB_URL"]
+    api_checkpoint = api_env["LANGGRAPH_CHECKPOINT_URL"]
+    worker_checkpoint = worker_env["LANGGRAPH_CHECKPOINT_URL"]
     assert isinstance(api_dsn, str)
     assert isinstance(worker_dsn, str)
-    for dsn in (api_dsn, worker_dsn):
-        assert "app_runtime" in dsn
-        assert "APP_RUNTIME_DB_PASSWORD" in dsn
+    assert isinstance(api_checkpoint, str)
+    assert isinstance(worker_checkpoint, str)
+    assert "API_SUPABASE_DB_URL" in api_dsn
+    assert "WORKER_SUPABASE_DB_URL" in worker_dsn
+    assert "?set" in api_dsn
+    assert "?set" in worker_dsn
+    assert "?set" in api_checkpoint
+    assert "?set" in worker_checkpoint
+    for dsn in (api_dsn, worker_dsn, api_checkpoint, worker_checkpoint):
+        assert "host.docker.internal" not in dsn
         assert "postgres:postgres" not in dsn
         assert "postgresql://postgres:" not in dsn
     assert "SUPABASE_STORAGE_ADMIN_SECRET" not in worker_env
 
 
-def test_api_and_worker_supabase_url_can_target_hosted_auth() -> None:
-    """Compose API JWKS origin interpolates ``SUPABASE_URL`` like the worker."""
+def test_api_and_worker_supabase_url_requires_hosted_auth() -> None:
+    """Compose JWKS origin fails closed without hosted ``SUPABASE_URL``."""
 
     api_env = _mapping(_service("api")["environment"])
     worker_env = _mapping(_service("worker")["environment"])
+    frontend = _service("frontend")
+    build = _mapping(frontend["build"])
+    args = _mapping(build["args"])
     api_url = api_env["SUPABASE_URL"]
     worker_url = worker_env["SUPABASE_URL"]
-    assert api_url == "${SUPABASE_URL:-http://host.docker.internal:54321}"
-    assert worker_url == "${SUPABASE_URL:-http://host.docker.internal:54321}"
+    assert api_url == "${SUPABASE_URL:?set hosted SUPABASE_URL}"
+    assert worker_url == "${SUPABASE_URL:?set hosted SUPABASE_URL}"
+    assert args["NEXT_PUBLIC_SUPABASE_URL"] == (
+        "${NEXT_PUBLIC_SUPABASE_URL:?set NEXT_PUBLIC_SUPABASE_URL}"
+    )
+    assert args["NEXT_PUBLIC_SUPABASE_ANON_KEY"] == (
+        "${NEXT_PUBLIC_SUPABASE_ANON_KEY:?set NEXT_PUBLIC_SUPABASE_ANON_KEY}"
+    )
+
+
+def test_staging_api_uses_session_dsn_for_checkpoint_and_lightrag() -> None:
+    """Staging API SQL stays on the transaction pooler; sessions stay separate."""
+
+    path = REPO_ROOT / "infra" / "ec2" / "docker-compose.staging.yml"
+    loaded = _mapping(yaml.safe_load(path.read_text(encoding="utf-8")))
+    services = _mapping(loaded["services"])
+    for name in ("api-blue", "api-green", "worker"):
+        env = _mapping(_mapping(services[name])["environment"])
+        checkpoint = env["LANGGRAPH_CHECKPOINT_URL"]
+        lightrag = env["LIGHTRAG_DB_URL"]
+        assert isinstance(checkpoint, str)
+        assert isinstance(lightrag, str)
+        assert "STAGING_SUPABASE_SESSION_URL" in checkpoint
+        assert "STAGING_SUPABASE_SESSION_URL" in lightrag
+        assert "TRANSACTION" not in checkpoint
+        assert "TRANSACTION" not in lightrag
+    blue = _mapping(_mapping(services["api-blue"])["environment"])
+    assert "STAGING_SUPABASE_TRANSACTION_URL" in str(blue["SUPABASE_DB_URL"])
 
 
 def test_staging_api_green_requires_blue_green_profile() -> None:

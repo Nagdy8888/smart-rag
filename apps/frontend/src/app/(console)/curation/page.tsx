@@ -1,13 +1,13 @@
 /**
- * Glossary and entity-rule curation.
+ * Bookmark redirect from `/curation` to `/admin?tab=curation`.
  */
-import { CurationApp } from "../../../components/curation-app";
+import { redirect } from "next/navigation";
 
 /**
- * Render glossary import/approve/rollback and entity-rule actions.
+ * Send legacy Curation bookmarks to the P08-14 destination.
  *
- * @returns Curation surface.
+ * @returns Never. `redirect` throws.
  */
-export default function CurationPage() {
-  return <CurationApp />;
+export default function CurationRedirectPage() {
+  redirect("/admin?tab=curation");
 }

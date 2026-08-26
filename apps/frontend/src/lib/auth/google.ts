@@ -7,7 +7,7 @@
 export const GOOGLE_OAUTH_ENABLED = false;
 
 /**
- * Return whether the Google button may invoke Auth OAuth.
+ * Return whether Google OAuth may be invoked. No login button is rendered.
  *
  * @param enabled - Provider flag. False in this repository.
  * @returns True only when the provider is enabled.
@@ -20,8 +20,8 @@ export function shouldInvokeGoogleOAuth(enabled: boolean): boolean {
 }
 
 /**
- * Guard around `signInWithOAuth`. Used by tests to prove the disabled button
- * never reaches Auth.
+ * Guard around `signInWithOAuth`. Google chrome is omitted while disabled.
+ * Tests prove the helper never reaches Auth.
  *
  * @param enabled - Provider flag.
  * @param signInWithOAuth - Injected Auth method. Must not run when disabled.

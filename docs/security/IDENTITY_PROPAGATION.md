@@ -2,7 +2,7 @@
 title: Identity propagation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering, security, reviewers
 ---
 
@@ -21,11 +21,11 @@ sequenceDiagram
   participant RPC as app.list_visible_documents
 
   Browser->>FastAPI: Authorization Bearer JWT
-  FastAPI->>JWKS: Verify iss/aud/alg/exp/sub/kid/role (ES256/RS256; role=authenticated)
+  FastAPI->>JWKS: "Verify JWT claims ES256 or RS256 authenticated role"
   JWKS-->>FastAPI: Valid subject + session claims
-  FastAPI->>DB: SELECT profiles + company_settings (app_api)
+  FastAPI->>DB: "SELECT profiles and company_settings as app_api"
   DB-->>FastAPI: role, disabled, MFA, authorization_version
-  FastAPI->>FastAPI: Session revocation + MFA gate
+  FastAPI->>FastAPI: Session revocation + live role/capability check
   FastAPI->>RPC: caller_user_id, caller_role, authorization_version
   Note over RPC: validate_caller_context inside RPC
   RPC-->>FastAPI: ACL-filtered rows or zero rows
@@ -51,16 +51,18 @@ FastAPI dependency: `apps/backend/src/smart_rag_api/dependencies/identity.py`.
 - Reads `Authorization: Bearer` and verifies through
   `packages/core/src/smart_rag_core/security/jwks.py`.
   JWKS is always fetched from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`.
-  When `APP_ENV=local` and `SUPABASE_URL` is `http://127.0.0.1:54321` or
-  `http://host.docker.internal:54321`, `iss` may be either
-  `http://127.0.0.1:54321/auth/v1` or
+  Daily laptop runtime supplies a hosted `SUPABASE_URL` and therefore does
+  not expand those aliases. When `APP_ENV=local` and `SUPABASE_URL` is
+  `http://127.0.0.1:54321` or `http://host.docker.internal:54321` (local
+  fixture only), `iss` may be either `http://127.0.0.1:54321/auth/v1` or
   `http://host.docker.internal:54321/auth/v1`. Other environments require
   `iss` to equal `{SUPABASE_URL}/auth/v1`. HS256 remains forbidden. Arbitrary
   issuers are rejected. The JWT `role` claim must be `authenticated`;
   `service_role` and `anon` fail closed.
 - Loads profile + company settings via `app_api` Postgres reads.
-- Rejects disabled users, revoked sessions, and missing MFA for
-  owner/admin/upload-capable members.
+- Rejects disabled users and revoked sessions. MFA/AAL2 is not an
+  authorization gate. Owner/admin/upload-capable members authorize at
+  ordinary authenticated assurance.
 - `X-Test-*` headers mint a caller only when `APP_ENV=test` and
   `ALLOW_TEST_IDENTITY=true`. Staging and production reject that flag at
   startup and return HTTP 400 when the headers are present. Local without
@@ -84,7 +86,7 @@ Security-sensitive profile changes (`role`, `disabled_at`, `upload_enabled`, or
 caller snapshots then fail inside typed RPC validation. Lost-factor initiation
 sets `mfa_enrolled=false` and `upload_enabled=false`; provider factor deletion
 and global logout must succeed before the request is marked complete. Restoring
-upload capability still requires a newly enrolled factor and an AAL2 session.
+upload capability is `upload_enabled` plus an active role; MFA enrollment is not a gate.
 
 Offboarding performs only Phase 2 security effects: provider logout, disabled
 profile, capability removal, session timestamp, authorization-version bump, and
@@ -161,7 +163,7 @@ sequenceDiagram
   participant AW as app_audit_writer
   participant AE as app.audit_events
 
-  Svc->>AW: append_audit_event(...) or INSERT policy
+  Svc->>AW: "append_audit_event or INSERT policy"
   AW->>AE: INSERT only
   Note over AE: UPDATE/DELETE blocked by trigger
 ```

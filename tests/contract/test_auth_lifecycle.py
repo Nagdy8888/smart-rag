@@ -470,6 +470,71 @@ def test_offboarding_disables_revokes_and_bumps_authorization(
         )
 
 
+def test_offboarding_succeeds_at_ordinary_assurance(
+    postgres_url: str,
+    privileged_settings: PrivilegedAuthSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Owner/admin at aal1 can offboard; members remain unauthorized."""
+
+    actor_id = uuid.uuid4()
+    member_actor_id = uuid.uuid4()
+    subject_id = uuid.uuid4()
+    _insert_profile(
+        postgres_url,
+        user_id=actor_id,
+        email=f"offboard-aal1-owner-{actor_id}@example.com",
+        role="owner",
+        upload_enabled=False,
+        mfa_enrolled=False,
+    )
+    _insert_profile(
+        postgres_url,
+        user_id=member_actor_id,
+        email=f"offboard-aal1-member-{member_actor_id}@example.com",
+        role="member",
+        upload_enabled=True,
+        mfa_enrolled=False,
+    )
+    _insert_profile(
+        postgres_url,
+        user_id=subject_id,
+        email=f"offboard-aal1-subject-{subject_id}@example.com",
+        role="member",
+        upload_enabled=True,
+        mfa_enrolled=False,
+    )
+    monkeypatch.setattr(
+        offboarding,
+        "revoke_provider_sessions",
+        lambda settings, user_id: None,
+    )
+    with pytest.raises(offboarding.OffboardingError, match="authorization rejected"):
+        offboarding.apply_offboarding_security(
+            privileged_settings,
+            postgres_url,
+            subject_user_id=subject_id,
+            requested_by=member_actor_id,
+            actor_role="member",
+            actor_assurance_level="aal1",
+        )
+    completed = offboarding.apply_offboarding_security(
+        privileged_settings,
+        postgres_url,
+        subject_user_id=subject_id,
+        requested_by=actor_id,
+        actor_role="owner",
+        actor_assurance_level="aal1",
+    )
+    snapshot = load_profile_snapshot(
+        postgres_url,
+        user_id=str(subject_id),
+    )
+    assert snapshot is not None
+    assert snapshot.disabled is True
+    assert completed.subject_user_id == subject_id
+
+
 def test_invitation_domain_policy_is_authoritative_and_failure_revokes(
     postgres_url: str,
     privileged_settings: PrivilegedAuthSettings,

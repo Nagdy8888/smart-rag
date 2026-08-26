@@ -1,13 +1,13 @@
 /**
- * Usage meters, 402/rate copy, and honest unavailable budget/audit states.
+ * Bookmark redirect from `/usage` to `/admin?tab=usage`.
  */
-import { UsageApp } from "../../../components/usage-app";
+import { redirect } from "next/navigation";
 
 /**
- * Render GET /usage/me and company totals. No budget sliders.
+ * Send legacy Usage bookmarks to the P08-14 destination.
  *
- * @returns Usage surface.
+ * @returns Never. `redirect` throws.
  */
-export default function UsagePage() {
-  return <UsageApp />;
+export default function UsageRedirectPage() {
+  redirect("/admin?tab=usage");
 }

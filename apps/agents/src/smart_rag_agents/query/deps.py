@@ -28,9 +28,9 @@ class QueryGraphDeps:
     """Injectable adapters for memory, prep, retrieve, and optional tools.
 
     All fields default so Studio ``graph.py`` can compile without sockets
-    or OpenAI clients. Live FastAPI SSE binds Hybrid, gateway, prompts,
-    and a per-run ``app_api`` connection via
-    ``smart_rag_api.services.query_graph_runtime``. Do not share
+    or OpenAI clients. Live FastAPI SSE and ``query_studio_live`` bind
+    Hybrid, gateway, prompts, and a per-run ``app_api`` connection via
+    ``smart_rag_agents.query.live_runtime``. Do not share
     ``cancel_check`` or ``connection`` across concurrent compiled graphs.
 
     Attributes:
@@ -42,6 +42,8 @@ class QueryGraphDeps:
         force_model: Spend the one prep call even when deterministic.
         cancel_check: Cooperative cancellation probe.
         answer_prompt_text: Pinned ``answer_v1`` body when a live adapter runs.
+        general_chat_prompt_text: Pinned ``general_chat_v1`` body when a live
+            general-chat adapter runs.
         verifier_prompt_text: Pinned ``verifier_v1`` body when a live adapter runs.
         model_gateway: Optional ``ModelGateway``. Compile constructs none.
         optional_policy: Frozen mapping-versus-discovery policy.
@@ -62,6 +64,7 @@ class QueryGraphDeps:
     force_model: bool = False
     cancel_check: Callable[[], bool] | None = None
     answer_prompt_text: str | None = None
+    general_chat_prompt_text: str | None = None
     verifier_prompt_text: str | None = None
     model_gateway: object | None = None
     optional_policy: SelectionPolicy = RUNTIME_SELECTION_POLICY

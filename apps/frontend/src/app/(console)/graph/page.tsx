@@ -2,7 +2,7 @@
  * Graph explorer route. `useSearchParams` requires a Suspense boundary.
  */
 import { Suspense } from "react";
-import { GraphExplorer } from "../../../components/graph-explorer";
+import { GraphExplorer } from "../../../components/graph/graph-explorer";
 
 /**
  * Render graph search and inspect.

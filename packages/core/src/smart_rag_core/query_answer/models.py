@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from smart_rag_core.query_answer.versions import MAX_VERIFIER_LINKS
+from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 
 
@@ -83,6 +84,8 @@ class AnswerPayload(BaseModel):
         table_citations: Deterministic table provenance.
         status: ``complete``, ``partial``, or ``refused``.
         refused_links: Link IDs omitted or refused as unsupported.
+        answer_origin: Strict-split knowledge scope for newly generated
+            answers. ``None`` for historical or unset payloads.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -94,6 +97,7 @@ class AnswerPayload(BaseModel):
     table_citations: tuple[AnswerCitation, ...] = ()
     status: Literal["complete", "partial", "refused"] = "complete"
     refused_links: tuple[str, ...] = ()
+    answer_origin: KnowledgeScope | None = None
 
 
 class VerifierLinkVerdict(BaseModel):

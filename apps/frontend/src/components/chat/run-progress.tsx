@@ -1,50 +1,29 @@
 /**
- * Run pipeline progress. Five known stages only.
+ * Map a live run stage to the one-line Ask status copy.
  */
 
 import type { ChatViewState } from "../../lib/chat-view";
-import styles from "./chat.module.css";
-
-const PIPELINE_STEPS = [
-  { id: "preparing", label: "Preparing" },
-  { id: "searching", label: "Searching" },
-  { id: "resolving", label: "Resolving graph" },
-  { id: "reranking", label: "Reranking" },
-  { id: "answering", label: "Answering" },
-] as const;
-
-export type RunProgressProps = {
-  /** Current chat view. */
-  chat: ChatViewState;
-};
 
 /**
- * Render expanded stages while running, then a collapsed status row.
+ * Return the idle-hidden status line for an in-flight run.
  *
- * @param props - Chat view.
- * @returns Pipeline list or collapsed status.
+ * @param chat - Current view.
+ * @returns Exactly one of Preparing…, Retrieving…, Generating…, Verifying…,
+ *   or null when idle.
  */
-export function RunProgress({ chat }: RunProgressProps) {
-  const stage = (chat.stage ?? "").toLowerCase();
-  if (chat.terminal !== null) {
-    return (
-      <p className={styles.pipelineCollapsed}>
-        Run status
-        {chat.stage ? ` · ${chat.stage}` : ""}
-      </p>
-    );
+export function runStatusLine(chat: ChatViewState): string | null {
+  if (chat.terminal !== null || chat.runId === null) {
+    return null;
   }
-  return (
-    <ul className={styles.pipeline} aria-label="Run pipeline">
-      {PIPELINE_STEPS.map((step) => (
-        <li
-          key={step.id}
-          className={styles.pipelineStep}
-          data-active={stage.includes(step.id)}
-        >
-          {step.label}
-        </li>
-      ))}
-    </ul>
-  );
+  const raw = (chat.stage ?? "").toLowerCase();
+  if (raw.includes("verif")) {
+    return "Verifying…";
+  }
+  if (raw.includes("generat") || raw.includes("answer")) {
+    return "Generating…";
+  }
+  if (raw.includes("retriev") || raw.includes("search")) {
+    return "Retrieving…";
+  }
+  return "Preparing…";
 }

@@ -7,8 +7,11 @@ pure static checks and do not execute application code.
 from __future__ import annotations
 
 import ast
+import os
 from dataclasses import dataclass
 from pathlib import Path
+
+_SKIP_WALK_DIRS = frozenset({".venv", "node_modules", "__pycache__"})
 
 FORBIDDEN_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
@@ -75,11 +78,7 @@ def scan_unique_workspace_artifacts(
         discovered = tuple(
             sorted(
                 path.relative_to(repo_root).as_posix()
-                for path in repo_root.rglob(name)
-                if not any(
-                    part in {".venv", "node_modules", "__pycache__"}
-                    for part in path.parts
-                )
+                for path in _iter_named_files(repo_root, name)
             )
         )
         if discovered != (expected,):
@@ -91,6 +90,26 @@ def scan_unique_workspace_artifacts(
                 )
             )
     return violations
+
+
+def _iter_named_files(root: Path, name: str) -> list[Path]:
+    """Return files named ``name`` while pruning vendor trees.
+
+    Args:
+        root: Directory to walk.
+        name: Exact filename to collect.
+
+    Returns:
+        Matching paths. ``node_modules`` is never entered so Windows
+        junctions cannot abort the walk.
+    """
+
+    found: list[Path] = []
+    for current, dirnames, filenames in os.walk(root, followlinks=False):
+        dirnames[:] = [item for item in dirnames if item not in _SKIP_WALK_DIRS]
+        if name in filenames:
+            found.append(Path(current) / name)
+    return found
 
 
 def _iter_python_files(root: Path) -> list[Path]:
@@ -106,10 +125,12 @@ def _iter_python_files(root: Path) -> list[Path]:
     if not root.exists():
         return []
     files: list[Path] = []
-    for path in root.rglob("*.py"):
-        if any(part in {".venv", "node_modules", "__pycache__"} for part in path.parts):
-            continue
-        files.append(path)
+    for current, dirnames, filenames in os.walk(root, followlinks=False):
+        dirnames[:] = [item for item in dirnames if item not in _SKIP_WALK_DIRS]
+        current_path = Path(current)
+        for filename in filenames:
+            if filename.endswith(".py"):
+                files.append(current_path / filename)
     return sorted(files)
 
 
@@ -228,12 +249,22 @@ def assert_frontend_has_no_python_workspace_imports(repo_root: Path) -> list[str
         "apps/backend",
         "apps/worker",
     )
-    for path in frontend.rglob("*"):
-        if path.suffix.lower() not in {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}:
-            continue
-        if "node_modules" in path.parts or ".next" in path.parts:
-            continue
-        text = path.read_text(encoding="utf-8")
-        if any(needle in text for needle in needles):
-            offenders.append(str(path.relative_to(repo_root)))
+    skip_dirs = _SKIP_WALK_DIRS | {".next"}
+    for current, dirnames, filenames in os.walk(frontend, followlinks=False):
+        dirnames[:] = [item for item in dirnames if item not in skip_dirs]
+        current_path = Path(current)
+        for filename in filenames:
+            path = current_path / filename
+            if path.suffix.lower() not in {
+                ".ts",
+                ".tsx",
+                ".js",
+                ".jsx",
+                ".mjs",
+                ".cjs",
+            }:
+                continue
+            text = path.read_text(encoding="utf-8")
+            if any(needle in text for needle in needles):
+                offenders.append(str(path.relative_to(repo_root)))
     return offenders

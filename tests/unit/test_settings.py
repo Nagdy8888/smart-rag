@@ -30,6 +30,7 @@ def configure_hosted_backend_env(
     """
 
     monkeypatch.setenv("APP_ENV", app_env)
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("MOCK_MODEL_MODE", "false")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-unit-fixture-not-real")
     monkeypatch.setenv("VALKEY_LIMITS_URL", "redis://:unit@127.0.0.1:6379/0")
@@ -50,6 +51,25 @@ def test_deployable_settings_are_typed_and_share_secure_defaults() -> None:
     assert backend.service_name == "backend"
     assert worker.service_name == "worker"
     assert agents.service_name == "agents"
+    assert agents.langgraph_studio_live_enabled is False
+    assert agents.langgraph_studio_access_token is None
+    assert not issubclass(AgentSettings, BackendSettings)
+
+
+def test_agent_studio_live_token_is_redacted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Studio live JWT stays on AgentSettings and never appears in repr."""
+
+    canary = "studio-live-settings-canary-token"
+    monkeypatch.setenv("LANGGRAPH_STUDIO_LIVE_ENABLED", "true")
+    monkeypatch.setenv("LANGGRAPH_STUDIO_ACCESS_TOKEN", canary)
+    settings = AgentSettings()
+    assert settings.langgraph_studio_live_enabled is True
+    assert settings.langgraph_studio_access_token is not None
+    assert settings.langgraph_studio_access_token.get_secret_value() == canary
+    assert canary not in repr(settings)
+    assert canary not in str(settings)
 
 
 def test_backend_settings_load_documented_environment_aliases(
@@ -73,6 +93,30 @@ def test_backend_settings_load_documented_environment_aliases(
         settings.openai_api_key.get_secret_value() == "sk-this-value-must-remain-secret"
     )
     assert "sk-this-value" not in repr(settings)
+
+
+def test_local_backend_requires_explicit_supabase_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Laptop runtime fails closed when ``SUPABASE_URL`` is omitted."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    with pytest.raises(SettingsValidationError) as caught:
+        load_backend_settings()
+    assert "127.0.0.1" not in str(caught.value)
+    assert "supabase.co" not in str(caught.value)
+
+
+def test_test_env_injects_local_supabase_fixture_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``APP_ENV=test`` may omit ``SUPABASE_URL`` and uses the local fixture."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    settings = load_backend_settings()
+    assert str(settings.supabase_url).rstrip("/") == "http://127.0.0.1:54321"
 
 
 def test_wildcard_cors_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -167,6 +211,41 @@ def test_worker_checkpoint_url_falls_back_to_database_url(
     )
 
 
+def test_checkpoint_pooler_dsn_fails_closed_without_leaking_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Transaction-pooler checkpoint URLs fail before a paid run can start."""
+
+    secret = "super-secret-pooler-password"  # noqa: S105 - inert fixture
+    host = "aws-0-us-east-1.pooler.supabase.com"
+    monkeypatch.setenv(
+        "LANGGRAPH_CHECKPOINT_URL",
+        f"postgresql://unit:{secret}@{host}:6543/postgres",
+    )
+    with pytest.raises(SettingsValidationError) as exc_info:
+        load_backend_settings()
+    text = str(exc_info.value)
+    assert secret not in text
+    assert host not in text
+    assert "postgresql://" not in text
+
+
+def test_session_checkpoint_dsn_is_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Direct/session checkpoint URLs remain valid."""
+
+    monkeypatch.setenv(
+        "LANGGRAPH_CHECKPOINT_URL",
+        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    )
+    settings = load_backend_settings()
+    assert (
+        settings.resolved_checkpoint_dsn()
+        == "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    )
+
+
 def test_jwks_operation_settings_validate_and_redact_secrets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -222,6 +301,17 @@ def test_local_and_test_keep_mock_defaults(
     test_settings = load_backend_settings()
     assert test_settings.app_env is Environment.TEST
     assert test_settings.allow_test_identity is True
+
+
+def test_hosted_environments_reject_langsmith_export_io(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Staging and production cannot export raw LangSmith I/O."""
+
+    configure_hosted_backend_env(monkeypatch, app_env="production")
+    monkeypatch.setenv("LANGSMITH_EXPORT_IO", "true")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
 
 
 def test_hosted_environments_require_https_non_loopback_cors(

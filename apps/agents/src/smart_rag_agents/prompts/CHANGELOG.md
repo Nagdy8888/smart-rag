@@ -14,6 +14,7 @@ Runtime v1 uses deterministic mapping; discovery is not retained.
 | Version | Date | Change |
 | --- | --- | --- |
 | `query_profile_v1` | 2026-08-14 | Initial bounded profile extraction prompt. No retrieval or answer generation. |
+| `query_profile_v1` | 2026-08-25 | Additive ``knowledge_scope`` / confidence fields. No second model call. |
 | `rerank_v1` | 2026-08-14 | Structured top-20 rerank. No answer generation or tools. |
 | `answer_v1` | 2026-08-16 | One grounded answer from canonical passages and deterministic table values. |
 | `verifier_v1` | 2026-08-16 | One batched check of at most six atomic links. No second call. |

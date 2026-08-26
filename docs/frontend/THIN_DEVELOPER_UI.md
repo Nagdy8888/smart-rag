@@ -2,7 +2,7 @@
 title: Thin authenticated developer UI
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: engineering, frontend
 ---
 
@@ -62,7 +62,7 @@ flowchart TD
 | Upload reserve | `POST /documents/uploads`; local `signed_url` is null |
 | Version status | `GET /ingestion/versions/{id}/status` for Hybrid/BM25/graph-handoff |
 | Readiness | public `GET /health/ready`; named ParadeDB/Valkey/LightRAG probes on `GET /ops/ready` (owner/admin) |
-| MFA | `403 MFA required` for owner/admin/`upload_enabled` until TOTP aal2 |
+| MFA | Removed from product UI. `GET /me.mfa_enrolled` is ignored (backend always false) |
 
 Paid chat uses JSON 202 so `run_id` is in the body, then the same GET EventSource
 path as reconnect. That is one paid reservation. Unknown SSE event types are
@@ -85,15 +85,18 @@ includes restricted or ineligible counts.
 
 Public `GET /health/ready` is `{status, query_ready, coarse detail}` only.
 The login page polls it so query-not-ready is visible without naming ParadeDB,
-Valkey, or LightRAG. Signed-in owner/admin consoles merge named probes from
-`GET /ops/ready`. Signed `bm25_unavailable` and `graph_outage` copy is always
+Valkey, LightRAG, or the checkpointer. The browser aborts that probe after
+8000ms. Signed-in owner/admin consoles merge named probes from
+`GET /ops/ready`. `query_ready` is true when the Hybrid path, durable
+checkpointer/store, Valkey, and real models are usable. Missing LightRAG is a
+typed degraded dependency and does not fake graph readiness or block Hybrid
+chat. Signed `bm25_unavailable` and `graph_outage` copy is always
 on the console; live SSE still owns per-run codes. Host uvicorn without
 `PARADEDB_URL` / `VALKEY_LIMITS_URL` reports public `detail=not_query_ready`,
 which is not a fake-healthy probe.
 
-Owner/admin and `upload_enabled` callers need MFA. A password JWT is `aal1`;
-the UI shows **MFA required** instead of a successful upload. After TOTP
-verify (`aal2`) plus `mfa_enrolled` and `upload_enabled`, local reserve still
+Owner/admin and `upload_enabled` callers do not need MFA. Upload authorization
+is role plus `upload_enabled` plus quota. Local reserve still
 returns `signed_url=null`.
 
 ## Environment

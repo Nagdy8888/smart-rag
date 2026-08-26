@@ -2,17 +2,18 @@
 title: Phase 8 journey matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: engineering, reviewers
-packet: P08-06
+packet: P08-19
 ---
 
 # Phase 8 journey matrix
 
 Maps every Phase 8 wrapper Done-when / packet-6 journey to an exact test.
 Stitch is a **template, not a layout**. Coverage is keyed to shipped contract
-surfaces (login, chat `/`, documents, graph, tables, team, tools, curation,
-usage, profile, unavailable GAP pages), not frame numbers.
+surfaces (login, chat `/`, documents, graph, tables, `/admin` tabs,
+`/account`), not frame numbers. Retired `/team` `/tools` `/curation`
+`/usage` `/profile` redirect. Production has no `/unavailable/*` chrome.
 
 Related: [phase-08 evidence](../development/phase-08-frontend-integration-evidence.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
@@ -66,9 +67,9 @@ flowchart TD
 | Sign-up / reset links | `tests/e2e/login.spec.ts` | signup and forgot-password links are visible from login | playwright-unauth | proven |
 | Callback replay | `tests/e2e/login.spec.ts` | callback replay shows generic failure copy | playwright-unauth | proven |
 | Google disabled GAP-07-04 | `src/lib/handshake.test.ts` | does not invoke OAuth when the provider is disabled | vitest-unit | proven |
-| MFA challenge copy | `tests/e2e/login.spec.ts` | MFA required banner copy is on the challenge surface | playwright-unauth | proven |
-| MFA required (chat) | `src/components/chat-app.test.tsx` | shows MFA required banner and has no recovery-code control | vitest-component | proven |
-| Upload MFA | `src/lib/api.test.ts` | throws mfa_required on 403 MFA required | vitest-unit | proven |
+| MFA routes removed | `tests/e2e/login.spec.ts` | `/mfa/challenge` redirects to login; no Google button | playwright-unauth | proven |
+| MFA required (chat) | `src/components/chat-app.test.tsx` | no MFA challenge/enroll links | vitest-component | proven |
+| Upload leftover MFA copy | `src/lib/api.test.ts` | 403 `MFA required` is generic auth/upload failure, not `mfa_required` | vitest-unit | proven |
 | MFA recovery GAP-07-07 | `src/components/auth/auth-screens.test.tsx` | has no recovery-code input that submits | vitest-component | proven |
 | MFA recovery GAP-07-07 | `tests/e2e/phase08-journeys.spec.ts` | GAP-07-07 and GAP-07-08 unavailable pages have no mocked recovery or bootstrap | playwright-unauth | proven |
 | Owner bootstrap GAP-07-08 | `src/components/auth/auth-screens.test.tsx` | has no owner-bootstrap form | vitest-component | proven |
@@ -99,7 +100,7 @@ flowchart TD
 | Unknown SSE events | `src/lib/chat-view.test.ts` | keeps the answer when an unknown additive event is injected | vitest-unit | proven |
 | Heartbeat + Cancel terminal | `src/lib/chat-view.test.ts` | counts heartbeats and records cancelled as the terminal | vitest-unit | proven |
 | Cancel HTTP | `src/lib/api.test.ts` | posts cancel with resume headers and no X-Client-Version | vitest-unit | proven |
-| Cancel from ChatApp | `src/components/chat-app.test.tsx` | Cancel posts /runs/{id}/cancel without X-Client-Version | vitest-component | proven |
+| Cancel from ChatApp | `src/components/chat-app.test.tsx` | Stop posts /runs/{id}/cancel without X-Client-Version | vitest-component | proven |
 | Reconnect 404 private-run | `src/lib/api.test.ts` | classifies a foreign or missing run as deleted without a second POST | vitest-unit | proven |
 | Reconnect 404 chrome | `src/components/chat-app.test.tsx` | reconnect 404 shows deleted copy without source text | vitest-component | proven |
 | Conversation DELETE | `src/lib/api.test.ts` | DELETEs the conversation and treats 204 as success | vitest-unit | proven |
@@ -121,7 +122,7 @@ is no client route field.
 | Media `media_limitation` | `src/lib/chat-view.test.ts` | records route correction, deadline, and limitation codes from the catalog | vitest-unit | proven |
 | BM25 `bm25_unavailable` | `src/lib/limitations.test.ts` | uses signed historical-graph language | vitest-unit | proven |
 | LightRAG `graph_outage` | `src/lib/limitations.test.ts` | uses signed historical-graph language | vitest-unit | proven |
-| Table / comparison `source_ranges` | `src/components/core-rag-surfaces.test.tsx` | renders deterministic source_ranges and no client total or export | vitest-component | proven |
+| Table / comparison `source_ranges` | `src/components/tables/tables-app.test.tsx` | runs a valid analyze, labels display sort, and opens cell provenance | vitest-component | proven |
 | Citations without snippets GAP-07-09 | `src/lib/api.test.ts` | keeps ids and drops passage snippet fields | vitest-unit | proven |
 | Live five composite streams | `tests/contract/test_thin_developer_ui_live.py` | test_thin_ui_live_five_composite_streams | python-contract-live | proven |
 
@@ -133,18 +134,36 @@ is no client route field.
 | Quota 402 reserve | `src/lib/api.test.ts` | does not return a reservation on 402 quota or budget exhaustion | vitest-unit | proven |
 | Crawl member 403 | `src/lib/api.test.ts` | still posts for a member helper call (server 403 is authoritative) | vitest-unit | proven |
 | Quarantine labels | `src/lib/ingestion-status.test.ts` | labels Graph Pending distinctly from failed and does not invent quarantine HTTP | vitest-unit | proven |
-| Graph Pending vs deletion | `src/components/core-rag-surfaces.test.tsx` | loads Graph Pending, BM25 none, and deletion_pending without a delete control | vitest-component | proven |
-| Document delete GAP-07-14 | `src/lib/api.test.ts` | does not export a deleteDocument client | vitest-unit | proven |
+| Graph Pending vs deletion | `src/components/core-rag-surfaces.test.tsx` | loads Graph Pending, BM25 none, and deletion_pending without a member delete control | vitest-component | proven |
+| Document delete | `src/lib/api.test.ts` | deleteDocument 204/403/404/429 | vitest-unit | proven |
+| Document delete chrome | `src/components/documents/document-library.test.tsx` | owner confirmation 204; member 403 copy; pagination append | vitest-component | proven |
 | Document 404 no title | `src/components/core-rag-surfaces.test.tsx` | shows Not found without a title leak | vitest-component | proven |
 | Unauth document 404 → login | `tests/e2e/phase08-journeys.spec.ts` | unauthenticated document 404 still redirects to login | playwright-unauth | proven |
 | ACL blindness no count | `src/components/core-rag-surfaces.test.tsx` | shows ACL blindness without unauthorized counts or titles | vitest-component | proven |
 | Graph Pending authorized count | `src/components/core-rag-surfaces.test.tsx` | shows Graph Pending with authorized not-ready count only | vitest-component | proven |
+| Tables URL preselect | `src/components/tables/tables-app.test.tsx` | preselects an accessible tableId from the URL | vitest-component | proven |
+| Tables invalid plan | `src/components/tables/tables-app.test.tsx` | rejects unknown columns and raw SQL before submission | vitest-component | proven |
+| Tables failure preservation | `src/components/tables/tables-app.test.tsx` | preserves the draft and submitted plan on 403 | vitest-component | proven |
+| Graph search-select-inspect | `src/components/graph/graph-explorer.test.tsx` | searches, inspects, lists nodes, and opens evidence details | vitest-component | proven |
+| Graph document seed | `src/components/graph/graph-explorer.test.tsx` | inspects from a document seed without entity chips | vitest-component | proven |
+| Graph chip cap | `src/components/graph/graph-explorer.test.tsx` | caps chips at 12 and shows mixed-direction labels as text | vitest-component | proven |
+| Graph outage vs ACL | `src/components/graph/graph-explorer.test.tsx` | distinguishes graph outage from ACL blindness | vitest-component | proven |
+| Graph inspect 403 chips | `src/components/graph/graph-explorer.test.tsx` | preserves chips on inspect 403 | vitest-component | proven |
+| Graph inspect 403 client | `src/lib/api.test.ts` | classifies inspect 403 as ClassifiedApiError | vitest-unit | proven |
 | `graph_partial_readiness` copy | `src/lib/limitations.test.ts` | covers GraphLimitationCode values without unauthorized counts | vitest-unit | proven |
 | Curation approve `row_version` | `src/components/administration-surfaces.test.tsx` | approves an entity rule with row_version only for an owner | vitest-component | proven |
+| Entity-rule PATCH 409 | `src/components/administration-surfaces.test.tsx` | shows Reload rule after a stale PATCH | vitest-component | proven |
+| patchEntityRule 409 | `src/lib/api.test.ts` | patchEntityRule classifies 409 stale_row_version | vitest-unit | proven |
+| Admin member 403 | `src/components/administration-surfaces.test.tsx` | shows a permission error after a real 403 for a member | vitest-component | proven |
+| Admin tabs URL | `src/components/administration-surfaces.test.tsx` | lets an owner switch tabs through URL state | vitest-component | proven |
+| Offboard no MFA | `src/components/administration-surfaces.test.tsx` | offboards a known user id without MFA copy | vitest-component | proven |
+| Tools search no seed | `src/components/administration-surfaces.test.tsx` | hides enable for a member, searches with q, and has no seed form | vitest-component | proven |
+| listTools encodes `q` | `src/lib/api.test.ts` | listTools URL-encodes q | vitest-unit | proven |
 | Rate / `budget_exhausted` | `src/lib/api.test.ts` | maps 402 budget_exhausted | vitest-unit | proven |
 | `rate_limited` Retry-After | `src/lib/api.test.ts` | maps 429 rate_limited with Retry-After | vitest-unit | proven |
-| Usage GAP-07-12 Unavailable | `src/components/administration-surfaces.test.tsx` | hides company meters for a member and still shows GAP-07-12 without passages | vitest-component | proven |
-| Budget sliders absent GAP-07-11 | `src/components/administration-surfaces.test.tsx` | shows token meters and no budget slider or fake audit events | vitest-component | proven |
+| Usage no budget/audit chrome | `src/components/administration-surfaces.test.tsx` | shows token meters and no budget slider or fake audit events | vitest-component | proven |
+| Member usage no audit chrome | `src/components/administration-surfaces.test.tsx` | hides company meters for a member without audit chrome | vitest-component | proven |
+| Account four `/me` fields | `src/components/administration-surfaces.test.tsx` | shows /me fields and has no settings save | vitest-component | proven |
 | Abandoned/expired/oversize HTTP | `src/lib/ingestion-status.test.ts` | labels Graph Pending distinctly from failed and does not invent quarantine HTTP | vitest-unit | proven |
 | Live upload signed_url null + user JWT PUT | `tests/contract/test_thin_developer_ui_live.py` | test_mfa_aal2_upload_reserve_signed_url_is_null | python-contract-live | proven |
 
@@ -158,10 +177,12 @@ enums on `GET /ingestion/versions/{id}/status`. The UI prints the server
 | --- | --- | --- | --- | --- |
 | Protected routes → `/login` | `tests/e2e/phase08-journeys.spec.ts` | unauthenticated shipped routes redirect to login except public auth pages | playwright-unauth | proven |
 | Login chrome | `tests/e2e/phase08-journeys.spec.ts` | login chrome has skip link, Sign in, and contract nav without Stitch frames | playwright-unauth | proven |
-| 280px desktop nav | `tests/e2e/design-system.spec.ts` | desktop navigation is 280px and skip link targets main | playwright-unauth | proven |
-| 390px mobile nav | `tests/e2e/design-system.spec.ts` | mobile navigation stacks above main | playwright-unauth | proven |
-| Reduced motion | `tests/e2e/design-system.spec.ts` | reduced motion disables spinner animation | playwright-unauth | proven |
+| 232px desktop nav | `tests/e2e/design-system.spec.ts` | authenticated desktop navigation is 232px when a session exists | playwright-live | proven |
+| 390px mobile nav | `tests/e2e/design-system.spec.ts` | authenticated mobile keeps compact brand and a menu control | playwright-live | proven |
+| Reduced motion | `tests/e2e/design-system.spec.ts` | reduced motion disables authored transitions | playwright-unauth | proven |
 | Skip link keyboard | `tests/e2e/a11y-security.spec.ts` | Tab order on login starts at the skip link and focuses main | playwright-unauth | proven |
+| Login geometry/overflow | `tests/e2e/quality-audit.spec.ts` | login geometry, overflow, and mapped Sign in at required viewports | playwright-unauth | proven |
+| Action inventory | `scripts/check_frontend_action_inventory.py` | unique keep IDs mapped to source and tests | python-unit | proven |
 | RTL ACME offsets 7–11 | `src/components/accessibility-security.test.tsx` | wraps ACME in a mark of text nodes for offsets 7–11 | vitest-component | proven |
 | XSS fixtures inert | `src/components/accessibility-security.test.tsx` | renders XSS, javascript URLs, bidi controls, and mixed text as text | vitest-component | proven |
 | CSP headers | `tests/e2e/phase08-journeys.spec.ts` | login response includes CSP without Tailwind CDN | playwright-unauth | proven |

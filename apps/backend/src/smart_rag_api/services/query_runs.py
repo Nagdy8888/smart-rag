@@ -7,10 +7,13 @@ from uuid import UUID
 import psycopg
 from pydantic import SecretStr
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.query_admission.messages import append_query_message
 from smart_rag_core.query_admission.service import (
     QueryRunRecord,
     RunCitationRecord,
     cancel_query_run,
+    fail_query_run,
     get_query_run,
     list_run_citations,
 )
@@ -76,6 +79,32 @@ class QueryRunService:
             postgres_rate_limit_url=SecretStr(self._postgres_url),
             valkey_client=self._valkey_client,
         )
+        try:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                append_query_message(
+                    connection,
+                    caller=caller,
+                    conversation_id=conversation_id,
+                    run_id=result.context.run_id,
+                    role="user",
+                    content=message,
+                )
+                connection.commit()
+        except (psycopg.Error, QueryAdmissionError) as exc:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                try:
+                    fail_query_run(
+                        connection,
+                        caller=caller,
+                        run_id=result.context.run_id,
+                    )
+                    connection.commit()
+                except QueryAdmissionError:
+                    connection.rollback()
+            del exc
+            raise QueryAdmissionError("message_persist_failed") from None
         stream_path = STREAM_PATH_TEMPLATE.format(run_id=result.context.run_id)
         return result.context, stream_path
 

@@ -114,13 +114,15 @@ describe("prohibited production patterns", () => {
     expect(names).not.toContain("gallery");
     expect(names).not.toContain("chat");
     expect(names).not.toContain("docs");
-    expect(names).not.toContain("admin");
+    expect(names).not.toContain("gallery");
     expect(names.some((name) => name.startsWith("frame_"))).toBe(false);
     expect(names).toEqual(
       expect.arrayContaining([
         "documents",
         "graph",
         "tables",
+        "admin",
+        "account",
         "team",
         "tools",
         "curation",
@@ -130,19 +132,22 @@ describe("prohibited production patterns", () => {
     );
   });
 
-  it("does not ship a DELETE /documents client or privileged Storage href helper", () => {
+  it("ships a DELETE /documents client and keeps citation href null", () => {
     const api = readFileSync(path.join(srcRoot, "lib/api.ts"), "utf8");
-    expect(api).not.toMatch(/DELETE[`'"\s]*\/documents\//);
-    expect(api).not.toContain("deleteDocument");
+    expect(api).toContain("deleteDocument");
+    expect(api).toMatch(/method:\s*"DELETE"/);
     const drawer = readFileSync(path.join(srcRoot, "lib/citation-drawer.ts"), "utf8");
     expect(drawer).toContain("return null");
+    expect(drawer).not.toContain("DOCUMENT_DELETE_UNAVAILABLE");
   });
 
   it("allows Auth-direct App Router folders", () => {
     const names = appRouteNames(path.join(srcRoot, "app"));
     expect(names).toEqual(
-      expect.arrayContaining(["login", "signup", "auth", "mfa", "invitations"]),
+      expect.arrayContaining(["login", "signup", "auth", "invitations"]),
     );
+    expect(names).not.toContain("mfa");
+    expect(names).not.toContain("unavailable");
   });
 
   it("does not embed service-role or privileged keys in frontend source", () => {

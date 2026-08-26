@@ -2,7 +2,7 @@
 title: Authorization model
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-24
 audience: engineering, security, reviewers
 ---
 
@@ -14,10 +14,10 @@ Smart RAG v1 authorization is **server-derived**, **fail-closed**, and **monoton
 
 | Role | Documents | ACL admin | Conversations | Tools | Upload (Phase 5) |
 | --- | --- | --- | --- | --- | --- |
-| owner | read/write all | grant/revoke/visibility | own + audit all | read + configure | with MFA |
-| admin | read/write all | grant/revoke/visibility | own + audit all | read + configure | with MFA |
-| member | read per visibility/ACL | **deny** | creator-private | read per permission | optional + MFA |
-| member (upload_enabled) | read per visibility/ACL | **deny** | creator-private | read per permission | with MFA |
+| owner | read/write all | grant/revoke/visibility | own + audit all | read + configure | ordinary authenticated session |
+| admin | read/write all | grant/revoke/visibility | own + audit all | read + configure | ordinary authenticated session |
+| member | read per visibility/ACL | **deny** | creator-private | read per permission | deny unless `upload_enabled` |
+| member (upload_enabled) | read per visibility/ACL | **deny** | creator-private | read per permission | ordinary authenticated session |
 | viewer | read per visibility/ACL | **deny** | creator-private | read per permission | deny |
 | disabled | deny | deny | deny | deny | deny |
 
@@ -97,7 +97,7 @@ Packet 3 **revokes** all `app`/`private`/`langgraph`/`lightrag` grants from `ano
 | `app.get_version_ingestion_status` | caller context, version_id | DEFINER ACL status. Empty set when unauthorized (HTTP 404) |
 | `app.delete_visible_document` | caller context, document_id | Owner/admin tombstone wrapping `exclude_version_from_retrieval`. Unreadable ids return NULL |
 | `app.list_run_citations` | caller context, run_id | Creator-only. ACL + current-version recheck nulls `chunk_id` when unavailable |
-| `app.accept_invitation` | token_hash, user_id, email, assurance_level | Refuses demotion; privileged/upload upgrades require AAL2 and revoke sessions |
+| `app.accept_invitation` | token_hash, user_id, email, assurance_level | Refuses demotion; privileged/upload upgrades revoke sessions. `assurance_level` is ignored |
 | `app.validate_caller_context` | caller_user_id, caller_role, authorization_version | Boolean membership + snapshot check |
 | `private.set_document_acl` | caller context, document, grantee, grant/revoke | Idempotent owner/admin-only ACL mutation with audit |
 | `app.set_document_visibility` | caller context, document, visibility | Owner/admin-only flip; restricted downgrade clears graph eligibility |

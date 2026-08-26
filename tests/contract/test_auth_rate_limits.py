@@ -165,3 +165,37 @@ def test_low_risk_read_emergency_limiter_is_audited() -> None:
     assert decision.degraded is True
     assert decision.owner == "fastapi_emergency"
     assert flags == ["rate_limit_degraded"]
+
+
+def test_valkey_success_emits_recovered_after_emergency() -> None:
+    """A later successful Valkey consume clears the degraded latch."""
+
+    from smart_rag_api.services.auth_rate_limits import RateLimitKind
+    from smart_rag_core.runtime.valkey import MemoryValkeyClient
+
+    events: list[str] = []
+    down = MemoryValkeyClient(fail_closed=True)
+    check_auth_rate_limit(
+        bucket_key=f"read-{uuid.uuid4()}",
+        max_attempts=3,
+        window_seconds=60,
+        postgres_url=None,
+        valkey_client=down,
+        kind=RateLimitKind.LOW_RISK_READ,
+        on_degraded=lambda: events.append("degraded"),
+        on_recovered=lambda: events.append("recovered"),
+    )
+    up = MemoryValkeyClient()
+    decision = check_auth_rate_limit(
+        bucket_key=f"read-{uuid.uuid4()}",
+        max_attempts=3,
+        window_seconds=60,
+        postgres_url=None,
+        valkey_client=up,
+        kind=RateLimitKind.LOW_RISK_READ,
+        on_degraded=lambda: events.append("degraded"),
+        on_recovered=lambda: events.append("recovered"),
+    )
+    assert decision.owner == "fastapi_valkey"
+    assert decision.degraded is False
+    assert events == ["degraded", "recovered"]

@@ -3,7 +3,7 @@ title: ADR — Privileged Auth administration boundary
 adr_id: ADR-privileged-auth-administration-boundary
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-24
 approver: "Phase 2 Packet 4 implementation"
 approval_date: "2026-08-13"
 ---
@@ -37,9 +37,10 @@ frontend, health, or `SharedSettings` paths.
   `auth_admin/`.
 - Invitation actors and domains are re-resolved from authoritative database
   rows. Provider delivery failure revokes the application invitation token.
-- Lost-factor recovery requires a distinct active owner/admin at AAL2 and a
-  bounded external verification reference. Completion deletes every provider
-  factor and globally logs out the subject before committing completion.
+- Lost-factor recovery requires a distinct active owner/admin and a bounded
+  external verification reference. AAL2 is not required. Completion deletes
+  every provider factor and globally logs out the subject before committing
+  completion. Frontend recovery UX is removed in P08-12.
 - Offboarding immediately disables the profile, removes upload capability,
   revokes sessions, and bumps the authorization snapshot. Export/purge remains
   explicitly deferred to its later owner.
@@ -53,3 +54,5 @@ frontend, health, or `SharedSettings` paths.
 - [AUTH_RATE_LIMIT_OWNERSHIP.md](../security/AUTH_RATE_LIMIT_OWNERSHIP.md)
 - [SUPABASE_JWKS_ROLLOVER.md](../runbooks/SUPABASE_JWKS_ROLLOVER.md)
 - [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md)
+
+Product Auth is single-factor after P08-11/P08-12. The frontend has no TOTP enroll/challenge UI. Operator factor deletion uses Auth Admin APIs only; see docs/runbooks/managed-auth-totp-residue.md.

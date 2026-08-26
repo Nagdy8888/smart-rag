@@ -52,6 +52,7 @@ extend-exclude = [
     ".cursor",
     "docs",
     "stitch_smart_rag_enterprise_console",
+    "_tmp_*.py",
 ]
 
 [tool.ruff.lint]

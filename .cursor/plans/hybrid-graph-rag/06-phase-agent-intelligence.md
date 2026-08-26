@@ -55,6 +55,25 @@ Complete these in order. A checked box requires committed implementation evidenc
 7. [x] [Implement Supabase checkpoints/store memory, idempotency/run-event GC, full governance enforcement, trace redaction, prompt versions, usage accounting, feedback, and immediate conversation deletion.](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md)
 8. [x] [Ship the thin authenticated developer UI and prove route, fallback, injection, idempotency, budget, outage, event-loop, and privacy gates.](./06-phase-agent-intelligence/packets/08-thin-developer-ui.md)
 
+Packets P06-09 through P06-15 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23.
+
+9. [ ] [Canonical amendment for general-chat strict-split, ADR, and packets P06-10 through P06-15.](./06-phase-agent-intelligence/packets/09-canonical-general-chat-amendment.md)
+10. [ ] [Implement typed knowledge-scope classification and deterministic NoRetrieval route compilation.](./06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md)
+11. [ ] [Drain successful LangGraph streams and classify expected cancellation without hiding real trace errors.](./06-phase-agent-intelligence/packets/11-sse-stream-lifecycle-tracing.md)
+12. [ ] [Implement bounded, budgeted general and user-text model answers without weakening document grounding.](./06-phase-agent-intelligence/packets/12-general-chat-execution.md)
+13. [ ] [Add authenticated query_studio_live with per-run resources and normal ACL, admission, and budget controls.](./06-phase-agent-intelligence/packets/13-authenticated-studio-live.md)
+14. [ ] [Add answer-origin, clarification, and citation-safe behavior to the main chat UI.](./06-phase-agent-intelligence/packets/14-chat-origin-ux.md)
+15. [ ] [Run all deterministic and live gates, inspect LangSmith traces, and update evidence and runbooks.](./06-phase-agent-intelligence/packets/15-integrated-verification.md)
+
+## Approved planned deviation: general-chat strict split
+
+User approval on 2026-08-25: add a strict dual-mode assistant to the production Ask path and a separate live LangSmith Studio graph. General questions may use OpenAI world knowledge. Company/document questions remain citation-required RAG. Mixed or uncertain scope returns clarification. Never fall back from insufficient company evidence to world knowledge.
+
+- Recorded in [`docs/adr/ADR-general-chat-strict-split.md`](../../../docs/adr/ADR-general-chat-strict-split.md).
+- Preserve `query_studio` as the deterministic, unbound, no-cost graph. Live retrieval uses only `query_studio_live` with a real developer JWT.
+- No service-role key or synthetic live identity is permitted.
+- P06-10 is the first coding packet after this markdown amendment.
+
 ## Phase sequence requirement
 
 **Program sequence item 6:** Agent intelligence covers deadline-bounded LangGraph, complete composable route matrix, escalation, deterministic Combined fusion/ablation, inference verification, optional-tool disclosure, memory, resumable streaming, reserve-once durable budgets, Valkey-down rate behavior, bounded CPU offload/event-loop telemetry, conversation deletion, traces, and thin UI.
@@ -87,7 +106,7 @@ Do not set `status: complete` until every `Done when` item below is proven.
 
 ## Canonical detailed requirements
 
-The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight ordered packets. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
+The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
 
 ### Phase 6 runtime Hybrid dependency contract
 

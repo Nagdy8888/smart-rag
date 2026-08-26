@@ -12,7 +12,11 @@ from scripts.ci.schema_fingerprint import (
     capture_schema_fingerprint,
     schema_fingerprint_sha256,
 )
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import (
+    refuse_hosted_destructive_dsn,
+    resolve_supabase_db_url,
+    try_connect,
+)
 
 KEY_TABLES = (
     "app.profiles",
@@ -32,9 +36,10 @@ def test_schema_fingerprint_covers_reset_determinism_contract() -> None:
     """Inventory roles, extensions, schema objects, and browser denials."""
 
     url = resolve_supabase_db_url()
+    refuse_hosted_destructive_dsn(url)
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip("Local Supabase fixture unreachable")
 
     with connection:
         fingerprint = capture_schema_fingerprint(connection)
@@ -47,9 +52,10 @@ def test_schema_objects_exist_and_invariants_hold() -> None:
     """Prove key tables, vector dim, triggers, and idempotency constraints."""
 
     url = resolve_supabase_db_url()
+    refuse_hosted_destructive_dsn(url)
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip("Local Supabase fixture unreachable")
 
     with connection:
         with connection.cursor() as cursor:

@@ -6,12 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { XSS_ENTITY, XSS_FILENAME } from "../lib/hostile-text-fixtures";
-import { DOCUMENT_DELETE_UNAVAILABLE, DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/citation-drawer";
-import { CitationDrawer } from "./chat-app";
-import { DocumentDetail } from "./document-detail";
-import { DocumentLibrary } from "./document-library";
-import { GraphExplorer } from "./graph-explorer";
-import { TablesApp } from "./tables-app";
+import { DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/citation-drawer";
+import { CitationDrawer } from "./chat/chat-app";
+import { DocumentDetail } from "./documents/document-detail";
+import { DocumentLibrary } from "./documents/document-library";
+import { GraphExplorer } from "./graph/graph-explorer";
+import { TablesApp } from "./tables/tables-app";
 import { SessionProvider } from "../lib/auth/session-provider";
 import { graphNotReadyCopy, limitationCopy } from "../lib/limitations";
 import type { CitationResponse } from "../lib/types";
@@ -23,8 +23,10 @@ const listDocuments = vi.fn();
 const listTables = vi.fn();
 const fetchVersionStatus = vi.fn();
 const inspectGraph = vi.fn();
+const searchGraphEntities = vi.fn();
 const analyzeTable = vi.fn();
 const fetchDocument = vi.fn();
+const deleteDocument = vi.fn();
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
@@ -77,6 +79,7 @@ vi.mock("../lib/api", async () => {
     fetchMeta: (...args: unknown[]) => fetchMeta(...args),
     fetchReady: (...args: unknown[]) => fetchReady(...args),
     fetchDocument: (...args: unknown[]) => fetchDocument(...args),
+    deleteDocument: (...args: unknown[]) => deleteDocument(...args),
     listConversations: vi.fn(async () => []),
     listDocuments: (...args: unknown[]) => listDocuments(...args),
     listTables: (...args: unknown[]) => listTables(...args),
@@ -90,6 +93,7 @@ vi.mock("../lib/api", async () => {
     listCitations: vi.fn(async () => []),
     fetchVersionStatus: (...args: unknown[]) => fetchVersionStatus(...args),
     inspectGraph: (...args: unknown[]) => inspectGraph(...args),
+    searchGraphEntities: (...args: unknown[]) => searchGraphEntities(...args),
     analyzeTable: (...args: unknown[]) => analyzeTable(...args),
   };
 });
@@ -116,9 +120,9 @@ beforeEach(() => {
     role: "member",
     authorization_version: 1,
     upload_enabled: true,
-    mfa_enrolled: true,
   });
   fetchDocument.mockResolvedValue({ ok: false, notFound: true });
+  deleteDocument.mockResolvedValue(undefined);
   listDocuments.mockResolvedValue([]);
   listTables.mockResolvedValue([]);
   fetchVersionStatus.mockResolvedValue(null);
@@ -129,6 +133,7 @@ beforeEach(() => {
     row_count: 0,
     depth: 3,
   });
+  searchGraphEntities.mockResolvedValue([]);
   analyzeTable.mockResolvedValue({
     table_id: "t",
     version_id: "v",
@@ -203,11 +208,23 @@ describe("GraphExplorer ACL vs Graph Pending", () => {
       row_count: 1,
       depth: 3,
     });
+    searchGraphEntities.mockResolvedValue([
+      {
+        object_id: "acme",
+        object_type: "entity",
+        chunk_id: "c1",
+        document_id: "d1",
+        version_id: "v1",
+        support: 1,
+      },
+    ]);
     renderSurface(<GraphExplorer />);
-    fireEvent.change(await screen.findByLabelText("Entity keys (comma-separated, max 12)"), {
+    fireEvent.change(await screen.findByLabelText("Search entities"), {
       target: { value: "acme" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: /acme/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Inspect graph" }));
     expect(await screen.findAllByText(limitationCopy("graph_acl_blindness"))).not.toHaveLength(0);
     expect(screen.queryByText("99")).toBeNull();
     expect(screen.queryByText("SECRET TITLE")).toBeNull();
@@ -223,14 +240,26 @@ describe("GraphExplorer ACL vs Graph Pending", () => {
       row_count: 0,
       depth: 3,
     });
+    searchGraphEntities.mockResolvedValue([
+      {
+        object_id: "acme",
+        object_type: "entity",
+        chunk_id: "c1",
+        document_id: "d1",
+        version_id: "v1",
+        support: 1,
+      },
+    ]);
     renderSurface(<GraphExplorer />);
-    fireEvent.change(await screen.findByLabelText("Entity keys (comma-separated, max 12)"), {
+    fireEvent.change(await screen.findByLabelText("Search entities"), {
       target: { value: "acme" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: /acme/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Inspect graph" }));
     expect(
-      await screen.findByText(limitationCopy("graph_pending"), { exact: false }),
-    ).toBeInTheDocument();
+      await screen.findAllByText(limitationCopy("graph_pending"), { exact: false }),
+    ).not.toHaveLength(0);
     expect(screen.getByText(graphNotReadyCopy(2), { exact: false })).toBeInTheDocument();
     expect(screen.queryByText(/restricted/i)).toBeNull();
     expect(screen.queryByText(/ineligible/i)).toBeNull();
@@ -259,11 +288,16 @@ describe("TablesApp source_ranges", () => {
     });
     renderSurface(<TablesApp />);
     fireEvent.click(await screen.findByRole("button", { name: /Sheet1/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    fireEvent.change(screen.getByLabelText("Filter column"), {
+      target: { value: "amount" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Analyze" }));
+    fireEvent.click(await screen.findByRole("button", { name: "View provenance" }));
     expect(await screen.findByText("Sheet1!A1:B2")).toBeInTheDocument();
-    expect(screen.getByText(XSS_FILENAME, { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText(XSS_FILENAME, { exact: false }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
-    expect(screen.getByText(/Client total is null/)).toBeInTheDocument();
+    expect(screen.queryByText(/Client total is null/)).toBeNull();
     expect(document.querySelector("img")).toBeNull();
   });
 });
@@ -275,7 +309,6 @@ describe("DocumentLibrary status and roles", () => {
       role: "viewer",
       authorization_version: 1,
       upload_enabled: true,
-      mfa_enrolled: false,
     });
     renderSurface(<DocumentLibrary />);
     expect(await screen.findByText(/Upload controls are hidden/)).toBeInTheDocument();
@@ -291,6 +324,7 @@ describe("DocumentLibrary status and roles", () => {
         visibility: "company",
         current_version_id: "ver-1",
         visibility_generation: 1,
+        created_at: "2026-08-24T00:00:00Z",
       },
     ]);
     fetchVersionStatus.mockResolvedValue({
@@ -328,11 +362,14 @@ describe("DocumentLibrary status and roles", () => {
       recent_jobs: [],
     });
     renderSurface(<DocumentLibrary />);
-    fireEvent.click(await screen.findByRole("button", { name: "Load status" }));
-    expect(await screen.findByText("Deletion pending")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Document actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Load status" }));
+    expect(await screen.findAllByText("Deletion pending")).not.toHaveLength(0);
     expect(screen.getByText(/index=none/)).toBeInTheDocument();
     expect(screen.getByText(limitationCopy("graph_pending"), { exact: false })).toBeInTheDocument();
-    expect(screen.getByText(DOCUMENT_DELETE_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByText(/Document deletion is not available/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Document actions" }));
+    expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
     expect(screen.queryByRole("button", { name: /delete document/i })).toBeNull();
     expect(screen.getByText(XSS_FILENAME, { exact: false })).toBeInTheDocument();
     expect(document.querySelector("img")).toBeNull();

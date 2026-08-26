@@ -3,7 +3,9 @@ import {
   applyAdmission,
   applySseFrame,
   createChatViewState,
+  hasKeptAnswer,
   resumeAfterSequence,
+  shouldShowChatFailureBanner,
 } from "./chat-view";
 import { parseSseBlock } from "./sse";
 
@@ -32,6 +34,18 @@ describe("chat view", () => {
     expect(resumeAfterSequence(state)).toBe(4);
   });
 
+  it("records prompt and completion tokens from usage events", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: usage\nid: 2\ndata: {"prompt_tokens":1234,"completion_tokens":88}',
+      ),
+    );
+    expect(state.diagnostics.promptTokens).toBe(1234);
+    expect(state.diagnostics.completionTokens).toBe(88);
+  });
+
   it("logs unknown events and continues", () => {
     let state = createChatViewState("k");
     state = applySseFrame(state, parseSseBlock("event: future_metric\ndata: {}"));
@@ -48,14 +62,26 @@ describe("chat view", () => {
 
   it("freezes token deltas after a terminal event", () => {
     let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 7\ndata: {"delta":"Hi"}'),
+    );
     state = applySseFrame(state, parseSseBlock("event: completed\nid: 8\ndata: {}"));
     state = applySseFrame(
       state,
       parseSseBlock('event: token_delta\nid: 9\ndata: {"delta":"late"}'),
     );
-    expect(state.answerText).toBe("");
+    expect(state.answerText).toBe("Hi");
     expect(state.terminal).toBe("completed");
     expect(state.lastSequence).toBe(9);
+  });
+
+  it("treats completed without answer or refusal as a protocol failure", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(state, parseSseBlock("event: completed\nid: 8\ndata: {}"));
+    expect(state.terminal).toBe("error");
+    expect(state.status).toBe("empty_answer");
+    expect(state.failure).toEqual({ kind: "protocol", detail: "empty_answer" });
   });
 
   it("ignores duplicate and older sequences", () => {
@@ -126,6 +152,67 @@ describe("chat view", () => {
     ]);
     expect(state.stage).toBe("deadline");
     expect(state.terminal).toBe("partial");
+    expect(state.failure).toBeNull();
+    expect(shouldShowChatFailureBanner(state)).toBe(false);
+  });
+
+  it("keeps the first terminal when a later error arrives", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"Hi"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: partial\nid: 2\ndata: {"reason":"verified_partial"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: error\nid: 3\ndata: {"code":"run_failed"}'),
+    );
+    expect(state.answerText).toBe("Hi");
+    expect(state.terminal).toBe("partial");
+    expect(state.failure).toBeNull();
+    expect(hasKeptAnswer(state)).toBe(true);
+    expect(shouldShowChatFailureBanner(state)).toBe(false);
+  });
+
+  it("does not open a failure banner when error arrives after tokens", () => {
+    let state = createChatViewState("k");
+    state = applyAdmission(state, {
+      run_id: "1271314a-dc2a-46b7-bff1-b4c630d78415",
+      reservation_id: "res-1",
+      route_family: "hybrid",
+      reconnect: false,
+    });
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"Hi"}'),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: error\nid: 2\ndata: {"code":"run_failed"}'),
+    );
+    expect(state.terminal).toBe("error");
+    expect(state.failure).toBeNull();
+    expect(shouldShowChatFailureBanner(state)).toBe(false);
+  });
+
+  it("opens a failure banner only when error has no kept tokens", () => {
+    let state = createChatViewState("k");
+    state = applyAdmission(state, {
+      run_id: "run-empty",
+      reservation_id: "res-1",
+      route_family: "hybrid",
+      reconnect: false,
+    });
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: error\nid: 1\ndata: {"code":"run_failed"}'),
+    );
+    expect(state.terminal).toBe("error");
+    expect(state.failure).toEqual({ kind: "protocol", detail: "run_failed" });
+    expect(shouldShowChatFailureBanner(state)).toBe(true);
   });
 
   it("keeps the answer when an unknown additive event is injected", () => {
@@ -145,6 +232,64 @@ describe("chat view", () => {
     expect(state.answerText).toBe("Hi!");
     expect(state.diagnostics.unknownEvents).toEqual(["future_metric"]);
     expect(state.terminal).toBeNull();
+  });
+
+  it("stores additive answer origin without inferring it from the route", () => {
+    let state = createChatViewState("k");
+    state = applyAdmission(state, {
+      run_id: "run-1",
+      reservation_id: "res-1",
+      route_family: "hybrid",
+      reconnect: false,
+    });
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: answer_origin\nid: 1\ndata: {"origin":"general_knowledge"}',
+      ),
+    );
+    expect(state.answerOrigin).toBe("general_knowledge");
+    expect(state.clarificationRequired).toBe(false);
+    expect(state.diagnostics.effectiveRoute).toBe("hybrid");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: answer_origin\nid: 2\ndata: {"origin":"ambiguous"}',
+      ),
+    );
+    expect(state.answerOrigin).toBe("ambiguous");
+    expect(state.clarificationRequired).toBe(true);
+  });
+
+  it("tolerates unknown origin payloads and isolates XSS text", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: answer_origin\nid: 1\ndata: {"origin":"<script>x</script>"}',
+      ),
+    );
+    expect(state.answerOrigin).toBe("<script>x</script>");
+    expect(state.clarificationRequired).toBe(false);
+    expect(state.terminal).toBeNull();
+  });
+
+  it("records hidden stray citations when origin is not company documents", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: citation_preview\nid: 1\ndata: {"citation_ids":["cite-1","cite-2"]}',
+      ),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: answer_origin\nid: 2\ndata: {"origin":"user_supplied_text"}',
+      ),
+    );
+    expect(state.diagnostics.citationIds).toEqual(["cite-1", "cite-2"]);
+    expect(state.diagnostics.strayCitationsHidden).toBe(2);
   });
 
   it("counts heartbeats and records cancelled as the terminal", () => {

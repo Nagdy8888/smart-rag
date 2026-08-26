@@ -1,13 +1,13 @@
 /**
- * Tool catalog and owner/admin enable/permissions.
+ * Bookmark redirect from `/tools` to `/admin?tab=tools`.
  */
-import { ToolsApp } from "../../../components/tools-app";
+import { redirect } from "next/navigation";
 
 /**
- * Render GET /tools cards. Enable remains server-enforced.
+ * Send legacy Tools bookmarks to the P08-14 destination.
  *
- * @returns Tools surface.
+ * @returns Never. `redirect` throws.
  */
-export default function ToolsPage() {
-  return <ToolsApp />;
+export default function ToolsRedirectPage() {
+  redirect("/admin?tab=tools");
 }

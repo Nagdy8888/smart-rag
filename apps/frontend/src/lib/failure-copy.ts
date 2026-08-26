@@ -7,7 +7,7 @@ import {
   STALE_ROW_VERSION_COPY,
 } from "./admin-copy";
 import type { ApiFailure } from "./api";
-import { MFA_REQUIRED_BANNER, SESSION_REVOKED_BANNER } from "./auth/copy";
+import { SESSION_REVOKED_BANNER } from "./auth/copy";
 import { handshakeBelowMinCopy } from "./handshake";
 import { displayText } from "./safe-text";
 
@@ -24,11 +24,12 @@ export function apiFailureBanner(failure: ApiFailure): string {
   switch (failure.kind) {
     case "upgrade":
       return handshakeBelowMinCopy();
-    case "mfa":
-      return MFA_REQUIRED_BANNER;
     case "auth":
       if (failure.detail === "session_revoked") {
         return SESSION_REVOKED_BANNER;
+      }
+      if (failure.status === 403) {
+        return FORBIDDEN_MUTATION_COPY;
       }
       return `Session rejected (${displayText(failure.detail)}). Sign in again. UI state is not authorization.`;
     case "budget":
@@ -44,6 +45,18 @@ export function apiFailureBanner(failure: ApiFailure): string {
       return `Limiter fail-closed (${displayText(failure.detail)}). Approved reads may degrade; cost mutations are denied.`;
     case "deleted":
       return "Conversation deleted. Reads, resume, and citations are denied. No source text is shown.";
+    case "conflict":
+      return `Request conflict (${displayText(failure.detail)}). Reload and retry.`;
+    case "validation":
+      return `Request invalid (${displayText(failure.detail)}).`;
+    case "protocol":
+      if (failure.detail === "empty_answer") {
+        return "The run completed without an answer.";
+      }
+      if (failure.detail === "run_failed") {
+        return GENERIC_PRODUCTION_ERROR;
+      }
+      return `Run error (${displayText(failure.detail)}).`;
     case "server":
       return GENERIC_PRODUCTION_ERROR;
     default: {
@@ -61,8 +74,6 @@ export function apiFailureBanner(failure: ApiFailure): string {
  */
 export function mutationFailureBanner(error: Error): string {
   switch (error.message) {
-    case "mfa_required":
-      return MFA_REQUIRED_BANNER;
     case "forbidden":
       return FORBIDDEN_MUTATION_COPY;
     case "budget_exhausted":
@@ -78,4 +89,23 @@ export function mutationFailureBanner(error: Error): string {
     default:
       return GENERIC_PRODUCTION_ERROR;
   }
+}
+
+/**
+ * Render one chat-run alert. The run ID appears at most once as a support
+ * reference. Internal status codes such as `run_failed` stay out of chrome.
+ *
+ * @param failure - Classified chat failure.
+ * @param runId - Durable run identifier, or null.
+ * @returns Single banner body.
+ */
+export function chatRunFailureBanner(
+  failure: ApiFailure,
+  runId: string | null,
+): string {
+  const body = apiFailureBanner(failure);
+  if (runId === null || runId === "") {
+    return body;
+  }
+  return `${body} Reference ${runId}.`;
 }

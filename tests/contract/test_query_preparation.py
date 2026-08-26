@@ -288,6 +288,16 @@ def test_counted_prep_consumes_profile_kind(
     db_connection.commit()
 
     def _caller_model(query: str, memory: object) -> PreparationModelPayload:
+        """Return a fixed preparation payload.
+
+        Args:
+            query: User query text.
+            memory: Unused memory snapshot.
+
+        Returns:
+            Deterministic preparation model payload.
+        """
+
         del memory
         return PreparationModelPayload(
             rewrite=query,

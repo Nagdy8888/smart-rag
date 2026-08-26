@@ -2,7 +2,7 @@
 title: Phase 6 Agent intelligence evidence
 owner: engineering-lead
 status: pending
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-25
 audience: engineering, reviewers
 phase: 6
 ---
@@ -1547,3 +1547,463 @@ not a mock `page.route` 503.
 
 **Please accept Phase 6** if the local Done-when evidence is enough, or keep
 the table above as explicit blockers.
+
+## P08-09 co-owned amendment — durable input and verified-final SSE
+
+Phase 8 packet 9 repairs production executor durability without unchecking
+completed Phase 6 packets. Existing admission, budget true-up, deadline,
+cancellation, ownership, idempotency, one-terminal, and replay/resume suites
+are preserved:
+
+- Fixture executors may still yield empty `completed`.
+- `test_pending_orphan_without_input_emits_worker_unavailable` still holds
+  when process input is missing and durable load is unavailable.
+- Production mapping now holds `generate_answer` draft text until
+  `verify_answer`, emits non-empty `token_delta`, and refuses empty
+  `completed`.
+
+Commands: `.\.venv\Scripts\pytest.exe tests/unit/test_sse_protocol.py tests/contract/test_sse_resume.py tests/contract/test_sse_heartbeat.py tests/unit/test_query_sse_mapping.py tests/unit/test_query_sse_executor.py -q` → 31 passed, 1 skipped.
+
+P08-20 documentation integrity: frontend action inventory and Phase 8
+docs now treat this co-owned SSE repair as closed. Do not restore empty
+`completed` success or typewriter streaming.
+
+P08-22 live stack (2026-08-25): local admit now inserts `app.runs` after
+the API image was rebuilt past MFA removal and pinned to
+`host.docker.internal:54322`. One bounded browser Composite run
+(`952d26fd-4c19-4fab-bcac-4c135854c772`) persisted `schema` then
+sanitized `error`/`run_failed` 14 ms after `query.sse.started`, with
+zero `token_delta` and zero usage. That is not verified-final delivery.
+Details are in
+[`phase-08-frontend-integration-evidence.md`](./phase-08-frontend-integration-evidence.md).
+
+## P06-08 narrow fix — LangSmith Studio Chat compatibility (2026-08-25)
+
+The completed Packet 8 developer surface had a Studio-only compatibility gap:
+`query_studio` accepted an arbitrary `messages` list but exposed neither
+LangGraph's typed message schema/reducer nor a terminal assistant turn. Graph
+mode worked, while Studio Chat could not complete a visible exchange.
+
+The narrow repair:
+
+- moves `messages` out of production `QueryGraphState` and into a
+  Studio-only state using `Annotated[list[AnyMessage], add_messages]`;
+- accepts both LangChain message objects and Studio/OpenAI-style message
+  mappings when deriving `user_query`;
+- routes every Studio terminal path through `emit_studio_response`, which
+  appends one `AIMessage` from verified/draft answer text or the existing safe
+  status/refusal;
+- preserves no paid admission, no application conversation-memory write, no
+  new gateway/tool call, and no fabricated retrieval success;
+- documents that the unbound Studio graph returns
+  `Insufficient authorized evidence.` for document questions.
+
+Current primary documentation was checked through Context7 library
+`/websites/langchain_oss_python_langgraph`: LangGraph chat state uses
+`AnyMessage` plus the `add_messages` reducer, and nodes append `AIMessage`
+updates.
+
+Verification:
+
+- `uv run pytest tests/unit/test_query_studio.py tests/contract/test_langgraph_config.py -q`
+  → 10 passed.
+- `uv run pytest tests/unit/test_query_graph_runtime.py tests/unit/test_query_routing_matrix.py tests/unit/test_query_retrieve_state_sync.py tests/unit/test_query_correction.py tests/unit/test_query_branches_citations.py tests/unit/test_query_admission_ceilings.py tests/unit/test_query_studio.py tests/contract/test_langgraph_config.py -q`
+  → passed (one unrelated Starlette deprecation warning).
+- focused Ruff over the five changed Python/test files → passed.
+- focused Pyright over the same files → 0 errors.
+- live `POST http://127.0.0.1:2024/runs/wait` with
+  `assistant_id=query_studio` and one `{"role":"human","content":"Hello"}`
+  input returned ordered `human` then `ai` messages; the assistant content was
+  the deterministic local greeting.
+
+The local Agent Server hot-reloaded all three graph exports successfully.
+Live retrieval/OpenAI binding remains intentionally unverified and unchanged.
+Rollback is to remove the Studio-only message state/emitter and restore direct
+Studio terminal edges to `END`; production FastAPI query execution is not
+affected.
+
+## P06-09 — Canonical general-chat amendment (2026-08-25)
+
+Markdown-only amendment. No application code, prompt, migration, or graph
+registration changed.
+
+Requirement: record the approved strict-split deviation, ADR, and additive
+Phase 6 packets P06-10 through P06-15. P06-14 is a Phase 6/Phase 8 co-owned
+UI amendment. Historical Phase 6 packets 1–8 and Phase 8 packet numbers
+remain unchanged.
+
+Files:
+
+- [`.cursor/plans/hybrid-graph-rag/00-global-contracts.md`](../../.cursor/plans/hybrid-graph-rag/00-global-contracts.md)
+- [`.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence.md`](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence.md)
+- [`.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md`](../../.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration.md)
+- [`.cursor/plans/hybrid-graph-rag/99-source-coverage.md`](../../.cursor/plans/hybrid-graph-rag/99-source-coverage.md)
+- [`.cursor/plans/hybrid-graph-rag/plan-integrity-lock.json`](../../.cursor/plans/hybrid-graph-rag/plan-integrity-lock.json)
+- packet files `09`–`15` under
+  [`.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/`](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/)
+- [`docs/adr/ADR-general-chat-strict-split.md`](../adr/ADR-general-chat-strict-split.md)
+- [`docs/README.md`](../README.md)
+- [`docs/adr/README.md`](../adr/README.md)
+
+Verification:
+
+| Command | Exit |
+| --- | --- |
+| `python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py --update` | 0 (107 canonical files) |
+| `python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py` | 0 |
+| `pnpm exec markdownlint-cli2 docs/adr/ADR-general-chat-strict-split.md docs/README.md docs/adr/README.md` | 0 |
+| `uv run python scripts/check_docs.py` | 0 (elapsed 254191 ms) |
+
+Proven: wrapper/packet titles match, reciprocal ADR/index links resolve, Phase 8
+does not renumber P08-22/P08-23, and P06-10 is the next coding packet.
+
+Unverified: none for this markdown packet.
+
+Rollback: delete the new packet files and ADR, revert the deviation/index
+sections, and restore the previous integrity lock.
+
+Handoff to P06-10: implement typed `KnowledgeScope` classification and
+deterministic NoRetrieval mode mapping without touching answer generation,
+Studio live, SSE lifecycle, or frontend code.
+
+## P06-10 — Typed knowledge-scope routing (2026-08-25)
+
+Requirement: classify `KnowledgeScope` with the approved priority, compile
+existing route families plus NoRetrieval answer modes, and copy scope onto
+graph state. No answer generation, Studio live, SSE lifecycle, or frontend
+edits.
+
+Classification proven:
+
+| Query | Scope | Route / mode |
+| --- | --- | --- |
+| `Hi` / `Hello` | `general_knowledge` | NoRetrieval / `general_model` |
+| `What can you do?` | `general_knowledge` | NoRetrieval / `general_model` |
+| capital of France / photosynthesis | `general_knowledge` | NoRetrieval / `general_model` |
+| `Rewrite this paragraph: …` | `user_supplied_text` | NoRetrieval / `user_text_model` |
+| invoice / `our` / document / table / relationship / summary / graph | `company_documents` | existing matrix; mode `None` |
+| `Hi, what is our refund period?` | `company_documents` | Hybrid |
+| France + our refund | `ambiguous` | NoRetrieval / `clarification` |
+| `Explain monetary policy` | `ambiguous` (no company signal) | NoRetrieval |
+| low-confidence / invalid / unavailable model | `ambiguous` | — |
+| company + malicious `GENERAL_KNOWLEDGE` | `company_documents` | one forced prep call |
+| `Why is the sky blue?` | model `general_knowledge` | exactly one prep call |
+| invoice without force | `company_documents` | zero prep calls |
+
+Existing Hybrid/Combined/Table/inspection/media matrix rows remain company
+scope with no NoRetrieval mode. Isolated `policy` is not a company signal.
+
+Verification:
+
+| Command | Exit |
+| --- | --- |
+| `uv run pytest tests/unit/test_knowledge_scope.py tests/unit/test_query_routing_matrix.py tests/contract/test_query_preparation.py tests/unit/test_query_profile.py -q` | 0 |
+| `uv run pytest tests/unit/test_knowledge_scope.py tests/unit/test_query_routing_matrix.py tests/unit/test_query_correction.py tests/unit/test_query_profile.py -q` | 0 (71 passed) |
+| `uv run ruff check packages/core/src/smart_rag_core/query_routing apps/agents/src/smart_rag_agents/query/state.py tests/unit/test_knowledge_scope.py` | 0 |
+| `uv run pyright` on changed routing/state/test files | 0 |
+
+`uv run pyright packages/core/src/smart_rag_core/query_routing` still reports
+pre-existing `branches.py` optional-member errors that this packet did not
+introduce.
+
+Unverified: live preparation-model scope quality on OpenAI.
+
+Rollback: remove `knowledge_scope.py` and the additive fields, restore
+`_extension`/`_needs_model` and the previous `query_profile_v1` hash.
+
+Handoff to P06-11: drain successful LangGraph SSE streams and classify
+expected cancellation without hiding real LangSmith errors.
+
+## P06-11 — SSE stream lifecycle and LangSmith tracing (2026-08-25)
+
+Requirement: drain successful LangGraph `astream` loops to
+`StopAsyncIteration`, call `aclose` only on unfinished streams, classify
+expected cancellation without converting `GeneratorExit` into success, and
+open a redacted `query.run.sse` parent around complete executor consumption.
+
+Lifecycle proven:
+
+| Fixture | `aclose_count` | `stream_exhausted` | Termination | Settlement |
+| --- | --- | --- | --- | --- |
+| verified terminal + trailing chunk | 0 | True | `completed` | persist once |
+| mid-stream cancel | 1 | False | `cancelled` | none |
+| empty verified answer | 0 | True | `error` | none |
+| HTTP consumer disconnect | n/a | n/a | background `completed` | resumable |
+| stuck executor after cancel | n/a | n/a | hard-cancel after 0.25s | n/a |
+
+Redaction proven: `query.run.sse` parents export correlation IDs, hashed
+user, route, and versions only. Query text, JWT, email, API-key, and
+passage canaries are absent. Tracing-disabled runs execute the thunk with
+no parent. A raised `RuntimeError("graph_failed")` stays an error.
+
+Verification:
+
+| Command | Exit |
+| --- | --- |
+| `uv run pytest tests/unit/test_query_sse_executor.py tests/unit/test_query_sse_mapping.py tests/unit/test_sse_protocol.py tests/contract/test_sse_resume.py tests/contract/test_sse_heartbeat.py tests/unit/test_query_run_sse_trace.py -q` | 0 (44 passed; `SUPABASE_URL`/`APP_ENV=test` required to collect `create_app` tests) |
+| `uv run ruff check` on `sse_stream.py`, `query_run_trace.py`, and the two new/updated unit files | 0 |
+| `uv run pyright packages/core/src/smart_rag_core/observability/query_run_trace.py tests/unit/test_query_run_sse_trace.py` | 0 |
+
+`uv run pyright` on `sse_stream.py` and `test_query_sse_executor.py` still
+reports pre-existing unused-import, bindings, and older-lambda errors that
+this packet did not introduce.
+
+Unverified: live LangSmith UI inspection that completed runs no longer
+surface `GeneratorExit` as intended success. Unit/contract proof is
+complete; live inspection is deferred to P06-15 and remains blocked without
+credentials.
+
+Rollback: restore the previous `execute()` early-return/`aclose` path,
+remove `query.run.sse` helpers, and restore the `_run_executor` cancel
+`break`.
+
+Handoff to P06-12: implement bounded general/user-text generation with
+`answer_origin` and `usage_kind="answer"`.
+
+## P06-12 — General and user-text execution (2026-08-25)
+
+Requirement: add a no-source `general_chat_v1` path that counts as
+`usage_kind="answer"`, set `answer_origin` on every new answer, and keep
+company grounding unchanged.
+
+Prompt: `general_chat_v1` SHA-256
+`b920c67bb472daa5cb5338d15025711cd5f9d4e94e9abfabda01216668a97d51`.
+Reuses `ANSWER_MODEL_ID=gpt-4o-mini`. No new usage kind or migration.
+
+Origin matrix:
+
+| Query | Origin | Model calls | Citations |
+| --- | --- | --- | --- |
+| `Hi` | `deterministic` | 0 | none |
+| `How can you help me?` | `general_knowledge` | 1 (`answer`) | none |
+| capital of France | `general_knowledge` | 1 | none |
+| rewrite supplied text | `user_supplied_text` | 1 | none |
+| mixed France + refund | `ambiguous` | 0 | none |
+| company, no evidence | `company_documents` | 0 | refusal |
+| company with evidence | `company_documents` | existing RAG | cited |
+
+SSE: additive `answer_origin` (`origin` field) before `token_delta`; schema
+major version stays `1`. Historical/null payloads emit no origin event.
+Mock general chat performs no DNS. Document-access claims are refused, not
+stripped. A second generation still raises `second_answer_generation`.
+
+Verification:
+
+| Command | Exit |
+| --- | --- |
+| `uv run pytest tests/unit/test_general_chat_gateway.py tests/unit/test_general_chat_generate.py tests/unit/test_answer_verifier.py tests/unit/test_query_graph_runtime.py tests/unit/test_query_sse_mapping.py tests/unit/test_prompt_registry.py -q` | 0 (52 passed) |
+| `uv run ruff check` on gateways, query_answer, prompts, query nodes, `query_graph_runtime.py` | 0 |
+| `uv run pyright` on `openai_general_chat.py`, `generate.py`, `models.py`, `schemas.py`, `versions.py` | 0 |
+
+`uv run pyright` on the full `query/` and `query_graph_runtime.py` trees
+still reports pre-existing checkpointer/bindings errors this packet did not
+introduce.
+
+Rollback: remove `general_chat_v1`, `openai_general_chat.py`,
+`answer_origin`, and the general-chat gateway/node branches.
+
+Handoff to P06-13: add authenticated `query_studio_live` without changing
+unbound `query_studio`.
+
+## P06-13 — Authenticated `query_studio_live` (2026-08-25)
+
+Requirement: add a separate Agent Server factory that admits a paid live
+Studio run after JWKS, profile, revocation, rate, and Composite/Auto
+budget checks. Unbound `query_studio` stays synthetic.
+
+Factory signature source: pinned `langgraph==1.2.11` /
+`langgraph-cli[inmem]==0.4.31` `langgraph_api._factory_utils` accepts
+`make_graph(runtime: ServerRuntime)` (0/1/2-arg variants). Installed
+`langgraph_sdk.runtime.ServerRuntime` documents
+`execution_runtime is None` for introspection. Implemented:
+
+```python
+@asynccontextmanager
+async def make_graph(runtime: ServerRuntime[None]) -> AsyncGenerator[StudioCompiledGraph, None]:
+```
+
+`langgraph.json` now registers `query_studio_live` at
+`./src/smart_rag_agents/query/studio_live.py:make_graph`. The
+`query_studio` entry is unchanged.
+
+Import boundaries: `studio_live.py` / `live_runtime.py` /
+`profile_snapshot.py` do not import `smart_rag_api` or FastAPI. Backend
+`query_graph_runtime.py` and `profile_loader.py` re-export the moved
+helpers. `AgentSettings` does not inherit `BackendSettings` and declares
+no service-role field.
+
+Admission/idempotency/redaction: same human message id reuses
+`uuid5(STUDIO_LIVE_NAMESPACE, thread:turn:hash)`; a new turn id gets a
+new key; role/version reload each seed; canary token is absent from
+state JSON, settings repr, and graph schemas. Disabled/missing/invalid/
+revoked tokens reject without `studio_local`. Introspection opens zero
+sockets. The per-run connection closes on success, error, and cancel.
+
+Verification:
+
+| Command | Exit |
+| --- | --- |
+| `uv run pytest tests/contract/test_langgraph_config.py tests/contract/test_import_boundaries.py tests/unit/test_query_studio.py tests/unit/test_query_studio_live.py tests/unit/test_query_graph_runtime.py -q` | 0 (52 passed) |
+| `uv run ruff check` on `studio_live.py`, `live_runtime.py`, `graph.py`, `profile_snapshot.py` | 0 |
+| `uv run pyright` on the same four files | 0 |
+
+Unverified: live JWT + hosted Supabase + budget + OpenAI + retrieval
+success. Marked **blocked** until those credentials and services are
+available. Do not treat mocked admit as live proof.
+
+Rollback: remove the `query_studio_live` graph entry; leave
+`query_studio` unbound. FastAPI SSE wiring is unchanged.
+
+Handoff to P06-14: add answer-origin, clarification, and citation-safe
+behavior to the main chat UI. `KNOWN_SSE_EVENT_TYPES` must include
+`answer_origin`.
+
+## P06-14 — Main chat origin UX (2026-08-25)
+
+Requirement: render additive `answer_origin` on the Ask surface without
+inferring origin from Hybrid/Combined/NoRetrieval route pills, and hide
+citation chips except for `company_documents` or a missing (legacy)
+origin.
+
+Labels:
+
+| Origin | Label | Citations |
+| --- | --- | --- |
+| `general_knowledge` | General knowledge | hidden |
+| `company_documents` | Company documents | shown |
+| `user_supplied_text` | Your text | hidden |
+| `deterministic` | Assistant | hidden |
+| `ambiguous` | Needs clarification | hidden; `LimitationCallout` with exact mixed-scope copy |
+| `null` / omitted | no origin badge | shown (legacy) |
+| unknown / XSS string | isolated text | hidden |
+
+Clarification copy (exact): “This question mixes general knowledge and
+company documents. Ask one general question or one document question so
+the answer source stays clear.”
+
+Empty-state title (exact): “Ask a general question, or ask about your
+company documents for a cited answer.”
+
+Auth, reconnect, cancellation, idempotency, verified-final token
+holding, and source-drawer authorization were not changed. Origin is
+never derived from `route_family`.
+
+Playwright Ask journey: **skipped**. `apps/frontend/playwright.config.ts`
+requires local GoTrue at `127.0.0.1:54321` and API at `:8000`. Those
+processes were not running for this packet, and local Supabase is a
+labelled destructive fixture rather than the hosted operator path.
+
+Verification:
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend test` | 0 (298 passed / 44 files) |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend build` | 0 (Next.js 16.3.0) |
+
+Rollback: remove `answer-origin.ts`, origin fields on `ChatViewState` /
+`AnswerSurface`, and restore the previous empty-state title. Leave SSE
+major version `1`.
+
+Handoff to P06-15: run deterministic plus live gates, inspect LangSmith
+or mark blocked, and update routing/budget/SSE/Studio docs.
+
+## P06-15 — Integrated verification (2026-08-25)
+
+Requirement: run the repository deterministic gates, prove the
+strict-split scenario matrix from existing tests, inspect LangSmith or
+mark it blocked, prove live Studio or mark it blocked, and update the
+named runbooks. Do not claim live success from mocks.
+
+Process overrides used for Python quality commands (local `.env` enables
+live-model and tracing flags that break mock-default constructors):
+`APP_ENV=local`, `MOCK_MODEL_MODE=true`, `ALLOW_TEST_IDENTITY=false`,
+`LANGSMITH_TRACING=false`. Values from `.env` were not printed.
+
+### Deterministic gates
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run python scripts/check.py --tier unit` | 0 | 1105 passed, 3 skipped; Phase 6 eval registry 0 |
+| `uv run python scripts/check.py --tier contract` | 1 | 416 passed, 21 skipped, 11 failed; see blockers |
+| `uv run python scripts/check.py --tier types` | 1 | Ratchet 379 vs baseline 0; pre-existing across 69 files |
+| `uv run ruff check .` | 0 | After excluding leftover `_tmp_*.py` scratch and sorting `__all__` / imports |
+| `uv run pyright` (full repo) | 1 | Same 379-error report as the ratchet |
+| `uv run pyright` on packet-owned files listed below | 0 | knowledge_scope, openai_general_chat, query_run_trace, studio_live, test_langsmith_tracing |
+| `pnpm --filter smart-rag-frontend test` | 0 | 298 passed |
+| `pnpm --filter smart-rag-frontend lint` | 0 | |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 | |
+| `pnpm --filter smart-rag-frontend build` | 0 | Next.js 16.3.0 |
+
+Packet-owned Pyright set:
+`knowledge_scope.py`, `openai_general_chat.py`, `query_run_trace.py`,
+`studio_live.py`, `test_langsmith_tracing.py`.
+
+Bounded repair in this packet:
+
+- Allow-list `openai_general_chat.py` in
+  `test_production_openai_calls_use_traced_helpers`. The adapter already
+  constructs the client with `traced_openai_client`.
+- Treat `_tmp*` the same as `.tmp*` in the authored-file scanner and
+  Ruff exclude so leftover P08-22 scratch does not fail
+  `test_process_environment_reads_are_centralized` or `ruff check .`.
+- Sort `smart_rag_core.security.__all__` and the
+  `test_query_routing_matrix.py` import block.
+
+### Scenario matrix (deterministic proof)
+
+| # | Scenario | Proof | Result |
+| --- | --- | --- | --- |
+| 1 | `Hi` → general-chat model, no retrieval | `test_knowledge_scope.test_full_greeting_is_general_knowledge`, `test_general_chat_generate` | Passed |
+| 2 | `How can you help me?` → general, one `answer` call, no citations | `test_general_chat_generate` | Passed |
+| 3 | Capital of France → general, no retrieval | `test_knowledge_scope`, `test_general_chat_generate` | Passed |
+| 4 | `Rewrite this paragraph: …` → user-text, one call | `test_knowledge_scope.test_rewrite_with_supplied_text_is_user_text` | Passed |
+| 5 | `What is our refund period?` → company; cited or refusal, never general fallback | `test_knowledge_scope`, `test_general_chat_generate` | Passed |
+| 6 | Current relationship → Combined unchanged | `test_query_routing_matrix` (`INV-SR-1001 related to procurement` → Combined Hybrid+graph local) | Passed |
+| 7 | Table request → StructuredTable unchanged | `test_query_routing_matrix` (`sum the Q1 sheet totals`) | Passed |
+| 8 | Mixed general+company → clarification, zero retrieval/model | `test_knowledge_scope.test_mixed_general_and_company_is_ambiguous` | Passed |
+| 9 | Follow-up after cited company answer stays company | `test_knowledge_scope.test_company_followup_memory_keeps_document_scope` | Passed |
+| 10 | Prompt injection cannot flip scope | `test_knowledge_scope.test_company_guard_overrides_malicious_general_model`, `test_general_chat_generate.test_prompt_injection_cannot_claim_document_access` | Passed |
+| 11 | Duplicate / reconnect is one paid run | `test_query_sse_executor` settlement once; Studio `test_same_human_message_reuses_idempotency_key` | Passed (unit) |
+| 12 | General call is `usage_kind=answer` on the reserved envelope | `test_general_chat_generate` / `QUERY_BUDGETS.md` | Passed (unit). Live reservation row **blocked** |
+| 13 | ACL downgrade/deletion hides evidence | `tests/contract/test_citation_acl_recheck.py` exists; not re-run live here | **Blocked** (needs durable Supabase ACL fixture) |
+| 14 | Expired/revoked Studio JWT rejects before model/retrieval | `test_query_studio_live` expired/revoked cases | Passed (unit). Live JWT **blocked** |
+
+### Live / LangSmith / Studio blockers
+
+| Gate | Status | Why |
+| --- | --- | --- |
+| LangSmith UI: completed runs no longer show `GeneratorExit` as success | **Blocked** | No browser LangSmith session in this run. Unit/contract lifecycle proof remains P06-11. Do not treat mocked spans as UI proof |
+| Live FastAPI Ask matrix (3 chats, cancel, gateway failure) | **Blocked** | Hosted JWT/API chat not exercised in this packet |
+| `query_studio` greeting/topology | **Blocked** | Unit passed (`test_query_studio`). Interactive Studio UI remains blocked |
+| `query_studio_live` general / authorized / unauthorized / new-turn / retry / expired | **Blocked** | Unit passed. Live execution blocked: `LANGGRAPH_STUDIO_LIVE_ENABLED` unset and no live token was loaded into the process |
+| Playwright Ask journey | **Skipped** | Config targets local GoTrue `:54321` and API `:8000`; those are not the hosted operator path |
+| Full contract tier | **Blocked** | 11 failures are local-fixture/live-stack, not this feature: ParadeDB `:54329` connect timeout; leftover `concurrency_cap` on `:54322`; role inventory 6 vs 5; thin-UI live JWT 401 / `query_ready` mismatch |
+
+### Documentation
+
+Updated: `QUERY_ROUTING.md`, `QUERY_BUDGETS.md`, `SSE.md`,
+`LANGSMITH_TRACING.md`, `LANGGRAPH_STUDIO.md`, `CONFIGURATION.md`,
+`.env.example`, `docs/README.md`.
+
+Covered: strict split, `answer_origin`, no company→world-knowledge
+fallback, Studio live token setup/rotation/removal without printing it,
+`query_studio` vs `query_studio_live`, `GeneratorExit` interpretation,
+rollback, troubleshooting.
+
+### Rollback
+
+1. Keep unbound `query_studio`. Remove `query_studio_live` from
+   `langgraph.json` and set `LANGGRAPH_STUDIO_LIVE_ENABLED=false`.
+2. Delete `LANGGRAPH_STUDIO_ACCESS_TOKEN` from gitignored env.
+3. Set `LANGSMITH_TRACING=false`.
+4. Revert Ask origin chrome if the UI amendment must be withdrawn.
+
+### User acceptance
+
+P06-15 deterministic unit/frontend/ruff/packet-owned Pyright are proven.
+Full types tier, full contract tier, live LangSmith UI, live Studio, live
+Ask, and Playwright remain **blocked**. Phase 6 wrapper items stay
+unchecked until you accept this evidence and the remaining live blockers
+are cleared or waived.

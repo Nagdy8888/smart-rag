@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { handshakeBelowMinCopy } from "../../src/lib/handshake";
-import { CALLBACK_FAILED, MFA_REQUIRED_BANNER } from "../../src/lib/auth/copy";
+import { CALLBACK_FAILED } from "../../src/lib/auth/copy";
 
 test("unauthenticated console shows sign-in", async ({ page }) => {
   await page.goto("/");
@@ -13,9 +13,7 @@ test("unauthenticated console shows sign-in", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "API readiness" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Signed outage copy" })).toHaveCount(0);
   await expect(page.getByTestId("app-shell-nav")).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Continue with Google (when enabled)" }),
-  ).toBeDisabled();
+  await expect(page.getByRole("button", { name: /google/i })).toHaveCount(0);
 });
 
 test("login form is fully visible in the first mobile viewport", async ({ page }) => {
@@ -48,9 +46,10 @@ test("callback replay shows generic failure copy", async ({ page }) => {
   await expect(page.getByText(CALLBACK_FAILED)).toBeVisible();
 });
 
-test("MFA required banner copy is on the challenge surface", async ({ page }) => {
+test("MFA challenge route is not a public Auth surface", async ({ page }) => {
   await page.goto("/mfa/challenge");
-  await expect(page.getByText(MFA_REQUIRED_BANNER)).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole("button", { name: /google/i })).toHaveCount(0);
 });
 
 test("handshake banner appears when min_client_version is 9.0.0", async ({
@@ -71,12 +70,12 @@ test("handshake banner appears when min_client_version is 9.0.0", async ({
   await expect(page.getByText(handshakeBelowMinCopy())).toBeVisible();
 });
 
-test("GAP-07-07 unavailable page has no recovery-code control", async ({
+test("retired GAP-07-07 route returns production 404", async ({
   page,
 }) => {
-  await page.goto("/unavailable/GAP-07-07");
-  await expect(page.getByRole("heading", { name: "Unavailable" })).toBeVisible();
-  await expect(page.getByText("GAP-07-07", { exact: true })).toBeVisible();
+  const response = await page.goto("/unavailable/GAP-07-07");
+  expect(response?.status()).toBe(404);
+  await expect(page).not.toHaveURL(/\/login/);
+  await expect(page.getByRole("heading", { name: "Unavailable" })).toHaveCount(0);
   await expect(page.getByLabel(/recovery/i)).toHaveCount(0);
-  await expect(page.locator("input")).toHaveCount(0);
 });

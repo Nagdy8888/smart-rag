@@ -60,19 +60,17 @@ Owner: client-approver + engineering-lead.
 - If not: stay on staging, publish a Hybrid-only internal pilot ADR, still no real corpus until C-001.
 
 ```mermaid
-gantt
-  title Hardening vs calendar
-  dateFormat YYYY-MM-DD
-  section Runtime honesty
-  Docs off CSP CORS mock failclosed :a1, 2026-08-19, 14d
-  Alias Arabic retrieval repair :a2, 2026-08-19, 21d
-  section Staging
-  Runnable host Compose TLS :b1, 2026-09-02, 30d
-  Provider matrix :b2, 2026-09-02, 30d
-  section Proof
-  Live evals holdout pentest :c1, 2026-10-04, 25d
-  section Go
-  Phase 11 or named pilot :d1, 2026-10-29, 20d
+flowchart TD
+  honesty["Runtime honesty 2026-08-19"] --> docsOff["Docs off, CSP, CORS, mock fail-closed"]
+  honesty --> aliasRepair["Alias and Arabic retrieval repair"]
+  docsOff --> staging["Staging from 2026-09-02"]
+  aliasRepair --> staging
+  staging --> composeTls["Runnable host Compose TLS"]
+  staging --> providerMatrix["Provider matrix"]
+  composeTls --> proof["Proof from 2026-10-04"]
+  providerMatrix --> proof
+  proof --> evals["Live evals, holdout, pentest"]
+  evals --> goDecision["Phase 11 or named pilot from 2026-10-29"]
 ```
 
 Dates are illustrative from the review day 2026-08-19.

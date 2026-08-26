@@ -554,9 +554,7 @@ def main(argv: list[str] | None = None) -> int:
         fill_restart = compose_start(REPO_ROOT, "valkey-limits")
         flush: dict[str, object] = {"passed": False, "detail": "password_missing"}
         if password:
-            flush = valkey_flush(
-                REPO_ROOT, service="valkey-limits", password=password
-            )
+            flush = valkey_flush(REPO_ROOT, service="valkey-limits", password=password)
         fill["flush"] = flush
         restore = restore_services(REPO_ROOT)
         restored = True

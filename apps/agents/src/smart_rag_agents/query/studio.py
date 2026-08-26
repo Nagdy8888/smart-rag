@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime, timedelta
-from typing import TypeAlias, cast
+from typing import Annotated, TypeAlias, cast
 from uuid import UUID, uuid4, uuid5
 
+from langchain_core.messages import AIMessage, AnyMessage, BaseMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
 from smart_rag_core.query_admission.ceilings import envelope_for_family
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
@@ -24,6 +26,7 @@ from typing_extensions import TypedDict
 
 from smart_rag_agents.query.graph import build_query_graph
 from smart_rag_agents.query.state import QueryGraphState, pending_query_state
+from smart_rag_agents.query.studio_tracing import apply_studio_langsmith_flags
 
 STUDIO_NAMESPACE = UUID("8f1c0d2a-4b7e-4c9a-9d31-7a6e5f4b3c21")
 """Stable UUID namespace for Studio conversation/user ids. Not an auth subject."""
@@ -47,14 +50,26 @@ class StudioQueryInput(TypedDict, total=False):
     route_family: str
     routing_surface: str
     requested_manual_route: str | None
-    messages: list[dict[str, object]]
+    messages: Annotated[list[AnyMessage], add_messages]
+
+
+class StudioQueryState(QueryGraphState):
+    """Query state extended with LangGraph's standard chat message channel.
+
+    Attributes:
+        messages: Human and assistant turns merged by ``add_messages``. The
+            channel is local to the Studio export and is not production
+            conversation memory or an authorization source.
+    """
+
+    messages: Annotated[list[AnyMessage], add_messages]
 
 
 StudioCompiledGraph: TypeAlias = CompiledStateGraph[
-    QueryGraphState,
+    StudioQueryState,
     None,
     StudioQueryInput,
-    QueryGraphState,
+    StudioQueryState,
 ]
 
 
@@ -114,16 +129,138 @@ def query_text_from_studio_input(state: object) -> str:
     if isinstance(raw, str) and raw.strip():
         return raw.strip()
     for item in reversed(_as_object_list(mapping.get("messages"))):
-        if not isinstance(item, dict):
+        if isinstance(item, BaseMessage):
+            role = item.type.lower()
+            content = item.content
+        elif isinstance(item, dict):
+            typed = cast(dict[str, object], item)
+            role = str(typed.get("role") or typed.get("type") or "").lower()
+            content = typed.get("content")
+        else:
             continue
-        typed = cast(dict[str, object], item)
-        role = str(typed.get("role") or typed.get("type") or "").lower()
         if role not in {"human", "user"}:
             continue
-        text = _text_from_message_content(typed.get("content"))
+        text = _text_from_message_content(content)
         if text:
             return text
     return ""
+
+
+def _studio_usage_label(state: QueryGraphState) -> str:
+    """Return a short token-consumption line when the run used a model.
+
+    Args:
+        state: Terminal query state with optional accumulated tokens.
+
+    Returns:
+        ``N prompt · M completion``, or empty when both counts are zero.
+    """
+
+    prompt = state.get("prompt_tokens")
+    completion = state.get("completion_tokens")
+    if not isinstance(prompt, int) or isinstance(prompt, bool):
+        return ""
+    if not isinstance(completion, int) or isinstance(completion, bool):
+        return ""
+    if prompt <= 0 and completion <= 0:
+        return ""
+    return f"{prompt:,} prompt · {completion:,} completion"
+
+
+def _with_studio_usage(text: str, state: QueryGraphState) -> str:
+    """Append token consumption under Studio answer text.
+
+    Args:
+        text: Safe answer or status fallback.
+        state: Terminal query state.
+
+    Returns:
+        ``text`` unchanged when the run spent no tokens.
+    """
+
+    usage = _studio_usage_label(state)
+    if not usage:
+        return text
+    return f"{text}\n\n{usage}"
+
+
+def _answer_text(value: object) -> str:
+    """Return non-empty ``answer_text`` from an answer-shaped mapping.
+
+    Args:
+        value: Untrusted graph-state fragment.
+
+    Returns:
+        Stripped answer text, or an empty string.
+    """
+
+    if not isinstance(value, dict):
+        return ""
+    mapping = cast(dict[str, object], value)
+    text = mapping.get("answer_text")
+    return text.strip() if isinstance(text, str) else ""
+
+
+def studio_response_text(state: QueryGraphState) -> str:
+    """Choose the safe terminal text rendered as the Studio assistant turn.
+
+    Args:
+        state: Terminal query state.
+
+    Returns:
+        Verified answer text when present, then draft answer text, then a safe
+        status/detail fallback. Provider token totals are appended only when
+        the run spent tokens. The function never fabricates retrieval
+        evidence.
+    """
+
+    verification = state.get("verification")
+    if isinstance(verification, dict):
+        text = _answer_text(verification.get("answer"))
+        if text:
+            return _with_studio_usage(text, state)
+    text = _answer_text(state.get("answer"))
+    if text:
+        return _with_studio_usage(text, state)
+    status = str(state.get("status") or "finished").replace("_", " ")
+    detail = str(state.get("detail") or "").strip()
+    fallback = f"{status}: {detail}" if detail else f"Studio run {status} without an answer."
+    return _with_studio_usage(fallback, state)
+
+
+def emit_studio_response(
+    state: StudioQueryState,
+) -> dict[str, list[AnyMessage]]:
+    """Append one assistant message for LangSmith Studio Chat mode.
+
+    State inputs:
+        Terminal ``answer`` / ``verification`` and safe status diagnostics.
+
+    State outputs:
+        One ``AIMessage`` update on the Studio-only ``messages`` channel.
+
+    Persistence writes:
+        None. The local Agent Server may retain the thread in its development
+        store; this node does not write application conversation memory.
+
+    External/model calls:
+        None.
+
+    Budget/deadline behavior:
+        Consumes no reservation, token, model, tool, or retry budget.
+
+    Failure/fallback route:
+        Missing answer text emits the existing safe status/detail rather than
+        claiming successful retrieval.
+
+    Args:
+        state: Terminal query graph state.
+
+    Returns:
+        A partial state update containing one assistant message.
+    """
+
+    return {"messages": [AIMessage(content=studio_response_text(state))]}
 
 
 def _thread_id(config: RunnableConfig) -> str:
@@ -211,7 +348,7 @@ def studio_authorized_runtime(
 
 
 def seed_studio_runtime(
-    state: QueryGraphState,
+    state: StudioQueryState,
     config: RunnableConfig,
 ) -> QueryGraphState:
     """Inject synthetic local context so Studio can run without FastAPI admit.
@@ -279,6 +416,8 @@ def seed_studio_runtime(
         requested_manual_route=manual,
     )
 
+
+apply_studio_langsmith_flags()
 
 graph: StudioCompiledGraph = build_query_graph(studio_local=True).compile()  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
 """Compiled Studio query graph. Checkpointer-free and unbound."""

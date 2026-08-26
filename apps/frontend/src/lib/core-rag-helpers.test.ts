@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { citationChipHref, DOCUMENT_DELETE_UNAVAILABLE } from "./citation-drawer";
+import { citationChipHref } from "./citation-drawer";
 import { COMPOSER_MAX_CHARS, composerDraftIsSendable } from "./composer";
 import { objectNameForUpload } from "./upload-client";
 
@@ -28,8 +28,9 @@ describe("objectNameForUpload", () => {
   });
 });
 
-describe("GAP-07-14 copy", () => {
-  it("documents that document delete HTTP is unavailable", () => {
-    expect(DOCUMENT_DELETE_UNAVAILABLE).toMatch(/not available/i);
+describe("GAP-07-14 removal", () => {
+  it("does not keep document-delete-unavailable copy", async () => {
+    const drawer = await import("./citation-drawer");
+    expect("DOCUMENT_DELETE_UNAVAILABLE" in drawer).toBe(false);
   });
 });

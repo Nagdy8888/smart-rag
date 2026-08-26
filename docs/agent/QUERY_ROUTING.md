@@ -2,7 +2,7 @@
 title: Query routing matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 2
 ---
@@ -32,7 +32,42 @@ Related: [QUERY_ADMISSION.md](./QUERY_ADMISSION.md) ·
 [COMBINED_FUSION.md](./COMBINED_FUSION.md) ·
 [ANSWER_VERIFICATION.md](./ANSWER_VERIFICATION.md) ·
 [PHASE6_HANDOFF.md](../graph/PHASE6_HANDOFF.md) ·
+[ADR-general-chat-strict-split.md](../adr/ADR-general-chat-strict-split.md) ·
+[SSE.md](../api/SSE.md) ·
 [docs index](../README.md)
+
+## Strict-split knowledge scope
+
+Every preparation records `knowledge_scope` before the route matrix.
+Company/document signals always win. Mixed or low-confidence scope is
+`ambiguous` and never retrieves. World knowledge is allowed only on
+`general_knowledge` and `user_supplied_text`. Company routes never fall
+back to world knowledge when evidence is missing; they refuse.
+
+| Scope | Effective family | Model | Citations / `answer_origin` |
+| --- | --- | --- | --- |
+| `deterministic` | `NoRetrieval` / `deterministic_chat` | 0 | none / `deterministic` |
+| `general_knowledge` | `NoRetrieval` / `general_model` | one `usage_kind=answer` | none / `general_knowledge` |
+
+Standalone greetings such as “Hi” and “Hello” are `general_knowledge`.
+They use one general-chat model call. They do not use the canned
+document-help line. A greeting prefix on a company question, such as
+“Hi, what is our refund period?”, still stays on documents.
+| `user_supplied_text` | `NoRetrieval` / `user_text_model` | one `usage_kind=answer` | none / `user_supplied_text` |
+| `ambiguous` | `NoRetrieval` / `clarification` | 0 | none / `ambiguous` |
+| `company_documents` | Hybrid / Combined / table / inspection as before | existing RAG | cited or refusal / `company_documents` |
+
+Follow-up turns stay `company_documents` when recent assistant memory
+contains citation or source-id evidence, unless the user clearly switches
+to a general-only or user-text-only request. Identity and capability
+prompts such as “Who are you?” and “How can you help me?”, and
+standalone greetings such as “Hi”, are that switch: they stay
+`general_knowledge` and do not ask for mixed-scope clarification. Prompt-injection text cannot force company claims onto
+the general path or force a world-knowledge fallback onto the company
+path.
+
+SSE emits additive `answer_origin` `{origin}` before `token_delta`. The
+Ask UI never infers origin from Hybrid/Combined/NoRetrieval pills.
 
 ## Memory
 
@@ -66,9 +101,10 @@ override is rejected.
 
 ```mermaid
 flowchart TD
-  start[QueryPreparation] --> nr{Greeting help or transform?}
-  nr -->|yes| none[NoRetrieval no company claims]
-  nr -->|no| gi{Explicit graph inspection?}
+  start[QueryPreparation] --> scope{Knowledge scope}
+  scope -->|deterministic general or user-text| none[NoRetrieval no company claims]
+  scope -->|ambiguous| clarify[NoRetrieval clarification no retrieval]
+  scope -->|company| gi{Explicit graph inspection?}
   gi -->|yes| inspect[GraphOnlyInspection not an answer]
   gi -->|no| media{Media-only without caption or OCR?}
   media -->|yes| mediaRef[ScopedRefusal media_limitation]
@@ -160,9 +196,17 @@ blindness counts are disclosed only on the authorized visibility path.
 `generate_answer` → `verify_answer` → END.
 
 Studio's module-level `graph` stays checkpointer-free and unbound. Local
-LangGraph Studio uses a separate `query_studio` graph that seeds synthetic
-`status=studio_local` context so you can step nodes without FastAPI admit
-([LANGGRAPH_STUDIO.md](../development/LANGGRAPH_STUDIO.md)). Live FastAPI SSE
-compiles per run via `query_graph_runtime.build_query_graph_deps` with Hybrid,
-counted gateway, prompts, optional LightRAG, and a per-run `app_api`
-connection. Missing Hybrid or gateway fails closed.
+LangGraph Studio uses two graphs
+([LANGGRAPH_STUDIO.md](../development/LANGGRAPH_STUDIO.md)):
+
+- `query_studio` seeds synthetic `status=studio_local` so you can step
+  nodes without FastAPI admit. It never opens sockets or spends budget.
+- `query_studio_live` is a separate factory. Execution admits a paid
+  Composite/Auto run after JWKS, profile, revocation, rate, and budget
+  checks. Introspection stays unbound. Disabled, missing, expired, or
+  revoked JWTs reject before retrieval or model work.
+
+Live FastAPI SSE compiles per run via
+`query_graph_runtime.build_query_graph_deps` with Hybrid, counted
+gateway, prompts, optional LightRAG, and a per-run `app_api` connection.
+Missing Hybrid or gateway fails closed.

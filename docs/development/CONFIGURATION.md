@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-26
 audience: developers, operators
 ---
 
@@ -23,10 +23,11 @@ Validation errors list field paths and categories but omit source values.
 | `MOCK_MODEL_MODE` | boolean; `true` | public | Secure default; selects frozen fixtures and denies DNS access to `api.openai.com`. Local live OpenAI is opt-in via gitignored env (`false` plus `OPENAI_API_KEY`). Real company content stays prohibited until the OpenAI org matrix is `verified` |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; `INFO` | public | Root JSON log threshold |
 | `OPENAI_API_KEY` | optional secret in mock mode | secret | Required when `MOCK_MODEL_MODE=false`; never logged or represented in plaintext |
-| `LANGSMITH_TRACING` | boolean; `false` | public | Off by default. When true, every gateway model/embedding call emits a redacted LangSmith span. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) |
+| `LANGSMITH_TRACING` | boolean; `false` | public | Off by default. When true, every gateway model/embedding call emits a redacted LangSmith span. Local Compose reads this from `.env.compose`, not leftover host pytest flags. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) |
 | `LANGSMITH_API_KEY` | optional secret | secret | Required when `LANGSMITH_TRACING=true`. Local LangGraph Studio UI also needs this key to attach at `smith.langchain.com/studio` even when tracing stays false. Never logged or represented in plaintext |
-| `LANGSMITH_PROJECT` | safe identifier; `smart-rag` | public | LangSmith project that receives redacted traces |
+| `LANGSMITH_PROJECT` | safe identifier; `smart-rag` | public | LangSmith project that receives redacted traces. Open this exact project in the UI |
 | `LANGSMITH_ENDPOINT` | optional HTTP URL | internal | Override for a non-default LangSmith API; unset uses the hosted default |
+| `LANGSMITH_EXPORT_IO` | boolean; `false` | public | Local-only. When `true` with `APP_ENV=local` and tracing on, LangSmith receives the user message, assistant reply, model prompts, and completions. Token counts and estimated USD export even when this flag is false. Staging and production reject the flag. API keys, JWTs, and embedding vectors stay omitted. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) and [ADR-local-langsmith-export-io.md](../adr/ADR-local-langsmith-export-io.md) |
 | `MOCK_MODEL_FIXTURE_ID` | safe identifier; `phase-1-foundation-v1` | internal | Included in fixture provenance; does not imply retrieval |
 | `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 16,384 | public | Deployable gateway input bound |
 | `VALKEY_LIMITS_URL` | optional URL | secret | Rate-limit Valkey. Packet 5 connects per command at request time, never at import. Unset falls back to Postgres for mutations |
@@ -46,6 +47,17 @@ Validation errors list field paths and categories but omit source values.
 | `ADMIN_ALERT_SMTP_PORT` | integer; `54325` | public | Exposed local SMTP port from `supabase/config.toml` `local_smtp.smtp_port` |
 | `ADMIN_ALERT_SMTP_FROM` | email; `alerts@localhost` | public | Envelope from for metadata-only admin alerts |
 | `ADMIN_ALERT_SMTP_TO` | email; `owner@localhost` | public | Owner/admin mailbox captured by Inbucket |
+
+## Agent-only variables
+
+These fields live on `AgentSettings` only. `AgentSettings` does not inherit
+`BackendSettings`. Live Studio loads `BackendSettings` separately for JWKS
+and DSNs. See [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md).
+
+| Variable | Type / default | Security | Contract |
+| --- | --- | --- | --- |
+| `LANGGRAPH_STUDIO_LIVE_ENABLED` | boolean; `false` | public | Enables authenticated `query_studio_live` execution. Introspection stays unbound. Enabled without a token rejects and never synthetic-admits |
+| `LANGGRAPH_STUDIO_ACCESS_TOKEN` | optional secret JWT | secret | Verified Supabase user access token for live Studio. Never a service-role key. Omitted from settings repr, logs, traces, checkpoints, and graph state. Rotate by replacing the gitignored value and restarting `langgraph dev`. Remove the variable and set live enabled to false to disable. Do not print this value |
 
 ## Phase 5 LightRAG settings
 
@@ -83,14 +95,15 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | --- | --- | --- | --- |
 | `API_BIND_HOST` | non-empty string; `0.0.0.0` | public | Uvicorn bind address used only by the console entrypoint |
 | `API_BIND_PORT` | integer 1–65,535; `8000` | public | Uvicorn container port |
-| `SUPABASE_URL` | HTTP origin; `http://127.0.0.1:54321` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. See local `iss` aliases below. |
+| `SUPABASE_URL` | HTTP origin; required except `APP_ENV=test` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Runtime Compose requires a hosted origin. `APP_ENV=test` injects the local fixture origin when unset. See local `iss` aliases below. |
 | `SUPABASE_JWT_AUDIENCE` | non-empty string; `authenticated` | public | Required JWT `aud` claim |
 | `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
-| `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api`. Compose API/worker must not use the postgres superuser DSN; see `APP_RUNTIME_DB_PASSWORD` |
+| `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api`. Compose API/worker must not use the postgres superuser DSN; see `APP_RUNTIME_DB_PASSWORD`. May be a transaction pooler for short API work. |
 | `APP_RUNTIME_DB_PASSWORD` | secret; required for local Compose | secret | Password for LOGIN wrapper `app_runtime`. `app_api` is NOLOGIN. See [LOCAL_RUNTIME_ROLES.md](../deployment/LOCAL_RUNTIME_ROLES.md) |
-| `API_SUPABASE_DB_URL` | optional secret URL | secret | Compose API DSN override. Must be non-superuser |
-| `WORKER_SUPABASE_DB_URL` | optional secret URL | secret | Compose worker DSN override. Must be non-superuser |
-| `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. |
+| `API_SUPABASE_DB_URL` | required secret URL for Compose | secret | Compose API transaction-pooler DSN as `app_runtime`. Interpolation fails closed if unset |
+| `WORKER_SUPABASE_DB_URL` | required secret URL for Compose | secret | Compose worker session/direct DSN as `app_runtime`. Interpolation fails closed if unset |
+| `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Session/direct checkpointer/store DSN. Falls back to `SUPABASE_DB_URL` only when that fallback is also session/direct. Port `6543` and `pgbouncer=true` fail closed. Role `app_checkpointer`, schema `langgraph`. Runtime never auto-migrates. |
+| `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Session/direct only. Unset = unconfigured. Never schema-admin. |
 | `CORS_ALLOW_ORIGINS` | comma-separated exact origins; `http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3010,http://localhost:3010` | public | Wildcards forbidden. Never pair `*` with credentials. `:3010` is the Playwright developer-console origin so tests do not reuse Compose `:3000` |
 | `API_VERSION` | `major.minor.patch`; `0.1.0` | public | Published by `GET /api/meta` |
 | `SSE_SCHEMA_VERSION` | safe token; `1` | public | Published by `GET /api/meta` and the first SSE `schema` event |
@@ -101,18 +114,26 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |
 | `RATE_LIMIT_RETRY_AFTER_SECONDS` | 1–3600; `60` | public | `Retry-After` on limiter 429/503 |
 
-Host `.env` sets `SUPABASE_URL=http://127.0.0.1:54321`. Compose API and worker
-interpolate `${SUPABASE_URL:-http://host.docker.internal:54321}` so a gitignored
-hosted-ingest env file can point JWKS at hosted Auth. The default remains
-local Docker GoTrue. When `APP_ENV=local` and `SUPABASE_URL` is one of
-those two local origins, FastAPI accepts `iss`
+Runtime Compose interpolates `${SUPABASE_URL:?set hosted SUPABASE_URL}`.
+There is no `host.docker.internal:54321` fallback. Wire hosted Auth with
+[`scripts/ops/wire_hosted_ingest_env.py`](../../scripts/ops/wire_hosted_ingest_env.py).
+The default project `.env` is also used for that interpolation. A fixture
+`SUPABASE_URL=http://127.0.0.1:54321` there overrides `.env.compose` and the
+service `env_file`, so the API rejects hosted browser JWTs with 401
+`unauthorized`. Start with [`scripts/dev.ps1`](../../scripts/dev.ps1) (loads
+`.env.compose` into the process and refuses a loopback API Auth host) and
+keep the fixture origin out of `.env` while Compose is running.
+`APP_ENV=test` may omit `SUPABASE_URL` and receives the local fixture
+origin. When `APP_ENV=local` and `SUPABASE_URL` is one of the two local
+fixture origins, FastAPI accepts `iss`
 `http://127.0.0.1:54321/auth/v1` or
 `http://host.docker.internal:54321/auth/v1`. Signature, `kid`, and `alg`
-still verify against the configured JWKS URL. Hosted demo ingest uses the
-hosted origin (no local `iss` alias). Staging and production never
+still verify against the configured JWKS URL. Hosted laptop runtime uses
+the hosted origin (no local `iss` alias). Staging and production never
 expand aliases. Do not mutate `GOTRUE_JWT_ISSUER` to paper over this split.
-See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md) and
-[demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md).
+See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md),
+[ADR-hosted-runtime-local-test-fixture.md](../adr/ADR-hosted-runtime-local-test-fixture.md),
+and [demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md).
 
 `X-Client-Version` is a request header, not an environment variable. New paid
 `POST /conversations/{conversation_id}/messages` must send a semver-like value
@@ -123,11 +144,12 @@ Phase 6 packet 1 query admission still uses
 classifies that bucket as `COST_MUTATION` (Valkey then Postgres, never
 fail-open).
 
-## Local Auth MFA (developer UI uploads)
+## Local Auth MFA (dormant provider capability)
 
-Owner, admin, and `upload_enabled` callers require a verified TOTP session
-(`aal2`). Local password grants are `aal1`. Enable TOTP in
-`supabase/config.toml`:
+Application authorization no longer requires TOTP or `aal2`. Owner, admin,
+and `upload_enabled` callers may upload and offboard at ordinary
+authenticated assurance. Supabase Auth may still expose dormant TOTP
+settings; they must not authorize. Historical local TOTP config:
 
 ```toml
 [auth.mfa]
@@ -155,7 +177,7 @@ listed in `additional_redirect_urls`. Local upload reserve still returns
 | `JOB_HEARTBEAT_INTERVAL_SECONDS` | integer 10–900; `60` | public | Heartbeat cadence while a job is leased |
 | `JOB_POLL_INTERVAL_SECONDS` | integer 1–60; `5` | public | Idle delay between queue polls |
 | `WORKER_CONCURRENCY` | integer 1–8; `2` | public | Maximum concurrently processed ingestion jobs |
-| `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Checkpointer/store DSN; defaults to `SUPABASE_DB_URL`. Role `app_checkpointer`, schema `langgraph`. Runtime never auto-migrates. |
+| `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Checkpointer/store DSN; defaults to `SUPABASE_DB_URL` only when that URL is session/direct. Role `app_checkpointer`, schema `langgraph`. Transaction pooler DSNs fail closed. Runtime never auto-migrates. |
 | `SMART_RAG_PROMPT_ENV` | `dev`, `staging`, or `prod`; `dev` | public | Prompt registry promotion. Unknown ids fail closed. See [prompts/CHANGELOG.md](../../apps/agents/src/smart_rag_agents/prompts/CHANGELOG.md) |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. Cap 4. |
 
@@ -216,9 +238,11 @@ Browser bundles may only contain publishable values. See
 
 | Variable | Type / default | Security | Contract |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | HTTP origin; `http://127.0.0.1:8000` | public | FastAPI origin for Bearer fetch SSE |
-| `NEXT_PUBLIC_SUPABASE_URL` | HTTP origin | public | Browser-direct Auth. Never a service-role URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | publishable anon key | public | Browser Auth only. Never the service role |
+| `NEXT_PUBLIC_API_BASE_URL` | HTTP origin; `http://127.0.0.1:8000` | public | FastAPI origin for Bearer fetch SSE. Must be supplied as a Docker **build-arg** when building the frontend image; runtime env does not rewrite the Next.js bundle. |
+| `NEXT_PUBLIC_SUPABASE_URL` | HTTP origin | public | Browser-direct Auth. Never a service-role URL. Docker image **build-arg**. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | publishable anon key | public | Browser Auth only. Never the service role. Docker image **build-arg**. |
+
+`GET /health/ready` is bounded (Postgres and checkpointer probes use a 1s connect timeout). The browser client aborts the public probe after 8000ms (`HEALTH_READY_TIMEOUT_MS`).
 
 ## Failure and security behavior
 

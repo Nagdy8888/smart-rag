@@ -8,24 +8,29 @@ from smart_rag_core.settings import BackendSettings
 
 from smart_rag_api.dependencies.identity import CallerContextDep
 from smart_rag_api.schemas.fastapi_security import MetaResponse
+from smart_rag_api.dependencies.services import clear_rate_limit_degraded
 from smart_rag_api.services.readiness import (
     ReadinessResponse,
     build_readiness,
     public_readiness_as_dict,
     readiness_as_dict,
+    valkey_probes_ok,
 )
 
 router = APIRouter(tags=["ops"])
 
 
-def _build_request_readiness(request: Request) -> ReadinessResponse:
-    """Compose readiness from lifespan-bound probes.
+def _compose_request_readiness(
+    request: Request, *, rate_limit_degraded: bool
+) -> ReadinessResponse:
+    """Build readiness from the request's lifespan-bound clients.
 
     Args:
         request: Request with lifespan state.
+        rate_limit_degraded: Whether the emergency limiter latch is set.
 
     Returns:
-        Honest readiness model used by public and operator views.
+        Honest readiness model for this probe.
     """
 
     settings: BackendSettings | None = getattr(request.app.state, "settings", None)
@@ -35,15 +40,43 @@ def _build_request_readiness(request: Request) -> ReadinessResponse:
         valkey_cache=getattr(request.app.state, "valkey_cache_client", None),
         lightrag_attached=getattr(request.app.state, "lightrag_adapter", None)
         is not None,
-        rate_limit_degraded=bool(
-            getattr(request.app.state, "rate_limit_degraded", False)
-        ),
+        rate_limit_degraded=rate_limit_degraded,
     )
 
 
+def _build_request_readiness(request: Request) -> ReadinessResponse:
+    """Compose readiness from lifespan-bound probes.
+
+    A stale ``rate_limit_degraded`` latch is cleared when both Valkey
+    probes are ``ok``. Ask stays blocked only while the emergency limiter
+    is still required.
+
+    Args:
+        request: Request with lifespan state.
+
+    Returns:
+        Honest readiness model used by public and operator views.
+
+    Side Effects:
+        Clears ``app.state.rate_limit_degraded`` when Valkey has recovered.
+    """
+
+    degraded = bool(getattr(request.app.state, "rate_limit_degraded", False))
+    payload = _compose_request_readiness(
+        request, rate_limit_degraded=degraded
+    )
+    if degraded and valkey_probes_ok(payload):
+        clear_rate_limit_degraded(request)
+        payload = _compose_request_readiness(request, rate_limit_degraded=False)
+    return payload
+
+
 @router.get("/health/live")
-def live() -> dict[str, str]:
+async def live() -> dict[str, str]:
     """Process liveness. Does not probe dependencies.
+
+    This handler is async so it stays on the event loop. Sync readiness
+    probes must not fill the default thread pool and hide liveness.
 
     Returns:
         ``status=live``.
@@ -93,8 +126,11 @@ def operator_ready(request: Request, caller: CallerContextDep) -> dict[str, obje
 
 
 @router.get("/api/meta", response_model=MetaResponse)
-def api_meta(request: Request) -> MetaResponse:
+async def api_meta(request: Request) -> MetaResponse:
     """Publish version handshake fields. Packet 6 owns enforcement.
+
+    This handler is async so a full sync thread pool cannot stall the
+    Ask compatibility handshake.
 
     Args:
         request: Request with settings.

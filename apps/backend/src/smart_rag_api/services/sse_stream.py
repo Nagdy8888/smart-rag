@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from uuid import UUID
@@ -18,7 +18,11 @@ from fastapi.responses import StreamingResponse
 import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
-from smart_rag_core.query_admission.service import QueryRunRecord
+from smart_rag_core.query_admission.service import (
+    QueryRunRecord,
+    load_query_run_runtime,
+    true_up_query_reservation,
+)
 
 # isort: on
 from smart_rag_core.security.identity import CallerContext
@@ -30,7 +34,14 @@ from smart_rag_core.sse.framing import format_sse_event
 from smart_rag_core.sse.sanitize import sanitize_error_payload
 from smart_rag_core.sse.store import PersistedRunEvent, RunEventStore
 
+from smart_rag_api.services.query_sse_mapping import (
+    QuerySseMapper,
+    assert_catalog_event,
+)
+
 LOGGER = logging.getLogger(__name__)
+CANCEL_GRACE_SECONDS = 0.25
+"""Cooperative executor cleanup window after an explicit cancel."""
 
 SSE_RESPONSE_HEADERS: dict[str, str] = {
     "Cache-Control": "no-cache",
@@ -42,6 +53,67 @@ _POLL_SECONDS = 0.05
 _NON_STARTABLE_STATUSES = frozenset(
     {"running", "completed", "cancelled", "partial", "failed"}
 )
+_STREAM_MODE_NAMES = frozenset({"updates", "values", "messages", "debug"})
+
+
+def _coerce_stream_token_count(value: object) -> int | None:
+    """Return a non-negative token count from a node or SSE field.
+
+    Args:
+        value: Graph or catalog token field.
+
+    Returns:
+        Integer count, or None when the value is missing or invalid.
+    """
+
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float) and value.is_integer() and value >= 0:
+        return int(value)
+    return None
+
+
+def _updates_mapping_from_chunk(raw_chunk: object) -> dict[str, object] | None:
+    """Unwrap one LangGraph ``astream`` updates payload.
+
+    Args:
+        raw_chunk: Dict ``{node: update}`` or ``(stream_mode, payload)``.
+
+    Returns:
+        Node-keyed mapping, or None when the chunk is not updates data.
+    """
+
+    chunk: object = raw_chunk
+    if isinstance(chunk, tuple) and len(chunk) == 2:
+        mode, data = chunk
+        if isinstance(mode, str) and mode in _STREAM_MODE_NAMES:
+            chunk = data
+    if not isinstance(chunk, dict):
+        return None
+    return {str(key): value for key, value in cast(dict[object, object], chunk).items()}
+
+
+def _token_counts_from_update(
+    typed_update: Mapping[str, object],
+) -> tuple[int | None, int | None]:
+    """Read prompt and completion totals from one node update.
+
+    Args:
+        typed_update: Node return mapping.
+
+    Returns:
+        ``(prompt_tokens, completion_tokens)`` with None for missing sides.
+    """
+
+    prompt = _coerce_stream_token_count(typed_update.get("prompt_tokens"))
+    if prompt is None:
+        prompt = _coerce_stream_token_count(typed_update.get("input_tokens"))
+    completion = _coerce_stream_token_count(typed_update.get("completion_tokens"))
+    if completion is None:
+        completion = _coerce_stream_token_count(typed_update.get("output_tokens"))
+    return prompt, completion
 
 
 class QueryRunExecutor(Protocol):
@@ -134,13 +206,19 @@ class LangGraphQueryRunExecutor:
         Side Effects:
             None at construction. First ``execute`` may open a Postgres pool
             and construct process Hybrid/gateway bindings.
-            ``PostgresSaver.setup()`` and ``PostgresStore.setup()`` are never
-            called.
+            ``PostgresSaver.setup()``, ``AsyncPostgresSaver.setup()``, and
+            ``PostgresStore.setup()`` are never called.
         """
 
         self._holder = None
+        self._async_holder = None
         self._store = None
         self._bindings = None
+        self.termination_summary: dict[str, object] = {
+            "termination_reason": "unknown",
+            "terminal_event_type": None,
+            "stream_exhausted": False,
+        }
 
     def _process_bindings(self, settings: object):
         """Return process-reusable Hybrid/gateway bindings.
@@ -177,18 +255,17 @@ class LangGraphQueryRunExecutor:
             ``(store_get, store_put)`` callables, or ``(None, None)``.
 
         Side Effects:
-            Opens a checkpointer pool and memory store on first use.
+            Opens a memory store on first use. The async checkpointer is
+            opened separately.
         """
 
         resolved = getattr(settings, "resolved_checkpoint_dsn", None)
         dsn = resolved() if callable(resolved) else None
-        if dsn is None:
+        if not isinstance(dsn, str) or not dsn:
             return None, None
-        if self._holder is None:
-            from smart_rag_agents.query.checkpointer import open_query_checkpointer
+        if self._store is None:
             from smart_rag_agents.query.store import open_query_memory_store
 
-            self._holder = open_query_checkpointer(dsn)
             self._store = open_query_memory_store(dsn)
         memory_store = self._store
         if memory_store is None:
@@ -211,6 +288,32 @@ class LangGraphQueryRunExecutor:
 
         return memory_store.get_compact, _bind_put
 
+    async def _ensure_async_checkpointer(self, settings: object):
+        """Open the compact async query checkpointer once per process.
+
+        Args:
+            settings: Backend settings with the checkpoint DSN.
+
+        Returns:
+            ``CompactAsyncPostgresSaver`` or ``None`` when no DSN is
+            configured.
+
+        Side Effects:
+            Opens an async checkpointer pool on first use. Never calls
+            ``setup()``.
+        """
+
+        if self._async_holder is not None:
+            return self._async_holder.saver
+        resolved = getattr(settings, "resolved_checkpoint_dsn", None)
+        dsn = resolved() if callable(resolved) else None
+        if not isinstance(dsn, str) or not dsn:
+            return None
+        from smart_rag_agents.query.checkpointer import open_query_async_checkpointer
+
+        self._async_holder = await open_query_async_checkpointer(dsn)
+        return self._async_holder.saver
+
     async def execute(
         self,
         *,
@@ -227,7 +330,8 @@ class LangGraphQueryRunExecutor:
 
         Yields:
             Status events and at most one terminal. Retrieved source text is
-            never copied into payloads.
+            never copied into payloads. Summary or assistant persist after
+            ``completed``/``partial`` cannot replace that terminal.
 
         Raises:
             asyncio.CancelledError: When the wrapping task is cancelled.
@@ -237,9 +341,6 @@ class LangGraphQueryRunExecutor:
 
         from smart_rag_core.observability.governance_gate import (
             assert_langsmith_export_permitted,
-        )
-        from smart_rag_core.observability.query_run_trace import (
-            query_run_trace_metadata,
         )
         from smart_rag_core.security.external_processing import ContentClass
         from smart_rag_core.settings import load_backend_settings
@@ -258,18 +359,14 @@ class LangGraphQueryRunExecutor:
             provider_settings_verified=settings.subprocessor_matrix_verified,
             local_unsigned_waiver=settings.allows_unsigned_local_live_providers(),
         )
-        trace_extra = query_run_trace_metadata(
-            run_id=context.run_id,
-            user_id=context.user_id,
-            requested_route=context.route_family.value,
-            effective_route=context.route_family.value,
-            corrected_route=None,
-            model_versions={},
-            prompt_versions={},
+        self._set_termination(
+            reason="unknown",
+            terminal_event_type=None,
+            stream_exhausted=False,
         )
-        del trace_extra
 
         if datetime.now(tz=UTC) >= context.deadline_at:
+            self._set_termination(reason="deadline", terminal_event_type="partial")
             yield ("deadline", {"route_family": context.route_family.value})
             yield ("partial", {"reason": "deadline_exhausted"})
             return
@@ -277,9 +374,6 @@ class LangGraphQueryRunExecutor:
         from smart_rag_agents.query.graph import (
             compile_query_graph,
             pending_query_state,
-        )
-        from smart_rag_core.query_routing.constants import (
-            LIMITATION_VERIFIER_OMITTED_LINKS,
         )
 
         from smart_rag_api.services.query_graph_runtime import (
@@ -289,11 +383,38 @@ class LangGraphQueryRunExecutor:
         )
 
         connection = None
-        stream_iter: object | None = None
+        connection_closed = False
+        stream_iter: AsyncIterator[object] | None = None
+        stream_exhausted = False
+        stream_aclose_called = False
+        terminal_yielded = False
+        successful_terminal_committed = False
+        last_remaining_calls = context.model_call_ceiling
+        last_status = "running"
+        last_prompt_tokens: int | None = None
+        last_completion_tokens: int | None = None
+
+        def _close_connection() -> None:
+            """Close the app_api connection exactly once.
+
+            Side Effects:
+                Closes ``connection`` when it is still open.
+            """
+
+            nonlocal connection_closed
+            if connection is None or connection_closed:
+                return
+            connection_closed = True
+            connection.close()
+
         try:
             bindings = self._process_bindings(settings)
             connection = open_run_app_api_connection(bindings.supabase_dsn)
-            store_get, store_put = self._bind_memory_store(settings)
+            store_binding = self._bind_memory_store(settings)
+            if inspect.isawaitable(store_binding):
+                store_get, store_put = await store_binding
+            else:
+                store_get, store_put = store_binding
             deps = build_query_graph_deps(
                 bindings=bindings,
                 connection=connection,
@@ -301,7 +422,7 @@ class LangGraphQueryRunExecutor:
                 store_get=store_get,
                 store_put=store_put,
             )
-            checkpointer = self._holder.saver if self._holder is not None else None
+            checkpointer = await self._ensure_async_checkpointer(settings)
             compiled = compile_query_graph(deps, checkpointer=checkpointer)
             state = pending_query_state(
                 authorized_runtime=context.model_dump(mode="json"),
@@ -313,69 +434,315 @@ class LangGraphQueryRunExecutor:
             }
             stream_method: Callable[..., AsyncIterator[object]] = compiled.astream  # type: ignore[reportUnknownMemberType]
             stream_iter = stream_method(state, cast(Any, config), stream_mode="updates")
-            last_remaining_calls = context.model_call_ceiling
-            last_status = "running"
+            mapper = QuerySseMapper()
+            LOGGER.info(
+                "query sse stream started",
+                extra={
+                    "event": "query.sse.started",
+                    "run_id": str(context.run_id),
+                },
+            )
             async for raw_chunk in stream_iter:
+                # A completed node may have consumed a reservation and written
+                # usage on this connection. Commit before the separate event
+                # store appends its status, otherwise both writers deadlock on
+                # the same run/reservation transaction.
+                connection.commit()
                 if cancel_event.is_set():
-                    return
-                chunk: object = raw_chunk
-                if not isinstance(chunk, dict):
-                    continue
-                updates = {
-                    str(node_name): update
-                    for node_name, update in cast(dict[object, object], chunk).items()
-                }
-                for node_name, update in updates.items():
-                    status = "running"
-                    update_map: dict[str, object] = {}
-                    if isinstance(update, dict):
-                        update_map = {
-                            str(key): value
-                            for key, value in cast(dict[object, object], update).items()
-                        }
-                        raw_status = update_map.get("status")
-                        if isinstance(raw_status, str) and raw_status:
-                            status = raw_status[:64]
-                            last_status = status
-                        remaining = update_map.get("remaining_model_calls")
-                        if isinstance(remaining, int):
-                            last_remaining_calls = remaining
-                    yield (
-                        "status",
-                        {"stage": node_name[:64], "status": status},
+                    self._set_termination(
+                        reason="cancelled",
+                        terminal_event_type="cancelled",
+                        stream_exhausted=False,
                     )
-                    verification = update_map.get("verification")
-                    if isinstance(verification, dict) and verification.get(
-                        "omitted_link_ids"
-                    ):
-                        yield (
-                            "limitation",
-                            {"code": LIMITATION_VERIFIER_OMITTED_LINKS},
+                    break
+                typed_chunk = _updates_mapping_from_chunk(raw_chunk)
+                if typed_chunk is not None:
+                    for node_update in typed_chunk.values():
+                        if isinstance(node_update, dict):
+                            typed_update = {
+                                str(key): value
+                                for key, value in cast(
+                                    dict[object, object], node_update
+                                ).items()
+                            }
+                            remaining = typed_update.get("remaining_model_calls")
+                            if isinstance(remaining, int):
+                                last_remaining_calls = remaining
+                            raw_status = typed_update.get("status")
+                            if isinstance(raw_status, str) and raw_status:
+                                last_status = raw_status[:64]
+                            prompt_tokens, completion_tokens = (
+                                _token_counts_from_update(typed_update)
+                            )
+                            if prompt_tokens is not None:
+                                last_prompt_tokens = prompt_tokens
+                            if completion_tokens is not None:
+                                last_completion_tokens = completion_tokens
+                for event_type, payload in mapper.consume_chunk(
+                    typed_chunk if typed_chunk is not None else cast(object, raw_chunk)
+                ):
+                    assert_catalog_event(event_type, payload)
+                    if event_type == "usage":
+                        event_prompt, event_completion = _token_counts_from_update(
+                            payload
                         )
-                    if update_map and raw_status_is_partial(update_map):
-                        yield (
-                            "deadline",
-                            {"route_family": context.route_family.value},
+                        if event_prompt is not None:
+                            last_prompt_tokens = event_prompt
+                        if event_completion is not None:
+                            last_completion_tokens = event_completion
+                    yield (event_type, payload)
+                    if event_type in {"completed", "partial", "error", "cancelled"}:
+                        if not terminal_yielded:
+                            terminal_yielded = True
+                            reason = (
+                                "error"
+                                if event_type == "error"
+                                else (
+                                    "cancelled"
+                                    if event_type == "cancelled"
+                                    else event_type
+                                )
+                            )
+                            self._set_termination(
+                                reason=reason,
+                                terminal_event_type=event_type,
+                            )
+                        if (
+                            event_type in {"completed", "partial"}
+                            and not successful_terminal_committed
+                        ):
+                            successful_terminal_committed = True
+                            self._commit_successful_terminal(
+                                context,
+                                mapper,
+                                remaining_model_calls=last_remaining_calls,
+                                terminal_status=last_status,
+                            )
+            else:
+                stream_exhausted = True
+                self._set_termination(
+                    reason=str(self.termination_summary.get("termination_reason")),
+                    terminal_event_type=(
+                        str(self.termination_summary["terminal_event_type"])
+                        if isinstance(
+                            self.termination_summary.get("terminal_event_type"),
+                            str,
                         )
-                        yield ("partial", {"reason": "deadline_exhausted"})
-                        return
-            if not cancel_event.is_set():
-                self._maybe_summarize(
-                    context,
-                    remaining_model_calls=last_remaining_calls,
-                    terminal_status=last_status,
+                        else None
+                    ),
+                    stream_exhausted=True,
                 )
-                yield ("completed", {})
+            if stream_exhausted and not cancel_event.is_set():
+                for event_type, payload in mapper.finish():
+                    assert_catalog_event(event_type, payload)
+                    yield (event_type, payload)
+                    if event_type in {"completed", "partial", "error", "cancelled"}:
+                        terminal_yielded = True
+                        self._set_termination(
+                            reason=("error" if event_type == "error" else event_type),
+                            terminal_event_type=event_type,
+                            stream_exhausted=True,
+                        )
+                    if (
+                        event_type in {"completed", "partial"}
+                        and not successful_terminal_committed
+                    ):
+                        successful_terminal_committed = True
+                        self._commit_successful_terminal(
+                            context,
+                            mapper,
+                            remaining_model_calls=last_remaining_calls,
+                            terminal_status=last_status,
+                        )
         except QueryGraphRuntimeError as exc:
+            self._set_termination(reason="error", terminal_event_type="error")
             yield ("error", {"code": exc.reason})
+        except asyncio.CancelledError:
+            self._set_termination(
+                reason="interrupted",
+                terminal_event_type=str(
+                    self.termination_summary.get("terminal_event_type")
+                )
+                if self.termination_summary.get("terminal_event_type")
+                else "cancelled",
+                stream_exhausted=stream_exhausted,
+            )
+            raise
+        except GeneratorExit:
+            self._set_termination(
+                reason="interrupted",
+                stream_exhausted=stream_exhausted,
+            )
+            raise
+        except Exception:
+            self._set_termination(reason="error", terminal_event_type="error")
+            raise
         finally:
-            if connection is not None:
-                connection.close()
-            close = getattr(stream_iter, "aclose", None)
-            if callable(close):
-                closed = close()
-                if inspect.isawaitable(closed):
-                    await closed
+            self._record_stream_usage(
+                input_tokens=last_prompt_tokens,
+                output_tokens=last_completion_tokens,
+            )
+            _close_connection()
+            if (
+                stream_iter is not None
+                and not stream_exhausted
+                and not stream_aclose_called
+            ):
+                stream_aclose_called = True
+                await self._aclose_stream(stream_iter)
+
+    def _set_termination(
+        self,
+        *,
+        reason: str,
+        terminal_event_type: str | None = None,
+        stream_exhausted: bool | None = None,
+    ) -> None:
+        """Store a sanitized stream-termination summary.
+
+        Args:
+            reason: ``completed``, ``partial``, ``cancelled``, ``deadline``,
+                ``error``, ``interrupted``, or ``unknown``.
+            terminal_event_type: First SSE terminal type, if any.
+            stream_exhausted: Override for natural ``astream`` exhaustion.
+                ``None`` keeps the current value.
+        """
+
+        exhausted = self.termination_summary.get("stream_exhausted")
+        kept = exhausted if stream_exhausted is None else stream_exhausted
+        previous = self.termination_summary
+        self.termination_summary = {
+            "termination_reason": reason,
+            "terminal_event_type": terminal_event_type,
+            "stream_exhausted": kept,
+        }
+        for key in (
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "estimated_cost_usd",
+        ):
+            value = previous.get(key)
+            if value is not None:
+                self.termination_summary[key] = value
+
+    def _record_stream_usage(
+        self,
+        *,
+        input_tokens: int | None,
+        output_tokens: int | None,
+    ) -> None:
+        """Attach accumulated token counts and estimated USD to the summary.
+
+        Args:
+            input_tokens: Latest graph ``prompt_tokens`` total.
+            output_tokens: Latest graph ``completion_tokens`` total.
+
+        Side Effects:
+            Updates ``termination_summary`` usage fields. Does not log text.
+        """
+
+        if input_tokens is None and output_tokens is None:
+            return
+        input_count = 0 if input_tokens is None else input_tokens
+        output_count = 0 if output_tokens is None else output_tokens
+        from smart_rag_core.observability.langsmith_tracing import (
+            estimate_traced_chat_cost_usd,
+        )
+
+        self.termination_summary["input_tokens"] = input_count
+        self.termination_summary["output_tokens"] = output_count
+        self.termination_summary["total_tokens"] = input_count + output_count
+        self.termination_summary["estimated_cost_usd"] = float(
+            estimate_traced_chat_cost_usd(
+                input_tokens=input_count,
+                output_tokens=output_count,
+            )
+        )
+
+    async def _aclose_stream(self, stream_iter: AsyncIterator[object]) -> None:
+        """Close an unfinished LangGraph stream without converting GeneratorExit.
+
+        Args:
+            stream_iter: ``astream`` iterator that did not exhaust naturally.
+
+        Raises:
+            GeneratorExit: Re-raised when the generator is being closed.
+            asyncio.CancelledError: Re-raised after ``aclose`` finishes.
+        """
+
+        close = getattr(stream_iter, "aclose", None)
+        if not callable(close):
+            return
+
+        async def _close() -> None:
+            """Await ``aclose`` when it returns an awaitable."""
+
+            closed = close()
+            if inspect.isawaitable(closed):
+                await closed
+
+        close_task = asyncio.create_task(_close())
+        try:
+            await asyncio.shield(close_task)
+        except asyncio.CancelledError:
+            await close_task
+            raise
+        except GeneratorExit:
+            raise
+
+    def _commit_successful_terminal(
+        self,
+        context: AuthorizedRuntimeContext,
+        mapper: QuerySseMapper,
+        *,
+        remaining_model_calls: int,
+        terminal_status: str,
+    ) -> None:
+        """Write summary and assistant text after a non-error terminal.
+
+        The caller must already have yielded ``completed`` or ``partial``.
+        Persist failures stay off the SSE log so they cannot overwrite that
+        terminal with ``error``.
+
+        Args:
+            context: Authorized run context.
+            mapper: Mapper that emitted the verified terminal.
+            remaining_model_calls: Remaining counted calls after the graph.
+            terminal_status: Last node status.
+
+        Side Effects:
+            May consume ``usage_kind=summary`` and insert one assistant
+            ``app.messages`` row. Logs ``error_type`` only when a write
+            fails.
+        """
+
+        try:
+            self._maybe_summarize(
+                context,
+                remaining_model_calls=remaining_model_calls,
+                terminal_status=terminal_status,
+            )
+        except Exception as exc:
+            LOGGER.info(
+                "query summary skipped",
+                extra={
+                    "event": "query.sse.summary_failed",
+                    "error_type": type(exc).__name__,
+                    "run_id": str(context.run_id),
+                },
+            )
+        try:
+            self._persist_assistant_answer(context, mapper)
+        except Exception as exc:
+            LOGGER.info(
+                "assistant message persist skipped",
+                extra={
+                    "event": "query.sse.assistant_persist_failed",
+                    "error_type": type(exc).__name__,
+                    "run_id": str(context.run_id),
+                },
+            )
 
     def _maybe_summarize(
         self,
@@ -421,6 +788,14 @@ class LangGraphQueryRunExecutor:
             key: str,
             payload: dict[str, object],
         ) -> None:
+            """Write one compacted store item.
+
+            Args:
+                namespace: Store namespace tuple.
+                key: Item key.
+                payload: JSON-compatible value.
+            """
+
             store.put_compact(namespace, key, payload)
 
         with psycopg.connect(postgres_url) as connection:
@@ -439,6 +814,58 @@ class LangGraphQueryRunExecutor:
                 store_put=_put,
             )
             connection.commit()
+
+    def _persist_assistant_answer(
+        self,
+        context: AuthorizedRuntimeContext,
+        mapper: QuerySseMapper,
+    ) -> None:
+        """Persist verified assistant prose when a DSN and text exist.
+
+        Args:
+            context: Authorized run context.
+            mapper: Mapper that emitted the verified terminal.
+
+        Side Effects:
+            Inserts one assistant ``app.messages`` row. Skips when the DSN
+            or verified text is missing. Never logs message content.
+        """
+
+        answer_text = mapper.verified_text
+        if not answer_text:
+            return
+        from smart_rag_core.query_admission.messages import append_query_message
+        from smart_rag_core.query_routing.preparation import caller_from_runtime
+        from smart_rag_core.settings import load_backend_settings
+
+        settings = load_backend_settings()
+        postgres_url = (
+            settings.supabase_db_url.get_secret_value()
+            if settings.supabase_db_url is not None
+            else None
+        )
+        if postgres_url is None:
+            return
+        try:
+            with psycopg.connect(postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                append_query_message(
+                    connection,
+                    caller=caller_from_runtime(context),
+                    conversation_id=context.conversation_id,
+                    run_id=context.run_id,
+                    role="assistant",
+                    content=answer_text,
+                )
+                connection.commit()
+        except (QueryAdmissionError, psycopg.Error):
+            LOGGER.info(
+                "assistant message persist skipped",
+                extra={
+                    "event": "query.sse.assistant_persist_failed",
+                    "run_id": str(context.run_id),
+                },
+            )
 
 
 def raw_status_is_partial(update: dict[str, object]) -> bool:
@@ -592,6 +1019,7 @@ class SseStreamService:
         executor: QueryRunExecutor,
         sse_schema_version: str,
         heartbeat_interval_seconds: int = HEARTBEAT_INTERVAL_SECONDS,
+        postgres_url: str | None = None,
     ) -> None:
         """Bind store, registry, and executor.
 
@@ -601,6 +1029,9 @@ class SseStreamService:
             executor: LangGraph production executor or a test fixture.
             sse_schema_version: Value for the first ``schema`` event.
             heartbeat_interval_seconds: Production default is 15.
+            postgres_url: Optional ``app_api`` DSN for durable resume and
+                reservation settlement. Unit tests omit this so missing
+                process input stays ``worker_unavailable``.
         """
 
         self._store = store
@@ -608,6 +1039,8 @@ class SseStreamService:
         self._executor = executor
         self._sse_schema_version = sse_schema_version
         self._heartbeat_interval_seconds = heartbeat_interval_seconds
+        self._postgres_url = postgres_url
+        self._settled_run_ids: set[UUID] = set()
 
     def remember_admitted(
         self,
@@ -662,16 +1095,27 @@ class SseStreamService:
             run_id: Run to cancel.
         """
 
+        handle = self._registry.get(run_id)
         self._registry.request_cancel(run_id)
         try:
             self._store.get_authorized_run(caller, run_id=run_id)
         except QueryAdmissionError:
             return
-        self._append(caller, run_id, "cancelled", {})
-        handle = self._registry.get(run_id)
-        if handle is not None:
+        if not self._has_terminal(caller, run_id):
+            self._append(caller, run_id, "cancelled", {})
+        if handle is None:
+            return
+        heartbeat = handle.heartbeat_task
+        if heartbeat is not None and not heartbeat.done():
+            heartbeat.cancel()
+        executor = handle.executor_task
+        if executor is None or executor.done():
             handle.terminal = True
-            self._cancel_tasks(handle)
+            return
+        loop = executor.get_loop()
+        loop.call_soon_threadsafe(
+            lambda: loop.create_task(self._cooperative_cancel(handle))
+        )
 
     async def iter_frames(
         self,
@@ -720,15 +1164,20 @@ class SseStreamService:
 
         if live is None and record.status == "pending":
             if context is None and not self._registry.has_input(run_id):
-                self._emit_worker_unavailable(caller, run_id)
-                async for frame, sequence, terminal in self._replay(
-                    caller, run_id, cursor
-                ):
-                    cursor = sequence
-                    yield frame
-                    if terminal:
-                        return
-                return
+                loaded = self._load_durable_start(caller, run_id)
+                if loaded is None:
+                    self._emit_worker_unavailable(caller, run_id)
+                    async for frame, sequence, terminal in self._replay(
+                        caller, run_id, cursor
+                    ):
+                        cursor = sequence
+                        yield frame
+                        if terminal:
+                            return
+                    return
+                message, runtime = loaded
+                self._registry.remember_input(run_id, message, runtime)
+                context = runtime
             live = self._registry.get_or_create(run_id)
             self._start_once(caller, record, live, context)
 
@@ -803,6 +1252,14 @@ class SseStreamService:
             )
         message = self._registry.take_input(record.run_id)
         runtime = context or self._registry.take_context(record.run_id)
+        if (not message or runtime is None) and self._postgres_url:
+            loaded = self._load_durable_start(caller, record.run_id)
+            if loaded is not None:
+                loaded_message, loaded_runtime = loaded
+                if not message:
+                    message = loaded_message
+                if runtime is None:
+                    runtime = loaded_runtime
         live.executor_task = asyncio.create_task(
             self._run_executor(caller, record, live, message, runtime)
         )
@@ -830,25 +1287,139 @@ class SseStreamService:
         """
 
         runtime = context or self._registry.take_context(record.run_id)
+        if (runtime is None or not message) and self._postgres_url:
+            loaded = self._load_durable_start(caller, record.run_id)
+            if loaded is not None:
+                loaded_message, loaded_runtime = loaded
+                if not message:
+                    message = loaded_message
+                if runtime is None:
+                    runtime = loaded_runtime
         if runtime is None:
             self._emit_worker_unavailable(caller, record.run_id)
             live.terminal = True
             self._cancel_tasks(live)
             return
         try:
-            async for event_type, payload in self._executor.execute(
-                context=runtime,
-                message=message,
-                cancel_event=live.cancel_event,
-            ):
-                if live.cancel_event.is_set():
-                    break
-                self._append(caller, record.run_id, event_type, payload)
-            if not self._has_terminal(caller, record.run_id):
-                if live.cancel_event.is_set():
-                    self._append(caller, record.run_id, "cancelled", {})
+            from smart_rag_core.observability.query_run_trace import (
+                invoke_traced_query_run_sse,
+            )
+            from smart_rag_core.settings import (
+                SettingsValidationError,
+                load_backend_settings,
+            )
+
+            try:
+                settings = load_backend_settings()
+            except (SettingsValidationError, ValueError):
+                settings = None
+
+            async def _consume() -> dict[str, object]:
+                """Drain the executor and persist drafts.
+
+                Returns:
+                    Termination summary plus assistant text and usage when
+                    the stream emitted those catalog events.
+                """
+
+                assistant_parts: list[str] = []
+                prompt_tokens: int | None = None
+                completion_tokens: int | None = None
+                async for event_type, payload in self._executor.execute(
+                    context=runtime,
+                    message=message,
+                    cancel_event=live.cancel_event,
+                ):
+                    self._append(caller, record.run_id, event_type, payload)
+                    if event_type == "token_delta":
+                        delta = payload.get("delta")
+                        if isinstance(delta, str) and delta:
+                            assistant_parts.append(delta)
+                    elif event_type == "usage":
+                        event_prompt, event_completion = _token_counts_from_update(
+                            payload
+                        )
+                        if event_prompt is not None:
+                            prompt_tokens = event_prompt
+                        if event_completion is not None:
+                            completion_tokens = event_completion
+                if not self._has_terminal(caller, record.run_id):
+                    if live.cancel_event.is_set():
+                        self._append(caller, record.run_id, "cancelled", {})
+                    else:
+                        self._append(
+                            caller,
+                            record.run_id,
+                            "error",
+                            {"code": "run_failed"},
+                        )
+                summary = getattr(self._executor, "termination_summary", None)
+                payload: dict[str, object]
+                if isinstance(summary, dict):
+                    typed_summary = cast(dict[object, object], summary)
+                    payload = {str(key): value for key, value in typed_summary.items()}
                 else:
-                    self._append(caller, record.run_id, "completed", {})
+                    payload = {
+                        "termination_reason": (
+                            "cancelled" if live.cancel_event.is_set() else "unknown"
+                        ),
+                        "terminal_event_type": None,
+                        "stream_exhausted": False,
+                    }
+                if assistant_parts:
+                    payload["assistant_message"] = "".join(assistant_parts)
+                if prompt_tokens is None:
+                    prompt_tokens = _coerce_stream_token_count(
+                        payload.get("input_tokens")
+                    )
+                if prompt_tokens is None:
+                    prompt_tokens = _coerce_stream_token_count(
+                        payload.get("prompt_tokens")
+                    )
+                if completion_tokens is None:
+                    completion_tokens = _coerce_stream_token_count(
+                        payload.get("output_tokens")
+                    )
+                if completion_tokens is None:
+                    completion_tokens = _coerce_stream_token_count(
+                        payload.get("completion_tokens")
+                    )
+                if prompt_tokens is not None:
+                    payload["input_tokens"] = prompt_tokens
+                if completion_tokens is not None:
+                    payload["output_tokens"] = completion_tokens
+                input_count = _coerce_stream_token_count(payload.get("input_tokens"))
+                output_count = _coerce_stream_token_count(payload.get("output_tokens"))
+                if input_count is not None or output_count is not None:
+                    from smart_rag_core.observability.langsmith_tracing import (
+                        estimate_traced_chat_cost_usd,
+                    )
+
+                    input_total = 0 if input_count is None else input_count
+                    output_total = 0 if output_count is None else output_count
+                    payload["input_tokens"] = input_total
+                    payload["output_tokens"] = output_total
+                    payload["total_tokens"] = input_total + output_total
+                    payload["estimated_cost_usd"] = float(
+                        estimate_traced_chat_cost_usd(
+                            input_tokens=input_total,
+                            output_tokens=output_total,
+                        )
+                    )
+                return payload
+
+            if settings is None:
+                await _consume()
+            else:
+                await invoke_traced_query_run_sse(
+                    _consume,
+                    settings=settings,
+                    run_id=record.run_id,
+                    user_id=runtime.user_id,
+                    user_message=message,
+                    requested_route=runtime.route_family.value,
+                    effective_route=runtime.route_family.value,
+                )
         except asyncio.CancelledError:
             if not self._has_terminal(caller, record.run_id):
                 self._append(caller, record.run_id, "cancelled", {})
@@ -914,6 +1485,74 @@ class SseStreamService:
             {"sse_schema_version": self._sse_schema_version},
         )
 
+    def _load_durable_start(
+        self, caller: CallerContext, run_id: UUID
+    ) -> tuple[str, AuthorizedRuntimeContext] | None:
+        """Rebuild user text and runtime from durable records.
+
+        Args:
+            caller: Owner.
+            run_id: Admitted run.
+
+        Returns:
+            Persisted message and runtime, or None when the DSN is unset
+            or durable input cannot be loaded. Missing input must remain
+            ``worker_unavailable`` for process-local tests.
+        """
+
+        if not self._postgres_url:
+            return None
+        try:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                runtime, message = load_query_run_runtime(
+                    connection, caller=caller, run_id=run_id
+                )
+        except (QueryAdmissionError, psycopg.Error):
+            return None
+        if not message:
+            return None
+        return message, runtime
+
+    def _settle_reservation(self, caller: CallerContext, run_id: UUID) -> None:
+        """True-up the run reservation once on a terminal event.
+
+        Args:
+            caller: Owner.
+            run_id: Run whose reservation should settle.
+
+        Side Effects:
+            Calls ``true_up_query_reservation`` at most once per run in
+            this process. No-ops without a DSN or reservation id.
+        """
+
+        if not self._postgres_url or run_id in self._settled_run_ids:
+            return
+        try:
+            record = self._store.get_authorized_run(caller, run_id=run_id)
+        except QueryAdmissionError:
+            return
+        reservation_id = record.reservation_id
+        if reservation_id is None:
+            self._settled_run_ids.add(run_id)
+            return
+        try:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                true_up_query_reservation(
+                    connection, caller=caller, reservation_id=reservation_id
+                )
+                connection.commit()
+            self._settled_run_ids.add(run_id)
+        except (QueryAdmissionError, psycopg.Error):
+            LOGGER.info(
+                "reservation true-up skipped",
+                extra={
+                    "event": "sse.reservation_true_up_failed",
+                    "run_id": str(run_id),
+                },
+            )
+
     def _emit_worker_unavailable(self, caller: CallerContext, run_id: UUID) -> None:
         """Persist schema then a sanitized terminal when this process cannot run.
 
@@ -958,7 +1597,7 @@ class SseStreamService:
         if event_type == "heartbeat" and self._has_terminal(caller, run_id):
             return None
         try:
-            return self._store.append(
+            persisted = self._store.append(
                 caller,
                 run_id=run_id,
                 event_type=event_type,
@@ -972,7 +1611,7 @@ class SseStreamService:
             if event_type == "error":
                 return None
             try:
-                return self._store.append(
+                persisted = self._store.append(
                     caller,
                     run_id=run_id,
                     event_type="error",
@@ -982,6 +1621,9 @@ class SseStreamService:
                 return None
         except QueryAdmissionError:
             return None
+        if persisted is not None and persisted.event_type in TERMINAL_SSE_EVENT_TYPES:
+            self._settle_reservation(caller, run_id)
+        return persisted
 
     def _has_terminal(self, caller: CallerContext, run_id: UUID) -> bool:
         """Return whether a terminal event is already persisted.
@@ -1019,6 +1661,40 @@ class SseStreamService:
             )
             terminal = event.event_type in TERMINAL_SSE_EVENT_TYPES
             yield frame, event.sequence, terminal
+
+    async def _cooperative_cancel(self, live: LiveQueryRun) -> None:
+        """Give the executor a short cleanup window, then hard-cancel.
+
+        Args:
+            live: Process handle whose cancel event is already set.
+
+        Side Effects:
+            Cancels ``executor_task`` only when it is still running after
+            ``CANCEL_GRACE_SECONDS``. Marks the handle terminal.
+        """
+
+        executor = live.executor_task
+        if executor is None or executor.done():
+            live.terminal = True
+            return
+        try:
+            await asyncio.wait_for(
+                asyncio.shield(executor), timeout=CANCEL_GRACE_SECONDS
+            )
+        except TimeoutError:
+            if not executor.done():
+                executor.cancel()
+                try:
+                    await executor
+                except asyncio.CancelledError:
+                    pass
+        except asyncio.CancelledError:
+            if not executor.done():
+                try:
+                    await executor
+                except asyncio.CancelledError:
+                    pass
+        live.terminal = True
 
     def _cancel_tasks(self, live: LiveQueryRun) -> None:
         """Cancel heartbeat and executor tasks for a finished run.

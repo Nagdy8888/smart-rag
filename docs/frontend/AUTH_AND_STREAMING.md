@@ -2,14 +2,14 @@
 title: Auth and streaming frontend
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-26
 audience: engineering, frontend, security
 packet: P08-02
 ---
 
 # Auth and streaming (Phase 8 packet 2)
 
-SSR Auth, MFA/invitation surfaces, min-client handshake, and Bearer SSE UX.
+SSR Auth, invitation accept, min-client handshake, and Bearer SSE UX.
 Stitch frames are a **template, not a layout**. These routes exist because
 Auth/FastAPI contracts exist, not because Stitch numbered them.
 
@@ -31,20 +31,18 @@ convenience. FastAPI still authorizes every Bearer call.
 
 | Path | Contract | Notes |
 | --- | --- | --- |
-| `/login` | `signInWithPassword` | Generic "Sign in failed". Google disabled (GAP-07-04) |
+| `/login` | `signInWithPassword` | Generic "Sign in failed". Google omitted while disabled (GAP-07-04) |
 | `/signup` | `signUp` | Invitation still required for FastAPI membership |
 | `/forgot-password` | `resetPasswordForEmail` | Check-inbox copy; does not reveal existence |
 | `/auth/callback` | PKCE `exchangeCodeForSession` | Replay → "Sign-in could not be completed" |
 | `/auth/reset` | `updateUser({ password })` | After recovery `next=/auth/reset` |
-| `/mfa/enroll` | `mfa.enroll` TOTP | QR `<img>` only for data-URL `qr_code` |
-| `/mfa/challenge` | `mfa.challenge` / `verify` | MFA-required banner + Sign out |
 | `/invitations/accept` | `POST /invitations/accept` `{ token }` | Email from JWT, not the form |
-| `/unavailable/GAP-07-07` | none | Honest Unavailable; no recovery HTTP |
-| `/unavailable/GAP-07-08` | none | Honest Unavailable; no bootstrap HTTP |
-| `/` | Auto chat | Packet 3. No route POST field. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) |
+| `/` | Ask | Packet 15 rebuild. No route POST field. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) |
+| `/admin` | Team/Tools/Curation/Usage tabs | Convenience only. FastAPI still authorizes. Legacy `/team`, `/tools`, `/curation`, and `/usage` redirect here |
+| `/account` | Read-only `GET /me` | Legacy `/profile` redirects here. No MFA field |
 
-Team admin create/offboard, tools, curation, usage, and profile are
-packet 4 native routes. See [ADMINISTRATION.md](./ADMINISTRATION.md).
+`/review-fixtures` and `/unavailable/*` are not product routes; they 404.
+Administration bodies live under `/admin?tab=`. See [ADMINISTRATION.md](./ADMINISTRATION.md).
 Documents, graph, and tables are packet 3 native routes.
 
 ## SSR cookie flow
@@ -87,23 +85,20 @@ wrong; FastAPI returns 401/403.
 
 | Surface | Owner | UI claim |
 | --- | --- | --- |
-| Email/password, reset, MFA enroll/challenge | Supabase Auth | Must **not** say FastAPI throttles login (GAP-07-20) |
+| Email/password, reset | Supabase Auth | Must **not** say FastAPI throttles login (GAP-07-20) |
 | Invitation accept | FastAPI `AUTH_ADJACENT` | Sanitized `detail` codes |
 | Chat POST / upload reserve | FastAPI handshake + limiter | 426/402/429/503 banners |
 
-## MFA vs GAP-07-07
+## MFA removed (P08-12)
 
-TOTP enroll/challenge are Auth-direct. FastAPI 403 `MFA required` shows the
-banner, Sign out, and links to `/mfa/challenge` and `/mfa/enroll`. Upload 403
-uses the same banner and never fakes TOTP success.
-
-Lost-factor recovery, admin session revoke UI, and recovery codes are
-**Unavailable GAP-07-07** because `mfa_recovery.py` has no router. Owner
-bootstrap is **Unavailable GAP-07-08**.
+TOTP enroll/challenge routes and MFA-required banners are deleted. Local Auth sets `auth.mfa.totp.enroll_enabled` and `verify_enabled` to false. Hosted residue is handled by [managed-auth-totp-residue.md](../runbooks/managed-auth-totp-residue.md). GAP-07-07 has no product route; `/unavailable/*` 404s. There is no recovery-code HTTP.
 
 ## Handshake before spend
 
 `GET /api/meta` publishes `min_client_version` and `sse_schema_version`.
+The handler is async so a busy readiness thread pool cannot stall the
+handshake. When meta fetch fails, Ask shows “Compatibility could not be
+confirmed…” and retries every 10s until `/api/meta` succeeds.
 The composer compares `CLIENT_VERSION` (`0.1.0`) before
 `startMessageStream`. Below minimum: banner
 "This client is below min_client_version. Update before asking a question."
@@ -120,15 +115,18 @@ never stack traces.
 terminal. An in-flight run reconnects with GET `/runs/{id}/events?after=`
 and omits `X-Client-Version`. The same `Idempotency-Key` is reused if POST
 must retry; the server reuses the run. Sequences are monotonic: duplicate
-or older `id` values are ignored. One terminal freezes later token deltas.
-Cancel posts `/runs/{id}/cancel` and aborts the in-flight admit POST and
+or older `id` values are ignored. The first terminal wins; later terminals
+and token deltas are ignored. `partial` is not a protocol-failure banner.
+When tokens already arrived, an `error` terminal keeps them on the answer
+surface and does not also render “Something went wrong.” Cancel posts
+`/runs/{id}/cancel` and aborts the in-flight admit POST and
 resume GET via `AbortSignal`. Heartbeats increment diagnostics. Frames
 whose `query_run_id` is not the current run are ignored.
 
 ## Frame 01/03 and gap decisions
 
 Frame 01 sign-in chrome is **not** a product route. Native `/login` covers
-email/password, disabled Google, and readiness pills. Frame 03 owner-setup
+email/password, omitted Google, and readiness pills. Frame 03 owner-setup
 wizard is **not** shipped (GAP-07-08). Invitation accept fills team entry.
 
 ## Failure modes
@@ -143,6 +141,9 @@ wizard is **not** shipped (GAP-07-08). Invitation accept fills team entry.
 | 402 `budget_exhausted` | Budget banner |
 | 429 `rate_limited` / `concurrency_limit` | Rate banner + Retry-After |
 | 503 `limiter_unavailable` | Fail-closed banner |
+| SSE `partial` | Answer note only: “Partial answer. Verified tokens are kept.” |
+| SSE `error` with tokens | Answer note only: “The run ended in an error. Received tokens are kept.” |
+| SSE `error` without tokens | One banner: “Something went wrong.” plus at most one run reference. Never `run_failed` |
 | Unknown SSE | Logged; stream continues |
 
 ## Verification

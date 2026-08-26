@@ -16,8 +16,12 @@ import {
   finalizeUpload,
   importGlossary,
   inspectGraph,
+  listDocuments,
+  listTables,
+  nextDocumentCursor,
   listCitations,
   listTools,
+  patchEntityRule,
   offboardUser,
   paidMutationHeaders,
   reserveUpload,
@@ -27,7 +31,13 @@ import {
   startOrResumeMessageStream,
   cancelRun,
   deleteConversation,
+  deleteDocument,
+  DOCUMENT_LIST_PAGE_SIZE,
   fetchMe,
+  fetchRun,
+  fetchConversation,
+  submitFeedback,
+  ClassifiedApiError,
 } from "./api";
 import { clientComputedTableTotal } from "./table-plan";
 import { CLIENT_VERSION } from "./client-version";
@@ -67,10 +77,11 @@ describe("classifyApiError", () => {
     });
   });
 
-  it("maps 403 MFA required to an MFA banner", () => {
+  it("maps leftover 403 MFA required copy to generic auth, not an MFA kind", () => {
     expect(classifyApiError(403, { detail: "MFA required" })).toEqual({
-      kind: "mfa",
-      detail: "MFA required",
+      kind: "auth",
+      status: 403,
+      detail: "unauthorized",
     });
   });
 
@@ -469,9 +480,74 @@ describe("enqueueWebsiteCrawl", () => {
         },
         fetchImpl,
       ),
-    ).rejects.toThrow("forbidden");
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+  });
+
+  it("classifies validation and rate-limit crawl failures", async () => {
+    const fetch422: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "invalid_url" }), {
+        status: 422,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      enqueueWebsiteCrawl(
+        { accessToken: "jwt-token" },
+        {
+          start_url: "https://example.com",
+          approved_domain: "example.com",
+          idempotency_key: "crawl-key-2",
+        },
+        fetch422,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "validation" } });
+
+    const fetch429: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "rate_limited" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "8" },
+      });
+    await expect(
+      enqueueWebsiteCrawl(
+        { accessToken: "jwt-token" },
+        {
+          start_url: "https://example.com",
+          approved_domain: "example.com",
+          idempotency_key: "crawl-key-3",
+        },
+        fetch429,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "rate" } });
+  });
+
+  it("reuses the caller idempotency key on the Idempotency-Key header", async () => {
+    let key = "";
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      const headers = init?.headers as Record<string, string>;
+      key = headers["Idempotency-Key"];
+      return new Response(
+        JSON.stringify({
+          document_id: "doc-c",
+          version_id: "ver-c",
+          source_id: "src-c",
+          approval_id: "appr-c",
+          job_id: "job-c",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    await enqueueWebsiteCrawl(
+      { accessToken: "jwt-token" },
+      {
+        start_url: "https://example.com",
+        approved_domain: "example.com",
+        idempotency_key: "stable-crawl-key",
+      },
+      fetchImpl,
+    );
+    expect(key).toBe("stable-crawl-key");
   });
 });
+
 
 describe("fetchDocument", () => {
   it("returns notFound on 404 without reading a title", async () => {
@@ -516,6 +592,21 @@ describe("inspectGraph client clamp", () => {
     expect(JSON.stringify(result.nodes[0])).not.toContain("SECRET");
     expect(result.limitations[0]?.count).toBe(7);
   });
+
+  it("classifies inspect 403 as ClassifiedApiError", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      inspectGraph(
+        { accessToken: "jwt-token" },
+        { entity_keys: ["e1"], depth: 3 },
+        fetchImpl,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+  });
 });
 
 describe("analyzeTable extra fields", () => {
@@ -549,12 +640,159 @@ describe("analyzeTable extra fields", () => {
     expect(result.source_ranges).toEqual(["A1:B2"]);
     expect(clientComputedTableTotal()).toBeNull();
   });
+
+  it("classifies analyze 403/422/429 as ClassifiedApiError", async () => {
+    const denied: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      analyzeTable(
+        { accessToken: "jwt-token" },
+        {
+          table_id: "11111111-1111-4111-8111-111111111111",
+          version_id: "22222222-2222-4222-8222-222222222222",
+          predicates: [{ column: "amount", operator: "gt", value: 0 }],
+        },
+        denied,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+
+    const invalid: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "table_plan_rejected" }), {
+        status: 422,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      analyzeTable(
+        { accessToken: "jwt-token" },
+        {
+          table_id: "11111111-1111-4111-8111-111111111111",
+          version_id: "22222222-2222-4222-8222-222222222222",
+          predicates: [{ column: "amount", operator: "gt", value: 0 }],
+        },
+        invalid,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "validation" } });
+
+    const limited: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "rate_limited" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "2" },
+      });
+    await expect(
+      analyzeTable(
+        { accessToken: "jwt-token" },
+        {
+          table_id: "11111111-1111-4111-8111-111111111111",
+          version_id: "22222222-2222-4222-8222-222222222222",
+          predicates: [{ column: "amount", operator: "gt", value: 0 }],
+        },
+        limited,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "rate" } });
+  });
 });
 
-describe("GAP-07-14 no delete-document HTTP helper", () => {
-  it("does not export a deleteDocument client", async () => {
+describe("listTables", () => {
+  it("throws ClassifiedApiError on 403", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      listTables({ accessToken: "jwt-token" }, fetchImpl),
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+  });
+});
+
+describe("deleteDocument", () => {
+  it("exports a DELETE client and treats 204 as success", async () => {
     const api = await import("./api");
-    expect("deleteDocument" in api).toBe(false);
+    expect("deleteDocument" in api).toBe(true);
+    const fetchImpl: typeof fetch = async (input, init) => {
+      expect(String(input)).toContain("/documents/doc-1");
+      expect(init?.method).toBe("DELETE");
+      return new Response(null, { status: 204 });
+    };
+    await expect(
+      deleteDocument({ accessToken: "jwt-token" }, "doc-1", fetchImpl),
+    ).resolves.toBeUndefined();
+  });
+
+  it("classifies 403, 404, and 429", async () => {
+    const cases: Array<{ status: number; kind: string }> = [
+      { status: 403, kind: "auth" },
+      { status: 404, kind: "deleted" },
+      { status: 429, kind: "rate" },
+    ];
+    for (const item of cases) {
+      const fetchImpl: typeof fetch = async () =>
+        new Response(JSON.stringify({ detail: "denied" }), {
+          status: item.status,
+          headers: { "Content-Type": "application/json" },
+        });
+      const failure =
+        item.status === 403
+          ? { kind: "auth", status: 403 }
+          : { kind: item.kind };
+      await expect(
+        deleteDocument({ accessToken: "jwt-token" }, "doc-1", fetchImpl),
+      ).rejects.toMatchObject({ failure });
+    }
+  });
+});
+
+describe("listDocuments keyset pagination", () => {
+  it("sends limit and cursor and maps created_at", async () => {
+    let url = "";
+    const fetchImpl: typeof fetch = async (input) => {
+      url = String(input);
+      return new Response(
+        JSON.stringify([
+          {
+            document_id: "doc-1",
+            title: "Policy",
+            visibility: "company",
+            current_version_id: "ver-1",
+            visibility_generation: 1,
+            created_at: "2026-08-24T12:00:00Z",
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const page = await listDocuments(
+      { accessToken: "jwt-token" },
+      { cursor: "2026-08-24T12:00:00Z,doc-0", limit: 50 },
+      fetchImpl,
+    );
+    expect(url).toContain("limit=50");
+    expect(url).toContain("cursor=2026-08-24T12%3A00%3A00Z%2Cdoc-0");
+    expect(page[0]?.created_at).toBe("2026-08-24T12:00:00Z");
+  });
+
+  it("builds the next created_at,id cursor only for a full page", () => {
+    const full = Array.from({ length: DOCUMENT_LIST_PAGE_SIZE }, (_, index) => ({
+      document_id: `doc-${String(index)}`,
+      title: "T",
+      visibility: "company",
+      current_version_id: null,
+      visibility_generation: 1,
+      created_at: "2026-08-24T00:00:00Z",
+    }));
+    expect(nextDocumentCursor(full, DOCUMENT_LIST_PAGE_SIZE)).toBe(
+      "2026-08-24T00:00:00Z,doc-49",
+    );
+    expect(nextDocumentCursor(full.slice(0, 3), DOCUMENT_LIST_PAGE_SIZE)).toBeNull();
+    expect(
+      nextDocumentCursor(
+        [{ ...full[0], created_at: null }],
+        1,
+      ),
+    ).toBeNull();
   });
 });
 
@@ -605,14 +843,14 @@ describe("administration clients", () => {
     expect(body).not.toContain("drop table");
   });
 
-  it("createInvitation classifies MFA required, 402, and 429", async () => {
+  it("createInvitation classifies leftover 403 MFA copy, 402, and 429", async () => {
     const cases: Array<{
       status: number;
       detail: string;
       thrown: string;
       headers?: Record<string, string>;
     }> = [
-      { status: 403, detail: "MFA required", thrown: "mfa_required" },
+      { status: 403, detail: "MFA required", thrown: "request_rejected" },
       { status: 402, detail: "budget_exhausted", thrown: "budget_exhausted" },
       {
         status: 429,
@@ -709,6 +947,32 @@ describe("administration clients", () => {
     expect(cards.map((card) => card.tool_key)).toEqual(["export_csv"]);
     expect(JSON.stringify(cards)).not.toContain("admin_secret_tool");
     expect(JSON.stringify(cards)).not.toContain("REDACTED");
+  });
+
+  it("listTools URL-encodes q", async () => {
+    let url = "";
+    const fetchImpl: typeof fetch = async (input) => {
+      url = String(input);
+      return new Response("[]", { status: 200 });
+    };
+    await listTools({ accessToken: "jwt-token" }, "a b/c", fetchImpl);
+    expect(url).toContain("q=a%20b%2Fc");
+  });
+
+  it("patchEntityRule classifies 409 stale_row_version", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "stale_row_version" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      patchEntityRule(
+        { accessToken: "jwt-token" },
+        "rule-1",
+        { entity_type: "ORG", canonical_name: "Acme", row_version: 1 },
+        fetchImpl,
+      ),
+    ).rejects.toThrow("stale_row_version");
   });
 
   it("approveEntityRule posts { row_version } only", async () => {
@@ -883,14 +1147,47 @@ describe("loadConsoleReadiness", () => {
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     };
-    const ready = await loadConsoleReadiness({ accessToken: "jwt-token" }, fetchImpl);
+    const ready = await loadConsoleReadiness(
+      { accessToken: "jwt-token" },
+      "owner",
+      fetchImpl,
+    );
     expect(ready?.dependencies).toEqual([{ name: "paradedb", status: "down" }]);
     expect(ready?.rate_limit_degraded).toBe(true);
   });
+
+  it("skips /ops/ready for member role", async () => {
+    let opsCalls = 0;
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/ops/ready")) {
+        opsCalls += 1;
+        return new Response(JSON.stringify({ detail: "forbidden" }), {
+          status: 403,
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          status: "ok",
+          query_ready: true,
+          detail: "ready",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const ready = await loadConsoleReadiness(
+      { accessToken: "jwt-token" },
+      "member",
+      fetchImpl,
+    );
+    expect(opsCalls).toBe(0);
+    expect(ready?.query_ready).toBe(true);
+    expect(ready?.dependencies).toEqual([]);
+  });
 });
 
-describe("reserveUpload MFA", () => {
-  it("throws mfa_required on 403 MFA required", async () => {
+describe("reserveUpload leftover MFA copy", () => {
+  it("does not throw mfa_required on 403 MFA required", async () => {
     const fetchImpl: typeof fetch = async () =>
       new Response(JSON.stringify({ detail: "MFA required" }), {
         status: 403,
@@ -903,7 +1200,7 @@ describe("reserveUpload MFA", () => {
         "idem-upload-1",
         fetchImpl,
       ),
-    ).rejects.toThrow("mfa_required");
+    ).rejects.toThrow("upload_reserve_failed");
   });
 
   it("does not return a reservation on 402 quota or budget exhaustion", async () => {
@@ -936,6 +1233,18 @@ describe("fetchMe session revocation", () => {
     await expect(fetchMe({ accessToken: "jwt-token" }, fetchImpl)).rejects.toThrow(
       "session_revoked",
     );
+  });
+
+  it("throws ClassifiedApiError on 401 unauthorized", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "Invalid access token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(fetchMe({ accessToken: "jwt-token" }, fetchImpl)).rejects.toMatchObject({
+      name: "ClassifiedApiError",
+      failure: { kind: "auth", status: 401, detail: "unauthorized" },
+    });
   });
 });
 
@@ -1016,11 +1325,28 @@ describe("cancelRun", () => {
       expect(headers.Authorization).toBe("Bearer jwt-token");
       expect(headers["X-Client-Version"]).toBeUndefined();
       expect(headers["X-Test-Role"]).toBeUndefined();
-      return new Response(null, { status: 204 });
+      return new Response(
+        JSON.stringify({
+          run_id: "run-1",
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          status: "cancelled",
+          reservation_id: null,
+          created_at: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
     };
     await expect(
       cancelRun({ accessToken: "jwt-token" }, "run-1", fetchImpl),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({
+      run_id: "run-1",
+      conversation_id: "conv-1",
+      creator_user_id: "u1",
+      status: "cancelled",
+      reservation_id: null,
+      created_at: null,
+    });
   });
 });
 
@@ -1089,5 +1415,120 @@ describe("listCitations without snippets", () => {
       fetchImpl,
     );
     expect(citations).toEqual([]);
+  });
+});
+
+
+describe("classifyApiError conflict and validation", () => {
+  it("maps 409 and 422 to typed failures", () => {
+    expect(classifyApiError(409, { detail: "conflict" })).toEqual({
+      kind: "conflict",
+      detail: "conflict",
+    });
+    expect(classifyApiError(422, { detail: "validation_error" })).toEqual({
+      kind: "validation",
+      detail: "validation_error",
+    });
+  });
+});
+
+describe("fetchRun and fetchConversation", () => {
+  it("returns an owned run and does not invent transcript fields", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      expect(String(input)).toBe("http://127.0.0.1:8000/runs/run-1");
+      return new Response(
+        JSON.stringify({
+          run_id: "run-1",
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          status: "running",
+          reservation_id: "res-1",
+          created_at: "2026-08-17T00:00:00Z",
+          answer: "SECRET",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const run = await fetchRun({ accessToken: "jwt-token" }, "run-1", fetchImpl);
+    expect(run).toEqual({
+      run_id: "run-1",
+      conversation_id: "conv-1",
+      creator_user_id: "u1",
+      status: "running",
+      reservation_id: "res-1",
+      created_at: "2026-08-17T00:00:00Z",
+    });
+    expect(JSON.stringify(run)).not.toContain("SECRET");
+  });
+
+  it("classifies a foreign run as deleted", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "not_found" }), { status: 404 });
+    await expect(
+      fetchRun({ accessToken: "jwt-token" }, "run-foreign", fetchImpl),
+    ).rejects.toBeInstanceOf(ClassifiedApiError);
+  });
+
+  it("fetches an owned conversation", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      expect(String(input)).toBe(
+        "http://127.0.0.1:8000/conversations/conv-1",
+      );
+      return new Response(
+        JSON.stringify({
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          title: "Chat",
+          created_at: "2026-08-17T00:00:00Z",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const conversation = await fetchConversation(
+      { accessToken: "jwt-token" },
+      "conv-1",
+      fetchImpl,
+    );
+    expect(conversation.conversation_id).toBe("conv-1");
+  });
+});
+
+describe("submitFeedback", () => {
+  it("returns the 201 payload and throws on 403", async () => {
+    const ok: typeof fetch = async () =>
+      new Response(JSON.stringify({ feedback_id: "fb-1" }), { status: 201 });
+    await expect(
+      submitFeedback(
+        { accessToken: "jwt-token" },
+        "run-1",
+        true,
+        "chunk/cleaning loss",
+        null,
+        ok,
+      ),
+    ).resolves.toEqual({ feedback_id: "fb-1" });
+
+    const forbidden: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), { status: 403 });
+    await expect(
+      submitFeedback(
+        { accessToken: "jwt-token" },
+        "run-1",
+        true,
+        "chunk/cleaning loss",
+        "note",
+        forbidden,
+      ),
+    ).rejects.toMatchObject({ failure: { kind: "auth", status: 403 } });
+  });
+});
+
+describe("cancelRun failures", () => {
+  it("throws a classified error instead of returning success", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), { status: 403 });
+    await expect(
+      cancelRun({ accessToken: "jwt-token" }, "run-1", fetchImpl),
+    ).rejects.toBeInstanceOf(ClassifiedApiError);
   });
 });

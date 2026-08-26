@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ReactElement } from "react";
 import React from "react";
 import "@testing-library/jest-dom/vitest";
 import {
@@ -13,6 +12,8 @@ import {
 } from "../../lib/hostile-text-fixtures";
 import { Badge } from "./badge";
 import { Button } from "./button";
+import { ConfirmDialog } from "./confirm-dialog";
+import { PageHeader } from "./page-header";
 import { CitationChip } from "./citation-chip";
 import { DataTable } from "./data-table";
 import { EmptyState } from "./empty-state";
@@ -178,5 +179,97 @@ describe("primitives render hostile and mixed-direction text", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByRole("button", { name: "Open sheet" })).toHaveFocus();
+  });
+});
+
+describe("pending buttons and confirm dialog", () => {
+  it("blocks duplicate pending clicks and shows the disabled reason", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <Button
+        pending
+        pendingLabel="Saving…"
+        disabledReason="Save in progress"
+        onClick={onClick}
+      >
+        Save
+      </Button>,
+    );
+    const control = screen.getByRole("button", { name: "Saving…" });
+    expect(control).toBeDisabled();
+    expect(screen.getByText("Save in progress")).toBeInTheDocument();
+    await user.click(control);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("renders a PageHeader lead without a duplicate title heading", () => {
+    render(
+      <PageHeader title="Documents" description="Current versions only." />,
+    );
+    expect(screen.queryByRole("heading", { name: "Documents" })).toBeNull();
+    expect(screen.getByText("Current versions only.")).toBeInTheDocument();
+  });
+
+  it("focuses Cancel on a danger confirm and ignores Escape while pending", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onConfirm = vi.fn();
+    const { rerender } = render(
+      <ConfirmDialog
+        title="Delete report.pdf"
+        danger
+        confirmLabel="Delete"
+        onClose={onClose}
+        onConfirm={onConfirm}
+      >
+        This permanently removes report.pdf.
+      </ConfirmDialog>,
+    );
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    await waitFor(() => {
+      expect(cancel).toHaveFocus();
+    });
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+    onClose.mockClear();
+    rerender(
+      <ConfirmDialog
+        title="Delete report.pdf"
+        danger
+        pending
+        confirmLabel="Delete"
+        pendingLabel="Deleting…"
+        onClose={onClose}
+        onConfirm={onConfirm}
+      >
+        This permanently removes report.pdf.
+      </ConfirmDialog>,
+    );
+    await user.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Deleting…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  });
+});
+
+describe("EmptyState", () => {
+  it("renders title, body, and action", () => {
+    render(
+      <EmptyState
+        title="Ask your company knowledge"
+        body="Answers come from your authorized documents, with citations you can inspect."
+        action={<Button>Try a prompt</Button>}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Ask your company knowledge" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Answers come from your authorized documents, with citations you can inspect.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try a prompt" })).toBeInTheDocument();
   });
 });

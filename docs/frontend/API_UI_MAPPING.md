@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -48,7 +48,7 @@ flowchart TD
 
 | Class | Owner | FastAPI throttle? |
 | --- | --- | --- |
-| Email/password, Google OAuth, password reset, MFA enroll/challenge/verify, session | Supabase Auth (`@supabase/ssr` 0.7.0, JS 2.57.4) | **No** |
+| Email/password, password reset, session | Supabase Auth (`@supabase/ssr` 0.7.0, JS 2.57.4). Google omitted while disabled. MFA UI removed P08-12. | **No** |
 | Invitation create/accept, offboarding, chat, upload, crawl, admin mutations | FastAPI | Yes (`AUTH_ADJACENT` / `COST_MUTATION`) |
 | Authenticated reads | FastAPI | Yes (`LOW_RISK_READ`) |
 | Anonymous sign-in | Disabled in `supabase/config.toml` | N/A |
@@ -96,6 +96,7 @@ Heartbeat interval is **15** seconds. Forbidden payload keys include
 | `coverage` | `coverage_score?` | no |
 | `optional_tool_disclosure` | `tool_keys` | no |
 | `citation_preview` | `citation_ids`, `ranks` | no |
+| `answer_origin` | `origin` | no |
 | `token_delta` | `delta` | no |
 | `usage` | `prompt_tokens`, `completion_tokens` | no |
 | `completed` | empty | **yes** |
@@ -127,7 +128,7 @@ Those are [GAP-07-02](#gap-register).
 | `rate_limited` | 429 + `Retry-After` | FastAPI limiter |
 | `limiter_unavailable` | 503 + `Retry-After` | Mutation limiter fail-closed |
 | `authorization_rejected` / `forbidden` | 403 | Role/capability |
-| `MFA required` | 403 | Privileged caller without aal2 |
+| `MFA required` | removed | Backend P08-11 + frontend P08-12: no MFA kind, route, or banner |
 | `not_found` | 404 | Missing, unauthorized, tombstone, IDOR |
 | `idempotency_conflict` | 409 | Key reuse mismatch |
 | `budget_exhausted` | 402 | Durable query budget |
@@ -159,10 +160,10 @@ ParadeDB `down` on ready is Hybrid degrade, not BM25-snippet success.
 
 | Method | Path | Fields | Authz |
 | --- | --- | --- | --- |
-| GET | `/me` | `user_id`, `role`, `authorization_version`, `upload_enabled`, `mfa_enrolled` | any active member |
+| GET | `/me` | `user_id`, `role`, `authorization_version`, `upload_enabled`; deprecated `mfa_enrolled` is always false and unused | any active member |
 | POST | `/admin/invitations` | req `email`, `role`, `upload_enabled`; resp `invitation_id`, `email`, `role`, `upload_enabled`, `expires_at` (token by mail only; `APP_ENV=test` may set `X-Test-Invitation-Token`) | owner/admin; only owner may invite owner |
 | POST | `/invitations/accept` | req `token`; resp `invitation_id` | authenticated; email from JWT |
-| POST | `/admin/users/{user_id}/offboard` | resp `request_id`, `subject_user_id`, `completed_at` | owner/admin **AAL2** |
+| POST | `/admin/users/{user_id}/offboard` | resp `request_id`, `subject_user_id`, `completed_at` | owner/admin |
 
 No HTTP for owner bootstrap (`bootstrap_owner` service), MFA recovery
 (`mfa_recovery.py` service), company-settings CRUD, or audit list/export.
@@ -183,9 +184,9 @@ No HTTP for owner bootstrap (`bootstrap_owner` service), MFA recovery
 Version `status` enum: `uploading`, `uploaded`, `scanning`, `parsing`,
 `hybrid_ready`, `graph_pending`, `graph_ready`, `graph_ineligible`,
 `deletion_pending`, `failed`. `DELETE /documents/{id}` is owner/admin HTTP
-(tombstone + `exclude_version_from_retrieval`). There is **no** signed
-source-preview/download HTTP route. The Stitch library delete control may
-still be unwired (GAP-07-14 UI).
+(tombstone + `exclude_version_from_retrieval`) and is wired in the Documents
+console behind confirmation. There is **no** signed
+source-preview/download HTTP route.
 
 ### Chat and runs
 
@@ -196,6 +197,7 @@ still be unwired (GAP-07-14 UI).
 | GET | `/conversations/{conversation_id}` | creator or owner/admin; else 404 |
 | DELETE | `/conversations/{conversation_id}` | **204**; foreign/tombstone **404**; immediate purge |
 | POST | `/conversations/{conversation_id}/messages` | handshake + admit; **requires** Idempotency-Key or body key |
+| GET | `/conversations/{conversation_id}/messages` | creator-only transcript; `limit` 1–100 default 50; `before` keyset; 200 `{items, next_before_id}`; foreign/deleted **404** |
 | GET | `/runs/{run_id}` | creator only; IDOR 404 |
 | POST | `/runs/{run_id}/cancel` | creator |
 | GET | `/runs/{run_id}/events` | Bearer SSE resume |
@@ -213,10 +215,10 @@ Feedback tags (byte-for-byte): `chunk/cleaning loss`, `profile field wrong`,
 | --- | --- | --- |
 | POST | `/graph/inspect` | req `entity_keys` ≤12 and/or `document_id`, `depth` 1–3; resp `nodes`, `locators`, `limitations[{code,count?}]`, `row_count` ≤200, `depth`. FastAPI COST_MUTATION. No vendor prose |
 | GET | `/graph/entities/search` | `q`, `limit` ≤25; hits `object_id`, `object_type`, `chunk_id`, `document_id`, `version_id`, `support` |
-| GET | `/tables` | manifests without storage paths |
-| POST | `/tables/analyze` | body `plan` (`TableQueryPlan`); resp `table_id`, `version_id`, `document_id`, `rows`, `source_ranges` |
-| GET | `/tools` | role-filtered cards; unauthorized names omitted |
-| POST | `/admin/tools` | owner/admin seed |
+| GET | `/tables` | manifests without storage paths; UI preselects `?tableId=` / `?documentId=` only when listed |
+| POST | `/tables/analyze` | body `plan` (`TableQueryPlan` extra=forbid); resp `table_id`, `version_id`, `document_id`, `rows`, `source_ranges`. No export API. |
+| GET | `/tools` | role-filtered cards; unauthorized names omitted; `q` is URL-encoded |
+| POST | `/admin/tools` | owner/admin seed API only; ordinary `/admin` Tools tab has no seed form |
 | POST | `/admin/tools/{tool_key}/enable` | owner/admin |
 | POST | `/admin/tools/{tool_key}/permissions` | owner/admin; executor still rechecks live role |
 | POST | `/admin/glossary/imports` | owner/admin |
@@ -245,12 +247,12 @@ status `graph_handoff.{pending,processing,completed,failed,dead_letter}`.
 | Google OAuth | Auth `signInWithOAuth`; local `[auth.external.google] enabled=false` | none | GAP-07-04 |
 | Forgot/reset | Auth `resetPasswordForEmail` | none | GAP-07-05 |
 | Auth callback | Redirect includes `http://127.0.0.1:3010/auth/callback` | no page | GAP-07-05 |
-| MFA enroll/challenge | Auth TOTP enroll/verify enabled | banner only | GAP-07-06 |
+| MFA enroll/challenge | Auth TOTP enroll/verify disabled | omitted | P08-12 |
 | MFA recovery | `mfa_recovery.py` **service**, no router | none | GAP-07-07 |
 | Lost-factor / session revoke / re-enrollment | offboard HTTP; recovery service | none | GAP-07-07 |
 | Owner setup | `bootstrap_owner` **service**, no router | none | GAP-07-08 |
 | Invitations | FastAPI create/accept | none | UI only |
-| Team / offboard | FastAPI offboard AAL2 | none | UI only |
+| Team / offboard | FastAPI offboard owner/admin | none | UI only |
 | Chat Auto | messages + SSE + citations + feedback + delete | yes | diagnostics limited to catalog |
 | Advanced route panel | **no** request field | copy-only | GAP-07-01 |
 | Documents / upload / status | list, reserve, status | reserve + status | finalize/crawl/retry UI |
@@ -330,7 +332,7 @@ mocks. Stitch may show an honest unavailable/blocked state.
 | GAP-07-11 | Budget policy read/write HTTP | Phase 6 | Show 402 `budget_exhausted`; no budget editor |
 | GAP-07-12 | Audit list/export HTTP | Phase 2/6 | Chain exists; no viewer API; do not mock events |
 | GAP-07-13 | Company settings HTTP | Phase 6 | Singleton loaded for `authorization_version`; no CRUD |
-| GAP-07-14 | Document delete UI | Phase 3/6 | HTTP `DELETE /documents/{id}` exists for owner/admin; Stitch library control may still be unwired |
+| GAP-07-14 | Document delete UI | Phase 8 P08-16 | HTTP `DELETE /documents/{id}` is wired for owner/admin; members 403; 404 is not-found without title leak |
 | GAP-07-15 | Upload finalize / crawl / retry UI | Phase 7/8 UI | APIs exist |
 | GAP-07-16 | Graph/table/tools/glossary/entity-rule UI | Phase 7/8 UI | APIs exist |
 | GAP-07-17 | Company usage dashboard | Phase 7/8 UI | `GET /usage/company` exists |
@@ -365,18 +367,18 @@ where listed.
 | D MFA challenge | code | `mfa.challenge` / `verify` | Auth | |
 | D MFA required | banner, Sign out | 403 `MFA required` + `signOut` | FastAPI identity + Auth | no fake TOTP success |
 | D Recovery | any control | GAP-07-07 | none | Unavailable |
-| A Google | Continue with Google | `signInWithOAuth` | GAP-07-04 disabled locally | disabled button |
+| A Google | omitted | `signInWithOAuth` never called | GAP-07-04 disabled locally | no button |
 
 ### FastAPI identity and team
 
 | Screen | Control | Contract | Authz | Idempotency |
 | --- | --- | --- | --- | --- |
-| Shell | role, user_id, upload, mfa | `GET /me` | live profile | n/a |
+| Shell | role, user_id, upload | `GET /me` | live profile | n/a |
 | E Invite create | email, role, upload_enabled | `POST /admin/invitations` | owner/admin | AUTH_ADJACENT |
 | E Invite token | delivered by mail | not in JSON | owner/admin | n/a |
 | E Accept | token | `POST /invitations/accept` | JWT email, not body email | AUTH_ADJACENT |
-| E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin AAL2 | AUTH_ADJACENT |
-| E Owner setup | bootstrap | GAP-07-08 | none | Unavailable |
+| E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin; no MFA | AUTH_ADJACENT |
+| E Owner setup | bootstrap | GAP-07-08 | none | omitted; no chrome |
 | E Member directory | list | none | none | no HTTP; do not mock |
 
 ### Chat, SSE, citations, feedback
@@ -384,6 +386,7 @@ where listed.
 | Screen | Control | Contract | Authz | Idempotency / resume |
 | --- | --- | --- | --- | --- |
 | F List | conversations | `GET /conversations` | creator | n/a |
+| F Transcript | earlier messages | `GET /conversations/{id}/messages` | creator; 404 otherwise | `limit`/`before` keyset |
 | F New | title optional | `POST /conversations` | creator | COST_MUTATION |
 | F Delete | delete | `DELETE /conversations/{id}` | creator or owner/admin; 204/404 | n/a |
 | F Handshake | version | `GET /api/meta` then `X-Client-Version` | public then paid POST | 426 blocks reserve |
@@ -402,7 +405,8 @@ where listed.
 | F Citations | chips | `citation_preview` then `GET /runs/{id}/citations` | creator | no snippets |
 | F Source drawer | preview/download | GAP-07-09 | — | IDs/provenance only |
 | F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | exact 10 tags |
-| F Usage strip | totals | `GET /usage/me` | caller | no prompt text |
+| F Usage strip | account totals | `GET /usage/me` | caller | no prompt text |
+| F Run tokens | prompt / completion | SSE `usage` | creator | hidden when both are 0 |
 | F Profile rewrite / candidates / BM25 bytes / rerank / inferences / latency | — | GAP-07-02 | — | do not invent |
 | G 426/402/429/503 | banners | HTTP details above | — | no paid retry on 426/402 |
 
@@ -424,7 +428,7 @@ Unknown additive SSE types: log and ignore. One terminal among
 | H Graph not-ready copy | sentence | `graphNotReadyCopy(n)` from authorized counts only | never restricted | n/a |
 | H Delete document | owner/admin | `DELETE /documents/{id}` | owner/admin; 204/404 | COST_MUTATION |
 | I Restricted preview | — | GAP-07-09 | — | Unavailable |
-| I Graph tab | inspect | `POST /graph/inspect` `document_id` | ACL | n/a |
+| I Graph tab | Open graph | `/graph?documentId=` then `POST /graph/inspect` | ACL | n/a |
 | I Tables tab | list | `GET /tables` | ACL | n/a |
 
 ### Graph, tables, tools, usage, settings
@@ -432,20 +436,20 @@ Unknown additive SSE types: log and ignore. One terminal among
 | Screen | Control | Contract | Authz | Bounds |
 | --- | --- | --- | --- | --- |
 | J Search | q, limit | `GET /graph/entities/search` | ACL | limit ≤25 |
-| J Inspect | keys, depth | `POST /graph/inspect` | ACL | keys ≤12, depth ≤3, rows ≤200 |
+| J Inspect graph | chips, depth 1–3 | `POST /graph/inspect` | ACL | keys ≤12, depth ≤3, rows ≤200; list-first; no SVG/edit |
 | J ETA | — | GAP-07-10 | — | handoff counts only |
 | K Analyze | plan | `POST /tables/analyze` | ACL | `TableQueryPlan` extra=forbid |
 | K Export | — | optional tool after disclosure | live role recheck | no button otherwise |
-| L Catalog | cards | `GET /tools` | role-filtered | omit unauthorized names |
+| L Catalog | cards, `q` | `GET /tools?q=` | role-filtered | omit unauthorized names; no seed form |
 | L Enable | active | `POST /admin/tools/{key}/enable` | owner/admin | allow-listed keys |
 | L Permissions | role, permission | `POST /admin/tools/{key}/permissions` | owner/admin | executor rechecks |
 | L Glossary | import/approve/rollback | `/admin/glossary/imports*` | owner/admin | `idempotency_key` |
-| L Entity rules | CRUD/suggest/approve/revoke | `/admin/graph/entity-rules*` | owner/admin | `row_version` |
-| M Usage company | totals | `GET /usage/company` | owner/admin | 403 else |
-| M Budget editor | — | GAP-07-11 | — | 402 only |
-| M Audit | — | GAP-07-12 | — | Unavailable |
-| M Profile editor | name/locale | GAP-07-19 | — | `/me` five fields only |
-| M Company settings | — | GAP-07-13 | — | Unavailable |
+| L Entity rules | CRUD/suggest/approve/revoke/PATCH | `/admin/graph/entity-rules*` | owner/admin | `row_version`; 409 Reload rule |
+| M Usage me/company | totals | `GET /usage/me`, `GET /usage/company` | company 403 else | two cards; no charts |
+| M Budget editor | — | GAP-07-11 | — | omitted; 402 classified only |
+| M Audit | — | GAP-07-12 | — | omitted; no panel |
+| M Account | four `/me` fields | `GET /me` | any member | no name/locale editor |
+| M Company settings | — | GAP-07-13 | — | omitted; no save |
 
 ### Negative mapping tests
 

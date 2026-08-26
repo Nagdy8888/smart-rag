@@ -315,9 +315,24 @@ def test_live_seventy_probe_passes_on_held_p95_without_busy_loop(
     """Injected 8-doc p95 hold classifies Passed without a 70% fire."""
 
     def _stats() -> list[dict[str, object]]:
+        """Return a quiet API CPU sample.
+
+        Returns:
+            One container stats object.
+        """
+
         return [{"Name": "smart-rag-api-1", "CPUPerc": "4.00%"}]
 
     def _foreground(token: str) -> dict[str, object]:
+        """Return a held-p95 foreground probe payload.
+
+        Args:
+            token: Unused probe token.
+
+        Returns:
+            Passing foreground timings.
+        """
+
         del token
         return {
             "passed": True,

@@ -23,7 +23,6 @@ export type CurrentUserResponse = {
   role: string;
   authorization_version: number;
   upload_enabled: boolean;
-  mfa_enrolled: boolean;
 };
 
 /** One named probe from authenticated `GET /ops/ready`. */
@@ -49,6 +48,20 @@ export type ConversationResponse = {
   created_at: string | null;
 };
 
+/** One `GET /conversations/{id}/messages` item. Content is escaped text. */
+export type ConversationMessage = {
+  message_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
+/** Keyset page from `GET /conversations/{id}/messages`. */
+export type ConversationMessagesResponse = {
+  items: ConversationMessage[];
+  next_before_id: string | null;
+};
+
 /** JSON 202 from `POST /conversations/{id}/messages`. */
 export type SubmitMessageResponse = {
   run_id: string;
@@ -57,6 +70,21 @@ export type SubmitMessageResponse = {
   reservation_id: string;
   route_family: string;
   status: string;
+};
+
+/** `GET /runs/{run_id}` and `POST /runs/{run_id}/cancel` body. */
+export type RunResponse = {
+  run_id: string;
+  conversation_id: string;
+  creator_user_id: string;
+  status: string;
+  reservation_id: string | null;
+  created_at: string | null;
+};
+
+/** `POST /runs/{run_id}/feedback` 201 body. */
+export type FeedbackResponse = {
+  feedback_id: string;
 };
 
 /** `GET /runs/{id}/citations` item. */
@@ -75,6 +103,7 @@ export type DocumentResponse = {
   visibility: string;
   current_version_id: string | null;
   visibility_generation: number;
+  created_at: string | null;
 };
 
 /** `POST /documents/uploads/finalize` body. Field names match OpenAPI. */
@@ -395,7 +424,19 @@ export type SignedUploadResponse = {
   upload_method: string;
 };
 
-/** Catalog event names from `smart_rag_core.sse.catalog`. */
+/** Strict-split answer origins from additive `answer_origin` SSE events. */
+export const ANSWER_ORIGINS = [
+  "general_knowledge",
+  "company_documents",
+  "user_supplied_text",
+  "deterministic",
+  "ambiguous",
+] as const;
+
+/** One catalog answer origin. Unknown values are tolerated at the reducer. */
+export type AnswerOrigin = (typeof ANSWER_ORIGINS)[number];
+
+/** Catalog event names from the backend SSE catalog. */
 export const KNOWN_SSE_EVENT_TYPES = [
   "schema",
   "status",
@@ -408,6 +449,7 @@ export const KNOWN_SSE_EVENT_TYPES = [
   "coverage",
   "optional_tool_disclosure",
   "citation_preview",
+  "answer_origin",
   "token_delta",
   "usage",
   "completed",
@@ -625,4 +667,19 @@ export type EntityRuleUpsertRequest = {
   confidence?: number | null;
   status?: EntityRuleStatus;
   row_version?: number | null;
+};
+
+/** `POST /admin/graph/entity-rules/suggestions`. Never auto-approves. */
+export type EntityRuleSuggestRequest = {
+  entity_type: string;
+  canonical_name: string;
+  aliases?: string[];
+  do_not_merge?: string[];
+  display_label?: string | null;
+  languages?: string[];
+  alias_scope?: "company" | "synthetic_eval";
+  relation_label_policy?: "directed" | "symmetric";
+  reason?: string;
+  source?: EntityRuleSource;
+  confidence?: number | null;
 };

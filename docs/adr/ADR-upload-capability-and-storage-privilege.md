@@ -57,13 +57,13 @@ sequenceDiagram
   participant FastAPI
   participant Postgres
   participant Storage
-  Browser->>FastAPI: reserve_upload_quota(declared_bytes, idempotency_key)
-  FastAPI->>Postgres: app.reserve_upload_quota (app_api)
-  Postgres-->>FastAPI: reservation_id, expires_at (15m)
-  FastAPI-->>Browser: path + effective_exp=min(15m, JWT exp)
+  Browser->>FastAPI: "reserve_upload_quota declared_bytes idempotency_key"
+  FastAPI->>Postgres: "app.reserve_upload_quota as app_api"
+  Postgres-->>FastAPI: "reservation_id expires_at 15m"
+  FastAPI-->>Browser: "path plus effective_exp min of 15m and JWT exp"
   Browser->>Storage: INSERT with user JWT + RLS
   Storage->>Postgres: storage.objects policy checks reservation
-  Browser->>FastAPI: finalize(actual_bytes)
+  Browser->>FastAPI: "finalize actual_bytes"
   FastAPI->>Postgres: app.finalize_upload_quota
   Note over FastAPI,Storage: Over-limit or never-finalized cleanup uses storage_admin DELETE API
 ```

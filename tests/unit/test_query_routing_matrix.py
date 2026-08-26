@@ -23,6 +23,7 @@ from smart_rag_core.query_routing.constants import (
     WHOLE_DOCUMENT_SECTION_COVERAGE,
 )
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
+from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.matrix import (
     compile_retrieval_plan,
     frozen_coverage_threshold,
@@ -38,6 +39,7 @@ from smart_rag_core.query_routing.preparation import (
     prepare_query,
 )
 from smart_rag_core.query_routing.serde import preparation_from_state
+from smart_rag_core.query_routing.signals import is_no_retrieval
 from smart_rag_core.retrieval.frozen_profile import (
     COVERAGE_SCORE_BASELINE,
     coverage_threshold_for,
@@ -263,6 +265,15 @@ def test_matrix_routes(
         plan
     ):
         assert "temporal_graph_limitation" not in plan.limitations
+    if family is Phase6RouteFamily.NO_RETRIEVAL:
+        assert plan.company_claim_forbidden is True
+        assert plan.no_retrieval_answer_mode is not None
+        assert BranchKind.HYBRID not in _kinds(plan)
+        assert BranchKind.GRAPH_LOCAL not in _kinds(plan)
+        assert BranchKind.STRUCTURED_TABLE not in _kinds(plan)
+    else:
+        assert plan.knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
+        assert plan.no_retrieval_answer_mode is None
 
 
 def test_historical_relationship_never_has_graph_branch() -> None:
@@ -326,6 +337,13 @@ def test_no_retrieval_forbids_company_claim() -> None:
         RetrievalPlan.model_validate(
             {**plan.model_dump(), "company_claim_forbidden": False}
         )
+
+
+def test_greeting_prefix_does_not_hide_company_question() -> None:
+    """A polite greeting prefix must not disable document retrieval."""
+
+    assert is_no_retrieval("Hi!") is True
+    assert is_no_retrieval("Hi, what is the documented refund policy?") is False
 
 
 def test_graph_only_is_inspection_not_answer() -> None:
@@ -399,6 +417,8 @@ def test_preparation_contains_every_required_field() -> None:
     assert prep.original == prep.original_fallback_variant
     assert prep.model_calls == 0
     assert prep.timezone == "UTC"
+    assert prep.knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
+    assert "knowledge_scope" in REQUIRED_PREPARATION_FIELDS
 
 
 def test_profile_schema_omission_fails() -> None:
@@ -431,6 +451,16 @@ def test_model_assisted_prep_uses_at_most_one_call() -> None:
     calls = {"n": 0}
 
     def _caller(query: str, memory: object) -> object:
+        """Count one preparation model call.
+
+        Args:
+            query: User query.
+            memory: Unused memory snapshot.
+
+        Returns:
+            A preparation payload that keeps the entity token.
+        """
+
         del memory
         calls["n"] += 1
         from smart_rag_core.query_routing.models import PreparationModelPayload
@@ -460,6 +490,16 @@ def test_rewrite_dropping_entity_keeps_original() -> None:
     """A rewrite that drops codes is discarded; original remains the fallback."""
 
     def _caller(query: str, memory: object) -> object:
+        """Return a rewrite that drops the invoice code.
+
+        Args:
+            query: Unused original query.
+            memory: Unused memory snapshot.
+
+        Returns:
+            A preparation payload without the code token.
+        """
+
         del query, memory
         from smart_rag_core.query_routing.models import PreparationModelPayload
 

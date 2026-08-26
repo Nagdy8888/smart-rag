@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
+from decimal import Decimal
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from smart_rag_core.memory.payload import memory_store_namespace
@@ -40,6 +42,8 @@ from smart_rag_core.query_answer.versions import (
     ANSWER_MODEL_ID,
     ANSWER_PROMPT_SHA256,
     ANSWER_PROMPT_VERSION,
+    GENERAL_CHAT_PROMPT_SHA256,
+    GENERAL_CHAT_PROMPT_VERSION,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
 )
@@ -58,6 +62,10 @@ from smart_rag_core.query_routing.correction import (
     decide_correction,
 )
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
+from smart_rag_core.query_routing.knowledge_scope import (
+    KnowledgeScope,
+    NoRetrievalAnswerMode,
+)
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.memory import load_authorized_memory
 from smart_rag_core.query_routing.models import (
@@ -325,6 +333,8 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         "remaining_model_calls": remaining_calls,
         "keyword_extract_count": 0,
         "catalog_llm_call_count": 0,
+        "knowledge_scope": preparation.knowledge_scope.value,
+        "no_retrieval_answer_mode": None,
         "detail": "query prepared; answering is not implemented",
     }
 
@@ -389,6 +399,12 @@ def compile_plan_node(state: QueryGraphState) -> QueryGraphState:
         "requested_route": plan.requested_route.value,
         "effective_route": plan.effective_route.value,
         "corrected_route": None,
+        "knowledge_scope": plan.knowledge_scope.value,
+        "no_retrieval_answer_mode": (
+            None
+            if plan.no_retrieval_answer_mode is None
+            else plan.no_retrieval_answer_mode.value
+        ),
         "catalog_llm_call_count": 0,
         "detail": "retrieval plan compiled; answering is not implemented",
     }
@@ -745,7 +761,8 @@ def generate_answer_node(
         ``remaining_model_calls``.
 
     State outputs:
-        ``answer`` and decremented ``remaining_model_calls`` when a counted
+        ``answer``, accumulated ``prompt_tokens`` / ``completion_tokens``,
+        and decremented ``remaining_model_calls`` when a counted
         ``usage_kind=answer`` call ran.
 
     Persistence writes:
@@ -785,6 +802,8 @@ def generate_answer_node(
             plan = None
     company_forbidden = plan.company_claim_forbidden if plan is not None else False
     graph_forbidden = plan.graph_as_answer_forbidden if plan is not None else False
+    knowledge_scope = plan.knowledge_scope if plan is not None else None
+    answer_mode = plan.no_retrieval_answer_mode if plan is not None else None
     if _route_needs_retrieval(plan) and deps.hybrid_retriever is None:
         return {
             **state,
@@ -793,13 +812,29 @@ def generate_answer_node(
             "answer": AnswerPayload(
                 answer_text="Insufficient authorized evidence.",
                 status="refused",
+                answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
             ).model_dump(mode="json"),
         }
     remaining = state["remaining_model_calls"]
     answer_calls = state.get("answer_call_count") or 0
-    needs_model = bool(fusion.evidence or tables.records) and not (
-        company_forbidden or graph_forbidden
+    added_prompt_tokens = 0
+    added_completion_tokens = 0
+    needs_rag_model = (
+        bool(fusion.evidence or tables.records)
+        and knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
+        and not graph_forbidden
     )
+    if knowledge_scope is None:
+        needs_rag_model = bool(fusion.evidence or tables.records) and not (
+            company_forbidden or graph_forbidden
+        )
+    needs_general_model = answer_mode in {
+        NoRetrievalAnswerMode.GENERAL_MODEL,
+        NoRetrievalAnswerMode.USER_TEXT_MODEL,
+    }
+    if needs_rag_model:
+        needs_general_model = False
+    needs_model = needs_rag_model or needs_general_model
     if needs_model:
         try:
             remaining = assert_call_available(remaining)
@@ -829,7 +864,10 @@ def generate_answer_node(
                     ).model_dump(mode="json"),
                 }
     caller = None
-    if needs_model and (deps.model_gateway is None or not deps.answer_prompt_text):
+    prompt_ready = bool(deps.answer_prompt_text) if needs_rag_model else bool(
+        deps.general_chat_prompt_text
+    )
+    if needs_model and (deps.model_gateway is None or not prompt_ready):
         return {
             **state,
             "status": "verified_partial",
@@ -839,26 +877,52 @@ def generate_answer_node(
                 status="partial",
             ).model_dump(mode="json"),
         }
-    if needs_model and deps.model_gateway is not None and deps.answer_prompt_text:
+    if needs_model and deps.model_gateway is not None and prompt_ready:
 
-        def _send() -> AnswerPayload:
-            """Invoke the shared gateway answer operation.
+        def _send() -> tuple[AnswerPayload, int, int]:
+            """Invoke one RAG or general-chat gateway operation.
 
             Returns:
-                Parsed answer payload.
+                Parsed answer payload plus provider token counts.
             """
 
+            if needs_general_model:
+                return _gateway_general_chat(
+                    deps,
+                    query=str(state.get("user_query") or ""),
+                    knowledge_scope=(
+                        KnowledgeScope.USER_SUPPLIED_TEXT
+                        if answer_mode is NoRetrievalAnswerMode.USER_TEXT_MODEL
+                        else KnowledgeScope.GENERAL_KNOWLEDGE
+                    ),
+                    recent_memory=_memory_text_from_state(state.get("memory_records")),
+                    context=context,
+                )
             return _gateway_answer(
                 deps,
                 query=str(state.get("user_query") or ""),
                 fusion=fusion,
                 tables=tables.records,
-                remaining=remaining,
+                context=context,
             )
+
+        def _usage_from_result(
+            result: tuple[AnswerPayload, int, int],
+        ) -> tuple[int | None, int | None, Decimal | None]:
+            """Read provider tokens from a successful gateway send.
+
+            Args:
+                result: Payload plus prompt and completion counts.
+
+            Returns:
+                Prompt tokens, completion tokens, and no measured USD.
+            """
+
+            return result[1], result[2], None
 
         try:
             if deps.connection is not None and context is not None:
-                payload, _consumed, _usage_id = execute_counted_model_call(
+                counted, _consumed, _usage_id = execute_counted_model_call(
                     deps.connection,
                     caller=caller_from_runtime(context),
                     run_id=context.run_id,
@@ -868,10 +932,11 @@ def generate_answer_node(
                     model_id=ANSWER_MODEL_ID,
                     provider_attempt_id=str(uuid4()),
                     send=_send,
+                    usage_from_result=_usage_from_result,
                 )
-                answer = payload
+                answer, added_prompt_tokens, added_completion_tokens = counted
             else:
-                answer = _send()
+                answer, added_prompt_tokens, added_completion_tokens = _send()
         except AnswerError as exc:
             return {
                 **state,
@@ -893,17 +958,42 @@ def generate_answer_node(
                 already_generated=answer_calls,
                 company_claim_forbidden=company_forbidden,
                 graph_as_answer_forbidden=graph_forbidden,
+                knowledge_scope=knowledge_scope,
+                no_retrieval_answer_mode=answer_mode,
+                recent_memory=_memory_text_from_state(state.get("memory_records")),
             )
         except AnswerError as exc:
+            if knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS:
+                return {
+                    **state,
+                    "status": "insufficient_evidence",
+                    "detail": exc.reason,
+                }
             return {
                 **state,
-                "status": "insufficient_evidence",
+                "status": "verified_partial",
                 "detail": exc.reason,
+                "answer": AnswerPayload(
+                    answer_text="Verified partial: answer generation stopped.",
+                    status="partial",
+                ).model_dump(mode="json"),
             }
         if needs_model:
             answer_calls = 1
     status = "answered"
-    if answer.status == "refused" and not fusion.evidence and not tables.records:
+    general_origins = {
+        KnowledgeScope.GENERAL_KNOWLEDGE,
+        KnowledgeScope.USER_SUPPLIED_TEXT,
+        KnowledgeScope.DETERMINISTIC,
+        KnowledgeScope.AMBIGUOUS,
+    }
+    if (
+        answer.status == "refused"
+        and not fusion.evidence
+        and not tables.records
+        and knowledge_scope not in general_origins
+        and answer.answer_origin not in general_origins
+    ):
         status = "insufficient_evidence"
     return {
         **state,
@@ -914,6 +1004,7 @@ def generate_answer_node(
         "answer_call_count": answer_calls,
         "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
         "keyword_extract_count": 0,
+        **_accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
     }
 
 
@@ -925,7 +1016,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         ``remaining_model_calls``, ``verifier_call_count``.
 
     State outputs:
-        ``verification`` and possibly decremented remaining calls.
+        ``verification``, accumulated ``prompt_tokens`` /
+        ``completion_tokens``, and possibly decremented remaining calls.
 
     Persistence writes:
         Counted ``verifier`` usage when a connection and gateway are bound.
@@ -972,11 +1064,16 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         except ValueError:
             plan = None
     checked, failures = deterministic_check_answer(
-        payload, fusion=fusion, tables=tables.records
+        payload,
+        fusion=fusion,
+        tables=tables.records,
+        evidence_required=_route_needs_retrieval(plan),
     )
     remaining = state["remaining_model_calls"]
     verifier_calls = state.get("verifier_call_count") or 0
     omitted: tuple[str, ...] = ()
+    added_prompt_tokens = 0
+    added_completion_tokens = 0
     if checked.atomic_links:
         caller = None
         if deps.model_gateway is not None and deps.verifier_prompt_text:
@@ -991,13 +1088,17 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                     Structured verifier payload.
                 """
 
-                return _gateway_verifier(
+                nonlocal added_prompt_tokens, added_completion_tokens
+                payload, prompt_tokens, completion_tokens = _gateway_verifier(
                     deps,
                     links=links,
                     fusion=fusion,
                     tables=tables.records,
-                    remaining=remaining,
+                    context=_runtime(state),
                 )
+                added_prompt_tokens += prompt_tokens
+                added_completion_tokens += completion_tokens
+                return payload
 
             caller = _verifier_caller
         try:
@@ -1070,6 +1171,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         "verifier_call_count": verifier_calls,
         "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
         "keyword_extract_count": 0,
+        **_accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
     }
 
 
@@ -1128,14 +1230,87 @@ def _tables_from_state(raw: object) -> TableComposition:
     return TableComposition.model_validate(raw)
 
 
+def _nonneg_token_count(value: object) -> int:
+    """Return a non-negative token count from a gateway field.
+
+    Args:
+        value: Untrusted attribute from a gateway response.
+
+    Returns:
+        Integer token count. Booleans and non-integers become 0.
+    """
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return max(0, value)
+
+
+def _tokens_from_gateway_response(response: object) -> tuple[int, int]:
+    """Read provider prompt and completion tokens from a gateway response.
+
+    Args:
+        response: Gateway response with ``input_tokens`` / ``output_tokens``.
+
+    Returns:
+        Prompt tokens and completion tokens. Missing fields are 0.
+    """
+
+    return (
+        _nonneg_token_count(getattr(response, "input_tokens", 0)),
+        _nonneg_token_count(getattr(response, "output_tokens", 0)),
+    )
+
+
+def _accumulated_tokens(
+    state: QueryGraphState, prompt_tokens: int, completion_tokens: int
+) -> dict[str, int]:
+    """Add one model call's tokens onto the run totals.
+
+    Args:
+        state: Current graph state.
+        prompt_tokens: Provider prompt tokens from this call.
+        completion_tokens: Provider completion tokens from this call.
+
+    Returns:
+        Partial state update with accumulated totals.
+    """
+
+    return {
+        "prompt_tokens": int(state.get("prompt_tokens") or 0) + max(0, prompt_tokens),
+        "completion_tokens": int(state.get("completion_tokens") or 0)
+        + max(0, completion_tokens),
+    }
+
+
+def _gateway_timeout_seconds(
+    context: AuthorizedRuntimeContext | None,
+) -> float:
+    """Bound one answer or verifier call to remaining run deadline seconds.
+
+    Model-call remaining counts are not seconds. Using them as the OpenAI
+    timeout fails closed on hosted live generate after retrieve.
+
+    Args:
+        context: Admitted run context, or None in isolated unit tests.
+
+    Returns:
+        Timeout seconds clipped to ``0.1``-``45``.
+    """
+
+    if context is None:
+        return 20.0
+    remaining = (context.deadline_at - datetime.now(UTC)).total_seconds()
+    return max(0.1, min(45.0, remaining))
+
+
 def _gateway_answer(
     deps: QueryGraphDeps,
     *,
     query: str,
     fusion: FusionResult,
     tables: tuple[object, ...],
-    remaining: int,
-) -> AnswerPayload:
+    context: AuthorizedRuntimeContext | None,
+) -> tuple[AnswerPayload, int, int]:
     """Run one async gateway answer call from the sync graph.
 
     Args:
@@ -1143,10 +1318,10 @@ def _gateway_answer(
         query: User query.
         fusion: Canonical evidence.
         tables: Table records.
-        remaining: Remaining model calls, unused except as a timeout proxy.
+        context: Admitted run context used for the live deadline timeout.
 
     Returns:
-        Parsed answer payload.
+        Parsed answer payload plus provider prompt and completion tokens.
 
     Raises:
         AnswerError: If the gateway is unbound.
@@ -1166,6 +1341,7 @@ def _gateway_answer(
         for item in tables
     )
     records = assemble_source_records(fusion, typed_tables)
+    timeout_seconds = _gateway_timeout_seconds(context)
     request = AnswerModelRequest(
         query=query or "query",
         prompt_version=ANSWER_PROMPT_VERSION,
@@ -1174,7 +1350,7 @@ def _gateway_answer(
         source_records=records or " ",
         chunk_ids=tuple(item.chunk_id for item in fusion.evidence),
         table_ids=tuple(item.table_id for item in typed_tables),
-        remaining_deadline_seconds=max(0.1, min(45.0, float(remaining or 1))),
+        remaining_deadline_seconds=timeout_seconds,
     )
     gateway = deps.model_gateway
     if gateway is None:
@@ -1188,7 +1364,126 @@ def _gateway_answer(
         ),
     )
     payload = AnswerPayload.model_validate(response.payload)
-    return filter_invented_ids(payload, fusion, typed_tables)
+    filtered = filter_invented_ids(payload, fusion, typed_tables)
+    prompt_tokens, completion_tokens = _tokens_from_gateway_response(response)
+    return (
+        filtered.model_copy(
+            update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
+        ),
+        prompt_tokens,
+        completion_tokens,
+    )
+
+
+def _memory_text_from_state(raw: object) -> str:
+    """Format bounded untrusted memory for general chat.
+
+    Args:
+        raw: ``memory_records`` list from graph state.
+
+    Returns:
+        Delimited memory text, or empty when none is present.
+    """
+
+    from typing import cast
+
+    if not isinstance(raw, list):
+        return ""
+    parts: list[str] = []
+    for item in raw[:8]:
+        if not isinstance(item, dict):
+            continue
+        typed_item = {
+            str(key): value
+            for key, value in cast(dict[object, object], item).items()
+        }
+        role = str(typed_item.get("role") or "unknown")[:32]
+        content = str(typed_item.get("content") or "")[:500]
+        if not content:
+            continue
+        parts.append(f'<<untrusted-memory role="{role}">>{content}</untrusted-memory>')
+    return "\n".join(parts)[:4000]
+
+
+def _gateway_general_chat(
+    deps: QueryGraphDeps,
+    *,
+    query: str,
+    knowledge_scope: KnowledgeScope,
+    recent_memory: str,
+    context: AuthorizedRuntimeContext | None,
+) -> tuple[AnswerPayload, int, int]:
+    """Run one async general-chat gateway call from the sync graph.
+
+    Args:
+        deps: Bound gateway and general-chat prompt.
+        query: User query.
+        knowledge_scope: General or user-text origin.
+        recent_memory: Delimited untrusted memory.
+        context: Admitted run context used for the live deadline timeout.
+
+    Returns:
+        Parsed uncited answer payload plus provider token counts.
+
+    Raises:
+        AnswerError: If the gateway is unbound or the provider fails.
+    """
+
+    from typing import Any, Literal, cast
+
+    from smart_rag_core.gateways.model import GeneralChatModelRequest
+    from smart_rag_core.query_answer.generate import sanitize_general_chat_payload
+
+    timeout_seconds = _gateway_timeout_seconds(context)
+    request = GeneralChatModelRequest(
+        query=query or "query",
+        recent_memory=recent_memory,
+        knowledge_scope=knowledge_scope,
+        prompt_version=GENERAL_CHAT_PROMPT_VERSION,
+        prompt_sha256=GENERAL_CHAT_PROMPT_SHA256,
+        prompt_text=str(deps.general_chat_prompt_text or "general_chat"),
+        remaining_deadline_seconds=timeout_seconds,
+    )
+    gateway = deps.model_gateway
+    if gateway is None:
+        raise AnswerError("model_gateway_unbound")
+    try:
+        response = cast(
+            Any,
+            _run_coro(
+                lambda: cast(Any, gateway).generate_general_chat(request),
+                cancel_check=deps.cancel_check,
+                timeout_seconds=request.remaining_deadline_seconds,
+            ),
+        )
+    except AnswerError:
+        raise
+    except Exception as exc:
+        raise AnswerError("general_chat_provider_error") from exc
+    raw_payload: object = getattr(response, "payload", {})
+    if not isinstance(raw_payload, dict):
+        raise AnswerError("general_chat_schema_invalid")
+    typed_raw = {
+        str(key): value
+        for key, value in cast(dict[object, object], raw_payload).items()
+    }
+    raw_status = typed_raw.get("status")
+    status: Literal["complete", "partial", "refused"] = "refused"
+    if raw_status == "complete":
+        status = "complete"
+    elif raw_status == "partial":
+        status = "partial"
+    payload = AnswerPayload(
+        answer_text=str(typed_raw.get("answer_text") or ""),
+        status=status,
+        answer_origin=knowledge_scope,
+    )
+    prompt_tokens, completion_tokens = _tokens_from_gateway_response(response)
+    return (
+        sanitize_general_chat_payload(payload, origin=knowledge_scope),
+        prompt_tokens,
+        completion_tokens,
+    )
 
 
 def _gateway_verifier(
@@ -1197,8 +1492,8 @@ def _gateway_verifier(
     links: tuple[AtomicLink, ...],
     fusion: FusionResult,
     tables: tuple[object, ...],
-    remaining: int,
-) -> VerifierPayload:
+    context: AuthorizedRuntimeContext | None,
+) -> tuple[VerifierPayload, int, int]:
     """Run one async gateway verifier call from the sync graph.
 
     Args:
@@ -1206,10 +1501,10 @@ def _gateway_verifier(
         links: At most six atomic links.
         fusion: Canonical evidence.
         tables: Table records.
-        remaining: Remaining model calls, unused except as a timeout proxy.
+        context: Admitted run context used for the live deadline timeout.
 
     Returns:
-        ``VerifierPayload``.
+        ``VerifierPayload`` plus provider prompt and completion tokens.
 
     Raises:
         AnswerError: If the gateway is unbound.
@@ -1229,6 +1524,7 @@ def _gateway_verifier(
         for item in tables
     )
     records = assemble_source_records(fusion, typed_tables)
+    timeout_seconds = _gateway_timeout_seconds(context)
     request = VerifierModelRequest(
         prompt_version=VERIFIER_PROMPT_VERSION,
         prompt_sha256=VERIFIER_PROMPT_SHA256,
@@ -1237,7 +1533,7 @@ def _gateway_verifier(
         links=tuple(
             cast(dict[str, object], item.model_dump(mode="json")) for item in links
         ),
-        remaining_deadline_seconds=max(0.1, min(45.0, float(remaining or 1))),
+        remaining_deadline_seconds=timeout_seconds,
     )
     gateway = deps.model_gateway
     if gateway is None:
@@ -1250,7 +1546,25 @@ def _gateway_verifier(
             timeout_seconds=request.remaining_deadline_seconds,
         ),
     )
-    return VerifierPayload.model_validate(response.payload)
+    prompt_tokens, completion_tokens = _tokens_from_gateway_response(response)
+    return (
+        VerifierPayload.model_validate(response.payload),
+        prompt_tokens,
+        completion_tokens,
+    )
+
+
+def _flush_langsmith_traces() -> None:
+    """Flush buffered LangSmith runs from this thread.
+
+    Side Effects:
+        Delegates to :func:`flush_langsmith_traces`. No-op when tracing is
+        off or no API key is configured.
+    """
+
+    from smart_rag_core.observability.langsmith_tracing import flush_langsmith_traces
+
+    flush_langsmith_traces()
 
 
 def _run_coro(
@@ -1263,7 +1577,8 @@ def _run_coro(
 
     Never nests ``asyncio.run`` on the live SSE event loop. When a loop is
     already running, the awaitable is created and completed on a dedicated
-    thread with its own loop.
+    thread with its own loop. The caller tracing context is copied and
+    LangSmith buffers are flushed before that thread exits.
 
     Args:
         factory: Zero-arg callable that returns an awaitable or a value.
@@ -1286,7 +1601,31 @@ def _run_coro(
     except RuntimeError:
         produced = factory()
         if asyncio.iscoroutine(produced):
-            return asyncio.run(produced)
+            async def _await_with_timeout() -> object:
+                """Await the worker coroutine within the configured deadline.
+
+                Returns:
+                    Gateway result produced before the timeout.
+
+                Raises:
+                    TimeoutError: When the gateway exceeds the bounded wait.
+                """
+
+                return await asyncio.wait_for(
+                    produced,
+                    timeout=max(0.1, timeout_seconds),
+                )
+
+            try:
+                return asyncio.run(_await_with_timeout())
+            except AnswerError:
+                raise
+            except TimeoutError as exc:
+                raise AnswerError("deadline_exhausted") from exc
+            except Exception as exc:
+                raise AnswerError("gateway_failed") from exc
+            finally:
+                _flush_langsmith_traces()
         return produced
 
     if cancel_check is not None and cancel_check():
@@ -1294,18 +1633,26 @@ def _run_coro(
 
     box: dict[str, object] = {}
     errors: dict[str, BaseException] = {}
+    copied = contextvars.copy_context()
 
     def _worker() -> None:
         """Create and complete the awaitable on this thread's event loop."""
 
-        try:
-            produced = factory()
-            if asyncio.iscoroutine(produced):
-                box["value"] = asyncio.run(produced)
-            else:
-                box["value"] = produced
-        except BaseException as exc:
-            errors["exc"] = exc
+        def _inner() -> None:
+            """Run the gateway factory inside the copied tracing context."""
+
+            try:
+                produced = factory()
+                if asyncio.iscoroutine(produced):
+                    box["value"] = asyncio.run(produced)
+                else:
+                    box["value"] = produced
+            except BaseException as exc:
+                errors["exc"] = exc
+            finally:
+                _flush_langsmith_traces()
+
+        copied.run(_inner)
 
     thread = threading.Thread(target=_worker, name="query-gateway-loop", daemon=True)
     thread.start()

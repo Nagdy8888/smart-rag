@@ -1,0 +1,178 @@
+"""Thin FastAPI helper to list creator-only conversation transcripts."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Literal, NoReturn
+from uuid import UUID
+
+import psycopg
+from psycopg.rows import dict_row
+from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.security.untrusted import isolate_untrusted_text
+
+_REASON_PREFIX = "query_memory:"
+_REASON_MAP = {
+    "authorization_rejected": "authorization_rejected",
+    "conversation_not_found": "not_found",
+    "conversation_deleted": "conversation_deleted",
+    "conversation_forbidden": "conversation_forbidden",
+}
+TranscriptRole = Literal["user", "assistant"]
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationMessageRecord:
+    """One authorized transcript row.
+
+    Attributes:
+        message_id: Message primary key.
+        role: ``user`` or ``assistant``.
+        content: HTML-escaped untrusted text.
+        created_at: Persist timestamp.
+    """
+
+    message_id: UUID
+    role: TranscriptRole
+    content: str
+    created_at: datetime
+
+
+def _raise_transcript(exc: BaseException) -> NoReturn:
+    """Map a Postgres error to a typed transcript failure.
+
+    Args:
+        exc: Driver or database error.
+
+    Raises:
+        QueryAdmissionError: Always, with a stable HTTP-mapped reason.
+    """
+
+    message = str(exc)
+    reason = "database_rejected"
+    if _REASON_PREFIX in message:
+        start = message.find(_REASON_PREFIX) + len(_REASON_PREFIX)
+        tail = message[start:].split()[0].strip("\"'")
+        raw = tail.split("\n")[0]
+        reason = _REASON_MAP.get(raw, "not_found")
+    raise QueryAdmissionError(reason) from exc
+
+
+def list_conversation_messages(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    conversation_id: UUID,
+    limit: int = 50,
+    before_id: UUID | None = None,
+) -> tuple[ConversationMessageRecord, ...]:
+    """Load a newest-first page of creator-owned user/assistant messages.
+
+    Args:
+        connection: Open connection. Caller must ``SET ROLE app_api``.
+        caller: JWKS-verified, profile-reloaded identity.
+        conversation_id: Conversation the caller must own.
+        limit: Page size, default 50, maximum 100.
+        before_id: Optional keyset cursor. Returns rows older than this id.
+
+    Returns:
+        Newest-first transcript records. Empty when the thread has no
+        user/assistant messages.
+
+    Raises:
+        QueryAdmissionError: Authorization, deleted, foreign, or missing
+            conversation. Foreign and deleted conversations use ``not_found``
+            after HTTP mapping.
+
+    Side Effects:
+        Executes ``app.list_conversation_messages``. No model calls and no SSE.
+    """
+
+    bounded = min(max(limit, 1), 100)
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT message_id, role, content, created_at
+                FROM app.list_conversation_messages(
+                  %s::uuid, %s::text, %s::bigint, %s::uuid, %s::integer, %s::uuid
+                )
+                """,
+                (
+                    caller.rpc_user_id(),
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    str(conversation_id),
+                    bounded,
+                    str(before_id) if before_id is not None else None,
+                ),
+            )
+            rows = cursor.fetchall()
+    except psycopg.Error as exc:
+        _raise_transcript(exc)
+
+    records: list[ConversationMessageRecord] = []
+    for row in rows:
+        created = row["created_at"]
+        if not isinstance(created, datetime):
+            raise QueryAdmissionError("database_rejected")
+        role = str(row["role"])
+        if role not in {"user", "assistant"}:
+            continue
+        records.append(
+            ConversationMessageRecord(
+                message_id=UUID(str(row["message_id"])),
+                role=role,  # type: ignore[arg-type]
+                content=isolate_untrusted_text(str(row["content"] or "")),
+                created_at=created,
+            )
+        )
+    return tuple(records)
+
+
+class ConversationTranscriptService:
+    """Factory-injected transcript reads."""
+
+    def __init__(self, postgres_url: str) -> None:
+        """Store the app_api DSN.
+
+        Args:
+            postgres_url: Server-side Postgres URL.
+        """
+
+        self._postgres_url = postgres_url
+
+    def list(
+        self,
+        caller: CallerContext,
+        *,
+        conversation_id: UUID,
+        limit: int = 50,
+        before_id: UUID | None = None,
+    ) -> tuple[ConversationMessageRecord, ...]:
+        """List one page of creator-owned transcript messages.
+
+        Args:
+            caller: Authenticated caller.
+            conversation_id: Conversation the caller must own.
+            limit: Page size, default 50, maximum 100.
+            before_id: Optional keyset cursor.
+
+        Returns:
+            Newest-first records.
+
+        Raises:
+            QueryAdmissionError: Authorization or missing conversation.
+        """
+
+        with psycopg.connect(self._postgres_url) as connection:
+            connection.execute("SET ROLE app_api")
+            return list_conversation_messages(
+                connection,
+                caller=caller,
+                conversation_id=conversation_id,
+                limit=limit,
+                before_id=before_id,
+            )

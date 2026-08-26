@@ -6,10 +6,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { Button } from "../ui/button";
-import { Icon } from "../ui/icon";
 import { Input } from "../ui/input";
 import { StatusBanner } from "../ui/status-banner";
 import { CodeText, UserText } from "../ui/user-text";
@@ -17,17 +17,10 @@ import { fetchMeta, acceptInvitation } from "../../lib/api";
 import { createBrowserSupabase } from "../../lib/auth/browser";
 import {
   CALLBACK_FAILED,
-  GOOGLE_OAUTH_BUTTON_LABEL,
-  GOOGLE_OAUTH_HELPER,
-  MFA_RECOVERY_UNAVAILABLE,
-  MFA_REQUIRED_BANNER,
-  OWNER_BOOTSTRAP_UNAVAILABLE,
   RESET_EMAIL_SENT,
   SIGN_IN_FAILED,
   SIGN_UP_SUCCESS,
 } from "../../lib/auth/copy";
-import { GOOGLE_OAUTH_ENABLED, maybeSignInWithGoogle } from "../../lib/auth/google";
-import { totpQrImageSrc } from "../../lib/auth/totp-qr";
 import { useSession } from "../../lib/auth/session-provider";
 import { SIGN_IN_TIMEOUT_MS, raceTimeout } from "../../lib/auth/timeout";
 import { publicSupabaseConfig } from "../../lib/env";
@@ -61,6 +54,7 @@ export function HandshakeBanner() {
   const metaQuery = useQuery({
     queryKey: publicQueryKeys.meta,
     queryFn: () => fetchMeta(),
+    refetchInterval: (query) => (query.state.status === "error" ? 10_000 : false),
   });
   const decision = evaluatePaidHandshake(
     metaQuery.data ?? null,
@@ -93,38 +87,13 @@ export function HandshakeBanner() {
 }
 
 /**
- * Disabled Google OAuth control (GAP-07-04).
- *
- * @returns Disabled button plus helper. Never calls `signInWithOAuth`.
- */
-export function GoogleOAuthButton() {
-  const supabase = useMemo(() => createBrowserSupabase(), []);
-  const onClick = useCallback(() => {
-    void maybeSignInWithGoogle(GOOGLE_OAUTH_ENABLED, () => {
-      if (supabase === null) {
-        return Promise.resolve(null);
-      }
-      return supabase.auth.signInWithOAuth({ provider: "google" });
-    });
-  }, [supabase]);
-  return (
-    <div className={authStyles.googleWrap}>
-      <Button type="button" disabled onClick={onClick}>
-        <Icon name="google" />
-        {GOOGLE_OAUTH_BUTTON_LABEL}
-      </Button>
-      <p className={authStyles.lead}>{GOOGLE_OAUTH_HELPER}</p>
-    </div>
-  );
-}
-
-/**
  * Email/password sign-in. Generic failure only. FastAPI does not throttle this form.
  *
  * @param props - `callbackError` when `/auth/callback` redirected here.
  * @returns Sign-in card.
  */
 export function SignInForm({ callbackError = false }: { callbackError?: boolean }) {
+  const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabase(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -148,14 +117,17 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
         );
         if (result.error || !result.data.session?.access_token) {
           setFailed(true);
+          return;
         }
+        router.replace("/");
+        router.refresh();
       } catch {
         setFailed(true);
       } finally {
         setPending(false);
       }
     },
-    [email, password, supabase],
+    [email, password, router, supabase],
   );
 
   return (
@@ -204,13 +176,14 @@ export function SignInForm({ callbackError = false }: { callbackError?: boolean 
           type="submit"
           variant="primary"
           className={authStyles.primaryWide}
-          disabled={pending}
+          pending={pending}
+          pendingLabel="Signing in…"
+          data-action-id="auth.sign_in"
+          data-testid="auth-sign-in"
         >
-          {pending ? "Signing in…" : "Sign in"}
+          Sign in
         </Button>
       </form>
-      <p className={authStyles.divider}>Or continue with</p>
-      <GoogleOAuthButton />
       <p className={authStyles.links}>
         Don&apos;t have an account? <Link href="/signup">Sign up</Link>
       </p>
@@ -301,7 +274,9 @@ export function SignUpForm() {
           required
           revealable
         />
-        <Button type="submit" variant="primary" className={authStyles.primaryWide}>
+        <Button type="submit" variant="primary" className={authStyles.primaryWide}
+          data-action-id="auth.sign_up"
+          data-testid="auth-sign-up">
           Sign up
         </Button>
       </form>
@@ -357,7 +332,9 @@ export function ForgotPasswordForm() {
           onChange={(event) => setEmail(event.target.value)}
           required
         />
-        <Button type="submit" variant="primary" className={authStyles.primaryWide}>
+        <Button type="submit" variant="primary" className={authStyles.primaryWide}
+          data-action-id="auth.forgot_password"
+          data-testid="auth-forgot-password">
           Send reset link
         </Button>
       </form>
@@ -421,214 +398,14 @@ export function ResetPasswordForm() {
           required
           revealable
         />
-        <Button type="submit" variant="primary" className={authStyles.primaryWide}>
+        <Button type="submit" variant="primary" className={authStyles.primaryWide}
+          data-action-id="auth.reset_password"
+          data-testid="auth-reset-password">
           Update password
         </Button>
       </form>
       <p className={authStyles.links}>
         <Link href="/">Console</Link>
-      </p>
-    </div>
-  );
-}
-
-/**
- * TOTP enrollment for aal1 sessions.
- *
- * @returns Enroll card. QR is an img only for data-URL `qr_code`.
- */
-export function MfaEnrollForm() {
-  const { supabase, signOut } = useSession();
-  const [secret, setSecret] = useState<string | null>(null);
-  const [qrSrc, setQrSrc] = useState<string | null>(null);
-  const [factorId, setFactorId] = useState<string | null>(null);
-  const [code, setCode] = useState("");
-  const [failed, setFailed] = useState(false);
-  const [verified, setVerified] = useState(false);
-
-  const startEnroll = useCallback(async () => {
-    setFailed(false);
-    if (supabase === null) {
-      setFailed(true);
-      return;
-    }
-    const enrolled = await supabase.auth.mfa.enroll({ factorType: "totp" });
-    if (enrolled.error || enrolled.data.type !== "totp") {
-      setFailed(true);
-      return;
-    }
-    setFactorId(enrolled.data.id);
-    setSecret(enrolled.data.totp.secret);
-    setQrSrc(totpQrImageSrc(enrolled.data.totp.qr_code));
-  }, [supabase]);
-
-  const verify = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault();
-      setFailed(false);
-      if (supabase === null || factorId === null) {
-        setFailed(true);
-        return;
-      }
-      const challenge = await supabase.auth.mfa.challenge({ factorId });
-      if (challenge.error) {
-        setFailed(true);
-        return;
-      }
-      const verifiedResult = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: challenge.data.id,
-        code,
-      });
-      if (verifiedResult.error) {
-        setFailed(true);
-        return;
-      }
-      setVerified(true);
-    },
-    [code, factorId, supabase],
-  );
-
-  return (
-    <div className={authStyles.card}>
-      <h1>Enroll MFA</h1>
-      <StatusBanner kind="error" role="alert">
-        {MFA_REQUIRED_BANNER}
-      </StatusBanner>
-      <StatusBanner kind="warning" role="status">
-        {MFA_RECOVERY_UNAVAILABLE}
-      </StatusBanner>
-      <EnvMissingBanner />
-      {failed ? (
-        <StatusBanner kind="error" role="alert">
-          {SIGN_IN_FAILED}
-        </StatusBanner>
-      ) : null}
-      {verified ? (
-        <StatusBanner kind="success" role="status">
-          Authenticator verified. Continue to the console.
-        </StatusBanner>
-      ) : null}
-      <div className={authStyles.form}>
-        <Button type="button" variant="primary" onClick={() => void startEnroll()}>
-          Start TOTP enrollment
-        </Button>
-        <Button type="button" onClick={() => void signOut()}>
-          Sign out
-        </Button>
-      </div>
-      {qrSrc ? (
-        // enroll totp.qr_code was already a data URL. Never inject raw SVG HTML.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={qrSrc} alt="TOTP QR code" width={160} height={160} />
-      ) : null}
-      {secret ? (
-        <p className={authStyles.lead}>
-          Authenticator secret: <CodeText value={secret} />
-        </p>
-      ) : null}
-      <form className={authStyles.form} onSubmit={(event) => void verify(event)}>
-        <Input
-          label="Authenticator code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-          required
-        />
-        <Button type="submit" variant="primary">
-          Verify TOTP
-        </Button>
-      </form>
-      <p className={authStyles.links}>
-        <Link href="/mfa/challenge">Challenge an existing factor</Link>
-      </p>
-    </div>
-  );
-}
-
-/**
- * TOTP challenge for verified factors at aal1.
- *
- * @returns Challenge card. No fake success without Auth verify.
- */
-export function MfaChallengeForm() {
-  const { supabase, signOut } = useSession();
-  const [code, setCode] = useState("");
-  const [failed, setFailed] = useState(false);
-  const [verified, setVerified] = useState(false);
-
-  const onSubmit = useCallback(
-    async (event: FormEvent) => {
-      event.preventDefault();
-      setFailed(false);
-      if (supabase === null) {
-        setFailed(true);
-        return;
-      }
-      const factors = await supabase.auth.mfa.listFactors();
-      const totp = factors.data?.totp[0];
-      if (factors.error || totp === undefined) {
-        setFailed(true);
-        return;
-      }
-      const challenge = await supabase.auth.mfa.challenge({ factorId: totp.id });
-      if (challenge.error) {
-        setFailed(true);
-        return;
-      }
-      const verifiedResult = await supabase.auth.mfa.verify({
-        factorId: totp.id,
-        challengeId: challenge.data.id,
-        code,
-      });
-      if (verifiedResult.error) {
-        setFailed(true);
-        return;
-      }
-      setVerified(true);
-    },
-    [code, supabase],
-  );
-
-  return (
-    <div className={authStyles.card}>
-      <h1>MFA challenge</h1>
-      <StatusBanner kind="error" role="alert">
-        {MFA_REQUIRED_BANNER}
-      </StatusBanner>
-      <StatusBanner kind="warning" role="status">
-        {MFA_RECOVERY_UNAVAILABLE}
-      </StatusBanner>
-      <EnvMissingBanner />
-      {failed ? (
-        <StatusBanner kind="error" role="alert">
-          {SIGN_IN_FAILED}
-        </StatusBanner>
-      ) : null}
-      {verified ? (
-        <StatusBanner kind="success" role="status">
-          Authenticator verified. Continue to the console.
-        </StatusBanner>
-      ) : null}
-      <form className={authStyles.form} onSubmit={(event) => void onSubmit(event)}>
-        <Input
-          label="Authenticator code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-          required
-        />
-        <Button type="submit" variant="primary">
-          Verify TOTP
-        </Button>
-        <Button type="button" onClick={() => void signOut()}>
-          Sign out
-        </Button>
-      </form>
-      <p className={authStyles.links}>
-        <Link href="/mfa/enroll">Enroll TOTP</Link>
       </p>
     </div>
   );
@@ -673,9 +450,6 @@ export function InvitationAcceptForm() {
       <p className={authStyles.lead}>
         Email comes from the signed-in account, not this form.
       </p>
-      <StatusBanner kind="info" role="status">
-        {OWNER_BOOTSTRAP_UNAVAILABLE}
-      </StatusBanner>
       <EnvMissingBanner />
       {accessToken === null ? (
         <StatusBanner kind="warning" role="status">
@@ -704,7 +478,9 @@ export function InvitationAcceptForm() {
           minLength={8}
           required
         />
-        <Button type="submit" variant="primary" disabled={accessToken === null}>
+        <Button type="submit" variant="primary" disabled={accessToken === null}
+          data-action-id="auth.accept_invitation"
+          data-testid="auth-accept-invitation">
           Accept invitation
         </Button>
       </form>
@@ -712,40 +488,6 @@ export function InvitationAcceptForm() {
         <Link href="/login">Sign in</Link>
       </p>
       {supabase === null ? <EnvMissingBanner /> : null}
-    </div>
-  );
-}
-
-const KNOWN_GAPS = {
-  "GAP-07-07": MFA_RECOVERY_UNAVAILABLE,
-  "GAP-07-08": OWNER_BOOTSTRAP_UNAVAILABLE,
-} as const;
-
-export type KnownUnavailableGap = keyof typeof KNOWN_GAPS;
-
-/**
- * Honest Unavailable surface. No mocked HTTP, no recovery-code inputs.
- *
- * @param props - Gap id from the route.
- * @returns Gap copy only.
- */
-export function UnavailableGap({ gap }: { gap: string }) {
-  const copy =
-    gap in KNOWN_GAPS
-      ? KNOWN_GAPS[gap as KnownUnavailableGap]
-      : "This surface is unavailable. No mocked API is provided.";
-  return (
-    <div className={authStyles.card}>
-      <h1>Unavailable</h1>
-      <StatusBanner kind="warning" role="status">
-        {copy}
-      </StatusBanner>
-      <p className={authStyles.lead}>
-        Gap id: <CodeText value={gap} />
-      </p>
-      <p className={authStyles.links}>
-        <Link href="/login">Sign in</Link>
-      </p>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -16,6 +17,8 @@ from smart_rag_api.services.sse_stream import (
     SseStreamService,
     default_executor_factory,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 def get_backend_settings(request: Request) -> BackendSettings:
@@ -98,6 +101,7 @@ def get_sse_stream_service(
     store = getattr(request.app.state, "run_event_store", None)
     if store is None:
         store = PostgresRunEventStore(postgres_url)
+        request.app.state.run_event_store = store
     executor = getattr(request.app.state, "query_run_executor", None)
     if executor is None:
         executor = default_executor_factory()
@@ -107,6 +111,7 @@ def get_sse_stream_service(
         executor=executor,
         sse_schema_version=settings.sse_schema_version,
         heartbeat_interval_seconds=HEARTBEAT_INTERVAL_SECONDS,
+        postgres_url=postgres_url,
     )
 
 
@@ -143,10 +148,33 @@ def mark_rate_limit_degraded(request: Request) -> None:
         request: Active request.
 
     Side Effects:
-        Sets ``app.state.rate_limit_degraded``.
+        Sets ``app.state.rate_limit_degraded`` to True. The flag stays
+        set until ``clear_rate_limit_degraded`` runs after Valkey
+        recovers. Ask stays blocked while it is True.
     """
 
     request.app.state.rate_limit_degraded = True
+
+
+def clear_rate_limit_degraded(request: Request) -> None:
+    """Clear the process degraded-readiness flag after Valkey recovers.
+
+    Args:
+        request: Active request.
+
+    Side Effects:
+        Sets ``app.state.rate_limit_degraded`` to False when it was True
+        and emits ``rate_limit_recovered`` once per transition. Idempotent
+        when the flag is already False.
+    """
+
+    if not bool(getattr(request.app.state, "rate_limit_degraded", False)):
+        return
+    request.app.state.rate_limit_degraded = False
+    LOGGER.info(
+        "rate_limit_recovered",
+        extra={"event": "rate_limit_recovered"},
+    )
 
 
 def enforce_rate_limit(
@@ -166,6 +194,10 @@ def enforce_rate_limit(
         max_attempts: Window cap.
         window_seconds: Window size.
 
+    Side Effects:
+        Sets ``app.state.rate_limit_degraded`` when the emergency limiter
+        is used. Clears it when a later Valkey consume succeeds.
+
     Raises:
         HTTPException: 429 with Retry-After, or 503 when enforcement is down.
     """
@@ -180,6 +212,7 @@ def enforce_rate_limit(
             valkey_client=get_valkey_limits_client(request),
             kind=kind,
             on_degraded=lambda: mark_rate_limit_degraded(request),
+            on_recovered=lambda: clear_rate_limit_degraded(request),
             retry_after_seconds=settings.rate_limit_retry_after_seconds,
         )
     except Exception as exc:

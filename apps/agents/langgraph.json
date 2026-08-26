@@ -1,9 +1,11 @@
 {
   "python_version": "3.11",
   "dependencies": ["."],
+  "env": "../../.env.compose",
   "graphs": {
     "query": "./src/smart_rag_agents/query/graph.py:graph",
     "query_studio": "./src/smart_rag_agents/query/studio.py:graph",
+    "query_studio_live": "./src/smart_rag_agents/query/studio_live.py:make_graph",
     "ingestion": "./src/smart_rag_agents/ingestion/graph.py:graph"
   }
 }

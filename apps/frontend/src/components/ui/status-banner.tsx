@@ -20,7 +20,7 @@ export type StatusBannerProps = {
   role?: "status" | "alert";
   /**
    * Move keyboard focus onto this banner when it appears. Defaults to true
-   * for `role="alert"` (426/402/MFA/error).
+   * for `role="alert"` (426/402/error).
    */
   autoFocus?: boolean;
 };

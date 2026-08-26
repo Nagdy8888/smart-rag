@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Destructive local reset; removes Compose volumes after explicit confirmation.
+  Destructive local-test-fixture reset; removes Compose volumes after explicit confirmation.
 #>
 param(
   [switch]$ConfirmReset

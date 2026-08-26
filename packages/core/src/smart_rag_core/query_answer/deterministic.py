@@ -78,6 +78,7 @@ def deterministic_check_answer(
     *,
     fusion: FusionResult,
     tables: tuple[TableEvidenceRecord, ...],
+    evidence_required: bool = True,
 ) -> tuple[AnswerPayload, tuple[str, ...]]:
     """Strip unauthorized, misaligned, or incomplete citations and links.
 
@@ -85,6 +86,9 @@ def deterministic_check_answer(
         payload: Model or mock answer.
         fusion: Canonical Combined/Hybrid evidence.
         tables: Deterministic table snapshots.
+        evidence_required: Whether an empty evidence set must force refusal.
+            NoRetrieval chat responses set this false because they make no
+            company-knowledge claim.
 
     Returns:
         Filtered payload and failure reason codes. Unsupported links are
@@ -123,7 +127,7 @@ def deterministic_check_answer(
         item for item in kept_citations if item.table_id is not None
     )
     status = payload.status
-    if not fusion.evidence and not tables:
+    if evidence_required and not fusion.evidence and not tables:
         status = "refused"
         failures.append("insufficient_evidence")
     elif "empty_citation_text" in failures and status == "complete":

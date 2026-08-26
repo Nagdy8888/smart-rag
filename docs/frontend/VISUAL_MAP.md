@@ -28,7 +28,7 @@ flowchart LR
   chat["frame_04 chat"] --> home["/"]
   library["frame_06 plus 07"] --> docs["/documents"]
   detail["frame_09"] --> docId["/documents/id"]
-  graphFrame["frame_10"] --> graph["/graph"]
+  graphFrame["frame_10"] --> graphRoute["/graph"]
   tablesFrame["frame_05"] --> tables["/tables"]
   usageFrame["frame_14"] --> usage["/usage"]
   primitives["frame_00"] --> shell["AppShell and admin routes"]
@@ -50,7 +50,7 @@ flowchart LR
 | `frame_10_graph_explorer` | `/graph` | Three panes, search, bounded viz, evidence | Depth 5, Edit Relationship, unauthorized titles |
 | `frame_14_usage_budgets_dashboard` | `/usage` | Meter dashboard hierarchy | Budget sliders, Slack, export-without-tool |
 
-`/signup`, `/forgot-password`, `/auth/reset`, `/mfa/*`, `/invitations/accept`
+`/signup`, `/forgot-password`, `/auth/reset`, `/invitations/accept`
 reuse the `frame_01` card. `/team`, `/tools`, `/curation`, `/profile` reuse
 `frame_00` primitives and the authenticated shell.
 

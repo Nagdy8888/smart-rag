@@ -67,10 +67,23 @@ def test_recv_until_nul_stops_without_eof() -> None:
     """z-protocol replies are complete at NUL; the socket may stay open."""
 
     class _OpenAfterNul:
+        """Socket stub that keeps extra bytes after the NUL terminator."""
+
         def __init__(self) -> None:
+            """Queue a complete PONG reply plus unused trailing bytes."""
+
             self._chunks = [b"PONG\x00", b"SHOULD_NOT_READ"]
 
         def recv(self, _size: int) -> bytes:
+            """Return the next queued chunk.
+
+            Args:
+                _size: Unused requested byte count.
+
+            Returns:
+                The next stub chunk, or empty bytes when exhausted.
+            """
+
             return self._chunks.pop(0) if self._chunks else b""
 
     received = _recv_until_nul(_OpenAfterNul())

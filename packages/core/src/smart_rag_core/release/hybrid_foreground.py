@@ -9,7 +9,6 @@ ids. Query text is accepted on stdin and is not written to the result JSON.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections.abc import Sequence
 
@@ -23,6 +22,7 @@ from smart_rag_core.retrieval.hybrid_run import HybridRetriever
 from smart_rag_core.retrieval.terms import TermRetriever
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.settings import SharedSettings
+from smart_rag_core.settings.base import get_process_environ
 
 FOREGROUND_SCHEMA_VERSION = "phase09-candidate-packet4-hybrid-foreground-v1"
 
@@ -178,7 +178,9 @@ def parse_foreground_stdin(raw: str) -> tuple[str, tuple[tuple[str, str], ...]]:
     user_id = payload.get("user_id")
     if not isinstance(user_id, str) or user_id == "":
         raise ValueError("hybrid foreground requires user_id")
-    rows = as_json_list(payload.get("queries"), source="hybrid-foreground-stdin.queries")
+    rows = as_json_list(
+        payload.get("queries"), source="hybrid-foreground-stdin.queries"
+    )
     queries: list[tuple[str, str]] = []
     for item in rows:
         row = as_json_object(item, source="hybrid-foreground-stdin.queries[]")
@@ -199,8 +201,8 @@ def main() -> int:
         Process exit code.
     """
 
-    supabase_url = os.environ.get("SUPABASE_DB_URL")
-    parade_url = os.environ.get("PARADEDB_URL")
+    supabase_url = get_process_environ("SUPABASE_DB_URL")
+    parade_url = get_process_environ("PARADEDB_URL")
     if not supabase_url or not parade_url:
         sys.stderr.write("SUPABASE_DB_URL and PARADEDB_URL are required\n")
         return 2
