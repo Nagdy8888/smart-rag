@@ -5,6 +5,8 @@
 !.env.*.example
 .tmp*
 .tmp-*/
+_tmp_*
+_tmp_*/
 
 # Cursor local agent state — keep plans/rules/skills committed for CI integrity
 .cursor/*
