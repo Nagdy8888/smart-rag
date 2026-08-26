@@ -95,6 +95,17 @@ def test_public_http_ready_omits_named_dependencies() -> None:
     assert "langgraph" not in serialized
 
 
+def test_live_and_meta_are_async_event_loop_handlers() -> None:
+    """Liveness and handshake must not wait on the sync thread pool."""
+
+    import inspect
+
+    from smart_rag_api.routers.ops import api_meta, live
+
+    assert inspect.iscoroutinefunction(live)
+    assert inspect.iscoroutinefunction(api_meta)
+
+
 def test_operator_ready_requires_authentication() -> None:
     """``GET /ops/ready`` is not a public topology leak."""
 
@@ -175,3 +186,69 @@ def test_checkpoint_down_blocks_query_ready() -> None:
     )
     assert payload.query_ready is False
     assert payload.status == "not_ready"
+
+
+def test_valkey_probes_ok_requires_both_instances() -> None:
+    """Recovery helper is true only when both Valkey probes are ok."""
+
+    from smart_rag_api.services.readiness import valkey_probes_ok
+
+    settings = BackendSettings()
+    payload = build_readiness(
+        settings,
+        valkey_limits=_ReadyValkey(),  # type: ignore[arg-type]
+        valkey_cache=_ReadyValkey(),  # type: ignore[arg-type]
+        lightrag_attached=False,
+        rate_limit_degraded=True,
+        postgres_probe="ok",
+        paradedb_probe="ok",
+        checkpoint_probe="ok",
+    )
+    assert valkey_probes_ok(payload) is True
+    down = build_readiness(
+        settings,
+        valkey_limits=None,
+        valkey_cache=_ReadyValkey(),  # type: ignore[arg-type]
+        lightrag_attached=False,
+        rate_limit_degraded=True,
+        postgres_probe="ok",
+        paradedb_probe="ok",
+        checkpoint_probe="ok",
+    )
+    assert valkey_probes_ok(down) is False
+
+
+def test_rate_limit_degraded_latch_clears_when_valkey_recovers() -> None:
+    """GET /health/ready clears a stale emergency-limiter latch."""
+
+    from fastapi.testclient import TestClient
+    from smart_rag_api.main import create_app
+    from smart_rag_core.runtime.valkey import MemoryValkeyClient
+
+    from tests.unit.typed_openapi import as_openapi_client
+
+    with TestClient(create_app()) as raw:
+        raw.app.state.rate_limit_degraded = True
+        raw.app.state.valkey_limits_client = MemoryValkeyClient()
+        raw.app.state.valkey_cache_client = MemoryValkeyClient()
+        response = as_openapi_client(raw).get("/health/ready")
+        assert response.status_code == 200
+        assert raw.app.state.rate_limit_degraded is False
+
+
+def test_rate_limit_degraded_latch_stays_when_valkey_is_down() -> None:
+    """A live Valkey outage keeps the emergency-limiter latch."""
+
+    from fastapi.testclient import TestClient
+    from smart_rag_api.main import create_app
+    from smart_rag_core.runtime.valkey import MemoryValkeyClient
+
+    from tests.unit.typed_openapi import as_openapi_client
+
+    with TestClient(create_app()) as raw:
+        raw.app.state.rate_limit_degraded = True
+        raw.app.state.valkey_limits_client = MemoryValkeyClient(fail_closed=True)
+        raw.app.state.valkey_cache_client = MemoryValkeyClient(fail_closed=True)
+        response = as_openapi_client(raw).get("/health/ready")
+        assert response.status_code == 200
+        assert raw.app.state.rate_limit_degraded is True

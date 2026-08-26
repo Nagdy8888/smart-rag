@@ -162,7 +162,10 @@ export function CitationDrawer({
  *
  * @returns Chat surface. The Sessions list and conversation body scroll
  *   independently; the Sessions header and composer stay pinned. New
- *   sessions take their title from the first prompt.
+ *   sessions take their title from the first prompt. Sign-out clears the
+ *   local run pointer. A `/me` 401/403 other than `session_revoked` shows
+ *   the session-rejected banner without waiting for Send. Readiness
+ *   refetches every 15s so Send unblocks after `query_ready` recovers.
  */
 export function ChatApp() {
   const queryClient = useQueryClient();
@@ -226,6 +229,7 @@ export function ChatApp() {
   const metaQuery = useQuery({
     queryKey: publicQueryKeys.meta,
     queryFn: () => fetchMeta(),
+    refetchInterval: (query) => (query.state.status === "error" ? 10_000 : false),
   });
 
   const handshake = evaluatePaidHandshake(
@@ -243,6 +247,8 @@ export function ChatApp() {
     queryKey: auth === null ? publicQueryKeys.ready : keys.consoleReady,
     queryFn: () => loadConsoleReadiness(auth, meQuery.data?.role ?? null),
     staleTime: 30_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 
   const conversationsQuery = useQuery({
@@ -348,6 +354,25 @@ export function ChatApp() {
     };
   }, []);
 
+  const previousAccessTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousAccessTokenRef.current;
+    previousAccessTokenRef.current = accessToken;
+    if (previous !== null && accessToken === null) {
+      recoveredRef.current = false;
+      resetClientChat();
+    }
+  }, [accessToken, resetClientChat]);
+
+  useEffect(() => {
+    if (!meQuery.isError || meQuery.error === null) {
+      return;
+    }
+    if (isClassifiedApiError(meQuery.error)) {
+      setFailure(meQuery.error.failure);
+    }
+  }, [meQuery.error, meQuery.isError]);
+
   const send = useCallback(async (text: string): Promise<boolean> => {
     if (sendLockRef.current) {
       return false;
@@ -380,8 +405,12 @@ export function ChatApp() {
         }
         setConversationId(created.conversation_id);
         void queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      } catch {
-        setFailure({ kind: "server", status: 500 });
+      } catch (error) {
+        setFailure(
+          isClassifiedApiError(error)
+            ? error.failure
+            : { kind: "server", status: 500 },
+        );
         sendLockRef.current = false;
         setSending(false);
         return false;

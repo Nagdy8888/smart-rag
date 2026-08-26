@@ -75,15 +75,6 @@ export const ConversationRail = memo(function ConversationRail({
   showCollapseToggle = false,
 }: ConversationRailProps) {
   conversationRailRenderCount.value += 1;
-  const firstOfGroup = new Set<string>();
-  let lastGroup: string | null = null;
-  for (const item of conversations) {
-    const group = conversationAgeGroup(item.created_at);
-    if (group !== lastGroup) {
-      firstOfGroup.add(item.conversation_id);
-      lastGroup = group;
-    }
-  }
 
   return (
     <aside
@@ -170,25 +161,30 @@ export const ConversationRail = memo(function ConversationRail({
           }))}
           onSelect={onSelect}
           getAccessibleName={(item) => conversationDisplayTitle(item.title)}
+          getGroupLabel={(item, previous) => {
+            const group = conversationAgeGroup(item.created_at);
+            if (previous === null) {
+              return group;
+            }
+            return conversationAgeGroup(previous.created_at) === group
+              ? null
+              : group;
+          }}
+          groupClassName={styles.railGroupLabel}
         >
           {(item) => (
-            <span className={styles.conversationButton}>
-              {firstOfGroup.has(item.conversation_id) ? (
-                <span className={styles.railGroupLabel} aria-hidden="true">
-                  {conversationAgeGroup(item.created_at)}
-                </span>
-              ) : null}
-              <span className={styles.conversationCopy}>
-                <span className={styles.conversationTitle}>
+            <div className={styles.conversationButton}>
+              <div className={styles.conversationCopy}>
+                <div className={styles.conversationTitle}>
                   <UserText value={conversationDisplayTitle(item.title)} />
-                </span>
+                </div>
                 {item.created_at ? (
-                  <span className={styles.muted} aria-hidden="true">
+                  <div className={styles.conversationTime} aria-hidden="true">
                     {formatRelativeTime(item.created_at)}
-                  </span>
+                  </div>
                 ) : null}
-              </span>
-              <span className={styles.conversationDelete}>
+              </div>
+              <div className={styles.conversationDelete}>
                 <Button
                   type="button"
                   variant="ghost"
@@ -203,8 +199,8 @@ export const ConversationRail = memo(function ConversationRail({
                 >
                   <Icon name="trash" />
                 </Button>
-              </span>
-            </span>
+              </div>
+            </div>
           )}
         </RovingList>
       </div>

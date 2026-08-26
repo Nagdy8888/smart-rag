@@ -2,7 +2,7 @@
 title: Production console design system
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: frontend, reviewers
 packet: P08-01
 ---
@@ -76,7 +76,13 @@ reintroduce them.
 | `--motion-fast` | `150ms ease-out` |
 | `--motion-drawer` | `200ms ease-out` |
 
-Light scheme only. Motion honors `prefers-reduced-motion`. Fonts are
+Light scheme only. `html` sets `color-scheme: only light` so Windows and
+Microsoft Edge do not restyle native controls, scrollbars, or autofill
+when the OS is in dark mode. Do not set `-webkit-font-smoothing:
+antialiased` on `body`: DirectWrite already hints Inter, and antialiased
+thins glyphs. Buttons and text fields use `appearance: none` and inherit
+Inter. The shell and auth split use `100vh` then `100dvh`. Scrollbars stay
+thin and light. Motion honors `prefers-reduced-motion`. Fonts are
 self-hosted Inter plus Inter Display SemiBold under
 `apps/frontend/public/fonts`. No Google Fonts CDN and no `next/font/google`.
 `--gradient-brand` is allowed only on the auth brand panel, empty-state
@@ -162,5 +168,9 @@ uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci
   `app-shell.module.css` desktop media query (`min-width: 801px`).
 - Geist / Google Fonts returning: `layout.tsx` must not import
   `next/font` loaders; CSP `font-src 'self'` forbids CDN hosts.
+- Thin gray type or dark native widgets in Edge on Windows: confirm
+  `globals.css` uses `color-scheme: only light`, does not set
+  `-webkit-font-smoothing: antialiased` on `body`, and resets form
+  `appearance` plus autofill.
 - Component tests missing DOM: `*.test.tsx` files need
   `// @vitest-environment jsdom`.

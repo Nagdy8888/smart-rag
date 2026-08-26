@@ -39,8 +39,34 @@ if ($missing.Count -gt 0) {
   throw ("Hosted Compose env is incomplete. Missing names: {0}" -f ($missing -join ", "))
 }
 
+# Process env wins Compose interpolation. Project `.env` often keeps the
+# local fixture SUPABASE_URL; without this export the API verifies hosted
+# browser JWTs against local GoTrue and Ask returns 401 unauthorized.
+Get-Content $EnvFile | ForEach-Object {
+  $line = $_.Trim()
+  if (-not $line -or $line.StartsWith("#")) {
+    return
+  }
+  $parts = $line.Split("=", 2)
+  if ($parts.Count -ne 2) {
+    return
+  }
+  $name = $parts[0].Trim()
+  $value = $parts[1].Trim().Trim('"').Trim("'")
+  if ($name) {
+    Set-Item -Path ("Env:{0}" -f $name) -Value $value
+  }
+}
+
 Write-Host "Starting hosted-runtime Docker Compose stack with .env.compose ..."
 docker compose --env-file $EnvFile up --build -d
+
+$authHost = docker compose --env-file $EnvFile exec -T api python -c "import os; from urllib.parse import urlparse; print(urlparse(os.environ.get('SUPABASE_URL','')).hostname or '')"
+$authHost = "$authHost".Trim()
+if ($authHost -in @("127.0.0.1", "localhost", "host.docker.internal")) {
+  throw ("API SUPABASE_URL host is the local fixture ({0}). Hosted browser sessions will 401. Recreate with .env.compose loaded into the process." -f $authHost)
+}
+Write-Host "API Auth JWKS host: $authHost"
 
 Write-Host ""
 Write-Host "Developer endpoints (when healthy):"

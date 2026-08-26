@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
+import pytest
 from smart_rag_agents.query.graph import compile_query_graph as _compile_query_graph
 from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 from smart_rag_api.services.sse_stream import (
@@ -19,6 +20,7 @@ from smart_rag_api.services.sse_stream import (
     QueryRunRegistry,
     SseStreamService,
 )
+from smart_rag_core.observability.langsmith_tracing import estimate_traced_chat_cost_usd
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_answer.models import AnswerPayload
@@ -129,6 +131,8 @@ def test_production_executor_emits_verified_delta_then_one_terminal(
                 "verify_answer": {
                     "status": "verified",
                     "answer": final.model_dump(mode="json"),
+                    "prompt_tokens": 80,
+                    "completion_tokens": 20,
                 }
             },
         )
@@ -213,7 +217,13 @@ def test_production_executor_emits_verified_delta_then_one_terminal(
     assert deltas == ["VISIBLE_FINAL"]
     assert "DRAFT_HIDDEN" not in str(events)
     assert any(event_type == "status" for event_type in types)
+    assert any(event_type == "usage" for event_type in types)
     assert commit_calls == ["commit", "commit"]
+    assert executor.termination_summary["input_tokens"] == 80
+    assert executor.termination_summary["output_tokens"] == 20
+    assert executor.termination_summary["estimated_cost_usd"] == pytest.approx(
+        float(estimate_traced_chat_cost_usd(input_tokens=80, output_tokens=20))
+    )
 
 
 def test_production_executor_empty_answer_cannot_complete(monkeypatch: Any) -> None:
@@ -933,7 +943,9 @@ def _patch_recording_executor(
 def test_successful_stream_drains_and_skips_aclose(monkeypatch: Any) -> None:
     """A terminal plus trailing chunk exhausts naturally without aclose."""
 
-    stream = _RecordingAsyncStream((_verified_chunk("VISIBLE_FINAL"), _trailing_chunk()))
+    stream = _RecordingAsyncStream(
+        (_verified_chunk("VISIBLE_FINAL"), _trailing_chunk())
+    )
     executor = LangGraphQueryRunExecutor()
     commits, settlements = _patch_recording_executor(
         monkeypatch, executor, _RecordingCompiled(stream)

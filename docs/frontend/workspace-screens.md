@@ -14,7 +14,7 @@ where they disagree.
 
 #### `AppShell`
 
-- Desktop grid columns are `232px minmax(0, 1fr)`; collapsed mode is `72px minmax(0, 1fr)`. Width does not animate.
+- Desktop grid columns are `232px minmax(0, 1fr)`; collapsed mode is `72px minmax(0, 1fr)`. Width does not animate. The shell height is `100vh` then `100dvh` so Edge on Windows still fills the viewport.
 - At `>=1024px` a 32px ghost “Collapse navigation” / “Expand navigation” icon control sits at the **rail bottom**. The choice is stored in `localStorage`. Breakpoints remain the default before the first toggle. A later `1280px` rule must not force the expanded width; collapsed classes win at every desktop width.
 - Nav rail uses `--color-ink` with `--color-ink-border` on the trailing edge. Topbar stays white with a bottom border.
 - Main area uses canvas background and owns vertical scrolling.
@@ -84,7 +84,7 @@ where they disagree.
 
 - Use available height below topbar. The console shell is viewport-bounded (`100dvh`); non-Ask console pages still scroll inside `main`.
 - Ask fills the remaining height below banners. There is no duplicate Ask `h2`. The Sessions list and the conversation body each own `overflow-y: auto`. The Sessions header and the composer stay outside those scrollports.
-- At `>=1280px`: 280px Sessions rail and `minmax(0, 1fr)` main workspace. A 28px icon-only “Collapse sessions” control narrows the rail. “Expand sessions” restores the same mounted list. The choice is stored in `localStorage`.
+- At `>=1280px`: 280px Sessions rail and `minmax(0, 1fr)` main workspace. A 28px icon-only “Collapse sessions” control narrows the rail to a 52px strip. The rail width follows that column so “Expand sessions” stays visible inside the strip, not under the answer pane. “Expand sessions” restores the same mounted list. The choice is stored in `localStorage`.
 - At `<1280px`: the desktop Sessions rail is omitted from the workspace grid. Sessions open in a left Sheet. Composer card is full-width with 12px margins; hint text is hidden; transcript uses 16px padding.
 - Transcript column is centered at `max-width: 760px`. Opening a session loads `GET /conversations/{id}/messages` (newest 50, rendered oldest-first). “Load earlier messages” prepends the previous page when `next_before_id` is set.
 - The Message field opts out of the 520px form-field cap. Session titles come from the first question on `POST /conversations`. Null titles render exactly “Untitled chat”. There is no title-update or LLM-title contract.
@@ -119,7 +119,7 @@ flowchart TB
 - White bordered panel, 14px radius, 280px wide.
 - Header: “Sessions” label (13px/600) left; one 32px compact primary icon-button “New chat” (plus icon) right.
 - Search is omitted because the API does not provide global search and local first-page search is misleading.
-- Session row: single-line title (ellipsis) and relative time (`Intl.RelativeTimeFormat`; short date after 7 days). Sticky groups: Today, Yesterday, Previous 7 days, Older.
+- Session row: single-line title (ellipsis, 20px line-height) and relative time on a second line (16px). Minimum row height is 56px. Age groups (Today, Yesterday, Previous 7 days, Older) are separate sticky headers, not inside the option. The Sessions list is a block scrollport; rows use `flex-shrink: 0` so Edge cannot collapse `min-height: 0` flex items on top of each other.
 - Clicking a row loads that conversation’s transcript. Active row uses `--color-surface-selected` plus `--color-accent-border`.
 - Delete appears on hover/focus as an icon button; the overflow menu is retained for keyboard users and shows pending “Deleting…”.
 - Footer may contain Load more when cursor data supports it.

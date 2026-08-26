@@ -8,6 +8,7 @@ import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { ChatApp } from "./chat/chat-app";
 import {
+  ClassifiedApiError,
   createConversation,
   fetchMe,
   fetchMeta,
@@ -330,6 +331,23 @@ describe("ChatApp MFA removal and revoked session", () => {
     expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   });
+
+  it("shows the session-rejected banner when /me is unauthorized", async () => {
+    vi.mocked(fetchMe).mockRejectedValue(
+      new ClassifiedApiError({
+        kind: "auth",
+        status: 401,
+        detail: "unauthorized",
+      }),
+    );
+    renderChat(<ChatApp />);
+    expect(
+      await screen.findByText(
+        "Session rejected (unauthorized). Sign in again. UI state is not authorization.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+  });
 });
 
 describe("ChatApp SSE limitation families and reconnect", () => {
@@ -589,6 +607,30 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     });
     expect(messagePosts).toEqual([]);
   });
+
+  it("shows the session-rejected banner when conversation create is unauthorized", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(createConversation).mockReset();
+    vi.mocked(createConversation).mockRejectedValue(
+      new ClassifiedApiError({
+        kind: "auth",
+        status: 401,
+        detail: "unauthorized",
+      }),
+    );
+    const messagePosts: string[] = [];
+    vi.stubGlobal("fetch", stubChatFetch({ messagePosts }));
+    renderChat(<ChatApp />);
+    await user.type(await screen.findByLabelText("Message"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(
+      await screen.findByText(
+        "Session rejected (unauthorized). Sign in again. UI state is not authorization.",
+      ),
+    ).toBeInTheDocument();
+    expect(messagePosts).toEqual([]);
+  });
 });
 
 
@@ -753,6 +795,10 @@ describe("ChatApp Ask workspace", () => {
     expect(
       screen.getByRole("listbox", { name: "Sessions", hidden: true }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Chat" })).not.toHaveTextContent(
+      "Older",
+    );
+    expect(screen.getByText("Older")).toBeInTheDocument();
   });
 
   it("collapses the Sessions list without deleting conversations", async () => {

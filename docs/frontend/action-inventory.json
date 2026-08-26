@@ -573,7 +573,7 @@
       "contract_owner": "frontend-shell",
       "contract": "local expand/collapse",
       "role": "authenticated",
-      "success_state": "Sessions column 248px or 52px",
+      "success_state": "Sessions column 280px or 52px",
       "failure_state": "none",
       "idempotency": "localStorage",
       "disposition": "keep",

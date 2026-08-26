@@ -54,6 +54,7 @@ export function HandshakeBanner() {
   const metaQuery = useQuery({
     queryKey: publicQueryKeys.meta,
     queryFn: () => fetchMeta(),
+    refetchInterval: (query) => (query.state.status === "error" ? 10_000 : false),
   });
   const decision = evaluatePaidHandshake(
     metaQuery.data ?? null,

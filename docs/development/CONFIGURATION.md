@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: developers, operators
 ---
 
@@ -27,6 +27,7 @@ Validation errors list field paths and categories but omit source values.
 | `LANGSMITH_API_KEY` | optional secret | secret | Required when `LANGSMITH_TRACING=true`. Local LangGraph Studio UI also needs this key to attach at `smith.langchain.com/studio` even when tracing stays false. Never logged or represented in plaintext |
 | `LANGSMITH_PROJECT` | safe identifier; `smart-rag` | public | LangSmith project that receives redacted traces. Open this exact project in the UI |
 | `LANGSMITH_ENDPOINT` | optional HTTP URL | internal | Override for a non-default LangSmith API; unset uses the hosted default |
+| `LANGSMITH_EXPORT_IO` | boolean; `false` | public | Local-only. When `true` with `APP_ENV=local` and tracing on, LangSmith receives the user message, assistant reply, model prompts, and completions. Token counts and estimated USD export even when this flag is false. Staging and production reject the flag. API keys, JWTs, and embedding vectors stay omitted. See [LANGSMITH_TRACING.md](./LANGSMITH_TRACING.md) and [ADR-local-langsmith-export-io.md](../adr/ADR-local-langsmith-export-io.md) |
 | `MOCK_MODEL_FIXTURE_ID` | safe identifier; `phase-1-foundation-v1` | internal | Included in fixture provenance; does not imply retrieval |
 | `MODEL_INPUT_MAX_CHARS` | integer 1–65,536; 16,384 | public | Deployable gateway input bound |
 | `VALKEY_LIMITS_URL` | optional URL | secret | Rate-limit Valkey. Packet 5 connects per command at request time, never at import. Unset falls back to Postgres for mutations |
@@ -116,6 +117,12 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 Runtime Compose interpolates `${SUPABASE_URL:?set hosted SUPABASE_URL}`.
 There is no `host.docker.internal:54321` fallback. Wire hosted Auth with
 [`scripts/ops/wire_hosted_ingest_env.py`](../../scripts/ops/wire_hosted_ingest_env.py).
+The default project `.env` is also used for that interpolation. A fixture
+`SUPABASE_URL=http://127.0.0.1:54321` there overrides `.env.compose` and the
+service `env_file`, so the API rejects hosted browser JWTs with 401
+`unauthorized`. Start with [`scripts/dev.ps1`](../../scripts/dev.ps1) (loads
+`.env.compose` into the process and refuses a loopback API Auth host) and
+keep the fixture origin out of `.env` while Compose is running.
 `APP_ENV=test` may omit `SUPABASE_URL` and receives the local fixture
 origin. When `APP_ENV=local` and `SUPABASE_URL` is one of the two local
 fixture origins, FastAPI accepts `iss`

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 from uuid import UUID
@@ -53,6 +53,67 @@ _POLL_SECONDS = 0.05
 _NON_STARTABLE_STATUSES = frozenset(
     {"running", "completed", "cancelled", "partial", "failed"}
 )
+_STREAM_MODE_NAMES = frozenset({"updates", "values", "messages", "debug"})
+
+
+def _coerce_stream_token_count(value: object) -> int | None:
+    """Return a non-negative token count from a node or SSE field.
+
+    Args:
+        value: Graph or catalog token field.
+
+    Returns:
+        Integer count, or None when the value is missing or invalid.
+    """
+
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float) and value.is_integer() and value >= 0:
+        return int(value)
+    return None
+
+
+def _updates_mapping_from_chunk(raw_chunk: object) -> dict[str, object] | None:
+    """Unwrap one LangGraph ``astream`` updates payload.
+
+    Args:
+        raw_chunk: Dict ``{node: update}`` or ``(stream_mode, payload)``.
+
+    Returns:
+        Node-keyed mapping, or None when the chunk is not updates data.
+    """
+
+    chunk: object = raw_chunk
+    if isinstance(chunk, tuple) and len(chunk) == 2:
+        mode, data = chunk
+        if isinstance(mode, str) and mode in _STREAM_MODE_NAMES:
+            chunk = data
+    if not isinstance(chunk, dict):
+        return None
+    return {str(key): value for key, value in cast(dict[object, object], chunk).items()}
+
+
+def _token_counts_from_update(
+    typed_update: Mapping[str, object],
+) -> tuple[int | None, int | None]:
+    """Read prompt and completion totals from one node update.
+
+    Args:
+        typed_update: Node return mapping.
+
+    Returns:
+        ``(prompt_tokens, completion_tokens)`` with None for missing sides.
+    """
+
+    prompt = _coerce_stream_token_count(typed_update.get("prompt_tokens"))
+    if prompt is None:
+        prompt = _coerce_stream_token_count(typed_update.get("input_tokens"))
+    completion = _coerce_stream_token_count(typed_update.get("completion_tokens"))
+    if completion is None:
+        completion = _coerce_stream_token_count(typed_update.get("output_tokens"))
+    return prompt, completion
 
 
 class QueryRunExecutor(Protocol):
@@ -330,6 +391,8 @@ class LangGraphQueryRunExecutor:
         successful_terminal_committed = False
         last_remaining_calls = context.model_call_ceiling
         last_status = "running"
+        last_prompt_tokens: int | None = None
+        last_completion_tokens: int | None = None
 
         def _close_connection() -> None:
             """Close the app_api connection exactly once.
@@ -392,12 +455,8 @@ class LangGraphQueryRunExecutor:
                         stream_exhausted=False,
                     )
                     break
-                typed_chunk: dict[str, object] | None = None
-                if isinstance(raw_chunk, dict):
-                    typed_chunk = {
-                        str(key): value
-                        for key, value in cast(dict[object, object], raw_chunk).items()
-                    }
+                typed_chunk = _updates_mapping_from_chunk(raw_chunk)
+                if typed_chunk is not None:
                     for node_update in typed_chunk.values():
                         if isinstance(node_update, dict):
                             typed_update = {
@@ -412,10 +471,25 @@ class LangGraphQueryRunExecutor:
                             raw_status = typed_update.get("status")
                             if isinstance(raw_status, str) and raw_status:
                                 last_status = raw_status[:64]
+                            prompt_tokens, completion_tokens = (
+                                _token_counts_from_update(typed_update)
+                            )
+                            if prompt_tokens is not None:
+                                last_prompt_tokens = prompt_tokens
+                            if completion_tokens is not None:
+                                last_completion_tokens = completion_tokens
                 for event_type, payload in mapper.consume_chunk(
                     typed_chunk if typed_chunk is not None else cast(object, raw_chunk)
                 ):
                     assert_catalog_event(event_type, payload)
+                    if event_type == "usage":
+                        event_prompt, event_completion = _token_counts_from_update(
+                            payload
+                        )
+                        if event_prompt is not None:
+                            last_prompt_tokens = event_prompt
+                        if event_completion is not None:
+                            last_completion_tokens = event_completion
                     yield (event_type, payload)
                     if event_type in {"completed", "partial", "error", "cancelled"}:
                         if not terminal_yielded:
@@ -465,11 +539,7 @@ class LangGraphQueryRunExecutor:
                     if event_type in {"completed", "partial", "error", "cancelled"}:
                         terminal_yielded = True
                         self._set_termination(
-                            reason=(
-                                "error"
-                                if event_type == "error"
-                                else event_type
-                            ),
+                            reason=("error" if event_type == "error" else event_type),
                             terminal_event_type=event_type,
                             stream_exhausted=True,
                         )
@@ -508,6 +578,10 @@ class LangGraphQueryRunExecutor:
             self._set_termination(reason="error", terminal_event_type="error")
             raise
         finally:
+            self._record_stream_usage(
+                input_tokens=last_prompt_tokens,
+                output_tokens=last_completion_tokens,
+            )
             _close_connection()
             if (
                 stream_iter is not None
@@ -536,11 +610,55 @@ class LangGraphQueryRunExecutor:
 
         exhausted = self.termination_summary.get("stream_exhausted")
         kept = exhausted if stream_exhausted is None else stream_exhausted
+        previous = self.termination_summary
         self.termination_summary = {
             "termination_reason": reason,
             "terminal_event_type": terminal_event_type,
             "stream_exhausted": kept,
         }
+        for key in (
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "estimated_cost_usd",
+        ):
+            value = previous.get(key)
+            if value is not None:
+                self.termination_summary[key] = value
+
+    def _record_stream_usage(
+        self,
+        *,
+        input_tokens: int | None,
+        output_tokens: int | None,
+    ) -> None:
+        """Attach accumulated token counts and estimated USD to the summary.
+
+        Args:
+            input_tokens: Latest graph ``prompt_tokens`` total.
+            output_tokens: Latest graph ``completion_tokens`` total.
+
+        Side Effects:
+            Updates ``termination_summary`` usage fields. Does not log text.
+        """
+
+        if input_tokens is None and output_tokens is None:
+            return
+        input_count = 0 if input_tokens is None else input_tokens
+        output_count = 0 if output_tokens is None else output_tokens
+        from smart_rag_core.observability.langsmith_tracing import (
+            estimate_traced_chat_cost_usd,
+        )
+
+        self.termination_summary["input_tokens"] = input_count
+        self.termination_summary["output_tokens"] = output_count
+        self.termination_summary["total_tokens"] = input_count + output_count
+        self.termination_summary["estimated_cost_usd"] = float(
+            estimate_traced_chat_cost_usd(
+                input_tokens=input_count,
+                output_tokens=output_count,
+            )
+        )
 
     async def _aclose_stream(self, stream_iter: AsyncIterator[object]) -> None:
         """Close an unfinished LangGraph stream without converting GeneratorExit.
@@ -1200,15 +1318,31 @@ class SseStreamService:
                 """Drain the executor and persist drafts.
 
                 Returns:
-                    Sanitized termination summary from the concrete executor.
+                    Termination summary plus assistant text and usage when
+                    the stream emitted those catalog events.
                 """
 
+                assistant_parts: list[str] = []
+                prompt_tokens: int | None = None
+                completion_tokens: int | None = None
                 async for event_type, payload in self._executor.execute(
                     context=runtime,
                     message=message,
                     cancel_event=live.cancel_event,
                 ):
                     self._append(caller, record.run_id, event_type, payload)
+                    if event_type == "token_delta":
+                        delta = payload.get("delta")
+                        if isinstance(delta, str) and delta:
+                            assistant_parts.append(delta)
+                    elif event_type == "usage":
+                        event_prompt, event_completion = _token_counts_from_update(
+                            payload
+                        )
+                        if event_prompt is not None:
+                            prompt_tokens = event_prompt
+                        if event_completion is not None:
+                            completion_tokens = event_completion
                 if not self._has_terminal(caller, record.run_id):
                     if live.cancel_event.is_set():
                         self._append(caller, record.run_id, "cancelled", {})
@@ -1220,18 +1354,59 @@ class SseStreamService:
                             {"code": "run_failed"},
                         )
                 summary = getattr(self._executor, "termination_summary", None)
+                payload: dict[str, object]
                 if isinstance(summary, dict):
                     typed_summary = cast(dict[object, object], summary)
-                    return {
-                        str(key): value for key, value in typed_summary.items()
+                    payload = {str(key): value for key, value in typed_summary.items()}
+                else:
+                    payload = {
+                        "termination_reason": (
+                            "cancelled" if live.cancel_event.is_set() else "unknown"
+                        ),
+                        "terminal_event_type": None,
+                        "stream_exhausted": False,
                     }
-                return {
-                    "termination_reason": (
-                        "cancelled" if live.cancel_event.is_set() else "unknown"
-                    ),
-                    "terminal_event_type": None,
-                    "stream_exhausted": False,
-                }
+                if assistant_parts:
+                    payload["assistant_message"] = "".join(assistant_parts)
+                if prompt_tokens is None:
+                    prompt_tokens = _coerce_stream_token_count(
+                        payload.get("input_tokens")
+                    )
+                if prompt_tokens is None:
+                    prompt_tokens = _coerce_stream_token_count(
+                        payload.get("prompt_tokens")
+                    )
+                if completion_tokens is None:
+                    completion_tokens = _coerce_stream_token_count(
+                        payload.get("output_tokens")
+                    )
+                if completion_tokens is None:
+                    completion_tokens = _coerce_stream_token_count(
+                        payload.get("completion_tokens")
+                    )
+                if prompt_tokens is not None:
+                    payload["input_tokens"] = prompt_tokens
+                if completion_tokens is not None:
+                    payload["output_tokens"] = completion_tokens
+                input_count = _coerce_stream_token_count(payload.get("input_tokens"))
+                output_count = _coerce_stream_token_count(payload.get("output_tokens"))
+                if input_count is not None or output_count is not None:
+                    from smart_rag_core.observability.langsmith_tracing import (
+                        estimate_traced_chat_cost_usd,
+                    )
+
+                    input_total = 0 if input_count is None else input_count
+                    output_total = 0 if output_count is None else output_count
+                    payload["input_tokens"] = input_total
+                    payload["output_tokens"] = output_total
+                    payload["total_tokens"] = input_total + output_total
+                    payload["estimated_cost_usd"] = float(
+                        estimate_traced_chat_cost_usd(
+                            input_tokens=input_total,
+                            output_tokens=output_total,
+                        )
+                    )
+                return payload
 
             if settings is None:
                 await _consume()
@@ -1241,6 +1416,7 @@ class SseStreamService:
                     settings=settings,
                     run_id=record.run_id,
                     user_id=runtime.user_id,
+                    user_message=message,
                     requested_route=runtime.route_family.value,
                     effective_route=runtime.route_family.value,
                 )
@@ -1502,7 +1678,9 @@ class SseStreamService:
             live.terminal = True
             return
         try:
-            await asyncio.wait_for(asyncio.shield(executor), timeout=CANCEL_GRACE_SECONDS)
+            await asyncio.wait_for(
+                asyncio.shield(executor), timeout=CANCEL_GRACE_SECONDS
+            )
         except TimeoutError:
             if not executor.done():
                 executor.cancel()

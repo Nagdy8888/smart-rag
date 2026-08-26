@@ -2,7 +2,7 @@
 title: Auth and streaming frontend
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: engineering, frontend, security
 packet: P08-02
 ---
@@ -96,6 +96,9 @@ TOTP enroll/challenge routes and MFA-required banners are deleted. Local Auth se
 ## Handshake before spend
 
 `GET /api/meta` publishes `min_client_version` and `sse_schema_version`.
+The handler is async so a busy readiness thread pool cannot stall the
+handshake. When meta fetch fails, Ask shows “Compatibility could not be
+confirmed…” and retries every 10s until `/api/meta` succeeds.
 The composer compares `CLIENT_VERSION` (`0.1.0`) before
 `startMessageStream`. Below minimum: banner
 "This client is below min_client_version. Update before asking a question."

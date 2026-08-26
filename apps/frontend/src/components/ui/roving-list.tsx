@@ -5,6 +5,7 @@
 "use client";
 
 import {
+  Fragment,
   useRef,
   useState,
   type KeyboardEvent,
@@ -34,6 +35,13 @@ export type RovingListProps<T> = {
   className?: string;
   /** Override the option accessible name when the row has nested controls. */
   getAccessibleName?: (item: T) => string;
+  /**
+   * Optional section label rendered as a non-option row before this item.
+   * Return null to keep the previous group.
+   */
+  getGroupLabel?: (item: T, previous: T | null) => string | null;
+  /** Class for the group label element. */
+  groupClassName?: string;
 };
 
 /**
@@ -43,6 +51,8 @@ export type RovingListProps<T> = {
  * @returns `role="listbox"` list.
  * @remarks
  * ArrowUp/ArrowDown/Home/End move the roving tabindex. Enter/Space select.
+ * Optional `getGroupLabel` inserts a non-option header so labels do not
+ * live inside the row and cannot overlap the title.
  */
 export function RovingList<T>({
   "aria-label": ariaLabel,
@@ -52,6 +62,8 @@ export function RovingList<T>({
   children,
   className,
   getAccessibleName,
+  getGroupLabel,
+  groupClassName,
 }: RovingListProps<T>) {
   const [activeIndex, setActiveIndex] = useState(0);
   const buttonRefs = useRef<Array<HTMLElement | null>>([]);
@@ -109,28 +121,39 @@ export function RovingList<T>({
     >
       {items.map((row, index) => {
         const selected = row.id === selectedId;
+        const previous = index > 0 ? (items[index - 1]?.item ?? null) : null;
+        const groupLabel = getGroupLabel?.(row.item, previous) ?? null;
         return (
-          <li key={row.id} role="presentation">
-            <div
-              role="option"
-              aria-selected={selected}
-              aria-label={getAccessibleName?.(row.item)}
-              tabIndex={index === active ? 0 : -1}
-              ref={(node) => {
-                buttonRefs.current[index] = node;
-              }}
-              onClick={() => onSelect(row.item)}
-              onFocus={() => setActiveIndex(index)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(row.item);
-                }
-              }}
-            >
-              {children(row.item)}
-            </div>
-          </li>
+          <Fragment key={row.id}>
+            {groupLabel !== null && groupLabel !== "" ? (
+              <li role="presentation" className={styles.rovingGroup}>
+                <p className={groupClassName ?? styles.rovingGroupLabel}>
+                  {groupLabel}
+                </p>
+              </li>
+            ) : null}
+            <li role="presentation">
+              <div
+                role="option"
+                aria-selected={selected}
+                aria-label={getAccessibleName?.(row.item)}
+                tabIndex={index === active ? 0 : -1}
+                ref={(node) => {
+                  buttonRefs.current[index] = node;
+                }}
+                onClick={() => onSelect(row.item)}
+                onFocus={() => setActiveIndex(index)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(row.item);
+                  }
+                }}
+              >
+                {children(row.item)}
+              </div>
+            </li>
+          </Fragment>
         );
       })}
     </ul>

@@ -1,9 +1,10 @@
-"""Query-run LangSmith metadata: hashes and counts only."""
+"""Query-run LangSmith metadata: hashes, counts, and local chat I/O."""
 
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractContextManager, nullcontext
+from decimal import Decimal, InvalidOperation
 from typing import Any, TypeVar, cast
 from uuid import UUID
 
@@ -13,7 +14,11 @@ from smart_rag_core.observability.governance_gate import (
     assert_langsmith_export_permitted,
 )
 from smart_rag_core.observability.langsmith_tracing import (
+    estimate_traced_chat_cost_usd,
     flush_langsmith_traces,
+    langsmith_export_io_enabled,
+    langsmith_usage_metadata,
+    record_current_usage_metadata,
     short_content_hash,
     traceable,
     tracing_is_enabled,
@@ -22,6 +27,7 @@ from smart_rag_core.observability.logging import (
     correlation_context,
     current_correlation_ids,
 )
+from smart_rag_core.query_answer.versions import ANSWER_MODEL_ID
 from smart_rag_core.security.external_processing import ContentClass
 from smart_rag_core.settings import SharedSettings
 
@@ -425,14 +431,206 @@ _SSE_PARENT_OUTPUT_KEYS = frozenset(
 )
 
 
-def redact_query_run_sse_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
-    """Export correlation IDs, hashed user, route, and versions only.
+def _optional_token_count(value: object) -> int | None:
+    """Return a non-boolean integer token count.
 
     Args:
-        inputs: Traceable kwargs. Must not contain query text or JWTs.
+        value: Candidate token field.
 
     Returns:
-        Redacted parent inputs.
+        Integer count, or None when the value is missing or invalid.
+    """
+
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float) and value.is_integer() and value >= 0:
+        return int(value)
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return None
+
+
+def _optional_cost_usd(value: object) -> Decimal | None:
+    """Return a non-negative USD estimate.
+
+    Args:
+        value: Candidate cost field.
+
+    Returns:
+        Decimal USD, or None when the value is missing or invalid.
+    """
+
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, Decimal):
+        cost = value
+    elif isinstance(value, (int, float)):
+        cost = Decimal(str(value))
+    elif isinstance(value, str) and value:
+        try:
+            cost = Decimal(value)
+        except (InvalidOperation, ValueError):
+            return None
+    else:
+        return None
+    if cost < 0:
+        return None
+    return cost
+
+
+def _attach_hashed_text(
+    payload: dict[str, Any],
+    *,
+    field: str,
+    value: object,
+    export_io: bool,
+    display_key: str,
+) -> None:
+    """Hash private chat text and copy it only when local I/O export is on.
+
+    Args:
+        payload: Exportable mapping being built.
+        field: Source field name used for hash and char-count keys.
+        value: User message or assistant prose.
+        export_io: Whether local raw I/O export is active.
+        display_key: LangSmith Input/Output key (``input`` or ``output``).
+    """
+
+    if not isinstance(value, str) or not value:
+        return
+    payload[f"{field}_sha256"] = short_content_hash(value)
+    payload[f"{field}_chars"] = len(value)
+    if export_io:
+        payload[field] = value
+        payload[display_key] = value
+
+
+def _usage_token_counts(typed: Mapping[str, object]) -> tuple[int, int] | None:
+    """Read prompt/completion token totals from a summary mapping.
+
+    Args:
+        typed: Termination summary or traceable return wrapper.
+
+    Returns:
+        ``(input_tokens, output_tokens)`` when either count is present.
+    """
+
+    input_tokens = _optional_token_count(typed.get("input_tokens"))
+    if input_tokens is None:
+        input_tokens = _optional_token_count(typed.get("prompt_tokens"))
+    output_tokens = _optional_token_count(typed.get("output_tokens"))
+    if output_tokens is None:
+        output_tokens = _optional_token_count(typed.get("completion_tokens"))
+    if input_tokens is None and output_tokens is None:
+        return None
+    return (
+        0 if input_tokens is None else input_tokens,
+        0 if output_tokens is None else output_tokens,
+    )
+
+
+def _attach_usage_fields(payload: dict[str, Any], typed: Mapping[str, object]) -> None:
+    """Copy token counts and estimated USD onto a parent-span payload.
+
+    Args:
+        payload: Exportable mapping being built.
+        typed: Termination summary or traceable return wrapper.
+    """
+
+    counts = _usage_token_counts(typed)
+    if counts is None:
+        return
+    input_count, output_count = counts
+    payload["input_tokens"] = input_count
+    payload["output_tokens"] = output_count
+    payload["total_tokens"] = input_count + output_count
+    cost = _optional_cost_usd(typed.get("estimated_cost_usd"))
+    if cost is None:
+        cost = estimate_traced_chat_cost_usd(
+            input_tokens=input_count,
+            output_tokens=output_count,
+        )
+    payload["estimated_cost_usd"] = float(cost)
+    usage = langsmith_usage_metadata(
+        input_tokens=input_count,
+        output_tokens=output_count,
+        total_cost_usd=cost,
+    )
+    payload["usage_metadata"] = usage
+    payload["usage"] = {
+        "input_tokens": input_count,
+        "output_tokens": output_count,
+        "total_tokens": input_count + output_count,
+        "estimated_cost_usd": float(cost),
+    }
+
+
+def _promote_visible_output(payload: dict[str, Any]) -> None:
+    """Put token and USD fields inside LangSmith's Output panel.
+
+    Args:
+        payload: Exportable mapping after hashed-text and usage attachment.
+
+    Side Effects:
+        When local I/O export set a string ``output``, replace it with an
+        object that keeps the assistant text next to token and USD fields.
+        LangSmith's pretty view otherwise shows only the string.
+    """
+
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return
+    text = payload.get("output")
+    if isinstance(text, str) and text:
+        payload["output"] = {"text": text, **usage}
+
+
+def _normalize_query_run_result(result: Mapping[str, object]) -> dict[str, object]:
+    """Copy token aliases onto the raw parent return for usage extraction.
+
+    Args:
+        result: Thunk termination summary.
+
+    Returns:
+        Mutable copy with ``input_tokens``, ``output_tokens``, estimated
+        USD, and ``usage_metadata`` when either token count is present.
+    """
+
+    payload = dict(result)
+    counts = _usage_token_counts(payload)
+    if counts is None:
+        return payload
+    input_count, output_count = counts
+    payload["input_tokens"] = input_count
+    payload["output_tokens"] = output_count
+    cost = _optional_cost_usd(payload.get("estimated_cost_usd"))
+    if cost is None:
+        cost = estimate_traced_chat_cost_usd(
+            input_tokens=input_count,
+            output_tokens=output_count,
+        )
+    payload["estimated_cost_usd"] = float(cost)
+    payload["usage_metadata"] = langsmith_usage_metadata(
+        input_tokens=input_count,
+        output_tokens=output_count,
+        total_cost_usd=cost,
+    )
+    return payload
+
+
+def redact_query_run_sse_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
+    """Export correlation IDs, hashed user, route, and optional chat input.
+
+    Args:
+        inputs: Traceable kwargs. JWTs and emails must never be present.
+            ``user_message`` is hashed unless local ``LANGSMITH_EXPORT_IO``
+            is on.
+
+    Returns:
+        Redacted parent inputs. Raw user text is included only for local
+        I/O export.
     """
 
     payload: dict[str, Any] = {"correlation": current_correlation_ids()}
@@ -446,18 +644,26 @@ def redact_query_run_sse_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
                 str(item_key)[:64]: str(item_value)[:64]
                 for item_key, item_value in mapped.items()
             }
+    _attach_hashed_text(
+        payload,
+        field="user_message",
+        value=inputs.get("user_message"),
+        export_io=langsmith_export_io_enabled(),
+        display_key="input",
+    )
     return payload
 
 
 def redact_query_run_sse_outputs(outputs: object) -> dict[str, Any]:
-    """Export the sanitized termination summary only.
+    """Export termination, usage, and optional assistant prose.
 
     Args:
         outputs: Traceable return wrapper or the raw summary mapping.
 
     Returns:
-        Termination reason, terminal type, and exhausted bool. Never query
-        text, messages, sources, JWTs, or citations.
+        Termination reason, token counts, and estimated USD. Assistant
+        text is included only when local ``LANGSMITH_EXPORT_IO`` is on.
+        Never copies JWTs, emails, sources, or extra summary keys.
     """
 
     raw: object = outputs
@@ -474,7 +680,46 @@ def redact_query_run_sse_outputs(outputs: object) -> dict[str, Any]:
             payload[key] = value
         elif isinstance(value, str) and value:
             payload[key] = value[:64]
+    _attach_hashed_text(
+        payload,
+        field="assistant_message",
+        value=typed.get("assistant_message"),
+        export_io=langsmith_export_io_enabled(),
+        display_key="output",
+    )
+    _attach_usage_fields(payload, typed)
+    _promote_visible_output(payload)
     return payload or {"termination_reason": "unknown"}
+
+
+def _record_query_run_usage(result: Mapping[str, object]) -> None:
+    """Attach token and USD metadata from a query-run termination summary.
+
+    Args:
+        result: Thunk return mapping. Missing token fields are ignored.
+
+    Side Effects:
+        Updates the active LangSmith run when tracing is on and the summary
+        reports token counts.
+    """
+
+    counts = _usage_token_counts(result)
+    if counts is None:
+        return
+    input_count, output_count = counts
+    cost = _optional_cost_usd(result.get("estimated_cost_usd"))
+    if cost is None:
+        cost = estimate_traced_chat_cost_usd(
+            input_tokens=input_count,
+            output_tokens=output_count,
+        )
+    record_current_usage_metadata(
+        provider="openai",
+        model=ANSWER_MODEL_ID,
+        input_tokens=input_count,
+        output_tokens=output_count,
+        total_cost_usd=cost,
+    )
 
 
 async def invoke_traced_query_run_sse(
@@ -483,6 +728,7 @@ async def invoke_traced_query_run_sse(
     settings: SharedSettings,
     run_id: UUID | str,
     user_id: UUID | str,
+    user_message: str | None = None,
     requested_route: str | None = None,
     effective_route: str | None = None,
     model_versions: Mapping[str, str] | None = None,
@@ -492,10 +738,13 @@ async def invoke_traced_query_run_sse(
 
     Args:
         thunk: Async consumer that drains the executor and returns the
-            sanitized termination summary.
+            sanitized termination summary. May include ``assistant_message``
+            and token/cost fields.
         settings: Process settings used for the export gate.
         run_id: Application run id.
         user_id: Subject hashed before export.
+        user_message: Untrusted user text. Hashed unless local
+            ``LANGSMITH_EXPORT_IO`` is on.
         requested_route: Envelope family reserved at admit.
         effective_route: Planner-selected family.
         model_versions: Model ids keyed by usage kind.
@@ -508,8 +757,9 @@ async def invoke_traced_query_run_sse(
         ExternalFlowBlockedError: When export is not permitted.
 
     Side Effects:
-        Creates a LangSmith chain run named ``query.run.sse`` when tracing
-        is enabled. Does not suppress ``GeneratorExit``.
+        Creates a LangSmith LLM run named ``query.run.sse`` when tracing
+        is enabled so Usage/Cost can render. Does not suppress
+        ``GeneratorExit``.
     """
 
     assert_query_agent_eval_langsmith_gate(settings)
@@ -518,6 +768,8 @@ async def invoke_traced_query_run_sse(
         "run_id": str(run_id),
         "user_id_sha256": hashed_user_id(user_id),
         "graph_name": QUERY_RUN_SSE_SPAN,
+        "ls_provider": "openai",
+        "ls_model_name": ANSWER_MODEL_ID,
     }
     if requested_route:
         extra["requested_route"] = requested_route
@@ -533,7 +785,7 @@ async def invoke_traced_query_run_sse(
 
     @traceable(
         name=QUERY_RUN_SSE_SPAN,
-        run_type="chain",
+        run_type="llm",
         process_inputs=redact_query_run_sse_inputs,
         process_outputs=redact_query_run_sse_outputs,
         metadata=extra,
@@ -542,16 +794,18 @@ async def invoke_traced_query_run_sse(
     async def _parent(
         run_id: str,
         user_id_sha256: str,
+        user_message: str | None = None,
         requested_route: str | None = None,
         effective_route: str | None = None,
         model_versions: Mapping[str, str] | None = None,
         prompt_versions: Mapping[str, str] | None = None,
     ) -> Mapping[str, object]:
-        """Redacted SSE parent. Arguments are ids, hashes, and versions.
+        """Redacted SSE parent. Arguments are ids, hashes, and chat text.
 
         Args:
             run_id: Application run id.
             user_id_sha256: Hashed user id.
+            user_message: User text for local I/O export; hashed otherwise.
             requested_route: Admit family.
             effective_route: Planner family.
             model_versions: Model ids by usage kind.
@@ -564,12 +818,15 @@ async def invoke_traced_query_run_sse(
         del (
             run_id,
             user_id_sha256,
+            user_message,
             requested_route,
             effective_route,
             model_versions,
             prompt_versions,
         )
-        return await thunk()
+        result = _normalize_query_run_result(await thunk())
+        _record_query_run_usage(result)
+        return result
 
     try:
         with _query_eval_tracing_scope(
@@ -578,6 +835,7 @@ async def invoke_traced_query_run_sse(
             return await _parent(
                 run_id=str(extra["run_id"]),
                 user_id_sha256=str(extra["user_id_sha256"]),
+                user_message=user_message,
                 requested_route=_optional_trace_str(extra.get("requested_route")),
                 effective_route=_optional_trace_str(extra.get("effective_route")),
                 model_versions=model_versions,

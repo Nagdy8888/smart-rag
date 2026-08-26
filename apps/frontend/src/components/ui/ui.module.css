@@ -8,6 +8,7 @@
   justify-content: center;
   gap: calc(var(--space) * 2);
   box-sizing: border-box;
+  appearance: none;
   height: var(--control-height);
   min-height: var(--control-height);
   padding: 0 14px;
@@ -216,6 +217,7 @@
 
 .control {
   box-sizing: border-box;
+  appearance: none;
   height: var(--control-height);
   min-height: var(--control-height);
   width: 100%;
@@ -514,7 +516,7 @@
 
 .userText {
   unicode-bidi: isolate;
-  line-height: var(--line-height-ar);
+  line-height: inherit;
   overflow-wrap: anywhere;
 }
 
@@ -647,18 +649,39 @@
 
 .rovingList {
   list-style: none;
-  display: flex;
-  flex-direction: column;
+  display: block;
   margin: 0;
   padding: 0;
 }
 
-.rovingList > li,
-.rovingList [role="option"] {
-  min-height: var(--row-height);
+.rovingList > li {
+  display: block;
+  flex-shrink: 0;
+  height: auto;
+}
+
+.rovingGroup {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface);
+}
+
+.rovingGroupLabel {
+  margin: 0;
+  padding: calc(var(--space) * 2) calc(var(--space) * 2) calc(var(--space) * 1);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
 }
 
 .rovingList [role="option"] {
+  display: block;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-height: var(--row-height);
+  height: auto;
   width: 100%;
   text-align: start;
   font: inherit;

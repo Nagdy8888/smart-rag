@@ -37,7 +37,8 @@ class ReadinessResponse(BaseModel):
             ParadeDB down is reported but does not block ``query_ready``;
             Hybrid then degrades to dense+term.
         detail: Short operator-facing reason.
-        rate_limit_degraded: True when the emergency limiter was used.
+        rate_limit_degraded: True while the emergency limiter is still
+            in use. Cleared after Valkey probes succeed again.
         dependencies: Named probe results.
     """
 
@@ -145,7 +146,8 @@ def build_readiness(
         valkey_limits: Limits instance client.
         valkey_cache: Cache instance client.
         lightrag_attached: True when the runtime adapter is bound.
-        rate_limit_degraded: Emergency limiter flag.
+        rate_limit_degraded: Emergency limiter flag. Callers should pass
+            False once Valkey probes are ``ok`` again.
         postgres_probe: Optional precomputed DB probe for tests.
         paradedb_probe: Optional precomputed ParadeDB probe for tests.
         checkpoint_probe: Optional precomputed checkpointer/store probe
@@ -260,6 +262,20 @@ def build_readiness(
         rate_limit_degraded=rate_limit_degraded,
         dependencies=dependencies,
     )
+
+
+def valkey_probes_ok(payload: ReadinessResponse) -> bool:
+    """Return whether both Valkey instances reported ``ok``.
+
+    Args:
+        payload: Composed readiness document.
+
+    Returns:
+        True when ``valkey_limits`` and ``valkey_cache`` are ``ok``.
+    """
+
+    names = {item.name: item.status for item in payload.dependencies}
+    return names.get("valkey_limits") == "ok" and names.get("valkey_cache") == "ok"
 
 
 def readiness_as_dict(payload: ReadinessResponse) -> dict[str, Any]:

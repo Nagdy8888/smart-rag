@@ -149,13 +149,18 @@
 
 html {
   height: 100%;
-  color-scheme: light;
+  /* `only` keeps Windows / Edge native widgets on the light palette. */
+  color-scheme: only light;
+  overflow-x: clip;
+  accent-color: var(--color-accent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) var(--color-surface-muted);
 }
 
 html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+  /* 100vw includes the classic Edge scrollbar and shifts the layout. */
+  max-width: 100%;
 }
 
 body {
@@ -167,8 +172,68 @@ body {
   font-family: var(--font-sans);
   font-size: var(--text-body-size);
   line-height: var(--text-body-height);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* DirectWrite already hints Inter. Antialiased thins glyphs on Windows. */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  color-scheme: only light;
+}
+
+button,
+textarea,
+select,
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
+  appearance: none;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-accent);
+}
+
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--color-text);
+  caret-color: var(--color-text);
+  box-shadow: inset 0 0 0 1000px var(--color-surface);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border: 2px solid var(--color-surface-muted);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+::selection {
+  background: var(--color-accent-muted);
+  color: var(--color-text);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
 * {

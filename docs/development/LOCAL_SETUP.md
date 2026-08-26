@@ -36,6 +36,13 @@ flowchart LR
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` before building the frontend image.
 5. Run `.\scripts\dev.ps1`. It starts Compose sidecars only and fails
    closed if hosted names are missing. Then run `.\scripts\verify-local.ps1`.
+   Do not leave the local fixture `SUPABASE_URL=http://127.0.0.1:54321` in
+   `.env` while Compose is running. That value wins interpolation over
+   `.env.compose`, so Ask returns 401 `unauthorized` after a hosted sign-in.
+   If Ask says `query_ready` is false while Valkey is healthy, a single
+   limits timeout latched `rate_limit_degraded`. Restart the API to clear
+   it immediately. After this change, `/health/ready` clears the latch
+   when both Valkey probes are `ok`.
 6. For destructive reset/RLS/schema gates, start the fixture with
    `.\scripts\ci\start_local_supabase_fixture.ps1`. Those suites refuse
    `*.supabase.co`.

@@ -6,7 +6,9 @@
 .shell {
   display: flex;
   flex-direction: column;
+  height: 100vh;
   height: 100dvh;
+  min-height: 100vh;
   min-height: 100dvh;
   overflow: hidden;
   background: var(--color-bg);
@@ -324,6 +326,7 @@
     width: var(--nav-width-collapsed);
     flex: 0 0 var(--nav-width-collapsed);
     max-height: 100vh;
+    max-height: 100dvh;
     overflow: auto;
     transition: none;
   }

@@ -62,6 +62,9 @@ class SharedSettings(BaseSettings):
             Public, default ``smart-rag``.
         langsmith_endpoint: Optional LangSmith API URL from
             ``LANGSMITH_ENDPOINT``. Internal.
+        langsmith_export_io: Local-only raw I/O export from
+            ``LANGSMITH_EXPORT_IO``. Public, secure default ``false``.
+            Staging and production reject ``true``.
         subprocessor_matrix_verified: Signed LangSmith/Vercel org-matrix
             verification from ``SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED``.
             Public, secure default ``false``.
@@ -150,6 +153,18 @@ class SharedSettings(BaseSettings):
         validation_alias="LANGSMITH_ENDPOINT",
         description="Optional LangSmith API URL; unset uses the hosted default.",
         json_schema_extra={"security": "internal"},
+    )
+    langsmith_export_io: bool = Field(
+        default=False,
+        validation_alias="LANGSMITH_EXPORT_IO",
+        description=(
+            "Export unredacted user messages, assistant replies, model "
+            "prompts, and completions to LangSmith. Honored only when "
+            "APP_ENV=local. API keys, JWTs, and embedding vectors stay "
+            "omitted. Token counts and estimated USD export even when this "
+            "flag is false."
+        ),
+        json_schema_extra={"security": "public"},
     )
     subprocessor_matrix_verified: bool = Field(
         default=False,
@@ -243,6 +258,10 @@ class SharedSettings(BaseSettings):
             raise ValueError(
                 "ALLOW_TEST_IDENTITY is forbidden when APP_ENV is staging or production"
             )
+        if self.langsmith_export_io:
+            raise ValueError(
+                "LANGSMITH_EXPORT_IO is forbidden when APP_ENV is staging or production"
+            )
         return self
 
     @model_validator(mode="after")
@@ -253,13 +272,16 @@ class SharedSettings(BaseSettings):
             The validated settings instance.
 
         Raises:
-            ValueError: If tracing is enabled without ``LANGSMITH_API_KEY``.
+            ValueError: If tracing is enabled without ``LANGSMITH_API_KEY``,
+                or if ``LANGSMITH_EXPORT_IO`` is true outside ``APP_ENV=local``.
         """
 
         if self.langsmith_tracing and self.langsmith_api_key is None:
             raise ValueError(
                 "LANGSMITH_API_KEY is required when LANGSMITH_TRACING=true"
             )
+        if self.langsmith_export_io and self.app_env is not Environment.LOCAL:
+            raise ValueError("LANGSMITH_EXPORT_IO is allowed only when APP_ENV=local")
         return self
 
     def allows_unsigned_local_live_providers(self) -> bool:
@@ -279,10 +301,11 @@ class SharedSettings(BaseSettings):
     def apply_langsmith_sdk_flags(self) -> dict[str, str]:
         """Write LangSmith SDK process flags from already-validated settings.
 
-        Hide-input and hide-output are always enabled so wrapper-generated
-        child spans cannot export Responses or embedding bodies. Tracing is
-        forced off unless this instance enabled it, so a leftover shell
-        variable cannot outrank the typed contract.
+        Hide-input and hide-output are enabled unless local
+        ``LANGSMITH_EXPORT_IO`` is on, so wrapper-generated child spans
+        cannot export Responses bodies by default. Tracing is forced off
+        unless this instance enabled it, so a leftover shell variable
+        cannot outrank the typed contract.
 
         Returns:
             Applied flag names and non-secret values. The API key is omitted.
@@ -293,12 +316,21 @@ class SharedSettings(BaseSettings):
             SDKs. Does not open a network connection.
         """
 
-        os.environ["LANGSMITH_HIDE_INPUTS"] = "true"
-        os.environ["LANGSMITH_HIDE_OUTPUTS"] = "true"
+        export_io = (
+            self.langsmith_export_io
+            and self.app_env is Environment.LOCAL
+            and self.langsmith_tracing
+            and self.langsmith_api_key is not None
+        )
+        hide = "false" if export_io else "true"
+        os.environ["LANGSMITH_HIDE_INPUTS"] = hide
+        os.environ["LANGSMITH_HIDE_OUTPUTS"] = hide
+        os.environ["LANGSMITH_EXPORT_IO"] = "true" if export_io else "false"
         os.environ["LANGCHAIN_TRACING_V2"] = "false"
         applied: dict[str, str] = {
-            "LANGSMITH_HIDE_INPUTS": "true",
-            "LANGSMITH_HIDE_OUTPUTS": "true",
+            "LANGSMITH_HIDE_INPUTS": hide,
+            "LANGSMITH_HIDE_OUTPUTS": hide,
+            "LANGSMITH_EXPORT_IO": "true" if export_io else "false",
             "LANGSMITH_TRACING": "false",
             "LANGCHAIN_TRACING_V2": "false",
             "LANGSMITH_PROJECT": self.langsmith_project,

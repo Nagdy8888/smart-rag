@@ -18,6 +18,7 @@ from smart_rag_core.gateways.embedding import EmbeddingRequest, create_embedding
 from smart_rag_core.gateways.model import ModelRequest, create_model_gateway
 from smart_rag_core.observability.langsmith_tracing import (
     LANGCHAIN_TRACING_V2_ENV,
+    LANGSMITH_EXPORT_IO_ENV,
     LANGSMITH_HIDE_INPUTS_ENV,
     LANGSMITH_HIDE_OUTPUTS_ENV,
     LANGSMITH_TRACING_ENV,
@@ -199,6 +200,7 @@ def test_configure_langsmith_forces_hide_and_default_off(
     applied = configure_langsmith(settings)
     assert applied[LANGSMITH_HIDE_INPUTS_ENV] == "true"
     assert applied[LANGSMITH_HIDE_OUTPUTS_ENV] == "true"
+    assert applied["LANGSMITH_EXPORT_IO"] == "false"
     assert applied[LANGSMITH_TRACING_ENV] == "false"
     assert applied[LANGCHAIN_TRACING_V2_ENV] == "false"
 
@@ -242,6 +244,33 @@ def test_redact_gateway_inputs_omits_query_and_excerpts() -> None:
     assert not payload_contains_forbidden_text(
         payload, CANARY_TOKEN, CANARY_EMAIL, CANARY_PASSAGE
     )
+
+
+def test_redact_gateway_inputs_includes_prompt_when_export_io(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local LANGSMITH_EXPORT_IO keeps prompt text on the gateway span."""
+
+    monkeypatch.setenv(LANGSMITH_EXPORT_IO_ENV, "true")
+    request = ModelRequest(prompt=f"{CANARY_TOKEN} {CANARY_EMAIL} {CANARY_PASSAGE}")
+    payload = redact_gateway_inputs({"self": object(), "request": request})
+    assert payload["prompt"] == request.prompt
+
+
+def test_configure_langsmith_local_export_io_unhides_wrap_openai(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local export I/O clears hide flags so wrap_openai child spans keep bodies."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv(LANGSMITH_TRACING_ENV, "true")
+    monkeypatch.setenv("LANGSMITH_API_KEY", "lsv2_canary_must_not_leak")
+    monkeypatch.setenv(LANGSMITH_EXPORT_IO_ENV, "true")
+    settings = AgentSettings()
+    applied = configure_langsmith(settings)
+    assert applied[LANGSMITH_HIDE_INPUTS_ENV] == "false"
+    assert applied[LANGSMITH_HIDE_OUTPUTS_ENV] == "false"
+    assert applied[LANGSMITH_EXPORT_IO_ENV] == "true"
 
 
 def test_mock_generate_is_traced_without_prompt_body() -> None:
@@ -454,18 +483,71 @@ def test_usage_metadata_is_attached_without_model_content(
         "ls_provider": "openai",
         "ls_model_name": "text-embedding-3-large",
     }
-    assert run.usage_metadata == {
-        "input_tokens": 123,
-        "output_tokens": 0,
-        "total_tokens": 123,
-        "total_cost": pytest.approx(0.00001599),
-    }
+    assert run.usage_metadata["input_tokens"] == 123
+    assert run.usage_metadata["output_tokens"] == 0
+    assert run.usage_metadata["total_tokens"] == 123
+    assert run.usage_metadata["input_cost"] == pytest.approx(0.00001599)
+    assert run.usage_metadata["output_cost"] == pytest.approx(0.0)
+    assert run.usage_metadata["total_cost"] == pytest.approx(0.00001599)
     assert not payload_contains_forbidden_text(
         (run.metadata, run.usage_metadata),
         CANARY_TOKEN,
         CANARY_EMAIL,
         CANARY_PASSAGE,
     )
+
+
+def test_record_gateway_response_usage_estimates_missing_usd(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Gateway responses without a cost field still attach a USD estimate."""
+
+    from decimal import Decimal
+
+    from smart_rag_core.gateways.model import RerankModelResponse
+    from smart_rag_core.observability import langsmith_tracing as tracing
+    from smart_rag_core.observability.langsmith_tracing import (
+        estimate_traced_chat_cost_usd,
+        record_gateway_response_usage,
+    )
+
+    class _Run:
+        """Minimal current-run stub that records usage metadata."""
+
+        def __init__(self) -> None:
+            """Initialize mutable metadata and an empty usage payload."""
+
+            self.metadata: dict[str, object] = {}
+            self.usage_metadata: dict[str, object] = {}
+
+        def set(self, *, usage_metadata: dict[str, object]) -> None:
+            """Record the usage payload passed by the tracing helper.
+
+            Args:
+                usage_metadata: LangSmith-recognized counts and costs.
+            """
+
+            self.usage_metadata = usage_metadata
+
+    run = _Run()
+    monkeypatch.setattr(tracing, "tracing_is_enabled", lambda: True)
+    monkeypatch.setattr(tracing, "get_current_run_tree", lambda: run)
+    response = RerankModelResponse(
+        mode="openai",
+        payload={"status": "complete"},
+        request_id="req-rerank-1",
+        input_tokens=200,
+        output_tokens=40,
+    )
+    record_gateway_response_usage(response)
+    expected = estimate_traced_chat_cost_usd(input_tokens=200, output_tokens=40)
+    assert run.usage_metadata["input_tokens"] == 200
+    assert run.usage_metadata["output_tokens"] == 40
+    assert run.usage_metadata["total_tokens"] == 240
+    assert run.usage_metadata["total_cost"] == pytest.approx(float(expected))
+    payload = tracing.redact_gateway_outputs(response)
+    assert payload["estimated_cost_usd"] == pytest.approx(float(expected))
+    assert Decimal(str(payload["estimated_cost_usd"])) == expected
 
 
 def test_lightrag_trace_exports_usage_cost_without_extract_text() -> None:

@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-26
 audience: engineering, security
 ---
 
@@ -53,8 +53,8 @@ keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGA
 
 | Method | Path | Caller | Authorization | Notes |
 | --- | --- | --- | --- | --- |
-| GET | `/health/live` | public | process up | No dependency probe |
-| GET | `/health/ready` | public | `{status, query_ready, detail}` only | Coarse `detail` (`ok` / `not_query_ready`). Never names ParadeDB/Valkey/LightRAG/checkpointer. Mock mode keeps `query_ready=false`. Missing LightRAG may still be query-ready when Hybrid is healthy. |
+| GET | `/health/live` | public | process up | Async; no dependency probe. Must not wait on readiness threads. |
+| GET | `/health/ready` | public | `{status, query_ready, detail}` only | Coarse `detail` (`ok` / `not_query_ready`). Never names ParadeDB/Valkey/LightRAG/checkpointer. Mock mode keeps `query_ready=false`. Missing LightRAG may still be query-ready when Hybrid is healthy. Clears a stale `rate_limit_degraded` latch when both Valkey probes are `ok`. |
 | GET | `/ops/ready` | owner/admin | named dependency probes | Full operator payload |
 | GET | `/api/meta` | public | handshake fields | Packet 6 enforces `min_client_version` |
 | GET | `/me` | authenticated | live profile role | Client role claims ignored |

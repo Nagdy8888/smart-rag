@@ -12,7 +12,10 @@ from uuid import uuid4
 import langsmith
 import pytest
 from smart_rag_core.observability.langsmith_tracing import (
+    LANGSMITH_EXPORT_IO_ENV,
+    estimate_traced_chat_cost_usd,
     payload_contains_forbidden_text,
+    short_content_hash,
 )
 from smart_rag_core.observability.query_run_trace import (
     QUERY_RUN_SSE_SPAN,
@@ -90,6 +93,7 @@ def test_sse_redactors_drop_query_jwt_and_sources() -> None:
             "run_id": "run-1",
             "user_id_sha256": hashed_user_id(user_id),
             "requested_route": "hybrid",
+            "user_message": CANARY_PASSAGE,
             "query": CANARY_PASSAGE,
             "jwt": CANARY_JWT,
             "email": CANARY_EMAIL,
@@ -99,21 +103,103 @@ def test_sse_redactors_drop_query_jwt_and_sources() -> None:
     )
     assert inputs["run_id"] == "run-1"
     assert inputs["requested_route"] == "hybrid"
+    assert inputs["user_message_sha256"] == short_content_hash(CANARY_PASSAGE)
+    assert "user_message" not in inputs
+    assert "input" not in inputs
     rendered_inputs = json.dumps(inputs)
     assert CANARY_PASSAGE not in rendered_inputs
     assert CANARY_JWT not in rendered_inputs
     assert CANARY_TOKEN not in rendered_inputs
     assert CANARY_EMAIL not in rendered_inputs
     outputs = redact_query_run_sse_outputs(
-        _summary(reason="completed", event_type="completed", exhausted=True)
+        {
+            **_summary(reason="completed", event_type="completed", exhausted=True),
+            "assistant_message": CANARY_PASSAGE,
+            "input_tokens": 80,
+            "output_tokens": 20,
+        }
     )
     assert outputs["termination_reason"] == "completed"
     assert outputs["terminal_event_type"] == "completed"
     assert outputs["stream_exhausted"] is True
+    assert outputs["input_tokens"] == 80
+    assert outputs["output_tokens"] == 20
+    assert outputs["total_tokens"] == 100
+    assert outputs["estimated_cost_usd"] == pytest.approx(
+        float(estimate_traced_chat_cost_usd(input_tokens=80, output_tokens=20))
+    )
+    assert outputs["assistant_message_sha256"] == short_content_hash(CANARY_PASSAGE)
+    assert "assistant_message" not in outputs
+    assert "output" not in outputs
     rendered_outputs = json.dumps(outputs)
     assert CANARY_PASSAGE not in rendered_outputs
     assert CANARY_JWT not in rendered_outputs
     assert CANARY_TOKEN not in rendered_outputs
+
+
+def test_sse_redactors_export_chat_io_when_flag_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local LANGSMITH_EXPORT_IO keeps user and assistant text on the parent."""
+
+    monkeypatch.setenv(LANGSMITH_EXPORT_IO_ENV, "true")
+    user_text = "What is the wellhead pressure?"
+    assistant_text = "The wellhead pressure is 1200 psi."
+    inputs = redact_query_run_sse_inputs(
+        {
+            "run_id": "run-io",
+            "user_message": user_text,
+            "jwt": CANARY_JWT,
+        }
+    )
+    assert inputs["input"] == user_text
+    assert inputs["user_message"] == user_text
+    assert CANARY_JWT not in json.dumps(inputs)
+    outputs = redact_query_run_sse_outputs(
+        {
+            "termination_reason": "completed",
+            "terminal_event_type": "completed",
+            "stream_exhausted": True,
+            "assistant_message": assistant_text,
+            "input_tokens": 12,
+            "output_tokens": 8,
+            "jwt": CANARY_JWT,
+        }
+    )
+    visible = outputs["output"]
+    assert isinstance(visible, dict)
+    assert visible["text"] == assistant_text
+    assert visible["input_tokens"] == 12
+    assert visible["output_tokens"] == 8
+    assert visible["total_tokens"] == 20
+    assert visible["estimated_cost_usd"] == pytest.approx(
+        float(estimate_traced_chat_cost_usd(input_tokens=12, output_tokens=8))
+    )
+    assert outputs["assistant_message"] == assistant_text
+    assert outputs["usage_metadata"]["total_tokens"] == 20
+    assert outputs["usage_metadata"]["input_cost"] > 0
+    assert outputs["usage_metadata"]["output_cost"] > 0
+    assert CANARY_JWT not in json.dumps(outputs)
+
+
+def test_sse_redactors_accept_prompt_token_aliases() -> None:
+    """Graph ``prompt_tokens`` aliases still become LangSmith usage fields."""
+
+    outputs = redact_query_run_sse_outputs(
+        {
+            "termination_reason": "completed",
+            "terminal_event_type": "completed",
+            "stream_exhausted": True,
+            "prompt_tokens": 30,
+            "completion_tokens": 10,
+        }
+    )
+    assert outputs["input_tokens"] == 30
+    assert outputs["output_tokens"] == 10
+    assert outputs["usage_metadata"]["total_tokens"] == 40
+    assert outputs["usage_metadata"]["total_cost"] == pytest.approx(
+        float(estimate_traced_chat_cost_usd(input_tokens=30, output_tokens=10))
+    )
 
 
 def test_completed_sse_parent_omits_canaries() -> None:
@@ -133,7 +219,12 @@ def test_completed_sse_parent_omits_canaries() -> None:
         """
 
         captured["ran"] = "1"
-        return _summary(reason="completed", event_type="completed", exhausted=True)
+        return {
+            **_summary(reason="completed", event_type="completed", exhausted=True),
+            "assistant_message": CANARY_PASSAGE,
+            "input_tokens": 40,
+            "output_tokens": 10,
+        }
 
     async def _run() -> Mapping[str, object]:
         """Invoke the parent span inside a recording client.
@@ -148,6 +239,7 @@ def test_completed_sse_parent_omits_canaries() -> None:
                 settings=settings,
                 run_id=run_id,
                 user_id=user_id,
+                user_message=CANARY_PASSAGE,
                 requested_route="hybrid",
                 effective_route="hybrid",
                 model_versions={"answer": "gpt-test"},
@@ -157,8 +249,13 @@ def test_completed_sse_parent_omits_canaries() -> None:
     result = asyncio.run(_run())
     assert captured["ran"] == "1"
     assert result["termination_reason"] == "completed"
+    assert result["usage_metadata"]["total_tokens"] == 50
     names = [item["name"] for item in recorder.created]
     assert QUERY_RUN_SSE_SPAN in names
+    parent = next(
+        item for item in recorder.created if item["name"] == QUERY_RUN_SSE_SPAN
+    )
+    assert parent["run_type"] == "llm"
     serialized = json.dumps(recorder.created + recorder.updated, default=str)
     assert CANARY_PASSAGE not in serialized
     assert CANARY_TOKEN not in serialized
@@ -167,6 +264,12 @@ def test_completed_sse_parent_omits_canaries() -> None:
     assert str(user_id) not in serialized
     assert not payload_contains_forbidden_text(
         recorder.created, CANARY_PASSAGE, CANARY_TOKEN, CANARY_EMAIL, CANARY_JWT
+    )
+    redacted = redact_query_run_sse_outputs(result)
+    assert redacted["input_tokens"] == 40
+    assert redacted["output_tokens"] == 10
+    assert redacted["estimated_cost_usd"] == pytest.approx(
+        float(estimate_traced_chat_cost_usd(input_tokens=40, output_tokens=10))
     )
 
 
@@ -209,6 +312,64 @@ def test_cancelled_sse_parent_keeps_cancelled_reason() -> None:
     assert outputs["stream_exhausted"] is False
     serialized = json.dumps(recorder.created + recorder.updated, default=str)
     assert CANARY_PASSAGE not in serialized
+
+
+def test_completed_sse_parent_exports_chat_io_when_flag_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Enabled local I/O export records user message and assistant reply."""
+
+    monkeypatch.setenv(LANGSMITH_EXPORT_IO_ENV, "true")
+    recorder = RecordingLangSmithClient()
+    settings = AgentSettings()
+    user_text = "Summarize the latest plot."
+    assistant_text = "The latest plot shows a declining water cut."
+
+    async def _thunk() -> Mapping[str, object]:
+        """Return a completed summary with chat I/O and usage.
+
+        Returns:
+            Completed termination mapping plus assistant text and tokens.
+        """
+
+        return {
+            "termination_reason": "completed",
+            "terminal_event_type": "completed",
+            "stream_exhausted": True,
+            "assistant_message": assistant_text,
+            "input_tokens": 25,
+            "output_tokens": 15,
+        }
+
+    async def _run() -> Mapping[str, object]:
+        """Invoke the parent span with user text.
+
+        Returns:
+            Thunk result.
+        """
+
+        with _tracing_context(enabled=True, client=recorder):
+            return await invoke_traced_query_run_sse(
+                _thunk,
+                settings=settings,
+                run_id=uuid4(),
+                user_id=uuid4(),
+                user_message=user_text,
+                requested_route="hybrid",
+            )
+
+    result = asyncio.run(_run())
+    assert result["assistant_message"] == assistant_text
+    serialized = json.dumps(recorder.created + recorder.updated, default=str)
+    assert user_text in serialized
+    assert assistant_text in serialized
+    assert "estimated_cost_usd" in serialized
+    assert "input_tokens" in serialized
+    assert "usage_metadata" in serialized
+    parent = next(
+        item for item in recorder.created if item["name"] == QUERY_RUN_SSE_SPAN
+    )
+    assert parent["run_type"] == "llm"
 
 
 def test_real_error_is_not_converted_to_success() -> None:

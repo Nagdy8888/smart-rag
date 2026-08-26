@@ -128,6 +128,26 @@ describe("roving list", () => {
     await user.keyboard("{Enter}");
     expect(onSelect).toHaveBeenCalledWith("Beta");
   });
+
+  it("renders group labels outside options so row text does not include them", () => {
+    render(
+      <RovingList
+        aria-label="Conversations"
+        items={[
+          { id: "a", item: "Alpha" },
+          { id: "b", item: "Beta" },
+        ]}
+        onSelect={vi.fn()}
+        getGroupLabel={(_item, previous) => (previous === null ? "Today" : null)}
+      >
+        {(item) => item}
+      </RovingList>,
+    );
+    expect(screen.getByRole("option", { name: "Alpha" })).not.toHaveTextContent(
+      "Today",
+    );
+    expect(screen.getByText("Today")).toBeInTheDocument();
+  });
 });
 
 describe("reviewed fixtures stay inert", () => {

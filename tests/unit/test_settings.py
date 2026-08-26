@@ -303,6 +303,17 @@ def test_local_and_test_keep_mock_defaults(
     assert test_settings.allow_test_identity is True
 
 
+def test_hosted_environments_reject_langsmith_export_io(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Staging and production cannot export raw LangSmith I/O."""
+
+    configure_hosted_backend_env(monkeypatch, app_env="production")
+    monkeypatch.setenv("LANGSMITH_EXPORT_IO", "true")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
+
+
 def test_hosted_environments_require_https_non_loopback_cors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

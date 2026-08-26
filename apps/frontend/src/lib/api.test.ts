@@ -1234,6 +1234,18 @@ describe("fetchMe session revocation", () => {
       "session_revoked",
     );
   });
+
+  it("throws ClassifiedApiError on 401 unauthorized", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "Invalid access token" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(fetchMe({ accessToken: "jwt-token" }, fetchImpl)).rejects.toMatchObject({
+      name: "ClassifiedApiError",
+      failure: { kind: "auth", status: 401, detail: "unauthorized" },
+    });
+  });
 });
 
 describe("paid POST handshake 426", () => {

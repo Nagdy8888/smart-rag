@@ -2,7 +2,7 @@
 title: Subprocessor governance
 owner: product-owner
 status: accepted
-last-reviewed: 2026-08-13
+last-reviewed: 2026-08-26
 audience: client-approver, security
 approver: "user (Cursor chat; Phase 1–5 mandate; no legal name provided)"
 approval_date: 2026-08-13
@@ -45,9 +45,13 @@ Sources (2026-08-13): [Usage and billing / retention](https://docs.langchain.com
 **Application rule:** Until org rows are `verified`, keep `LANGSMITH_TRACING`
 false for real company content in **staging and production**. Local
 (`APP_ENV=local`, `MOCK_MODEL_MODE=false`) may enable tracing with operator
-keys; exported spans remain hashes/counts/usage only (hide I/O forced). See
-[LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md). Raw private source
-content is never copied into traces. This local waiver is not org verification.
+keys. Default export is hashes/counts/usage only. `LANGSMITH_EXPORT_IO=true`
+is a laptop-only debug switch that attaches the user message, assistant
+reply, prompts, and completions; staging and production reject it. Token
+counts and estimated USD export even when the flag is false. See
+[LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md) and
+[ADR-local-langsmith-export-io.md](../adr/ADR-local-langsmith-export-io.md).
+This local waiver is not org verification.
 
 ## 3. Supabase settings matrix
 

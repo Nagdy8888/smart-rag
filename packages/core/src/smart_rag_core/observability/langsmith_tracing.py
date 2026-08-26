@@ -1,13 +1,15 @@
 """LangSmith export for every model and embedding gateway call.
 
 Tracing is off unless ``LANGSMITH_TRACING`` is true on validated settings.
-Exported spans never include prompts, queries, excerpts, embeddings, API keys,
-or raw passages. Hide-input/output environment flags are forced on as a second
-control because ``wrap_openai`` would otherwise log Responses bodies.
+Exported spans omit prompts, queries, excerpts, embeddings, API keys, and
+raw passages unless local ``LANGSMITH_EXPORT_IO`` is on. Hide-input/output
+environment flags stay on by default because ``wrap_openai`` would otherwise
+log Responses bodies.
 """
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import logging
@@ -49,6 +51,7 @@ LOGGER = logging.getLogger(__name__)
 
 LANGSMITH_HIDE_INPUTS_ENV = "LANGSMITH_HIDE_INPUTS"
 LANGSMITH_HIDE_OUTPUTS_ENV = "LANGSMITH_HIDE_OUTPUTS"
+LANGSMITH_EXPORT_IO_ENV = "LANGSMITH_EXPORT_IO"
 LANGSMITH_TRACING_ENV = "LANGSMITH_TRACING"
 LANGCHAIN_TRACING_V2_ENV = "LANGCHAIN_TRACING_V2"
 
@@ -68,6 +71,21 @@ _SENSITIVE_KEYS = frozenset(
         "vectors",
     }
 )
+
+
+def langsmith_export_io_enabled() -> bool:
+    """Return whether local raw LangSmith I/O export is active.
+
+    Returns:
+        True only after validated startup wrote ``LANGSMITH_EXPORT_IO=true``.
+        Staging and production never write that value.
+    """
+
+    return os.environ.get(LANGSMITH_EXPORT_IO_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
 
 
 def short_content_hash(value: str) -> str:
@@ -194,8 +212,8 @@ def traced_openai_client(
     Returns:
         An ``OpenAI`` client. When tracing is enabled the client is wrapped
         with ``wrap_openai`` so Responses and Chat calls become child LLM
-        runs. Combined with hide-input/output flags, those child runs omit
-        prompt bodies.
+        runs. Hide-input/output flags omit prompt bodies unless local
+        ``LANGSMITH_EXPORT_IO`` is on.
 
     Side Effects:
         May wrap the SDK client with LangSmith instrumentation.
@@ -250,8 +268,8 @@ def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
             ``request``.
 
     Returns:
-        Exportable metadata. Query text, excerpts, prompts, and API keys are
-        omitted.
+        Exportable metadata. Query text, excerpts, and prompts are omitted
+        unless local ``LANGSMITH_EXPORT_IO`` is on. API keys stay omitted.
     """
 
     request = inputs.get("request")
@@ -262,14 +280,19 @@ def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
         "correlation": current_correlation_ids(),
         "operation": str(operation or "unknown"),
     }
+    export_io = langsmith_export_io_enabled()
     query = getattr(request, "query", None)
     if isinstance(query, str):
         payload["query_sha256"] = short_content_hash(query)
         payload["query_chars"] = len(query)
+        if export_io:
+            payload["query"] = query
     prompt = getattr(request, "prompt", None)
     if isinstance(prompt, str):
         payload["prompt_sha256"] = short_content_hash(prompt)
         payload["prompt_chars"] = len(prompt)
+        if export_io:
+            payload["prompt"] = prompt
     role = getattr(request, "role", None)
     if isinstance(role, str):
         payload["role"] = role
@@ -277,16 +300,22 @@ def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(system_prompt, str):
         payload["system_prompt_sha256"] = short_content_hash(system_prompt)
         payload["system_prompt_chars"] = len(system_prompt)
+        if export_io:
+            payload["system_prompt"] = system_prompt
     prompt_text = getattr(request, "prompt_text", None)
     if isinstance(prompt_text, str):
         payload["prompt_text_sha256"] = short_content_hash(prompt_text)
         payload["prompt_text_chars"] = len(prompt_text)
+        if export_io:
+            payload["prompt_text"] = prompt_text
     excerpts = getattr(request, "excerpts", None)
     if excerpts is not None:
         excerpt_list = tuple(str(item) for item in excerpts)
         payload["excerpt_count"] = len(excerpt_list)
         payload["excerpt_chars"] = sum(len(item) for item in excerpt_list)
         payload["excerpts_sha256"] = short_content_hash("\n".join(excerpt_list))
+        if export_io:
+            payload["excerpts"] = list(excerpt_list)
     candidate_ids = getattr(request, "candidate_ids", None)
     if candidate_ids is not None:
         payload["candidate_count"] = len(tuple(candidate_ids))
@@ -300,6 +329,8 @@ def redact_gateway_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
         payload["input_count"] = len(texts)
         payload["input_chars"] = sum(len(item) for item in texts)
         payload["inputs_sha256"] = short_content_hash("\n".join(texts))
+        if export_io:
+            payload["inputs"] = list(texts)
     dimensions = getattr(request, "dimensions", None)
     if isinstance(dimensions, int):
         payload["dimensions"] = dimensions
@@ -332,6 +363,8 @@ def redact_gateway_outputs(outputs: object) -> dict[str, Any]:
     if isinstance(content, str):
         payload["content_chars"] = len(content)
         payload["content_sha256"] = short_content_hash(content)
+        if langsmith_export_io_enabled():
+            payload["content"] = content
     request_id = getattr(raw, "request_id", None) or getattr(
         raw, "provider_request_id", None
     )
@@ -356,6 +389,16 @@ def redact_gateway_outputs(outputs: object) -> dict[str, Any]:
     pricing_version = getattr(raw, "pricing_version", None)
     if isinstance(pricing_version, str) and pricing_version:
         payload["pricing_version"] = pricing_version
+    if "estimated_cost_usd" not in payload:
+        input_count = payload.get("input_tokens")
+        output_count = payload.get("output_tokens")
+        if isinstance(input_count, int) and isinstance(output_count, int):
+            payload["estimated_cost_usd"] = float(
+                estimate_traced_chat_cost_usd(
+                    input_tokens=input_count,
+                    output_tokens=output_count,
+                )
+            )
     vectors = getattr(raw, "vectors", None)
     if vectors is not None:
         payload["vector_count"] = len(tuple(vectors))
@@ -383,13 +426,20 @@ def redact_openai_call_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
     """
 
     payload: dict[str, Any] = {"correlation": current_correlation_ids()}
+    export_io = langsmith_export_io_enabled()
     for key, value in inputs.items():
+        if key == "api_key":
+            continue
         if key in _SENSITIVE_KEYS:
             if isinstance(value, str):
                 payload[f"{key}_sha256"] = short_content_hash(value)
                 payload[f"{key}_chars"] = len(value)
+                if export_io:
+                    payload[key] = value
             elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
                 payload[f"{key}_count"] = len(cast(Sequence[object], value))
+                if export_io:
+                    payload[key] = [str(item) for item in cast(Sequence[object], value)]
             continue
         if (
             key == "candidate_ids"
@@ -497,6 +547,8 @@ def redact_lightrag_llm_call_outputs(outputs: object) -> dict[str, Any]:
     if isinstance(content, str):
         payload["content_chars"] = len(content)
         payload["content_sha256"] = short_content_hash(content)
+        if langsmith_export_io_enabled():
+            payload["content"] = content
     return payload
 
 
@@ -529,6 +581,8 @@ def redact_embedding_call_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
         payload["input_count"] = len(texts)
         payload["input_chars"] = sum(len(item) for item in texts)
         payload["inputs_sha256"] = short_content_hash("\n".join(texts))
+        if langsmith_export_io_enabled():
+            payload["input"] = list(texts)
     return payload
 
 
@@ -566,6 +620,84 @@ def redact_embedding_call_outputs(outputs: object) -> dict[str, Any]:
     return payload
 
 
+def estimate_traced_chat_cost_usd(
+    *,
+    input_tokens: int,
+    output_tokens: int,
+    cached_input_tokens: int = 0,
+) -> Decimal:
+    """Estimate standard-API USD for gpt-4o-mini token counts.
+
+    Args:
+        input_tokens: Provider-reported input tokens, including cached tokens.
+        output_tokens: Provider-reported output tokens.
+        cached_input_tokens: Input tokens billed at the cached-input rate.
+
+    Returns:
+        Pinned list-price estimate. The OpenAI invoice remains canonical.
+
+    Raises:
+        ValueError: If counts are negative or cached input exceeds total input.
+    """
+
+    from smart_rag_core.gateways.openai_lightrag import estimate_lightrag_llm_cost
+
+    return estimate_lightrag_llm_cost(
+        input_tokens=input_tokens,
+        cached_input_tokens=cached_input_tokens,
+        output_tokens=output_tokens,
+    )
+
+
+def langsmith_usage_metadata(
+    *,
+    input_tokens: int,
+    output_tokens: int,
+    total_cost_usd: Decimal | None = None,
+) -> dict[str, int | float]:
+    """Build the LangSmith-recognized usage payload.
+
+    Args:
+        input_tokens: Provider-reported input token count.
+        output_tokens: Provider-reported output token count.
+        total_cost_usd: Optional precomputed total. When omitted, input and
+            output costs are estimated separately from the pinned list price.
+
+    Returns:
+        Mapping with token counts plus ``input_cost``, ``output_cost``, and
+        ``total_cost``. LangSmith shows these on LLM runs.
+    """
+
+    if total_cost_usd is not None and output_tokens == 0:
+        input_cost = total_cost_usd
+        output_cost = Decimal("0")
+        total_cost = total_cost_usd
+    elif total_cost_usd is not None and input_tokens == 0:
+        input_cost = Decimal("0")
+        output_cost = total_cost_usd
+        total_cost = total_cost_usd
+    else:
+        input_cost = estimate_traced_chat_cost_usd(
+            input_tokens=input_tokens,
+            output_tokens=0,
+        )
+        output_cost = estimate_traced_chat_cost_usd(
+            input_tokens=0,
+            output_tokens=output_tokens,
+        )
+        total_cost = (
+            total_cost_usd if total_cost_usd is not None else input_cost + output_cost
+        )
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": input_tokens + output_tokens,
+        "input_cost": float(input_cost),
+        "output_cost": float(output_cost),
+        "total_cost": float(total_cost),
+    }
+
+
 def record_current_usage_metadata(
     *,
     provider: str,
@@ -596,12 +728,49 @@ def record_current_usage_metadata(
     run.metadata["ls_provider"] = provider
     run.metadata["ls_model_name"] = model
     run.set(
-        usage_metadata={
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": input_tokens + output_tokens,
-            "total_cost": float(total_cost_usd),
-        }
+        usage_metadata=langsmith_usage_metadata(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_cost_usd=total_cost_usd,
+        )
+    )
+
+
+def record_gateway_response_usage(response: object) -> None:
+    """Attach token and USD metadata from one gateway response.
+
+    Args:
+        response: Gateway return value. Token fields are optional; foundation
+            fixtures without usage are ignored.
+
+    Side Effects:
+        Updates the active LangSmith run when tracing is on and the response
+        reports token counts. Raw prompts and completions are never added.
+    """
+
+    input_tokens = getattr(response, "input_tokens", None)
+    output_tokens = getattr(response, "output_tokens", None)
+    if isinstance(input_tokens, bool) or isinstance(output_tokens, bool):
+        return
+    if not isinstance(input_tokens, int) and not isinstance(output_tokens, int):
+        return
+    input_count = input_tokens if isinstance(input_tokens, int) else 0
+    output_count = output_tokens if isinstance(output_tokens, int) else 0
+    raw_cost = getattr(response, "estimated_cost_usd", None)
+    if raw_cost is None:
+        total_cost = estimate_traced_chat_cost_usd(
+            input_tokens=input_count,
+            output_tokens=output_count,
+        )
+    else:
+        total_cost = Decimal(str(raw_cost))
+    model_id = getattr(response, "model_id", None)
+    record_current_usage_metadata(
+        provider="openai",
+        model=model_id if isinstance(model_id, str) and model_id else "",
+        input_tokens=input_count,
+        output_tokens=output_count,
+        total_cost_usd=total_cost,
     )
 
 
@@ -772,12 +941,41 @@ def model_call_traceable(*, name: str, run_type: LangSmithRunType = "llm") -> An
         run_type: LangSmith run type. Use ``embedding`` for embedding batches.
 
     Returns:
-        Decorator that redacts gateway request/response bodies.
+        Decorator that redacts gateway request/response bodies and attaches
+        recognized token and USD metadata when the response reports usage.
     """
 
-    return traceable(
-        name=name,
-        run_type=run_type,
-        process_inputs=redact_gateway_inputs,
-        process_outputs=redact_gateway_outputs,
-    )
+    def decorator(func: Any) -> Any:
+        """Wrap one gateway method with a redacted LangSmith span.
+
+        Args:
+            func: Async gateway method that accepts ``request``.
+
+        Returns:
+            Traceable coroutine that records usage metadata after the call.
+        """
+
+        @functools.wraps(func)
+        async def _record_usage(self: Any, request: Any) -> Any:
+            """Invoke the gateway method and attach token and USD metadata.
+
+            Args:
+                self: Gateway instance.
+                request: Typed gateway request.
+
+            Returns:
+                Unchanged gateway response.
+            """
+
+            result = await func(self, request)
+            record_gateway_response_usage(result)
+            return result
+
+        return traceable(
+            name=name,
+            run_type=run_type,
+            process_inputs=redact_gateway_inputs,
+            process_outputs=redact_gateway_outputs,
+        )(_record_usage)
+
+    return decorator

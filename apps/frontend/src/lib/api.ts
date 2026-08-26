@@ -662,6 +662,9 @@ export async function fetchMeta(
  * @param auth - Access token.
  * @param fetchImpl - Injected fetch.
  * @returns Server-derived caller snapshot.
+ * @throws Error `session_revoked` when FastAPI returns that detail.
+ * @throws ClassifiedApiError on other 401/403 bodies so Ask can show the
+ *   session-rejected banner. Other failures stay `me_failed`.
  */
 export async function fetchMe(
   auth: ApiAuth,
@@ -675,6 +678,9 @@ export async function fetchMe(
     const classified = classifyApiError(response.status, body);
     if (classified?.kind === "auth" && classified.detail === "session_revoked") {
       throw new Error("session_revoked");
+    }
+    if (classified?.kind === "auth") {
+      throw new ClassifiedApiError(classified);
     }
     throw new Error("me_failed");
   }

@@ -67,6 +67,30 @@ describe("primitive geometry source lock", () => {
     expect(ui).not.toMatch(/fonts\.googleapis\.com/);
   });
 
+  it("keeps Windows and Edge on the light Inter stack without UA chrome", () => {
+    expect(globals).toMatch(/color-scheme:\s*only light/);
+    expect(globals).not.toMatch(/-webkit-font-smoothing:\s*antialiased/);
+    expect(globals).not.toMatch(/-moz-osx-font-smoothing:\s*grayscale/);
+    expect(globals).toMatch(/font-synthesis:\s*none/);
+    expect(globals).toMatch(/appearance:\s*none/);
+    expect(globals).not.toMatch(/max-width:\s*100vw/);
+    expect(ui).toMatch(/\.button\s*\{[\s\S]*?appearance:\s*none/);
+    expect(ui).toMatch(/\.control\s*\{[\s\S]*?appearance:\s*none/);
+    expect(shell).toMatch(/\.shell\s*\{[\s\S]*?height:\s*100vh/);
+    expect(chat).toMatch(/\.conversationButton\s*\{[\s\S]*?appearance:\s*none/);
+    expect(ui).toMatch(/\.rovingList\s*\{[\s\S]*?display:\s*block/);
+    expect(ui).toMatch(/\.rovingList > li\s*\{[\s\S]*?flex-shrink:\s*0/);
+    expect(chat).toMatch(
+      /\.railList > li,\s*\n\.railList \[role="option"\]\s*\{[^}]*flex-shrink:\s*0/,
+    );
+    expect(chat).toMatch(/\.conversationButton\s*\{[\s\S]*?min-height:\s*56px/);
+    expect(chat).toMatch(/\.conversationTitle\s*\{[\s\S]*?line-height:\s*20px/);
+    expect(chat).toMatch(/\.conversationTime\s*\{[\s\S]*?line-height:\s*16px/);
+    expect(chat).not.toMatch(
+      /\.railList > li,\s*\n\.railList \[role="option"\]\s*\{[^}]*min-height:\s*0/,
+    );
+  });
+
   it("does not declare a second hex palette in primitive CSS", () => {
     expect(ui).not.toMatch(/#4E5BD5/i);
     expect(ui).not.toMatch(/#F4F6F8/i);

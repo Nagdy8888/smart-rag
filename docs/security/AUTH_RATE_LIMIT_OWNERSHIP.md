@@ -2,7 +2,7 @@
 title: Auth rate-limit ownership
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-25
 audience: engineering, security, ops
 ---
 
@@ -18,7 +18,7 @@ claim to protect browser-direct Supabase Auth traffic.
 | Email/password sign-in, OAuth, password reset, MFA challenge | Hosted Supabase Auth controls / captcha (selected plan) | **Not enforced** by local Supabase CLI stack | Documented only; `local_auth_throttling_proven=False` |
 | Invitation create/accept, offboarding (FastAPI-mediated) | FastAPI Valkey limits then Postgres `private.consume_auth_rate_limit` | Postgres when Valkey unset; dual failure 503 + Retry-After | `test_auth_rate_limits.py` |
 | Query admission / chat starts / uploads / crawls / admin mutations | FastAPI COST_MUTATION or AUTH_ADJACENT | Same fail-closed path | Packet 1 + packet 5 tests |
-| Authenticated low-risk reads | FastAPI Valkey; on Valkey loss per-process emergency limiter | Emits `rate_limit_degraded`; readiness degraded | `test_low_risk_read_emergency_limiter_is_audited` |
+| Authenticated low-risk reads | FastAPI Valkey; on Valkey loss per-process emergency limiter | Emits `rate_limit_degraded`; readiness degraded until Valkey recovers | `test_low_risk_read_emergency_limiter_is_audited`, `test_valkey_success_emits_recovered_after_emergency` |
 | Anonymous sign-in | Disabled (`enable_anonymous_sign_ins = false`) | N/A | `supabase/config.toml` |
 
 FastAPI never throttles browser-direct Auth. The FastAPI limiter is a
@@ -33,6 +33,7 @@ flowchart TD
   valkeyRead -->|yes| incrRead[INCR plus TTL]
   valkeyRead -->|no or timeout| emergency[Emergency process limiter]
   emergency --> audit[rate_limit_degraded audit plus readiness]
+  incrRead --> recovered[clear latch when Valkey succeeds again]
   kind -->|AUTH_ADJACENT COST_MUTATION PRE_AUTH_IP| valkeyMut{Valkey limits up?}
   valkeyMut -->|yes| incrMut[INCR plus TTL]
   valkeyMut -->|timeout or unset| pg[private.consume_auth_rate_limit]
@@ -42,6 +43,12 @@ flowchart TD
   allowed -->|no| deny429[429 Retry-After]
   pg -->|connection error or URL unset| fail503[503 fail-closed Retry-After]
 ```
+
+`rate_limit_degraded` is current-state, not a process-lifetime latch. A
+Valkey timeout on a low-risk read sets it and clears `query_ready` so Ask
+cannot spend while limits run on the emergency cap. A later successful
+Valkey `INCR` or a `/health/ready` probe that sees both Valkey instances
+`ok` clears the flag. Ask stays blocked only while Valkey is still down.
 
 Mutations never skip the limiter. A test that observes a cost mutation
 succeeding with both Valkey and Postgres unavailable is a failing defect.
