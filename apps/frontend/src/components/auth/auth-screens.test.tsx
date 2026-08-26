@@ -3,14 +3,27 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { XSS_FILENAME } from "../../lib/hostile-text-fixtures";
-import { SIGN_IN_FAILED } from "../../lib/auth/copy";
+import {
+  CALLBACK_FAILED,
+  OWNER_BOOTSTRAP_UNAVAILABLE,
+  RESET_EMAIL_SENT,
+  SIGN_IN_FAILED,
+} from "../../lib/auth/copy";
+import { handshakeBelowMinCopy } from "../../lib/handshake";
 import { SessionProvider } from "../../lib/auth/session-provider";
-import { SignInForm, SignUpForm } from "./auth-screens";
-import { OWNER_BOOTSTRAP_UNAVAILABLE } from "../../lib/auth/copy";
+import {
+  EnvMissingBanner,
+  ForgotPasswordForm,
+  HandshakeBanner,
+  InvitationAcceptForm,
+  ResetPasswordForm,
+  SignInForm,
+  SignUpForm,
+} from "./auth-screens";
 
 afterEach(() => {
   cleanup();
@@ -19,9 +32,20 @@ afterEach(() => {
 const signInWithPassword = vi.fn();
 const signInWithOAuth = vi.fn();
 const signUp = vi.fn();
-const getSession = vi.fn(async () => ({ data: { session: null } }));
+const resetPasswordForEmail = vi.fn();
+const updateUser = vi.fn();
+const getSession = vi.fn(
+  async (): Promise<{
+    data: { session: { access_token: string; user: { email: string } } | null };
+  }> => ({ data: { session: null } }),
+);
 const onAuthStateChange = vi.fn(() => ({
   data: { subscription: { unsubscribe: vi.fn() } },
+}));
+const fetchMeta = vi.fn();
+const acceptInvitation = vi.fn();
+const { envState } = vi.hoisted(() => ({
+  envState: { present: true },
 }));
 
 vi.mock("../../lib/auth/browser", () => ({
@@ -30,6 +54,8 @@ vi.mock("../../lib/auth/browser", () => ({
       signInWithPassword,
       signInWithOAuth,
       signUp,
+      resetPasswordForEmail,
+      updateUser,
       getSession,
       onAuthStateChange,
       signOut: vi.fn(),
@@ -45,10 +71,13 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("../../lib/env", () => ({
-  publicSupabaseConfig: () => ({
-    url: "http://127.0.0.1:54321",
-    anonKey: "anon",
-  }),
+  publicSupabaseConfig: () =>
+    envState.present
+      ? {
+          url: "http://127.0.0.1:54321",
+          anonKey: "anon",
+        }
+      : null,
   apiBaseUrl: () => "http://127.0.0.1:8000",
 }));
 
@@ -56,13 +85,23 @@ vi.mock("../../lib/api", async () => {
   const actual = await vi.importActual<typeof import("../../lib/api")>("../../lib/api");
   return {
     ...actual,
-    fetchMeta: vi.fn(async () => ({
-      api_version: "1",
-      sse_schema_version: "1",
-      min_client_version: "0.1.0",
-    })),
+    fetchMeta: (...args: unknown[]) => fetchMeta(...args),
     fetchReady: vi.fn(async () => null),
+    acceptInvitation: (...args: unknown[]) => acceptInvitation(...args),
   };
+});
+
+beforeEach(() => {
+  envState.present = true;
+  fetchMeta.mockResolvedValue({
+    api_version: "1",
+    sse_schema_version: "1",
+    min_client_version: "0.1.0",
+  });
+  acceptInvitation.mockReset();
+  resetPasswordForEmail.mockReset();
+  updateUser.mockReset();
+  getSession.mockResolvedValue({ data: { session: null } });
 });
 
 /**
@@ -155,5 +194,102 @@ describe("SignInForm redirect", () => {
       expect(replace).toHaveBeenCalledWith("/");
       expect(refresh).toHaveBeenCalled();
     });
+  });
+
+  it("shows handshake-safe callback copy without leaking the code", () => {
+    renderAuth(<SignInForm callbackError />);
+    expect(screen.getByRole("alert")).toHaveTextContent(CALLBACK_FAILED);
+    expect(screen.queryByText(/pkce|code_verifier/i)).toBeNull();
+  });
+});
+
+describe("ForgotPasswordForm", () => {
+  it("always shows check-inbox copy and uses the PKCE recovery callback", async () => {
+    resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    renderAuth(<ForgotPasswordForm />);
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
+    await user.click(screen.getByRole("button", { name: "Send reset link" }));
+    expect(await screen.findByText(RESET_EMAIL_SENT)).toBeInTheDocument();
+    expect(resetPasswordForEmail).toHaveBeenCalledWith(
+      "user@example.com",
+      expect.objectContaining({
+        redirectTo: expect.stringMatching(/\/auth\/callback\?next=\/auth\/reset$/),
+      }),
+    );
+  });
+});
+
+describe("ResetPasswordForm", () => {
+  it("shows generic failure copy without provider traces", async () => {
+    updateUser.mockResolvedValueOnce({
+      error: { message: "AuthApiError: Password should be at least 6 characters" },
+      data: { user: null },
+    });
+    const user = userEvent.setup();
+    renderAuth(<ResetPasswordForm />);
+    await user.type(screen.getByLabelText("New password"), "short");
+    await user.click(screen.getByRole("button", { name: "Update password" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(SIGN_IN_FAILED);
+    expect(screen.queryByText(/AuthApiError|6 characters/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("InvitationAcceptForm", () => {
+  it("asks the caller to sign in before posting a token", async () => {
+    renderAuth(<InvitationAcceptForm />);
+    expect(
+      await screen.findByText("Sign in, then paste the invitation token."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept invitation" })).toBeDisabled();
+  });
+
+  it("posts { token } only and renders the accepted invitation id", async () => {
+    getSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "jwt-token",
+          user: { email: "member@example.com" },
+        },
+      },
+    });
+    acceptInvitation.mockResolvedValue({ invitation_id: "inv-1" });
+    const user = userEvent.setup();
+    renderAuth(<InvitationAcceptForm />);
+    expect(await screen.findByText(/Signed in as/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Invitation token"), "token-ok-1");
+    await user.click(screen.getByRole("button", { name: "Accept invitation" }));
+    expect(await screen.findByText(/inv-1/)).toBeInTheDocument();
+    expect(acceptInvitation).toHaveBeenCalledWith({ accessToken: "jwt-token" }, "token-ok-1");
+  });
+});
+
+describe("EnvMissingBanner", () => {
+  it("renders when public Supabase config is absent", () => {
+    envState.present = false;
+    renderAuth(<EnvMissingBanner />);
+    expect(
+      screen.getByText("Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("HandshakeBanner", () => {
+  it("blocks spend when the client is below min_client_version", async () => {
+    fetchMeta.mockResolvedValue({
+      api_version: "1",
+      sse_schema_version: "1",
+      min_client_version: "9.0.0",
+    });
+    renderAuth(<HandshakeBanner />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(handshakeBelowMinCopy());
+  });
+
+  it("warns when meta is unreachable", async () => {
+    fetchMeta.mockRejectedValue(new Error("meta_down"));
+    renderAuth(<HandshakeBanner />);
+    expect(
+      await screen.findByText(/Compatibility could not be confirmed/),
+    ).toBeInTheDocument();
   });
 });

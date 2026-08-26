@@ -210,11 +210,13 @@ async def open_langgraph_astream(
         "recursion_limit": context.recursion_limit,
         "configurable": {"thread_id": str(context.conversation_id)},
     }
+    from smart_rag_api.services.sse.stream_dispatch import production_astream_options
+
     stream_method: Callable[..., AsyncIterator[object]] = compiled.astream  # type: ignore[reportUnknownMemberType]
     stream_iter = stream_method(
         state,
         cast(Any, config),
-        stream_mode="updates",
         context=QueryGraphContext(deps=deps),
+        **production_astream_options(),
     )
     return connection, stream_iter, deps

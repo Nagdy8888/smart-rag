@@ -1,9 +1,17 @@
-"""Normalize LangGraph stream chunks and token fields once."""
+"""Compatibility facade for stream token helpers and updates unwrap."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import cast
+
+from smart_rag_api.services.sse.stream_parts import updates_mapping_from_chunk
+
+__all__ = [
+    "STREAM_MODE_NAMES",
+    "coerce_stream_token_count",
+    "token_counts_from_update",
+    "updates_mapping_from_chunk",
+]
 
 STREAM_MODE_NAMES = frozenset({"updates", "values", "messages", "debug"})
 
@@ -25,30 +33,6 @@ def coerce_stream_token_count(value: object) -> int | None:
     if isinstance(value, float) and value.is_integer() and value >= 0:
         return int(value)
     return None
-
-
-def updates_mapping_from_chunk(raw_chunk: object) -> dict[str, object] | None:
-    """Unwrap one LangGraph ``astream`` updates payload.
-
-    Args:
-        raw_chunk: Dict ``{node: update}`` or ``(stream_mode, payload)``.
-
-    Returns:
-        Node-keyed mapping, or None when the chunk is not updates data.
-    """
-
-    chunk: object = raw_chunk
-    if isinstance(chunk, tuple):
-        parts = [item for item in cast(tuple[object, ...], chunk)]
-        if (
-            len(parts) == 2
-            and isinstance(parts[0], str)
-            and parts[0] in STREAM_MODE_NAMES
-        ):
-            chunk = parts[1]
-    if not isinstance(chunk, dict):
-        return None
-    return {str(key): value for key, value in cast(dict[object, object], chunk).items()}
 
 
 def token_counts_from_update(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from smart_rag_api.services.sse.mapping.contracts import REJECT_STATUSES
+
 
 def status_event(
     node_name: str, update: dict[str, object]
@@ -13,11 +15,15 @@ def status_event(
         update: Node return mapping.
 
     Returns:
-        ``status`` event with stage and status only.
+        ``status`` event with stage, status, and completion phase.
     """
 
     raw_status = update.get("status")
     status = (
         raw_status[:64] if isinstance(raw_status, str) and raw_status else "running"
     )
-    return ("status", {"stage": node_name[:64], "status": status})
+    phase = "failed" if status in REJECT_STATUSES else "completed"
+    return (
+        "status",
+        {"stage": node_name[:64], "status": status, "phase": phase},
+    )

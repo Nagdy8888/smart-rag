@@ -4,24 +4,23 @@
 
 "use client";
 
-import { memo } from "react";
+import { Fragment, memo } from "react";
 import type { ConversationResponse } from "../../lib/types";
 import { conversationAgeGroup, formatRelativeTime } from "../../lib/relative-time";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
 import { Menu } from "../ui/menu";
-import { RovingList } from "../ui/roving-list";
 import { Skeleton } from "../ui/skeleton";
 import { UserText } from "../ui/user-text";
-import styles from "./chat.module.css";
+import styles from "./chat-rail.module.css";
 
 /** Incremented on each memoized rail render. Used by isolation tests. */
 export const conversationRailRenderCount = { value: 0 };
 
 export type ConversationRailProps = {
   /** Loaded conversations. One API page only. */
-  conversations: ConversationResponse[];
+  conversations: readonly ConversationResponse[];
   /** Selected conversation id. */
   selectedId: string | null;
   /** True while the list query is pending. */
@@ -53,14 +52,48 @@ export function conversationDisplayTitle(title: string | null): string {
 }
 
 /**
+ * Return whether two rail prop snapshots represent the same list chrome.
+ *
+ * Callback identity is ignored so SSE token publications cannot rerender
+ * unchanged session rows.
+ *
+ * @param previous - Last rail props.
+ * @param next - Next rail props.
+ * @returns True when list data and selection chrome are unchanged.
+ */
+function railListUnchanged(
+  previous: ConversationRailProps,
+  next: ConversationRailProps,
+): boolean {
+  return (
+    previous.selectedId === next.selectedId &&
+    previous.loading === next.loading &&
+    previous.expanded === next.expanded &&
+    previous.showCollapseToggle === next.showCollapseToggle &&
+    previous.deletePending === next.deletePending &&
+    previous.conversations.length === next.conversations.length &&
+    previous.conversations.every((item, index) => {
+      const other = next.conversations[index];
+      return (
+        other !== undefined &&
+        item.conversation_id === other.conversation_id &&
+        item.title === other.title
+      );
+    })
+  );
+}
+
+/**
  * Render the conversation rail.
  *
  * @param props - Controlled list data and callbacks.
  * @returns Aside whose session list scrolls independently of the header.
  * @remarks
+ * Each row is a list item with one primary select control. Delete is a
+ * sibling, never nested inside the select control. Delete uses the current
+ * confirm flow from the parent (immediate `onDelete` today).
  * Render-isolation contract: ChatApp must pass stable callbacks and must
- * not derive rail props from SSE `chat` view state. Memoization holds
- * only when conversation-list data is unchanged.
+ * not derive rail props from SSE `chat` view state.
  */
 export const ConversationRail = memo(function ConversationRail({
   conversations,
@@ -151,59 +184,64 @@ export const ConversationRail = memo(function ConversationRail({
         {conversations.length === 0 && !loading ? (
           <EmptyState title="No sessions yet" body="Ask a question to create one." />
         ) : null}
-        <RovingList
-          className={styles.railList}
-          aria-label="Sessions"
-          selectedId={selectedId}
-          items={conversations.map((item) => ({
-            id: item.conversation_id,
-            item,
-          }))}
-          onSelect={onSelect}
-          getAccessibleName={(item) => conversationDisplayTitle(item.title)}
-          getGroupLabel={(item, previous) => {
+        <ul className={styles.railList} aria-label="Sessions">
+          {conversations.map((item, index) => {
+            const title = conversationDisplayTitle(item.title);
+            const selected = item.conversation_id === selectedId;
+            const previous = index > 0 ? (conversations[index - 1] ?? null) : null;
             const group = conversationAgeGroup(item.created_at);
-            if (previous === null) {
-              return group;
-            }
-            return conversationAgeGroup(previous.created_at) === group
-              ? null
-              : group;
-          }}
-          groupClassName={styles.railGroupLabel}
-        >
-          {(item) => (
-            <div className={styles.conversationButton}>
-              <div className={styles.conversationCopy}>
-                <div className={styles.conversationTitle}>
-                  <UserText value={conversationDisplayTitle(item.title)} />
-                </div>
-                {item.created_at ? (
-                  <div className={styles.conversationTime} aria-hidden="true">
-                    {formatRelativeTime(item.created_at)}
-                  </div>
+            const showGroup =
+              previous === null || conversationAgeGroup(previous.created_at) !== group;
+            return (
+              <Fragment key={item.conversation_id}>
+                {showGroup ? (
+                  <li>
+                    <p className={styles.railGroupLabel}>{group}</p>
+                  </li>
                 ) : null}
-              </div>
-              <div className={styles.conversationDelete}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Delete conversation"
-                  pending={deletePending && selectedId === item.conversation_id}
-                  pendingLabel="Deleting…"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete(item.conversation_id);
-                  }}
+                <li
+                  className={styles.conversationRow}
+                  data-selected={selected ? "true" : "false"}
                 >
-                  <Icon name="trash" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </RovingList>
+                  <button
+                    type="button"
+                    className={styles.conversationButton}
+                    aria-current={selected ? "true" : undefined}
+                    aria-label={title}
+                    onClick={() => onSelect(item)}
+                  >
+                    <div className={styles.conversationCopy}>
+                      <div className={styles.conversationTitle}>
+                        <UserText value={title} />
+                      </div>
+                      {item.created_at ? (
+                        <div className={styles.conversationTime} aria-hidden="true">
+                          {formatRelativeTime(item.created_at)}
+                        </div>
+                      ) : null}
+                    </div>
+                  </button>
+                  <div className={styles.conversationDelete}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Delete conversation"
+                      pending={deletePending && selectedId === item.conversation_id}
+                      pendingLabel="Deleting…"
+                      onClick={() => {
+                        onDelete(item.conversation_id);
+                      }}
+                    >
+                      <Icon name="trash" />
+                    </Button>
+                  </div>
+                </li>
+              </Fragment>
+            );
+          })}
+        </ul>
       </div>
     </aside>
   );
-});
+}, railListUnchanged);

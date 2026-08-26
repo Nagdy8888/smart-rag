@@ -47,8 +47,22 @@ describe("sessionQueryKeys", () => {
     expect(serialized).not.toContain(token);
     expect(keys.me).toEqual(["me", "user-a"]);
     expect(keys.conversations).toEqual(["conversations", "user-a"]);
-    expect(keys.consoleReady).toEqual(["console-ready", "user-a"]);
+    expect(keys.consoleReady(null)).toEqual([
+      "console-ready",
+      "user-a",
+      "pending",
+    ]);
+    expect(keys.consoleReady("member")).toEqual([
+      "console-ready",
+      "user-a",
+      "member",
+    ]);
     expect(keys.citations("run-1")).toEqual(["citations", "user-a", "run-1"]);
+    expect(keys.conversationMessages("c1")).toEqual([
+      "conversation-messages",
+      "user-a",
+      "c1",
+    ]);
   });
 
   it("isolates two users without sharing a token-shaped key", () => {

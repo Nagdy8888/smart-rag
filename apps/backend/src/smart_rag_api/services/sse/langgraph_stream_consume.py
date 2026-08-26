@@ -4,18 +4,15 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 
-from smart_rag_api.services.query_sse_mapping import (
-    QuerySseMapper,
-    assert_catalog_event,
-)
-from smart_rag_api.services.sse.chunks import (
-    token_counts_from_update,
-    updates_mapping_from_chunk,
-)
+from smart_rag_api.services.sse.chunks import token_counts_from_update
+from smart_rag_api.services.sse.stream_dispatch import dispatch_stream_part
+
+if TYPE_CHECKING:
+    from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 
 
 @dataclass
@@ -110,6 +107,8 @@ async def iter_mapped_langgraph_updates(
         Catalog ``(event_type, payload)`` drafts, then the consume result.
     """
 
+    from smart_rag_api.services.query_sse_mapping import assert_catalog_event
+
     stream_exhausted = False
     successful_terminal_committed = False
     terminal_yielded = False
@@ -124,31 +123,21 @@ async def iter_mapped_langgraph_updates(
                 stream_exhausted=False,
             )
             break
-        typed_chunk = updates_mapping_from_chunk(raw_chunk)
-        if typed_chunk is not None:
-            for node_update in typed_chunk.values():
-                if isinstance(node_update, dict):
-                    typed_update = {
-                        str(key): value
-                        for key, value in cast(
-                            dict[object, object], node_update
-                        ).items()
-                    }
-                    (
-                        last_remaining_calls,
-                        last_status,
-                        last_prompt_tokens,
-                        last_completion_tokens,
-                    ) = _update_counters(
-                        typed_update,
-                        last_remaining_calls=last_remaining_calls,
-                        last_status=last_status,
-                        last_prompt_tokens=last_prompt_tokens,
-                        last_completion_tokens=last_completion_tokens,
-                    )
-        for event_type, payload in mapper.consume_chunk(
-            typed_chunk if typed_chunk is not None else cast(object, raw_chunk)
-        ):
+        dispatched = dispatch_stream_part(raw_chunk, mapper)
+        for typed_update in dispatched.node_updates:
+            (
+                last_remaining_calls,
+                last_status,
+                last_prompt_tokens,
+                last_completion_tokens,
+            ) = _update_counters(
+                typed_update,
+                last_remaining_calls=last_remaining_calls,
+                last_status=last_status,
+                last_prompt_tokens=last_prompt_tokens,
+                last_completion_tokens=last_completion_tokens,
+            )
+        for event_type, payload in dispatched.drafts:
             assert_catalog_event(event_type, payload)
             if event_type == "usage":
                 event_prompt, event_completion = token_counts_from_update(payload)

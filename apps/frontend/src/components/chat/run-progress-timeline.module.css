@@ -1,0 +1,48 @@
+/**
+ * Visible node/tool progress timeline beside the run-progress owner.
+ */
+
+.statusLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.progressTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progressToggle {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.progressList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progressItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.progressKey {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}

@@ -3,8 +3,8 @@
 from smart_rag_api.services.sse.mapping import (
     ALLOWED_SSE_FIELDS,
     DRAFT_ANSWER_NODES,
-    GENERATE_ANSWER_NODE,
     GENERAL_SCOPE_NODE,
+    GENERATE_ANSWER_NODE,
     MIXED_SCOPE_NODE,
     TOKEN_DELTA_LIMIT,
     VERIFY_ANSWER_NODE,
@@ -16,8 +16,8 @@ from smart_rag_api.services.sse.mapping import (
 __all__ = [
     "ALLOWED_SSE_FIELDS",
     "DRAFT_ANSWER_NODES",
-    "GENERATE_ANSWER_NODE",
     "GENERAL_SCOPE_NODE",
+    "GENERATE_ANSWER_NODE",
     "MIXED_SCOPE_NODE",
     "TOKEN_DELTA_LIMIT",
     "VERIFY_ANSWER_NODE",

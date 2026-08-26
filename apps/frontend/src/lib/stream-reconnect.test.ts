@@ -38,6 +38,9 @@ describe("stream reconnect policy", () => {
       "terminal",
     );
     expect(shouldStopReconnect({ ...base, signedOut: true })).toBe("signed_out");
+    expect(shouldStopReconnect({ ...base, unauthorized: true })).toBe(
+      "signed_out",
+    );
     expect(shouldStopReconnect({ ...base, runDeleted: true })).toBe(
       "run_deleted",
     );

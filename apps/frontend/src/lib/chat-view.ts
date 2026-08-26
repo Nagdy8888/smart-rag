@@ -12,6 +12,11 @@ import {
 } from "./sse";
 import { shouldShowCitations } from "./answer-origin";
 import type { ApiFailure } from "./api";
+import {
+  applyProgressFrame,
+  emptyRunProgress,
+  type RunProgressState,
+} from "./run-progress";
 
 /** Developer-visible diagnostics collected from catalog events. */
 export type ChatDiagnostics = {
@@ -46,6 +51,7 @@ export type ChatViewState = {
   idempotencyKey: string;
   answerOrigin: string | null;
   clarificationRequired: boolean;
+  progress: RunProgressState;
 };
 
 /**
@@ -93,6 +99,7 @@ export function createChatViewState(idempotencyKey: string): ChatViewState {
     idempotencyKey,
     answerOrigin: null,
     clarificationRequired: false,
+    progress: emptyRunProgress(),
   };
 }
 
@@ -192,6 +199,13 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
 
   const next: ChatViewState = { ...state, lastSequence };
   const diagnostics = { ...state.diagnostics };
+  next.progress = applyProgressFrame(
+    state.progress,
+    frame.event,
+    payload,
+    lastSequence,
+    state.terminal !== null,
+  );
 
   switch (frame.event) {
     case "status":
@@ -245,6 +259,10 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
       break;
     }
     case "token_delta":
+      if (!next.progress.verificationCompleted) {
+        next.failure = { kind: "protocol", detail: "unverified_token_delta" };
+        break;
+      }
       next.answerText = `${state.answerText}${displayText(stringField(payload, "delta") ?? "")}`;
       break;
     case "usage":

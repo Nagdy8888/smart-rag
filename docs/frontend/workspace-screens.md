@@ -102,16 +102,18 @@ flowchart TB
         end
         subgraph answerColumn [Answer column]
           conversation[Transcript scroll]
-          statusLine[Status line when running]
-          composer[Composer card]
+        timeline[Run progress timeline]
+        reveal[Verified answer reveal]
+        composer[Composer card]
         end
       end
     end
   end
   topbar --> mainArea
   sessionsHeader --> sessionsList
-  conversation --> statusLine
-  statusLine --> composer
+  conversation --> timeline
+  timeline --> reveal
+  reveal --> composer
 ```
 
 #### `SessionRail`
@@ -157,6 +159,42 @@ flowchart TB
 - While a run is active, render the server-originated node/tool timeline (started/completed/failed only). Known labels include Preparing, Retrieving, Generating, and Verifying when those stages actually arrive. After verification the status may read “Verified — displaying answer” during paced reveal. Skipped nodes never appear.
 - Not rendered when idle. The permanent 4-item stepper is removed.
 - Unknown stage stays in Run details, not as a new primary phase.
+- Server progress may complete faster than a paint; history still retains started/completed rows.
+- Presentation reveal is capped at 2.5s and 90 publications. `Show full answer`, pointer-down, and copy skip the remainder. `prefers-reduced-motion: reduce` shows the full verified text immediately. Historical messages never re-reveal.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Waiting: send admitted
+  Waiting --> Verifying: verify_answer started
+  Verifying --> Revealing: verified text released
+  Revealing --> Complete: deadline, skip, or reduced motion
+  Waiting --> Interrupted: cancel or error
+  Verifying --> Interrupted: cancel or error
+  Revealing --> Interrupted: cancel or error
+  Complete --> [*]
+  Interrupted --> [*]
+```
+
+```mermaid
+flowchart LR
+  chatApp[ChatApp composition]
+  queries[useChatQueries]
+  run[useChatRun]
+  reveal[useVerifiedAnswerReveal]
+  scroll[useConversationScroll]
+  rail[ConversationRail]
+  timeline[RunProgressTimeline]
+  answer[AnswerSurface]
+  chatApp --> queries
+  chatApp --> run
+  chatApp --> reveal
+  chatApp --> scroll
+  chatApp --> rail
+  chatApp --> timeline
+  chatApp --> answer
+  run --> consumeSse[consumeSse]
+```
 
 #### `ChatComposer`
 

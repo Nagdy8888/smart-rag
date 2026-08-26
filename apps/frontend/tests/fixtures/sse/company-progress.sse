@@ -1,0 +1,102 @@
+: SYNTHETIC_NO_LEAK_MARKER
+
+id: 1
+event: schema
+data: {"sse_schema_version":"1"}
+
+id: 2
+event: status
+data: {"stage":"enforce_admission","status":"running","phase":"started"}
+
+id: 3
+event: status
+data: {"stage":"enforce_admission","status":"admitted","phase":"completed"}
+
+id: 4
+event: status
+data: {"stage":"load_memory","status":"running","phase":"started"}
+
+id: 5
+event: status
+data: {"stage":"load_memory","status":"loaded","phase":"completed"}
+
+id: 6
+event: status
+data: {"stage":"prepare_query","status":"running","phase":"started"}
+
+id: 7
+event: status
+data: {"stage":"prepare_query","status":"prepared","phase":"completed"}
+
+id: 8
+event: status
+data: {"stage":"compile_plan","status":"running","phase":"started"}
+
+id: 9
+event: status
+data: {"stage":"compile_plan","status":"planned","phase":"completed"}
+
+id: 10
+event: status
+data: {"stage":"company_scope","status":"running","phase":"started"}
+
+id: 11
+event: status
+data: {"stage":"company_scope","status":"retrieved","phase":"completed"}
+
+id: 12
+event: status
+data: {"stage":"apply_correction","status":"running","phase":"started"}
+
+id: 13
+event: status
+data: {"stage":"apply_correction","status":"corrected","phase":"completed"}
+
+id: 14
+event: status
+data: {"stage":"fuse_evidence","status":"running","phase":"started"}
+
+id: 15
+event: status
+data: {"stage":"fuse_evidence","status":"fused","phase":"completed"}
+
+id: 16
+event: status
+data: {"stage":"compose_tables","status":"running","phase":"started"}
+
+id: 17
+event: status
+data: {"stage":"compose_tables","status":"composed","phase":"completed"}
+
+id: 18
+event: status
+data: {"stage":"disclose_optional_tools","status":"running","phase":"started"}
+
+id: 19
+event: status
+data: {"stage":"disclose_optional_tools","status":"optional_tools_resolved","phase":"completed"}
+
+id: 20
+event: status
+data: {"stage":"generate_answer","status":"running","phase":"started"}
+
+id: 21
+event: status
+data: {"stage":"generate_answer","status":"drafted","phase":"completed"}
+
+id: 22
+event: status
+data: {"stage":"verify_answer","status":"running","phase":"started"}
+
+id: 23
+event: status
+data: {"stage":"verify_answer","status":"verified","phase":"completed"}
+
+id: 24
+event: token_delta
+data: {"delta":"PUBLIC_FINAL"}
+
+id: 25
+event: completed
+data: {}
+

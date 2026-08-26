@@ -89,11 +89,11 @@ def test_sse_service_settles_reservation_once_on_terminal(monkeypatch: Any) -> N
         calls.append(reservation_id)
 
     monkeypatch.setattr(
-        "smart_rag_api.services.sse.service_persist.psycopg.connect",
+        "smart_rag_api.services.sse.run_settlement.psycopg.connect",
         _connect,
     )
     monkeypatch.setattr(
-        "smart_rag_api.services.sse.service_persist.true_up_query_reservation",
+        "smart_rag_api.services.sse.run_settlement.true_up_query_reservation",
         _true_up,
     )
     store = MemoryRunEventStore()

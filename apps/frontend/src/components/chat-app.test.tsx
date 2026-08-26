@@ -125,6 +125,14 @@ const defaultMeta = {
   min_client_version: "9.0.0",
 };
 
+beforeEach(() => {
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
+  vi.stubGlobal("cancelAnimationFrame", () => undefined);
+});
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -236,7 +244,10 @@ function routingLimitationSse(): string {
     );
   });
   frames.push(
-    'event: citation_preview\nid: 20\ndata: {"citation_ids":["cite-1"],"snippet":"SECRET PASSAGE"}\n\n',
+    'event: citation_preview\nid: 19\ndata: {"citation_ids":["cite-1"],"snippet":"SECRET PASSAGE"}\n\n',
+  );
+  frames.push(
+    'event: status\nid: 20\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\n',
   );
   frames.push('event: token_delta\nid: 21\ndata: {"delta":"<script>x</script>"}\n\n');
   frames.push("event: completed\nid: 22\ndata: {}\n\n");
@@ -283,7 +294,7 @@ function stubChatFetch(options: {
           headers: { "Content-Type": "application/json" },
         });
       }
-      return new Response(options.events ?? "event: token_delta\nid: 1\ndata: {\"delta\":\"Hi\"}\n\nevent: completed\nid: 2\ndata: {}\n\n", {
+      return new Response(options.events ?? "event: status\nid: 1\ndata: {\"stage\":\"verify_answer\",\"status\":\"verified\",\"phase\":\"completed\"}\n\nevent: token_delta\nid: 2\ndata: {\"delta\":\"Hi\"}\n\nevent: completed\nid: 3\ndata: {}\n\n", {
         status: 200,
         headers: { "Content-Type": "text/event-stream" },
       });
@@ -377,7 +388,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     vi.stubGlobal("fetch", stubChatFetch({ events: routingLimitationSse() }));
     renderChat(<ChatApp />);
     await screen.findByRole("button", { name: "Send" });
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "What connected ACME?");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(
@@ -391,7 +402,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     expect(screen.getAllByText(limitationCopy("graph_pending")).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
-    expect(screen.getByText("<script>x</script>")).toBeInTheDocument();
+    expect(await screen.findByText("<script>x</script>")).toBeInTheDocument();
     expect(document.querySelector("script")).toBeNull();
     expect(screen.queryByText("SECRET PASSAGE")).toBeNull();
     expect(await screen.findByRole("button", { name: "Citation 1" })).toBeInTheDocument();
@@ -409,7 +420,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     });
     vi.stubGlobal("fetch", fetchImpl);
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("button", { name: "Reconnect" })).toBeInTheDocument();
@@ -476,12 +487,10 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     };
     vi.stubGlobal("fetch", fetchImpl);
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => {
-      expect(screen.getByTestId("advanced-diagnostics")).toHaveTextContent("1");
-    });
+    await screen.findByRole("button", { name: "Stop" });
     await user.click(screen.getByRole("button", { name: "Stop" }));
     await waitFor(() => {
       expect(cancelCalls).toEqual(["http://127.0.0.1:8000/runs/run-1/cancel"]);
@@ -505,7 +514,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
       }),
     );
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findAllByText(/Reconnecting/)).not.toHaveLength(0);
@@ -527,7 +536,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     const deleteCalls: string[] = [];
     vi.stubGlobal("fetch", stubChatFetch({ deleteCalls }));
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.click(screen.getByRole("button", { name: "Conversation actions" }));
     await user.click(screen.getByRole("menuitem", { name: "Delete" }));
     expect(
@@ -570,7 +579,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     vi.stubGlobal(
       "fetch",
       stubChatFetch({
-        events: "event: token_delta\nid: 1\ndata: {\"delta\":\"Hi\"}\n\nevent: completed\nid: 2\ndata: {}\n\n",
+        events: "event: status\nid: 1\ndata: {\"stage\":\"verify_answer\",\"status\":\"verified\",\"phase\":\"completed\"}\n\nevent: token_delta\nid: 2\ndata: {\"delta\":\"Hi\"}\n\nevent: completed\nid: 3\ndata: {}\n\n",
         messagePosts,
       }),
     );
@@ -682,14 +691,15 @@ describe("ChatApp Ask workspace", () => {
         events: [
           'event: answer_origin\nid: 1\ndata: {"origin":"general_knowledge"}\n\n',
           'event: citation_preview\nid: 2\ndata: {"citation_ids":["cite-1"]}\n\n',
-          'event: token_delta\nid: 3\ndata: {"delta":"Paris is the capital of France."}\n\n',
-          'event: usage\nid: 4\ndata: {"prompt_tokens":412,"completion_tokens":88}\n\n',
-          "event: completed\nid: 5\ndata: {}\n\n",
+          'event: status\nid: 3\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\n',
+          'event: token_delta\nid: 4\ndata: {"delta":"Paris is the capital of France."}\n\n',
+          'event: usage\nid: 5\ndata: {"prompt_tokens":412,"completion_tokens":88}\n\n',
+          "event: completed\nid: 6\ndata: {}\n\n",
         ].join(""),
       }),
     );
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "capital of France");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("Paris is the capital of France.")).toBeInTheDocument();
@@ -729,13 +739,14 @@ describe("ChatApp Ask workspace", () => {
         events: [
           'event: answer_origin\nid: 1\ndata: {"origin":"company_documents"}\n\n',
           'event: citation_preview\nid: 2\ndata: {"citation_ids":["cite-1"]}\n\n',
-          'event: token_delta\nid: 3\ndata: {"delta":"The refund period is 30 days."}\n\n',
-          "event: completed\nid: 4\ndata: {}\n\n",
+          'event: status\nid: 3\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\n',
+          'event: token_delta\nid: 4\ndata: {"delta":"The refund period is 30 days."}\n\n',
+          "event: completed\nid: 5\ndata: {}\n\n",
         ].join(""),
       }),
     );
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "What is our refund period?");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("button", { name: "Citation 1" })).toBeInTheDocument();
@@ -770,13 +781,14 @@ describe("ChatApp Ask workspace", () => {
         events: [
           'event: answer_origin\nid: 1\ndata: {"origin":"ambiguous"}\n\n',
           'event: citation_preview\nid: 2\ndata: {"citation_ids":["cite-1"]}\n\n',
-          'event: token_delta\nid: 3\ndata: {"delta":"Please ask one question."}\n\n',
-          "event: completed\nid: 4\ndata: {}\n\n",
+          'event: status\nid: 3\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\n',
+          'event: token_delta\nid: 4\ndata: {"delta":"Please ask one question."}\n\n',
+          "event: completed\nid: 5\ndata: {}\n\n",
         ].join(""),
       }),
     );
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "France and refund");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText(MIXED_SCOPE_CLARIFICATION)).toBeInTheDocument();
@@ -788,28 +800,30 @@ describe("ChatApp Ask workspace", () => {
   it("exposes labeled Sessions and Conversation regions", async () => {
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
     renderChat(<ChatApp />);
-    expect(await screen.findByRole("option", { name: "Chat" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Chat" })).toBeInTheDocument();
     expect(screen.getByTestId("sessions-rail")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Conversation" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Answer" })).toBeInTheDocument();
     expect(
-      screen.getByRole("listbox", { name: "Sessions", hidden: true }),
+      screen.getByRole("list", { name: "Sessions", hidden: true }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Chat" })).not.toHaveTextContent(
+    expect(screen.getByRole("button", { name: "Chat" })).not.toHaveTextContent(
       "Older",
     );
     expect(screen.getByText("Older")).toBeInTheDocument();
+    expect(document.querySelector('[role="option"]')).toBeNull();
+    expect(document.querySelector('[role="option"] button')).toBeNull();
   });
 
   it("collapses the Sessions list without deleting conversations", async () => {
     const user = userEvent.setup();
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
     renderChat(<ChatApp />);
-    expect(await screen.findByRole("option", { name: "Chat" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Chat" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Collapse sessions" }));
-    expect(screen.queryByRole("option", { name: "Chat" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Chat" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Expand sessions" }));
-    expect(screen.getByRole("option", { name: "Chat" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Chat" })).toBeInTheDocument();
   });
 
   it("New prevents a delayed reload recovery from restoring the old run", async () => {
@@ -887,7 +901,7 @@ describe("ChatApp Ask workspace", () => {
       next_before_id: null,
     });
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await waitFor(() => {
       expect(fetchConversation).toHaveBeenCalled();
       expect(fetchConversationMessages).toHaveBeenCalled();
@@ -954,26 +968,29 @@ describe("ChatApp Ask workspace", () => {
     };
     vi.stubGlobal("fetch", fetchImpl);
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "Summarize the policy");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByRole("button", { name: "Stop" });
     streamCtl.send(
-      'event: status\nid: 1\ndata: {"stage":"generate_answer","status":"running"}\n\n',
+      'event: status\nid: 1\ndata: {"stage":"generate_answer","status":"running","phase":"started"}\n\n',
     );
-    expect(await screen.findByText("Generating…")).toBeInTheDocument();
+    expect((await screen.findAllByText("Generating…")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Verified policy summary.")).toBeNull();
     expect(document.querySelector(".typewriter, [data-caret]")).toBeNull();
     streamCtl.send(
-      'event: status\nid: 2\ndata: {"stage":"verify_answer","status":"running"}\n\n',
+      'event: status\nid: 2\ndata: {"stage":"verify_answer","status":"running","phase":"started"}\n\n',
     );
-    expect(await screen.findByText("Verifying…")).toBeInTheDocument();
+    expect((await screen.findAllByText("Verifying…")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Verified policy summary.")).toBeNull();
     streamCtl.send(
-      'event: token_delta\nid: 3\ndata: {"delta":"Verified policy summary."}\n\n',
+      'event: status\nid: 3\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\n',
+    );
+    streamCtl.send(
+      'event: token_delta\nid: 4\ndata: {"delta":"Verified policy summary."}\n\n',
     );
     expect(await screen.findByText("Verified policy summary.")).toBeInTheDocument();
-    streamCtl.send("event: completed\nid: 4\ndata: {}\n\n");
+    streamCtl.send("event: completed\nid: 5\ndata: {}\n\n");
     streamCtl.close();
     expect(await screen.findByRole("button", { name: "Give feedback" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
@@ -996,17 +1013,17 @@ describe("ChatApp Ask workspace", () => {
       "fetch",
       stubChatFetch({
         events:
-          'event: token_delta\nid: 1\ndata: {"delta":"Hi there."}\n\nevent: error\nid: 2\ndata: {"code":"run_failed"}\n\n',
+          'event: status\nid: 1\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\nevent: token_delta\nid: 2\ndata: {"delta":"Hi there."}\n\nevent: error\nid: 3\ndata: {"code":"run_failed"}\n\n',
       }),
     );
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(
       await screen.findByText("The run ended in an error. Received tokens are kept."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Hi there.")).toBeInTheDocument();
+    expect(await screen.findByText("Hi there.")).toBeInTheDocument();
     expect(screen.queryByText(/Something went wrong/)).toBeNull();
   });
 
@@ -1028,7 +1045,7 @@ describe("ChatApp Ask workspace", () => {
       }),
     );
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(
@@ -1052,11 +1069,11 @@ describe("ChatApp Ask workspace", () => {
       "fetch",
       stubChatFetch({
         events:
-          'event: token_delta\nid: 1\ndata: {"delta":"Hello."}\n\nevent: partial\nid: 2\ndata: {"reason":"verified_partial"}\n\n',
+          'event: status\nid: 1\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\nevent: token_delta\nid: 2\ndata: {"delta":"Hello."}\n\nevent: partial\nid: 3\ndata: {"reason":"verified_partial"}\n\n',
       }),
     );
     renderChat(<ChatApp />);
-    await user.click(await screen.findByRole("option", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "hi");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(
@@ -1076,7 +1093,7 @@ describe("ChatApp Ask workspace", () => {
       },
     ]);
     renderChat(<ChatApp />);
-    expect(await screen.findByRole("option", { name: "Untitled chat" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Untitled chat" })).toBeInTheDocument();
   });
 
   it("hides Reconnect, the stepper, and attachments copy while idle", async () => {
@@ -1157,7 +1174,10 @@ describe("ChatApp Ask workspace", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByRole("button", { name: "Stop" });
     const before = conversationRailRenderCount.value;
-    streamCtl.send('event: token_delta\nid: 1\ndata: {"delta":"Hello tokens."}\n\n');
+    streamCtl.send(
+      'event: status\nid: 1\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\n',
+    );
+    streamCtl.send('event: token_delta\nid: 2\ndata: {"delta":"Hello tokens."}\n\n');
     expect(await screen.findByText("Hello tokens.")).toBeInTheDocument();
     expect(conversationRailRenderCount.value).toBe(before);
     streamCtl.close();

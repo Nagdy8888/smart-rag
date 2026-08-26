@@ -11,7 +11,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import styles from "./ui.module.css";
+import styles from "./styles/controls.module.css";
 
 export type ButtonVariant =
   | "primary"

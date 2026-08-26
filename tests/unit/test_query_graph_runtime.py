@@ -175,7 +175,7 @@ def test_default_process_bindings_have_hybrid_and_gateway() -> None:
 def test_sse_execute_does_not_continue_without_app_api_connection() -> None:
     """Failed ``app_api`` connect must surface as SSE error, not ``connection=None``."""
 
-    source = (
+    runtime_source = (
         Path(__file__).resolve().parents[2]
         / "apps"
         / "backend"
@@ -183,14 +183,27 @@ def test_sse_execute_does_not_continue_without_app_api_connection() -> None:
         / "smart_rag_api"
         / "services"
         / "sse"
-        / "executors.py"
+        / "langgraph_runtime.py"
+    ).read_text(encoding="utf-8")
+    executor_source = (
+        Path(__file__).resolve().parents[2]
+        / "apps"
+        / "backend"
+        / "src"
+        / "smart_rag_api"
+        / "services"
+        / "sse"
+        / "langgraph_executor.py"
     ).read_text(encoding="utf-8")
     assert (
         "except QueryGraphRuntimeError:\n                connection = None"
-        not in source
+        not in runtime_source
     )
-    assert "open_run_app_api_connection(bindings.supabase_dsn)" in source
-    assert 'yield ("error", {"code": exc.reason})' in source
+    assert "except QueryGraphRuntimeError:\n                connection = None" not in (
+        executor_source
+    )
+    assert "open_run_app_api_connection(bindings.supabase_dsn)" in runtime_source
+    assert 'yield ("error", {"code": exc.reason})' in executor_source
 
 
 def test_context_loader_keeps_connection_idle_for_retrieval_transaction(

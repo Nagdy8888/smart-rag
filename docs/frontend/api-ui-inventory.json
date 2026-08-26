@@ -54,6 +54,7 @@
   "sse_event_types": [
     "schema",
     "status",
+    "tool_progress",
     "heartbeat",
     "route_correction",
     "limitation",

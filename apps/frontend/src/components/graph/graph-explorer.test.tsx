@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
+import { activateCanvasNode } from "./graph-canvas";
 import { GraphExplorer } from "./graph-explorer";
 import { SessionProvider } from "../../lib/auth/session-provider";
 import { ClassifiedApiError } from "../../lib/api";
@@ -206,6 +207,24 @@ describe("GraphExplorer", () => {
     expect(screen.queryByRole("img", { name: "Bounded graph neighborhood" })).toBeNull();
   });
 
+  it("labels canvas as supplementary and returns to the accessible list", async () => {
+    renderSurface(<GraphExplorer />);
+    await searchSelectInspect();
+    fireEvent.click(screen.getByRole("button", { name: "Canvas" }));
+    expect(
+      await screen.findByLabelText("Supplementary graph canvas"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open accessible list" }));
+    expect(screen.getByRole("button", { name: "List" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("graph-accessible-list")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    expect(screen.getAllByText("Evidence details").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+
   it("shows empty inspect copy and truthful bounds", async () => {
     inspectGraph.mockResolvedValue({
       nodes: [],
@@ -277,6 +296,34 @@ describe("GraphExplorer", () => {
     await searchSelectInspect();
     expect(await screen.findByText(/Server denied this request/)).toBeInTheDocument();
     expect(screen.getByLabelText("Selected entities")).toHaveTextContent("acme");
+  });
+
+  it("maps focused canvas Enter and Space to the same onSelect as pointer", () => {
+    const onSelect = vi.fn();
+    const node = {
+      object_id: XSS_ENTITY,
+      object_type: "entity",
+      chunk_id: "c1",
+      document_id: "d1",
+      version_id: "v1",
+      support: 1,
+      hop: 1,
+    };
+    const preventDefault = vi.fn();
+    activateCanvasNode(
+      { key: "Enter", preventDefault } as unknown as KeyboardEvent,
+      onSelect,
+      node,
+    );
+    activateCanvasNode(
+      { key: " ", preventDefault } as unknown as KeyboardEvent,
+      onSelect,
+      node,
+    );
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenNthCalledWith(1, node);
+    expect(onSelect).toHaveBeenNthCalledWith(2, node);
+    expect(preventDefault).toHaveBeenCalledTimes(2);
   });
 
   it("does not search for an empty query", async () => {

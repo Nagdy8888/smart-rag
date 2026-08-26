@@ -30,7 +30,7 @@ export function GraphListFallback({
   onSelect,
 }: GraphListFallbackProps) {
   return (
-    <section aria-label="Graph list">
+    <section aria-label="Graph list" data-testid="graph-accessible-list">
       {nodes.length === 0 ? (
         <p className={styles.muted}>{EMPTY_INSPECT_COPY}</p>
       ) : (

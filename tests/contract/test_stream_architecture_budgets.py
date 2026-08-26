@@ -26,6 +26,8 @@ STREAM_OWNERS: tuple[str, ...] = (
     "apps/backend/src/smart_rag_api/services/sse/answer_persistence.py",
     "apps/backend/src/smart_rag_api/services/sse/langgraph_executor.py",
     "apps/backend/src/smart_rag_api/services/sse/langgraph_stream_consume.py",
+    "apps/backend/src/smart_rag_api/services/sse/stream_dispatch.py",
+    "apps/backend/src/smart_rag_api/services/sse/stream_parts.py",
     "apps/backend/src/smart_rag_api/services/sse/service.py",
     "apps/backend/src/smart_rag_api/services/sse/run_access.py",
     "apps/backend/src/smart_rag_api/services/sse/run_orchestration.py",
@@ -43,6 +45,8 @@ MAPPING_OWNERS: tuple[str, ...] = (
     "apps/backend/src/smart_rag_api/services/sse/mapping/limitations.py",
     "apps/backend/src/smart_rag_api/services/sse/mapping/verified.py",
     "apps/backend/src/smart_rag_api/services/sse/mapping/mapper.py",
+    "apps/backend/src/smart_rag_api/services/sse/mapping/progress.py",
+    "apps/backend/src/smart_rag_api/services/sse/mapping/diagnostics.py",
 )
 
 

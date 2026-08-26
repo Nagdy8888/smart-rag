@@ -10,6 +10,8 @@ import {
   answerOriginLabel,
   shouldShowCitations,
 } from "../../lib/answer-origin";
+import type { RunProgressItem } from "../../lib/run-progress";
+import type { ChatViewState } from "../../lib/chat-view";
 import type { CitationResponse, ConversationMessage } from "../../lib/types";
 import { formatRunTokenUsage } from "../../lib/format-usage";
 import { formatRelativeTime } from "../../lib/relative-time";
@@ -19,10 +21,11 @@ import { CitationChip } from "../ui/citation-chip";
 import { EmptyState } from "../ui/empty-state";
 import { LimitationCallout } from "../ui/limitation-callout";
 import { LiveRegion } from "../ui/live-region";
-import { Spinner } from "../ui/spinner";
 import { StatusPill } from "../ui/status-pill";
 import { UserText } from "../ui/user-text";
-import styles from "./chat.module.css";
+import { RunProgressTimeline } from "./run-progress-timeline";
+import { VerifiedAnswerReveal } from "./verified-answer-reveal";
+import styles from "./chat-transcript.module.css";
 
 export type AnswerSurfaceProps = {
   /** Persisted messages in ascending order. */
@@ -52,8 +55,24 @@ export type AnswerSurfaceProps = {
   answerOrigin?: string | null;
   /** Effective route family. Never used to infer origin. */
   effectiveRoute?: string | null;
-  /** One-line run status while active. */
+  /** One-line run status while active. Prefer `progressItems`. */
   statusLine?: string | null;
+  /** Reducer progress rows. Empty when no node has started. */
+  progressItems?: readonly RunProgressItem[];
+  /** True after verify_answer completed. */
+  verificationCompleted?: boolean;
+  /** Live chat view for truthful summary copy. */
+  chat?: ChatViewState | null;
+  /** True while verified text is still being presented. */
+  revealing?: boolean;
+  /** Visible verified prefix. Defaults to `answer`. */
+  visibleAnswer?: string;
+  /** Conversation + run presentation key. */
+  presentationKey?: string;
+  /** Complete the live reveal immediately. */
+  onShowFullAnswer?: () => void;
+  /** Safe copy when Load earlier failed. */
+  loadEarlierError?: string | null;
   /** Relative time for the live assistant meta row. */
   liveCreatedAt?: string | null;
   /** Provider prompt tokens for the current run. */
@@ -162,6 +181,14 @@ export const AnswerSurface = memo(function AnswerSurface({
   answerOrigin = null,
   effectiveRoute = null,
   statusLine = null,
+  progressItems = [],
+  verificationCompleted = false,
+  chat = null,
+  revealing = false,
+  visibleAnswer,
+  presentationKey = "live",
+  onShowFullAnswer,
+  loadEarlierError = null,
   liveCreatedAt = null,
   promptTokens = 0,
   completionTokens = 0,
@@ -185,8 +212,12 @@ export const AnswerSurface = memo(function AnswerSurface({
     .reverse()
     .find((item) => item.role === "assistant");
   const showLiveUser = question !== "" && lastHistUser?.content !== question;
+  const showProgress =
+    progressItems.length > 0 ||
+    statusLine !== null ||
+    (chat !== null && chat.terminal === null && chat.runId !== null);
   const showLiveAssistant =
-    (statusLine !== null || answer !== "") &&
+    (showProgress || answer !== "") &&
     lastHistAssistant?.content !== answer;
   const empty =
     messages.length === 0 &&
@@ -207,6 +238,16 @@ export const AnswerSurface = memo(function AnswerSurface({
         >
           Load earlier messages
         </Button>
+      ) : null}
+      {loadEarlierError ? (
+        <LimitationCallout tone="warning">
+          {loadEarlierError}
+          {onLoadEarlier ? (
+            <Button type="button" variant="ghost" onClick={onLoadEarlier}>
+              Retry
+            </Button>
+          ) : null}
+        </LimitationCallout>
       ) : null}
       {empty ? (
         <EmptyState
@@ -237,11 +278,16 @@ export const AnswerSurface = memo(function AnswerSurface({
           <UserText value={question} />
         </p>
       ) : null}
-      {statusLine ? (
-        <p className={styles.statusLine} role="status">
-          <Spinner label={statusLine} />
-          {statusLine}
-        </p>
+      {showProgress ? (
+        <RunProgressTimeline
+          items={progressItems}
+          terminal={terminal}
+          verificationCompleted={verificationCompleted}
+          answerAvailable={answer.trim() !== ""}
+          collapsed={verificationCompleted && answer.trim() !== "" && !revealing}
+          chat={chat}
+          revealing={revealing}
+        />
       ) : null}
       {showLiveAssistant ? (
         <div>
@@ -261,15 +307,15 @@ export const AnswerSurface = memo(function AnswerSurface({
               </span>
             </p>
           ) : null}
-          <LiveRegion aria-label="Answer" politeness="polite">
-            {answer ? (
-              <p className={styles.answerProse} dir="auto">
-                <UserText value={answer} />
-              </p>
-            ) : (
-              ""
-            )}
-          </LiveRegion>
+          {answer ? (
+            <VerifiedAnswerReveal
+              presentationKey={presentationKey}
+              visibleText={visibleAnswer ?? answer}
+              isRevealing={revealing}
+              authoritativeReady={answer.trim() !== ""}
+              onShowFull={onShowFullAnswer ?? (() => undefined)}
+            />
+          ) : null}
           <CitationRow
             citations={citations}
             answerOrigin={answerOrigin}

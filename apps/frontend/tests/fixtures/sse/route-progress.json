@@ -1,0 +1,66 @@
+{
+  "leakage_marker": "SYNTHETIC_NO_LEAK_MARKER",
+  "forbidden_substrings": [
+    "SECRET_QUERY",
+    "SECRET_DRAFT",
+    "SECRET_RESULT",
+    "SECRET_ERROR",
+    "traceback",
+    "exception text"
+  ],
+  "routes": {
+    "general": {
+      "file": "general-progress.sse",
+      "required_stages": [
+        "enforce_admission",
+        "load_memory",
+        "prepare_query",
+        "compile_plan",
+        "general_scope",
+        "verify_answer"
+      ],
+      "forbidden_stages": [
+        "company_scope",
+        "apply_correction",
+        "fuse_evidence",
+        "compose_tables",
+        "disclose_optional_tools",
+        "generate_answer",
+        "mixed_scope",
+        "invalid_scope"
+      ],
+      "tool_keys": []
+    },
+    "company": {
+      "file": "company-progress.sse",
+      "required_stages": [
+        "enforce_admission",
+        "company_scope",
+        "apply_correction",
+        "fuse_evidence",
+        "compose_tables",
+        "disclose_optional_tools",
+        "generate_answer",
+        "verify_answer"
+      ],
+      "forbidden_stages": ["general_scope", "mixed_scope", "invalid_scope"],
+      "tool_keys": []
+    },
+    "invalid": {
+      "file": "invalid-progress.sse",
+      "required_stages": [
+        "enforce_admission",
+        "compile_plan",
+        "invalid_scope"
+      ],
+      "forbidden_stages": [
+        "company_scope",
+        "general_scope",
+        "mixed_scope",
+        "generate_answer",
+        "verify_answer"
+      ],
+      "tool_keys": []
+    }
+  }
+}

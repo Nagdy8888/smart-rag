@@ -27,6 +27,9 @@ from smart_rag_agents.query.state import (
     QueryStateGraph,
     pending_query_state,
 )
+from smart_rag_agents.query.streaming.progress import (
+    register_production_progress_nodes,
+)
 
 __all__ = [
     "CompiledQueryGraph",
@@ -125,9 +128,10 @@ def build_query_graph(
         output_schema=output_schema,  # pyright: ignore[reportArgumentType]
     )
 
-    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
-        "enforce_admission",
-        enforce_admission,
+    register_production_progress_nodes(
+        builder,
+        enforce_admission=enforce_admission,
+        nodes=nodes,
     )
     terminal_target = END
     if studio_local or studio_live:
@@ -161,19 +165,6 @@ def build_query_graph(
         )
     else:
         builder.add_edge(START, "enforce_admission")
-    builder.add_node("load_memory", nodes.load_memory)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("prepare_query", nodes.prepare_query)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("compile_plan", nodes.compile_plan)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("company_scope", nodes.company_scope)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("general_scope", nodes.general_scope)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("mixed_scope", nodes.mixed_scope)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("invalid_scope", nodes.invalid_scope)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("apply_correction", nodes.apply_correction)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("fuse_evidence", nodes.fuse_evidence)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("compose_tables", nodes.compose_tables)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("disclose_optional_tools", nodes.disclose_optional_tools)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("generate_answer", nodes.generate_answer)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("verify_answer", nodes.verify_answer)  # pyright: ignore[reportUnknownMemberType]
     builder.add_conditional_edges(
         "enforce_admission",
         _route_after_admission,

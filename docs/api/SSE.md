@@ -70,7 +70,8 @@ tracebacks, secrets, source HTML, or passages.
 | Type | Role |
 | --- | --- |
 | `schema` | First event on a new stream. Carries `sse_schema_version`. |
-| `status` | Stage/status. |
+| `status` | Stage/status. Optional additive `phase` (`started`/`completed`/`failed`) for live progress; omitted on legacy rows. |
+| `tool_progress` | Optional-tool progress. `tool_key` and `phase` only. No args, results, or display text. |
 | `heartbeat` | Every 15 seconds, persisted, while the run is non-terminal. |
 | `route_correction` | Single-correction diagnostic. |
 | `limitation` | Named limitation code. |
@@ -105,6 +106,32 @@ Live `LangGraphQueryRunExecutor` compiles **per execute** with
 does not continue with `connection=None`. Concurrent Combined retrieves
 serialize `query_budget` onto the shared LightRAG adapter. Studio's
 module-level `graph` stays unbound.
+
+## Progress, verify, then tokens
+
+Live LangGraph uses `stream_mode=["updates","custom"]` version `v2`.
+Custom node-start writer events may arrive before the matching updates
+completion. The mapper emits `status.phase` and optional `tool_progress`.
+`token_delta` is held until `verify_answer` completes. Replay is
+monotonic and first-terminal-wins. `deadline` is diagnostic; `partial`
+is the terminal.
+
+```mermaid
+sequenceDiagram
+  participant Node as GraphNode
+  participant Writer as stream_writer
+  participant Mapper as SSEMapper
+  participant Client as AskClient
+  Node->>Writer: custom started
+  Writer->>Mapper: custom StreamPart
+  Mapper->>Client: status phase started
+  Node->>Mapper: updates completed
+  Mapper->>Client: status phase completed
+  Note over Mapper,Client: no token_delta before verify_answer
+  Node->>Mapper: verify completed
+  Mapper->>Client: token_delta then terminal
+  Client->>Client: paced reveal or skip
+```
 
 ## Sanitization and reconnect
 

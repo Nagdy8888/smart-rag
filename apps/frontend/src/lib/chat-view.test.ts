@@ -9,6 +9,18 @@ import {
 } from "./chat-view";
 import { parseSseBlock } from "./sse";
 
+/**
+ * Build a verify-complete status frame so later token_delta events are legal.
+ *
+ * @param id - Persisted sequence.
+ * @returns Parsed SSE frame.
+ */
+function verifyFrame(id: number) {
+  return parseSseBlock(
+    `event: status\nid: ${String(id)}\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}`,
+  );
+}
+
 describe("chat view", () => {
   it("reuses the same idempotency key across retry", () => {
     const key = "22222222-2222-4222-8222-222222222222";
@@ -25,6 +37,7 @@ describe("chat view", () => {
       route_family: "composite",
       reconnect: false,
     });
+    state = applySseFrame(state, verifyFrame(3));
     state = applySseFrame(
       state,
       parseSseBlock('event: token_delta\nid: 4\ndata: {"delta":"<script>x</script>"}'),
@@ -62,6 +75,7 @@ describe("chat view", () => {
 
   it("freezes token deltas after a terminal event", () => {
     let state = createChatViewState("k");
+    state = applySseFrame(state, verifyFrame(6));
     state = applySseFrame(
       state,
       parseSseBlock('event: token_delta\nid: 7\ndata: {"delta":"Hi"}'),
@@ -86,6 +100,7 @@ describe("chat view", () => {
 
   it("ignores duplicate and older sequences", () => {
     let state = createChatViewState("k");
+    state = applySseFrame(state, verifyFrame(4));
     state = applySseFrame(
       state,
       parseSseBlock('event: token_delta\nid: 5\ndata: {"delta":"ok"}'),
@@ -158,17 +173,18 @@ describe("chat view", () => {
 
   it("keeps the first terminal when a later error arrives", () => {
     let state = createChatViewState("k");
+    state = applySseFrame(state, verifyFrame(1));
     state = applySseFrame(
       state,
-      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"Hi"}'),
+      parseSseBlock('event: token_delta\nid: 2\ndata: {"delta":"Hi"}'),
     );
     state = applySseFrame(
       state,
-      parseSseBlock('event: partial\nid: 2\ndata: {"reason":"verified_partial"}'),
+      parseSseBlock('event: partial\nid: 3\ndata: {"reason":"verified_partial"}'),
     );
     state = applySseFrame(
       state,
-      parseSseBlock('event: error\nid: 3\ndata: {"code":"run_failed"}'),
+      parseSseBlock('event: error\nid: 4\ndata: {"code":"run_failed"}'),
     );
     expect(state.answerText).toBe("Hi");
     expect(state.terminal).toBe("partial");
@@ -185,13 +201,14 @@ describe("chat view", () => {
       route_family: "hybrid",
       reconnect: false,
     });
+    state = applySseFrame(state, verifyFrame(1));
     state = applySseFrame(
       state,
-      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"Hi"}'),
+      parseSseBlock('event: token_delta\nid: 2\ndata: {"delta":"Hi"}'),
     );
     state = applySseFrame(
       state,
-      parseSseBlock('event: error\nid: 2\ndata: {"code":"run_failed"}'),
+      parseSseBlock('event: error\nid: 3\ndata: {"code":"run_failed"}'),
     );
     expect(state.terminal).toBe("error");
     expect(state.failure).toBeNull();
@@ -217,17 +234,18 @@ describe("chat view", () => {
 
   it("keeps the answer when an unknown additive event is injected", () => {
     let state = createChatViewState("k");
+    state = applySseFrame(state, verifyFrame(1));
     state = applySseFrame(
       state,
-      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"Hi"}'),
+      parseSseBlock('event: token_delta\nid: 2\ndata: {"delta":"Hi"}'),
     );
     state = applySseFrame(
       state,
-      parseSseBlock("event: future_metric\nid: 2\ndata: {\"n\":1}"),
+      parseSseBlock("event: future_metric\nid: 3\ndata: {\"n\":1}"),
     );
     state = applySseFrame(
       state,
-      parseSseBlock('event: token_delta\nid: 3\ndata: {"delta":"!"}'),
+      parseSseBlock('event: token_delta\nid: 4\ndata: {"delta":"!"}'),
     );
     expect(state.answerText).toBe("Hi!");
     expect(state.diagnostics.unknownEvents).toEqual(["future_metric"]);
@@ -302,6 +320,31 @@ describe("chat view", () => {
     );
     expect(state.diagnostics.heartbeatCount).toBe(2);
     expect(state.terminal).toBe("cancelled");
+  });
+
+  it("fails closed on token_delta before verification", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 1\ndata: {"delta":"SECRET_DRAFT"}'),
+    );
+    expect(state.answerText).toBe("");
+    expect(state.failure).toEqual({
+      kind: "protocol",
+      detail: "unverified_token_delta",
+    });
+  });
+
+  it("appends token_delta immediately after verify completion", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(state, verifyFrame(1));
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: token_delta\nid: 2\ndata: {"delta":"PUBLIC_FINAL"}'),
+    );
+    expect(state.progress.verificationCompleted).toBe(true);
+    expect(state.answerText).toBe("PUBLIC_FINAL");
+    expect(state.failure).toBeNull();
   });
 
   it("records BM25, LightRAG, ACL, pending, and summary limitation codes", () => {

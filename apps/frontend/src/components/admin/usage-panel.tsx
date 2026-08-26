@@ -5,23 +5,22 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
 import { StatusBanner } from "../ui/status-banner";
 import { UserText } from "../ui/user-text";
-import {
-  fetchMe,
-  fetchUsageCompany,
-  fetchUsageMe,
-  loadConsoleReadiness,
-  type ApiAuth,
-} from "../../lib/api";
+import { fetchUsageCompany, fetchUsageMe, type ApiAuth } from "../../lib/api";
 import { RATE_LIMIT_COPY } from "../../lib/admin-copy";
+import { useApiAuth } from "../../lib/auth/use-api-auth";
 import { useSession } from "../../lib/auth/session-provider";
 import { mutationFailureBanner } from "../../lib/failure-copy";
-import { publicQueryKeys, sessionQueryKeys } from "../../lib/query-keys";
+import { useConsoleReadiness } from "../../lib/hooks/use-console-readiness";
+import { useCurrentUser } from "../../lib/hooks/use-current-user";
+import { sessionQueryKeys } from "../../lib/query-keys";
 import { showCompanyUsageConvenience } from "../../lib/roles";
 import type { UsageResponse } from "../../lib/types";
-import styles from "./admin.module.css";
+import shellStyles from "./admin-shell.module.css";
+import tableStyles from "./admin-tables.module.css";
+
+const styles = { ...shellStyles, ...tableStyles };
 
 /**
  * One usage metric card.
@@ -65,31 +64,20 @@ function UsageCard({
  */
 export function UsagePanel() {
   const session = useSession();
-  const accessToken = session.accessToken;
-  const auth = useMemo<ApiAuth | null>(
-    () => (accessToken ? { accessToken } : null),
-    [accessToken],
-  );
-  const keys = sessionQueryKeys(accessToken);
-  const meQuery = useQuery({
-    queryKey: keys.me,
-    queryFn: () => fetchMe(auth as ApiAuth),
-    enabled: auth !== null,
-  });
+  const auth = useApiAuth();
+  const keys = sessionQueryKeys(session.accessToken);
+  const { currentUser } = useCurrentUser();
+  const { ready } = useConsoleReadiness();
   const usageQuery = useQuery({
     queryKey: keys.usage,
     queryFn: () => fetchUsageMe(auth as ApiAuth),
     enabled: auth !== null,
   });
-  const showCompany = showCompanyUsageConvenience(meQuery.data?.role);
+  const showCompany = showCompanyUsageConvenience(currentUser?.role);
   const companyQuery = useQuery({
     queryKey: keys.usageCompany,
     queryFn: () => fetchUsageCompany(auth as ApiAuth),
     enabled: auth !== null && showCompany,
-  });
-  const readyQuery = useQuery({
-    queryKey: auth === null ? publicQueryKeys.ready : keys.consoleReady,
-    queryFn: () => loadConsoleReadiness(auth, meQuery.data?.role ?? null),
   });
   const companyError =
     companyQuery.error instanceof Error
@@ -99,7 +87,7 @@ export function UsagePanel() {
     usageQuery.error instanceof Error
       ? mutationFailureBanner(usageQuery.error)
       : null;
-  const rateDegraded = readyQuery.data?.rate_limit_degraded === true;
+  const rateDegraded = ready?.rate_limit_degraded === true;
 
   return (
     <div className={styles.stack}>

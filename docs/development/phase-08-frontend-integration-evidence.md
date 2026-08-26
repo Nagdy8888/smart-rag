@@ -2,7 +2,7 @@
 title: Phase 8 frontend integration evidence
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: engineering, reviewers, client-approver
 ---
 
@@ -2472,3 +2472,72 @@ Integrity: `uv run python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_int
 
 Revert the additive packet files and contract notes. Do not renumber
 P08-22/P08-23. Do not uncheck completed historical packets.
+
+## Streaming overhaul suite — GOV through VER (2026-08-26)
+
+**Status:** PARTIAL
+
+### Requirement and acceptance
+- [PASS] Same-origin auth callback (`safeNextPath`); no open redirect.
+- [PASS] Backend SSE path split under `services/sse/`; extra-forbid catalog with optional `status.phase` and `tool_progress`.
+- [PASS] Frontend god-file extraction: ChatApp ≤300; table-plan/admin-bodies barrels ≤100; AnalysisPlan ≤200; document-library/curation/auth/graph under packet budgets.
+- [PASS] Progress-only before verification; paced verified reveal ≤2.5s / ≤90 publications; skip and reduced motion.
+- [PASS] Conversation rail does not re-render on `token_delta`.
+- [PASS] Session query keys use JWT `sub`; revoked session stays latched.
+- [PASS] `consumeSse` publishes one React state per `reader.read()` batch; heartbeat-only updates cursor only.
+- [PASS] Hydration-stable nav preference via `useSyncExternalStore`; 390px topbar hides duplicate brand.
+- [PASS] Tables list pending/error/empty are mutually exclusive.
+- [BLOCKED] P08-22 hosted live Verifying, `app.llm_usage` settlement, durable-terminal UI, hosted schema — no hosted write approval.
+- [UNVERIFIED] Playwright `tests/e2e/sse-progress-fixture.spec.ts` against a live local stack.
+- [UNVERIFIED] Full root `frontend` / `docs` / `unit` tiers in this run.
+
+### Changed paths
+- `apps/frontend/src/lib/table-plan/` — draft/validate/compile/results owners
+- `apps/frontend/src/lib/admin-bodies/` — invitation/glossary/entity-rule builders
+- `apps/frontend/src/lib/hooks/use-console-readiness.ts` — one readiness query per session-role
+- `apps/frontend/src/lib/hooks/use-layout-preference.ts` — hydration-stable localStorage
+- `apps/frontend/src/components/tables/analysis-plan/` — presentation sections
+- `apps/frontend/src/components/{documents,admin,auth,graph}/` extracted controllers
+- `apps/frontend/src/components/ui/styles/` and chat/shell/admin CSS modules
+- `apps/frontend/tests/fixtures/sse/` — synthetic route fixtures
+- `docs/api/SSE.md`, `docs/frontend/workspace-screens.md`, `docs/frontend/action-inventory.json`
+
+### Commands
+| Command | Exit | Duration | Counts/result |
+|---|---:|---:|---|
+| `pnpm --filter smart-rag-frontend exec vitest run` focused chat/tables/lib suites | 0 | ~14s | 136 passed |
+| surface/geometry/admin/auth/graph suites | 0 | ~10s | 77 passed |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 | ~13s | clean |
+| `pnpm --filter smart-rag-frontend lint` | 0 | ~19s | clean |
+| action inventory | 0 | | verified |
+
+### Runtime proof
+- profile: local deterministic fixtures; hosted P08-22 remains BLOCKED
+- leakage marker: `SYNTHETIC_NO_LEAK_MARKER`
+
+### Architecture
+- ChatApp 300 → 300 composition-only
+- table-plan.ts 504 → ≤100 barrel
+- analysis-plan.tsx 589 → ≤200
+- document-library.tsx 541 → 189
+- curation-panel.tsx 499 → 91
+- auth-screens.tsx 493 → 12
+- graph-explorer.tsx 340 → 206
+- leftover allow-list: `design-tokens.ts` token table; `chat-view.ts` / `answer-surface.tsx` still over 300
+
+### Security, authorization, replay, fallback
+- Redirect matrix stays same-origin.
+- Cache keys never store the raw JWT.
+- Resume/cancel remain first-terminal-wins; reconnect does not start a second paid POST.
+
+### Unverified or blocked
+- Hosted settlement, live Verifying paint, durable partial vs UI running.
+- Full Playwright visual baselines after 390px CSS split.
+- Integrity lock `--update` not run in this close.
+
+### ADR/deviation
+- Presentation delay remains ADR-verified-answer-paced-reveal only.
+- P08-22/P08-23 not renumbered or checked.
+
+### Rollback
+- Revert the frontend/backend modularization and presentation owners. Keep Phase 6 graph-node dirty-tree work untouched.

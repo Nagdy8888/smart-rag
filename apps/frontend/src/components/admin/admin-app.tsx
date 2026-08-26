@@ -20,7 +20,7 @@ import { listEntityRules, type ApiAuth } from "../../lib/api";
 import { useSession } from "../../lib/auth/session-provider";
 import { sessionQueryKeys } from "../../lib/query-keys";
 import { ADMIN_TABS, parseAdminTab, type AdminTab } from "../../lib/shell-navigation";
-import styles from "./admin.module.css";
+import styles from "./admin-shell.module.css";
 
 const TAB_LABELS: Record<AdminTab, string> = {
   team: "Team & access",

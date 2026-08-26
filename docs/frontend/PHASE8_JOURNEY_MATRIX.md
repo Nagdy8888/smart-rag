@@ -2,7 +2,7 @@
 title: Phase 8 journey matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-26
 audience: engineering, reviewers
 packet: P08-19
 ---
@@ -188,6 +188,11 @@ enums on `GET /ingestion/versions/{id}/status`. The UI prints the server
 | CSP headers | `tests/e2e/phase08-journeys.spec.ts` | login response includes CSP without Tailwind CDN | playwright-unauth | proven |
 | Prohibited patterns | `src/lib/prohibited-patterns.test.ts` | rejects CDN, innerHTML, dead hashes, blur, fonts, avatars, and random auth | vitest-unit | proven |
 | No `X-Test-` in api.ts | `src/lib/prohibited-patterns.test.ts` | does not send X-Test headers from api.ts | vitest-unit | proven |
+| Company progress fixture | `src/lib/sse-fixtures.test.ts` | marks every route fixture as synthetic and leak-free | vitest-unit | proven |
+| Verified reveal skip | `src/components/chat/verified-answer-reveal.test.tsx` | Show full answer completes immediately | vitest-component | proven |
+| Rail isolation | `src/components/chat-app.test.tsx` | does not re-render the Sessions rail on token_delta | vitest-component | proven |
+| Fixture Ask journey | `tests/e2e/sse-progress-fixture.spec.ts` | company fixture shows waiting then verify then skippable verified answer | playwright-live | unverified-live |
+| Reduced-motion fixture | `tests/e2e/sse-progress-fixture.spec.ts` | reduced motion renders the full verified fixture immediately | playwright-live | unverified-live |
 
 ## Remaining unverified-live items
 

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import psycopg
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 
-from smart_rag_api.services.query_sse_mapping import QuerySseMapper
+if TYPE_CHECKING:
+    from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 
 LOGGER = logging.getLogger(__name__)
 

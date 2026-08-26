@@ -3,7 +3,7 @@
  */
 
 import type { ReactNode, TextareaHTMLAttributes } from "react";
-import styles from "./ui.module.css";
+import styles from "./styles/controls.module.css";
 
 export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   /** Visible English label. */

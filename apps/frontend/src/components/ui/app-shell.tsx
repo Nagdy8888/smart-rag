@@ -6,21 +6,24 @@
 
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   CLIENT_NAV_IS_NOT_AUTHORIZATION,
   hiddenNavImpliesForbidden,
 } from "../../lib/client-authorization";
+import { useLayoutPreference } from "../../lib/hooks/use-layout-preference";
 import {
   NAV_EXPANDED_STORAGE_KEY,
   defaultNavExpanded,
-  readBooleanPreference,
-  writeBooleanPreference,
 } from "../../lib/layout-preferences";
 import { AppNav, ConsoleTopbar } from "./app-nav";
+import navStyles from "./app-nav.module.css";
+import layoutStyles from "./app-shell.module.css";
+import topbarStyles from "./app-topbar.module.css";
 import { Button } from "./button";
 import { Icon } from "./icon";
-import styles from "./app-shell.module.css";
+
+const styles = { ...layoutStyles, ...navStyles, ...topbarStyles };
 
 export type AppShellProps = {
   /** Main landmark content. */
@@ -35,23 +38,19 @@ export type AppShellProps = {
  * @remarks
  * Security: omitting nav items does not imply HTTP 403.
  * `CLIENT_NAV_IS_NOT_AUTHORIZATION` is true. The desktop expand state is
- * stored in localStorage. `data-expanded` and the expanded/collapsed
- * classes may differ on hydrate.
+ * stored in localStorage after hydration via `useLayoutPreference`.
  */
 export function AppShell({ children }: AppShellProps) {
-  const [navExpanded, setNavExpanded] = useState(() =>
-    readBooleanPreference(NAV_EXPANDED_STORAGE_KEY, defaultNavExpanded()),
+  const [navExpanded, setNavExpanded] = useLayoutPreference(
+    NAV_EXPANDED_STORAGE_KEY,
+    defaultNavExpanded(),
   );
 
   /**
    * Toggle the desktop console rail and persist the choice.
    */
   function toggleNavExpanded(): void {
-    setNavExpanded((current) => {
-      const next = !current;
-      writeBooleanPreference(NAV_EXPANDED_STORAGE_KEY, next);
-      return next;
-    });
+    setNavExpanded(!navExpanded);
   }
 
   const toggleLabel = navExpanded ? "Collapse navigation" : "Expand navigation";
@@ -70,7 +69,6 @@ export function AppShell({ children }: AppShellProps) {
           aria-label="Console"
           data-testid="app-shell-nav"
           data-expanded={navExpanded ? "true" : "false"}
-          suppressHydrationWarning
         >
           <div className={styles.brand}>
             <span className={styles.brandMark} aria-hidden="true">

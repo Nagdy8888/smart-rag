@@ -12,7 +12,11 @@ import {
 } from "../../lib/hostile-text-fixtures";
 import { Badge } from "./badge";
 import { Button } from "./button";
+import { lockBodyScroll } from "./body-scroll-lock";
 import { ConfirmDialog } from "./confirm-dialog";
+import { Drawer } from "./drawer";
+import { trapFocus } from "./focus-trap";
+import { isEditableKeyboardTarget } from "./focus-trap";
 import { PageHeader } from "./page-header";
 import { CitationChip } from "./citation-chip";
 import { DataTable } from "./data-table";
@@ -250,6 +254,109 @@ describe("pending buttons and confirm dialog", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Deleting…" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  });
+});
+
+describe("focus trap and body scroll lock", () => {
+  it("releases nested body locks only after the last release", () => {
+    document.body.style.overflow = "auto";
+    const unlockOuter = lockBodyScroll();
+    const unlockInner = lockBodyScroll();
+    expect(document.body.style.overflow).toBe("hidden");
+    unlockInner();
+    expect(document.body.style.overflow).toBe("hidden");
+    unlockOuter();
+    expect(document.body.style.overflow).toBe("auto");
+    unlockOuter();
+    expect(document.body.style.overflow).toBe("auto");
+  });
+
+  it("wraps Tab both directions and restores the trigger", async () => {
+    const user = userEvent.setup();
+    const trigger = document.createElement("button");
+    trigger.textContent = "Opener";
+    document.body.append(trigger);
+    trigger.focus();
+    render(
+      <div data-testid="trap-root">
+        <button type="button">First</button>
+        <button type="button">Last</button>
+      </div>,
+    );
+    const root = screen.getByTestId("trap-root");
+    const release = trapFocus(root, { returnFocus: trigger });
+    expect(screen.getByRole("button", { name: "First" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Last" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "First" })).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Last" })).toHaveFocus();
+    release();
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+  });
+
+  it("closes a Drawer from the backdrop and restores the trigger", async () => {
+    const user = userEvent.setup();
+    function DrawerHarness() {
+      const [open, setOpen] = React.useState(false);
+      const triggerRef = React.useRef<HTMLButtonElement>(null);
+      return (
+        <div>
+          <Button ref={triggerRef} onClick={() => setOpen(true)}>
+            Open drawer
+          </Button>
+          {open ? (
+            <Drawer
+              title="Evidence details"
+              onClose={() => setOpen(false)}
+              returnFocusRef={triggerRef}
+            >
+              <Button>Inside drawer</Button>
+            </Drawer>
+          ) : null}
+        </div>
+      );
+    }
+    render(<DrawerHarness />);
+    await user.click(screen.getByRole("button", { name: "Open drawer" }));
+    expect(screen.getByRole("dialog", { name: "Evidence details" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Dismiss drawer" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Open drawer" })).toHaveFocus();
+  });
+
+  it("moves to Home and End menu items and skips disabled rows", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <Menu
+        label="Row actions"
+        trigger="Actions"
+        items={[
+          { id: "one", label: "Open", onSelect },
+          { id: "skip", label: "Disabled", onSelect, disabled: true },
+          { id: "two", label: "Delete", onSelect, danger: true },
+        ]}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Row actions" }));
+    await waitFor(() => {
+      expect(screen.getByRole("menuitem", { name: "Open" })).toHaveFocus();
+    });
+    await user.keyboard("{End}");
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(screen.getByRole("menuitem", { name: "Open" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Row actions" })).toHaveFocus();
+  });
+
+  it("does not treat an input as a command-menu shortcut target", () => {
+    const input = document.createElement("input");
+    expect(isEditableKeyboardTarget(input)).toBe(true);
+    expect(isEditableKeyboardTarget(document.createElement("button"))).toBe(false);
   });
 });
 

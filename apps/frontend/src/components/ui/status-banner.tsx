@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useRef } from "react";
 import { displayText } from "../../lib/safe-text";
-import styles from "./ui.module.css";
+import styles from "./styles/data-display.module.css";
 
 export type StatusBannerKind = "info" | "warning" | "error" | "success";
 

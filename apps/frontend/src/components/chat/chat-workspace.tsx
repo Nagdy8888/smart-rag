@@ -3,7 +3,7 @@
  */
 
 import type { ReactNode } from "react";
-import styles from "./chat.module.css";
+import styles from "./chat-rail.module.css";
 
 export type ChatWorkspaceProps = {
   /** Conversation rail or mobile placeholder. */

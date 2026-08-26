@@ -5,7 +5,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
-import styles from "./ui.module.css";
+import styles from "./styles/overlays.module.css";
 
 export type TooltipProps = {
   /** Short descriptive text. */

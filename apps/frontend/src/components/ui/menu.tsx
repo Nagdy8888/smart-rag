@@ -13,7 +13,8 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "./button";
-import styles from "./ui.module.css";
+import { getFocusableElements } from "./focus-trap";
+import styles from "./styles/overlays.module.css";
 
 export type MenuItem = {
   /** Stable item id. */
@@ -42,6 +43,22 @@ export type MenuProps = {
 };
 
 /**
+ * Enabled menuitem buttons inside the open panel.
+ *
+ * @param root - Menu wrap.
+ * @returns Enabled menuitem buttons.
+ */
+function enabledMenuItems(root: HTMLElement | null): HTMLButtonElement[] {
+  if (root === null) {
+    return [];
+  }
+  return getFocusableElements(root).filter(
+    (node): node is HTMLButtonElement =>
+      node instanceof HTMLButtonElement && node.getAttribute("role") === "menuitem",
+  );
+}
+
+/**
  * Render a trigger plus anchored menu list.
  *
  * @param props - Label, trigger node, and items.
@@ -57,6 +74,7 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
     if (!open) {
       return;
     }
+    enabledMenuItems(wrapRef.current)[0]?.focus();
     /**
      * Close on outside pointer down.
      *
@@ -75,7 +93,7 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
   }, [open]);
 
   /**
-   * Move among enabled items and handle Escape/Enter.
+   * Move among enabled items and handle Escape/Home/End.
    *
    * @param event - Keyboard event from the menu.
    */
@@ -86,15 +104,25 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
       triggerRef.current?.focus();
       return;
     }
+    const buttons = enabledMenuItems(wrapRef.current);
+    if (buttons.length === 0) {
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      buttons[0]?.focus();
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      buttons[buttons.length - 1]?.focus();
+      return;
+    }
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
       return;
     }
     event.preventDefault();
-    const buttons = wrapRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']:not(:disabled)");
-    if (!buttons || buttons.length === 0) {
-      return;
-    }
-    const current = Array.from(buttons).findIndex((node) => node === document.activeElement);
+    const current = buttons.findIndex((node) => node === document.activeElement);
     const delta = event.key === "ArrowDown" ? 1 : -1;
     const next = current < 0 ? 0 : (current + delta + buttons.length) % buttons.length;
     buttons[next]?.focus();

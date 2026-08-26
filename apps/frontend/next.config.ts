@@ -134,6 +134,7 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  poweredByHeader: false,
   devIndicators: false,
   async headers() {
     return [

@@ -19,6 +19,22 @@ from smart_rag_agents.query.nodes.shared import runtime_from_state, skip_closed_
 from smart_rag_agents.query.state import QueryGraphState
 
 
+def _tool_progress_reporter() -> object:
+    """Build the LangGraph optional-tool progress adapter.
+
+    Imported lazily so ``nodes`` can load without the streaming package.
+
+    Returns:
+        A ``ToolProgressReporter`` implementation.
+    """
+
+    from smart_rag_agents.query.streaming.tool_progress import (
+        LangGraphToolProgressReporter,
+    )
+
+    return LangGraphToolProgressReporter()
+
+
 def _table_ids(state: QueryGraphState) -> tuple[str, ...]:
     """Collect composed StructuredTable IDs for executor recheck.
 
@@ -127,6 +143,7 @@ def disclose_optional_tools_node(
             force_discovery=deps.force_discovery,
             current_caller=live,
             idempotency_key=str(context.run_id),
+            progress=_tool_progress_reporter(),
         )
     except ToolError as exc:
         return {

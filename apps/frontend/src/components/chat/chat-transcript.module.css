@@ -1,0 +1,195 @@
+/**
+ * Answer stage, transcript, citations, and terminal notes.
+ */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space) * 4);
+}
+
+.conversation {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.jumpLatest {
+  position: sticky;
+  bottom: 8px;
+  align-self: center;
+}
+
+.answer {
+  flex: 0 1 auto;
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+}
+
+.userBubble {
+  margin: 0;
+  margin-inline-start: auto;
+  max-width: 85%;
+  min-width: 0;
+  padding: 10px 14px;
+  background: var(--color-accent-muted);
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: var(--line-height-ar);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.answerProse {
+  margin: 0;
+  max-width: 72ch;
+  min-width: 0;
+  font-size: 14px;
+  line-height: var(--line-height-ar);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.messageMeta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.assistantBlock {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+
+.citationRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.answerFooter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+}
+
+.terminalNote {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.terminalPartial {
+  color: var(--color-warning);
+}
+
+.terminalCancelled {
+  color: var(--color-text-muted);
+}
+
+.terminalError {
+  color: var(--color-danger);
+}
+
+.terminalDeadline {
+  color: var(--color-warning);
+}
+
+.feedbackForm {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+  min-width: 16rem;
+}
+
+.muted {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+}
+
+.autoChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 calc(var(--space) * 2);
+  border-radius: 999px;
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.stageHeader {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: calc(var(--space) * 2);
+  align-items: center;
+}
+
+.emptyPrompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  margin: calc(var(--space) * 3) 0;
+}
+
+.answerHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space) * 2);
+  margin: 0 0 calc(var(--space) * 2);
+  font-weight: 600;
+}
+
+.queryBlock {
+  margin-inline-start: auto;
+  max-width: 85%;
+}
+
+@media (max-width: 1279px) {
+  .conversation {
+    padding-inline: 16px;
+  }
+}

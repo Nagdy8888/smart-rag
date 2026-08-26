@@ -1,0 +1,128 @@
+/**
+ * 56px console top bar, command, account, and readiness popover.
+ */
+
+.topbar {
+  min-height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space) * 3);
+  padding: 0 calc(var(--space) * 4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.topbarStart,
+.topbarEnd {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 2);
+  min-width: 0;
+}
+
+.menuButton,
+.commandButton {
+  display: inline-flex;
+}
+
+.topbarBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--space) * 2);
+}
+
+.topbarBrandName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.topbarTitle {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.readiness {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.avatarMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.readinessPopover {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.readinessPopover ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+@media (min-width: 1024px) {
+  .menuButton,
+  .topbarBrand {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .topbar {
+    padding-inline-start: calc(var(--space) * 3);
+    overflow-x: hidden;
+  }
+
+  .topbarBrand {
+    display: none;
+  }
+
+  .menuButton,
+  .commandButton,
+  .avatarMark,
+  [data-testid="shell-readiness"] button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  [data-testid="shell-readiness"] .pill {
+    max-width: 4.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 479px) {
+  .commandButton {
+    display: none;
+  }
+}

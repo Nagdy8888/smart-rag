@@ -12,11 +12,10 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { lockBodyScroll } from "./body-scroll-lock";
 import { Button } from "./button";
-import styles from "./ui.module.css";
-
-const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+import { trapFocus } from "./focus-trap";
+import styles from "./styles/overlays.module.css";
 
 export type ConfirmDialogProps = {
   /** Dialog title. */
@@ -40,22 +39,10 @@ export type ConfirmDialogProps = {
 };
 
 /**
- * List currently focusable elements inside a container.
- *
- * @param root - Dialog node.
- * @returns Focusable HTMLElements in DOM order.
- */
-function focusableElements(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-    (node) => !node.hasAttribute("disabled"),
-  );
-}
-
-/**
  * Render a centered confirmation dialog.
  *
  * @param props - Title, body, confirm/cancel, pending lock.
- * @returns Modal dialog. Side effects: focus trap and restore.
+ * @returns Modal dialog. Side effects: focus trap, scroll lock, and restore.
  */
 export function ConfirmDialog({
   title,
@@ -73,25 +60,24 @@ export function ConfirmDialog({
   const titleId = useId();
 
   useEffect(() => {
-    const previouslyFocused =
-      returnFocusRef?.current ?? (document.activeElement as HTMLElement | null);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    if (danger) {
-      cancelRef.current?.focus();
-    } else {
-      const root = panelRef.current;
-      const first = root ? focusableElements(root)[0] : undefined;
-      first?.focus();
+    const root = panelRef.current;
+    if (root === null) {
+      return;
     }
+    const unlock = lockBodyScroll();
+    const release = trapFocus(root, {
+      returnFocus:
+        returnFocusRef?.current ?? (document.activeElement as HTMLElement | null),
+      initialFocus: danger ? cancelRef.current : undefined,
+    });
     return () => {
-      document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus();
+      release();
+      unlock();
     };
   }, [danger, returnFocusRef]);
 
   /**
-   * Trap Tab and handle Escape when no irreversible request is pending.
+   * Close on Escape when no irreversible request is pending.
    *
    * @param event - Keyboard event from the dialog.
    */
@@ -101,28 +87,6 @@ export function ConfirmDialog({
       if (!pending) {
         onClose();
       }
-      return;
-    }
-    if (event.key !== "Tab" || panelRef.current === null) {
-      return;
-    }
-    const nodes = focusableElements(panelRef.current);
-    if (nodes.length === 0) {
-      return;
-    }
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-    if (first === undefined || last === undefined) {
-      return;
-    }
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-      return;
-    }
-    if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
     }
   }
 
@@ -150,7 +114,14 @@ export function ConfirmDialog({
         </h2>
         <div className={styles.confirmBody}>{children}</div>
         <div className={styles.confirmActions}>
-          <Button ref={cancelRef} type="button" disabled={pending} onClick={() => { if (!pending) onClose(); }}>
+          <Button
+            ref={cancelRef}
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (!pending) onClose();
+            }}
+          >
             Cancel
           </Button>
           <Button

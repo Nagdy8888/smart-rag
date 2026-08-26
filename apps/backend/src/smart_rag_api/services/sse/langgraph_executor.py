@@ -1,4 +1,4 @@
-"""LangGraph ``updates``-mode query executor."""
+"""LangGraph v2 ``updates``+``custom`` query executor."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from typing import Any
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 
-from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 from smart_rag_api.services.sse.answer_persistence import AnswerPersistenceMixin
 from smart_rag_api.services.sse.langgraph_runtime import (
     LangGraphRuntimeFactory,
@@ -119,7 +118,7 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
         message: str,
         cancel_event: asyncio.Event,
     ) -> AsyncIterator[tuple[str, dict[str, object]]]:
-        """Stream node completions as ``status`` events, then a terminal.
+        """Stream node starts, completions, and one verified terminal.
 
         Args:
             context: Server-derived ceilings and deadline.
@@ -198,6 +197,8 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
                 ensure_async_checkpointer=self._ensure_async_checkpointer,
                 compiled_query_graph=self._compiled_query_graph,
             )
+            from smart_rag_api.services.query_sse_mapping import QuerySseMapper
+
             mapper = QuerySseMapper()
             LOGGER.info(
                 "query sse stream started",

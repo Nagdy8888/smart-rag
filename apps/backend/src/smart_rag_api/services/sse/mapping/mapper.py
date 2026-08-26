@@ -10,6 +10,7 @@ from smart_rag_api.services.sse.mapping.contracts import (
     VERIFY_ANSWER_NODE,
 )
 from smart_rag_api.services.sse.mapping.limitations import limitation_from_update
+from smart_rag_api.services.sse.mapping.progress import CustomProgressDecoder
 from smart_rag_api.services.sse.mapping.status import status_event
 from smart_rag_api.services.sse.mapping.verified import (
     emit_verified_events,
@@ -34,6 +35,21 @@ class QuerySseMapper:
         self.verified = False
         self.emitted_token_delta = False
         self.terminal_emitted = False
+        self._progress = CustomProgressDecoder()
+
+    def consume_custom(self, data: object) -> list[tuple[str, dict[str, object]]]:
+        """Translate one custom writer payload into catalog drafts.
+
+        Args:
+            data: Custom ``get_stream_writer`` mapping.
+
+        Returns:
+            Allow-listed drafts. Malformed payloads yield nothing.
+        """
+
+        if self.terminal_emitted:
+            return []
+        return self._progress.consume_custom(data)
 
     def consume_chunk(self, chunk: object) -> list[tuple[str, dict[str, object]]]:
         """Translate one compiled ``updates`` chunk into SSE drafts.
@@ -62,6 +78,7 @@ class QuerySseMapper:
                     if str(key) not in {"passage", "snippet", "html", "traceback"}
                 }
             events.append(status_event(node_name, update))
+            self._progress.note_stage_terminal(node_name[:64])
             limitation = limitation_from_update(update)
             if limitation is not None:
                 events.append(limitation)

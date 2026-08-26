@@ -30,6 +30,8 @@ ALLOWED_SSE_FIELDS: Final[frozenset[str]] = frozenset(
         "prompt_tokens",
         "completion_tokens",
         "tool_keys",
+        "tool_key",
+        "phase",
         "sse_schema_version",
     }
 )

@@ -5,38 +5,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import {
-  INGESTION_STATUS_POLL_MS,
-  IngestionStatus,
-  ingestionStatusIsTerminal,
-} from "./ingestion-status";
-import { Button } from "../ui/button";
+import { IngestionStatus } from "./ingestion-status";
+import { DocumentDeleteSheet } from "./document-delete-sheet";
+import { useDocumentDetail } from "./hooks/use-document-detail";
 import { ErrorState } from "../ui/error-state";
 import { Icon } from "../ui/icon";
 import { Menu } from "../ui/menu";
-import { Sheet } from "../ui/sheet";
 import { Skeleton } from "../ui/skeleton";
-import { StatusBanner } from "../ui/status-banner";
 import { StatusPill } from "../ui/status-pill";
 import { formatVisibility } from "../../lib/format-visibility";
 import { UserText } from "../ui/user-text";
-import {
-  deleteDocument,
-  fetchDocument,
-  fetchMe,
-  fetchVersionStatus,
-  isClassifiedApiError,
-  listTables,
-  retryIngestionJob,
-  type ApiAuth,
-} from "../../lib/api";
-import { useSession } from "../../lib/auth/session-provider";
 import { DOCUMENT_NOT_FOUND_COPY } from "../../lib/citation-drawer";
-import { sessionQueryKeys } from "../../lib/query-keys";
-import { isOwnerOrAdmin } from "../../lib/roles";
 import styles from "./documents.module.css";
 
 /**
@@ -46,108 +25,9 @@ import styles from "./documents.module.css";
  * @returns Detail surface.
  */
 export function DocumentDetail({ documentId }: { documentId: string }) {
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const session = useSession();
-  const accessToken = session.accessToken;
-  const auth = useMemo<ApiAuth | null>(
-    () => (accessToken ? { accessToken } : null),
-    [accessToken],
-  );
-  const keys = sessionQueryKeys(accessToken);
-  const [pageVisible, setPageVisible] = useState(true);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const detail = useDocumentDetail(documentId);
 
-  useEffect(() => {
-    function onVisibility(): void {
-      setPageVisible(document.visibilityState === "visible");
-    }
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, []);
-
-  const documentQuery = useQuery({
-    queryKey: keys.document(documentId),
-    queryFn: () => fetchDocument(auth as ApiAuth, documentId),
-    enabled: auth !== null,
-  });
-
-  const versionId =
-    documentQuery.data?.ok === true
-      ? documentQuery.data.document.current_version_id
-      : null;
-
-  const versionQuery = useQuery({
-    queryKey: keys.versionStatus(versionId),
-    queryFn: () => fetchVersionStatus(auth as ApiAuth, versionId as string),
-    enabled: auth !== null && versionId !== null,
-    refetchInterval: (query) => {
-      if (!pageVisible || versionId === null) {
-        return false;
-      }
-      const status = query.state.data?.version?.status;
-      if (!status || ingestionStatusIsTerminal(status)) {
-        return false;
-      }
-      return INGESTION_STATUS_POLL_MS;
-    },
-  });
-
-  const tablesQuery = useQuery({
-    queryKey: keys.tables,
-    queryFn: () => listTables(auth as ApiAuth),
-    enabled: auth !== null,
-  });
-
-  const meQuery = useQuery({
-    queryKey: keys.me,
-    queryFn: () => fetchMe(auth as ApiAuth),
-    enabled: auth !== null,
-  });
-
-  const retryMutation = useMutation({
-    mutationFn: (jobId: string) => retryIngestionJob(auth as ApiAuth, jobId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: keys.versionStatus(versionId),
-      });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (auth === null) {
-        throw new Error("unsigned");
-      }
-      await deleteDocument(auth, documentId);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: keys.documents });
-      void queryClient.invalidateQueries({ queryKey: keys.document(documentId) });
-      router.push("/documents?deleted=1");
-    },
-    onError: (error) => {
-      if (isClassifiedApiError(error)) {
-        if (error.failure.kind === "auth") {
-          setDeleteError("You cannot delete this document.");
-          return;
-        }
-        if (error.failure.kind === "deleted") {
-          setDeleteOpen(false);
-          router.push("/documents");
-          return;
-        }
-        if (error.failure.kind === "rate") {
-          setDeleteError("Too many attempts. Try later.");
-          return;
-        }
-      }
-      setDeleteError("Document could not be deleted.");
-    },
-  });
-
-  if (!session.ready || accessToken === null) {
+  if (!detail.signedIn) {
     return (
       <div className={styles.page}>
         <p className={styles.muted}>
@@ -157,7 +37,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
     );
   }
 
-  if (documentQuery.isPending) {
+  if (detail.pending) {
     return (
       <div className={styles.page}>
         <Skeleton label="Loading document" width="16rem" />
@@ -166,7 +46,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
     );
   }
 
-  if (documentQuery.data?.ok === false || documentQuery.isError) {
+  if (detail.missing || detail.record === null) {
     return (
       <div className={styles.page}>
         <ErrorState title="Not found" message={DOCUMENT_NOT_FOUND_COPY} />
@@ -174,21 +54,8 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
     );
   }
 
-  const record =
-    documentQuery.data?.ok === true ? documentQuery.data.document : null;
-  if (record === null) {
-    return (
-      <div className={styles.page}>
-        <ErrorState title="Not found" message={DOCUMENT_NOT_FOUND_COPY} />
-      </div>
-    );
-  }
-
-  const versionPayload = versionQuery.data;
-  const tables = (tablesQuery.data ?? []).filter(
-    (item) => item.document_id === record.document_id,
-  );
-  const canDelete = isOwnerOrAdmin(meQuery.data?.role);
+  const record = detail.record;
+  const versionPayload = detail.versionPayload;
   const statusLabel = versionPayload?.version.status ?? record.visibility;
 
   return (
@@ -202,11 +69,9 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
             <UserText value={record.title ?? record.document_id} />
           </h1>
           <StatusPill status={formatVisibility(record.visibility)} />
-          {versionPayload ? (
-            <StatusPill status={statusLabel} />
-          ) : null}
+          {versionPayload ? <StatusPill status={statusLabel} /> : null}
         </div>
-        {canDelete ? (
+        {detail.canDelete ? (
           <Menu
             label="Document actions"
             trigger={<Icon name="more" />}
@@ -216,10 +81,7 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
                 label: "Delete",
                 danger: true,
                 actionId: "documents.delete",
-                onSelect: () => {
-                  setDeleteError(null);
-                  setDeleteOpen(true);
-                },
+                onSelect: detail.openDelete,
               },
             ]}
           />
@@ -232,8 +94,8 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
             <IngestionStatus
               payload={versionPayload}
               layout="timeline"
-              onRetry={(jobId) => retryMutation.mutate(jobId)}
-              retryPending={retryMutation.isPending}
+              onRetry={detail.retryJob}
+              retryPending={detail.retryPending}
             />
           ) : (
             <section className={styles.section} aria-label="Processing">
@@ -244,11 +106,11 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
 
           <section className={styles.section} aria-label="Tables">
             <h2>Tables</h2>
-            {tables.length === 0 ? (
+            {detail.tables.length === 0 ? (
               <p className={styles.muted}>No authorized tables on this document.</p>
             ) : (
               <ul className={styles.jobList}>
-                {tables.map((table) => (
+                {detail.tables.map((table) => (
                   <li key={table.table_id}>
                     <Link href="/tables">
                       <UserText value={table.table_name} />
@@ -289,53 +151,20 @@ export function DocumentDetail({ documentId }: { documentId: string }) {
             </Link>
           </div>
           <p className={styles.muted}>
-            Signed in as <UserText value={meQuery.data?.role ?? ""} />. Role hiding
+            Signed in as <UserText value={detail.roleLabel} />. Role hiding
             is convenience only.
           </p>
         </aside>
       </div>
 
-      {deleteOpen ? (
-        <Sheet
-          title="Delete document?"
-          onClose={() => {
-            setDeleteOpen(false);
-            setDeleteError(null);
-          }}
-        >
-          <p className={styles.confirmBody}>
-            “<UserText value={record.title ?? record.document_id} />” will be
-            removed from retrieval and scheduled for cleanup. This cannot be
-            undone.
-          </p>
-          {deleteError ? (
-            <StatusBanner kind="error" role="alert">
-              {deleteError}
-            </StatusBanner>
-          ) : null}
-          <div className={styles.toolbar}>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setDeleteOpen(false);
-                setDeleteError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              data-action-id="documents.delete"
-              pending={deleteMutation.isPending}
-              pendingLabel="Deleting…"
-              onClick={() => deleteMutation.mutate()}
-            >
-              Delete document
-            </Button>
-          </div>
-        </Sheet>
+      {detail.deleteOpen ? (
+        <DocumentDeleteSheet
+          label={record.title ?? record.document_id}
+          deleteError={detail.deleteError}
+          pending={detail.deletePending}
+          onClose={detail.closeDelete}
+          onConfirm={detail.confirmDelete}
+        />
       ) : null}
     </div>
   );

@@ -55,7 +55,9 @@ export function frameBelongsToCurrentRun(
  * @param initial - Current view, including `runId` after admit.
  * @param signal - Abort from Cancel or a new send. Honored on the reader
  *   and on `AbortError` from `reader.read()`.
- * @param onState - Called after each applied frame.
+ * @param onState - Called once per `reader.read()` batch, or at terminal.
+ * @param onCursor - Optional. Called when an accepted batch advances sequence,
+ *   including heartbeat-only batches. Does not imply a React publication.
  * @returns Final view. Does not start paid work.
  */
 export async function consumeSse(
@@ -63,6 +65,7 @@ export async function consumeSse(
   initial: ChatViewState,
   signal: AbortSignal,
   onState: (state: ChatViewState) => void,
+  onCursor?: (lastSequence: number) => void,
 ): Promise<ChatViewState> {
   const reader = response.body?.getReader();
   if (!reader) {
@@ -80,15 +83,27 @@ export async function consumeSse(
       buffer += decoder.decode(chunk.value, { stream: true });
       const parsed = parseSseBuffer(buffer);
       buffer = parsed.rest;
+      const sequenceBefore = current.lastSequence;
+      let sawVisibleFrame = false;
       for (const frame of parsed.frames) {
         if (!frameBelongsToCurrentRun(frame, current.runId)) {
           continue;
         }
         current = applySseFrame(current, frame);
-        onState(current);
+        if (frame.event !== "heartbeat") {
+          sawVisibleFrame = true;
+        }
         if (current.terminal !== null) {
+          onState(current);
+          onCursor?.(current.lastSequence);
           return current;
         }
+      }
+      if (current.lastSequence !== sequenceBefore) {
+        onCursor?.(current.lastSequence);
+      }
+      if (sawVisibleFrame) {
+        onState(current);
       }
     }
   } catch (error) {

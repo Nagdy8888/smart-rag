@@ -341,25 +341,25 @@ def test_graph_chunk_is_parsed_once(monkeypatch: Any) -> None:
     """Usage accounting and the SSE mapper share one normalized chunk."""
 
     parses: list[object] = []
-    from smart_rag_api.services.sse import chunks as chunk_mod
+    from smart_rag_api.services.sse import stream_parts as parts_mod
 
-    real = chunk_mod.updates_mapping_from_chunk
+    real = parts_mod.parse_stream_part
 
-    def _count(raw_chunk: object) -> dict[str, object] | None:
+    def _count(raw_chunk: object) -> object:
         """Count one parse then delegate.
 
         Args:
-            raw_chunk: LangGraph updates payload.
+            raw_chunk: LangGraph stream part.
 
         Returns:
-            Normalized node mapping.
+            Parsed part, or None.
         """
 
         parses.append(raw_chunk)
         return real(raw_chunk)
 
     monkeypatch.setattr(
-        "smart_rag_api.services.sse.executors.updates_mapping_from_chunk",
+        "smart_rag_api.services.sse.stream_dispatch.parse_stream_part",
         _count,
     )
     stream = _RecordingAsyncStream((_verified_chunk("ONCE"),))
@@ -512,7 +512,7 @@ def test_append_lock_failure_logs_sanitized_fields(
     caller = _caller()
     runtime = _runtime()
     service.remember_admitted(caller, runtime, message="hello")
-    with caplog.at_level(logging.INFO, logger="smart_rag_api.services.sse.service_persist"):
+    with caplog.at_level(logging.INFO, logger="smart_rag_api.services.sse.event_append"):
         persisted = service._append(
             caller,
             runtime.run_id,

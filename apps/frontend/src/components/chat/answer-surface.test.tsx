@@ -108,6 +108,34 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.queryByTestId("answer-token-usage")).not.toBeInTheDocument();
   });
 
+  it("does not render assistant prose before verified tokens exist", () => {
+    render(
+      <AnswerSurface
+        question="What is our refund policy?"
+        answer=""
+        citations={[]}
+        terminal={null}
+        progressItems={[
+          {
+            id: "n:generate_answer",
+            kind: "node",
+            key: "generate_answer",
+            phase: "started",
+            outcome: null,
+            firstSequence: 1,
+            lastSequence: 1,
+          },
+        ]}
+        verificationCompleted={false}
+        hrefForCitation={() => undefined}
+        onSelectCitation={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByText("Generating…").length).toBeGreaterThan(0);
+    expect(screen.queryByText("The refund period is 30 days.")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("verified-answer-reveal")).not.toBeInTheDocument();
+  });
+
   it("uses the dual-mode empty state", () => {
     render(
       <AnswerSurface
