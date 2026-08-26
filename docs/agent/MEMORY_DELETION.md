@@ -103,7 +103,7 @@ holdout.
 ## Verification
 
 ```text
-uv run python -m pytest tests/unit/test_conversation_deletion.py tests/contract/test_query_memory_reaper.py tests/unit/test_prompt_registry.py -q
+uv run python -m pytest tests/unit/test_conversation_deletion.py tests/contract/test_query_memory_reaper.py tests/contract/test_query_memory_summary.py tests/contract/test_query_memory_deletion.py tests/contract/test_query_memory_langsmith.py tests/unit/test_prompt_registry.py -q
 ```
 
 ## Failure modes

@@ -2428,3 +2428,47 @@ Browser re-audit (Playwright MCP on `http://127.0.0.1:3000`, plus the :3010 Play
 - `createConversation` now throws on non-OK so a 401 cannot produce `GET /conversations/undefined/messages`.
 
 Completion: P2–P8 are implemented on this branch. P1 transcript API remains the only API-surface change. Visual snapshots under `apps/frontend/tests/e2e/visual-routes.spec.ts-snapshots/` were regenerated.
+
+## P08-07 — Canonical remediation amendment and baseline (reconcile)
+
+**Status:** PASS — 2026-08-26 reconciliation.
+
+Existing 2026-08-24 evidence in this file already records packets 07–23, the
+functional-overhaul ADR, action inventory, visual contract, and no
+application-source edits. Wrapper checkbox 7 was still open after P08-08
+through P08-21 completed. This reconcile checks P08-07 and sets packet 07
+`status: complete` without rewriting history.
+
+## P08-24 — Canonical streaming overhaul amendment and policy ADR
+
+**Status:** PASS — 2026-08-26.
+
+Integrity: `uv run python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py --update` then verify → exit 0, 172 canonical files.
+
+### Requirement quoted
+
+> Authorize the streaming/modularization suite without pretending the draft
+> plan is canonical. Write the paced-reveal ADR, amend Phase 6/8 contracts,
+> add P06-16, and promote additive P08 packets. No application code.
+
+### Changed paths
+
+- `docs/adr/ADR-verified-answer-paced-reveal.md`
+- `.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/16-sse-custom-progress.md`
+- `.cursor/plans/hybrid-graph-rag/08-phase-frontend-integration/packets/24-*.md` through `87-*.md`
+- Phase 6/8 wrappers, shared/visual contracts, P08-09/P08-15 superseding notes
+- `docs/frontend/workspace-screens.md`, docs indexes, coverage manifest
+
+### Acceptance
+
+- [PASS] P08-07 reconciled and checked.
+- [PASS] ADR supersedes no-artificial-delay presentation only.
+- [PASS] One coding sibling is not activated by this documentation packet;
+  P08-25 (SEC-01) is the next application-code packet.
+- [UNVERIFIED] Integrity verifier — recorded immediately after this amendment.
+- [PASS] No application runtime source changed in this packet.
+
+### Rollback
+
+Revert the additive packet files and contract notes. Do not renumber
+P08-22/P08-23. Do not uncheck completed historical packets.

@@ -148,13 +148,13 @@ flowchart TB
 - Full-width block, no bubble. Body scale, 72ch measure.
 - Citation chips, then a 12px muted meta row (relative time, route badge when known, and this run’s prompt/completion tokens from SSE `usage` when either count is greater than zero).
 - Live runs append to the same list: the in-flight question is a user bubble; the stream is the last assistant block.
-- Do not show a streaming caret or typewriter animation.
+- Do not show a streaming caret or a pre-verification typewriter. After verification, reveal already-authoritative verified text under ADR-verified-answer-paced-reveal (skip, reduced motion, and historical messages show the full text immediately).
 - Partial/cancelled/error retains existing text and adds a StatusBanner below.
 - Footer order: citations, feedback, then collapsed “Run details”.
 
 #### Status line
 
-- While a run is active, one line above the streaming block: 16px spinner plus exactly one of “Preparing…”, “Retrieving…”, “Generating…”, “Verifying…”.
+- While a run is active, render the server-originated node/tool timeline (started/completed/failed only). Known labels include Preparing, Retrieving, Generating, and Verifying when those stages actually arrive. After verification the status may read “Verified — displaying answer” during paced reveal. Skipped nodes never appear.
 - Not rendered when idle. The permanent 4-item stepper is removed.
 - Unknown stage stays in Run details, not as a new primary phase.
 

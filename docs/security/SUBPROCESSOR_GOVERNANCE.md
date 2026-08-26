@@ -53,6 +53,22 @@ counts and estimated USD export even when the flag is false. See
 [ADR-local-langsmith-export-io.md](../adr/ADR-local-langsmith-export-io.md).
 This local waiver is not org verification.
 
+Dedicated hosted online evaluators are a second LangSmith export class.
+They attach only to `smart-rag-agent-eval-online` and may receive the
+bounded synthetic envelope (question, answer, reference, ≤12 excerpts of
+≤600 characters). They must never receive real-company content, holdout
+labels, BM25 snippets, graph prose, JWTs, API keys, DSNs, emails, or
+signed URLs. The weekly hosted-judge spend cap is USD 2.00 with no
+backfill. The normal `smart-rag` project must not gain these evaluator
+rules. Rollback is disable/delete those two project rules, then delete
+the two evaluator resources if unreferenced. 2026-08-26: both
+dedicated rules exist only on `smart-rag-agent-eval-online`. The
+application project `smart-rag-demo-3` has zero evaluator rules. The
+hosted-judge spend cap could not be enforced on this org. See
+[LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md)
+and
+[phase-06-agent-intelligence-evidence.md](../development/phase-06-agent-intelligence-evidence.md).
+
 ## 3. Supabase settings matrix
 
 Sources: [GDPR / residency](https://supabase.com/docs/guides/security/gdpr-compliance), [DPA](https://supabase.com/legal/dpa), [Backups](https://supabase.com/docs/guides/platform/backups), Phase 2 evidence for local stack.
