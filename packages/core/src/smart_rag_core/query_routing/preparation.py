@@ -9,6 +9,11 @@ import psycopg
 
 from smart_rag_core.evaluation.schema import FieldProvenance, ProfileField
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.exceptions import (
+    QueryBudgetError,
+    QueryCeilingError,
+)
+from smart_rag_core.query_admission.service import ReservationConsumeResult
 from smart_rag_core.query_admission.usage import execute_counted_model_call
 from smart_rag_core.query_profile.extract import extract_deterministic
 from smart_rag_core.query_profile.models import (
@@ -21,6 +26,7 @@ from smart_rag_core.query_routing.exceptions import QueryRoutingError
 from smart_rag_core.query_routing.fidelity import score_rewrite_fidelity
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
+    ScopeDegradationReason,
     classify_knowledge_scope,
     company_intent_signal,
     scope_requires_model,
@@ -43,7 +49,6 @@ from smart_rag_core.query_routing.safety import sanitize_user_text
 from smart_rag_core.query_routing.signals import (
     is_corpus_wide_theme,
     is_graph_inspection,
-    is_greeting,
     is_historical_relationship,
     is_low_confidence_relationship,
     is_product_help,
@@ -100,8 +105,6 @@ def _needs_model(
     if force_model:
         return True
     extract = extract_deterministic(query)
-    if is_greeting(query):
-        return False
     if is_product_help(query) and not company_intent_signal(query, extract):
         return False
     if extract.rewrite_justified:
@@ -163,6 +166,7 @@ def prepare_query(
     connection: psycopg.Connection | None = None,
     caller: CallerContext | None = None,
     model_id: str = "query-profile-mock-v1",
+    on_reservation_consume: Callable[[ReservationConsumeResult], None] | None = None,
 ) -> QueryPreparation:
     """Build one ``QueryPreparation`` with at most one counted model call.
 
@@ -182,6 +186,9 @@ def prepare_query(
         caller: Server-derived caller for consume. Derived from runtime
             when omitted.
         model_id: Provider model identifier recorded on usage.
+        on_reservation_consume: Optional hook after a successful profile
+            consume. The graph writes the new optimistic version onto
+            ``authorized_runtime`` so the answer call does not conflict.
 
     Returns:
         Typed preparation. ``model_calls`` is 0 or 1. Original is preserved.
@@ -202,10 +209,13 @@ def prepare_query(
     payload: PreparationModelPayload | None = None
     model_calls: int = 0
     fallback = "not_needed"
+    forced_degradation: ScopeDegradationReason | None = None
     if needs_model:
         if model_caller is None:
             fallback = "profile_budget_denied"
+            forced_degradation = ScopeDegradationReason.PROFILE_UNAVAILABLE
         else:
+            from smart_rag_core.gateways.model import ModelGatewayUnavailableError
 
             def _send() -> PreparationModelPayload:
                 """Invoke the one structured preparation adapter.
@@ -216,33 +226,46 @@ def prepare_query(
 
                 return model_caller(original, tuple(memory))
 
-            if connection is None:
-                try:
+            try:
+                if connection is None:
                     payload = _send()
-                except ValueError as exc:
-                    raise QueryRoutingError(_prep_value_error(exc)) from exc
+                    model_calls = 1
+                    fallback = "none"
+                else:
+                    resolved_caller = caller or CallerContext(
+                        user_id=str(runtime.user_id),
+                        role=runtime.role,
+                        authorization_version=runtime.authorization_version,
+                        session_id=runtime.session_id,
+                    )
+                    payload, consumed, _usage_id = execute_counted_model_call(
+                        connection,
+                        caller=resolved_caller,
+                        run_id=runtime.run_id,
+                        reservation_id=runtime.reservation_id,
+                        expected_version=runtime.optimistic_version,
+                        usage_kind=USAGE_KIND_PROFILE,
+                        model_id=model_id,
+                        provider_attempt_id=str(uuid4()),
+                        send=_send,
+                    )
+                    if on_reservation_consume is not None:
+                        on_reservation_consume(consumed)
+                    model_calls = 1
+                    fallback = "none"
+            except ValueError:
+                payload = None
                 model_calls = 1
-                fallback = "none"
-            else:
-                resolved_caller = caller or CallerContext(
-                    user_id=str(runtime.user_id),
-                    role=runtime.role,
-                    authorization_version=runtime.authorization_version,
-                    session_id=runtime.session_id,
-                )
-                payload, _consumed, _usage_id = execute_counted_model_call(
-                    connection,
-                    caller=resolved_caller,
-                    run_id=runtime.run_id,
-                    reservation_id=runtime.reservation_id,
-                    expected_version=runtime.optimistic_version,
-                    usage_kind=USAGE_KIND_PROFILE,
-                    model_id=model_id,
-                    provider_attempt_id=str(uuid4()),
-                    send=_send,
-                )
-                model_calls = 1
-                fallback = "none"
+                fallback = "profile_malformed"
+                forced_degradation = ScopeDegradationReason.PROFILE_MALFORMED
+            except (
+                ModelGatewayUnavailableError,
+                QueryBudgetError,
+                QueryCeilingError,
+            ):
+                payload = None
+                fallback = "profile_budget_denied"
+                forced_degradation = ScopeDegradationReason.PROFILE_UNAVAILABLE
     if model_calls > 1:
         raise QueryRoutingError("separate_rewrite_call")
     inferred = _to_inferred(payload) if payload is not None else None
@@ -279,6 +302,7 @@ def prepare_query(
             None if payload is None else payload.knowledge_scope_confidence
         ),
         model_available=payload is not None,
+        forced_degradation=forced_degradation,
     )
     try:
         preparation = QueryPreparation(
@@ -326,6 +350,7 @@ def prepare_query(
             and routing_surface is RoutingSurface.DIAGNOSTIC,
             knowledge_scope=scope.knowledge_scope,
             knowledge_scope_confidence=scope.confidence,
+            scope_degradation_reason=scope.scope_degradation_reason,
         )
     except ValueError as exc:
         raise QueryRoutingError(_prep_value_error(exc)) from exc

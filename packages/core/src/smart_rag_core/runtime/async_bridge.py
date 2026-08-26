@@ -35,9 +35,10 @@ def run_coro_blocking(coro: object) -> object:
     Side Effects:
         When no event loop is running, uses ``asyncio.run``. When a loop
         is already running, starts one daemon thread with a private loop,
-        copies the caller tracing context, runs the coroutine to
-        completion, flushes LangSmith, then closes that loop. The live
-        loop is never nested.
+        copies the caller tracing context, runs the coroutine to completion,
+        then closes that loop. LangSmith exports through its process
+        background queue; this request path never waits for telemetry.
+        The live loop is never nested.
 
     Example:
         ``lead_set = run_coro_blocking(retriever.retrieve_local(...))``
@@ -49,24 +50,8 @@ def run_coro_blocking(coro: object) -> object:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        try:
-            return asyncio.run(typed)
-        finally:
-            _flush_langsmith_traces()
+        return asyncio.run(typed)
     return _run_in_dedicated_thread(typed)
-
-
-def _flush_langsmith_traces() -> None:
-    """Flush buffered LangSmith runs from this thread.
-
-    Side Effects:
-        Delegates to :func:`flush_langsmith_traces`. No-op when tracing is
-        off or no API key is configured.
-    """
-
-    from smart_rag_core.observability.langsmith_tracing import flush_langsmith_traces
-
-    flush_langsmith_traces()
 
 
 def _run_in_dedicated_thread(coro: Coroutine[object, object, T]) -> T:
@@ -93,8 +78,8 @@ def _run_in_dedicated_thread(coro: Coroutine[object, object, T]) -> T:
 
         Side Effects:
             Creates, runs, and closes a private loop. Stores the result
-            or exception in the enclosing dicts. Flushes LangSmith so
-            spans created on this short-lived thread are exported.
+            or exception in the enclosing dicts. Trace export stays on
+            LangSmith's process background queue.
         """
 
         def _inner() -> None:
@@ -109,7 +94,6 @@ def _run_in_dedicated_thread(coro: Coroutine[object, object, T]) -> T:
             finally:
                 loop.close()
                 asyncio.set_event_loop(None)
-                _flush_langsmith_traces()
 
         copied.run(_inner)
 

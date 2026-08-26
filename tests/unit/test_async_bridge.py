@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
+import pytest
 from smart_rag_core.runtime.async_bridge import run_coro_blocking
 
 
@@ -36,6 +38,36 @@ def test_run_coro_blocking_from_running_loop() -> None:
         return int(run_coro_blocking(_value()))
 
     assert asyncio.run(_outer()) == 7
+
+
+def test_run_coro_blocking_never_waits_for_trace_drain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Retrieval bridge completion is independent of LangSmith availability."""
+
+    from smart_rag_core.runtime import async_bridge
+
+    def _slow_flush(*, timeout_seconds: float) -> None:
+        """Model an unavailable telemetry exporter.
+
+        Args:
+            timeout_seconds: Unused simulated drain bound.
+        """
+
+        del timeout_seconds
+        time.sleep(0.5)
+
+    monkeypatch.setattr(
+        async_bridge,
+        "_flush_langsmith_traces",
+        _slow_flush,
+        raising=False,
+    )
+    started = time.monotonic()
+    result = run_coro_blocking(_value())
+    elapsed = time.monotonic() - started
+    assert result == 7
+    assert elapsed < 0.3
 
 
 def test_run_coro_blocking_passthrough_non_coroutine() -> None:

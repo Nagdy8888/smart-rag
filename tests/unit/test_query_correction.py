@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
-import smart_rag_core.retrieval.hybrid_run as _hybrid_run_cycle_guard  # noqa: F401
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.branches import execute_branches

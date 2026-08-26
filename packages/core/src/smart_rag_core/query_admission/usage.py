@@ -129,9 +129,7 @@ def execute_counted_model_call(
         usage_kind=usage_kind,
         model_id=model_id,
         provider_attempt_id=provider_attempt_id,
-        prompt_tokens=(
-            recorded_prompt if recorded_prompt is not None else prompt_cap
-        ),
+        prompt_tokens=(recorded_prompt if recorded_prompt is not None else prompt_cap),
         completion_tokens=(
             recorded_completion if recorded_completion is not None else completion_cap
         ),

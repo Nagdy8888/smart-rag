@@ -223,8 +223,9 @@ PYTEST_SUITES: tuple[Packet4Suite, ...] = (
         acceptance="P09-04-C",
         title="Reserve-once admit contention, crash true-up, and concurrency cap",
         pytest_args=(
-            "tests/contract/test_query_run_admission.py",
+            "tests/contract/test_query_admission_budget.py",
             "tests/contract/test_query_memory_reaper.py",
+            "tests/contract/test_query_memory_summary.py",
         ),
     ),
     Packet4Suite(

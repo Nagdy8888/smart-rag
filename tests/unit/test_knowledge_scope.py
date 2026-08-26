@@ -11,7 +11,9 @@ from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
     NoRetrievalAnswerMode,
+    ScopeDegradationReason,
     classify_knowledge_scope,
+    scope_requires_model,
 )
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.models import (
@@ -22,7 +24,11 @@ from smart_rag_core.query_routing.models import (
     RetrievalPlan,
 )
 from smart_rag_core.query_routing.preparation import prepare_query
-from smart_rag_core.query_routing.signals import is_greeting, is_product_help
+from smart_rag_core.query_routing.signals import (
+    is_greeting,
+    is_product_help,
+    is_small_talk,
+)
 from smart_rag_core.security.identity import UserRole
 
 
@@ -92,12 +98,18 @@ def _plan(query: str) -> RetrievalPlan:
 def test_full_greeting_is_general_knowledge() -> None:
     """A complete greeting uses the general-chat model, not a canned line."""
 
+    assert is_greeting("Hi") is True
+    assert scope_requires_model("Hi") is True
     decision = classify_knowledge_scope("Hi")
     assert decision.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
-    assert is_greeting("Hi") is True
+    assert (
+        decision.scope_degradation_reason is ScopeDegradationReason.PROFILE_UNAVAILABLE
+    )
     prep = _prep("Hello")
     plan = _plan("Hello")
     assert prep.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert prep.scope_degradation_reason is ScopeDegradationReason.PROFILE_UNAVAILABLE
+    assert prep.model_calls == 0
     assert plan.effective_route is Phase6RouteFamily.NO_RETRIEVAL
     assert plan.no_retrieval_answer_mode is NoRetrievalAnswerMode.GENERAL_MODEL
     assert plan.company_claim_forbidden is True
@@ -206,31 +218,41 @@ def test_isolated_policy_is_not_a_company_signal() -> None:
 
     decision = classify_knowledge_scope("Explain monetary policy")
     assert decision.company_signal is False
-    assert decision.knowledge_scope is KnowledgeScope.AMBIGUOUS
+    assert decision.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert (
+        decision.scope_degradation_reason is ScopeDegradationReason.PROFILE_UNAVAILABLE
+    )
 
 
-def test_low_confidence_and_invalid_scope_are_ambiguous() -> None:
-    """Unavailable, invalid, or low-confidence model output is ambiguous."""
+def test_low_confidence_and_invalid_scope_degrade_general() -> None:
+    """Unavailable, invalid, or low-confidence model output is not mixed."""
 
     unavailable = classify_knowledge_scope(
         "Why is the sky blue?",
         model_available=False,
     )
-    assert unavailable.knowledge_scope is KnowledgeScope.AMBIGUOUS
+    assert unavailable.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert (
+        unavailable.scope_degradation_reason
+        is ScopeDegradationReason.PROFILE_UNAVAILABLE
+    )
     invalid = classify_knowledge_scope(
         "Why is the sky blue?",
         model_scope="not_a_scope",
         model_confidence=0.99,
         model_available=True,
     )
-    assert invalid.knowledge_scope is KnowledgeScope.AMBIGUOUS
+    assert invalid.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert invalid.scope_degradation_reason is ScopeDegradationReason.PROFILE_MALFORMED
     low = classify_knowledge_scope(
         "Why is the sky blue?",
         model_scope=KnowledgeScope.GENERAL_KNOWLEDGE.value,
         model_confidence=0.79,
         model_available=True,
     )
-    assert low.knowledge_scope is KnowledgeScope.AMBIGUOUS
+    assert low.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert low.scope_degradation_reason is ScopeDegradationReason.PROFILE_LOW_CONFIDENCE
+    assert low.confidence == 0.79
 
 
 def test_company_guard_overrides_malicious_general_model() -> None:
@@ -358,3 +380,198 @@ def test_identity_plus_company_in_one_prompt_stays_ambiguous() -> None:
     assert decision.knowledge_scope is KnowledgeScope.AMBIGUOUS
     plan = _plan(query)
     assert plan.no_retrieval_answer_mode is NoRetrievalAnswerMode.CLARIFICATION
+    assert decision.scope_degradation_reason is None
+    assert plan.scope_degradation_reason is None
+
+
+def test_root_cause_probes_are_usable_not_mixed() -> None:
+    """Former false-ambiguity probes classify to a usable typed result."""
+
+    probes = (
+        "hi friend",
+        "hi my friend",
+        "hey there",
+        "good day",
+        "how are you?",
+        "thanks a lot",
+        "What is the capital of Japan?",
+        "What is the refund period?",
+    )
+    for query in probes:
+        decision = classify_knowledge_scope(query)
+        assert decision.knowledge_scope is not KnowledgeScope.AMBIGUOUS, query
+        plan = _plan(query)
+        assert plan.no_retrieval_answer_mode is NoRetrievalAnswerMode.GENERAL_MODEL
+        assert plan.company_claim_forbidden is True
+
+
+def test_english_arabic_and_emoji_greetings_match() -> None:
+    """Greeting detection covers addresses, Arabic forms, and trailing emoji."""
+
+    for query in (
+        "hi friend",
+        "hi my friend",
+        "hey there!",
+        "good day",
+        "salam",
+        "مرحبا",
+        "السلام عليكم",
+        "اهلا",
+        "أهلا",
+        "hi 👋",
+        "oh hello team",
+    ):
+        assert is_greeting(query) is True, query
+        assert scope_requires_model(query) is True
+
+
+def test_small_talk_requires_profile_and_is_not_company_followup() -> None:
+    """Small talk uses the profile call and ignores cited company memory."""
+
+    assert is_small_talk("how are you?") is True
+    assert is_small_talk("what's up") is True
+    assert is_small_talk("nice to meet you") is True
+    assert is_small_talk("good to see you") is True
+    memory = (
+        MemoryRecord(
+            message_id="11111111-1111-1111-1111-111111111111",
+            role="assistant",
+            content="INV-SR-1001 is open. See chunk_id abc.",
+            created_at="2026-08-25T00:00:00Z",
+            delimited="<memory id=1>INV-SR-1001 is open. See chunk_id abc.</memory>",
+        ),
+    )
+    decision = classify_knowledge_scope("hi", memory=memory)
+    assert decision.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert decision.company_signal is False
+    assert scope_requires_model("hi", memory=memory) is True
+
+
+def test_greeting_spends_one_profile_call() -> None:
+    """A bound caller spends exactly one profile call for a pure greeting."""
+
+    calls = {"n": 0}
+
+    def _caller(query: str, memory: object) -> PreparationModelPayload:
+        """Classify a greeting as general knowledge.
+
+        Args:
+            query: Unused original query.
+            memory: Unused memory snapshot.
+
+        Returns:
+            One structured payload.
+        """
+
+        del query, memory
+        calls["n"] += 1
+        return PreparationModelPayload(
+            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE.value,
+            knowledge_scope_confidence=0.95,
+            confidence=0.95,
+        )
+
+    prep = prepare_query("hi friend", runtime=_runtime(), model_caller=_caller)
+    assert calls["n"] == 1
+    assert prep.model_calls == 1
+    assert prep.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert prep.scope_degradation_reason is None
+
+
+def test_greeting_ignores_model_ambiguous_and_company_memory() -> None:
+    """A standalone greeting stays general when the profile invents mixed."""
+
+    memory = (
+        MemoryRecord(
+            message_id="11111111-1111-1111-1111-111111111111",
+            role="assistant",
+            content="INV-SR-1001 is open. See chunk_id abc.",
+            created_at="2026-08-25T00:00:00Z",
+            delimited="<memory id=1>INV-SR-1001 is open. See chunk_id abc.</memory>",
+        ),
+    )
+    decision = classify_knowledge_scope(
+        "hi friend",
+        memory=memory,
+        model_scope=KnowledgeScope.AMBIGUOUS.value,
+        model_confidence=0.99,
+        model_available=True,
+    )
+    assert decision.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert decision.company_signal is False
+    assert decision.scope_degradation_reason is None
+    assert is_greeting("hi friend") is True
+
+    def _caller(query: str, snapshot: object) -> PreparationModelPayload:
+        """Return a high-confidence mixed scope for a greeting.
+
+        Args:
+            query: Unused original query.
+            snapshot: Unused memory snapshot.
+
+        Returns:
+            One structured payload claiming mixed scope.
+        """
+
+        del query, snapshot
+        return PreparationModelPayload(
+            knowledge_scope=KnowledgeScope.AMBIGUOUS.value,
+            knowledge_scope_confidence=0.99,
+            confidence=0.99,
+        )
+
+    prep = prepare_query(
+        "hi friend",
+        runtime=_runtime(),
+        memory=memory,
+        model_caller=_caller,
+    )
+    assert prep.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert prep.scope_degradation_reason is None
+    plan = compile_retrieval_plan(prep, _runtime())
+    assert plan.effective_route is Phase6RouteFamily.NO_RETRIEVAL
+    assert plan.no_retrieval_answer_mode is NoRetrievalAnswerMode.GENERAL_MODEL
+    assert plan.company_claim_forbidden is True
+
+
+def test_model_ambiguous_without_conflict_is_not_mixed() -> None:
+    """Model-invented mixed on remaining natural language is degraded general."""
+
+    decision = classify_knowledge_scope(
+        "Why is the sky blue?",
+        model_scope=KnowledgeScope.AMBIGUOUS.value,
+        model_confidence=0.99,
+        model_available=True,
+    )
+    assert decision.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert decision.scope_degradation_reason is ScopeDegradationReason.PROFILE_MALFORMED
+    assert decision.company_signal is False
+
+
+def test_malformed_profile_payload_degrades() -> None:
+    """A ValueError from the profile caller records typed malformed degradation."""
+
+    def _caller(query: str, memory: object) -> PreparationModelPayload:
+        """Raise instead of fabricating a profile.
+
+        Args:
+            query: Unused original query.
+            memory: Unused memory snapshot.
+
+        Returns:
+            Never.
+
+        Raises:
+            ValueError: Always ``profile_malformed``.
+        """
+
+        del query, memory
+        raise ValueError("profile_malformed")
+
+    prep = prepare_query(
+        "Why is the sky blue?", runtime=_runtime(), model_caller=_caller
+    )
+    assert prep.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert prep.scope_degradation_reason is ScopeDegradationReason.PROFILE_MALFORMED
+    assert prep.fallback_reason == "profile_malformed"
+    assert prep.model_calls == 1

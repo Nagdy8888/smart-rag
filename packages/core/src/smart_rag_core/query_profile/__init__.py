@@ -19,14 +19,21 @@ from smart_rag_core.query_profile.phase6_map import (
 )
 from smart_rag_core.query_profile.profiler import profile_query, profile_query_sync
 from smart_rag_core.query_profile.runner import evaluate_open_splits
+from smart_rag_core.query_profile.schemas import query_profile_json_schema
 from smart_rag_core.query_profile.versions import (
+    ALLOWED_PROFILE_MODEL_IDS,
+    PROFILE_MAX_OUTPUT_TOKENS,
+    PROFILE_MODEL_ID,
     PROFILE_MODEL_VERSION,
     PROFILE_PROMPT_SHA256,
     PROFILE_PROMPT_VERSION,
 )
 
 __all__ = [
+    "ALLOWED_PROFILE_MODEL_IDS",
     "PHASE6_EXTENSION_FAMILIES",
+    "PROFILE_MAX_OUTPUT_TOKENS",
+    "PROFILE_MODEL_ID",
     "PROFILE_MODEL_VERSION",
     "PROFILE_PROMPT_SHA256",
     "PROFILE_PROMPT_VERSION",
@@ -43,4 +50,5 @@ __all__ = [
     "map_query_type_to_phase6_family",
     "profile_query",
     "profile_query_sync",
+    "query_profile_json_schema",
 ]
