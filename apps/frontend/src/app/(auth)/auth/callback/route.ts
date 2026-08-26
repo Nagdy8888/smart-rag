@@ -5,22 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "../../../../lib/auth/server";
-
-/**
- * Allow only same-origin relative next paths.
- *
- * @param raw - `next` query value.
- * @returns Safe path starting with `/`.
- */
-function safeNextPath(raw: string | null): string {
-  if (raw === null || raw === "") {
-    return "/";
-  }
-  if (!raw.startsWith("/") || raw.startsWith("//")) {
-    return "/";
-  }
-  return raw;
-}
+import { safeNextPath } from "./safe-next-path";
 
 /**
  * Exchange the Auth `code` for a session cookie.
@@ -34,7 +19,7 @@ function safeNextPath(raw: string | null): string {
 export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = safeNextPath(url.searchParams.get("next"));
+  const next = safeNextPath(url.searchParams.get("next"), url.origin);
   const fail = NextResponse.redirect(new URL("/login?error=callback", url.origin));
   if (!code) {
     return fail;
