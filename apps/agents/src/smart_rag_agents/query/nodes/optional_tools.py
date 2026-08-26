@@ -15,7 +15,7 @@ from smart_rag_agents.query.nodes.binding import (
     bound_tool_names,
     selected_tool_schemas,
 )
-from smart_rag_agents.query.nodes.pipeline import runtime_from_state, skip_closed_nodes
+from smart_rag_agents.query.nodes.shared import runtime_from_state, skip_closed_nodes
 from smart_rag_agents.query.state import QueryGraphState
 
 
