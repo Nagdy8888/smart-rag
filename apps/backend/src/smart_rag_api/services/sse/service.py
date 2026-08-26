@@ -13,7 +13,7 @@ from smart_rag_core.sse.store import RunEventStore
 
 from smart_rag_api.services.sse.constants import NON_STARTABLE_STATUSES, POLL_SECONDS
 from smart_rag_api.services.sse.executors import QueryRunExecutor
-from smart_rag_api.services.sse.registry import LiveQueryRun, QueryRunRegistry
+from smart_rag_api.services.sse.registry import QueryRunRegistry
 from smart_rag_api.services.sse.run_access import RunAccessMixin
 from smart_rag_api.services.sse.run_orchestration import RunOrchestrationMixin
 from smart_rag_api.services.sse.service_persist import SsePersistMixin
