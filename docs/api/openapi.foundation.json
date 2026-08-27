@@ -1142,6 +1142,11 @@
           },
           "tag": {
             "enum": [
+              "helpful answer",
+              "accurate citation",
+              "correct route",
+              "correct calculation",
+              "sufficient graph",
               "chunk/cleaning loss",
               "profile field wrong",
               "candidate miss",

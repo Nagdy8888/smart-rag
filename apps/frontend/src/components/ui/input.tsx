@@ -19,13 +19,15 @@ export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   error?: string;
   /** Show a password visibility toggle when `type` is password. */
   revealable?: boolean;
+  /** Drop the 520px field cap so the control can fill its parent. */
+  fullWidth?: boolean;
 };
 
 /**
  * Render a labeled input with optional error styling and password reveal.
  *
  * @param props - Native input attributes plus `label`, `labelEnd`,
- *   `leadingIcon`, `error`, and `revealable`.
+ *   `leadingIcon`, `error`, `revealable`, and `fullWidth`.
  * @returns Field with associated label. No fetch side effects.
  */
 export function Input({
@@ -37,6 +39,7 @@ export function Input({
   className,
   type = "text",
   revealable = false,
+  fullWidth = false,
   ...rest
 }: InputProps) {
   const [revealed, setRevealed] = useState(false);
@@ -55,7 +58,7 @@ export function Input({
     .filter(Boolean)
     .join(" ");
   return (
-    <div className={styles.field}>
+    <div className={[styles.field, fullWidth ? styles.fieldFull : undefined].filter(Boolean).join(" ")}>
       <span className={styles.labelRow}>
         <label htmlFor={inputId}>{label}</label>
         {labelEnd}

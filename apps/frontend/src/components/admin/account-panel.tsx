@@ -4,13 +4,11 @@
 
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
 import { PageHeader } from "../ui/page-header";
+import { Spinner } from "../ui/spinner";
 import { CodeText, UserText } from "../ui/user-text";
-import { fetchMe, type ApiAuth } from "../../lib/api";
-import { useSession } from "../../lib/auth/session-provider";
-import { sessionQueryKeys } from "../../lib/query-keys";
+import { inviteRoleLabel } from "../../lib/admin-copy";
+import { useCurrentUser } from "../../lib/hooks/use-current-user";
 import shellStyles from "./admin-shell.module.css";
 import tableStyles from "./admin-tables.module.css";
 
@@ -22,40 +20,30 @@ const styles = { ...shellStyles, ...tableStyles };
  * @returns Account page. Sign out stays in the shell menu.
  */
 export function AccountPanel() {
-  const session = useSession();
-  const accessToken = session.accessToken;
-  const auth = useMemo<ApiAuth | null>(
-    () => (accessToken ? { accessToken } : null),
-    [accessToken],
-  );
-  const keys = sessionQueryKeys(accessToken);
-  const meQuery = useQuery({
-    queryKey: keys.me,
-    queryFn: () => fetchMe(auth as ApiAuth),
-    enabled: auth !== null,
-  });
-  const me = meQuery.data;
+  const { currentUser, currentUserPending } = useCurrentUser();
+  const me = currentUser;
 
   return (
     <div className={styles.page}>
       <PageHeader description="Signed-in identity for this workspace." />
+      {currentUserPending ? <Spinner label="Loading account" /> : null}
       <section className={styles.panel} aria-label="Current user" data-testid="profile-fields">
         <dl className={styles.dl}>
-          <dt>user_id</dt>
+          <dt>User ID</dt>
           <dd>
             <CodeText value={me?.user_id ?? ""} />
           </dd>
-          <dt>role</dt>
+          <dt>Role</dt>
           <dd>
-            <UserText value={me?.role ?? ""} />
+            <UserText value={me ? inviteRoleLabel(me.role) : ""} />
           </dd>
-          <dt>authorization_version</dt>
+          <dt>Authorization version</dt>
           <dd>
-            <UserText value={String(me?.authorization_version ?? "")} />
+            <UserText value={me ? String(me.authorization_version) : ""} />
           </dd>
-          <dt>upload_enabled</dt>
+          <dt>Upload access</dt>
           <dd>
-            <UserText value={String(me?.upload_enabled ?? "")} />
+            <UserText value={me ? (me.upload_enabled ? "Enabled" : "Disabled") : ""} />
           </dd>
         </dl>
       </section>

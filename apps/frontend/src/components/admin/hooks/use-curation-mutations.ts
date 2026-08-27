@@ -81,7 +81,7 @@ export function useCurationMutations() {
     onSuccess: (result) => {
       setError(null);
       setImportId(result.import_id);
-      setOutcome(`glossary ${result.status} import_id=${result.import_id}`);
+      setOutcome(`Glossary import ${result.status}.`);
     },
     onError: (caught: Error) => setError(mutationFailureBanner(caught)),
   });
@@ -95,7 +95,7 @@ export function useCurationMutations() {
     },
     onSuccess: (result) => {
       setError(null);
-      setOutcome(`glossary ${result.status} import_id=${result.import_id}`);
+      setOutcome(`Glossary import ${result.status}.`);
     },
     onError: (caught: Error) => setError(mutationFailureBanner(caught)),
   });
@@ -109,7 +109,7 @@ export function useCurationMutations() {
     },
     onSuccess: (result) => {
       setError(null);
-      setOutcome(`glossary ${result.status} import_id=${result.import_id}`);
+      setOutcome(`Glossary import ${result.status}.`);
     },
     onError: (caught: Error) => setError(mutationFailureBanner(caught)),
   });
@@ -126,11 +126,11 @@ export function useCurationMutations() {
         source: "feedback",
       });
     },
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       setError(null);
       setStaleConflict(false);
       setSuggestOpen(false);
-      setOutcome(`suggested ${result.rule_id} row_version=${String(result.row_version)}`);
+      setOutcome("Suggestion saved.");
       await queryClient.invalidateQueries({ queryKey: keys.entityRules });
     },
     onError: (caught: Error) => setError(mutationFailureBanner(caught)),
@@ -156,11 +156,11 @@ export function useCurationMutations() {
         row_version: rule.row_version,
       });
     },
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       setError(null);
       setStaleConflict(false);
       setEditRule(null);
-      setOutcome(`patched ${result.rule_id} row_version=${String(result.row_version)}`);
+      setOutcome("Rule saved.");
       await queryClient.invalidateQueries({ queryKey: keys.entityRules });
     },
     onError: (caught: Error) => {
@@ -176,10 +176,10 @@ export function useCurationMutations() {
       }
       return approveEntityRule(auth, rule.id, rule.row_version);
     },
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       setError(null);
       setStaleConflict(false);
-      setOutcome(`approved ${result.rule_id} row_version=${String(result.row_version)}`);
+      setOutcome("Rule approved.");
       await queryClient.invalidateQueries({ queryKey: keys.entityRules });
     },
     onError: (caught: Error) => {
@@ -195,10 +195,10 @@ export function useCurationMutations() {
       }
       return revokeEntityRule(auth, rule.id, rule.row_version);
     },
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       setError(null);
       setStaleConflict(false);
-      setOutcome(`revoked ${result.rule_id} row_version=${String(result.row_version)}`);
+      setOutcome("Rule revoked.");
       await queryClient.invalidateQueries({ queryKey: keys.entityRules });
     },
     onError: (caught: Error) => {

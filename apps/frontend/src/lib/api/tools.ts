@@ -57,9 +57,21 @@ export async function listTools(
   const response = await fetchImpl(apiUrl(`/tools${suffix}`), {
     headers: resumeHeaders(auth),
   });
-  const parsed: unknown = await response.json();
+  let parsed: unknown = [];
+  try {
+    parsed = await response.json();
+  } catch {
+    parsed = {};
+  }
+  if (!response.ok) {
+    const body =
+      parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
   if (!Array.isArray(parsed)) {
-    return [];
+    throw new Error("request_rejected");
   }
   return parsed
     .filter(

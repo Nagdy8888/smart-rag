@@ -545,7 +545,13 @@ def test_viewer_tool_catalog_omits_admin_keys(
         "smart_rag_api.routers.tools.enforce_rate_limit",
         _noop_rate_limit,
     )
-    with TestClient(create_app()) as raw:
+    monkeypatch.setattr(
+        "smart_rag_api.services.tools_http.ToolHttpService._catalog_seeds",
+        lambda self, caller: {},
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    with TestClient(application) as raw:
         client = as_openapi_client(raw)
         viewer = client.get("/tools", headers=_identity(_VIEWER, "viewer"))
         owner = client.get("/tools", headers=_identity(_OWNER, "owner"))

@@ -25,14 +25,19 @@ catalog_router = APIRouter(prefix="/tools", tags=["tools"])
 admin_router = APIRouter(prefix="/admin/tools", tags=["tools-admin"])
 
 
-def get_tool_catalog_service() -> ToolHttpService:
-    """Factory for in-code catalog search. Postgres is not required.
+def get_tool_catalog_service(
+    postgres_url: Annotated[str, Depends(get_postgres_url)],
+) -> ToolHttpService:
+    """Factory for catalog search with optional seed overlay.
+
+    Args:
+        postgres_url: Injected DSN used to overlay ``app.tool_catalog.active``.
 
     Returns:
-        Tool service with an empty DSN.
+        Tool service.
     """
 
-    return ToolHttpService("")
+    return ToolHttpService(postgres_url)
 
 
 def get_tool_admin_service(

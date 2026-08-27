@@ -294,7 +294,7 @@ describe("DocumentLibrary delete and pagination", () => {
       },
     ]);
     renderSurface(<DocumentLibrary />);
-    fireEvent.click(await screen.findByRole("button", { name: "Document actions" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Document actions" }))[0]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     expect(screen.getByRole("heading", { name: "Delete document?" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Delete document" }));
@@ -322,7 +322,7 @@ describe("DocumentLibrary delete and pagination", () => {
       new ClassifiedApiError({ kind: "auth", status: 403, detail: "forbidden" }),
     );
     renderSurface(<DocumentLibrary />);
-    fireEvent.click(await screen.findByRole("button", { name: "Document actions" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Document actions" }))[0]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete document" }));
     expect(await screen.findByText("You cannot delete this document.")).toBeInTheDocument();
@@ -359,15 +359,91 @@ describe("DocumentLibrary delete and pagination", () => {
       },
     );
     renderSurface(<DocumentLibrary />);
-    expect(await screen.findByText("Doc 0")).toBeInTheDocument();
+    expect(await screen.findAllByText("Doc 0")).not.toHaveLength(0);
     expect(screen.queryByRole("button", { name: /preview/i })).toBeNull();
     expect(screen.queryByText(/Source preview and download are not available/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    expect(await screen.findByText("Extra")).toBeInTheDocument();
+    expect(await screen.findAllByText("Extra")).not.toHaveLength(0);
     expect(screen.getAllByText(/^Doc /).length + 1).toBeGreaterThan(50);
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
     const cursors = listDocuments.mock.calls.map((call) => call[1]?.cursor);
     expect(cursors).toContain("2026-08-24T00:00:00Z,doc-49");
+  });
+});
+
+describe("DocumentLibrary status", () => {
+  it("loads search and graph pills from version status without a menu click", async () => {
+    listDocuments.mockResolvedValue([
+      {
+        document_id: "doc-1",
+        title: "Policy handbook",
+        visibility: "company",
+        current_version_id: "ver-1",
+        visibility_generation: 1,
+        created_at: "2026-08-24T00:00:00Z",
+      },
+    ]);
+    fetchVersionStatus.mockResolvedValue({
+      version: {
+        version_id: "ver-1",
+        document_id: "doc-1",
+        status: "graph_pending",
+        retrieval_eligible: true,
+        document_graph_eligible: true,
+        hybrid_verified_at: null,
+        bm25_verified_at: null,
+        graph_handoff_at: null,
+        retry_allowed: false,
+        bm25: {
+          active_index_version: 1,
+          index_schema_version: "v1",
+          lag_seconds: 0,
+          pending: 0,
+          processing: 0,
+          failed: 0,
+          dead_letter: 0,
+          retry_attempts: 0,
+          verified_at: null,
+        },
+        graph_handoff: {
+          pending: 1,
+          processing: 0,
+          completed: 0,
+          failed: 0,
+          dead_letter: 0,
+        },
+      },
+      recent_jobs: [],
+    });
+    renderSurface(<DocumentLibrary />);
+    expect(await screen.findAllByText("Search ready")).not.toHaveLength(0);
+    expect(screen.getAllByText("Graph pending").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Not indexed")).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Load status" })).toBeNull();
+    await waitFor(() => {
+      expect(fetchVersionStatus).toHaveBeenCalled();
+    });
+  });
+
+  it("opens Processing with an honest fallback when version status is missing", async () => {
+    listDocuments.mockResolvedValue([
+      {
+        document_id: "doc-1",
+        title: "Policy handbook",
+        visibility: "company",
+        current_version_id: "ver-1",
+        visibility_generation: 1,
+        created_at: "2026-08-24T00:00:00Z",
+      },
+    ]);
+    fetchVersionStatus.mockResolvedValue(null);
+    renderSurface(<DocumentLibrary />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Document actions" }))[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "View processing" }));
+    expect(await screen.findByRole("heading", { name: "Processing" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("Processing details could not be loaded."),
+    ).toBeInTheDocument();
   });
 });
 
@@ -445,8 +521,20 @@ describe("DocumentDetail delete and context links", () => {
       "href",
       "/tables?documentId=doc-1",
     );
+    expect(await screen.findByRole("link", { name: "Owned table" })).toHaveAttribute(
+      "href",
+      "/tables?tableId=t-own&documentId=doc-1",
+    );
+    expect(screen.getByRole("link", { name: "Back to documents" })).toHaveAttribute(
+      "href",
+      "/documents",
+    );
+    expect(await screen.findAllByText("Search ready")).not.toHaveLength(0);
+    expect(screen.queryByText("none")).toBeNull();
+    expect(screen.queryByText(/Role hiding/)).toBeNull();
     expect(screen.getByText("Owned table")).toBeInTheDocument();
     expect(screen.queryByText("Other table")).toBeNull();
+    expect(screen.queryByText(/The graph is not ready/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Document actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete document" }));
@@ -469,6 +557,8 @@ describe("DocumentDetail delete and context links", () => {
     });
     deleteDocument.mockRejectedValue(new ClassifiedApiError({ kind: "deleted" }));
     renderSurface(<DocumentDetail documentId="doc-1" />);
+    expect(screen.queryByText("none")).toBeNull();
+    expect(screen.queryByText(/Role hiding/)).toBeNull();
     fireEvent.click(await screen.findByRole("button", { name: "Document actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete document" }));

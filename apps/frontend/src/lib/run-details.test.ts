@@ -1,0 +1,95 @@
+// @vitest-environment node
+
+import { describe, expect, it } from "vitest";
+import {
+  cacheStatusLabel,
+  correctionReasonLabel,
+  isRealDetailValue,
+  routeIcon,
+  routeLabel,
+  routeSummary,
+  runStatusLabel,
+  runStatusSummary,
+  runStatusTone,
+} from "./run-details";
+
+describe("isRealDetailValue", () => {
+  it("rejects empty placeholders", () => {
+    expect(isRealDetailValue(null)).toBe(false);
+    expect(isRealDetailValue("")).toBe(false);
+    expect(isRealDetailValue("—")).toBe(false);
+    expect(isRealDetailValue("none")).toBe(false);
+    expect(isRealDetailValue("None")).toBe(false);
+  });
+
+  it("keeps catalog values", () => {
+    expect(isRealDetailValue("composite")).toBe(true);
+  });
+});
+
+describe("routeLabel", () => {
+  it("maps known families and isolates unknown text", () => {
+    expect(routeLabel("composite")).toBe("Composite");
+    expect(routeLabel("hybrid")).toBe("Hybrid");
+    expect(routeLabel("combined")).toBe("Combined");
+    expect(routeLabel("structured_table")).toBe("Tables");
+    expect(routeLabel("graph_inspection")).toBe("Graph inspection");
+    expect(routeLabel("<script>x</script>")).toBe("<script>x</script>");
+    expect(routeLabel(null)).toBeNull();
+    expect(routeLabel("none")).toBeNull();
+  });
+});
+
+describe("routeSummary", () => {
+  it("explains known families only", () => {
+    expect(routeSummary("composite")).toBe(
+      "Searches documents, tables, and relationships.",
+    );
+    expect(routeSummary("custom_family")).toBeNull();
+    expect(routeSummary(null)).toBeNull();
+  });
+});
+
+describe("runStatusLabel", () => {
+  it("never says running when runId is null", () => {
+    expect(runStatusLabel(null, null)).toBeNull();
+    expect(runStatusLabel("completed", null)).toBe("Completed");
+    expect(runStatusLabel(null, "run-1")).toBe("In progress");
+    expect(runStatusLabel("partial", "run-1")).toBe("Partial");
+    expect(runStatusLabel("cancelled", "run-1")).toBe("Cancelled");
+    expect(runStatusLabel("error", "run-1")).toBe("Error");
+    expect(runStatusLabel("deadline", "run-1")).toBe("Deadline reached");
+  });
+});
+
+describe("correctionReasonLabel", () => {
+  it("maps the relationship reason and isolates unknown text", () => {
+    expect(correctionReasonLabel("relationship")).toBe(
+      "The question needed relationship search.",
+    );
+    expect(correctionReasonLabel(null)).toBeNull();
+    expect(correctionReasonLabel("<img>")).toBe("<img>");
+  });
+});
+
+describe("runStatusTone and runStatusSummary", () => {
+  it("maps catalog terminals without inventing running when idle", () => {
+    expect(runStatusTone("completed", "run-1")).toBe("success");
+    expect(runStatusTone("error", "run-1")).toBe("danger");
+    expect(runStatusTone("partial", "run-1")).toBe("warning");
+    expect(runStatusTone(null, null)).toBe("neutral");
+    expect(runStatusSummary("completed", true)).toBe("Verified and ready.");
+    expect(runStatusSummary("completed", false)).toBe("The run finished.");
+    expect(runStatusSummary(null, false)).toBe("Working on this question.");
+  });
+});
+
+describe("routeIcon and cacheStatusLabel", () => {
+  it("picks a known icon and friendly cache copy", () => {
+    expect(routeIcon("composite")).toBe("search");
+    expect(routeIcon("structured_table")).toBe("tables");
+    expect(routeIcon("graph_inspection")).toBe("graph");
+    expect(cacheStatusLabel("hit")).toBe("Reused a cached search");
+    expect(cacheStatusLabel(null)).toBeNull();
+  });
+});

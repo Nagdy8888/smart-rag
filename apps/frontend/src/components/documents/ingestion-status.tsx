@@ -9,14 +9,17 @@ import { Sheet } from "../ui/sheet";
 import { StatusPill } from "../ui/status-pill";
 import { UserText } from "../ui/user-text";
 import {
+  bm25DetailRows,
   compactIngestionPills,
-  formatBm25Summary,
-  formatGraphHandoffSummary,
-  ingestionStatusLabel,
+  graphHandoffDetailRows,
+  ingestionJobKindLabel,
+  ingestionJobStatusLabel,
   ingestionStatusTone,
   ingestionTimelineSteps,
+  openIngestionJobs,
 } from "../../lib/ingestion-status";
-import { graphNotReadyCopy, limitationCopy } from "../../lib/limitations";
+import { isRealDetailValue } from "../../lib/run-details";
+import { limitationCopy } from "../../lib/limitations";
 import type {
   DocumentIngestionStatusResponse,
   IngestionJobSummary,
@@ -107,6 +110,53 @@ export function IngestionStatus({
     );
   }
   const steps = ingestionTimelineSteps(version.status);
+  const scanResult = version.scan?.result;
+  const reviewCategory = version.review?.declared_category;
+  const reviewPolicy = version.review?.attestation_policy_version;
+  const bm25Rows = bm25DetailRows(version.bm25);
+  const handoffRows = graphHandoffDetailRows(version.graph_handoff);
+  const openJobs = openIngestionJobs(payload.recent_jobs ?? []);
+  const chunkCount = version.chunk_count ?? 0;
+  const ocrPages = version.ocr?.page_count ?? 0;
+  const detailRows: { label: string; value: ReactNode }[] = [
+    ...bm25Rows.map((row) => ({ label: row.label, value: row.value })),
+    ...handoffRows.map((row) => ({ label: row.label, value: row.value })),
+  ];
+  if (chunkCount > 0) {
+    detailRows.push({
+      label: "Searchable chunks",
+      value: String(chunkCount),
+    });
+  }
+  if (ocrPages > 0) {
+    detailRows.push({
+      label: "Pages",
+      value: String(ocrPages),
+    });
+  }
+  if (isRealDetailValue(scanResult)) {
+    detailRows.push({
+      label: "Scan",
+      value: <UserText value={scanResult} />,
+    });
+  }
+  if (isRealDetailValue(reviewCategory)) {
+    detailRows.push({
+      label: "Attestation",
+      value: (
+        <>
+          <UserText value={reviewCategory} />
+          {isRealDetailValue(reviewPolicy) ? (
+            <>
+              {" "}
+              <UserText value={reviewPolicy} />
+            </>
+          ) : null}
+        </>
+      ),
+    });
+  }
+  const showDetails = detailRows.length > 0 || openJobs.length > 0;
   const body = (
     <div className={styles.formStack}>
       <ol className={styles.timeline}>
@@ -125,67 +175,48 @@ export function IngestionStatus({
           </li>
         ))}
       </ol>
-      <StatusPill
-        status={ingestionStatusLabel(version.status)}
-        tone={ingestionStatusTone(version.status)}
-      />
-      {version.status === "graph_pending" || !version.document_graph_eligible ? (
+      {version.status === "graph_pending" ? (
         <LimitationCallout tone="warning">
-          {limitationCopy("graph_pending")} {graphNotReadyCopy(1)}
+          {limitationCopy("graph_pending")}
         </LimitationCallout>
       ) : null}
-      <details className={styles.details}>
-        <summary>Technical details</summary>
-        <dl className={styles.dl}>
-          <dt>BM25</dt>
-          <dd>{formatBm25Summary(version.bm25)}</dd>
-          <dt>Graph handoff</dt>
-          <dd>{formatGraphHandoffSummary(version.graph_handoff)}</dd>
-          {version.scan ? (
-            <>
-              <dt>Scan</dt>
-              <dd>
-                <UserText value={version.scan.result ?? "none"} />
-              </dd>
-            </>
+      {showDetails ? (
+        <details className={styles.details}>
+          <summary>Technical details</summary>
+          {detailRows.length > 0 ? (
+            <dl className={styles.dl}>
+              {detailRows.map((row) => (
+                <div key={row.label} className={styles.detailRow}>
+                  <dt>{row.label}</dt>
+                  <dd>{row.value}</dd>
+                </div>
+              ))}
+            </dl>
           ) : null}
-          {version.review ? (
-            <>
-              <dt>Attestation</dt>
-              <dd>
-                <UserText value={version.review.declared_category ?? "none"} />{" "}
-                <UserText value={version.review.attestation_policy_version ?? ""} />
-              </dd>
-            </>
+          {openJobs.length > 0 ? (
+            <ul className={styles.jobList}>
+              {openJobs.map((job: IngestionJobSummary) => (
+                <li key={job.id}>
+                  <UserText value={ingestionJobKindLabel(job.job_kind)} />
+                  {" — "}
+                  <UserText value={ingestionJobStatusLabel(job.status)} />
+                  {version.retry_allowed && onRetry ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      pending={retryPending}
+                      pendingLabel="Retrying…"
+                      onClick={() => onRetry(job.id)}
+                    >
+                      Retry
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           ) : null}
-          {version.ocr ? (
-            <>
-              <dt>OCR</dt>
-              <dd>
-                pages={String(version.ocr.page_count)} ocr={String(version.ocr.ocr_pages)}
-              </dd>
-            </>
-          ) : null}
-        </dl>
-        <ul className={styles.jobList}>
-          {(payload.recent_jobs ?? []).map((job: IngestionJobSummary) => (
-            <li key={job.id}>
-              <UserText value={job.job_kind} /> — <UserText value={job.status} />
-              {version.retry_allowed && onRetry ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  pending={retryPending}
-                  pendingLabel="Retrying…"
-                  onClick={() => onRetry(job.id)}
-                >
-                  Retry
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </details>
+        </details>
+      ) : null}
     </div>
   );
   if (!asSheet) {
@@ -195,7 +226,7 @@ export function IngestionStatus({
     return body;
   }
   return (
-    <Sheet title="Ingestion status" onClose={onClose}>
+    <Sheet title="Processing" onClose={onClose}>
       {body}
     </Sheet>
   );

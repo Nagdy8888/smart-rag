@@ -4,9 +4,9 @@
 
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DOCUMENT_LIST_PAGE_SIZE,
   deleteDocument,
@@ -23,7 +23,10 @@ import { evaluatePaidHandshake } from "../../../lib/handshake";
 import { useCurrentUser } from "../../../lib/hooks/use-current-user";
 import { publicQueryKeys, sessionQueryKeys } from "../../../lib/query-keys";
 import { isOwnerOrAdmin, showCrawlConvenience, showUploadConvenience } from "../../../lib/roles";
-import type { DocumentResponse } from "../../../lib/types";
+import type {
+  DocumentIngestionStatusResponse,
+  DocumentResponse,
+} from "../../../lib/types";
 import { ingestionStatusIsTerminal, INGESTION_STATUS_POLL_MS } from "../ingestion-status";
 import {
   classifyDocumentDeleteFailure,
@@ -50,8 +53,9 @@ function documentMatchesFilter(doc: DocumentResponse, needle: string): boolean {
  * Own library queries and paid import/delete mutations.
  *
  * File import is reserve → Storage JWT → finalize. Duplicate upload clicks
- * reuse one idempotency key until success. Polling stops on terminal status,
- * closed inspector, hidden tab, or unmount.
+ * reuse one idempotency key until success. List status is fetched per loaded
+ * version, page-bounded. Polling stops on terminal status, hidden tab, or
+ * unmount.
  *
  * @returns Controlled library state. Does not claim client-side authorization.
  */
@@ -171,8 +175,56 @@ export function useDocumentLibrary() {
     },
   });
   const role = currentUser?.role;
-  const loaded = pages.flat();
-  const loadedStatus = versionQuery.data;
+  const loaded = useMemo(() => pages.flat(), [pages]);
+  const versionIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          loaded
+            .map((doc) => doc.current_version_id)
+            .filter((id): id is string => typeof id === "string" && id !== ""),
+        ),
+      ),
+    [loaded],
+  );
+  const statusQueries = useQueries({
+    queries: versionIds.map((versionId) => ({
+      queryKey: keys.versionStatus(versionId),
+      queryFn: () => fetchVersionStatus(auth as ApiAuth, versionId),
+      enabled: auth !== null,
+      refetchInterval: (query: {
+        state: { data?: DocumentIngestionStatusResponse | null };
+      }) => {
+        if (!pageVisible) {
+          return false;
+        }
+        const status = query.state.data?.version?.status;
+        if (!status || ingestionStatusIsTerminal(status)) {
+          return false;
+        }
+        return INGESTION_STATUS_POLL_MS;
+      },
+    })),
+  });
+  const statusByVersionId = useMemo(() => {
+    const next: Record<string, DocumentIngestionStatusResponse> = {};
+    versionIds.forEach((id, index) => {
+      const payload = statusQueries[index]?.data;
+      if (payload) {
+        next[id] = payload;
+      }
+    });
+    return next;
+  }, [statusQueries, versionIds]);
+  const pendingStatusIds = useMemo(() => {
+    const pending = new Set<string>();
+    versionIds.forEach((id, index) => {
+      if (statusQueries[index]?.isPending) {
+        pending.add(id);
+      }
+    });
+    return pending;
+  }, [statusQueries, versionIds]);
   return {
     signedIn: session.ready && session.accessToken !== null,
     showUpload: showUploadConvenience(role, currentUser?.upload_enabled),
@@ -190,16 +242,18 @@ export function useDocumentLibrary() {
     nextCursor,
     loadMore: () => loadMoreMutation.mutate(),
     loadMorePending: loadMoreMutation.isPending,
-    statusByVersionId:
-      statusVersionId !== null && loadedStatus != null
-        ? { [statusVersionId]: loadedStatus }
-        : {},
+    statusByVersionId,
+    pendingStatusIds,
     openInspector: (versionId: string) => {
       setStatusVersionId(versionId);
       setInspectorOpen(true);
     },
     inspectorOpen,
-    inspectorPayload: versionQuery.data,
+    inspectorPending:
+      statusVersionId !== null && pendingStatusIds.has(statusVersionId),
+    inspectorPayload:
+      versionQuery.data ??
+      (statusVersionId !== null ? statusByVersionId[statusVersionId] : undefined),
     closeInspector: () => setInspectorOpen(false),
     retryJob: (jobId: string) => retryMutation.mutate(jobId),
     retryPending: retryMutation.isPending,

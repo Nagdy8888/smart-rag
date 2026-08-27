@@ -31,8 +31,13 @@ export const SQL_REJECTED_COPY = "Raw SQL is not accepted.";
 /** Empty successful analyze. */
 export const EMPTY_ANALYZE_ROWS_COPY = "The analysis returned no rows.";
 
-/** Empty `GET /tables` list. */
-export const EMPTY_MANIFESTS_COPY = "No structured tables are available.";
+/** Empty `GET /tables` list. Only CSV/XLSX artifacts appear here. */
+export const EMPTY_MANIFESTS_COPY =
+  "Extracted spreadsheet tables from ingested documents appear here.";
+
+/** Empty extracted tables for one document, including `?documentId=` on `/tables`. */
+export const EMPTY_DOCUMENT_TABLES_COPY =
+  "This document has no extracted tables.";
 
 /** Result keys that fail the internal identifier regex are omitted. */
 export const OMITTED_RESULT_COLUMN_COPY =

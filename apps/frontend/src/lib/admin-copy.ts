@@ -49,4 +49,46 @@ export const FORBIDDEN_MUTATION_COPY =
 
 /** Optimistic concurrency conflict on entity-rule approve/revoke. */
 export const STALE_ROW_VERSION_COPY =
-  "Entity rule update conflict (stale_row_version). Reload the list and retry with the current row_version.";
+  "This rule changed since you loaded it. Reload the list and try again.";
+
+/**
+ * Title-case a stored invite role for chrome. Unknown values stay as text.
+ *
+ * @param role - Server role string.
+ * @returns Display label.
+ */
+export function inviteRoleLabel(role: string): string {
+  switch (role) {
+    case "owner":
+      return "Owner";
+    case "admin":
+      return "Admin";
+    case "member":
+      return "Member";
+    case "viewer":
+      return "Viewer";
+    default:
+      return role;
+  }
+}
+
+/**
+ * Title-case a stored tool permission for chrome.
+ *
+ * @param permission - Server permission string.
+ * @returns Display label.
+ */
+export function toolPermissionLabel(permission: string): string {
+  switch (permission) {
+    case "none":
+      return "None";
+    case "read":
+      return "Read";
+    case "execute":
+      return "Execute";
+    case "admin":
+      return "Admin";
+    default:
+      return permission;
+  }
+}

@@ -5,6 +5,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Spinner } from "../ui/spinner";
 import { StatusBanner } from "../ui/status-banner";
 import { UserText } from "../ui/user-text";
 import { fetchUsageCompany, fetchUsageMe, type ApiAuth } from "../../lib/api";
@@ -23,10 +24,23 @@ import tableStyles from "./admin-tables.module.css";
 const styles = { ...shellStyles, ...tableStyles };
 
 /**
+ * Format a usage number for the 24px metric line.
+ *
+ * @param value - API integer or decimal string.
+ * @returns Display text. Empty when the payload is still loading.
+ */
+function metricText(value: string | number | undefined): string {
+  if (value === undefined) {
+    return "—";
+  }
+  return String(value);
+}
+
+/**
  * One usage metric card.
  *
  * @param props - Title, payload, test id.
- * @returns Tokens and USD only.
+ * @returns Prompt, completion, USD, and usage records from the API.
  */
 function UsageCard({
   title,
@@ -37,21 +51,24 @@ function UsageCard({
   usage: UsageResponse | undefined;
   testId: string;
 }) {
-  const tokens =
-    usage === undefined
-      ? "—"
-      : String(usage.prompt_tokens + usage.completion_tokens);
-  const usd = usage === undefined ? "—" : String(usage.cost_usd);
   return (
     <section className={styles.metricCard} aria-label={title} data-testid={testId}>
       <h2>{title}</h2>
-      <p className={styles.metricLabel}>Tokens</p>
+      <p className={styles.metricLabel}>Prompt tokens</p>
       <p className={styles.metricValue}>
-        <UserText value={tokens} />
+        <UserText value={metricText(usage?.prompt_tokens)} />
+      </p>
+      <p className={styles.metricLabel}>Completion tokens</p>
+      <p className={styles.metricValue}>
+        <UserText value={metricText(usage?.completion_tokens)} />
       </p>
       <p className={styles.metricLabel}>USD</p>
       <p className={styles.metricValue}>
-        <UserText value={usd} />
+        <UserText value={metricText(usage?.cost_usd)} />
+      </p>
+      <p className={styles.metricLabel}>Usage records</p>
+      <p className={styles.metricValue}>
+        <UserText value={metricText(usage?.usage_rows)} />
       </p>
     </section>
   );
@@ -87,10 +104,17 @@ export function UsagePanel() {
     usageQuery.error instanceof Error
       ? mutationFailureBanner(usageQuery.error)
       : null;
+  const loadingMe = usageQuery.isPending && usageQuery.data === undefined;
+  const loadingCompany =
+    showCompany && companyQuery.isPending && companyQuery.data === undefined;
   const rateDegraded = ready?.rate_limit_degraded === true;
 
   return (
     <div className={styles.stack}>
+      <p className={styles.panelLead}>
+        Recorded model usage for this workspace. Totals only; prompt text is
+        never shown.
+      </p>
       {meError ? (
         <StatusBanner kind="error" role="alert">
           {meError}
@@ -101,6 +125,7 @@ export function UsagePanel() {
           {companyError}
         </StatusBanner>
       ) : null}
+      {loadingMe && !meError ? <Spinner label="Loading usage" /> : null}
       <div className={styles.usageRow}>
         <UsageCard title="Your usage" usage={usageQuery.data} testId="usage-meters" />
         {showCompany ? (
@@ -111,6 +136,7 @@ export function UsagePanel() {
           />
         ) : null}
       </div>
+      {loadingCompany ? <Spinner label="Loading company usage" /> : null}
       {rateDegraded ? (
         <StatusBanner kind="warning" role="status">
           Rate limiter is degraded. {RATE_LIMIT_COPY}

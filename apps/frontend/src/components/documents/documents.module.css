@@ -5,8 +5,14 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--space) * 4);
-  max-width: 73.75rem;
+  gap: calc(var(--space) * 6);
+  width: 100%;
+  max-width: 1440px;
+  min-width: 0;
+}
+
+.page > header {
+  margin-bottom: 0;
 }
 
 .header {
@@ -26,35 +32,176 @@
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: calc(var(--space) * 3);
-  align-items: flex-end;
+  gap: calc(var(--space) * 4) calc(var(--space) * 6);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.toolbarFilter {
+  flex: 1 1 16rem;
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 1);
+}
+
+.toolbarCount {
+  margin: 0;
+  padding-top: 24px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 .tableWrap {
-  overflow-x: auto;
+  overflow: auto;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
+  box-shadow: var(--shadow-1);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.tableCaption,
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .table th,
 .table td {
-  padding: calc(var(--space) * 2) calc(var(--space) * 3);
+  min-height: var(--row-height);
+  height: var(--row-height);
+  padding: 0 calc(var(--space) * 4);
   text-align: start;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
 
 .table th {
-  font-size: 0.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 40px;
+  min-height: 40px;
+  background: var(--color-surface-muted);
+  font-size: 12px;
+  line-height: 16px;
   font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.actionsCell {
+  text-align: end;
+  width: 3.25rem;
+  padding-inline-end: calc(var(--space) * 3);
+}
+
+.metaCell {
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.nameLink {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nameLink:hover {
+  text-decoration: underline;
+}
+
+.docIcon {
+  display: inline-flex;
   color: var(--color-text-muted);
+}
+
+.mobileList {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: calc(var(--space) * 3);
+}
+
+.mobileCard {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+  padding: calc(var(--space) * 3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+}
+
+.mobilePills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+}
+
+.mobileMeta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.mobileActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.backLink {
+  margin: 0;
+}
+
+.backLink a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.backLink a:hover {
+  text-decoration: underline;
+}
+
+.headerPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  margin-top: calc(var(--space) * 2);
+}
+
+.idRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space) * 1);
 }
 
 .mono {
@@ -78,8 +225,11 @@
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 3);
-  padding: calc(var(--space) * 4) 0;
-  border-bottom: 1px solid var(--color-border);
+  padding: calc(var(--space) * 5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
 }
 
 .section h2 {
@@ -125,9 +275,14 @@
 }
 
 .toolbarSummary {
-  margin: 0 0 calc(var(--space) * 1);
+  margin: 0;
   color: var(--color-text-muted);
   font-size: 0.875rem;
+}
+
+.loadMore {
+  display: flex;
+  justify-content: center;
 }
 
 .queueRow {
@@ -150,15 +305,49 @@
 .timeline {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--space) * 2);
+  gap: calc(var(--space) * 3);
+  position: relative;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--color-border);
 }
 
 .timelineStep {
   display: flex;
   align-items: center;
+  position: relative;
+}
+
+.timelineStep::before {
+  content: "";
+  position: absolute;
+  left: -1.25rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  z-index: 1;
+}
+
+.timelineStep[data-state="done"]::before {
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.timelineStep[data-state="current"]::before {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .timelineStep[data-state="upcoming"] {
@@ -184,6 +373,28 @@
   gap: calc(var(--space) * 2);
 }
 
+.sideActions a {
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sideActions a:hover {
+  text-decoration: underline;
+}
+
+.detailRow {
+  display: contents;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: var(--text-page-title-size);
+  line-height: var(--text-page-title-height);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 .confirmBody {
   margin: 0;
 }
@@ -195,33 +406,20 @@
 }
 
 @media (max-width: 767px) {
-  .table thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
+  .tableWrap {
+    display: none;
   }
 
-  .table,
-  .table tbody,
-  .table tr,
-  .table td {
-    display: block;
-    width: 100%;
-  }
-
-  .table tr {
-    padding: calc(var(--space) * 3);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .table td {
-    border-bottom: 0;
-    padding: calc(var(--space) * 1) 0;
+  .mobileList {
+    display: flex;
   }
 
   .dl {
     grid-template-columns: 1fr;
+  }
+
+  .toolbarCount {
+    padding-top: 0;
+    align-self: flex-start;
   }
 }

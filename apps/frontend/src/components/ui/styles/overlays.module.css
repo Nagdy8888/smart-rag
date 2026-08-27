@@ -109,6 +109,13 @@
   box-shadow: var(--shadow-2);
 }
 
+.menuPanelFixed {
+  position: fixed;
+  margin-top: 0;
+  z-index: 35;
+  min-width: 14rem;
+}
+
 .tooltipPanel {
   min-width: 0;
   max-width: 16rem;

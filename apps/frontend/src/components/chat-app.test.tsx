@@ -416,7 +416,11 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     expect(await screen.findByRole("button", { name: "Citation 1" })).toBeInTheDocument();
     const diagnostics = screen.getByTestId("advanced-diagnostics");
     expect(diagnostics).toHaveTextContent("future_metric");
-    expect(diagnostics).toHaveTextContent("combined");
+    expect(diagnostics).toHaveTextContent("Combined");
+    expect(diagnostics).toHaveTextContent("Hybrid");
+    expect(diagnostics).not.toHaveTextContent("Heartbeats");
+    expect(diagnostics).not.toHaveTextContent("none (ignored)");
+    expect(diagnostics).not.toHaveTextContent("verify_answer");
   });
 
   it("reconnect 404 shows deleted copy without source text", async () => {
@@ -718,7 +722,7 @@ describe("ChatApp Ask workspace", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText("Paris is the capital of France.")).toBeInTheDocument();
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("General knowledge");
-    expect(screen.getByTestId("answer-route")).toHaveTextContent("composite");
+    expect(screen.getByTestId("answer-route")).toHaveTextContent("Composite");
     expect(screen.queryByTestId("answer-citations")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Citation 1" })).toBeNull();
     expect(screen.getByRole("button", { name: "Sources (0)" })).toBeInTheDocument();
@@ -765,7 +769,7 @@ describe("ChatApp Ask workspace", () => {
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("button", { name: "Citation 1" })).toBeInTheDocument();
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("Company documents");
-    expect(screen.getByTestId("answer-route")).toHaveTextContent("composite");
+    expect(screen.getByTestId("answer-route")).toHaveTextContent("Composite");
     expect(screen.getByRole("button", { name: "Sources (1)" })).toBeInTheDocument();
   });
 

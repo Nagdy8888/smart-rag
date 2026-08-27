@@ -6,6 +6,7 @@
 export {
   DISPLAY_SORT_LABEL,
   EMPTY_ANALYZE_ROWS_COPY,
+  EMPTY_DOCUMENT_TABLES_COPY,
   EMPTY_MANIFESTS_COPY,
   EMPTY_TABLE_PLAN_DRAFT,
   OMITTED_RESULT_COLUMN_COPY,
@@ -35,8 +36,12 @@ export {
 export {
   buildTableQueryPlan,
   compileTablePlanDraft,
+  documentDisplayName,
+  manifestsForDocument,
   resolveSelectedManifest,
   tableAnalyzeBody,
+  tableDocumentIds,
+  tablesWorkspaceHref,
 } from "./table-plan/compile";
 export {
   allowListedResultColumns,

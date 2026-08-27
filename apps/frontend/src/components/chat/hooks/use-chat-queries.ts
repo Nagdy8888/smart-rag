@@ -44,6 +44,7 @@ export type UseChatQueriesResult = {
   messages: readonly ConversationMessage[];
   messagesNextBeforeId: string | null;
   messagesPending: boolean;
+  messagesError: boolean;
   citations: readonly CitationResponse[];
   usage: UsageResponse | null;
   meta: Awaited<ReturnType<typeof fetchMeta>> | undefined;
@@ -110,6 +111,7 @@ export function useChatQueries(input: UseChatQueriesInput): UseChatQueriesResult
     messages: messagesQuery.data?.items ?? [],
     messagesNextBeforeId: messagesQuery.data?.next_before_id ?? null,
     messagesPending: messagesQuery.isLoading,
+    messagesError: messagesQuery.isError,
     citations: citationsQuery.data ?? [],
     usage: usageQuery.data ?? null,
     meta: metaQuery.data,

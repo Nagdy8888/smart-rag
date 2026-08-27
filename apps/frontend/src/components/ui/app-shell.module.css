@@ -61,6 +61,18 @@
   padding: calc(var(--space) * 4);
 }
 
+@media (min-width: 768px) {
+  .main {
+    padding: calc(var(--space) * 5);
+  }
+}
+
+@media (min-width: 1280px) {
+  .main {
+    padding: calc(var(--space) * 6);
+  }
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

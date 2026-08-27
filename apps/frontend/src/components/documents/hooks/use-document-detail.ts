@@ -20,6 +20,7 @@ import { useSession } from "../../../lib/auth/session-provider";
 import { useCurrentUser } from "../../../lib/hooks/use-current-user";
 import { sessionQueryKeys } from "../../../lib/query-keys";
 import { isOwnerOrAdmin } from "../../../lib/roles";
+import type { DocumentResponse } from "../../../lib/types";
 import { INGESTION_STATUS_POLL_MS, ingestionStatusIsTerminal } from "../ingestion-status";
 import {
   classifyDocumentDeleteFailure,
@@ -118,8 +119,18 @@ export function useDocumentDetail(documentId: string) {
     },
   });
 
-  const record =
+  const recordBase =
     documentQuery.data?.ok === true ? documentQuery.data.document : null;
+  const listed = queryClient.getQueryData<DocumentResponse[]>(keys.documents);
+  const listedCreated =
+    listed?.find((row) => row.document_id === documentId)?.created_at ?? null;
+  const record =
+    recordBase === null
+      ? null
+      : {
+          ...recordBase,
+          created_at: recordBase.created_at ?? listedCreated,
+        };
   const missing =
     !documentQuery.isPending &&
     (documentQuery.data?.ok === false || documentQuery.isError || record === null);
@@ -130,11 +141,11 @@ export function useDocumentDetail(documentId: string) {
     missing,
     record,
     versionPayload: versionQuery.data,
+    versionPending: versionId !== null && versionQuery.isPending,
     tables: (tablesQuery.data ?? []).filter(
       (item) => record !== null && item.document_id === record.document_id,
     ),
     canDelete: isOwnerOrAdmin(currentUser?.role),
-    roleLabel: currentUser?.role ?? "",
     retryJob: (jobId: string) => retryMutation.mutate(jobId),
     retryPending: retryMutation.isPending,
     deleteOpen,

@@ -71,7 +71,9 @@ def test_member_cannot_read_restricted_version_status_by_id(
         cursor.execute(
             """
             SELECT status_payload
-            FROM app.get_version_ingestion_status(%s, %s, %s, %s)
+            FROM app.get_version_ingestion_status(
+              %s::uuid, %s::text, %s::bigint, %s::uuid
+            )
             """,
             (member_a, "member", authz, version_id),
         )
@@ -79,7 +81,9 @@ def test_member_cannot_read_restricted_version_status_by_id(
         cursor.execute(
             """
             SELECT status_payload
-            FROM app.get_version_ingestion_status(%s, %s, %s, %s)
+            FROM app.get_version_ingestion_status(
+              %s::uuid, %s::text, %s::bigint, %s::uuid
+            )
             """,
             (member_b, "member", authz, version_id),
         )
@@ -87,7 +91,9 @@ def test_member_cannot_read_restricted_version_status_by_id(
         cursor.execute(
             """
             SELECT status_payload
-            FROM app.get_version_ingestion_status(%s, %s, %s, %s)
+            FROM app.get_version_ingestion_status(
+              %s::uuid, %s::text, %s::bigint, %s::uuid
+            )
             """,
             (owner_id, "owner", authz, version_id),
         )

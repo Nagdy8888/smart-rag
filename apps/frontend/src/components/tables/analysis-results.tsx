@@ -4,6 +4,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "../ui/button";
 import { CodeText, UserText } from "../ui/user-text";
@@ -26,6 +27,8 @@ export type AnalysisResultsProps = {
   result: TableAnalyzeResponse;
   /** Manifest used for sheet identity. */
   selected: TableManifestResponse | null;
+  /** Document title from `GET /documents/{id}`, or the document id. */
+  documentName: string;
   /** Client display sort key. */
   displaySortKey: string | null;
   /** Client display sort direction. */
@@ -45,6 +48,7 @@ export type AnalysisResultsProps = {
 export function AnalysisResults({
   result,
   selected,
+  documentName,
   displaySortKey,
   displaySortDir,
   onDisplaySortKey,
@@ -78,7 +82,7 @@ export function AnalysisResults({
         <h2>Results</h2>
         <p className={styles.muted}>{result.rows.length} rows</p>
         {hasRanges ? (
-          <Button type="button" onClick={() => setProvenanceOpen(true)}>
+          <Button type="button" variant="secondary" onClick={() => setProvenanceOpen(true)}>
             View provenance
           </Button>
         ) : null}
@@ -138,32 +142,45 @@ export function AnalysisResults({
       {provenanceOpen ? (
         <Sheet title="Cell provenance" onClose={() => setProvenanceOpen(false)}>
           <dl className={styles.dl}>
-            <dt>document_id</dt>
+            <dt>Document</dt>
             <dd>
-              <CodeText value={result.document_id} />
+              <Link
+                href={`/documents/${encodeURIComponent(result.document_id)}`}
+                className={styles.documentLink}
+              >
+                <UserText value={documentName} />
+              </Link>
             </dd>
-            <dt>version_id</dt>
+            <dt>Version</dt>
             <dd>
               <CodeText value={result.version_id} />
             </dd>
-            <dt>table_id</dt>
+            <dt>Table</dt>
             <dd>
               <CodeText value={result.table_id} />
             </dd>
-            <dt>sheet</dt>
-            <dd>
-              <UserText value={selected?.sheet_name ?? "none"} />
-            </dd>
-            <dt>ranges</dt>
-            <dd>
-              <ul className={styles.rangeList}>
-                {result.source_ranges.map((range) => (
-                  <li key={range} className={styles.mono}>
-                    <CodeText value={range} />
-                  </li>
-                ))}
-              </ul>
-            </dd>
+            {selected?.sheet_name ? (
+              <>
+                <dt>Sheet</dt>
+                <dd>
+                  <UserText value={selected.sheet_name} />
+                </dd>
+              </>
+            ) : null}
+            {result.source_ranges.length > 0 ? (
+              <>
+                <dt>Ranges</dt>
+                <dd>
+                  <ul className={styles.rangeList}>
+                    {result.source_ranges.map((range) => (
+                      <li key={range} className={styles.mono}>
+                        <CodeText value={range} />
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </>
+            ) : null}
           </dl>
         </Sheet>
       ) : null}

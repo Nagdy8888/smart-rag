@@ -25,12 +25,14 @@ export type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "childre
   description?: string;
   /** Optional error text announced with `aria-describedby`. */
   error?: string;
+  /** Drop the 520px field cap so the control can fill its parent. */
+  fullWidth?: boolean;
 };
 
 /**
  * Render a labeled native `<select>`.
  *
- * @param props - Label, value, options, optional description/error, native attrs.
+ * @param props - Label, value, options, optional description/error/`fullWidth`, native attrs.
  * @returns Field with associated label. No fetch side effects.
  */
 export function Select({
@@ -41,6 +43,7 @@ export function Select({
   error,
   id,
   className,
+  fullWidth = false,
   ...rest
 }: SelectProps) {
   const selectId = id ?? label.replace(/\s+/g, "-").toLowerCase();
@@ -48,7 +51,7 @@ export function Select({
   const errorId = error ? `${selectId}-error` : undefined;
   const describedBy = [descriptionId, errorId].filter(Boolean).join(" ") || undefined;
   return (
-    <div className={styles.field}>
+    <div className={[styles.field, fullWidth ? styles.fieldFull : undefined].filter(Boolean).join(" ")}>
       <label htmlFor={selectId}>{label}</label>
       {description ? (
         <p id={descriptionId} className={styles.fieldHint}>

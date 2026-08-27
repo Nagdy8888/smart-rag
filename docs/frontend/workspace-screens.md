@@ -231,17 +231,22 @@ flowchart LR
 #### `RunDetailsDrawer`
 
 - Width 440px. Closed by default behind a ghost “Run details” control.
-- Render only rows whose value is real. Skip “—” rows.
+- Render only rows whose value is real. Skip “—”, empty, and `none` rows.
+- Card layout: status, search mode, token metrics, account spend, and run id. Human labels: Status (`Completed` / `In progress` / `Partial` / `Cancelled` / `Error` / `Deadline reached`), Search mode (`Hybrid` / `Combined` / `Composite` / `Tables` / `Graph inspection`) plus a one-line summary for known families.
+- Show “Started as” and “Why it changed” only after a real `route_correction`. Do not duplicate requested and effective when they match.
+- Tools, cache, coverage, and ignored stream events appear only when the stream supplied a value.
+- Do not show heartbeat counts, raw node names such as `verify_answer`, or placeholder `none` diagnostics.
 - Terminal text must never say “running” when `runId` is null.
-- Per-run tokens use `formatRunTokenUsage` (`412 prompt · 88 completion`) from SSE `usage`. Account USD uses `formatUsd` on `GET /usage/me`.
+- Per-run tokens use `formatRunTokenUsage` (`412 prompt · 88 completion`) from SSE `usage` as “This run”. Account USD uses `formatUsd` on `GET /usage/me` as “Your account.”
 - “Your account” labels `/usage/me`; never “Company total.”
 - IDs use monospace and Copy buttons with real clipboard feedback.
 - No raw traces, prompts, provider secrets, source text, nDCG, or invented latency.
+- When no run exists: “Send a question to see how that answer was produced, including search mode and token usage.”
 
 #### `FeedbackPopover`
 
 - Opens from “Give feedback” Secondary button after terminal.
-- First choose thumbs up/down, then required server tag Select, optional comment Textarea, Submit.
+- First choose thumbs up/down, then required server tag Select for that polarity, optional comment Textarea, Submit.
 - Width 360px; actions right aligned.
 - Success copy: “Feedback recorded.”
 - Failure copy: “Feedback could not be recorded. Try again.”
@@ -252,17 +257,18 @@ flowchart LR
 #### Page layout
 
 - Topbar title “Documents”. No trailing period and no duplicate page `h2`.
-- Filter input uses a search icon and placeholder “Filter by name…”. Caption under the filter: “Filters apply to loaded documents only.”
+- Description: “Upload files or add approved websites, then track search and graph readiness.”
+- Filter input uses a search icon, label “Filter by name”, and placeholder “Filter by name…”. Caption under the filter: “Filters apply to loaded documents only.”
 - Primary action: “Import source.”
-- Role-gated crawl notice is shown only to roles that can crawl.
+- Viewers do not see import controls or role-lecture copy.
 - Main content is one white bordered DataTable, not multiple dashboard cards.
 
 #### Document table
 
 - Desktop columns: Name, Visibility, Search status, Graph status, Created, Actions.
 - Name is the detail Link with document icon; optional ID appears below in monospace only when title is missing.
-- Status values come from real document/version status.
-- Row overflow menu includes “View details” and owner/admin “Delete.”
+- Status values come from real `GET /ingestion/versions/{id}/status` for loaded rows. Search/graph pills appear automatically; they do not wait on a menu click.
+- Row overflow menu includes “View details,” “View processing” when a version exists, and owner/admin “Delete.”
 - Clicking blank row space does not navigate; only explicit Name link does.
 - Mobile card order: Name, two status pills, visibility/created metadata, then overflow.
 
@@ -294,15 +300,16 @@ flowchart LR
 - One component used in list/detail.
 - Vertical timeline on detail; compact pills on list.
 - Ordered labels from real lifecycle: Uploaded, Scanning, Parsing, Search ready, Graph pending/ready/ineligible, Failed, Deletion pending.
-- Expandable technical details show scan signature status, OCR, chunks/tables, BM25, queue age, graph handoff, and retry only when fields exist.
+- Expandable technical details show scan, OCR, chunks, BM25, and graph handoff only when those fields have real values. Idle `none`/zero queues stay hidden.
 - Retry is a real Secondary button visible only when `retry_allowed`.
+- The Graph pending limitation callout appears only while status is `graph_pending`. Graph ineligible is a terminal pill, not a pending warning.
 
 #### Document detail
 
 - Header: back Link, document title, visibility/status pills, overflow menu.
 - Main desktop grid: `minmax(0, 2fr) minmax(280px, 1fr)`.
-- Left: processing timeline and real table references.
-- Right: metadata definition list and actions to “Inspect in graph” and “Open tables.”
+- Left: processing timeline and extracted table names when `GET /tables` returns rows for this document. Empty copy: “This document has no extracted tables.” Table names open `/tables?tableId=&documentId=`.
+- Right: metadata definition list and actions to “Inspect in graph” and “Open tables.” “Open tables” keeps `?documentId=`.
 - Delete is in overflow/danger zone, not a large primary button.
 - No source preview, download, audit, PII, or raw storage section.
 
@@ -318,22 +325,35 @@ flowchart LR
 #### Layout
 
 - Topbar title “Tables”. No trailing period.
-- Until a table is selected, show the picker plus `EmptyState` title “Pick a table to analyze” and body “Deterministic calculations with exact cell provenance.” Analyze stays visible and disabled.
+- Description: “Run bounded calculations on structured data with exact cell provenance.”
+- When no manifests exist, show `EmptyState` title “Extracted spreadsheet tables from ingested documents appear here.” Analyze stays visible and disabled. Do not also show “Pick a table to analyze.”
+- When `?documentId=` is set and that document has no extracted tables, show the same spreadsheet empty copy. Analyze stays visible and disabled. Do not invent rows or also show “Pick a table to analyze.”
+- Until a table is selected and manifests exist, show the picker plus `EmptyState` title “Pick a table to analyze” and body “Deterministic calculations with exact cell provenance.” Analyze stays visible and disabled.
 - Plan-builder sections render only after a table is selected. “Add X” controls are compact secondary buttons.
 - At `>=1024px`: 320px manifest sidebar and main results area; below that manifest picker is a Select.
+
+```mermaid
+flowchart LR
+  detail["Document detail"] -->|"Open tables ?documentId="| tables["/tables"]
+  detail -->|"table name ?tableId= and documentId="| tables
+  tables -->|"Back to document / title link"| detail
+  tables -->|"GET /documents/id titles"| docsApi["Document titles"]
+```
 
 #### Manifest sidebar
 
 - White bordered panel, 12px radius.
-- Header “Available tables”
-- Rows show safe table/sheet identity and document ID metadata.
+- Header “Available tables”, or “Tables in this document” when `?documentId=` is set.
+- Rows show safe table/sheet identity and the document title as a link to `/documents/{id}` (id fallback when `GET /documents/{id}` has no title). The title link is omitted while the list is already scoped to one document.
+- `?documentId=` filters `GET /tables` rows to that document, shows Back to document plus All tables, and does not list other documents’ tables.
 - Active row uses selected treatment.
-- Empty: “No structured tables are available.”
+- Empty: “Extracted spreadsheet tables from ingested documents appear here.” Seeded document with zero rows uses the same copy.
 
 #### Plan builder
 
 - White Card, title “Analysis plan”
 - Field order: Table, Columns, Filters, Aggregation, Group by, Sort, Comparison.
+- Selected table shows “From {document title}” as a link to `/documents/{id}`.
 - Optional sections start collapsed and open via real “Add filter,” “Add aggregation,” etc.
 - Repeating row has inputs plus labeled Remove IconButton.
 - One Primary “Analyze” button at bottom right.
@@ -349,9 +369,9 @@ flowchart LR
 #### Provenance drawer
 
 - Header “Cell provenance.”
-- List exact document/version/table/sheet/range fields from response.
-- Monospace for cell ranges.
+- List Document, Version, Table, Sheet, and Ranges from the response. Document is the fetched title (id fallback) linking to `/documents/{id}`. Omit Sheet when it is empty. Monospace for version/table ids and cell ranges.
 - No fake source link.
+- The compiled plan is not shown as raw JSON.
 
 ### Graph page component specification
 

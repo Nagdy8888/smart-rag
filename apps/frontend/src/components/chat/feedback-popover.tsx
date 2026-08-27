@@ -4,7 +4,7 @@
 
 "use client";
 
-import { FEEDBACK_TAGS, type FeedbackTag } from "../../lib/types";
+import { feedbackTagsFor, type FeedbackTag } from "../../lib/types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Popover } from "../ui/popover";
@@ -31,10 +31,31 @@ export type FeedbackPopoverProps = {
 };
 
 /**
+ * Keep the selected tag inside the current thumb catalog.
+ *
+ * @param thumbsUp - Selected polarity.
+ * @param tag - Current tag.
+ * @param onThumbs - Persist polarity.
+ * @param onTag - Persist tag when polarity changes the catalog.
+ */
+function selectThumbs(
+  thumbsUp: boolean,
+  tag: FeedbackTag,
+  onThumbs: (up: boolean) => void,
+  onTag: (tag: FeedbackTag) => void,
+): void {
+  onThumbs(thumbsUp);
+  const options = feedbackTagsFor(thumbsUp);
+  if (!options.includes(tag)) {
+    onTag(options[0]);
+  }
+}
+
+/**
  * Render thumbs plus a popover for tag/comment.
  *
  * @param props - Controlled feedback fields.
- * @returns Footer controls. Does not change the ten-tag catalog.
+ * @returns Footer controls. Tag options follow the selected thumb.
  */
 export function FeedbackPopover({
   thumbsUp,
@@ -46,18 +67,23 @@ export function FeedbackPopover({
   onSubmit,
   pending = false,
 }: FeedbackPopoverProps) {
+  const tagOptions = feedbackTagsFor(thumbsUp);
   return (
     <div className={styles.answerFooter}>
       <Popover label="Give feedback" trigger="Give feedback">
         <div className={styles.feedbackForm}>
           <div className={styles.row}>
-            <Button type="button" variant={thumbsUp ? "primary" : "ghost"} onClick={() => onThumbs(true)}>
+            <Button
+              type="button"
+              variant={thumbsUp ? "primary" : "ghost"}
+              onClick={() => selectThumbs(true, tag, onThumbs, onTag)}
+            >
               Thumbs up
             </Button>
             <Button
               type="button"
               variant={!thumbsUp ? "primary" : "ghost"}
-              onClick={() => onThumbs(false)}
+              onClick={() => selectThumbs(false, tag, onThumbs, onTag)}
             >
               Thumbs down
             </Button>
@@ -65,7 +91,7 @@ export function FeedbackPopover({
           <Select
             label="Tag"
             value={tag}
-            options={FEEDBACK_TAGS.map((item) => ({ value: item, label: item }))}
+            options={tagOptions.map((item) => ({ value: item, label: item }))}
             onChange={(event) => onTag(event.target.value as FeedbackTag)}
           />
           <Input

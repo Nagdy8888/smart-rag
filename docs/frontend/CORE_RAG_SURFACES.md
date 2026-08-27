@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-08-27
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -97,6 +97,27 @@ flowchart TD
   reference and never echoes `run_failed`.
 - Ask shows this run’s prompt and completion tokens from SSE `usage` on
   the live answer meta row. The line is omitted when both counts are 0.
+- Run details use human search-mode and status labels. Empty `none`
+  rows, heartbeat counts, and raw node names stay out of the sheet.
+  Route correction, tools, cache, coverage, and unknown events appear
+  only when the stream supplied them.
+- Documents list loads `GET /ingestion/versions/{id}/status` for each
+  loaded `current_version_id` and shows Search ready / Graph
+  pending|ready|ineligible pills without a menu click. “View processing”
+  opens the shared timeline sheet. Empty `none` version ids and viewer
+  role-lecture copy stay off the page.
+- Document detail repeats those search/graph pills, uses a connected
+  processing timeline, and omits the Graph pending warning unless status
+  is `graph_pending`. Technical details skip idle `none`/zero queues.
+  Empty extracted tables use “This document has no extracted tables.”
+  Table names open `/tables?tableId=&documentId=`.
+- Tables shows the bounded-calculation description. Raw submitted-plan
+  JSON stays off the page. Empty manifests use “Extracted spreadsheet
+  tables from ingested documents appear here.” and do not also show
+  “Pick a table to analyze.” Document titles come from `GET /documents/{id}` for
+  ids on listed manifests (and a `?documentId=` seed). That seed scopes
+  the sidebar, shows Back to document, and uses the same empty-tables
+  copy when that document has no extracted rows.
 
 ## Failure modes
 
@@ -105,6 +126,7 @@ flowchart TD
 | Handshake below min / unreachable | Send disabled; 426 banner |
 | 402 / 429 / 503 | Budget / rate / fail-closed banners |
 | Document 404 | "Not found." No title |
+| Ingestion status 5xx / missing RPC | List Search/Graph stay **Not indexed**; detail Processing says it could not be loaded |
 | Storage upload fail | Honest error. Do not finalize a fake success |
 | Crawl as member | UI hidden; helper still 403 |
 | Viewer upload | Convenience hidden; server 403 |
@@ -113,7 +135,7 @@ flowchart TD
 | Inspect 403 | Classified banner; selected chips stay |
 | Empty inspect | No authorized graph evidence matched this inspection. |
 | Table unknown column / SQL | Rejected before POST; Analyze is not sent |
-| Table analyze 403/422/429 | Classified banner; draft and submitted plan stay |
+| Table analyze 403/422/429 | Classified banner; the guided draft stays |
 | Chat `partial` | Answer note only; no protocol-failure banner |
 | Chat `error` after tokens | One “tokens are kept” note; no stacked generic banner |
 | Chat `error` with no tokens | One “Something went wrong” banner plus run reference |

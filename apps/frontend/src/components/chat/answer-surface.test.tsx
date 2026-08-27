@@ -50,7 +50,7 @@ describe("AnswerSurface origin chrome", () => {
         effectiveRoute: "hybrid",
       });
       expect(screen.getByTestId("answer-origin")).toHaveTextContent(label);
-      expect(screen.getByTestId("answer-route")).toHaveTextContent("hybrid");
+      expect(screen.getByTestId("answer-route")).toHaveTextContent("Hybrid");
       unmount();
     }
   });
@@ -134,6 +134,26 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.getAllByText("Generating…").length).toBeGreaterThan(0);
     expect(screen.queryByText("The refund period is 30 days.")).not.toBeInTheDocument();
     expect(screen.queryByTestId("verified-answer-reveal")).not.toBeInTheDocument();
+  });
+
+  it("does not treat a failed transcript as a new chat", () => {
+    render(
+      <AnswerSurface
+        messagesError
+        question=""
+        answer=""
+        citations={[]}
+        terminal={null}
+        hrefForCitation={() => undefined}
+        onSelectCitation={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText("Couldn't load this conversation."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Ask your company knowledge"),
+    ).not.toBeInTheDocument();
   });
 
   it("does not treat a pending transcript as a new chat", () => {

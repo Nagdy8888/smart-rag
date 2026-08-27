@@ -11,6 +11,7 @@ import { StatusPill } from "../ui/status-pill";
 import { UserText } from "../ui/user-text";
 import { absentStatusLabel, formatVisibility } from "../../lib/format-visibility";
 import { compactIngestionPills } from "../../lib/ingestion-status";
+import { formatRelativeTime } from "../../lib/relative-time";
 import type {
   DocumentIngestionStatusResponse,
   DocumentResponse,
@@ -20,8 +21,10 @@ import styles from "./documents.module.css";
 export type DocumentListProps = {
   /** Already loaded documents (possibly several keyset pages). */
   documents: DocumentResponse[];
-  /** Version status keyed by `current_version_id` after Load status. */
+  /** Version status keyed by `current_version_id`. */
   statusByVersionId?: Record<string, DocumentIngestionStatusResponse>;
+  /** Version ids whose status request is still in flight. */
+  pendingStatusIds?: ReadonlySet<string>;
   /** Open the version status inspector. */
   onLoadStatus: (versionId: string) => void;
   /** App-router navigation to the detail page. */
@@ -68,7 +71,7 @@ function rowMenuItems(
   if (doc.current_version_id) {
     items.push({
       id: "status",
-      label: "Load status",
+      label: "View processing",
       actionId: "documents.status",
       onSelect: () => {
         onLoadStatus(doc.current_version_id as string);
@@ -90,55 +93,102 @@ function rowMenuItems(
 }
 
 /**
- * Render search/graph cells from loaded version status only.
+ * Return search and graph status nodes for one document.
  *
  * @param doc - List row.
  * @param statusByVersionId - Fetched envelopes.
- * @returns Two table cells.
+ * @param pendingStatusIds - In-flight version ids.
+ * @returns Two display nodes.
  */
-function StatusCells({
-  doc,
-  statusByVersionId,
-}: {
-  doc: DocumentResponse;
-  statusByVersionId: Record<string, DocumentIngestionStatusResponse>;
-}) {
+function statusDisplays(
+  doc: DocumentResponse,
+  statusByVersionId: Record<string, DocumentIngestionStatusResponse>,
+  pendingStatusIds: ReadonlySet<string>,
+): { search: ReactNode; graph: ReactNode } {
   const versionId = doc.current_version_id;
-  const payload = versionId ? statusByVersionId[versionId] : undefined;
+  if (!versionId) {
+    return {
+      search: absentStatusLabel("index"),
+      graph: absentStatusLabel("index"),
+    };
+  }
+  if (pendingStatusIds.has(versionId)) {
+    return {
+      search: <span className={styles.muted}>Loading…</span>,
+      graph: <span className={styles.muted}>Loading…</span>,
+    };
+  }
+  const payload = statusByVersionId[versionId];
   if (payload === undefined) {
-    return (
-      <>
-        <td>{absentStatusLabel("index")}</td>
-        <td>{absentStatusLabel("index")}</td>
-      </>
-    );
+    return {
+      search: absentStatusLabel("index"),
+      graph: absentStatusLabel("index"),
+    };
   }
   const pills = compactIngestionPills(payload.version.status);
+  return {
+    search: pills.search ? (
+      <StatusPill status={pills.search.label} tone={pills.search.tone} />
+    ) : (
+      absentStatusLabel("pending")
+    ),
+    graph: pills.graph ? (
+      <StatusPill status={pills.graph.label} tone={pills.graph.tone} />
+    ) : (
+      absentStatusLabel("pending")
+    ),
+  };
+}
+
+/**
+ * Render the document name and optional id fallback.
+ *
+ * @param doc - List row.
+ * @returns Name block.
+ */
+function DocumentName({ doc }: { doc: DocumentResponse }) {
   return (
-    <>
-      <td>
-        {pills.search ? (
-          <StatusPill status={pills.search.label} tone={pills.search.tone} />
-        ) : (
-          absentStatusLabel("pending")
-        )}
-      </td>
-      <td>
-        {pills.graph ? (
-          <StatusPill status={pills.graph.label} tone={pills.graph.tone} />
-        ) : (
-          absentStatusLabel("pending")
-        )}
-      </td>
-    </>
+    <div>
+      <span className={styles.nameCell}>
+        <span className={styles.docIcon} aria-hidden="true">
+          <Icon name="documents" />
+        </span>
+        <Link href={`/documents/${doc.document_id}`} className={styles.nameLink}>
+          <UserText value={doc.title ?? doc.document_id} />
+        </Link>
+      </span>
+      {doc.title ? null : (
+        <p className={styles.mono}>
+          <UserText value={doc.document_id} />
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Render a created timestamp, or an em dash.
+ *
+ * @param createdAt - ISO timestamp.
+ * @returns Time node.
+ */
+function CreatedAt({ createdAt }: { createdAt: string | null }) {
+  if (!createdAt) {
+    return "—";
+  }
+  const absolute = new Date(createdAt).toLocaleString();
+  return (
+    <time dateTime={createdAt} title={absolute}>
+      {formatRelativeTime(createdAt)}
+    </time>
   );
 }
 
 /**
  * Render name, visibility, created time, and row actions.
  *
- * Search/graph cells stay em dash until version status is loaded.
- * Row clicks do not navigate; only the name link does.
+ * Search/graph cells use loaded version status. Row clicks do not navigate;
+ * only the name link does.
  *
  * @param props - Documents and action callbacks.
  * @returns Table, mobile cards, or empty state.
@@ -146,6 +196,7 @@ function StatusCells({
 export function DocumentList({
   documents,
   statusByVersionId = {},
+  pendingStatusIds = new Set(),
   onLoadStatus,
   onViewDetails,
   canDelete = false,
@@ -156,17 +207,19 @@ export function DocumentList({
 }: DocumentListProps) {
   if (documents.length === 0) {
     return (
-      <EmptyState title={emptyTitle}>
-        <p>{emptyBody}</p>
-        {emptyAction}
-      </EmptyState>
+      <EmptyState
+        icon="documents"
+        title={emptyTitle}
+        body={emptyBody}
+        action={emptyAction}
+      />
     );
   }
   return (
     <>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <caption className={styles.muted}>Authorized documents</caption>
+          <caption className={styles.tableCaption}>Authorized documents</caption>
           <thead>
             <tr>
               <th scope="col">Name</th>
@@ -174,52 +227,82 @@ export function DocumentList({
               <th scope="col">Search status</th>
               <th scope="col">Graph status</th>
               <th scope="col">Created</th>
-              <th scope="col">Actions</th>
+              <th scope="col">
+                <span className={styles.srOnly}>Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {documents.map((doc) => (
-              <tr key={doc.document_id}>
-                <td>
-                  <span className={styles.nameCell}>
-                    <Icon name="documents" aria-hidden="true" />
-                    <Link href={`/documents/${doc.document_id}`}>
-                      <UserText value={doc.title ?? doc.document_id} />
-                    </Link>
-                  </span>
-                  {doc.title ? null : (
-                    <p className={styles.mono}>
-                      <UserText value={doc.document_id} />
-                    </p>
-                  )}
-                </td>
-                <td>
-                  <StatusPill status={formatVisibility(doc.visibility)} />
-                </td>
-                <StatusCells doc={doc} statusByVersionId={statusByVersionId} />
-                <td>
-                  {doc.created_at
-                    ? new Date(doc.created_at).toLocaleString()
-                    : "—"}
-                </td>
-                <td>
-                  <Menu
-                    label="Document actions"
-                    trigger={<Icon name="more" />}
-                    items={rowMenuItems(
-                      doc,
-                      onLoadStatus,
-                      onViewDetails,
-                      canDelete,
-                      onDelete,
-                    )}
-                  />
-                </td>
-              </tr>
-            ))}
+            {documents.map((doc) => {
+              const status = statusDisplays(doc, statusByVersionId, pendingStatusIds);
+              return (
+                <tr key={doc.document_id}>
+                  <td>
+                    <DocumentName doc={doc} />
+                  </td>
+                  <td>
+                    <StatusPill status={formatVisibility(doc.visibility)} />
+                  </td>
+                  <td>{status.search}</td>
+                  <td>{status.graph}</td>
+                  <td className={styles.metaCell}>
+                    <CreatedAt createdAt={doc.created_at} />
+                  </td>
+                  <td className={styles.actionsCell}>
+                    <Menu
+                      label="Document actions"
+                      trigger={<Icon name="more" />}
+                      items={rowMenuItems(
+                        doc,
+                        onLoadStatus,
+                        onViewDetails,
+                        canDelete,
+                        onDelete,
+                      )}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+      <ul className={styles.mobileList}>
+        {documents.map((doc) => {
+          const status = statusDisplays(doc, statusByVersionId, pendingStatusIds);
+          return (
+            <li key={doc.document_id} className={styles.mobileCard}>
+              <DocumentName doc={doc} />
+              <div className={styles.mobilePills}>
+                {status.search}
+                {status.graph}
+              </div>
+              <p className={styles.mobileMeta}>
+                {formatVisibility(doc.visibility)}
+                {doc.created_at ? (
+                  <>
+                    {" · "}
+                    <CreatedAt createdAt={doc.created_at} />
+                  </>
+                ) : null}
+              </p>
+              <div className={styles.mobileActions}>
+                <Menu
+                  label="Document actions"
+                  trigger={<Icon name="more" />}
+                  items={rowMenuItems(
+                    doc,
+                    onLoadStatus,
+                    onViewDetails,
+                    canDelete,
+                    onDelete,
+                  )}
+                />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </>
   );
 }

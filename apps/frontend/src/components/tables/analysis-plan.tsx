@@ -4,6 +4,7 @@
 
 "use client";
 
+import Link from "next/link";
 import type { TablePlanDraft } from "../../lib/table-plan";
 import type { TableManifestResponse } from "../../lib/types";
 import { PrimaryAction } from "../ui/button";
@@ -21,6 +22,8 @@ export type AnalysisPlanProps = {
   manifests: readonly TableManifestResponse[];
   /** Currently selected accessible table. */
   selected: TableManifestResponse | null;
+  /** Document title from `GET /documents/{id}`, or the document id. */
+  documentName: string;
   /** Guided draft. Preserved across analyze failures. */
   draft: TablePlanDraft;
   /** Analyze in flight. */
@@ -42,6 +45,7 @@ export type AnalysisPlanProps = {
 export function AnalysisPlan({
   manifests,
   selected,
+  documentName,
   draft,
   pending,
   onSelectTableId,
@@ -78,10 +82,13 @@ export function AnalysisPlan({
       />
       {selected ? (
         <p className={styles.muted}>
-          Document{" "}
-          <span className={styles.mono}>
-            <UserText value={selected.document_id} />
-          </span>
+          From{" "}
+          <Link
+            href={`/documents/${encodeURIComponent(selected.document_id)}`}
+            className={styles.documentLink}
+          >
+            <UserText value={documentName} />
+          </Link>
         </p>
       ) : null}
       <ColumnsSection columns={draft.columns} patchDraft={patchDraft} />

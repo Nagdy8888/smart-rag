@@ -87,6 +87,9 @@ export function mutationFailureBanner(error: Error): string {
     case "stale_row_version":
       return STALE_ROW_VERSION_COPY;
     default:
+      if (/^[a-z][a-z0-9_]{0,63}$/i.test(error.message)) {
+        return apiFailureBanner({ kind: "validation", detail: error.message });
+      }
       return GENERIC_PRODUCTION_ERROR;
   }
 }

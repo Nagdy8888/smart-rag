@@ -353,6 +353,26 @@ describe("focus trap and body scroll lock", () => {
     expect(screen.getByRole("button", { name: "Row actions" })).toHaveFocus();
   });
 
+  it("portals the menu to document.body so overflow wrappers cannot clip it", async () => {
+    const user = userEvent.setup();
+    render(
+      <div style={{ overflow: "hidden", width: 48, height: 40 }}>
+        <Menu
+          label="Document actions"
+          trigger="More"
+          items={[
+            { id: "details", label: "View details", onSelect: vi.fn() },
+            { id: "status", label: "View processing", onSelect: vi.fn() },
+          ]}
+        />
+      </div>,
+    );
+    await user.click(screen.getByRole("button", { name: "Document actions" }));
+    const menu = await screen.findByRole("menu", { name: "Document actions" });
+    expect(menu.parentElement).toBe(document.body);
+    expect(screen.getByRole("menuitem", { name: "View processing" })).toBeVisible();
+  });
+
   it("does not treat an input as a command-menu shortcut target", () => {
     const input = document.createElement("input");
     expect(isEditableKeyboardTarget(input)).toBe(true);

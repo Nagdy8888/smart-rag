@@ -187,7 +187,7 @@ is read-only (GAP-07-01).
 
 | State | Signal | Copy / UI |
 | --- | --- | --- |
-| Empty | GET /tables `[]` | No structured tables are available. |
+| Empty | GET /tables `[]` | Extracted spreadsheet tables from ingested documents appear here. |
 | Analyze success | rows + source_ranges | deterministic table; display-only sort; Cell provenance drawer |
 | Empty success | rows `[]` | The analysis returned no rows. |
 | 404 parquet | not_found | Table artifact unavailable |

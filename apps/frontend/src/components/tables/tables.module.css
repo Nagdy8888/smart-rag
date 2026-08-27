@@ -5,17 +5,60 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--space) * 4);
-  max-width: 73.75rem;
+  gap: calc(var(--space) * 6);
+  width: 100%;
+  max-width: 1440px;
+  min-width: 0;
   color: var(--color-text);
   font-family: var(--font-sans);
   line-height: var(--line-height-en);
+}
+
+.page > header {
+  margin-bottom: 0;
 }
 
 .muted {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.9rem;
+}
+
+.contextBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--space) * 3);
+}
+
+.backLink {
+  margin: 0;
+}
+
+.backLink a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.backLink a:hover {
+  text-decoration: underline;
+}
+
+.contextTitle {
+  margin: 0;
+  flex: 1 1 12rem;
+  font-size: 0.95rem;
+}
+
+.documentLink {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.documentLink:hover {
+  text-decoration: underline;
 }
 
 .layout {
@@ -50,6 +93,18 @@
   flex-direction: column;
 }
 
+.manifestItem {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 1);
+  padding-bottom: calc(var(--space) * 2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.manifestItem .documentLink {
+  padding: 0 calc(var(--space) * 2) calc(var(--space) * 1);
+}
+
 .manifestButton,
 .manifestButtonActive {
   width: 100%;
@@ -63,7 +118,6 @@
   cursor: pointer;
   padding: calc(var(--space) * 2);
   border: 0;
-  border-bottom: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);

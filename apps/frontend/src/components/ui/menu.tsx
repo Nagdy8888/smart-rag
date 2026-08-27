@@ -1,5 +1,8 @@
 /**
  * Anchored action menu. Keyboard list, Escape, outside click, focus restore.
+ *
+ * The panel is portaled to `document.body` with `position: fixed` so table
+ * `overflow: auto` wrappers cannot clip it.
  */
 
 "use client";
@@ -7,11 +10,14 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./button";
 import { getFocusableElements } from "./focus-trap";
 import styles from "./styles/overlays.module.css";
@@ -42,6 +48,9 @@ export type MenuProps = {
   triggerActionId?: string;
 };
 
+const VIEWPORT_MARGIN_PX = 8;
+const TRIGGER_GAP_PX = 4;
+
 /**
  * Enabled menuitem buttons inside the open panel.
  *
@@ -59,6 +68,30 @@ function enabledMenuItems(root: HTMLElement | null): HTMLButtonElement[] {
 }
 
 /**
+ * Place a fixed menu against a trigger, right-aligned, clamped to the viewport.
+ *
+ * @param trigger - Trigger button.
+ * @param panel - Portaled menu panel.
+ * @returns CSS top/left in viewport pixels.
+ */
+function menuFixedPosition(
+  trigger: HTMLElement,
+  panel: HTMLElement,
+): { top: number; left: number } {
+  const rect = trigger.getBoundingClientRect();
+  const width = panel.offsetWidth;
+  const height = panel.offsetHeight;
+  let left = rect.right - width;
+  left = Math.min(left, window.innerWidth - width - VIEWPORT_MARGIN_PX);
+  left = Math.max(VIEWPORT_MARGIN_PX, left);
+  let top = rect.bottom + TRIGGER_GAP_PX;
+  if (top + height > window.innerHeight - VIEWPORT_MARGIN_PX) {
+    top = Math.max(VIEWPORT_MARGIN_PX, rect.top - height - TRIGGER_GAP_PX);
+  }
+  return { top, left };
+}
+
+/**
  * Render a trigger plus anchored menu list.
  *
  * @param props - Label, trigger node, and items.
@@ -66,25 +99,62 @@ function enabledMenuItems(root: HTMLElement | null): HTMLButtonElement[] {
  */
 export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setCoords(null);
+      return;
+    }
+    /**
+     * Recompute fixed coordinates after layout, scroll, or resize.
+     */
+    function updatePosition(): void {
+      const triggerNode = triggerRef.current;
+      const panelNode = panelRef.current;
+      if (triggerNode === null || panelNode === null) {
+        return;
+      }
+      const rect = triggerNode.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        setOpen(false);
+        return;
+      }
+      setCoords(menuFixedPosition(triggerNode, panelNode));
+    }
+    updatePosition();
+    enabledMenuItems(panelRef.current)[0]?.focus();
+    window.addEventListener("resize", updatePosition);
+    document.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      document.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    enabledMenuItems(wrapRef.current)[0]?.focus();
     /**
      * Close on outside pointer down.
      *
      * @param event - Document pointer event.
      */
     function onPointerDown(event: PointerEvent): void {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
-        setOpen(false);
-        triggerRef.current?.focus();
+      const target = event.target as Node;
+      if (
+        wrapRef.current?.contains(target) === true ||
+        panelRef.current?.contains(target) === true
+      ) {
+        return;
       }
+      setOpen(false);
+      triggerRef.current?.focus();
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => {
@@ -104,7 +174,7 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
       triggerRef.current?.focus();
       return;
     }
-    const buttons = enabledMenuItems(wrapRef.current);
+    const buttons = enabledMenuItems(panelRef.current);
     if (buttons.length === 0) {
       return;
     }
@@ -128,6 +198,44 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
     buttons[next]?.focus();
   }
 
+  const panelStyle: CSSProperties = coords
+    ? { top: coords.top, left: coords.left }
+    : { top: 0, left: 0, visibility: "hidden" };
+
+  const panel =
+    open && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            id={menuId}
+            ref={panelRef}
+            className={`${styles.menuPanel} ${styles.menuPanelFixed}`}
+            role="menu"
+            aria-label={label}
+            style={panelStyle}
+            onKeyDown={onMenuKeyDown}
+          >
+            {items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="menuitem"
+                className={item.danger ? styles.menuItemDanger : styles.menuItem}
+                disabled={item.disabled}
+                data-action-id={item.actionId}
+                onClick={() => {
+                  item.onSelect();
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <div className={styles.overlayAnchor} ref={wrapRef}>
       <Button
@@ -145,33 +253,7 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
       >
         {trigger}
       </Button>
-      {open ? (
-        <div
-          id={menuId}
-          className={styles.menuPanel}
-          role="menu"
-          aria-label={label}
-          onKeyDown={onMenuKeyDown}
-        >
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="menuitem"
-              className={item.danger ? styles.menuItemDanger : styles.menuItem}
-              disabled={item.disabled}
-              data-action-id={item.actionId}
-              onClick={() => {
-                item.onSelect();
-                setOpen(false);
-                triggerRef.current?.focus();
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {panel}
     </div>
   );
 }

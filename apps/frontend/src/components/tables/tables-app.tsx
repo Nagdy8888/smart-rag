@@ -7,10 +7,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { AnalysisPlan } from "./analysis-plan";
 import { AnalysisResults } from "./analysis-results";
+import { TablesDocumentBar } from "./tables-document-bar";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
 import { PageHeader } from "../ui/page-header";
@@ -20,6 +21,7 @@ import { StatusBanner } from "../ui/status-banner";
 import { UserText } from "../ui/user-text";
 import {
   analyzeTable,
+  fetchDocument,
   isClassifiedApiError,
   listTables,
   type ApiAuth,
@@ -31,7 +33,10 @@ import {
   EMPTY_MANIFESTS_COPY,
   EMPTY_TABLE_PLAN_DRAFT,
   compileTablePlanDraft,
+  documentDisplayName,
+  manifestsForDocument,
   resolveSelectedManifest,
+  tableDocumentIds,
   tablePlanCompileCopy,
   type TablePlanDraft,
 } from "../../lib/table-plan";
@@ -54,12 +59,18 @@ export function TablesApp() {
   const keys = sessionQueryKeys(accessToken);
   const tableIdParam = searchParams.get("tableId");
   const documentIdParam = searchParams.get("documentId");
+  const scopedToDocument =
+    documentIdParam !== null && documentIdParam !== "";
   const [userSelectedId, setUserSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<TablePlanDraft>(EMPTY_TABLE_PLAN_DRAFT);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [submittedPlan, setSubmittedPlan] = useState<TableQueryPlan | null>(null);
   const [displaySortKey, setDisplaySortKey] = useState<string | null>(null);
   const [displaySortDir, setDisplaySortDir] = useState<"asc" | "desc">("asc");
+
+  useEffect(() => {
+    setUserSelectedId(null);
+  }, [documentIdParam]);
 
   const tablesQuery = useQuery({
     queryKey: keys.tables,
@@ -68,12 +79,32 @@ export function TablesApp() {
   });
 
   const manifests = tablesQuery.data ?? [];
+  const visibleManifests = manifestsForDocument(manifests, documentIdParam);
   const selected = resolveSelectedManifest(
-    manifests,
+    visibleManifests,
     userSelectedId,
     tableIdParam,
     documentIdParam,
   );
+  const documentIds = tableDocumentIds(manifests, documentIdParam);
+  const documentQueries = useQueries({
+    queries: documentIds.map((documentId) => ({
+      queryKey: keys.document(documentId),
+      queryFn: () => fetchDocument(auth as ApiAuth, documentId),
+      enabled: auth !== null,
+    })),
+  });
+  const namedDocuments = documentQueries.flatMap((query) => {
+    if (query.data === undefined || !query.data.ok) {
+      return [];
+    }
+    return [
+      {
+        document_id: query.data.document.document_id,
+        title: query.data.document.title,
+      },
+    ];
+  });
 
   const analyzeMutation = useMutation({
     mutationFn: async (plan: TableQueryPlan) => {
@@ -107,6 +138,15 @@ export function TablesApp() {
         ? apiFailureBanner(analyzeMutation.error.failure)
         : GENERIC_PRODUCTION_ERROR
       : null;
+  const tablesPending = tablesQuery.isPending && tablesQuery.data === undefined;
+  const emptyCopy = tablesEmptyCopy(visibleManifests.length);
+  const selectedDocumentName =
+    selected === null
+      ? ""
+      : documentDisplayName(namedDocuments, selected.document_id);
+  const seededDocumentName = scopedToDocument
+    ? documentDisplayName(namedDocuments, documentIdParam)
+    : "";
 
   /**
    * Compile the draft and POST only a valid extra-forbid plan.
@@ -127,17 +167,20 @@ export function TablesApp() {
 
   const tableOptions = [
     { value: "", label: "Select a table", disabled: true },
-    ...manifests.map((item) => ({
+    ...visibleManifests.map((item) => ({
       value: item.table_id,
       label: item.sheet_name
         ? `${item.table_name} (${item.sheet_name})`
         : item.table_name,
     })),
   ];
+  const listHeading = scopedToDocument
+    ? "Tables in this document"
+    : "Available tables";
 
   return (
     <div className={styles.page}>
-      <PageHeader />
+      <PageHeader description="Run bounded calculations on structured data with exact cell provenance." />
       {listError ? (
         <StatusBanner kind="error" role="alert">
           {listError}
@@ -153,11 +196,17 @@ export function TablesApp() {
           {analyzeError}
         </StatusBanner>
       ) : null}
+      {scopedToDocument ? (
+        <TablesDocumentBar
+          documentId={documentIdParam}
+          documentName={seededDocumentName}
+        />
+      ) : null}
 
       <div className={styles.layout}>
-        <aside className={styles.sidebar} aria-label="Available tables">
-          <h2>Available tables</h2>
-          {tablesQuery.isPending && tablesQuery.data === undefined ? (
+        <aside className={styles.sidebar} aria-label={listHeading}>
+          <h2>{listHeading}</h2>
+          {tablesPending ? (
             <Skeleton label="Loading tables" width="100%" />
           ) : listError ? (
             <Button
@@ -170,14 +219,14 @@ export function TablesApp() {
             >
               Retry
             </Button>
-          ) : manifests.length === 0 ? (
-            <EmptyState title={EMPTY_MANIFESTS_COPY} />
+          ) : visibleManifests.length === 0 ? (
+            <p className={styles.muted}>{emptyCopy.title}</p>
           ) : (
             <ul className={styles.manifestList}>
-              {manifests.map((item) => {
+              {visibleManifests.map((item) => {
                 const active = selected?.table_id === item.table_id;
                 return (
-                  <li key={item.table_id}>
+                  <li key={item.table_id} className={styles.manifestItem}>
                     <button
                       type="button"
                       className={
@@ -186,19 +235,27 @@ export function TablesApp() {
                       aria-current={active ? "true" : undefined}
                       onClick={() => setUserSelectedId(item.table_id)}
                     >
-                      <span>
-                        <UserText value={item.table_name} />
-                        {item.sheet_name ? (
-                          <>
-                            {" "}
-                            (<UserText value={item.sheet_name} />)
-                          </>
-                        ) : null}
-                      </span>
-                      <span className={styles.mono}>
-                        <UserText value={item.document_id} />
-                      </span>
+                      <UserText value={item.table_name} />
+                      {item.sheet_name ? (
+                        <>
+                          {" "}
+                          (<UserText value={item.sheet_name} />)
+                        </>
+                      ) : null}
                     </button>
+                    {scopedToDocument ? null : (
+                      <Link
+                        href={`/documents/${encodeURIComponent(item.document_id)}`}
+                        className={styles.documentLink}
+                      >
+                        <UserText
+                          value={documentDisplayName(
+                            namedDocuments,
+                            item.document_id,
+                          )}
+                        />
+                      </Link>
+                    )}
                   </li>
                 );
               })}
@@ -209,21 +266,21 @@ export function TablesApp() {
         <div className={styles.main}>
           <div className={styles.manifestPicker}>
             <Select
-              label="Available tables"
+              label={listHeading}
               value={selected?.table_id ?? ""}
               options={tableOptions}
               onChange={(event) => setUserSelectedId(event.target.value)}
             />
-            {tablesQuery.isPending && tablesQuery.data === undefined ? (
+            {tablesPending ? (
               <Skeleton label="Loading tables" width="100%" />
-            ) : listError ? null : manifests.length === 0 ? (
-              <EmptyState title={EMPTY_MANIFESTS_COPY} />
+            ) : listError ? null : visibleManifests.length === 0 ? (
+              <p className={styles.muted}>{emptyCopy.title}</p>
             ) : null}
           </div>
-          {selected === null ? (
+          {listError || tablesPending ? null : selected === null ? (
             <EmptyState
-              title="Pick a table to analyze"
-              body="Deterministic calculations with exact cell provenance."
+              title={emptyCopy.title}
+              body={emptyCopy.body}
               action={
                 <Button type="button" disabled>
                   Analyze
@@ -232,8 +289,9 @@ export function TablesApp() {
             />
           ) : (
             <AnalysisPlan
-              manifests={manifests}
+              manifests={visibleManifests}
               selected={selected}
+              documentName={selectedDocumentName}
               draft={draft}
               pending={analyzeMutation.isPending}
               onSelectTableId={setUserSelectedId}
@@ -243,18 +301,14 @@ export function TablesApp() {
               onAnalyze={handleAnalyze}
             />
           )}
-          {submittedPlan ? (
-            <section className={styles.card} aria-label="Submitted plan">
-              <h2>Submitted plan</h2>
-              <pre className={styles.planPre}>
-                <UserText value={JSON.stringify(submittedPlan, null, 2)} />
-              </pre>
-            </section>
-          ) : null}
           {submittedPlan && analyzeMutation.isSuccess && analyzeMutation.data ? (
             <AnalysisResults
               result={analyzeMutation.data}
               selected={selected}
+              documentName={documentDisplayName(
+                namedDocuments,
+                analyzeMutation.data.document_id,
+              )}
               displaySortKey={displaySortKey}
               displaySortDir={displaySortDir}
               onDisplaySortKey={setDisplaySortKey}
@@ -265,4 +319,20 @@ export function TablesApp() {
       </div>
     </div>
   );
+}
+
+/**
+ * Empty-state copy for the global list or a document seed.
+ *
+ * @param visibleCount - Authorized manifests remaining after document scoping.
+ * @returns Title and optional body. Analyze stays disabled in the caller.
+ */
+function tablesEmptyCopy(visibleCount: number): { title: string; body?: string } {
+  if (visibleCount === 0) {
+    return { title: EMPTY_MANIFESTS_COPY };
+  }
+  return {
+    title: "Pick a table to analyze",
+    body: "Deterministic calculations with exact cell provenance.",
+  };
 }

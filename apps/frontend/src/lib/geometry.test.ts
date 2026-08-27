@@ -131,6 +131,24 @@ describe("Ask independent scroll source lock", () => {
     expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?280px/);
     expect(ui).toMatch(/\.fieldFull\s*\{[\s\S]*?max-width:\s*none/);
     expect(shell).toMatch(/\.navIsCollapsed\s*\{[\s\S]*?width:\s*var\(--nav-width-collapsed\)/);
-    expect(shell).not.toMatch(/@media \(min-width: 1280px\)/);
+    expect(readCss("../components/ui/app-nav.module.css")).not.toMatch(
+      /@media \(min-width: 1280px\)/,
+    );
+    expect(shell).toMatch(
+      /@media \(min-width: 1280px\)\s*\{\s*\.main\s*\{\s*padding:\s*calc\(var\(--space\) \* 6\)/,
+    );
+  });
+});
+
+describe("Admin page fill", () => {
+  it("stretches Admin to the console column so Usage meters cannot collapse", () => {
+    const admin = readCss(
+      "../components/admin/admin-shell.module.css",
+      "../components/admin/admin-tables.module.css",
+    );
+    expect(admin).toMatch(/\.page\s*\{[\s\S]*?width:\s*100%/);
+    expect(admin).toMatch(/\.page\s*\{[\s\S]*?max-width:\s*1440px/);
+    expect(admin).toMatch(/\.usageRow\s*\{[\s\S]*?width:\s*100%/);
+    expect(admin).toMatch(/\.teamGrid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2/);
   });
 });

@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { Button } from "../ui/button";
+import { Spinner } from "../ui/spinner";
 import { StatusBanner } from "../ui/status-banner";
 import { STALE_ROW_VERSION_COPY } from "../../lib/admin-copy";
 import { EntityRulesPanel } from "./entity-rules-panel";
@@ -25,10 +26,14 @@ export function CurationPanel() {
   const curation = useCurationMutations();
   const [inner, setInner] = useState<"glossary" | "rules">("glossary");
 
-  if (!curation.canMutate && curation.meFetched) {
+  if (!curation.meFetched) {
+    return <Spinner label="Loading curation" />;
+  }
+
+  if (!curation.canMutate) {
     return (
       <p className={styles.muted}>
-        Curation mutations are hidden for this role. Helpers still 403 on the server.
+        Curation is limited to owners and admins.
       </p>
     );
   }

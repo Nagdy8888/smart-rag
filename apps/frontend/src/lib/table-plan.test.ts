@@ -8,10 +8,14 @@ import {
   buildTableQueryPlan,
   clientComputedTableTotal,
   compileTablePlanDraft,
+  documentDisplayName,
+  manifestsForDocument,
   resolveSelectedManifest,
   tableAnalyzeBody,
+  tableDocumentIds,
   tableExportAllowed,
   tablePlanCompileCopy,
+  tablesWorkspaceHref,
 } from "./table-plan";
 import type { TableManifestResponse, TableQueryPlan } from "./types";
 
@@ -74,6 +78,54 @@ describe("resolveSelectedManifest", () => {
     expect(
       resolveSelectedManifest([MANIFEST, other], null, null, "d2")?.table_id,
     ).toBe(other.table_id);
+  });
+});
+
+describe("document-scoped table helpers", () => {
+  const other: TableManifestResponse = {
+    ...MANIFEST,
+    table_id: "33333333-3333-4333-8333-333333333333",
+    document_id: "d2",
+    table_name: "Other",
+  };
+
+  it("filters manifests to the seeded document", () => {
+    expect(manifestsForDocument([MANIFEST, other], null)).toEqual([
+      MANIFEST,
+      other,
+    ]);
+    expect(manifestsForDocument([MANIFEST, other], "d2")).toEqual([other]);
+  });
+
+  it("collects unique document ids and a seed with no tables", () => {
+    expect(tableDocumentIds([MANIFEST, other, MANIFEST], null)).toEqual([
+      "d1",
+      "d2",
+    ]);
+    expect(tableDocumentIds([MANIFEST], "missing")).toEqual(["d1", "missing"]);
+  });
+
+  it("prefers a fetched title and falls back to the document id", () => {
+    expect(
+      documentDisplayName(
+        [{ document_id: "d1", title: "Policy handbook" }],
+        "d1",
+      ),
+    ).toBe("Policy handbook");
+    expect(
+      documentDisplayName([{ document_id: "d1", title: null }], "d1"),
+    ).toBe("d1");
+    expect(documentDisplayName([], "d1")).toBe("d1");
+  });
+
+  it("builds tables workspace hrefs without inventing ids", () => {
+    expect(tablesWorkspaceHref({})).toBe("/tables");
+    expect(
+      tablesWorkspaceHref({ tableId: MANIFEST.table_id, documentId: "d1" }),
+    ).toBe(`/tables?tableId=${MANIFEST.table_id}&documentId=d1`);
+    expect(tablesWorkspaceHref({ documentId: "d1" })).toBe(
+      "/tables?documentId=d1",
+    );
   });
 });
 

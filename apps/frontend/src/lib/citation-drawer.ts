@@ -11,7 +11,7 @@ export const SOURCE_PREVIEW_UNAVAILABLE =
 
 /** Inference chains are not in the SSE catalog. */
 export const INFERENCE_LINKS_UNAVAILABLE =
-  "Inference-chain details are not part of this stream. Citation chips show authorized identifiers only.";
+  "Sources appear as citation chips on the answer.";
 
 /** 404 / IDOR copy. Never interpolates a title. */
 export const DOCUMENT_NOT_FOUND_COPY = "Not found.";

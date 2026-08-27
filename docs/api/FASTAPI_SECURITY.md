@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-08-27
 audience: engineering, security
 ---
 
@@ -82,12 +82,13 @@ keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGA
 | GET | `/ingestion/versions/{version_id}/status` | authenticated | `get_version_ingestion_status` ACL | **404** if missing or unauthorized (no existence leak). `last_error` sanitized |
 | GET | `/tables` | authenticated | current-version manifests | No storage paths |
 | POST | `/tables/analyze` | authenticated | `TableQueryPlan` extra=forbid | 404 missing parquet |
-| GET | `/tools` | authenticated | in-code registry + live role | Unauthorized names omitted |
+| GET | `/tools` | authenticated | in-code registry + live role, overlaying `app.tool_catalog.active` | Unauthorized names omitted. Owner/admin still see seed-disabled tools. Executor remains in-code. |
 | POST | `/admin/tools` | owner/admin | allow-listed keys only | DB seed is not executor authority |
-| POST | `/admin/tools/{key}/enable` | owner/admin | allow-list recheck | |
-| POST | `/admin/tools/{key}/permissions` | owner/admin | live role still gates execute | |
-| GET | `/usage/me` | authenticated | caller totals | No prompt text |
-| GET | `/usage/company` | owner/admin | company totals | Members/viewers 403 |
+| POST | `/admin/tools/{key}/enable` | owner/admin | allow-list recheck | Writes catalog seed `active`; `GET /tools` overlays it |
+| POST | `/admin/tools/{key}/permissions` | owner/admin | live role still gates execute | Upserts by tool + role; creates catalog row when missing |
+| GET | `/usage/me` | authenticated | caller totals; `scope=me` | No prompt text |
+| GET | `/usage/company` | owner/admin | company totals; `scope=company` | Members/viewers 403 |
+| GET | `/admin/graph/entity-rules` | owner/admin | list RPC | LOW_RISK_READ 120 after the role gate. Members/viewers 403 |
 
 Existing ingestion/glossary/entity-rule mutations keep owner/admin checks and
 now consume FastAPI-owned rate limits after the role gate.

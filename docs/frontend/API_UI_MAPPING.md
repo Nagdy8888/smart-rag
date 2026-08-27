@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-08-27
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -174,7 +174,7 @@ No HTTP for owner bootstrap (`bootstrap_owner` service), MFA recovery
 | Method | Path | Fields | Authz |
 | --- | --- | --- | --- |
 | GET | `/documents` | `document_id`, `title?`, `visibility`, `current_version_id?`, `visibility_generation`, `created_at?`; query `limit` (default 50, max 200), `cursor` | ACL |
-| GET | `/documents/{document_id}` | same | ACL else 404 |
+| GET | `/documents/{document_id}` | same fields including `created_at` | ACL else 404 |
 | DELETE | `/documents/{document_id}` | **204**; unseen **404**; visible non-owner/admin **403** | owner/admin; COST_MUTATION |
 | POST | `/documents/uploads` | req `declared_bytes` ≤ 104857600, `idempotency_key`; resp `reservation_id`, `storage_bucket`, `storage_path`, `expires_at`, `signed_url?`, `upload_method` | not viewer; `upload_enabled`; MFA when privileged. Local `signed_url` is **null** |
 | POST | `/documents/uploads/finalize` | req `reservation_id`, `object_name`, `content_hash`, `actual_bytes`, `media_type?`, `declared_category`, `attestation_policy_version`, `idempotency_key`, `document_title?`; resp `reservation_id`, `document_id`, `version_id`, `job_id` | same upload gate |
@@ -206,10 +206,12 @@ source-preview/download HTTP route.
 | GET | `/runs/{run_id}/citations` | `citation_id`, `citation_index`, `chunk_id?`, `provenance`, `source_unavailable`; **no snippets** |
 | POST | `/runs/{run_id}/feedback` | `thumbs_up`, `tag` (exact catalog), `comment?` |
 
-Feedback tags (byte-for-byte): `chunk/cleaning loss`, `profile field wrong`,
-`candidate miss`, `wrong rerank`, `bad refusal/overconfident answer`,
-`missed relationship`, `wrong route`, `wrong calculation`, `bad citation`,
-`insufficient graph`.
+Feedback tags (byte-for-byte). Thumbs up: `helpful answer`,
+`accurate citation`, `correct route`, `correct calculation`,
+`sufficient graph`. Thumbs down (unmerged diagnostics):
+`chunk/cleaning loss`, `profile field wrong`, `candidate miss`,
+`wrong rerank`, `bad refusal/overconfident answer`, `missed relationship`,
+`wrong route`, `wrong calculation`, `bad citation`, `insufficient graph`.
 
 ### Graph, tables, tools, usage
 
@@ -217,12 +219,12 @@ Feedback tags (byte-for-byte): `chunk/cleaning loss`, `profile field wrong`,
 | --- | --- | --- |
 | POST | `/graph/inspect` | req `entity_keys` ≤12 and/or `document_id`, `depth` 1–3; resp `nodes`, `locators`, `limitations[{code,count?}]`, `row_count` ≤200, `depth`. FastAPI COST_MUTATION. No vendor prose |
 | GET | `/graph/entities/search` | `q`, `limit` ≤25; hits `object_id`, `object_type`, `chunk_id`, `document_id`, `version_id`, `support` |
-| GET | `/tables` | manifests without storage paths; UI preselects `?tableId=` / `?documentId=` only when listed |
+| GET | `/tables` | manifests without storage paths; UI preselects `?tableId=` / `?documentId=` only when listed. `?documentId=` also scopes the sidebar. Titles come from `GET /documents/{id}` for those ids. |
 | POST | `/tables/analyze` | body `plan` (`TableQueryPlan` extra=forbid); resp `table_id`, `version_id`, `document_id`, `rows`, `source_ranges`. No export API. |
-| GET | `/tools` | role-filtered cards; unauthorized names omitted; `q` is URL-encoded |
+| GET | `/tools` | role-filtered cards; unauthorized names omitted; `q` is URL-encoded; `active` overlays catalog seed |
 | POST | `/admin/tools` | owner/admin seed API only; ordinary `/admin` Tools tab has no seed form |
-| POST | `/admin/tools/{tool_key}/enable` | owner/admin |
-| POST | `/admin/tools/{tool_key}/permissions` | owner/admin; executor still rechecks live role |
+| POST | `/admin/tools/{tool_key}/enable` | owner/admin; catalog seed overlay on `GET /tools` |
+| POST | `/admin/tools/{tool_key}/permissions` | owner/admin; upserts role permission; executor still rechecks live role |
 | POST | `/admin/glossary/imports` | owner/admin |
 | POST | `/admin/glossary/imports/{import_id}/approve` | owner/admin |
 | POST | `/admin/glossary/imports/{import_id}/rollback` | owner/admin |
@@ -407,7 +409,7 @@ where listed.
 | F Heartbeat | count | `heartbeat` 15s | creator | not assertive |
 | F Citations | chips | `citation_preview` then `GET /runs/{id}/citations` | creator | no snippets |
 | F Source drawer | preview/download | GAP-07-09 | — | IDs/provenance only |
-| F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | exact 10 tags |
+| F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | polarity catalogs, unmerged |
 | F Usage strip | account totals | `GET /usage/me` | caller | no prompt text |
 | F Run tokens | prompt / completion | SSE `usage` | creator | hidden when both are 0 |
 | F Profile rewrite / candidates / BM25 bytes / rerank / inferences / latency | — | GAP-07-02 | — | do not invent |
@@ -433,6 +435,8 @@ Unknown additive SSE types: log and ignore. One terminal among
 | I Restricted preview | — | GAP-07-09 | — | Unavailable |
 | I Graph tab | Open graph | `/graph?documentId=` then `POST /graph/inspect` | ACL | n/a |
 | I Tables tab | list | `GET /tables` | ACL | n/a |
+| I Tables tab | Open from document | `/tables?documentId=` and `/tables?tableId=&documentId=` | ACL | n/a |
+| I Tables tab | Document titles | `GET /documents/{id}` for listed manifest ids | ACL; 404 keeps the id | n/a |
 
 ### Graph, tables, tools, usage, settings
 

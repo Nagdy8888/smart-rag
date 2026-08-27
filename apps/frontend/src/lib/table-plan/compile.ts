@@ -55,6 +55,99 @@ export function resolveSelectedManifest(
 }
 
 /**
+ * Restrict manifests to one document when the URL seeds `documentId`.
+ *
+ * @param manifests - Authorized `GET /tables` rows.
+ * @param documentId - `?documentId=`, or null for the full list.
+ * @returns The same rows, or only those whose `document_id` matches.
+ */
+export function manifestsForDocument(
+  manifests: readonly TableManifestResponse[],
+  documentId: string | null,
+): readonly TableManifestResponse[] {
+  if (documentId === null || documentId === "") {
+    return manifests;
+  }
+  return manifests.filter((item) => item.document_id === documentId);
+}
+
+/**
+ * Collect unique document ids that need a title lookup.
+ *
+ * Order is first appearance in `manifests`, then a seeded id that has no
+ * extracted tables.
+ *
+ * @param manifests - Authorized `GET /tables` rows.
+ * @param seededDocumentId - `?documentId=` from the URL.
+ * @returns Distinct ids for `GET /documents/{id}`.
+ */
+export function tableDocumentIds(
+  manifests: readonly TableManifestResponse[],
+  seededDocumentId: string | null,
+): readonly string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const item of manifests) {
+    if (seen.has(item.document_id)) {
+      continue;
+    }
+    seen.add(item.document_id);
+    ids.push(item.document_id);
+  }
+  if (
+    seededDocumentId !== null &&
+    seededDocumentId !== "" &&
+    !seen.has(seededDocumentId)
+  ) {
+    ids.push(seededDocumentId);
+  }
+  return ids;
+}
+
+/**
+ * Prefer a document title from `GET /documents/{id}`; otherwise the id.
+ *
+ * @param documents - Successful document fetches.
+ * @param documentId - Manifest or seed id.
+ * @returns Title, or `document_id` when the title is null or the fetch missed.
+ */
+export function documentDisplayName(
+  documents: readonly { document_id: string; title: string | null }[],
+  documentId: string,
+): string {
+  const match = documents.find((item) => item.document_id === documentId);
+  if (match === undefined) {
+    return documentId;
+  }
+  return match.title ?? match.document_id;
+}
+
+/**
+ * Build `/tables` with optional table and document query params.
+ *
+ * @param options - Ids to include. Empty strings are omitted.
+ * @returns Path, or path with a query string.
+ */
+export function tablesWorkspaceHref(options: {
+  tableId?: string | null;
+  documentId?: string | null;
+}): string {
+  const params = new URLSearchParams();
+  if (options.tableId !== undefined && options.tableId !== null && options.tableId !== "") {
+    params.set("tableId", options.tableId);
+  }
+  if (
+    options.documentId !== undefined &&
+    options.documentId !== null &&
+    options.documentId !== ""
+  ) {
+    params.set("documentId", options.documentId);
+  }
+  const query = params.toString();
+  return query === "" ? "/tables" : `/tables?${query}`;
+}
+
+/**
  * Build a `TableQueryPlan` with only allow-listed fields.
  *
  * Extra keys such as `sql` are omitted even if the caller passes them.

@@ -70,6 +70,22 @@ def _require_owner_admin(caller: CallerContextDep) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
 
+def _rate_admin_read(request: Request, caller: CallerContextDep) -> None:
+    """Apply FastAPI-owned listing limits for entity-rule reads.
+
+    Args:
+        request: Active request.
+        caller: Authenticated owner/admin.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"entity-rules-read:{caller.user_id}",
+        kind=RateLimitKind.LOW_RISK_READ,
+        max_attempts=120,
+    )
+
+
 def _rate_admin_mutation(request: Request, caller: CallerContextDep) -> None:
     """Apply FastAPI-owned admin mutation limits.
 
@@ -127,7 +143,7 @@ def list_entity_rules_route(
     """
 
     _require_owner_admin(caller)
-    _rate_admin_mutation(request, caller)
+    _rate_admin_read(request, caller)
     try:
         return list_entity_rules_http(
             _postgres_url(request),

@@ -2,7 +2,7 @@
 title: Conversation memory, retention, and immediate deletion
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-08-27
 audience: engineering, security
 ---
 
@@ -85,10 +85,14 @@ enqueued by `app.enqueue_query_maintenance_jobs`.
 
 ## Feedback tags
 
-Thumbs feedback requires exactly one unmerged tag:
+Thumbs feedback requires exactly one unmerged tag from the polarity
+catalog:
 
-`chunk/cleaning loss`, `profile field wrong`, `candidate miss`,
-`wrong rerank`, `bad refusal/overconfident answer`,
+Thumbs up: `helpful answer`, `accurate citation`, `correct route`,
+`correct calculation`, `sufficient graph`.
+
+Thumbs down: `chunk/cleaning loss`, `profile field wrong`,
+`candidate miss`, `wrong rerank`, `bad refusal/overconfident answer`,
 `missed relationship`, `wrong route`, `wrong calculation`,
 `bad citation`, `insufficient graph`.
 

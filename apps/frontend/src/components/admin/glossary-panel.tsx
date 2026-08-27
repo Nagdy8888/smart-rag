@@ -11,7 +11,6 @@ import { Select } from "../ui/select";
 import type { UseCurationMutationsResult } from "./hooks/use-curation-mutations";
 import {
   GLOSSARY_ENTRY_TYPES,
-  GLOSSARY_LANGUAGES,
   GLOSSARY_SCOPES,
   type GlossaryEntryType,
   type GlossaryLanguage,
@@ -22,17 +21,18 @@ import tableStyles from "./admin-tables.module.css";
 
 const styles = { ...shellStyles, ...tableStyles };
 
-const LANGUAGE_OPTIONS = GLOSSARY_LANGUAGES.map((item) => ({
-  value: item,
-  label: item,
-}));
+const LANGUAGE_OPTIONS: { value: GlossaryLanguage; label: string }[] = [
+  { value: "en", label: "English" },
+  { value: "ar", label: "Arabic" },
+  { value: "mixed", label: "Mixed" },
+];
 const ENTRY_TYPE_OPTIONS = GLOSSARY_ENTRY_TYPES.map((item) => ({
   value: item,
-  label: item,
+  label: item.replaceAll("_", " "),
 }));
 const SCOPE_OPTIONS = GLOSSARY_SCOPES.map((item) => ({
   value: item,
-  label: item,
+  label: item === "synthetic_eval" ? "Evaluation only" : "Company",
 }));
 
 export type GlossaryPanelProps = {
@@ -47,59 +47,64 @@ export type GlossaryPanelProps = {
  * @returns Glossary section. Does not authorize mutations.
  */
 export function GlossaryPanel({ curation }: GlossaryPanelProps) {
-  const [sourceName, setSourceName] = useState("sme-seed");
+  const [sourceName, setSourceName] = useState("manual");
   const [sourceVersion, setSourceVersion] = useState("1");
   const [entryKey, setEntryKey] = useState("");
   const [canonicalTerm, setCanonicalTerm] = useState("");
   const [language, setLanguage] = useState<GlossaryLanguage>("en");
   const [entryType, setEntryType] = useState<GlossaryEntryType>("canonical_term");
-  const [scope, setScope] = useState<GlossaryScope>("synthetic_eval");
+  const [scope, setScope] = useState<GlossaryScope>("company");
   const [alias, setAlias] = useState("");
 
   return (
     <section className={styles.panel} aria-label="Glossary import">
       <h2>Glossary import</h2>
+      <p className={styles.panelLead}>
+        Import one term, then approve it to add aliases to search. Rollback
+        removes that import’s search projection. Entry keys may use letters,
+        numbers, dots, underscores, colons, or hyphens.
+      </p>
       <div className={styles.formGrid}>
         <Input
-          label="source_name"
+          label="Source name"
           value={sourceName}
           onChange={(event) => setSourceName(event.target.value)}
         />
         <Input
-          label="source_version"
+          label="Source version"
           value={sourceVersion}
           onChange={(event) => setSourceVersion(event.target.value)}
         />
         <Input
-          label="entry_key"
+          label="Entry key"
           value={entryKey}
           onChange={(event) => setEntryKey(event.target.value)}
         />
         <Input
-          label="canonical_term"
+          label="Canonical term"
           value={canonicalTerm}
           onChange={(event) => setCanonicalTerm(event.target.value)}
         />
         <Select
-          label="language"
+          label="Language"
           value={language}
           options={LANGUAGE_OPTIONS}
           onChange={(event) => setLanguage(event.target.value as GlossaryLanguage)}
         />
         <Select
-          label="entry_type"
+          label="Entry type"
           value={entryType}
           options={ENTRY_TYPE_OPTIONS}
           onChange={(event) => setEntryType(event.target.value as GlossaryEntryType)}
         />
         <Select
-          label="effective_scope"
+          label="Scope"
           value={scope}
           options={SCOPE_OPTIONS}
           onChange={(event) => setScope(event.target.value as GlossaryScope)}
         />
         <Input
-          label="alias (optional)"
+          label="Alias (optional)"
           value={alias}
           onChange={(event) => setAlias(event.target.value)}
         />
@@ -124,11 +129,8 @@ export function GlossaryPanel({ curation }: GlossaryPanelProps) {
       >
         Import glossary
       </PrimaryAction>
-      <p className={styles.muted}>
-        Status: {curation.outcome ?? "none"} import_id {curation.importId || "—"}
-      </p>
       <Input
-        label="import_id"
+        label="Import ID"
         value={curation.importId}
         onChange={(event) => curation.setImportId(event.target.value)}
       />

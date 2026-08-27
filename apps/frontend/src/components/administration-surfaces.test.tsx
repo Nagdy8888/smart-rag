@@ -239,7 +239,7 @@ describe("TeamAccessPanel", () => {
     expect(createInvitation).toBeDefined();
     expect(offboardUser).toBeDefined();
     expect(screen.queryByText(/bootstrap/i)).toBeNull();
-    expect(screen.queryByText(/member directory/i)).toBeNull();
+    expect(screen.queryByRole("table", { name: /member/i })).toBeNull();
   });
 
   it("does not render an invitation token and keeps hostile email as text", async () => {
@@ -296,12 +296,28 @@ describe("ToolsPanel", () => {
     expect(listTools).toHaveBeenCalledWith({ accessToken: "jwt-token" }, "csv export");
     expect(enableTool).toBeDefined();
   });
+
+  it("lets an owner disable a tool through the catalog seed", async () => {
+    renderSurface(<ToolsPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "Disable" }));
+    await waitFor(() =>
+      expect(enableTool).toHaveBeenCalledWith(
+        { accessToken: "jwt-token" },
+        "export_csv",
+        false,
+      ),
+    );
+  });
 });
 
 describe("UsagePanel", () => {
   it("shows token meters and no budget slider or fake audit events", async () => {
     renderSurface(<UsagePanel />);
     expect(await screen.findByText("1.25")).toBeInTheDocument();
+    expect(screen.getByText("Your usage")).toBeInTheDocument();
+    expect(screen.getByText(/Recorded model usage/)).toBeInTheDocument();
+    expect(screen.getAllByText("Prompt tokens").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Usage records").length).toBeGreaterThan(0);
     expect(screen.getByTestId("usage-meters")).toBeInTheDocument();
     expect(await screen.findByTestId("company-usage-meters")).toBeInTheDocument();
     expect(screen.queryByTestId("budget-editor-unavailable")).toBeNull();
@@ -342,7 +358,9 @@ describe("AccountPanel", () => {
   it("shows /me fields and has no settings save", async () => {
     renderSurface(<AccountPanel />);
     expect(await screen.findByText("u-owner")).toBeInTheDocument();
-    expect(screen.getByText("owner")).toBeInTheDocument();
+    expect(screen.getByText("User ID")).toBeInTheDocument();
+    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("Upload access")).toBeInTheDocument();
     expect(screen.queryByTestId("profile-editor-unavailable")).toBeNull();
     expect(screen.queryByTestId("company-settings-unavailable")).toBeNull();
     expect(screen.queryByRole("button", { name: /save/i })).toBeNull();
@@ -360,7 +378,7 @@ describe("CurationPanel", () => {
       upload_enabled: false,
     });
     renderSurface(<CurationPanel />);
-    expect(await screen.findByText(/Curation mutations are hidden/)).toBeInTheDocument();
+    expect(await screen.findByText(/Curation is limited/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import glossary" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
   });
@@ -384,7 +402,7 @@ describe("CurationPanel", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Entity rules" }));
     fireEvent.click(await screen.findByRole("button", { name: "Rule actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Approve" }));
-    expect(await screen.findByText(/row_version=2/)).toBeInTheDocument();
+    expect(await screen.findByText("Rule approved.")).toBeInTheDocument();
     expect(approveEntityRule).toHaveBeenCalledWith(
       { accessToken: "jwt-token" },
       "rule-1",

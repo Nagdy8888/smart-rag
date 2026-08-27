@@ -125,8 +125,11 @@ class DocumentService:
                 with connection.cursor(row_factory=dict_row) as cursor:
                     cursor.execute(
                         """
-                        SELECT id, title, visibility, current_version_id, visibility_generation
-                        FROM app.get_visible_document(%s, %s, %s, %s)
+                        SELECT id, title, visibility, current_version_id,
+                               visibility_generation, created_at
+                        FROM app.get_visible_document(
+                          %s::uuid, %s::text, %s::bigint, %s::uuid
+                        )
                         """,
                         (
                             caller.user_id,

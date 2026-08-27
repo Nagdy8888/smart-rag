@@ -122,6 +122,9 @@
 }
 
 .table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: var(--color-surface-muted);
   height: 40px;
   font-size: 12px;
@@ -136,10 +139,14 @@
 .table td {
   min-height: var(--row-height);
   height: var(--row-height);
-  padding: 0 calc(var(--space) * 3);
+  padding: 0 calc(var(--space) * 4);
   border-bottom: 1px solid var(--color-border);
   text-align: start;
   vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .tableNumeric {
@@ -148,7 +155,7 @@
 }
 
 .table tbody tr:hover {
-  background: var(--color-bg);
+  background: var(--color-surface-hover);
 }
 
 .table tbody tr {

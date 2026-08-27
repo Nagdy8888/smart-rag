@@ -2,7 +2,7 @@
 title: Thin authenticated developer UI
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-27
 audience: engineering, frontend
 ---
 
@@ -73,9 +73,12 @@ text nodes plus `displayText`; `href` values must pass `isSafeHttpUrl`.
 ## Diagnostics honesty
 
 SSE payloads are extra=forbid and do **not** include BM25 index/lag bytes.
-Chat diagnostics show route correction, limitation codes, cache status,
+Chat diagnostics collect route correction, limitation codes, cache status,
 coverage score, optional tool keys, citation ids, usage tokens, and heartbeat
-count.
+count. The Run details sheet shows only real user-facing rows: status, search
+mode, correction when it happened, tools/cache/coverage when present, usage,
+and the run id. Heartbeat count stays in reducer state and is not a product
+row.
 
 BM25 projection/index/lag/pending/failed/dead-letter come from
 `GET /ingestion/versions/{version_id}/status`. Graph ready is never inferred

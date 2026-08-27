@@ -2,7 +2,7 @@
 title: Durable job state machine
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-08-27
 audience: engineering
 ---
 
@@ -156,9 +156,13 @@ stateDiagram-v2
 ```
 
 `GET /ingestion/versions/{version_id}/status` is ACL-gated through
-`app.get_version_ingestion_status`. Unauthorized or missing versions return
-HTTP **404** (no existence leak). `last_error` is sanitized (no stack traces
-or secret-like text). Owner/admin may retry; members receive 403 on retry.
+`app.get_version_ingestion_status` (`supabase/migrations/20260819100000_ingestion_status_acl_v1.sql`).
+Unauthorized or missing versions return HTTP **404** (no existence leak).
+`last_error` is sanitized (no stack traces or secret-like text). Owner/admin
+may retry; members receive 403 on retry. The API casts caller arguments as
+`uuid` / `text` / `bigint` / `uuid` so a pooler-inferred `smallint`
+authorization version still matches. Hosted `smart-rag` must have this RPC;
+without it Documents shows **Not indexed** and Processing cannot load.
 
 Retrieval RPCs (`retrieve_dense_candidates`, `retrieve_term_candidates`,
 `recheck_retrieval_candidates`) only read chunks whose version equals

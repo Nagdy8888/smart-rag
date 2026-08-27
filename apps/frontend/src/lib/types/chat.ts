@@ -71,8 +71,17 @@ export const ANSWER_ORIGINS = [
 /** One catalog answer origin. Unknown values are tolerated at the reducer. */
 export type AnswerOrigin = (typeof ANSWER_ORIGINS)[number];
 
-/** Exact unmerged packet-7 feedback tags. */
-export const FEEDBACK_TAGS = [
+/** Exact unmerged thumbs-up tags. */
+export const FEEDBACK_TAGS_UP = [
+  "helpful answer",
+  "accurate citation",
+  "correct route",
+  "correct calculation",
+  "sufficient graph",
+] as const;
+
+/** Exact unmerged thumbs-down diagnostic tags. */
+export const FEEDBACK_TAGS_DOWN = [
   "chunk/cleaning loss",
   "profile field wrong",
   "candidate miss",
@@ -85,4 +94,20 @@ export const FEEDBACK_TAGS = [
   "insufficient graph",
 ] as const;
 
+/** Union of polarity catalogs. Tags are never merged. */
+export const FEEDBACK_TAGS = [
+  ...FEEDBACK_TAGS_UP,
+  ...FEEDBACK_TAGS_DOWN,
+] as const;
+
 export type FeedbackTag = (typeof FEEDBACK_TAGS)[number];
+
+/**
+ * Return the exact tag catalog for the selected thumb.
+ *
+ * @param thumbsUp - True after thumbs up.
+ * @returns Unmerged tags for that polarity.
+ */
+export function feedbackTagsFor(thumbsUp: boolean): readonly FeedbackTag[] {
+  return thumbsUp ? FEEDBACK_TAGS_UP : FEEDBACK_TAGS_DOWN;
+}

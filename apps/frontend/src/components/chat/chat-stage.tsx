@@ -38,6 +38,8 @@ export type ChatStageProps = {
   historyMessages: ConversationMessage[];
   /** True while the selected conversation transcript is fetching. */
   messagesPending?: boolean;
+  /** True when the selected transcript query failed. */
+  messagesError?: boolean;
   nextBeforeId: string | null;
   loadingEarlier: boolean;
   earlierError: string | null;
@@ -83,6 +85,7 @@ export function ChatStage(props: ChatStageProps) {
     run,
     historyMessages,
     messagesPending = false,
+    messagesError = false,
     nextBeforeId,
     loadingEarlier,
     earlierError,
@@ -124,6 +127,7 @@ export function ChatStage(props: ChatStageProps) {
   const visibleCitations = shouldShowCitations(chat.answerOrigin) ? [...citations] : [];
   const showEmptyPrompts =
     !messagesPending &&
+    !messagesError &&
     run.lastUserMessage === "" &&
     chat.answerText === "" &&
     historyMessages.length === 0;
@@ -168,6 +172,7 @@ export function ChatStage(props: ChatStageProps) {
         <AnswerSurface
           messages={historyMessages}
           messagesPending={messagesPending}
+          messagesError={messagesError}
           hasEarlier={nextBeforeId !== null}
           onLoadEarlier={onLoadEarlier}
           loadingEarlier={loadingEarlier}

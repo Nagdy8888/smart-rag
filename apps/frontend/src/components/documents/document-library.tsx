@@ -16,6 +16,7 @@ import { useDocumentLibrary } from "./hooks/use-document-library";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { PageHeader } from "../ui/page-header";
+import { Sheet } from "../ui/sheet";
 import { StatusBanner } from "../ui/status-banner";
 import styles from "./documents.module.css";
 
@@ -24,9 +25,9 @@ import styles from "./documents.module.css";
  *
  * @returns Library surface.
  * @remarks
- * File import is still reserve → Storage JWT → finalize. Polling stops on
- * terminal status, closed inspector, hidden tab, sign-out, or unmount.
- * Duplicate upload clicks reuse one idempotency key until success.
+ * File import is still reserve → Storage JWT → finalize. List status polls
+ * while a loaded version is non-terminal and the tab is visible. Duplicate
+ * upload clicks reuse one idempotency key until success.
  */
 export function DocumentLibrary() {
   const router = useRouter();
@@ -57,27 +58,26 @@ export function DocumentLibrary() {
 
   return (
     <div className={styles.page}>
-      <PageHeader actions={importButton} />
+      <PageHeader
+        description="Upload files or add approved websites, then track search and graph readiness."
+        actions={importButton}
+      />
       <HandshakeBanner />
 
-      {lib.showUpload ? null : (
-        <p className={styles.muted}>
-          Upload controls are hidden as convenience only. The server still
-          denies viewers and callers without upload_enabled.
-        </p>
-      )}
       <div className={styles.toolbar}>
-        <Input
-          label="Filter loaded documents"
-          leadingIcon="search"
-          placeholder="Filter by name…"
-          value={lib.filter}
-          onChange={(event) => lib.onFilter(event.target.value)}
-        />
-        <p className={styles.toolbarSummary}>
-          Filters apply to loaded documents only.
-        </p>
-        <p className={styles.toolbarSummary}>
+        <div className={styles.toolbarFilter}>
+          <Input
+            label="Filter by name"
+            leadingIcon="search"
+            placeholder="Filter by name…"
+            value={lib.filter}
+            onChange={(event) => lib.onFilter(event.target.value)}
+          />
+          <p className={styles.toolbarSummary}>
+            Filters apply to loaded documents only.
+          </p>
+        </div>
+        <p className={styles.toolbarCount}>
           Showing {String(lib.visibleDocs.length)} of {String(lib.loaded.length)}{" "}
           loaded
         </p>
@@ -95,6 +95,7 @@ export function DocumentLibrary() {
           <DocumentList
             documents={lib.visibleDocs}
             statusByVersionId={lib.statusByVersionId}
+            pendingStatusIds={lib.pendingStatusIds}
             onLoadStatus={lib.openInspector}
             onViewDetails={(documentId) => {
               router.push(`/documents/${documentId}`);
@@ -114,15 +115,17 @@ export function DocumentLibrary() {
             }
           />
           {lib.nextCursor !== null ? (
-            <Button
-              type="button"
-              variant="secondary"
-              pending={lib.loadMorePending}
-              pendingLabel="Loading…"
-              onClick={lib.loadMore}
-            >
-              Load more
-            </Button>
+            <div className={styles.loadMore}>
+              <Button
+                type="button"
+                variant="secondary"
+                pending={lib.loadMorePending}
+                pendingLabel="Loading…"
+                onClick={lib.loadMore}
+              >
+                Load more
+              </Button>
+            </div>
           ) : null}
         </>
       )}
@@ -174,6 +177,15 @@ export function DocumentLibrary() {
           onRetry={lib.retryJob}
           retryPending={lib.retryPending}
         />
+      ) : null}
+      {lib.inspectorOpen && !lib.inspectorPayload ? (
+        <Sheet title="Processing" onClose={lib.closeInspector}>
+          <p className={styles.muted}>
+            {lib.inspectorPending
+              ? "Loading…"
+              : "Processing details could not be loaded."}
+          </p>
+        </Sheet>
       ) : null}
       {lib.deleteTarget !== null ? (
         <DocumentDeleteSheet

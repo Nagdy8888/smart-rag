@@ -12,6 +12,7 @@ import { FORBIDDEN_MUTATION_COPY } from "../../lib/admin-copy";
 import { GENERIC_PRODUCTION_ERROR } from "../../lib/failure-copy";
 import {
   EMPTY_ANALYZE_ROWS_COPY,
+  EMPTY_DOCUMENT_TABLES_COPY,
   EMPTY_MANIFESTS_COPY,
   SQL_REJECTED_COPY,
   UNKNOWN_COLUMN_COPY,
@@ -22,6 +23,7 @@ const fetchMe = vi.fn();
 const fetchMeta = vi.fn();
 const listTables = vi.fn();
 const analyzeTable = vi.fn();
+const fetchDocument = vi.fn();
 
 const { navState } = vi.hoisted(() => ({
   navState: { search: new URLSearchParams() },
@@ -73,6 +75,7 @@ vi.mock("../../lib/api", async () => {
     fetchMeta: (...args: unknown[]) => fetchMeta(...args),
     listTables: (...args: unknown[]) => listTables(...args),
     analyzeTable: (...args: unknown[]) => analyzeTable(...args),
+    fetchDocument: (...args: unknown[]) => fetchDocument(...args),
   };
 });
 
@@ -104,6 +107,17 @@ beforeEach(() => {
     upload_enabled: true,
   });
   listTables.mockResolvedValue([MANIFEST]);
+  fetchDocument.mockResolvedValue({
+    ok: true,
+    document: {
+      document_id: MANIFEST.document_id,
+      title: "Policy handbook",
+      visibility: "company",
+      current_version_id: MANIFEST.version_id,
+      visibility_generation: 1,
+      created_at: "2026-08-24T00:00:00Z",
+    },
+  });
   analyzeTable.mockReset();
   analyzeTable.mockResolvedValue({
     table_id: MANIFEST.table_id,
@@ -179,6 +193,11 @@ describe("TablesApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "View provenance" }));
     expect(screen.getByRole("heading", { name: "Cell provenance" })).toBeInTheDocument();
     expect(screen.getByText("Sheet1!A1:B2")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link", { name: "Policy handbook" }).some(
+        (link) => link.getAttribute("href") === `/documents/${MANIFEST.document_id}`,
+      ),
+    ).toBe(true);
     expect(screen.queryByRole("link", { name: /source/i })).toBeNull();
     expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
@@ -223,10 +242,8 @@ describe("TablesApp", () => {
     expect(await screen.findByText(FORBIDDEN_MUTATION_COPY)).toBeInTheDocument();
     expect(screen.getByLabelText("Filter column")).toHaveValue("amount");
     expect(screen.getByLabelText("Filter value")).toHaveValue("1");
-    expect(screen.getByRole("region", { name: "Submitted plan" })).toHaveTextContent(
-      "amount",
-    );
     expect(screen.queryByRole("heading", { name: "Results" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Submitted plan" })).toBeNull();
   });
 
   it("preserves the plan on 422, 429, and server failure", async () => {
@@ -288,6 +305,10 @@ describe("TablesApp", () => {
     listTables.mockResolvedValue([]);
     renderSurface(<TablesApp />);
     expect((await screen.findAllByText(EMPTY_MANIFESTS_COPY)).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Pick a table to analyze")).toBeNull();
+    expect(
+      screen.getByText("Run bounded calculations on structured data with exact cell provenance."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
     expect(screen.getByRole("button", { name: "Analyze" })).toBeDisabled();
   });
@@ -314,11 +335,69 @@ describe("TablesApp", () => {
       target: { value: "amount" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Toggle display sort direction" }));
-    expect(screen.getByRole("region", { name: "Submitted plan" })).toHaveTextContent(
-      '"order_by"',
+    expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Submitted plan" })).toBeNull();
+  });
+
+  it("names the source document and links through to it", async () => {
+    renderSurface(<TablesApp />);
+    expect(
+      await screen.findByRole("link", { name: "Policy handbook" }),
+    ).toHaveAttribute("href", `/documents/${MANIFEST.document_id}`);
+  });
+
+  it("scopes the workspace to a document seed and links back", async () => {
+    navState.search = new URLSearchParams(`documentId=${MANIFEST.document_id}`);
+    renderSurface(<TablesApp />);
+    expect(await screen.findByRole("link", { name: "Back to document" })).toHaveAttribute(
+      "href",
+      `/documents/${MANIFEST.document_id}`,
     );
-    expect(screen.getByRole("region", { name: "Submitted plan" })).not.toHaveTextContent(
-      '"direction": "desc"',
+    expect(screen.getByRole("link", { name: "All tables" })).toHaveAttribute(
+      "href",
+      "/tables",
     );
+    expect(screen.getByRole("heading", { name: "Tables in this document" })).toBeInTheDocument();
+    expect((await screen.findAllByText("Policy handbook")).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("link", { name: "Policy handbook" })[0],
+    ).toHaveAttribute("href", `/documents/${MANIFEST.document_id}`);
+    expect(await screen.findByRole("button", { name: /Sheet1/ })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
+  it("hides other documents' tables when the URL seeds a document", async () => {
+    listTables.mockResolvedValue([
+      MANIFEST,
+      {
+        ...MANIFEST,
+        table_id: "33333333-3333-4333-8333-333333333333",
+        document_id: "d2",
+        table_name: "Other workbook",
+        sheet_name: "OtherSheet",
+      },
+    ]);
+    navState.search = new URLSearchParams(`documentId=${MANIFEST.document_id}`);
+    renderSurface(<TablesApp />);
+    expect(await screen.findByRole("button", { name: /Sheet1/ })).toBeInTheDocument();
+    expect(screen.queryByText("Other workbook")).toBeNull();
+  });
+
+  it("explains when the seeded document has no extracted tables", async () => {
+    navState.search = new URLSearchParams(`documentId=${MANIFEST.document_id}`);
+    listTables.mockResolvedValue([]);
+    renderSurface(<TablesApp />);
+    expect(await screen.findByRole("link", { name: "Back to document" })).toHaveAttribute(
+      "href",
+      `/documents/${MANIFEST.document_id}`,
+    );
+    expect((await screen.findAllByText(EMPTY_MANIFESTS_COPY)).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText(EMPTY_DOCUMENT_TABLES_COPY)).toBeNull();
+    expect(screen.queryByText("Pick a table to analyze")).toBeNull();
+    expect(screen.getByRole("button", { name: "Analyze" })).toBeDisabled();
   });
 });

@@ -14,6 +14,7 @@ import type { RunProgressItem } from "../../lib/run-progress";
 import type { ChatViewState } from "../../lib/chat-view";
 import type { CitationResponse, ConversationMessage } from "../../lib/types";
 import { formatRunTokenUsage } from "../../lib/format-usage";
+import { routeLabel } from "../../lib/run-details";
 import { formatRelativeTime } from "../../lib/relative-time";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -32,6 +33,8 @@ export type AnswerSurfaceProps = {
   messages?: ConversationMessage[];
   /** True while the selected transcript query is in flight. */
   messagesPending?: boolean;
+  /** True when the selected transcript query failed. */
+  messagesError?: boolean;
   /** True when an older page is available. */
   hasEarlier?: boolean;
   /** Load the previous transcript page. */
@@ -172,6 +175,7 @@ function CitationRow({
 export const AnswerSurface = memo(function AnswerSurface({
   messages = [],
   messagesPending = false,
+  messagesError = false,
   hasEarlier = false,
   onLoadEarlier,
   loadingEarlier = false,
@@ -198,6 +202,7 @@ export const AnswerSurface = memo(function AnswerSurface({
 }: AnswerSurfaceProps) {
   const note = answerTerminalNote(terminal, answer);
   const originLabel = answerOriginLabel(answerOrigin);
+  const routeName = routeLabel(effectiveRoute);
   const usageLabel = formatRunTokenUsage(promptTokens, completionTokens);
   const showClarification = answerOrigin === "ambiguous";
   const terminalClass =
@@ -224,6 +229,7 @@ export const AnswerSurface = memo(function AnswerSurface({
     lastHistAssistant?.content !== answer;
   const empty =
     !messagesPending &&
+    !messagesError &&
     messages.length === 0 &&
     !showLiveUser &&
     !showLiveAssistant &&
@@ -255,6 +261,11 @@ export const AnswerSurface = memo(function AnswerSurface({
       ) : null}
       {messagesPending && messages.length === 0 ? (
         <p className={styles.muted}>Loading conversation…</p>
+      ) : null}
+      {messagesError && !messagesPending && messages.length === 0 ? (
+        <LimitationCallout tone="warning">
+          Couldn&apos;t load this conversation.
+        </LimitationCallout>
       ) : null}
       {empty ? (
         <EmptyState
@@ -301,16 +312,16 @@ export const AnswerSurface = memo(function AnswerSurface({
           {originLabel !== null ? (
             <p className={styles.answerHeader}>
               <Badge label={originLabel} data-testid="answer-origin" />
-              {effectiveRoute ? (
+              {routeName ? (
                 <span data-testid="answer-route">
-                  <StatusPill status={effectiveRoute} />
+                  <StatusPill status={routeName} />
                 </span>
               ) : null}
             </p>
-          ) : effectiveRoute ? (
+          ) : routeName ? (
             <p className={styles.answerHeader}>
               <span data-testid="answer-route">
-                <StatusPill status={effectiveRoute} />
+                <StatusPill status={routeName} />
               </span>
             </p>
           ) : null}
@@ -334,10 +345,10 @@ export const AnswerSurface = memo(function AnswerSurface({
           ) : null}
           <p className={styles.messageMeta}>
             {liveCreatedAt ? formatRelativeTime(liveCreatedAt) : null}
-            {effectiveRoute ? ` · ${effectiveRoute}` : null}
+            {routeName ? ` · ${routeName}` : null}
             {usageLabel !== null ? (
               <>
-                {liveCreatedAt || effectiveRoute ? " · " : null}
+                {liveCreatedAt || routeName ? " · " : null}
                 <span data-testid="answer-token-usage">{usageLabel}</span>
               </>
             ) : null}

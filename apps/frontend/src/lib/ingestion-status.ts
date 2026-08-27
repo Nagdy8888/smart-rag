@@ -4,7 +4,9 @@
  * BM25 index/lag live on this payload, not on SSE chat events.
  */
 
-import type { Bm25Diagnostics, GraphHandoffDiagnostics } from "./types";
+import type { Bm25Diagnostics, GraphHandoffDiagnostics, IngestionJobSummary } from "./types";
+import { formatRelativeTime } from "./relative-time";
+import { isRealDetailValue } from "./run-details";
 
 /** Pill tone mapped from a lifecycle enum. */
 export type IngestionStatusTone = "neutral" | "success" | "warning" | "danger";
@@ -88,10 +90,10 @@ export function ingestionStatusLabel(status: string): string {
     uploaded: "Uploaded",
     scanning: "Scanning",
     parsing: "Parsing",
-    hybrid_ready: "Hybrid Ready",
-    graph_pending: "Graph Pending",
-    graph_ready: "Graph Ready",
-    graph_ineligible: "Graph Ineligible",
+    hybrid_ready: "Search ready",
+    graph_pending: "Graph pending",
+    graph_ready: "Graph ready",
+    graph_ineligible: "Graph ineligible",
     deletion_pending: "Deletion pending",
     failed: "Failed",
   };
@@ -139,9 +141,9 @@ export function compactIngestionPills(status: string): CompactIngestionPills {
     graph_ineligible: { label: "Search ready", tone: "success" },
   };
   const graphByStatus: Record<string, CompactIngestionPills["graph"]> = {
-    graph_pending: { label: "Graph Pending", tone: "warning" },
-    graph_ready: { label: "Graph Ready", tone: "success" },
-    graph_ineligible: { label: "Graph Ineligible", tone: "neutral" },
+    graph_pending: { label: "Graph pending", tone: "warning" },
+    graph_ready: { label: "Graph ready", tone: "success" },
+    graph_ineligible: { label: "Graph ineligible", tone: "neutral" },
   };
   return {
     search: searchByStatus[status] ?? null,
@@ -201,10 +203,10 @@ export function ingestionTimelineSteps(status: string): IngestionTimelineStep[] 
   }
   const graphLabel =
     status === "graph_ready"
-      ? "Graph Ready"
+      ? "Graph ready"
       : status === "graph_ineligible"
-        ? "Graph Ineligible"
-        : "Graph Pending";
+        ? "Graph ineligible"
+        : "Graph pending";
   const labels: Record<(typeof TIMELINE_ORDER)[number], string> = {
     uploaded: "Uploaded",
     scanning: "Scanning",
@@ -218,4 +220,138 @@ export function ingestionTimelineSteps(status: string): IngestionTimelineStep[] 
     label: labels[id],
     state: index < currentIndex ? "done" : index === currentIndex ? "current" : "upcoming",
   }));
+}
+
+/** One user-visible technical-details row. */
+export type IngestionDetailRow = {
+  /** Sentence-case label. */
+  label: string;
+  /** Already-safe display value. */
+  value: string;
+};
+
+const JOB_KIND_LABELS: Readonly<Record<string, string>> = {
+  scan_promote: "Scanning",
+  website_crawl: "Website crawl",
+  hybrid_index: "Search indexing",
+  lightrag_index: "Graph indexing",
+};
+
+const JOB_STATUS_LABELS: Readonly<Record<string, string>> = {
+  pending: "Waiting",
+  processing: "In progress",
+  completed: "Completed",
+  failed: "Failed",
+  dead_letter: "Needs retry",
+  backoff: "Waiting to retry",
+};
+
+/**
+ * Map a stored job kind onto a sentence-case label.
+ *
+ * @param kind - `ingestion_jobs.job_kind`.
+ * @returns Known label, or spaced snake_case when unknown.
+ */
+export function ingestionJobKindLabel(kind: string): string {
+  return JOB_KIND_LABELS[kind] ?? kind.replaceAll("_", " ");
+}
+
+/**
+ * Map a stored job status onto a sentence-case label.
+ *
+ * @param status - `ingestion_jobs.status`.
+ * @returns Known label, or spaced snake_case when unknown.
+ */
+export function ingestionJobStatusLabel(status: string): string {
+  return JOB_STATUS_LABELS[status] ?? status.replaceAll("_", " ");
+}
+
+/**
+ * Return whether a job is still interesting on the document page.
+ *
+ * Completed jobs stay off the list; retryable failures remain.
+ *
+ * @param status - Job status enum.
+ * @returns False for completed.
+ */
+export function isOpenIngestionJob(status: string): boolean {
+  return status !== "completed";
+}
+
+/**
+ * Build BM25 rows that skip idle zeros and `none` indexes.
+ *
+ * @param bm25 - Nested diagnostics.
+ * @returns Rows to render. Empty when there is nothing real to show.
+ */
+export function bm25DetailRows(bm25: Bm25Diagnostics): IngestionDetailRow[] {
+  const rows: IngestionDetailRow[] = [];
+  if (bm25.active_index_version !== null) {
+    rows.push({
+      label: "Search index",
+      value: `Version ${String(bm25.active_index_version)}`,
+    });
+  }
+  if (isRealDetailValue(bm25.verified_at)) {
+    rows.push({
+      label: "Search index verified",
+      value: formatRelativeTime(bm25.verified_at),
+    });
+  }
+  if (bm25.pending > 0) {
+    rows.push({ label: "Search index waiting", value: String(bm25.pending) });
+  }
+  if (bm25.processing > 0) {
+    rows.push({ label: "Search index running", value: String(bm25.processing) });
+  }
+  if (bm25.failed > 0) {
+    rows.push({ label: "Search index failed", value: String(bm25.failed) });
+  }
+  if (bm25.dead_letter > 0) {
+    rows.push({ label: "Search index needs retry", value: String(bm25.dead_letter) });
+  }
+  return rows;
+}
+
+/**
+ * Build graph-handoff rows that skip all-zero idle counts.
+ *
+ * @param handoff - Nested diagnostics.
+ * @returns Rows to render.
+ */
+export function graphHandoffDetailRows(
+  handoff: GraphHandoffDiagnostics,
+): IngestionDetailRow[] {
+  const rows: IngestionDetailRow[] = [];
+  if (handoff.completed > 0) {
+    rows.push({ label: "Graph handoff completed", value: String(handoff.completed) });
+  }
+  if (handoff.pending > 0) {
+    rows.push({ label: "Graph handoff waiting", value: String(handoff.pending) });
+  }
+  if (handoff.processing > 0) {
+    rows.push({ label: "Graph handoff running", value: String(handoff.processing) });
+  }
+  if (handoff.failed > 0) {
+    rows.push({ label: "Graph handoff failed", value: String(handoff.failed) });
+  }
+  if (handoff.dead_letter > 0) {
+    rows.push({
+      label: "Graph handoff needs retry",
+      value: String(handoff.dead_letter),
+    });
+  }
+  return rows;
+}
+
+/**
+ * Return open jobs that still belong on the processing list.
+ *
+ * @param jobs - Recent job summaries.
+ * @returns Non-completed jobs in API order.
+ */
+export function openIngestionJobs(
+  jobs: readonly IngestionJobSummary[],
+): IngestionJobSummary[] {
+  return jobs.filter((job) => isOpenIngestionJob(job.status));
 }

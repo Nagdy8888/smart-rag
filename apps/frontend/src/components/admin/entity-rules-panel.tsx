@@ -7,12 +7,13 @@
 import { useState } from "react";
 import { Button, PrimaryAction } from "../ui/button";
 import { DataTable } from "../ui/data-table";
+import { EmptyState } from "../ui/empty-state";
 import { Input } from "../ui/input";
 import { Menu } from "../ui/menu";
 import { StatusPill } from "../ui/status-pill";
-import { CodeText, UserText } from "../ui/user-text";
+import { UserText } from "../ui/user-text";
 import type { UseCurationMutationsResult } from "./hooks/use-curation-mutations";
-import type { EntityRuleListItem } from "../../lib/types";
+import type { EntityRuleListItem, EntityRuleStatus } from "../../lib/types";
 import shellStyles from "./admin-shell.module.css";
 import tableStyles from "./admin-tables.module.css";
 
@@ -22,6 +23,25 @@ export type EntityRulesPanelProps = {
   /** Shared curation mutation controller. */
   curation: UseCurationMutationsResult;
 };
+
+/**
+ * Map a rule status to pill copy and tone.
+ *
+ * @param status - Server status.
+ * @returns Display label and tone.
+ */
+function ruleStatusPill(status: EntityRuleStatus | string): {
+  label: string;
+  tone: "success" | "neutral" | "warning";
+} {
+  if (status === "approved") {
+    return { label: "Approved", tone: "success" };
+  }
+  if (status === "revoked") {
+    return { label: "Revoked", tone: "warning" };
+  }
+  return { label: "Suggested", tone: "neutral" };
+}
 
 /**
  * Render entity-rule drafting and the authorized rule table.
@@ -63,17 +83,17 @@ export function EntityRulesPanel({ curation }: EntityRulesPanelProps) {
       {curation.suggestOpen || curation.editRule ? (
         <div className={styles.formGrid}>
           <Input
-            label="entity_type"
+            label="Entity type"
             value={entityType}
             onChange={(event) => setEntityType(event.target.value)}
           />
           <Input
-            label="canonical_name"
+            label="Canonical name"
             value={canonicalName}
             onChange={(event) => setCanonicalName(event.target.value)}
           />
           <Input
-            label="aliases (comma)"
+            label="Aliases"
             value={aliases}
             onChange={(event) => setAliases(event.target.value)}
           />
@@ -105,76 +125,77 @@ export function EntityRulesPanel({ curation }: EntityRulesPanelProps) {
           Save rule
         </PrimaryAction>
       ) : null}
-      <DataTable
-        caption="Entity rules"
-        rows={curation.rules}
-        getRowId={(row) => row.id}
-        columns={[
-          {
-            id: "type",
-            header: "canonical type",
-            cell: (row) => <UserText value={row.entity_type} />,
-          },
-          {
-            id: "canonical",
-            header: "canonical name",
-            cell: (row) => <UserText value={row.canonical_name ?? ""} />,
-          },
-          {
-            id: "aliases",
-            header: "aliases",
-            cell: (row) => <UserText value={row.aliases.join(", ")} />,
-          },
-          {
-            id: "status",
-            header: "status",
-            cell: (row) => (
-              <StatusPill
-                tone={row.status === "approved" ? "success" : "neutral"}
-                status={row.status}
-              />
-            ),
-          },
-          {
-            id: "version",
-            header: "row version",
-            cell: (row) => <CodeText value={String(row.row_version)} />,
-          },
-          {
-            id: "actions",
-            header: "actions",
-            cell: (row) => (
-              <Menu
-                label="Rule actions"
-                trigger={<span>Actions</span>}
-                items={[
-                  {
-                    id: "edit",
-                    label: "Edit",
-                    actionId: "admin.entity_rule.edit",
-                    onSelect: () => startEdit(row),
-                  },
-                  {
-                    id: "approve",
-                    label: curation.approveRulePending ? "Approving…" : "Approve",
-                    disabled: curation.approveRulePending,
-                    actionId: "admin.entity_rule.approve",
-                    onSelect: () => curation.approveRule(row),
-                  },
-                  {
-                    id: "revoke",
-                    label: curation.revokePending ? "Revoking…" : "Revoke",
-                    danger: true,
-                    disabled: curation.revokePending,
-                    actionId: "admin.entity_rule.revoke",
-                    onSelect: () => curation.revokeRule(row),
-                  },
-                ]}
-              />
-            ),
-          },
-        ]}
-      />
+      {curation.rules.length === 0 ? (
+        <EmptyState
+          title="No entity rules yet."
+          body="Suggest a rule to keep aliases and display names consistent."
+          icon="curation"
+        />
+      ) : (
+        <DataTable
+          caption="Entity rules"
+          rows={curation.rules}
+          getRowId={(row) => row.id}
+          columns={[
+            {
+              id: "type",
+              header: "Type",
+              cell: (row) => <UserText value={row.entity_type} />,
+            },
+            {
+              id: "canonical",
+              header: "Canonical name",
+              cell: (row) => <UserText value={row.canonical_name ?? ""} />,
+            },
+            {
+              id: "aliases",
+              header: "Aliases",
+              cell: (row) => <UserText value={row.aliases.join(", ")} />,
+            },
+            {
+              id: "status",
+              header: "Status",
+              cell: (row) => {
+                const pill = ruleStatusPill(row.status);
+                return <StatusPill tone={pill.tone} status={pill.label} />;
+              },
+            },
+            {
+              id: "actions",
+              header: "Actions",
+              cell: (row) => (
+                <Menu
+                  label="Rule actions"
+                  trigger={<span>Actions</span>}
+                  items={[
+                    {
+                      id: "edit",
+                      label: "Edit",
+                      actionId: "admin.entity_rule.edit",
+                      onSelect: () => startEdit(row),
+                    },
+                    {
+                      id: "approve",
+                      label: curation.approveRulePending ? "Approving…" : "Approve",
+                      disabled: curation.approveRulePending,
+                      actionId: "admin.entity_rule.approve",
+                      onSelect: () => curation.approveRule(row),
+                    },
+                    {
+                      id: "revoke",
+                      label: curation.revokePending ? "Revoking…" : "Revoke",
+                      danger: true,
+                      disabled: curation.revokePending,
+                      actionId: "admin.entity_rule.revoke",
+                      onSelect: () => curation.revokeRule(row),
+                    },
+                  ]}
+                />
+              ),
+            },
+          ]}
+        />
+      )}
     </section>
   );
 }

@@ -15,7 +15,7 @@ import { useSession } from "../../lib/auth/session-provider";
 import { citationChipHref } from "../../lib/citation-drawer";
 import { evaluatePaidHandshake } from "../../lib/handshake";
 import { shouldShowCitations } from "../../lib/answer-origin";
-import { FEEDBACK_TAGS, type CitationResponse, type FeedbackTag } from "../../lib/types";
+import { FEEDBACK_TAGS_UP, type CitationResponse, type FeedbackTag } from "../../lib/types";
 import { Button } from "../ui/button";
 import { Sheet } from "../ui/sheet";
 import { ChatBanners } from "./chat-banners";
@@ -72,7 +72,7 @@ export function ChatApp() {
     terminal: run.chat.terminal !== null,
   });
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [feedbackTag, setFeedbackTag] = useState<FeedbackTag>(FEEDBACK_TAGS[0]);
+  const [feedbackTag, setFeedbackTag] = useState<FeedbackTag>(FEEDBACK_TAGS_UP[0]);
   const [feedbackComment, setFeedbackComment] = useState("");
   const [thumbsUp, setThumbsUp] = useState(true);
   const [selectedCitation, setSelectedCitation] = useState<CitationResponse | null>(null);
@@ -235,12 +235,11 @@ export function ChatApp() {
             run={run}
             historyMessages={historyMessages}
             messagesPending={liveQueries.messagesPending}
+            messagesError={liveQueries.messagesError}
             nextBeforeId={actions.nextBeforeId}
             loadingEarlier={actions.loadingEarlier}
             earlierError={actions.earlierError}
-            onLoadEarlier={() => {
-              void actions.handleLoadEarlier();
-            }}
+            onLoadEarlier={() => void actions.handleLoadEarlier()}
             visibleAnswer={reveal.visibleText}
             revealing={reveal.isRevealing}
             presentationKey={`${selection.conversationId ?? "none"}:${run.chat.runId ?? "none"}`}

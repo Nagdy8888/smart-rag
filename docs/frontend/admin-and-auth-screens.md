@@ -2,7 +2,7 @@
 title: Admin and auth screen specification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-27
 audience: frontend, security
 packet: P08-19
 ---
@@ -48,7 +48,8 @@ Exact pages:
 - Topbar title “Admin”. No trailing period.
 - Description: “Manage access, tools, retrieval curation, and usage.”
 - Horizontal Tabs: Team & access, Tools, Curation, Usage.
-- Tab content is one column with maximum width 1120px.
+- Page fills the console column (`width: 100%`, maximum 1440px, matching Documents).
+- Team & access places Invite and Offboard in a two-column grid from 801px.
 - Member/viewer never see this route in nav; direct page visit renders a safe permission ErrorState after real server confirmation.
 
 #### Team & access

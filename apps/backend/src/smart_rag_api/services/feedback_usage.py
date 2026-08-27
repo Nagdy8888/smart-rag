@@ -170,5 +170,5 @@ class FeedbackUsageService:
             prompt_tokens=int(row["prompt_tokens"]),
             completion_tokens=int(row["completion_tokens"]),
             usage_rows=int(row["usage_rows"]),
-            scope="company" if company else "caller",
+            scope="company" if company else "me",
         )

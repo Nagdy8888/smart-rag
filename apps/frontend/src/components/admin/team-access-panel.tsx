@@ -4,24 +4,25 @@
 
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import { Button, PrimaryAction } from "../ui/button";
 import { ConfirmDialog } from "../ui/confirm-dialog";
 import { Input } from "../ui/input";
 import { Select } from "../ui/select";
+import { Spinner } from "../ui/spinner";
 import { StatusBanner } from "../ui/status-banner";
 import { CodeText, UserText } from "../ui/user-text";
+import { createInvitation, offboardUser } from "../../lib/api";
 import {
-  createInvitation,
-  fetchMe,
-  offboardUser,
-  type ApiAuth,
-} from "../../lib/api";
-import { INVITE_TOKEN_MAIL_ONLY, OFFBOARD_IRREVERSIBLE_COPY } from "../../lib/admin-copy";
-import { useSession } from "../../lib/auth/session-provider";
+  INVITE_TOKEN_MAIL_ONLY,
+  NO_MEMBER_DIRECTORY_COPY,
+  OFFBOARD_IRREVERSIBLE_COPY,
+  inviteRoleLabel,
+} from "../../lib/admin-copy";
+import { useApiAuth } from "../../lib/auth/use-api-auth";
 import { mutationFailureBanner } from "../../lib/failure-copy";
-import { sessionQueryKeys } from "../../lib/query-keys";
+import { useCurrentUser } from "../../lib/hooks/use-current-user";
 import { showInviteConvenience, showOffboardConvenience } from "../../lib/roles";
 import {
   INVITE_ROLES,
@@ -34,7 +35,10 @@ import tableStyles from "./admin-tables.module.css";
 
 const styles = { ...shellStyles, ...tableStyles };
 
-const ROLE_OPTIONS = INVITE_ROLES.map((item) => ({ value: item, label: item }));
+const ROLE_OPTIONS = INVITE_ROLES.map((item) => ({
+  value: item,
+  label: inviteRoleLabel(item),
+}));
 
 /**
  * Team & access cards.
@@ -42,13 +46,8 @@ const ROLE_OPTIONS = INVITE_ROLES.map((item) => ({ value: item, label: item }));
  * @returns Invite and offboard forms. Helpers remain callable for forged-role tests.
  */
 export function TeamAccessPanel() {
-  const session = useSession();
-  const accessToken = session.accessToken;
-  const auth = useMemo<ApiAuth | null>(
-    () => (accessToken ? { accessToken } : null),
-    [accessToken],
-  );
-  const keys = sessionQueryKeys(accessToken);
+  const auth = useApiAuth();
+  const { currentUser, currentUserPending } = useCurrentUser();
   const reviewRef = useRef<HTMLButtonElement>(null);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<InviteRole>("member");
@@ -59,13 +58,8 @@ export function TeamAccessPanel() {
   const [offboarded, setOffboarded] = useState<OffboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const meQuery = useQuery({
-    queryKey: keys.me,
-    queryFn: () => fetchMe(auth as ApiAuth),
-    enabled: auth !== null,
-  });
-  const canInvite = showInviteConvenience(meQuery.data?.role);
-  const canOffboard = showOffboardConvenience(meQuery.data?.role);
+  const canInvite = showInviteConvenience(currentUser?.role);
+  const canOffboard = showOffboardConvenience(currentUser?.role);
 
   const inviteMutation = useMutation({
     mutationFn: async () => {
@@ -108,26 +102,34 @@ export function TeamAccessPanel() {
     },
   });
 
+  if (currentUserPending) {
+    return <Spinner label="Loading team access" />;
+  }
+
   return (
     <div className={styles.stack}>
+      <p className={styles.panelLead}>{NO_MEMBER_DIRECTORY_COPY}</p>
       {error ? (
         <StatusBanner kind="error" role="alert">
           {error}
         </StatusBanner>
       ) : null}
 
+      <div className={styles.teamGrid}>
       {canInvite ? (
         <section className={styles.panel} data-testid="invite-form" aria-label="Invite user">
           <h2>Invite user</h2>
           <Input
             label="Email"
             type="email"
+            fullWidth
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
           <Select
             label="Role"
             value={role}
+            fullWidth
             options={ROLE_OPTIONS}
             onChange={(event) => setRole(event.target.value as InviteRole)}
           />
@@ -142,6 +144,7 @@ export function TeamAccessPanel() {
           </label>
           <PrimaryAction
             type="button"
+            className={styles.stretchAction}
             data-action-id="admin.invite"
             pending={inviteMutation.isPending}
             pendingLabel="Sending…"
@@ -150,7 +153,7 @@ export function TeamAccessPanel() {
             Send invitation
           </PrimaryAction>
           {created ? (
-            <dl data-testid="invite-mail-only">
+            <dl className={styles.dl} data-testid="invite-mail-only">
               <dt>Invitation ID</dt>
               <dd>
                 <CodeText value={created.invitation_id} />
@@ -172,6 +175,7 @@ export function TeamAccessPanel() {
           <p className={styles.muted}>{OFFBOARD_IRREVERSIBLE_COPY}</p>
           <Input
             label="User ID"
+            fullWidth
             value={subjectUserId}
             onChange={(event) => setSubjectUserId(event.target.value)}
           />
@@ -179,6 +183,7 @@ export function TeamAccessPanel() {
             ref={reviewRef}
             type="button"
             variant="dangerQuiet"
+            className={styles.stretchAction}
             data-action-id="admin.offboard"
             disabled={subjectUserId.trim() === ""}
             disabledReason={subjectUserId.trim() === "" ? "Enter a user ID." : undefined}
@@ -187,7 +192,7 @@ export function TeamAccessPanel() {
             Review offboarding
           </Button>
           {offboarded ? (
-            <dl data-testid="offboard-result">
+            <dl className={styles.dl} data-testid="offboard-result">
               <dt>Subject</dt>
               <dd>
                 <CodeText value={offboarded.subject_user_id} />
@@ -200,6 +205,7 @@ export function TeamAccessPanel() {
           ) : null}
         </section>
       ) : null}
+      </div>
 
       {confirmOpen ? (
         <ConfirmDialog

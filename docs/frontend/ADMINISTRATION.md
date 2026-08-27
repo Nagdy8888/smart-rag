@@ -2,7 +2,7 @@
 title: Administration surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-08-27
 audience: engineering, frontend, security
 packet: P08-19
 ---
@@ -90,15 +90,18 @@ Do not invent a directory.
   and expiry only.
 - Offboard is irreversible. Owner/admin at single-factor may offboard.
 - Tool search sends `GET /tools?q=` with the query URL-encoded. Cards show
-  `tool_key`, `version_label`, `short_name`, `purpose`, `required_role`,
-  `risk_class`, and `active`. Unauthorized names are omitted, never
-  fake-redacted.
+  name, version, purpose, required role, risk, and enabled/disabled. Catalog
+  seed `active` overlays the in-code registry (`app.list_tool_catalog_seeds`).
+  Owner/admin still see disabled tools so they can re-enable them. Members
+  never receive unauthorized names, including disabled seeds. Executor
+  authorization stays in the in-code registry. Unauthorized names are omitted,
+  never fake-redacted.
 - Glossary import uses an extra-forbid client builder. Extra SQL-like
   fields are not posted.
 - Entity-rule approve/revoke and PATCH post `{ row_version }`. 409
   `stale_row_version` shows a conflict banner and **Reload rule**.
 - Suggest rule posts the existing suggestions endpoint.
-- Usage responses keep `scope`, `cost_usd`, `prompt_tokens`,
+- Usage responses keep `scope` (`me` or `company`), `cost_usd`, `prompt_tokens`,
   `completion_tokens`, and `usage_rows` only. Numeric values use 24px type
   and 13px labels. No charts, forecasts, or progress bars.
 - `GET /me` may still emit deprecated `mfa_enrolled=false`. The Account page

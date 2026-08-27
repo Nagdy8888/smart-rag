@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-08-27
 audience: engineering, reviewers
 ---
 
@@ -203,7 +203,8 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
   enqueue `company_default__rebuild` without switching the pointer.
 - `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. Packet 4 may set `active` when maps verify and the pointer already names the workspace. This is Graph Ready on the version, not a Packet 7 switch.
 - `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, `graph_maintenance`, or `query_run`. The kinds never share caps. `query_run` consume uses run-local optimistic version and never `SELECT FOR UPDATE` on `company_settings` or `profiles`.
-- Phase 6 packet 5 adds SECURITY DEFINER RPCs (`app.create_conversation`, `app.get_conversation`, `app.get_query_run`, `app.cancel_query_run`, `app.list_run_citations`, `app.submit_run_feedback`, `app.summarize_caller_usage`, `app.summarize_company_usage`, `app.list_authorized_table_manifests`, `app.get_visible_document`, `app.search_graph_entities`, `app.upsert_tool_catalog_seed`, `app.set_tool_permission`) with `SET search_path = pg_catalog, app` and `EXECUTE` to `app_api` only. Conversation deletion remains packet 7. Retrieval cache is Valkey IDs/ranks only; `app.recheck_retrieval_candidates` stays authority.
+- Phase 6 packet 5 adds SECURITY DEFINER RPCs (`app.create_conversation`, `app.get_conversation`, `app.get_query_run`, `app.cancel_query_run`, `app.list_run_citations`, `app.submit_run_feedback`, `app.summarize_caller_usage`, `app.summarize_company_usage`, `app.list_authorized_table_manifests`, `app.get_visible_document`, `app.search_graph_entities`, `app.upsert_tool_catalog_seed`, `app.set_tool_permission`, `app.list_tool_catalog_seeds`) with `SET search_path = pg_catalog, app` and `EXECUTE` to `app_api` only. Conversation deletion remains packet 7. Retrieval cache is Valkey IDs/ranks only; `app.recheck_retrieval_candidates` stays authority.
+- `app.set_tool_permission` upserts `(tool_id, role)` when `user_id` is null and inserts a catalog row when the key is missing. `GET /tools` overlays `app.tool_catalog.active` onto the in-code registry; executor authorization stays in-code.
 - Phase 6 packet 6 adds `app.run_events` (FORCE RLS, creator-private SELECT, no authenticated INSERT) plus `app.append_run_event` / `app.list_run_events_after` (`EXECUTE` to `app_api` only). Sequences are `COALESCE(MAX(sequence),0)+1` under a run lock. Payload keys `passage` / `snippet` / `html` / traceback-like names are stripped or rejected. See [SSE.md](../api/SSE.md).
 
 ## Related docs

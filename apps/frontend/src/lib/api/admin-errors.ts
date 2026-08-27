@@ -37,8 +37,14 @@ export function throwClassifiedAdminError(
   if (classified?.kind === "server") {
     throw new Error("request_rejected");
   }
+  if (classified?.kind === "validation") {
+    throw new Error(classified.detail);
+  }
   if (status === 409) {
     throw new Error(sanitizedDetail(body, "stale_row_version"));
+  }
+  if (status === 400) {
+    throw new Error(sanitizedDetail(body, "request_rejected"));
   }
   throw new Error("request_rejected");
 }

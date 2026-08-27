@@ -2,7 +2,7 @@
 title: Phase 8 journey matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-08-27
 audience: engineering, reviewers
 packet: P08-19
 ---
@@ -142,6 +142,7 @@ is no client route field.
 | ACL blindness no count | `src/components/core-rag-surfaces.test.tsx` | shows ACL blindness without unauthorized counts or titles | vitest-component | proven |
 | Graph Pending authorized count | `src/components/core-rag-surfaces.test.tsx` | shows Graph Pending with authorized not-ready count only | vitest-component | proven |
 | Tables URL preselect | `src/components/tables/tables-app.test.tsx` | preselects an accessible tableId from the URL | vitest-component | proven |
+| Tables document seed | `src/components/tables/tables-app.test.tsx` | scopes `?documentId=`, names the document, and uses document-empty copy | vitest-component | proven |
 | Tables invalid plan | `src/components/tables/tables-app.test.tsx` | rejects unknown columns and raw SQL before submission | vitest-component | proven |
 | Tables failure preservation | `src/components/tables/tables-app.test.tsx` | preserves the draft and submitted plan on 403 | vitest-component | proven |
 | Graph search-select-inspect | `src/components/graph/graph-explorer.test.tsx` | searches, inspects, lists nodes, and opens evidence details | vitest-component | proven |

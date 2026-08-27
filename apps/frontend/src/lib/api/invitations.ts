@@ -87,7 +87,7 @@ export async function createInvitation(
 }
 
 /**
- * Offboard one subject. Owner/admin AAL2 on the server.
+ * Offboard one subject. Owner/admin on the server.
  *
  * @param auth - Access token. No role header.
  * @param userId - Subject user UUID from `GET /me` (no member directory).

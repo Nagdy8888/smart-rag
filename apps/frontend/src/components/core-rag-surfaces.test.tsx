@@ -311,7 +311,9 @@ describe("DocumentLibrary status and roles", () => {
       upload_enabled: true,
     });
     renderSurface(<DocumentLibrary />);
-    expect(await screen.findByText(/Upload controls are hidden/)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Filter by name")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Import source" })).toBeNull();
+    expect(screen.queryByText(/Upload controls are hidden/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Reserve, upload, finalize" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Enqueue crawl" })).toBeNull();
   });
@@ -362,16 +364,19 @@ describe("DocumentLibrary status and roles", () => {
       recent_jobs: [],
     });
     renderSurface(<DocumentLibrary />);
-    fireEvent.click(await screen.findByRole("button", { name: "Document actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Load status" }));
     expect(await screen.findAllByText("Deletion pending")).not.toHaveLength(0);
-    expect(screen.getByText(/index=none/)).toBeInTheDocument();
-    expect(screen.getByText(limitationCopy("graph_pending"), { exact: false })).toBeInTheDocument();
+    fireEvent.click((await screen.findAllByRole("button", { name: "Document actions" }))[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "View processing" }));
+    expect(await screen.findByRole("heading", { name: "Processing" })).toBeInTheDocument();
+    expect(screen.getByText("Search index waiting")).toBeInTheDocument();
+    expect(screen.getByText("Graph handoff waiting")).toBeInTheDocument();
+    expect(screen.queryByText(/index=none/)).toBeNull();
+    expect(screen.queryByText(limitationCopy("graph_pending"))).toBeNull();
     expect(screen.queryByText(/Document deletion is not available/i)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Document actions" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Document actions" })[0]);
     expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
     expect(screen.queryByRole("button", { name: /delete document/i })).toBeNull();
-    expect(screen.getByText(XSS_FILENAME, { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText(XSS_FILENAME, { exact: false }).length).toBeGreaterThan(0);
     expect(document.querySelector("img")).toBeNull();
   });
 });

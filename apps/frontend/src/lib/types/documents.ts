@@ -151,6 +151,7 @@ export type IngestionStatusVersion = {
   bm25_verified_at: string | null;
   graph_handoff_at: string | null;
   retry_allowed: boolean;
+  chunk_count?: number;
   bm25: Bm25Diagnostics;
   graph_handoff: GraphHandoffDiagnostics;
   scan?: ScanDiagnostics;

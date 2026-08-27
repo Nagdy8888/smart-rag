@@ -852,6 +852,21 @@ describe("administration clients", () => {
     expect(body).not.toContain("drop table");
   });
 
+  it("createInvitation classifies 400 invitation_rejected", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "invitation_rejected" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      createInvitation(
+        { accessToken: "jwt-token" },
+        { email: "a@b.test", role: "member", upload_enabled: false },
+        fetchImpl,
+      ),
+    ).rejects.toThrow("invitation_rejected");
+  });
+
   it("createInvitation classifies leftover 403 MFA copy, 402, and 429", async () => {
     const cases: Array<{
       status: number;
@@ -956,6 +971,17 @@ describe("administration clients", () => {
     expect(cards.map((card) => card.tool_key)).toEqual(["export_csv"]);
     expect(JSON.stringify(cards)).not.toContain("admin_secret_tool");
     expect(JSON.stringify(cards)).not.toContain("REDACTED");
+  });
+
+  it("listTools classifies a 403 instead of returning an empty catalog", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      listTools({ accessToken: "jwt-token" }, undefined, fetchImpl),
+    ).rejects.toThrow("forbidden");
   });
 
   it("listTools URL-encodes q", async () => {

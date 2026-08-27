@@ -34,6 +34,11 @@ class ToolHttpService:
     ) -> tuple[ToolDefinition, ...]:
         """Return tools the live role may see. Rechecks role every call.
 
+        Catalog seed ``active`` flags overlay in-code defaults. Owner/admin
+        still see disabled seeds so they can re-enable them. Members never
+        receive unauthorized names, including disabled seeds. Executor
+        authorization remains the in-code registry.
+
         Args:
             caller: Authenticated caller.
             query: Optional case-insensitive substring on key/name/purpose.
@@ -43,16 +48,65 @@ class ToolHttpService:
         """
 
         visible = visible_tools(default_registry(), role=caller.role)
+        seeds = self._catalog_seeds(caller)
+        is_admin = caller.role in {UserRole.OWNER, UserRole.ADMIN}
+        overlaid: list[ToolDefinition] = []
+        for item in visible:
+            active = seeds.get(item.tool_key, item.active)
+            if not active and not is_admin:
+                continue
+            if active != item.active:
+                overlaid.append(item.model_copy(update={"active": active}))
+            else:
+                overlaid.append(item)
         if not query:
-            return visible
+            return tuple(overlaid)
         needle = query.casefold()
         return tuple(
             item
-            for item in visible
+            for item in overlaid
             if needle in item.tool_key.casefold()
             or needle in item.short_name.casefold()
             or needle in item.one_line_purpose.casefold()
         )
+
+    def _catalog_seeds(self, caller: CallerContext) -> dict[str, bool]:
+        """Load catalog seed active flags. Empty when Postgres is unset.
+
+        Args:
+            caller: Authenticated caller used for the RPC context.
+
+        Returns:
+            ``tool_key`` to ``active``. Missing keys keep the in-code default.
+            Connection or RPC failures degrade to an empty overlay.
+        """
+
+        if not self._postgres_url:
+            return {}
+        try:
+            with psycopg.connect(self._postgres_url) as connection:
+                connection.execute("SET ROLE app_api")
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT tool_key, active
+                        FROM app.list_tool_catalog_seeds(%s, %s, %s)
+                        """,
+                        (
+                            caller.user_id,
+                            caller.rpc_role(),
+                            caller.rpc_authorization_version(),
+                        ),
+                    )
+                    rows = cursor.fetchall()
+        except psycopg.Error:
+            return {}
+        seeds: dict[str, bool] = {}
+        for row in rows:
+            key = str(row[0])
+            if key:
+                seeds[key] = bool(row[1])
+        return seeds
 
     def upsert_seed(
         self,

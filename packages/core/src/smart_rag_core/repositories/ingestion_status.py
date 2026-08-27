@@ -47,7 +47,9 @@ class IngestionStatusRepository:
             cursor.execute(
                 """
                 SELECT status_payload, recent_jobs
-                FROM app.get_version_ingestion_status(%s, %s, %s, %s)
+                FROM app.get_version_ingestion_status(
+                  %s::uuid, %s::text, %s::bigint, %s::uuid
+                )
                 """,
                 (
                     caller_user_id,

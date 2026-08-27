@@ -32,12 +32,14 @@ export type SheetProps = {
   side?: SheetSide;
   /** Element that opened the sheet; focus returns here. */
   returnFocusRef?: RefObject<HTMLElement | null>;
+  /** Extra class on the panel. Width and surface only. */
+  panelClassName?: string;
 };
 
 /**
  * Render a modal side panel.
  *
- * @param props - Title, close handler, optional side and return-focus ref.
+ * @param props - Title, close handler, optional side, panel class, and return-focus ref.
  * @returns Dialog overlay. Side effects: focus trap, body scroll lock, restore.
  */
 export function Sheet({
@@ -46,6 +48,7 @@ export function Sheet({
   children,
   side = "right",
   returnFocusRef,
+  panelClassName,
 }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -88,9 +91,12 @@ export function Sheet({
       />
       <div
         ref={panelRef}
-        className={
-          side === "left" ? overlayStyles.sheetPanelLeft : overlayStyles.sheetPanelRight
-        }
+        className={[
+          side === "left" ? overlayStyles.sheetPanelLeft : overlayStyles.sheetPanelRight,
+          panelClassName,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

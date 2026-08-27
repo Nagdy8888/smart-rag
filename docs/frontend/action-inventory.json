@@ -736,7 +736,7 @@
     {
       "action_id": "documents.status",
       "route": "/documents",
-      "label": "Load status",
+      "label": "View processing",
       "control_kind": "local-state",
       "contract_owner": "fastapi",
       "contract": "GET /ingestion/versions/{id}/status",

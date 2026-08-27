@@ -3,6 +3,9 @@
  */
 
 .panel {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: calc(var(--space) * 5);
@@ -190,21 +193,41 @@
 
 .toolGrid {
   display: grid;
+  width: 100%;
+  min-width: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: calc(var(--space) * 3);
 }
 
 .usageRow {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(16rem, 1fr));
   gap: calc(var(--space) * 3);
 }
 
 .metricCard {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 12rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: calc(var(--space) * 4);
   background: var(--color-surface);
+}
+
+.teamGrid {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--space) * 4);
+  align-items: start;
+}
+
+.stretchAction {
+  width: 100%;
 }
 
 .metricValue {
@@ -238,13 +261,34 @@
   margin: 0;
 }
 
+.dl dt {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
 .mono {
   font-family: var(--font-mono);
 }
 
+.panelLead {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  max-width: 72ch;
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 2);
+  align-items: end;
+}
+
 @media (max-width: 800px) {
   .toolGrid,
-  .usageRow {
+  .usageRow,
+  .teamGrid {
     grid-template-columns: 1fr;
   }
 }
