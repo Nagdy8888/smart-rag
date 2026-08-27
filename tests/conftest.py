@@ -12,6 +12,23 @@ _TEST_SUPABASE_FIXTURE_URL = "http://127.0.0.1:54321"
 # when ``SUPABASE_URL`` is unset. Do not set ``APP_ENV=test`` here:
 # CORS and identity tests require the default ``APP_ENV=local``.
 setdefault_process_environ("SUPABASE_URL", _TEST_SUPABASE_FIXTURE_URL)
+setdefault_process_environ("MOCK_MODEL_MODE", "true")
+
+
+@pytest.fixture(autouse=True)
+def default_mock_model_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep unit/contract constructors on deterministic mock models.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+
+    Side Effects:
+        Sets ``MOCK_MODEL_MODE=true`` so a developer ``.env`` with live OpenAI
+        cannot change gateway constructors. Hosted-settings tests override
+        this per case.
+    """
+
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
 
 
 @pytest.fixture(autouse=True)

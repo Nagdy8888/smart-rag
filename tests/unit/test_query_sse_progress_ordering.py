@@ -219,7 +219,7 @@ def test_required_progress_order_and_commit_before_each_part() -> None:
     assert completed[-1]["stage"] == "verify_answer"
     assert [item[1]["phase"] for item in tools] == ["started", "completed"]
     assert conn.events[0] == "commit"
-    assert conn.events.count("commit") == len(parts)
+    assert conn.events.count("commit") == len(parts) + 1
     first_generate_start = next(
         index for index, event in enumerate(conn.events) if event == "yield:status"
     )

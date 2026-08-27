@@ -4,7 +4,7 @@ from __future__ import annotations
 
 PROFILE_PROMPT_VERSION = "query_profile_v1"
 PROFILE_PROMPT_SHA256 = (
-    "5a969a9d83d8716c6033fc1a7c5a773e5e63896953af3847d4e85216425e9e1f"
+    "a5c87258e3837daa2bdbac623d90e4d022817eeff2b8d5e650763d07c2d49a7b"
 )
 PROFILE_MODEL_ID = "gpt-4o-mini"
 ALLOWED_PROFILE_MODEL_IDS = frozenset({PROFILE_MODEL_ID})

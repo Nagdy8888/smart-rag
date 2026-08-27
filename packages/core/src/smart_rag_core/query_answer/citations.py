@@ -8,11 +8,33 @@ from uuid import UUID
 
 import psycopg
 
+from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.security.identity import CallerContext
 
 LOGGER = logging.getLogger(__name__)
+
+_REASON_PREFIX = "query_citation:"
+
+
+def _raise_citation_error(exc: BaseException) -> None:
+    """Map a Postgres error to ``QueryAdmissionError``.
+
+    Args:
+        exc: Driver or database error.
+
+    Raises:
+        QueryAdmissionError: Always.
+    """
+
+    message = str(exc)
+    reason = "database_rejected"
+    if _REASON_PREFIX in message:
+        start = message.find(_REASON_PREFIX) + len(_REASON_PREFIX)
+        tail = message[start:].split()[0].strip("\"'")
+        reason = tail.split("\n")[0]
+    raise QueryAdmissionError(reason) from exc
 
 
 def citation_provenance_payload(
@@ -92,7 +114,6 @@ def persist_answer_citations(
         Inserts into ``app.citations``. Does not create tables or columns.
     """
 
-    del caller
     ids: list[UUID] = []
     index = 0
     with connection.cursor() as cursor:
@@ -106,28 +127,27 @@ def persist_answer_citations(
                 inference=citation.inference,
             )
             snippet = (citation.span or "")[:500]
-            cursor.execute(
-                """
-                INSERT INTO app.citations (
-                  run_id, chunk_id, citation_index, snippet, provenance
+            try:
+                cursor.execute(
+                    """
+                    SELECT citation_id
+                    FROM app.insert_run_citation(
+                      %s, %s, %s, %s, %s, %s::uuid, %s, %s::jsonb
+                    )
+                    """,
+                    (
+                        caller.user_id,
+                        caller.rpc_role(),
+                        caller.rpc_authorization_version(),
+                        str(run_id),
+                        index,
+                        citation.chunk_id,
+                        snippet,
+                        _json(provenance),
+                    ),
                 )
-                VALUES (
-                  %s::uuid,
-                  %s::uuid,
-                  %s,
-                  %s,
-                  %s::jsonb
-                )
-                RETURNING id
-                """,
-                (
-                    str(run_id),
-                    citation.chunk_id,
-                    index,
-                    snippet,
-                    _json(provenance),
-                ),
-            )
+            except psycopg.Error as exc:
+                _raise_citation_error(exc)
             row = cursor.fetchone()
             if row is not None:
                 ids.append(UUID(str(row[0])))
@@ -195,7 +215,7 @@ def maybe_persist_verified_citations(
             fusion=fusion,
             answer=answer,
         )
-    except psycopg.Error:
+    except (psycopg.Error, QueryAdmissionError):
         LOGGER.info(
             "citation persist skipped",
             extra={

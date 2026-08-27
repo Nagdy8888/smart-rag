@@ -74,6 +74,12 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260824130000_query_run_messages_runtime_v1.sql",
     "20260824140000_remove_mfa_aal2_enforcement_v1.sql",
     "20260825200000_conversation_transcript_v1.sql",
+    "20260826190000_conversation_title_v1.sql",
+    "20260827120000_feedback_thumbs_polarity_tags_v1.sql",
+    "20260827130000_get_visible_document_created_at_v1.sql",
+    "20260827140000_tool_admin_catalog_overlay_v1.sql",
+    "20260827160000_workspace_member_directory_v1.sql",
+    "20260827170000_persist_run_citations_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

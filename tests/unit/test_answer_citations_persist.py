@@ -176,7 +176,9 @@ def test_persist_answer_citations_lists_for_owned_run(
     )
     answer = AnswerPayload(
         answer_text="Refund period is 30 days.",
-        citations=(AnswerCitation(chunk_id=str(chunk_id), span="Refund period is 30 days."),),
+        citations=(
+            AnswerCitation(chunk_id=str(chunk_id), span="Refund period is 30 days."),
+        ),
         status="complete",
     )
     db_connection.execute("SET ROLE app_api")

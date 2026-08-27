@@ -77,7 +77,7 @@ def test_production_executor_emits_verified_delta_then_one_terminal(
     assert "DRAFT_HIDDEN" not in str(events)
     assert any(event_type == "status" for event_type in types)
     assert any(event_type == "usage" for event_type in types)
-    assert commits.count("commit") == 2
+    assert commits.count("commit") == 3
     assert executor.termination_summary["input_tokens"] == 80
     assert executor.termination_summary["output_tokens"] == 20
     assert executor.termination_summary["estimated_cost_usd"] == pytest.approx(

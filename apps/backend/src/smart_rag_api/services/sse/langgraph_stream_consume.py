@@ -177,6 +177,12 @@ async def iter_mapped_langgraph_updates(
 
     Yields:
         Catalog ``(event_type, payload)`` drafts, then the consume result.
+
+    Side Effects:
+        Commits the run-scoped ``app_api`` connection before mapping each
+        stream part and once more after natural exhaustion so the final
+        graph node (``verify_answer``) can persist citations and counted
+        usage before the executor closes the connection.
     """
 
     from smart_rag_api.services.query_sse_mapping import assert_catalog_event
@@ -263,6 +269,8 @@ async def iter_mapped_langgraph_updates(
                     remaining_model_calls=last_remaining_calls,
                     terminal_status=last_status,
                 )
+    if stream_exhausted and not cancel_event.is_set():
+        connection.commit()
     yield MappedStreamResult(
         stream_exhausted=stream_exhausted,
         last_remaining_calls=last_remaining_calls,

@@ -65,12 +65,12 @@ def test_upsert_env_inserts_and_replaces_without_clobbering_comments(
         encoding="utf-8",
     )
     replacement = "rotated-wrapper"
-    module._upsert_env(path, module.RUNTIME_WRAPPER_ENV, replacement)
+    module.upsert_env(path, module.RUNTIME_WRAPPER_ENV, replacement)
     text = path.read_text(encoding="utf-8")
     assert "# keep me" in text
     assert "OTHER=1" in text
     assert f"{module.RUNTIME_WRAPPER_ENV}={replacement}" in text
     assert f"{module.RUNTIME_WRAPPER_ENV}=old" not in text
-    parsed = module._parse_env(path)
+    parsed = module.parse_env(path)
     assert parsed["OTHER"] == "1"
     assert parsed[module.RUNTIME_WRAPPER_ENV] == replacement

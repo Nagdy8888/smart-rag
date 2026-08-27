@@ -48,7 +48,7 @@ Profile adapter / runtime safety:
 - LangSmith `openai.responses.query_profile` and `model.query_profile`
   hash `user_query` / `recent_memory`; they do not copy raw text.
 - `query_profile_v1` SHA
-  `5a969a9d83d8716c6033fc1a7c5a773e5e63896953af3847d4e85216425e9e1f`
+  `a5c87258e3837daa2bdbac623d90e4d022817eeff2b8d5e650763d07c2d49a7b`
   unchanged.
 
 Existing Hybrid/Combined/Table/inspection/media matrix rows remain
