@@ -15,6 +15,9 @@ from smart_rag_core.release.io import as_json_list, as_json_object
 def compose_env_file(repo_root: Path) -> Path:
     """Return the Compose env file, preferring ``.env.compose``.
 
+    CI checkouts typically have only tracked ``.env.example``. Local
+    ``.env.compose`` and ``.env`` still win when present.
+
     Args:
         repo_root: Repository root.
 
@@ -22,7 +25,7 @@ def compose_env_file(repo_root: Path) -> Path:
         Existing env file path.
 
     Raises:
-        CandidateReleaseError: If neither env file exists.
+        CandidateReleaseError: If no Compose env file exists.
     """
 
     compose_env = repo_root / ".env.compose"
@@ -31,6 +34,9 @@ def compose_env_file(repo_root: Path) -> Path:
     local_env = repo_root / ".env"
     if local_env.is_file():
         return local_env
+    example_env = repo_root / ".env.example"
+    if example_env.is_file():
+        return example_env
     raise CandidateReleaseError("No Compose environment file found")
 
 

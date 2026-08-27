@@ -3,7 +3,10 @@
  */
 
 /**
- * Format a USD amount as a two-decimal currency string.
+ * Format a USD amount for Run Details and usage panels.
+ *
+ * Sub-cent run costs use up to six fractional digits so token-priced
+ * estimates do not round to `$0.00`.
  *
  * @param value - Numeric amount or numeric string from the usage API.
  * @returns Example: `formatUsd(0.4)` → `"$0.40"`. Non-finite input returns `"—"`.
@@ -13,11 +16,13 @@ export function formatUsd(value: number | string): string {
   if (!Number.isFinite(amount)) {
     return "—";
   }
+  const maximumFractionDigits =
+    amount > 0 && amount < 0.01 ? 6 : 2;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    maximumFractionDigits,
   }).format(amount);
 }
 

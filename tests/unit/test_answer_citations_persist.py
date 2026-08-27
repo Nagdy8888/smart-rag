@@ -10,6 +10,7 @@ import psycopg
 import pytest
 from smart_rag_core.query_admission.service import list_run_citations
 from smart_rag_core.query_answer.citations import (
+    ensure_fusion_source_citations,
     maybe_persist_verified_citations,
     persist_answer_citations,
 )
@@ -60,15 +61,18 @@ def test_maybe_persist_delegates_once_when_bound() -> None:
     run_id = uuid4()
     caller = MagicMock()
     connection = MagicMock()
-    cursor = MagicMock()
-    cursor.fetchone.return_value = None
-    connection.cursor.return_value.__enter__.return_value = cursor
     inserted = (uuid4(),)
 
-    with patch(
-        "smart_rag_core.query_answer.citations.persist_answer_citations",
-        return_value=inserted,
-    ) as persist:
+    with (
+        patch(
+            "smart_rag_core.query_answer.citations.list_run_citations",
+            side_effect=[(), (MagicMock(),)],
+        ) as list_existing,
+        patch(
+            "smart_rag_core.query_answer.citations.persist_answer_citations",
+            return_value=inserted,
+        ) as persist,
+    ):
         first = maybe_persist_verified_citations(
             connection,
             caller=caller,
@@ -76,7 +80,6 @@ def test_maybe_persist_delegates_once_when_bound() -> None:
             fusion=fusion,
             answer=answer,
         )
-        cursor.fetchone.return_value = (1,)
         second = maybe_persist_verified_citations(
             connection,
             caller=caller,
@@ -88,6 +91,19 @@ def test_maybe_persist_delegates_once_when_bound() -> None:
     assert first == inserted
     assert second == ()
     persist.assert_called_once()
+    assert list_existing.call_count == 2
+
+
+def test_ensure_fusion_source_citations_backfills_model_gap() -> None:
+    """Live answers without structured citations still cite retrieved passages."""
+
+    fusion = verifier_fusion(verifier_passage(1, text="Refund period is 30 days."))
+    answer = AnswerPayload(
+        answer_text="The refund period is 30 days.",
+        status="complete",
+    )
+    enriched = ensure_fusion_source_citations(answer, fusion=fusion, tables=())
+    assert enriched.citations[0].chunk_id == fusion.evidence[0].chunk_id
 
 
 @pytest.fixture

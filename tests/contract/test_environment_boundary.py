@@ -20,13 +20,16 @@ def _unauthorized_environment_reads(path: Path) -> list[int]:
         One-based lines containing direct ``os.getenv`` or ``os.environ``
         access, including equivalent direct imports. Operator CLIs under
         ``scripts/ops/`` are excluded; they bootstrap host env before the
-        settings package can load.
+        settings package can load. Test modules are excluded; they assert
+        process values written by the settings boundary.
     """
 
     normalized = path.as_posix()
     if "/smart_rag_core/settings/" in normalized:
         return []
     if "/scripts/ops/" in normalized:
+        return []
+    if "/tests/" in normalized:
         return []
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     direct_names: set[str] = set()

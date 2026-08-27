@@ -21,6 +21,7 @@ from smart_rag_core.gateways.model import (
     create_model_gateway,
 )
 from smart_rag_core.gateways.openai_profile import execute_openai_query_profile
+from smart_rag_core.models.env_pins import OPENAI_CHAT_MODEL_ID
 from smart_rag_core.query_profile.schemas import query_profile_json_schema
 from smart_rag_core.query_profile.versions import (
     ALLOWED_PROFILE_MODEL_IDS,
@@ -170,7 +171,7 @@ def test_live_profile_adapter_keeps_store_false() -> None:
     assert "PROFILE_PROMPT_VERSION" in source
     assert "PROFILE_PROMPT_SHA256" in source
     assert "tools=" not in source
-    assert PROFILE_MODEL_ID == "gpt-4o-mini"
+    assert PROFILE_MODEL_ID == OPENAI_CHAT_MODEL_ID
     assert PROFILE_MODEL_ID in ALLOWED_PROFILE_MODEL_IDS
     assert PROFILE_PROMPT_VERSION == "query_profile_v1"
     assert len(PROFILE_PROMPT_SHA256) == 64

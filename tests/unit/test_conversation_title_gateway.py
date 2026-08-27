@@ -14,6 +14,7 @@ from smart_rag_core.gateways.model import (
 from smart_rag_core.gateways.openai_conversation_title import (
     execute_openai_conversation_title,
 )
+from smart_rag_core.models.env_pins import OPENAI_CHAT_MODEL_ID
 from smart_rag_core.query_answer.versions import (
     CONVERSATION_TITLE_MODEL_ID,
     CONVERSATION_TITLE_PROMPT_SHA256,
@@ -88,6 +89,6 @@ def test_live_conversation_title_adapter_keeps_store_false() -> None:
     assert "CONVERSATION_TITLE_PROMPT_VERSION" in source
     assert "CONVERSATION_TITLE_PROMPT_SHA256" in source
     assert "source_records" not in source
-    assert CONVERSATION_TITLE_MODEL_ID == "gpt-4o-mini"
+    assert CONVERSATION_TITLE_MODEL_ID == OPENAI_CHAT_MODEL_ID
     assert CONVERSATION_TITLE_PROMPT_VERSION == "conversation_title_v1"
     assert len(CONVERSATION_TITLE_PROMPT_SHA256) == 64

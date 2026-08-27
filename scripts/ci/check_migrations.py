@@ -80,6 +80,9 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260827140000_tool_admin_catalog_overlay_v1.sql",
     "20260827160000_workspace_member_directory_v1.sql",
     "20260827170000_persist_run_citations_v1.sql",
+    "20260827180000_summarize_run_usage_v1.sql",
+    "20260827190000_summarize_run_usage_token_pricing_v1.sql",
+    "20260827200000_summarize_account_usage_token_pricing_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

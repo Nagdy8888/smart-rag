@@ -99,7 +99,11 @@ function menuFixedPosition(
  */
 export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [measuredCoords, setMeasuredCoords] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const coords = open ? measuredCoords : null;
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -107,7 +111,6 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
 
   useLayoutEffect(() => {
     if (!open) {
-      setCoords(null);
       return;
     }
     /**
@@ -124,7 +127,7 @@ export function Menu({ label, trigger, items, triggerActionId }: MenuProps) {
         setOpen(false);
         return;
       }
-      setCoords(menuFixedPosition(triggerNode, panelNode));
+      setMeasuredCoords(menuFixedPosition(triggerNode, panelNode));
     }
     updatePosition();
     enabledMenuItems(panelRef.current)[0]?.focus();

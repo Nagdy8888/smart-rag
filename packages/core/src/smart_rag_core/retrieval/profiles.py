@@ -15,6 +15,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from smart_rag_core.models.env_pins import ALLOWED_RERANK_MODEL_IDS, RERANK_MODEL_ID
+
+if RERANK_MODEL_ID not in ALLOWED_RERANK_MODEL_IDS:
+    raise RuntimeError("pinned rerank model is not allow-listed")
+
 DENSE_CANDIDATE_CAP = 100
 BM25_AUTHORIZED_SURVIVOR_CAP = 75
 BM25_SCAN_ID_CAP = 300
@@ -43,8 +48,6 @@ CHANNEL_WEIGHT_TERM = 1.0
 RERANK_POOL_SIZE = 20
 RERANK_MAX_PER_DOCUMENT = 5
 RERANK_EXCERPT_CHARS = 400
-RERANK_MODEL_ID = "gpt-4o-mini"
-ALLOWED_RERANK_MODEL_IDS = frozenset({RERANK_MODEL_ID})
 RERANK_PROMPT_VERSION = "rerank_v1"
 RERANK_MAX_OUTPUT_TOKENS = 2_048
 FINAL_EVIDENCE_MAX = 12

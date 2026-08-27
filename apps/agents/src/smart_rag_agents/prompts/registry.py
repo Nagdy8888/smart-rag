@@ -24,7 +24,7 @@ class PromptVersion:
     Attributes:
         prompt_id: Stable version id such as ``summary_v1``.
         path: Markdown file that holds the body.
-        sha256: Hex digest of the UTF-8 file bytes.
+        sha256: Hex digest of LF-normalized UTF-8 file bytes.
         environments: Environments that may load this version.
     """
 
@@ -35,7 +35,7 @@ class PromptVersion:
 
 
 def _sha256_file(path: Path) -> str:
-    """Return the SHA-256 hex digest of a prompt file.
+    """Return the LF-normalized SHA-256 hex digest of a prompt file.
 
     Args:
         path: Prompt markdown path.
@@ -49,7 +49,7 @@ def _sha256_file(path: Path) -> str:
 
     if not path.is_file():
         raise PromptRegistryError("prompt_file_missing")
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _entry(prompt_id: str, filename: str) -> PromptVersion:

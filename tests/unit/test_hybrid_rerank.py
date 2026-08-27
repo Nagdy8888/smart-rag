@@ -277,7 +277,9 @@ def test_prompt_hash_matches_checked_in_file() -> None:
         / "prompts"
         / "rerank_v1.md"
     )
-    digest = hashlib.sha256(prompt_path.read_bytes()).hexdigest()
+    digest = hashlib.sha256(
+        prompt_path.read_bytes().replace(b"\r\n", b"\n")
+    ).hexdigest()
     assert digest == RERANK_PROMPT_SHA256
     assert RERANK_PROMPT_VERSION in prompt_path.read_text(encoding="utf-8")
 

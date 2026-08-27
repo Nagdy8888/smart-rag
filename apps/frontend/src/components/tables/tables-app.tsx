@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnalysisPlan } from "./analysis-plan";
 import { AnalysisResults } from "./analysis-results";
 import { TablesDocumentBar } from "./tables-document-bar";
@@ -61,16 +61,26 @@ export function TablesApp() {
   const documentIdParam = searchParams.get("documentId");
   const scopedToDocument =
     documentIdParam !== null && documentIdParam !== "";
+  const documentScope = documentIdParam ?? "";
   const [userSelectedId, setUserSelectedId] = useState<string | null>(null);
+  const [selectionScope, setSelectionScope] = useState(documentScope);
+  const scopedUserSelectedId =
+    selectionScope === documentScope ? userSelectedId : null;
   const [draft, setDraft] = useState<TablePlanDraft>(EMPTY_TABLE_PLAN_DRAFT);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [submittedPlan, setSubmittedPlan] = useState<TableQueryPlan | null>(null);
   const [displaySortKey, setDisplaySortKey] = useState<string | null>(null);
   const [displaySortDir, setDisplaySortDir] = useState<"asc" | "desc">("asc");
 
-  useEffect(() => {
-    setUserSelectedId(null);
-  }, [documentIdParam]);
+  /**
+   * Remember a table pick for the current document query string.
+   *
+   * @param tableId - Manifest table id.
+   */
+  const selectTableId = (tableId: string): void => {
+    setSelectionScope(documentScope);
+    setUserSelectedId(tableId);
+  };
 
   const tablesQuery = useQuery({
     queryKey: keys.tables,
@@ -82,7 +92,7 @@ export function TablesApp() {
   const visibleManifests = manifestsForDocument(manifests, documentIdParam);
   const selected = resolveSelectedManifest(
     visibleManifests,
-    userSelectedId,
+    scopedUserSelectedId,
     tableIdParam,
     documentIdParam,
   );
@@ -233,7 +243,7 @@ export function TablesApp() {
                         active ? styles.manifestButtonActive : styles.manifestButton
                       }
                       aria-current={active ? "true" : undefined}
-                      onClick={() => setUserSelectedId(item.table_id)}
+                      onClick={() => selectTableId(item.table_id)}
                     >
                       <UserText value={item.table_name} />
                       {item.sheet_name ? (
@@ -269,7 +279,7 @@ export function TablesApp() {
               label={listHeading}
               value={selected?.table_id ?? ""}
               options={tableOptions}
-              onChange={(event) => setUserSelectedId(event.target.value)}
+              onChange={(event) => selectTableId(event.target.value)}
             />
             {tablesPending ? (
               <Skeleton label="Loading tables" width="100%" />
@@ -294,7 +304,7 @@ export function TablesApp() {
               documentName={selectedDocumentName}
               draft={draft}
               pending={analyzeMutation.isPending}
-              onSelectTableId={setUserSelectedId}
+              onSelectTableId={selectTableId}
               onDraftChange={(next) => {
                 setDraft(next);
               }}

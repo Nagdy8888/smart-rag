@@ -17,8 +17,8 @@ from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import UserRole
 
+from tests.support.scope_graph import COMPANY_ONLY_NODES, SpyHybrid
 from tests.support.typed_graph import compile_state_graph
-from tests.unit.test_scope_graph_routes import COMPANY_ONLY_NODES, SpyHybrid
 
 _GENERAL_REQUIRED = {
     "enforce_admission",

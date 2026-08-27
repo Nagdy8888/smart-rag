@@ -10,6 +10,10 @@ from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Final
 
+from smart_rag_core.ingestion.embeddings.policy import (
+    EMBEDDING_DIMENSIONS,
+    EMBEDDING_MODEL,
+)
 from smart_rag_core.jobs.exceptions import GraphLifecycleError
 from smart_rag_core.jobs.limits import (
     GRAPH_CLEAN_REBUILD_SLA_DAYS,
@@ -21,8 +25,9 @@ from smart_rag_core.jobs.limits import (
 
 FAIL_CLOSED_DELETE_STATUSES: Final[frozenset[str]] = frozenset({"not_allowed", "fail"})
 RETRYABLE_DELETE_STATUSES: Final[frozenset[str]] = frozenset({"success", "not_found"})
-HOMOGENEOUS_EMBEDDING_MODEL: Final[str] = "text-embedding-3-large"
-HOMOGENEOUS_EMBEDDING_DIMENSIONS: Final[int] = 1024
+
+HOMOGENEOUS_EMBEDDING_MODEL: Final[str] = EMBEDDING_MODEL
+HOMOGENEOUS_EMBEDDING_DIMENSIONS: Final[int] = EMBEDDING_DIMENSIONS
 
 
 class PointerCrashPhase(StrEnum):

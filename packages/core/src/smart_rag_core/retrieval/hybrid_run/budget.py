@@ -53,7 +53,15 @@ def tokens_from_retrieve_result(
         if len(ranked_result) >= 2:
             usage = ranked_result[1]
             if isinstance(usage, RerankUsage):
-                return usage.input_tokens, usage.output_tokens, None
+                from smart_rag_core.gateways.openai_pricing import (
+                    estimate_chat_cost_usd,
+                )
+
+                cost = estimate_chat_cost_usd(
+                    prompt_tokens=usage.input_tokens,
+                    completion_tokens=usage.output_tokens,
+                )
+                return usage.input_tokens, usage.output_tokens, cost
     return None, None, None
 
 

@@ -31,6 +31,8 @@ export type ChatDiagnostics = {
   citationIds: string[];
   promptTokens: number;
   completionTokens: number;
+  /** Billed USD for the current run when the usage event includes it. */
+  costUsd: number | null;
   heartbeatCount: number;
   unknownEvents: string[];
   strayCitationsHidden: number;
@@ -56,6 +58,8 @@ export type ChatViewState = {
   chatPromptTokens: number;
   /** Completed prior runs and title tokens in this live conversation. */
   chatCompletionTokens: number;
+  /** Billed USD from completed prior runs in this live conversation. */
+  chatCostUsd: number;
 };
 
 /**
@@ -76,6 +80,7 @@ export function emptyDiagnostics(): ChatDiagnostics {
     citationIds: [],
     promptTokens: 0,
     completionTokens: 0,
+    costUsd: null,
     heartbeatCount: 0,
     unknownEvents: [],
     strayCitationsHidden: 0,
@@ -106,6 +111,7 @@ export function createChatViewState(idempotencyKey: string): ChatViewState {
     progress: emptyRunProgress(),
     chatPromptTokens: 0,
     chatCompletionTokens: 0,
+    chatCostUsd: 0,
   };
 }
 
@@ -129,6 +135,7 @@ export function startNextChatRun(
     chatPromptTokens: previous.chatPromptTokens + previous.diagnostics.promptTokens,
     chatCompletionTokens:
       previous.chatCompletionTokens + previous.diagnostics.completionTokens,
+    chatCostUsd: previous.chatCostUsd + (previous.diagnostics.costUsd ?? 0),
   };
 }
 
@@ -176,6 +183,16 @@ export function chatTokenTotals(state: ChatViewState): {
     promptTokens: state.chatPromptTokens + state.diagnostics.promptTokens,
     completionTokens: state.chatCompletionTokens + state.diagnostics.completionTokens,
   };
+}
+
+/**
+ * Conversation-wide billed USD for the live Ask session.
+ *
+ * @param state - Current view.
+ * @returns Run totals plus any completed prior runs in this chat.
+ */
+export function chatCostTotal(state: ChatViewState): number {
+  return state.chatCostUsd + (state.diagnostics.costUsd ?? 0);
 }
 
 /**
@@ -345,6 +362,10 @@ export function applySseFrame(state: ChatViewState, frame: SseFrame): ChatViewSt
         typeof payload.prompt_tokens === "number" ? payload.prompt_tokens : 0;
       diagnostics.completionTokens =
         typeof payload.completion_tokens === "number" ? payload.completion_tokens : 0;
+      diagnostics.costUsd =
+        typeof payload.cost_usd === "number" && Number.isFinite(payload.cost_usd)
+          ? payload.cost_usd
+          : null;
       break;
     case "deadline":
       next.stage = "deadline";

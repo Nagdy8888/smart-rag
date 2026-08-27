@@ -58,6 +58,23 @@ class RunCitationRecord:
     source_unavailable: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class RunUsageSummary:
+    """Billed usage totals for one owned query run.
+
+    Attributes:
+        cost_usd: Sum of immutable ``app.llm_usage.cost_usd`` rows.
+        prompt_tokens: Sum of provider prompt tokens.
+        completion_tokens: Sum of provider completion tokens.
+        usage_rows: Number of billed rows included in the sums.
+    """
+
+    cost_usd: Decimal
+    prompt_tokens: int
+    completion_tokens: int
+    usage_rows: int
+
+
 def get_query_run(
     connection: psycopg.Connection,
     *,
@@ -240,3 +257,51 @@ def list_run_citations(
             )
         )
     return tuple(records)
+
+
+def summarize_run_usage(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+) -> RunUsageSummary:
+    """Return billed token and USD totals for one owned run.
+
+    Args:
+        connection: Open ``app_api`` connection on the run-scoped session.
+        caller: Server-derived owner.
+        run_id: Admitted query run.
+
+    Returns:
+        Aggregated ``app.llm_usage`` totals for ``run_id``.
+
+    Raises:
+        QueryAdmissionError: When the run is missing, foreign, or the RPC
+            rejects the caller.
+    """
+
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT cost_usd, prompt_tokens, completion_tokens, usage_rows
+                FROM app.summarize_run_usage(%s, %s, %s, %s)
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    run_id,
+                ),
+            )
+            row = cursor.fetchone()
+    except psycopg.Error as exc:
+        raise_admission(exc)
+    if row is None:
+        raise QueryAdmissionError("database_rejected")
+    return RunUsageSummary(
+        cost_usd=Decimal(str(row["cost_usd"])),
+        prompt_tokens=int(row["prompt_tokens"]),
+        completion_tokens=int(row["completion_tokens"]),
+        usage_rows=int(row["usage_rows"]),
+    )

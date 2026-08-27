@@ -314,7 +314,7 @@ managed Supabase.
 | `scripts/eval_query_profile.py` | Open-split scorer |
 
 Prompt SHA-256
-`a5c87258e3837daa2bdbac623d90e4d022817eeff2b8d5e650763d07c2d49a7b`
+`5a969a9d83d8716c6033fc1a7c5a773e5e63896953af3847d4e85216425e9e1f`
 (updated 2026-08-25 for additive ``knowledge_scope``). Original Packet 3 hash
 was `01f33dfbb98720b3cb08a89fdd7d8d8be48941e834e15deb53a8e8142ae20693`.
 Model version `query-profile-mock-v1`. Date parser `gregorian_v1`. Retrieval

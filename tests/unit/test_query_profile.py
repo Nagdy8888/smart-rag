@@ -61,7 +61,9 @@ PROMPT_PATH = (
 def test_prompt_hash_matches_checked_in_file() -> None:
     """The frozen prompt hash matches the agents prompt file."""
 
-    digest = hashlib.sha256(PROMPT_PATH.read_bytes()).hexdigest()
+    digest = hashlib.sha256(
+        PROMPT_PATH.read_bytes().replace(b"\r\n", b"\n")
+    ).hexdigest()
     assert digest == PROFILE_PROMPT_SHA256
     assert PROFILE_PROMPT_VERSION in PROMPT_PATH.read_text(encoding="utf-8")
 

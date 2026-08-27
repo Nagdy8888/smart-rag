@@ -12,6 +12,7 @@ from smart_rag_core.gateways.model import (
     create_model_gateway,
 )
 from smart_rag_core.gateways.openai_general_chat import execute_openai_general_chat
+from smart_rag_core.models.env_pins import OPENAI_CHAT_MODEL_ID
 from smart_rag_core.query_answer.versions import (
     ANSWER_MODEL_ID,
     GENERAL_CHAT_PROMPT_SHA256,
@@ -86,6 +87,6 @@ def test_live_general_chat_adapter_keeps_store_false() -> None:
     assert "GENERAL_CHAT_PROMPT_VERSION" in source
     assert "GENERAL_CHAT_PROMPT_SHA256" in source
     assert "source_records" not in source
-    assert ANSWER_MODEL_ID == "gpt-4o-mini"
+    assert ANSWER_MODEL_ID == OPENAI_CHAT_MODEL_ID
     assert GENERAL_CHAT_PROMPT_VERSION == "general_chat_v1"
     assert len(GENERAL_CHAT_PROMPT_SHA256) == 64

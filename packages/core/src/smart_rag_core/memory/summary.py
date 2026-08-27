@@ -15,6 +15,7 @@ from smart_rag_core.memory.payload import (
     memory_store_namespace,
     validate_memory_store_payload,
 )
+from smart_rag_core.models.env_pins import OPENAI_CHAT_MODEL_ID
 from smart_rag_core.query_admission.ceilings import usage_kind_caps
 from smart_rag_core.query_admission.exceptions import (
     QueryBudgetError,
@@ -123,7 +124,7 @@ def maybe_generate_conversation_summary(
             reservation_id=reservation_id,
             expected_version=expected_version,
             usage_kind=_USAGE_KIND,
-            model_id="gpt-4o-mini",
+            model_id=OPENAI_CHAT_MODEL_ID,
             provider_attempt_id=f"summary:{run_id}",
             send=producer,
         )

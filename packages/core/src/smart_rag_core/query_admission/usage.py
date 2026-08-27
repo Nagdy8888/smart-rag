@@ -9,6 +9,7 @@ from uuid import UUID
 
 import psycopg
 
+from smart_rag_core.gateways.openai_pricing import estimate_usage_cost_usd
 from smart_rag_core.query_admission.ceilings import usage_kind_caps
 from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
 from smart_rag_core.query_admission.service import (
@@ -120,6 +121,19 @@ def execute_counted_model_call(
             recorded_completion = extracted_completion
         if extracted_cost is not None:
             recorded_cost = extracted_cost
+    resolved_prompt = recorded_prompt if recorded_prompt is not None else prompt_cap
+    resolved_completion = (
+        recorded_completion if recorded_completion is not None else completion_cap
+    )
+    if recorded_cost is None and recorded_prompt is not None:
+        recorded_cost = estimate_usage_cost_usd(
+            usage_kind=usage_kind,
+            model_id=model_id,
+            prompt_tokens=resolved_prompt,
+            completion_tokens=resolved_completion,
+        )
+        if recorded_cost > usd_cap:
+            recorded_cost = usd_cap
     usage_id = record_query_llm_usage(
         connection,
         caller=caller,
@@ -129,10 +143,8 @@ def execute_counted_model_call(
         usage_kind=usage_kind,
         model_id=model_id,
         provider_attempt_id=provider_attempt_id,
-        prompt_tokens=(recorded_prompt if recorded_prompt is not None else prompt_cap),
-        completion_tokens=(
-            recorded_completion if recorded_completion is not None else completion_cap
-        ),
+        prompt_tokens=resolved_prompt,
+        completion_tokens=resolved_completion,
         cost_usd=recorded_cost if recorded_cost is not None else usd_cap,
         timeout_after_send=False,
     )

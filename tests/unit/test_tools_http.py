@@ -41,6 +41,16 @@ def _fixed_seeds(
     """
 
     def _load(self: ToolHttpService, caller: CallerContext) -> dict[str, bool]:
+        """Return the fixed overlay map.
+
+        Args:
+            self: Unused service instance.
+            caller: Unused caller.
+
+        Returns:
+            Seeded overlay flags keyed by tool_key.
+        """
+
         del self, caller
         return seeds
 

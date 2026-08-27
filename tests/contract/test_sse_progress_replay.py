@@ -79,7 +79,10 @@ def test_fixtures_are_monotonic_with_one_terminal_and_no_leaks() -> None:
             validate_sse_payload(item.event_type, item.payload)
         for marker in forbidden:
             assert marker not in raw
-        assert META["leakage_marker"] not in raw
+        assert f": {META['leakage_marker']}" in raw
+        for item in events:
+            dumped = json.dumps(item.payload)
+            assert META["leakage_marker"] not in dumped
 
 
 def test_route_fixtures_match_required_and_forbidden_stages() -> None:

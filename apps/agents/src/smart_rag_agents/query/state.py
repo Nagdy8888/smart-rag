@@ -61,6 +61,7 @@ class QueryGraphState(TypedDict):
             null.
         prompt_tokens: Accumulated provider prompt tokens for this run.
         completion_tokens: Accumulated provider completion tokens for this run.
+        cost_usd: Billed USD total from ``app.llm_usage`` when set at verify.
     """
 
     status: Literal[
@@ -128,6 +129,7 @@ class QueryGraphState(TypedDict):
     scope_degradation_reason: str | None
     prompt_tokens: int
     completion_tokens: int
+    cost_usd: float | None
 
 
 QueryStateGraph: TypeAlias = StateGraph[
@@ -211,4 +213,5 @@ def pending_query_state(
         "scope_degradation_reason": None,
         "prompt_tokens": 0,
         "completion_tokens": 0,
+        "cost_usd": None,
     }

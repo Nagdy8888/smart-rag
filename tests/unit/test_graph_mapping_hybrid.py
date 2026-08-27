@@ -149,7 +149,9 @@ def _mapper_attr(service: GraphIndexService, name: str) -> object:
 def test_mapping_rerank_prompt_matches_frozen_hash() -> None:
     """Mapping support rerank uses the pinned Hybrid rerank prompt file."""
 
-    digest = hashlib.sha256(_RERANK_PROMPT.read_bytes()).hexdigest()
+    digest = hashlib.sha256(
+        _RERANK_PROMPT.read_bytes().replace(b"\r\n", b"\n")
+    ).hexdigest()
     assert digest == RERANK_PROMPT_SHA256
     assert _RERANK_PROMPT.is_file()
 

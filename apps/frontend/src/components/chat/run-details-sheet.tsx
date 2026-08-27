@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { INFERENCE_LINKS_UNAVAILABLE } from "../../lib/citation-drawer";
-import { chatTokenTotals, type ChatViewState } from "../../lib/chat-view";
+import { chatCostTotal, chatTokenTotals, type ChatViewState } from "../../lib/chat-view";
 import { formatRunTokenUsage, formatUsd } from "../../lib/format-usage";
 import {
   cacheStatusLabel,
@@ -97,6 +97,31 @@ function TokenMetricsSection({
   );
 }
 
+type SpendSectionProps = {
+  label: string;
+  costUsd: number | null;
+  summary: string;
+};
+
+/**
+ * Show billed USD for one usage scope.
+ *
+ * @param props - Visible label and helper copy.
+ * @returns Spend row, or null when cost is unavailable.
+ */
+function SpendSection({ label, costUsd, summary }: SpendSectionProps) {
+  if (costUsd === null || !Number.isFinite(costUsd)) {
+    return null;
+  }
+  return (
+    <section className={styles.spend} aria-label={label}>
+      <p className={styles.kicker}>{label}</p>
+      <p className={styles.spendValue}>{formatUsd(costUsd)}</p>
+      <p className={styles.summary}>{summary}</p>
+    </section>
+  );
+}
+
 /**
  * Copy a technical id and report clipboard success or failure.
  *
@@ -176,6 +201,7 @@ export function RunDetailsSheet({
   const cacheLabel = cacheStatusLabel(diagnostics.cacheStatus);
   const usageUsd = formatUsd(companyUsd);
   const chatTotals = chatTokenTotals(chat);
+  const chatSpend = chatCostTotal(chat);
   const runUsage = formatRunTokenUsage(
     diagnostics.promptTokens,
     diagnostics.completionTokens,
@@ -240,16 +266,29 @@ export function RunDetailsSheet({
         completionTokens={diagnostics.completionTokens}
         summary="Profile, search, answer, and verifier tokens for this question."
       />
+      <SpendSection
+        label="This run spend"
+        costUsd={diagnostics.costUsd}
+        summary="Billed USD from immutable usage rows for this question."
+      />
       <TokenMetricsSection
         label="This chat"
         promptTokens={chatTotals.promptTokens}
         completionTokens={chatTotals.completionTokens}
         summary="Every question in this conversation, including this run and the session title."
       />
+      <SpendSection
+        label="This chat spend"
+        costUsd={chatSpend > 0 ? chatSpend : null}
+        summary="Billed USD for every completed question in this conversation."
+      />
       {usageUsd === "—" ? null : (
-        <section className={styles.spend} aria-label="Your account">
-          <p className={styles.kicker}>Your account</p>
+        <section className={styles.spend} aria-label="Account total">
+          <p className={styles.kicker}>Account total</p>
           <p className={styles.spendValue}>{usageUsd}</p>
+          <p className={styles.summary}>
+            All billed Ask usage on your account, not just this answer.
+          </p>
         </section>
       )}
       {diagnostics.toolKeys.length > 0 ? (
@@ -293,7 +332,11 @@ export function RunDetailsSheet({
       <p className={styles.srOnly} data-testid="usage-strip">
         {runUsage ? `This run ${runUsage}. ` : null}
         {chatUsage ? `This chat ${chatUsage}. ` : null}
-        Your account {usageUsd}.
+        {diagnostics.costUsd !== null
+          ? `This run spend ${formatUsd(diagnostics.costUsd)}. `
+          : null}
+        {chatSpend > 0 ? `This chat spend ${formatUsd(chatSpend)}. ` : null}
+        Account total {usageUsd}.
       </p>
     </div>
   );

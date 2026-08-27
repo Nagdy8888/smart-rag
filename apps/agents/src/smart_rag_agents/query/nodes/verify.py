@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from typing import cast
 
+import psycopg
 from smart_rag_core.query_admission.ceilings import assert_call_available
-from smart_rag_core.query_admission.exceptions import QueryCeilingError
-from smart_rag_core.query_answer.citations import maybe_persist_verified_citations
+from smart_rag_core.query_admission.exceptions import (
+    QueryAdmissionError,
+    QueryCeilingError,
+)
+from smart_rag_core.query_admission.service import summarize_run_usage
+from smart_rag_core.query_answer.citations import (
+    ensure_fusion_source_citations,
+    maybe_persist_verified_citations,
+)
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.models import (
@@ -35,7 +43,6 @@ from smart_rag_agents.query.nodes.state_codec import (
     fusion_from_state,
     tables_from_state,
 )
-from smart_rag_agents.query.nodes.tokens import accumulated_tokens
 from smart_rag_agents.query.state import QueryGraphState
 
 
@@ -203,6 +210,32 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         else "verified_partial",
     )
     context = runtime_from_state(state)
+    billed_prompt = int(state.get("prompt_tokens") or 0) + max(0, added_prompt_tokens)
+    billed_completion = int(state.get("completion_tokens") or 0) + max(
+        0, added_completion_tokens
+    )
+    billed_cost_usd: float | None = None
+    if deps.connection is not None and context is not None:
+        try:
+            billed = summarize_run_usage(
+                deps.connection,
+                caller=caller_from_runtime(context),
+                run_id=context.run_id,
+            )
+            billed_prompt = billed.prompt_tokens
+            billed_completion = billed.completion_tokens
+            billed_cost_usd = float(billed.cost_usd)
+        except (QueryAdmissionError, psycopg.Error):
+            pass
+    checked = ensure_fusion_source_citations(
+        checked,
+        fusion=fusion,
+        tables=tables.records,
+    )
+    if route_needs_retrieval(plan) and checked.answer_origin is None:
+        checked = checked.model_copy(
+            update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
+        )
     maybe_persist_verified_citations(
         deps.connection,
         caller=caller_from_runtime(context) if context is not None else None,
@@ -222,6 +255,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "verifier_call_count": verifier_calls,
             "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
             "keyword_extract_count": 0,
-            **accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
+            "prompt_tokens": billed_prompt,
+            "completion_tokens": billed_completion,
+            "cost_usd": billed_cost_usd,
         },
     )

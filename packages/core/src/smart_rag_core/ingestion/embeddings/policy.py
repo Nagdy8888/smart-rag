@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 
-EMBEDDING_MODEL = "text-embedding-3-large"
+from smart_rag_core.models.env_pins import EMBEDDING_MODEL
+
 EMBEDDING_DIMENSIONS = 1024
 CONTEXTUAL_EMBEDDING_VERSION = "contextual_v1"
 TOKENIZER_VERSION = "cl100k_base_v1"

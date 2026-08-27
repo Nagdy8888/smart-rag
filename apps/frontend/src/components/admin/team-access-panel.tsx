@@ -221,7 +221,7 @@ export function TeamAccessPanel() {
         },
       },
     ],
-    [canOffboard, currentUser?.user_id, styles.muted],
+    [canOffboard, currentUser?.user_id],
   );
 
   const invitationColumns = useMemo(
@@ -263,7 +263,7 @@ export function TeamAccessPanel() {
         },
       },
     ],
-    [styles.muted],
+    [],
   );
 
   if (currentUserPending) {

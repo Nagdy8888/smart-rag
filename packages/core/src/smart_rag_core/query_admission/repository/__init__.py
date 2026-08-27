@@ -13,9 +13,11 @@ from smart_rag_core.query_admission.repository.lifecycle import (
 from smart_rag_core.query_admission.repository.records import (
     QueryRunRecord,
     RunCitationRecord,
+    RunUsageSummary,
     get_query_run,
     list_run_citations,
     load_query_run_runtime,
+    summarize_run_usage,
 )
 from smart_rag_core.query_admission.repository.reservation import (
     ReservationConsumeResult,
@@ -36,6 +38,7 @@ __all__ = [
     "QueryRunRecord",
     "ReservationConsumeResult",
     "RunCitationRecord",
+    "RunUsageSummary",
     "TrueUpResult",
     "admit_query_run",
     "cancel_query_run",
@@ -49,5 +52,6 @@ __all__ = [
     "reconcile_expired_query_runs",
     "record_query_llm_usage",
     "record_run_restricted_evidence",
+    "summarize_run_usage",
     "true_up_query_reservation",
 ]

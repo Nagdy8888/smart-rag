@@ -74,6 +74,11 @@ class SharedSettings(BaseSettings):
         model_input_max_chars: Maximum model input size from
             ``MODEL_INPUT_MAX_CHARS``. Public, bounded from 1 through 65536,
             default 16384 characters.
+        openai_chat_model_id: Default OpenAI chat model from
+            ``OPENAI_CHAT_MODEL_ID``. Public, default ``gpt-4o-mini``.
+        openai_embedding_model: OpenAI embedding model from
+            ``OPENAI_EMBEDDING_MODEL``. Public, default
+            ``text-embedding-3-large``.
         valkey_limits_url: Rate-limit Valkey URL from ``VALKEY_LIMITS_URL``.
             Secret because it can contain credentials.
         valkey_cache_url: Cache Valkey URL from ``VALKEY_CACHE_URL``. Secret
@@ -190,6 +195,27 @@ class SharedSettings(BaseSettings):
         ge=1,
         le=65_536,
         description="Maximum characters accepted by the model gateway.",
+        json_schema_extra={"security": "public"},
+    )
+    openai_chat_model_id: str = Field(
+        default="gpt-4o-mini",
+        validation_alias="OPENAI_CHAT_MODEL_ID",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._-]+$",
+        description=(
+            "Default OpenAI chat model for profile, answer, verifier, rerank, "
+            "LightRAG LLM, conversation title, and eval judge."
+        ),
+        json_schema_extra={"security": "public"},
+    )
+    openai_embedding_model: str = Field(
+        default="text-embedding-3-large",
+        validation_alias="OPENAI_EMBEDDING_MODEL",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._-]+$",
+        description="OpenAI embedding model for hybrid retrieval and ingestion.",
         json_schema_extra={"security": "public"},
     )
     valkey_limits_url: SecretStr | None = Field(

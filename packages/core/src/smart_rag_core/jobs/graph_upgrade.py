@@ -12,6 +12,10 @@ from uuid import UUID
 
 import psycopg
 
+from smart_rag_core.ingestion.embeddings.policy import (
+    EMBEDDING_DIMENSIONS,
+    EMBEDDING_MODEL,
+)
 from smart_rag_core.jobs.exceptions import GraphLifecycleError
 from smart_rag_core.jobs.graph_lifecycle import (
     assert_homogeneous_embedding,
@@ -53,8 +57,8 @@ def record_upgrade_qualification(
     runtime_schema: str = RUNTIME_LIGHTRAG_SCHEMA,
     status: str = "recorded",
     notes: str = "",
-    embedding_model: str = "text-embedding-3-large",
-    embedding_dimensions: int = 1024,
+    embedding_model: str = EMBEDDING_MODEL,
+    embedding_dimensions: int = EMBEDDING_DIMENSIONS,
 ) -> UpgradeQualificationResult:
     """Persist isolated upgrade proof or refuse same-schema attempts.
 

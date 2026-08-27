@@ -1,0 +1,2 @@
+# Prompt hashes are SHA-256 of LF bytes. Keep prompt markdown LF on every checkout.
+apps/agents/src/smart_rag_agents/prompts/*.md text eol=lf

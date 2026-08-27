@@ -13,7 +13,6 @@ import functools
 import hashlib
 import json
 import logging
-import os
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -28,7 +27,7 @@ from langsmith.utils import (
 from openai import AsyncOpenAI, OpenAI
 
 from smart_rag_core.observability.logging import current_correlation_ids
-from smart_rag_core.settings import SharedSettings
+from smart_rag_core.settings import SharedSettings, get_process_environ
 
 if TYPE_CHECKING:
     from openai.types.create_embedding_response import CreateEmbeddingResponse
@@ -83,7 +82,7 @@ def langsmith_export_io_enabled() -> bool:
         Staging and production never write that value.
     """
 
-    return os.environ.get(LANGSMITH_EXPORT_IO_ENV, "").strip().lower() in {
+    return (get_process_environ(LANGSMITH_EXPORT_IO_ENV, "") or "").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -195,7 +194,7 @@ def flush_langsmith_traces(*, timeout_seconds: float) -> None:
         return
     if not tracing_is_enabled():
         return
-    if not os.environ.get("LANGSMITH_API_KEY"):
+    if not get_process_environ("LANGSMITH_API_KEY"):
         return
     try:
         run = get_current_run_tree()

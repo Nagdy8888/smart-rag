@@ -23,4 +23,13 @@ def usage_event(
         return None
     if prompt < 0 or completion < 0:
         return None
-    return ("usage", {"prompt_tokens": prompt, "completion_tokens": completion})
+    payload: dict[str, object] = {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+    }
+    raw_cost = update.get("cost_usd")
+    if isinstance(raw_cost, bool):
+        raw_cost = None
+    if isinstance(raw_cost, (int, float)) and raw_cost >= 0:
+        payload["cost_usd"] = float(raw_cost)
+    return ("usage", payload)

@@ -29,6 +29,7 @@ function completedComposite(): ChatViewState {
       ...admitted.diagnostics,
       promptTokens: 258,
       completionTokens: 32,
+      costUsd: 0.4,
       heartbeatCount: 1,
     },
     progress: {
@@ -101,6 +102,9 @@ describe("RunDetailsSheet", () => {
       "Session title generation is billed separately.",
     );
     expect(details).toHaveTextContent("$3.20");
+    expect(details).toHaveTextContent("Account total");
+    expect(details).toHaveTextContent("$0.40");
+    expect(details).toHaveTextContent("This run spend");
     expect(details).toHaveTextContent("run-1");
     expect(details).not.toHaveTextContent("Requested route");
     expect(details).not.toHaveTextContent("Effective route");

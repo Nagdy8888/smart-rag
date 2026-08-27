@@ -21,6 +21,10 @@ from smart_rag_core.evaluation.schema import (
     DATASET_SCHEMA_VERSION,
     LABEL_REVISION,
 )
+from smart_rag_core.ingestion.embeddings.policy import (
+    EMBEDDING_DIMENSIONS as EMBEDDING_DIMENSIONS_PIN,
+)
+from smart_rag_core.models.env_pins import EMBEDDING_MODEL as EMBEDDING_MODEL_PIN
 from smart_rag_core.query_profile.versions import (
     NORMALIZER_VERSION,
     PROFILE_PROMPT_SHA256,
@@ -59,8 +63,6 @@ LOCK_PATH = REPO_ROOT / "uv.lock"
 PYPROJECT_CORE = REPO_ROOT / "packages" / "core" / "pyproject.toml"
 OPENAI_SDK_PIN = "2.26.0"
 LANGSMITH_SDK_PIN = "0.10.18"
-EMBEDDING_MODEL_PIN = "text-embedding-3-large"
-EMBEDDING_DIMENSIONS_PIN = 1024
 LAUNCH_DECISION_NO_GO = "no_go"
 INDEPENDENT_SME_STATUS = "independently_sealed"
 

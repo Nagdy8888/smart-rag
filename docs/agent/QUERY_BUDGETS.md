@@ -40,7 +40,15 @@ and LightRAG query callbacks also add those actuals to
 durable path is unbound, then company-scope and correction write the
 ledger onto LangGraph state. Ask Run Details reads the SSE `usage` event
 emitted after verify, which is that accumulated run total (profile,
-search, answer, verifier). Ask Run Details shows that as **This run**.
+search, answer, verifier). Ask Run Details shows that as **This run**. Durable billed totals also
+come from `app.summarize_run_usage` (creator-only) which recomputes USD
+from stored token counts using pinned OpenAI list prices
+(`gpt-4o-mini` chat, `text-embedding-3-large` embeddings). Account and
+admin surfaces use `app.summarize_caller_usage` and
+`app.summarize_company_usage`. Migrations:
+`20260827180000_summarize_run_usage_v1.sql`,
+`20260827190000_summarize_run_usage_token_pricing_v1.sql`,
+`20260827200000_summarize_account_usage_token_pricing_v1.sql`.
 **This chat** adds earlier questions in the live session plus
 conversation-title generation (`POST /conversations/{id}/title`). Title
 tokens are not reserved against the query-run envelope.

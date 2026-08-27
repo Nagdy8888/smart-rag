@@ -20,11 +20,12 @@ from smart_rag_api.services.sse.chunks import (
 )
 from smart_rag_api.services.sse.executors import QueryRunExecutor
 from smart_rag_api.services.sse.registry import LiveQueryRun, QueryRunRegistry
+from smart_rag_api.services.sse.run_heartbeat import RunHeartbeatMixin
 
 LOGGER = logging.getLogger(__name__)
 
 
-class RunOrchestrationMixin:
+class RunOrchestrationMixin(RunHeartbeatMixin):
     """Mixin: start the graph once and persist executor plus heartbeat drafts."""
 
     _store: RunEventStore
@@ -295,29 +296,3 @@ class RunOrchestrationMixin:
             heartbeat = live.heartbeat_task
             if heartbeat is not None and not heartbeat.done():
                 heartbeat.cancel()
-
-    async def _run_heartbeat(
-        self, caller: CallerContext, run_id: UUID, live: LiveQueryRun
-    ) -> None:
-        """Persist a heartbeat every interval until the run is terminal.
-
-        Appends run off the event loop. A lock wait cannot freeze
-        ``astream`` or SSE polling. A failed heartbeat degrades to a
-        skipped beat.
-
-        Args:
-            caller: Owner.
-            run_id: Run id.
-            live: Process handle.
-        """
-
-        try:
-            while not live.terminal and not live.cancel_event.is_set():
-                await asyncio.sleep(self._heartbeat_interval_seconds)
-                if live.terminal or live.cancel_event.is_set():
-                    break
-                if self._has_terminal(caller, run_id):
-                    break
-                await self._append_async(caller, run_id, "heartbeat", {})
-        except asyncio.CancelledError:
-            return

@@ -57,7 +57,7 @@ flowchart TD
 | `manifest_development` | `9dcbe2c564d33a38fba096253d60d2c8172fb9dd6c76bf95627446c857f89264` |
 | `manifest_holdout` | `7c70b4267efbd9df46247c099333ef7e82ed4ccc6df906727d8997e7bcacada2` |
 | `manifest_qualification` | `716ea031255217a82fa8ce2a1d7f89dbf17e841a99e7b1f4dc4de3a51d42cc14` |
-| `query_profile_prompt` | `a5c87258e3837daa2bdbac623d90e4d022817eeff2b8d5e650763d07c2d49a7b` |
+| `query_profile_prompt` | `5a969a9d83d8716c6033fc1a7c5a773e5e63896953af3847d4e85216425e9e1f` |
 | `rerank_prompt` | `4767049107cfe6e8591c84d3b1d202393dfd2564383e6c5bfa0bd5fece8f1925` |
 | `schema` | `996fb7553dcffa1805020444b2c4e22eebf05d6a9909882468a2cc7b80d151c9` |
 

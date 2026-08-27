@@ -145,6 +145,29 @@ def test_mapper_emits_usage_from_verify_totals() -> None:
     }
 
 
+def test_mapper_emits_billed_cost_with_usage() -> None:
+    """Verified answers may publish billed USD alongside provider tokens."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified",
+                "answer": _payload("Counted answer."),
+                "prompt_tokens": 923,
+                "completion_tokens": 167,
+                "cost_usd": 0.48,
+            }
+        }
+    )
+    usage = next(item for item in events if item[0] == "usage")
+    assert usage[1] == {
+        "prompt_tokens": 923,
+        "completion_tokens": 167,
+        "cost_usd": 0.48,
+    }
+
+
 def test_mapper_empty_verified_answer_is_error_not_completed() -> None:
     """A successful graph with blank answer_text cannot emit completed."""
 
