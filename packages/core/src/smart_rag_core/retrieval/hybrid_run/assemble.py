@@ -10,12 +10,12 @@ from uuid import UUID
 from smart_rag_core.evaluation.schema import ExpectedProfile, QueryType
 from smart_rag_core.retrieval.coverage import CoverageSignal, HybridCoverage
 from smart_rag_core.retrieval.hybrid import HybridRetrievalResult, assemble_hybrid
-from smart_rag_core.retrieval.hybrid_run.profile_fields import _str_list_field
+from smart_rag_core.retrieval.hybrid_run.profile_fields import str_list_field
 from smart_rag_core.retrieval.hybrid_run.types import (
-    _EMBED_TEXT_CAP,
+    EMBED_TEXT_CAP,
+    AssembleHybridKwargs,
     HybridRunResult,
-    _AssembleHybridKwargs,
-    _VariantLists,
+    VariantLists,
 )
 from smart_rag_core.retrieval.profiles import (
     MAX_NORMALIZED_QUERY_CHARS,
@@ -26,11 +26,11 @@ from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
 
-def _hybrid_assemble_kwargs(
+def hybrid_assemble_kwargs(
     *,
-    dense_variants: _VariantLists,
-    bm25_variants: _VariantLists,
-    term_variants: _VariantLists,
+    dense_variants: VariantLists,
+    bm25_variants: VariantLists,
+    term_variants: VariantLists,
     bm25_fallback: RetrievalFallbackReason,
     temporal_intent: TemporalIntent,
     target_date: date | None,
@@ -47,7 +47,7 @@ def _hybrid_assemble_kwargs(
     required_terms: tuple[str, ...],
     matched_terms: tuple[str, ...],
     deadline_exhausted: bool,
-) -> _AssembleHybridKwargs:
+) -> AssembleHybridKwargs:
     """Pack the shared ``assemble_hybrid`` kwargs for one retrieve.
 
     Args:
@@ -98,11 +98,11 @@ def _hybrid_assemble_kwargs(
     }
 
 
-def _call_assemble_hybrid(
+def call_assemble_hybrid(
     *,
     heading_inventory: tuple[str, ...],
     covered_headings: tuple[str, ...],
-    kwargs: _AssembleHybridKwargs,
+    kwargs: AssembleHybridKwargs,
 ) -> HybridRetrievalResult:
     """Call ``assemble_hybrid`` with the same heading and channel arguments.
 
@@ -122,7 +122,7 @@ def _call_assemble_hybrid(
     )
 
 
-def _fail_closed_query(query: str) -> RetrievalFallbackReason | None:
+def fail_closed_query(query: str) -> RetrievalFallbackReason | None:
     """Return a named fallback when the query must not retrieve.
 
     Args:
@@ -138,7 +138,7 @@ def _fail_closed_query(query: str) -> RetrievalFallbackReason | None:
     return None
 
 
-def _query_texts(query: str, profile: ExpectedProfile | None) -> tuple[str, ...]:
+def query_texts(query: str, profile: ExpectedProfile | None) -> tuple[str, ...]:
     """Build unique embed texts: original plus at most three variants.
 
     Args:
@@ -151,18 +151,18 @@ def _query_texts(query: str, profile: ExpectedProfile | None) -> tuple[str, ...]
 
     ordered = [query]
     seen = {query.strip()}
-    for variant in _str_list_field(profile, "variants"):
+    for variant in str_list_field(profile, "variants"):
         key = variant.strip()
         if key == "" or key in seen:
             continue
         seen.add(key)
         ordered.append(variant)
-        if len(ordered) >= _EMBED_TEXT_CAP:
+        if len(ordered) >= EMBED_TEXT_CAP:
             break
     return tuple(ordered)
 
 
-def _principal_scope_hash(caller: CallerContext) -> str:
+def compute_principal_scope_hash(caller: CallerContext) -> str:
     """Hash caller identity for the ID-only cache key.
 
     Args:
@@ -178,7 +178,7 @@ def _principal_scope_hash(caller: CallerContext) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _closed_result(
+def closed_result(
     reason: RetrievalFallbackReason,
     *,
     started: float,
@@ -204,13 +204,13 @@ def _closed_result(
         ),
         fallback_reason=reason,
         deadline_exhausted=reason is RetrievalFallbackReason.TIMEOUT,
-        first_evidence_ms=_elapsed_ms(started),
+        first_evidence_ms=elapsed_ms(started),
         embedding_call_count=embedding_call_count,
         rerank_call_count=0,
     )
 
 
-def _elapsed_ms(started: float) -> float:
+def elapsed_ms(started: float) -> float:
     """Return milliseconds since ``started``.
 
     Args:

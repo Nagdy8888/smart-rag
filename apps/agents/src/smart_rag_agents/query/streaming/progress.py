@@ -136,5 +136,5 @@ def register_production_progress_nodes(
     for stage, node in staged:
         builder.add_node(  # pyright: ignore[reportUnknownMemberType]
             stage,
-            wrap_progress_node(stage, node),
+            wrap_progress_node(stage, cast(Callable[..., QueryGraphState], node)),
         )

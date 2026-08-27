@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import cast
+from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import psycopg
 
+from smart_rag_core.gateways.embedding import EmbeddingResponse
 from smart_rag_core.query_admission.exceptions import (
     QueryBudgetError,
     QueryCeilingError,
 )
-from smart_rag_core.query_admission.retrieve_budget import QueryRetrieveBudget
+from smart_rag_core.query_admission.retrieve_budget import (
+    QueryRetrieveBudget,
+    add_recorded_tokens,
+)
 from smart_rag_core.retrieval.context import RerankFn
 from smart_rag_core.retrieval.profiles import RERANK_MODEL_ID
 from smart_rag_core.retrieval.rerank import (
@@ -24,7 +29,49 @@ from smart_rag_core.retrieval.rerank import (
 from smart_rag_core.security.identity import CallerContext
 
 
-def _counted_retrieve_send(
+def tokens_from_retrieve_result(
+    result: object,
+) -> tuple[int | None, int | None, Decimal | None]:
+    """Read provider tokens from one retrieve-time send result.
+
+    Args:
+        result: An ``EmbeddingResponse`` or a rerank
+            ``(rankings, usage, fallback)`` triple.
+
+    Returns:
+        Prompt tokens, completion tokens, and optional USD. Unknown
+        shapes return ``(None, None, None)`` so durable consume keeps
+        the kind cap instead of recording 0.
+    """
+
+    if isinstance(result, EmbeddingResponse):
+        cost = result.estimated_cost_usd
+        recorded_cost = cost if cost > 0 else None
+        return result.prompt_tokens, 0, recorded_cost
+    if isinstance(result, tuple):
+        ranked_result = cast(tuple[object, ...], result)
+        if len(ranked_result) >= 2:
+            usage = ranked_result[1]
+            if isinstance(usage, RerankUsage):
+                return usage.input_tokens, usage.output_tokens, None
+    return None, None, None
+
+
+def _accumulate_retrieve_tokens(budget: QueryRetrieveBudget, result: object) -> None:
+    """Add provider tokens from ``result`` onto the retrieve ledger.
+
+    Args:
+        budget: Mutable retrieve ledger.
+        result: Send result from embedding or rerank.
+    """
+
+    prompt, completion, _cost = tokens_from_retrieve_result(result)
+    if prompt is None:
+        return
+    add_recorded_tokens(budget, prompt, completion or 0)
+
+
+def counted_retrieve_send(
     budget: QueryRetrieveBudget | None,
     *,
     usage_kind: str,
@@ -49,9 +96,11 @@ def _counted_retrieve_send(
             durable consume is rejected.
 
     Side Effects:
-        Debits ``budget`` remaining. When connection and reservation ids are
-        present, consumes via ``execute_counted_model_call`` so reserved USD
-        cannot be silently exceeded.
+        Debits ``budget`` remaining and records provider tokens on the
+        ledger. When connection and reservation ids are present, consumes
+        via ``execute_counted_model_call`` so reserved USD cannot be
+        silently exceeded. Token totals still accumulate when the durable
+        path is unbound so Ask Run Details can match provider traces.
     """
 
     if budget is None:
@@ -78,7 +127,7 @@ def _counted_retrieve_send(
             usage_kind=usage_kind,
         )
         result, consumed, _usage_id = execute_counted_model_call(
-            connection,
+            cast("psycopg.Connection[tuple[Any, ...]]", connection),
             caller=caller,
             run_id=run_id,
             reservation_id=reservation_id,
@@ -87,15 +136,19 @@ def _counted_retrieve_send(
             model_id=model_id,
             provider_attempt_id=str(uuid4()),
             send=send,
+            usage_from_result=tokens_from_retrieve_result,
         )
         budget.expected_version = consumed.optimistic_version
         debit_retrieve_budget(budget, usage_kind, remaining_usd=consumed.remaining_usd)
+        _accumulate_retrieve_tokens(budget, result)
         return result
     debit_retrieve_budget(budget, usage_kind)
-    return send()
+    result = send()
+    _accumulate_retrieve_tokens(budget, result)
+    return result
 
 
-def _counted_rerank(
+def counted_rerank(
     inner: RerankFn,
     budget: QueryRetrieveBudget | None,
     *,
@@ -156,7 +209,7 @@ def _counted_rerank(
 
             return inner(query, pool, remaining_deadline_seconds)
 
-        counted = _counted_retrieve_send(
+        counted = counted_retrieve_send(
             budget,
             usage_kind="rerank",
             model_id=RERANK_MODEL_ID,

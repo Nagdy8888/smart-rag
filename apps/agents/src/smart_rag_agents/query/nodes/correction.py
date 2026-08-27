@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from smart_rag_core.query_routing.branches import execute_branches
 from smart_rag_core.query_routing.correction import (
     apply_correction_to_plan,
@@ -21,6 +23,7 @@ from smart_rag_agents.query.nodes.shared import (
     runtime_from_state,
     skip_closed_nodes,
 )
+from smart_rag_agents.query.nodes.tokens import accumulated_tokens
 from smart_rag_agents.query.state import QueryGraphState
 
 
@@ -73,11 +76,14 @@ def apply_correction_node(
         plan = plan_from_state(state["retrieval_plan"])
         results = branch_results_from_state(state.get("branch_results"))
     except ValueError as exc:
-        return {
-            **state,
-            "status": "routing_rejected",
-            "detail": str(exc) or "invalid_correction_state",
-        }
+        return cast(
+            QueryGraphState,
+            {
+                **state,
+                "status": "routing_rejected",
+                "detail": str(exc) or "invalid_correction_state",
+            },
+        )
     already = bool(state.get("correction_applied"))
     try:
         decision = decide_correction(
@@ -89,11 +95,14 @@ def apply_correction_node(
             already_applied=already,
         )
     except QueryRoutingError as exc:
-        return {
-            **state,
-            "status": "routing_rejected",
-            "detail": exc.reason,
-        }
+        return cast(
+            QueryGraphState,
+            {
+                **state,
+                "status": "routing_rejected",
+                "detail": exc.reason,
+            },
+        )
     extra: list[BranchResult] = []
     updated = plan
     query_budget = retrieve_budget(state, context)
@@ -116,15 +125,18 @@ def apply_correction_node(
                     )
                 )
             except QueryRoutingError as exc:
-                return {
-                    **state,
-                    "status": "insufficient_evidence",
-                    "detail": exc.reason,
-                    "correction": decision.model_dump(mode="json"),
-                    "remaining_corrections": decision.remaining_corrections,
-                    "correction_applied": True,
-                    "remaining_model_calls": query_budget.remaining_model_calls,
-                }
+                return cast(
+                    QueryGraphState,
+                    {
+                        **state,
+                        "status": "insufficient_evidence",
+                        "detail": exc.reason,
+                        "correction": decision.model_dump(mode="json"),
+                        "remaining_corrections": decision.remaining_corrections,
+                        "correction_applied": True,
+                        "remaining_model_calls": query_budget.remaining_model_calls,
+                    },
+                )
     combined = (*results, *extra)
     terminal = "correction_applied"
     detail = "one correction applied; fusion and answering follow"
@@ -139,20 +151,28 @@ def apply_correction_node(
     if whole_refused:
         terminal = "insufficient_evidence"
         detail = "section_coverage_ratio below 1.0; scoped refusal"
-    return {
-        **state,
-        "status": terminal,
-        "detail": detail,
-        "retrieval_plan": updated.model_dump(mode="json"),
-        "branch_results": [item.model_dump(mode="json") for item in combined],
-        "correction": decision.model_dump(mode="json"),
-        "corrected_route": updated.corrected_route.value
-        if updated.corrected_route is not None
-        else None,
-        "effective_route": updated.effective_route.value,
-        "remaining_corrections": decision.remaining_corrections,
-        "correction_applied": decision.applied or already,
-        "keyword_extract_count": sum(item.keyword_extract_count for item in combined),
-        "catalog_llm_call_count": 0,
-        "remaining_model_calls": query_budget.remaining_model_calls,
-    }
+    return cast(
+        QueryGraphState,
+        {
+            **state,
+            "status": terminal,
+            "detail": detail,
+            "retrieval_plan": updated.model_dump(mode="json"),
+            "branch_results": [item.model_dump(mode="json") for item in combined],
+            "correction": decision.model_dump(mode="json"),
+            "corrected_route": updated.corrected_route.value
+            if updated.corrected_route is not None
+            else None,
+            "effective_route": updated.effective_route.value,
+            "remaining_corrections": decision.remaining_corrections,
+            "correction_applied": decision.applied or already,
+            "keyword_extract_count": sum(
+                item.keyword_extract_count for item in combined
+            ),
+            "catalog_llm_call_count": 0,
+            "remaining_model_calls": query_budget.remaining_model_calls,
+            **accumulated_tokens(
+                state, query_budget.prompt_tokens, query_budget.completion_tokens
+            ),
+        },
+    )

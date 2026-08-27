@@ -353,23 +353,25 @@ def probe_query_checkpoint_runtime(dsn: str, *, timeout_seconds: int = 1) -> Non
     from smart_rag_core.settings.postgres_dsn import require_session_postgres_dsn
 
     from smart_rag_agents.ingestion.checkpointer import (
-        _configure_checkpointer_connection,
+        CheckpointerConnection,
+        configure_checkpointer_connection,
     )
 
     require_session_postgres_dsn(dsn, setting_name="LANGGRAPH_CHECKPOINT_URL")
-    with psycopg.connect(
-        dsn,
-        autocommit=True,
-        connect_timeout=max(1, timeout_seconds),
-        prepare_threshold=0,
-        row_factory=dict_row,
+    with cast(
+        CheckpointerConnection,
+        psycopg.connect(
+            dsn,
+            autocommit=True,
+            connect_timeout=max(1, timeout_seconds),
+            prepare_threshold=0,
+        ),
     ) as connection:
-        _configure_checkpointer_connection(connection)
-        saver = PostgresSaver(connection)
-        store = PostgresStore(conn=connection)
+        connection.row_factory = dict_row
+        configure_checkpointer_connection(connection)
+        PostgresSaver(connection)
+        PostgresStore(conn=connection)
         connection.execute("SELECT 1")
-        if saver is None or store is None:
-            raise RuntimeError("langgraph runtime probe failed")
 
 
 def _compact_checkpoint(checkpoint: Checkpoint) -> Checkpoint:

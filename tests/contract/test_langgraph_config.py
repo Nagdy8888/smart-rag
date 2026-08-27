@@ -170,11 +170,7 @@ def test_query_studio_graph_runs_from_user_query_without_fastapi_admit() -> None
     assert "allow-listed" in bad_family["detail"]
 
     from_messages = studio_graph.invoke(  # pyright: ignore[reportUnknownMemberType]
-        {
-            "messages": [
-                HumanMessage(content="What is the status of INV-SR-1001?")
-            ]
-        }
+        {"messages": [HumanMessage(content="What is the status of INV-SR-1001?")]}
     )
     assert from_messages["user_query"] == "What is the status of INV-SR-1001?"
     assert isinstance(from_messages["messages"][0], HumanMessage)

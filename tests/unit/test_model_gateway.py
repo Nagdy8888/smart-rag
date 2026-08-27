@@ -108,9 +108,7 @@ def test_request_response_models_are_facade_aliases() -> None:
 def test_request_models_keep_frozen_schema_and_drop_unknown_fields() -> None:
     """Request models stay frozen and do not persist undeclared properties."""
 
-    request = ModelRequest.model_validate(
-        {"prompt": "foundation probe", "tools": []}
-    )
+    request = ModelRequest.model_validate({"prompt": "foundation probe", "tools": []})
     assert request.model_config.get("frozen") is True
     dumped = request.model_dump()
     assert dumped["operation"] == "foundation_probe"

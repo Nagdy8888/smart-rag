@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from smart_rag_core.query_admission.ceilings import assert_call_available
 from smart_rag_core.query_admission.exceptions import QueryCeilingError
+from smart_rag_core.query_answer.citations import maybe_persist_verified_citations
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.models import (
@@ -18,6 +21,7 @@ from smart_rag_core.query_routing.constants import (
     LIMITATION_VERIFIER_OMITTED_LINKS,
 )
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
+from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.query_routing.serde import plan_from_state
 
 from smart_rag_agents.query.deps import QueryGraphDeps
@@ -198,15 +202,26 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         in {"verified", "verified_partial", "refused", "insufficient_evidence"}
         else "verified_partial",
     )
-    return {
-        **state,
-        "status": terminal,
-        "detail": detail,
-        "answer": checked.model_dump(mode="json"),
-        "verification": result.model_dump(mode="json"),
-        "remaining_model_calls": remaining,
-        "verifier_call_count": verifier_calls,
-        "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
-        "keyword_extract_count": 0,
-        **accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
-    }
+    context = runtime_from_state(state)
+    maybe_persist_verified_citations(
+        deps.connection,
+        caller=caller_from_runtime(context) if context is not None else None,
+        run_id=context.run_id if context is not None else None,
+        fusion=fusion,
+        answer=checked,
+    )
+    return cast(
+        QueryGraphState,
+        {
+            **state,
+            "status": terminal,
+            "detail": detail,
+            "answer": checked.model_dump(mode="json"),
+            "verification": result.model_dump(mode="json"),
+            "remaining_model_calls": remaining,
+            "verifier_call_count": verifier_calls,
+            "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
+            "keyword_extract_count": 0,
+            **accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
+        },
+    )

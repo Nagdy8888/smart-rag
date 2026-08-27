@@ -10,7 +10,7 @@ from uuid import UUID
 import psycopg
 
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
-from smart_rag_core.query_admission.repository.errors import _raise_admission
+from smart_rag_core.query_admission.repository.errors import raise_admission
 from smart_rag_core.security.identity import CallerContext
 
 
@@ -81,7 +81,7 @@ def record_query_llm_usage(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("usage_returned_no_row")
     return UUID(str(row[0]))
@@ -146,7 +146,7 @@ def record_run_restricted_evidence(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("restricted_evidence_returned_no_row")
     return UUID(str(row[0]))

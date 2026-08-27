@@ -9,7 +9,7 @@ from smart_rag_api.services.sse.fixture_executor import (
     FixtureQueryRunExecutor as OwnerFixture,
 )
 
-from tests.support.query_sse import _runtime
+from tests.support.query_sse import runtime
 
 
 def test_fixture_executor_is_reexported_from_the_barrel() -> None:
@@ -30,7 +30,7 @@ def test_fixture_start_count_and_event_order() -> None:
 
         events: list[str] = []
         async for event_type, _payload in executor.execute(
-            context=_runtime(),
+            context=runtime(),
             message="unused",
             cancel_event=asyncio.Event(),
         ):
@@ -53,7 +53,7 @@ def test_fixture_hold_cancels_without_terminal() -> None:
 
         events: list[str] = []
         async for event_type, _payload in executor.execute(
-            context=_runtime(),
+            context=runtime(),
             message="unused",
             cancel_event=cancel,
         ):
@@ -74,7 +74,7 @@ def test_fixture_optional_terminal_can_be_omitted() -> None:
 
         events: list[str] = []
         async for event_type, _payload in executor.execute(
-            context=_runtime(),
+            context=runtime(),
             message="unused",
             cancel_event=asyncio.Event(),
         ):

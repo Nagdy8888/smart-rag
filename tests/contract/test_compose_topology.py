@@ -125,7 +125,8 @@ def _env_file_paths(service: dict[str, object]) -> list[str]:
             paths.append(item)
             continue
         if isinstance(item, dict):
-            path = item.get("path")
+            mapped = cast(dict[str, object], item)
+            path = mapped.get("path")
             if isinstance(path, str) and path:
                 paths.append(path)
             continue

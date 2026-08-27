@@ -28,6 +28,8 @@ from smart_rag_core.retrieval.lightrag_callbacks import CountedLightRagCallbacks
 from smart_rag_core.retrieval.lightrag_indexer import LightRagGraphIndexer
 from smart_rag_core.schema.enums import JobErrorCategory
 
+from tests.unit.typed_attrs import set_attr, typed_attr
+
 
 def _isolate_service() -> tuple[GraphIndexService, MagicMock]:
     """Build an index service whose live writer can be asserted.
@@ -168,15 +170,20 @@ def test_bind_workspace_retargets_vendor_storage() -> None:
 
     adapter = LightRagRuntimeAdapter.__new__(LightRagRuntimeAdapter)
     adapter.workspace = "company_default"
-    adapter.rag = SimpleNamespace(
-        workspace="company_default",
-        full_docs=SimpleNamespace(workspace="company_default"),
-        text_chunks=SimpleNamespace(workspace="company_default"),
+    set_attr(
+        adapter,
+        "rag",
+        SimpleNamespace(
+            workspace="company_default",
+            full_docs=SimpleNamespace(workspace="company_default"),
+            text_chunks=SimpleNamespace(workspace="company_default"),
+        ),
     )
     adapter.bind_workspace("company_default__rebuild")
     assert adapter.workspace == "company_default__rebuild"
-    assert adapter.rag.workspace == "company_default__rebuild"
-    assert adapter.rag.full_docs.workspace == "company_default__rebuild"
+    rag = typed_attr(adapter, "rag")
+    assert rag.workspace == "company_default__rebuild"
+    assert rag.full_docs.workspace == "company_default__rebuild"
 
 
 def test_ensure_pipeline_status_uses_bound_workspace(
@@ -217,26 +224,44 @@ def test_isolate_index_initializes_pipeline_before_insert(
     adapter = MagicMock()
     adapter.ensure_pipeline_status = AsyncMock()
     adapter.callbacks.counts = SimpleNamespace(embed=0, entity_extract=0, other=0)
-    service._indexer.adapter = adapter
+    typed_attr(service, "_indexer").adapter = adapter
     service._revalidate_index_eligibility = MagicMock()  # type: ignore[method-assign]
     service._assert_version_still_pending = MagicMock()  # type: ignore[method-assign]
-    service._mapper.set_map_workspace_key = MagicMock()
-    service._mapper.map_after_vendor_success = AsyncMock(
-        return_value=SimpleNamespace(
-            maps_verified=False,
-            reason="coverage_below_threshold",
-            pending_switch=False,
-            workspace_state="building",
-        )
+    set_attr(typed_attr(service, "_mapper"), "set_map_workspace_key", MagicMock())
+    set_attr(
+        typed_attr(service, "_mapper"),
+        "map_after_vendor_success",
+        AsyncMock(
+            return_value=SimpleNamespace(
+                maps_verified=False,
+                reason="coverage_below_threshold",
+                pending_switch=False,
+                workspace_state="building",
+            )
+        ),
     )
     source = SimpleNamespace(
         enveloped_text=lambda: "passage",
         source_token="g.txt",  # noqa: S106
     )
     manifest = SimpleNamespace(sources=(source,), source_ids=("v:c",))
+
+    def _load_manifest(*_args: object, **_kwargs: object) -> object:
+        """Return the fixture passage manifest.
+
+        Args:
+            *_args: Unused loader args.
+            **_kwargs: Unused loader kwargs.
+
+        Returns:
+            Passage manifest fixture.
+        """
+
+        return manifest
+
     monkeypatch.setattr(
         "smart_rag_core.jobs.graph_index_service.load_version_passage_manifest",
-        lambda *_args, **_kwargs: manifest,
+        _load_manifest,
     )
     insert = AsyncMock(
         return_value=GraphIndexEnqueueResult(
@@ -251,9 +276,9 @@ def test_isolate_index_initializes_pipeline_before_insert(
     )
     job = _index_job(isolate=True)
     asyncio.run(
-        service._index(
+        typed_attr(service, "_index")(
             job=job,
-            payload=dict(job["payload_ref"]),
+            payload=cast(dict[str, object], job["payload_ref"]),
             job_id=uuid4(),
             job_lease_token=str(uuid4()),
             reservation_id=uuid4(),
@@ -270,8 +295,10 @@ def test_isolate_pipeline_uninitialized_does_not_quarantine_live() -> None:
     from smart_rag_core.retrieval.lightrag_indexer import GraphIndexerError
 
     service, writer = _isolate_service()
-    service._index = AsyncMock(  # type: ignore[method-assign]
-        side_effect=GraphIndexerError("pipeline_status_uninitialized")
+    set_attr(
+        service,
+        "_index",
+        AsyncMock(side_effect=GraphIndexerError("pipeline_status_uninitialized")),
     )
     outcome = asyncio.run(
         service.process_claimed_job(

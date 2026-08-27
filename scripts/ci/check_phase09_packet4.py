@@ -30,6 +30,7 @@ from smart_rag_core.release.constants import (
 from smart_rag_core.release.io import (
     as_json_object,
     dump_canonical_json,
+    json_int,
 )
 from smart_rag_core.release.packet3 import (
     EXPECTED_EXACT_CODE_DOCUMENT_ID,
@@ -1255,17 +1256,13 @@ def _target_rows(
             continue
         if spec.target_id in {"QT-LAT-010"}:
             passed = stream_map.get("qt_lat_010_passed") is True
-            sampled = (
-                isinstance(first_n, int)
-                and not isinstance(first_n, bool)
-                and first_n > 0
-            )
+            sampled = json_int(first_n, default=0) > 0
             rows.append(
                 classify_target(
                     spec,
                     measured=first_p95,
                     mock_model_mode=mock_model_mode,
-                    sample_size=first_n if sampled else 0,
+                    sample_size=json_int(first_n, default=0) if sampled else 0,
                     detail=(
                         "mock Composite first token_delta; not live OpenAI"
                         if sampled
@@ -1278,17 +1275,13 @@ def _target_rows(
             continue
         if spec.target_id == "QT-LAT-011":
             passed = stream_map.get("qt_lat_011_passed") is True
-            sampled = (
-                isinstance(completion_n, int)
-                and not isinstance(completion_n, bool)
-                and completion_n > 0
-            )
+            sampled = json_int(completion_n, default=0) > 0
             rows.append(
                 classify_target(
                     spec,
                     measured=completion_p95,
                     mock_model_mode=mock_model_mode,
-                    sample_size=completion_n if sampled else 0,
+                    sample_size=json_int(completion_n, default=0) if sampled else 0,
                     detail=(
                         "mock Composite completion; not live OpenAI"
                         if sampled

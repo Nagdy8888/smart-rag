@@ -45,7 +45,17 @@ class EmbeddingRequest(BaseModel):
 
 
 class EmbeddingResponse(BaseModel):
-    """Provenance-marked embedding batch response."""
+    """Provenance-marked embedding batch response.
+
+    Attributes:
+        mode: Adapter mode.
+        vectors: One vector per input, ordered by request index.
+        provider_request_id: Provider or mock request id.
+        fixture_provenance: Fixture URI or OpenAI pin URI.
+        estimated_cost_usd: List-price estimate from prompt tokens.
+        prompt_tokens: Provider-reported input tokens. Mock adapters
+            report 0 because they never call a tokenizer.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -54,6 +64,7 @@ class EmbeddingResponse(BaseModel):
     provider_request_id: str
     fixture_provenance: str
     estimated_cost_usd: Decimal = Decimal("0")
+    prompt_tokens: int = Field(default=0, ge=0)
 
 
 class EmbeddingAdapter(Protocol):
@@ -221,6 +232,7 @@ class OpenAIEmbeddingAdapter:
                 f"openai://embeddings/{EMBEDDING_MODEL}/{EMBEDDING_DIMENSIONS}"
             ),
             estimated_cost_usd=cost,
+            prompt_tokens=prompt_tokens,
         )
 
 

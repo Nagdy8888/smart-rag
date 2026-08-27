@@ -313,8 +313,6 @@ def get_conversation_title_source(
         _raise_conversation(exc)
     if row is None:
         raise QueryAdmissionError("not_found")
-    if not isinstance(row, dict):
-        raise QueryAdmissionError("not_found")
     mapped = cast(dict[str, object], row)
     raw_title = mapped.get("current_title")
     user_excerpt = mapped.get("user_excerpt")

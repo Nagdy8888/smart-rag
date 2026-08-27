@@ -46,7 +46,7 @@ def run_coro_blocking(coro: object) -> object:
 
     if not asyncio.iscoroutine(coro):
         return coro
-    typed = cast(Coroutine[object, object, T], coro)
+    typed = cast(Coroutine[object, object, object], coro)
     try:
         asyncio.get_running_loop()
     except RuntimeError:

@@ -21,6 +21,7 @@ from tests.support.query_postgres import (
     insert_user_profile,
     retire_committed_query_run,
 )
+from tests.unit.typed_attrs import typed_attr
 
 
 @pytest.fixture
@@ -39,7 +40,7 @@ def test_event_store_transaction_applies_lock_timeout(db_url: str) -> None:
 
     store = PostgresRunEventStore(db_url)
     try:
-        with store._transaction() as connection:
+        with typed_attr(store, "_transaction")() as connection:
             shown = connection.execute("SHOW lock_timeout").fetchone()
             assert shown is not None
             assert str(shown[0]) in {EVENT_STORE_LOCK_TIMEOUT, "00:00:02"}

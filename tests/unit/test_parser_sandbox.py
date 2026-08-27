@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import io
 import zipfile
+from collections.abc import Sequence
+from typing import cast
 
 import pytest
 from smart_rag_core.ingestion.parser.archive import reject_archive_bomb
@@ -21,6 +23,7 @@ from smart_rag_core.ingestion.parser.service import ParserService
 from smart_rag_core.ingestion.parser.types import ParseDisposition
 
 from tests.fixtures.parser import build_archive_bomb
+from tests.unit.typed_attrs import typed_attr
 
 
 def test_oversize_input_fails_without_partial_elements() -> None:
@@ -44,9 +47,21 @@ def test_default_launcher_requires_docker_when_cli_missing(
 ) -> None:
     """Default launcher must not silently parse in-process when Docker is absent."""
 
+    def _missing_docker(_name: str) -> None:
+        """Pretend Docker is absent.
+
+        Args:
+            _name: Executable name.
+
+        Returns:
+            Always ``None``.
+        """
+
+        return None
+
     monkeypatch.setattr(
         "smart_rag_core.ingestion.parser.sandbox.launcher.shutil.which",
-        lambda _name: None,
+        _missing_docker,
     )
     launcher = ParserSandboxLauncher()
     assert launcher.config.use_docker is True
@@ -69,12 +84,12 @@ def test_parser_service_inprocess_only_when_test_env_flag(
     monkeypatch.delenv("ALLOW_INPROCESS_PARSER", raising=False)
     monkeypatch.setenv("APP_ENV", "local")
     docker_service = ParserService()
-    assert docker_service._launcher.config.use_docker is True
+    assert typed_attr(docker_service, "_launcher").config.use_docker is True
 
     monkeypatch.setenv("ALLOW_INPROCESS_PARSER", "true")
     monkeypatch.setenv("APP_ENV", "test")
     test_service = ParserService()
-    assert test_service._launcher.config.use_docker is False
+    assert typed_attr(test_service, "_launcher").config.use_docker is False
 
 
 def test_archive_parent_path_is_rejected() -> None:
@@ -150,7 +165,7 @@ def test_parser_sandbox_kill_timeout_returns_failed(
 
         if not isinstance(cmd, (list, tuple)):
             raise TypeError("expected docker argv")
-        argv = tuple(str(part) for part in cmd)
+        argv = tuple(str(part) for part in cast(Sequence[object], cmd))
         commands.append(argv)
         if len(argv) > 1 and argv[1] == "run":
             raise subprocess.TimeoutExpired(cmd="docker", timeout=1)
@@ -228,7 +243,7 @@ def test_docker_run_decodes_sandbox_stdio_as_utf8(
 
         if not isinstance(cmd, (list, tuple)):
             raise TypeError("expected docker argv")
-        argv = tuple(str(part) for part in cmd)
+        argv = tuple(str(part) for part in cast(Sequence[object], cmd))
         if len(argv) > 1 and argv[1] == "run":
             captured.update(kwargs)
         return subprocess.CompletedProcess(
@@ -239,9 +254,22 @@ def test_docker_run_decodes_sandbox_stdio_as_utf8(
         )
 
     monkeypatch.setattr(subprocess, "run", _run)
+
+    def _docker_which(_name: str) -> str:
+        """Return a fake Docker path.
+
+        Args:
+            _name: Executable name.
+
+        Returns:
+            Fake absolute Docker path.
+        """
+
+        return "/usr/bin/docker"
+
     monkeypatch.setattr(
         "smart_rag_core.ingestion.parser.sandbox.launcher.shutil.which",
-        lambda _name: "/usr/bin/docker",
+        _docker_which,
     )
     launcher = ParserSandboxLauncher(
         config=SandboxLaunchConfig(

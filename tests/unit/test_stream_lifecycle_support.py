@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from smart_rag_api.services.sse.stream_lifecycle import StreamLifecycleMixin
 
+from tests.unit.typed_attrs import typed_attr
+
 
 class _LifecycleHost(StreamLifecycleMixin):
     """Minimal host for mixin tests."""
@@ -24,7 +26,9 @@ def test_set_termination_preserves_usage_fields() -> None:
     host = _LifecycleHost()
     host.termination_summary["input_tokens"] = 3
     host.termination_summary["output_tokens"] = 5
-    host._set_termination(reason="completed", terminal_event_type="completed")
+    typed_attr(host, "_set_termination")(
+        reason="completed", terminal_event_type="completed"
+    )
     assert host.termination_summary["termination_reason"] == "completed"
     assert host.termination_summary["input_tokens"] == 3
     assert host.termination_summary["output_tokens"] == 5
@@ -34,8 +38,10 @@ def test_record_stream_usage_writes_totals_and_cost() -> None:
     """Token accounting fills total tokens and a non-negative USD estimate."""
 
     host = _LifecycleHost()
-    host._record_stream_usage(input_tokens=10, output_tokens=4)
+    typed_attr(host, "_record_stream_usage")(input_tokens=10, output_tokens=4)
     assert host.termination_summary["input_tokens"] == 10
     assert host.termination_summary["output_tokens"] == 4
     assert host.termination_summary["total_tokens"] == 14
-    assert float(host.termination_summary["estimated_cost_usd"]) >= 0.0
+    cost = host.termination_summary["estimated_cost_usd"]
+    assert isinstance(cost, (int, float))
+    assert float(cost) >= 0.0

@@ -42,7 +42,7 @@ from smart_rag_core.observability.query_run_trace import emit_online_eval_root
 from smart_rag_core.settings import AgentSettings
 
 from tests.support.online_eval import (
-    _output,
+    eval_output,
 )
 from tests.unit.typed_attrs import module_attr
 
@@ -199,7 +199,7 @@ def test_online_batch_does_not_create_dataset_or_experiment() -> None:
             """
 
             calls.append(str(inputs["case_id"]))
-            return _output(case_id=str(inputs["case_id"])).model_dump(mode="json")
+            return eval_output(case_id=str(inputs["case_id"])).model_dump(mode="json")
 
     emitted: list[str] = []
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from smart_rag_core.query_routing.branches import execute_branches
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
 from smart_rag_core.query_routing.serde import plan_from_state, preparation_from_state
@@ -13,6 +15,7 @@ from smart_rag_agents.query.nodes.shared import (
     runtime_from_state,
     skip_closed_nodes,
 )
+from smart_rag_agents.query.nodes.tokens import accumulated_tokens
 from smart_rag_agents.query.state import QueryGraphState
 
 
@@ -26,8 +29,9 @@ def company_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     State outputs:
         ``branch_results``, keyword/catalog counters (must stay 0),
         ``remaining_model_calls`` after retrieve-time embed/rerank/LightRAG,
-        and ``authorized_runtime`` with the post-retrieve reservation
-        version.
+        accumulated ``prompt_tokens`` / ``completion_tokens`` from those
+        retrieve calls, and ``authorized_runtime`` with the post-retrieve
+        reservation version.
 
     Persistence writes:
         None besides retriever-side RPCs owned by Hybrid/graph/table.
@@ -83,25 +87,34 @@ def company_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             cancel_check=deps.cancel_check,
         )
     except QueryRoutingError as exc:
-        return {
-            **state,
-            "status": "routing_rejected",
-            "detail": exc.reason,
-            "keyword_extract_count": 0,
-            "catalog_llm_call_count": 0,
-        }
+        return cast(
+            QueryGraphState,
+            {
+                **state,
+                "status": "routing_rejected",
+                "detail": exc.reason,
+                "keyword_extract_count": 0,
+                "catalog_llm_call_count": 0,
+            },
+        )
     extract_total = sum(item.keyword_extract_count for item in results)
     authorized = runtime_after_retrieve_budget(context, query_budget)
-    return {
-        **state,
-        "status": "branches_executed",
-        "authorized_runtime": authorized.model_dump(mode="json"),
-        "branch_results": [item.model_dump(mode="json") for item in results],
-        "keyword_extract_count": extract_total,
-        "catalog_llm_call_count": 0,
-        "remaining_model_calls": query_budget.remaining_model_calls,
-        "detail": "branches executed; fusion and answering are not implemented",
-    }
+    return cast(
+        QueryGraphState,
+        {
+            **state,
+            "status": "branches_executed",
+            "authorized_runtime": authorized.model_dump(mode="json"),
+            "branch_results": [item.model_dump(mode="json") for item in results],
+            "keyword_extract_count": extract_total,
+            "catalog_llm_call_count": 0,
+            "remaining_model_calls": query_budget.remaining_model_calls,
+            "detail": "branches executed; fusion and answering are not implemented",
+            **accumulated_tokens(
+                state, query_budget.prompt_tokens, query_budget.completion_tokens
+            ),
+        },
+    )
 
 
 execute_branches_node = company_scope_node

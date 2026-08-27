@@ -254,8 +254,14 @@
         "type": "object"
       },
       "ConversationResponse": {
-        "description": "Conversation JSON. Title is escaped untrusted text.",
+        "description": "Conversation JSON. Title is escaped untrusted text.\n\n``prompt_tokens`` and ``completion_tokens`` are provider usage for this\nHTTP response. They are meaningful on ``POST /conversations/{id}/title``\n(0 when the model was skipped or failed). List, get, and create return 0.",
         "properties": {
+          "completion_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
           "conversation_id": {
             "format": "uuid",
             "title": "Conversation Id",
@@ -277,6 +283,12 @@
             "format": "uuid",
             "title": "Creator User Id",
             "type": "string"
+          },
+          "prompt_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Prompt Tokens",
+            "type": "integer"
           },
           "title": {
             "anyOf": [
@@ -2134,6 +2146,54 @@
         "title": "OffboardResponse",
         "type": "object"
       },
+      "PendingInvitationResponse": {
+        "description": "One unaccepted invitation. The token hash is never included.",
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "invitation_id": {
+            "format": "uuid",
+            "title": "Invitation Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "upload_enabled": {
+            "title": "Upload Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "invitation_id",
+          "email",
+          "role",
+          "upload_enabled",
+          "expires_at"
+        ],
+        "title": "PendingInvitationResponse",
+        "type": "object"
+      },
       "QueueAgeDiagnostics": {
         "description": "Oldest pending ingestion job age for this version.",
         "properties": {
@@ -3105,6 +3165,98 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WorkspaceDirectoryResponse": {
+        "description": "Bounded owner/admin directory. Max 200 members and 200 invitations.",
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceMemberResponse"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "pending_invitations": {
+            "items": {
+              "$ref": "#/components/schemas/PendingInvitationResponse"
+            },
+            "title": "Pending Invitations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "members",
+          "pending_invitations"
+        ],
+        "title": "WorkspaceDirectoryResponse",
+        "type": "object"
+      },
+      "WorkspaceMemberResponse": {
+        "description": "One workspace profile for owner/admin Team listing.",
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "disabled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled At"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "upload_enabled": {
+            "title": "Upload Enabled",
+            "type": "boolean"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "email",
+          "display_name",
+          "role",
+          "upload_enabled",
+          "disabled_at"
+        ],
+        "title": "WorkspaceMemberResponse",
         "type": "object"
       }
     }
@@ -4972,6 +5124,136 @@
         ]
       }
     },
+    "/admin/users": {
+      "get": {
+        "description": "List workspace members and unaccepted invitations. Owner/admin only.\n\nArgs:\n    request: Active request.\n    caller: Authenticated caller.\n    service: Injected auth/team service.\n\nReturns:\n    Bounded directory. Invitation tokens are never included.\n\nRaises:\n    HTTPException: 403 for members/viewers.",
+        "operationId": "list_workspace_users_route_admin_users_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceDirectoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Workspace Users Route",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/admin/users/{user_id}/offboard": {
       "post": {
         "description": "Disable one subject and revoke sessions. Owner/admin only.\n\nArgs:\n    request: Active request with assurance level.\n    user_id: Subject user id.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Completed offboarding identifiers.",
@@ -6091,7 +6373,7 @@
     },
     "/conversations/{conversation_id}/title": {
       "post": {
-        "description": "Fill the session title with an LLM summary when it is still a fallback.\n\nCreator-only. Missing, deleted, and foreign conversations return the same\ngeneric 404 as ``GET /conversations/{id}``. When the stored title already\ndiffers from the first-prompt fallback, the existing title is returned\nwithout a model call. Model failures keep the fallback title.\n\nArgs:\n    request: Active request for rate limits.\n    conversation_id: Conversation the caller must own.\n    caller: Authenticated caller.\n    service: Injected conversation service.\n    gateway: Process model gateway.\n\nReturns:\n    Conversation with the persisted title.\n\nRaises:\n    HTTPException: 404 for missing, tombstoned, or foreign conversations.",
+        "description": "Fill the session title with an LLM summary when it is still a fallback.\n\nCreator-only. Missing, deleted, and foreign conversations return the same\ngeneric 404 as ``GET /conversations/{id}``. When the stored title already\ndiffers from the first-prompt fallback, the existing title is returned\nwithout a model call. Model failures keep the fallback title.\n\nArgs:\n    request: Active request for rate limits.\n    conversation_id: Conversation the caller must own.\n    caller: Authenticated caller.\n    service: Injected conversation service.\n    gateway: Process model gateway.\n\nReturns:\n    Conversation JSON. ``prompt_tokens`` and ``completion_tokens`` are\n    this title call's provider usage, or 0 when the model was skipped\n    or failed.\n\nRaises:\n    HTTPException: 404 for missing, tombstoned, or foreign conversations.",
         "operationId": "generate_conversation_title_route_conversations__conversation_id__title_post",
         "parameters": [
           {

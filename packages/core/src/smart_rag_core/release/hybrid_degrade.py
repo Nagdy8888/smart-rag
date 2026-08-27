@@ -119,8 +119,7 @@ def run_hybrid_degrade(
             supabase_dsn=supabase_url,
         )
         result = retriever.retrieve(query=query, caller=caller)
-    reason = result.fallback_reason
-    reason_value = reason.value if reason is not None else None
+    reason_value = result.fallback_reason.value
     expected = RetrievalFallbackReason.BM25_UNAVAILABLE.value
     passed = (not parade_up) and reason_value == expected
     return {

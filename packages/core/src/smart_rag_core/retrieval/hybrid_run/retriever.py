@@ -31,45 +31,45 @@ from smart_rag_core.retrieval.context_loader import (
 )
 from smart_rag_core.retrieval.hybrid import run_channels_parallel
 from smart_rag_core.retrieval.hybrid_run.assemble import (
-    _call_assemble_hybrid,
-    _closed_result,
-    _elapsed_ms,
-    _fail_closed_query,
-    _hybrid_assemble_kwargs,
-    _principal_scope_hash,
-    _query_texts,
+    call_assemble_hybrid,
+    closed_result,
+    compute_principal_scope_hash,
+    elapsed_ms,
+    fail_closed_query,
+    hybrid_assemble_kwargs,
+    query_texts,
 )
 from smart_rag_core.retrieval.hybrid_run.budget import (
-    _counted_rerank,
-    _counted_retrieve_send,
+    counted_rerank,
+    counted_retrieve_send,
 )
 from smart_rag_core.retrieval.hybrid_run.channels import (
-    _compose_fallback,
-    _flatten_channel_candidates,
-    _identity_rerank,
-    _restrict_channel_candidates,
-    _unpack_bm25,
-    _unpack_dense,
-    _unpack_term,
+    compose_fallback,
+    flatten_channel_candidates,
+    identity_rerank,
+    restrict_channel_candidates,
+    unpack_bm25,
+    unpack_dense,
+    unpack_term,
 )
 from smart_rag_core.retrieval.hybrid_run.evidence import (
-    _evidence_units,
-    _evidence_units_from_context,
+    evidence_units,
+    evidence_units_from_context,
 )
 from smart_rag_core.retrieval.hybrid_run.jobs import HybridChannelJobsMixin
 from smart_rag_core.retrieval.hybrid_run.profile_fields import (
-    _bool_field,
-    _query_type,
-    _str_field,
-    _str_list_field,
-    _target_date,
-    _temporal_intent,
+    bool_field,
+    query_type_field,
+    str_field,
+    str_list_field,
+    target_date_field,
+    temporal_intent_field,
 )
 from smart_rag_core.retrieval.hybrid_run.types import (
-    _FUSION_LIST_CAP,
+    FUSION_LIST_CAP,
+    ChannelJob,
     EvidenceUnit,
     HybridRunResult,
-    _ChannelJob,
 )
 from smart_rag_core.retrieval.profiles import (
     FINAL_EVIDENCE_MAX,
@@ -116,7 +116,7 @@ class HybridRetriever(HybridChannelJobsMixin):
         term: object | None = None,
         load_context: ContextFn | None = None,
         rerank: RerankFn | None = None,
-        channel_jobs: dict[str, _ChannelJob] | None = None,
+        channel_jobs: dict[str, ChannelJob] | None = None,
         supabase_dsn: str | None = None,
     ) -> None:
         """Bind gateways, optional retrievers, and test doubles.
@@ -159,7 +159,7 @@ class HybridRetriever(HybridChannelJobsMixin):
         principal_scope_hash: str | None = None,
         visibility_generation: int = 1,
         deadline_seconds: float | None = None,
-        channel_jobs: dict[str, _ChannelJob] | None = None,
+        channel_jobs: dict[str, ChannelJob] | None = None,
         restrict_version_id: UUID | None = None,
     ) -> HybridRunResult:
         """Run one Hybrid retrieve and return ranked IDs plus locators.
@@ -191,44 +191,44 @@ class HybridRetriever(HybridChannelJobsMixin):
         slice_seconds = (
             RETRIEVAL_SLICE_SECONDS if deadline_seconds is None else deadline_seconds
         )
-        scope_hash = principal_scope_hash or _principal_scope_hash(caller)
+        scope_hash = principal_scope_hash or compute_principal_scope_hash(caller)
         if not caller.is_active():
-            return _closed_result(
+            return closed_result(
                 RetrievalFallbackReason.AUTH_CONTEXT_INVALID,
                 started=started,
             )
-        query_check = _fail_closed_query(query)
+        query_check = fail_closed_query(query)
         if query_check is not None:
-            return _closed_result(query_check, started=started)
+            return closed_result(query_check, started=started)
 
-        texts = _query_texts(query, profile)
+        texts = query_texts(query, profile)
         embed_response, embed_error = self._embed_query_texts(
             texts, budget=self.query_budget
         )
         if embed_error is not None or embed_response is None:
-            return _closed_result(
+            return closed_result(
                 embed_error or RetrievalFallbackReason.DENSE_UNAVAILABLE,
                 started=started,
                 embedding_call_count=1,
             )
         vectors = embed_response.vectors
-        jobs: dict[str, _ChannelJob] | None = (
+        jobs: dict[str, ChannelJob] | None = (
             channel_jobs if channel_jobs is not None else self._channel_jobs
         )
         if jobs is None:
             jobs = self._build_channel_jobs(
                 caller=caller,
                 query=query,
-                texts=texts[:_FUSION_LIST_CAP],
-                vectors=vectors[:_FUSION_LIST_CAP],
+                texts=texts[:FUSION_LIST_CAP],
+                vectors=vectors[:FUSION_LIST_CAP],
             )
         completed, timed_out, exhausted = run_channels_parallel(
             jobs,
             deadline_seconds=slice_seconds,
         )
-        dense_lists, dense_reason = _unpack_dense(completed.get("dense"))
-        bm25_result = _unpack_bm25(completed.get("bm25"))
-        term_lists, term_reason = _unpack_term(completed.get("term"))
+        dense_lists, dense_reason = unpack_dense(completed.get("dense"))
+        bm25_result = unpack_bm25(completed.get("bm25"))
+        term_lists, term_reason = unpack_term(completed.get("term"))
         timed = frozenset(timed_out)
         if "dense" in timed:
             dense_lists = ()
@@ -244,33 +244,33 @@ class HybridRetriever(HybridChannelJobsMixin):
                 fallback_reason=RetrievalFallbackReason.TIMEOUT,
             )
             bm25_fallback = RetrievalFallbackReason.TIMEOUT
-        dense_lists, bm25_result, term_lists = _restrict_channel_candidates(
+        dense_lists, bm25_result, term_lists = restrict_channel_candidates(
             dense_lists,
             bm25_result,
             term_lists,
             restrict_version_id,
         )
-        fallback = _compose_fallback(
+        fallback = compose_fallback(
             dense_reason=dense_reason,
             term_reason=term_reason,
             bm25_fallback=bm25_fallback,
             deadline_exhausted=exhausted,
         )
         resolved_profile = profile
-        media_dependence = _bool_field(profile, "media_dependence")
-        historical = _bool_field(profile, "historical_relationship")
-        negation_scope = _str_field(profile, "negation_scope") or "none"
+        media_dependence = bool_field(profile, "media_dependence")
+        historical = bool_field(profile, "historical_relationship")
+        negation_scope = str_field(profile, "negation_scope") or "none"
         want_full_summary = False
-        query_type = _query_type(profile)
-        temporal_intent = _temporal_intent(profile)
-        target = _target_date(profile)
-        required_terms = _str_list_field(profile, "codes") + _str_list_field(
+        query_type = query_type_field(profile)
+        temporal_intent = temporal_intent_field(profile)
+        target = target_date_field(profile)
+        required_terms = str_list_field(profile, "codes") + str_list_field(
             profile, "exact_terms"
         )
         temporal_records = self._load_temporal_records(
-            _flatten_channel_candidates(dense_lists, bm25_result.candidates, term_lists)
+            flatten_channel_candidates(dense_lists, bm25_result.candidates, term_lists)
         )
-        assemble_kwargs = _hybrid_assemble_kwargs(
+        assemble_kwargs = hybrid_assemble_kwargs(
             dense_variants=dense_lists,
             bm25_variants=(bm25_result.candidates,) if bm25_result.candidates else (),
             term_variants=term_lists,
@@ -291,7 +291,7 @@ class HybridRetriever(HybridChannelJobsMixin):
             matched_terms=(),
             deadline_exhausted=exhausted,
         )
-        assembled = _call_assemble_hybrid(
+        assembled = call_assemble_hybrid(
             heading_inventory=(),
             covered_headings=(),
             kwargs=assemble_kwargs,
@@ -306,14 +306,14 @@ class HybridRetriever(HybridChannelJobsMixin):
         covered = heading_inventory_from_contexts(
             tuple(item for item in contexts if item.chunk_id in set(fused_ids))
         )
-        assembled = _call_assemble_hybrid(
+        assembled = call_assemble_hybrid(
             heading_inventory=inventory,
             covered_headings=covered,
             kwargs=assemble_kwargs,
         )
         remaining = max(0.0, slice_seconds - (time.perf_counter() - started))
-        rerank_fn: RerankFn = _counted_rerank(
-            self._rerank or _identity_rerank,
+        rerank_fn: RerankFn = counted_rerank(
+            self._rerank or identity_rerank,
             self.query_budget,
             count_gateway=self._rerank is not None,
         )
@@ -334,9 +334,9 @@ class HybridRetriever(HybridChannelJobsMixin):
                 rerank_calls = selection.usage.model_calls
             selected_ids = tuple(item.candidate.chunk_id for item in selection.passages)
             locator_rows = loader(selected_ids) if selected_ids else ()
-            evidence = _evidence_units(selection.passages, locator_rows)
+            evidence = evidence_units(selection.passages, locator_rows)
         elif assembled.fused:
-            evidence = _evidence_units_from_context(
+            evidence = evidence_units_from_context(
                 assembled.fused[:FINAL_EVIDENCE_MAX],
                 contexts,
             )
@@ -348,7 +348,7 @@ class HybridRetriever(HybridChannelJobsMixin):
             coverage=assembled.coverage,
             fallback_reason=fallback,
             deadline_exhausted=assembled.deadline_exhausted,
-            first_evidence_ms=_elapsed_ms(started),
+            first_evidence_ms=elapsed_ms(started),
             embedding_call_count=1,
             rerank_call_count=rerank_calls,
             cache_key=assembled.cache_key,
@@ -414,7 +414,7 @@ class HybridRetriever(HybridChannelJobsMixin):
         try:
             response = cast(
                 EmbeddingResponse,
-                _counted_retrieve_send(
+                counted_retrieve_send(
                     budget,
                     usage_kind="embedding",
                     model_id=EMBEDDING_MODEL,

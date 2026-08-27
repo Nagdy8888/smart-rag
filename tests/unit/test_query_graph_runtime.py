@@ -27,10 +27,10 @@ from smart_rag_agents.query.gateway.sync_bridge import (
 )
 from smart_rag_agents.query.nodes.answer import generate_answer_node
 from smart_rag_agents.query.nodes.verify import verify_answer_node
+from smart_rag_agents.query.runtime.adapters import context_loader
 from smart_rag_agents.query.state import pending_query_state
 from smart_rag_api.services.query_graph_runtime import (
     QueryGraphRuntimeError,
-    _context_loader,
     build_query_graph_deps,
     build_query_process_bindings,
 )
@@ -49,6 +49,9 @@ from smart_rag_core.query_fusion.models import (
 )
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.settings import SharedSettings
+
+from tests.support.query_runtime import RefusingHybridRetriever
+from tests.unit.typed_attrs import set_attr, typed_attr
 
 _FAKE_DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
@@ -81,23 +84,6 @@ class _CountedAnswerGateway:
             input_tokens=12,
             output_tokens=7,
         )
-
-
-class _DummyHybrid:
-    """Truthy Hybrid adapter used to prove generate fail-closed without retrieve."""
-
-    def retrieve(self, **kwargs: object) -> object:
-        """Refuse accidental retrieve.
-
-        Args:
-            **kwargs: Ignored retrieve keywords.
-
-        Raises:
-            AssertionError: Always. Generate must not retrieve.
-        """
-
-        del kwargs
-        raise AssertionError("hybrid retrieve must not run in this test")
 
 
 def _fusion() -> FusionResult:
@@ -137,8 +123,12 @@ def test_query_checkpointer_pool_covers_signed_concurrency() -> None:
         signature(open_query_async_checkpointer).parameters["max_size"].default
     )
     assert async_default == QUERY_CHECKPOINTER_POOL_MAX_SIZE
-    assert AsyncPostgresSaver.aget_tuple is not BaseCheckpointSaver.aget_tuple
-    assert PostgresSaver.aget_tuple is BaseCheckpointSaver.aget_tuple
+    assert typed_attr(AsyncPostgresSaver, "aget_tuple") is not typed_attr(
+        BaseCheckpointSaver, "aget_tuple"
+    )
+    assert typed_attr(PostgresSaver, "aget_tuple") is typed_attr(
+        BaseCheckpointSaver, "aget_tuple"
+    )
     with pytest.raises(ValueError, match="LANGGRAPH_CHECKPOINT_URL"):
         asyncio.run(
             open_query_async_checkpointer(
@@ -281,7 +271,7 @@ def test_context_loader_keeps_connection_idle_for_retrieval_transaction(
         "smart_rag_agents.query.runtime.adapters.fetch_authorized_chunk_context",
         _fetch,
     )
-    loader = _context_loader(
+    loader = context_loader(
         _FAKE_DSN,
         CallerContext(
             user_id=str(uuid4()),
@@ -341,8 +331,10 @@ def test_executor_default_bindings_are_not_empty_query_graph_deps() -> None:
         settings=SharedSettings(mock_model_mode=True),
         supabase_dsn=_FAKE_DSN,
     )
-    executor._bindings = bindings
-    cached = executor._process_bindings(SharedSettings(mock_model_mode=True))
+    set_attr(executor, "_bindings", bindings)
+    cached = typed_attr(executor, "_process_bindings")(
+        SharedSettings(mock_model_mode=True)
+    )
     assert cached.hybrid_retriever is not None
     assert cached.model_gateway is not None
     assert cached is bindings
@@ -360,7 +352,7 @@ def test_bound_mock_gateway_drives_sse_without_token_injection() -> None:
     settings = SharedSettings(mock_model_mode=True)
     gateway = create_model_gateway(settings)
     deps = QueryGraphDeps(
-        hybrid_retriever=_DummyHybrid(),
+        hybrid_retriever=RefusingHybridRetriever(),
         model_gateway=gateway,
         answer_prompt_text=answer_prompt_text(),
         verifier_prompt_text=verifier_prompt_text(),
@@ -399,7 +391,7 @@ def test_generate_answer_accumulates_provider_tokens() -> None:
     """Answer generation copies gateway token counts onto query state."""
 
     deps = QueryGraphDeps(
-        hybrid_retriever=_DummyHybrid(),
+        hybrid_retriever=RefusingHybridRetriever(),
         model_gateway=_CountedAnswerGateway(),
         answer_prompt_text=answer_prompt_text(),
     )
@@ -438,7 +430,7 @@ def test_unbound_gateway_with_hybrid_is_verified_partial() -> None:
     state["status"] = "optional_tools_resolved"
     state["remaining_model_calls"] = 5
     state["fusion"] = fusion.model_dump(mode="json")
-    deps = QueryGraphDeps(hybrid_retriever=_DummyHybrid())
+    deps = QueryGraphDeps(hybrid_retriever=RefusingHybridRetriever())
     out = generate_answer_node(state, deps)
     assert out["status"] == "verified_partial"
     assert out["detail"] == "model_gateway_unbound"
@@ -589,7 +581,7 @@ def test_mock_answer_is_not_used_as_verified_success() -> None:
     fusion = _fusion()
     payload = mock_answer_payload(fusion, (), user_query="refund")
     assert payload.status in {"complete", "partial"}
-    deps = QueryGraphDeps(hybrid_retriever=_DummyHybrid())
+    deps = QueryGraphDeps(hybrid_retriever=RefusingHybridRetriever())
     state = pending_query_state(user_query="refund")
     state["status"] = "optional_tools_resolved"
     state["remaining_model_calls"] = 5

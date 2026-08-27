@@ -11,7 +11,7 @@ from smart_rag_core.memory.reaper import (
 )
 from smart_rag_core.query_admission.service import true_up_query_reservation
 
-from tests.support.query_memory import _NOW, _complete_run
+from tests.support.query_memory import QUERY_MEMORY_NOW, complete_query_run
 from tests.support.query_postgres import (
     admit as _admit,
 )
@@ -48,11 +48,15 @@ def test_reaper_nulls_completed_keys_at_seven_days(
         message="second",
     )
     with db_connection.cursor() as cursor:
-        _complete_run(cursor, old.context.run_id, completed_at=_NOW - timedelta(days=7))
-        _complete_run(
+        complete_query_run(
+            cursor,
+            old.context.run_id,
+            completed_at=QUERY_MEMORY_NOW - timedelta(days=7),
+        )
+        complete_query_run(
             cursor,
             fresh.context.run_id,
-            completed_at=_NOW - timedelta(days=6, hours=23),
+            completed_at=QUERY_MEMORY_NOW - timedelta(days=6, hours=23),
         )
         cursor.execute(
             """
@@ -61,7 +65,7 @@ def test_reaper_nulls_completed_keys_at_seven_days(
             """,
             (old.context.run_id, fresh.context.run_id),
         )
-    result = reap_query_run_retention(db_connection, now=_NOW)
+    result = reap_query_run_retention(db_connection, now=QUERY_MEMORY_NOW)
     assert result.true_up_invoked is False
     assert result.keys_nulled == 1
     with db_connection.cursor() as cursor:
@@ -105,12 +109,12 @@ def test_reaper_does_not_touch_pending_keys(
             WHERE id = %s
             """,
             (
-                _NOW - timedelta(days=10),
-                _NOW - timedelta(days=10),
+                QUERY_MEMORY_NOW - timedelta(days=10),
+                QUERY_MEMORY_NOW - timedelta(days=10),
                 admitted.context.run_id,
             ),
         )
-    result = reap_query_run_retention(db_connection, now=_NOW)
+    result = reap_query_run_retention(db_connection, now=QUERY_MEMORY_NOW)
     assert result.pending_keys_preserved >= 1
     assert result.true_up_invoked is False
     with db_connection.cursor() as cursor:
@@ -139,15 +143,17 @@ def test_reaper_does_not_call_budget_true_up(
     reservation_id = admitted.context.reservation_id
     remaining_before = admitted.context.remaining_usd
     with db_connection.cursor() as cursor:
-        _complete_run(
-            cursor, admitted.context.run_id, completed_at=_NOW - timedelta(days=8)
+        complete_query_run(
+            cursor,
+            admitted.context.run_id,
+            completed_at=QUERY_MEMORY_NOW - timedelta(days=8),
         )
         cursor.execute(
             "SELECT remaining_usd, status FROM app.budget_reservations WHERE id = %s",
             (reservation_id,),
         )
         before = cursor.fetchone()
-    result = reap_query_run_retention(db_connection, now=_NOW)
+    result = reap_query_run_retention(db_connection, now=QUERY_MEMORY_NOW)
     assert result.true_up_invoked is False
     with db_connection.cursor() as cursor:
         cursor.execute(
@@ -185,10 +191,12 @@ def test_reaped_key_still_reconnects_same_paid_run(
         message="same payload",
     )
     with db_connection.cursor() as cursor:
-        _complete_run(
-            cursor, first.context.run_id, completed_at=_NOW - timedelta(days=7)
+        complete_query_run(
+            cursor,
+            first.context.run_id,
+            completed_at=QUERY_MEMORY_NOW - timedelta(days=7),
         )
-    reap_query_run_retention(db_connection, now=_NOW)
+    reap_query_run_retention(db_connection, now=QUERY_MEMORY_NOW)
     second, _ = _admit(
         db_connection,
         caller=caller,
@@ -226,11 +234,15 @@ def test_events_reaped_after_thirty_days(
         db_connection, caller=caller, conversation_id=conversation_id, message="young"
     )
     with db_connection.cursor() as cursor:
-        _complete_run(
-            cursor, old.context.run_id, completed_at=_NOW - timedelta(days=30)
+        complete_query_run(
+            cursor,
+            old.context.run_id,
+            completed_at=QUERY_MEMORY_NOW - timedelta(days=30),
         )
-        _complete_run(
-            cursor, young.context.run_id, completed_at=_NOW - timedelta(days=29)
+        complete_query_run(
+            cursor,
+            young.context.run_id,
+            completed_at=QUERY_MEMORY_NOW - timedelta(days=29),
         )
         cursor.execute(
             """
@@ -239,7 +251,7 @@ def test_events_reaped_after_thirty_days(
             """,
             (old.context.run_id, young.context.run_id),
         )
-    result = reap_query_run_retention(db_connection, now=_NOW)
+    result = reap_query_run_retention(db_connection, now=QUERY_MEMORY_NOW)
     assert result.events_deleted == 1
     with db_connection.cursor() as cursor:
         cursor.execute(

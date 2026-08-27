@@ -26,6 +26,12 @@ from smart_rag_api.routers.query_runs import (
     get_query_run_service as get_run_fetch_service,
 )
 from smart_rag_api.routers.usage import get_usage_service
+from smart_rag_api.services.auth_team import (
+    PendingInvitation,
+    WorkspaceDirectory,
+    WorkspaceMember,
+)
+from smart_rag_api.services.conversations import ConversationTitleResult
 from smart_rag_api.services.documents_http import DocumentRecord
 from smart_rag_core.conversations import ConversationRecord
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
@@ -61,7 +67,12 @@ from smart_rag_core.tools import (
     visible_tools,
 )
 
-from tests.unit.typed_openapi import as_openapi_client, json_object, json_object_list
+from tests.unit.typed_openapi import (
+    as_openapi_client,
+    client_app_state,
+    json_object,
+    json_object_list,
+)
 
 _REPO = Path(__file__).resolve().parents[2]
 _OWNER = "00000000-0000-4000-8000-000000000001"
@@ -224,8 +235,8 @@ class _FakeConversationService:
         *,
         conversation_id: UUID,
         gateway: object,
-    ) -> ConversationRecord:
-        """Return an escaped LLM-style title for HTTP tests.
+    ) -> ConversationTitleResult:
+        """Return an escaped LLM-style title and canned usage for HTTP tests.
 
         Args:
             caller: Authenticated caller.
@@ -233,15 +244,19 @@ class _FakeConversationService:
             gateway: Unused gateway stand-in.
 
         Returns:
-            Record with a compact escaped title.
+            Record with a compact escaped title and title-call tokens.
         """
 
         del gateway
-        return ConversationRecord(
-            conversation_id=conversation_id,
-            creator_user_id=UUID(caller.user_id),
-            title=isolate_untrusted_text("Policy summary"),
-            created_at=datetime.now(tz=UTC),
+        return ConversationTitleResult(
+            record=ConversationRecord(
+                conversation_id=conversation_id,
+                creator_user_id=UUID(caller.user_id),
+                title=isolate_untrusted_text("Policy summary"),
+                created_at=datetime.now(tz=UTC),
+            ),
+            prompt_tokens=12,
+            completion_tokens=3,
         )
 
 
@@ -464,6 +479,8 @@ def test_generate_conversation_title_returns_escaped_json(
     payload = json_object(response.json())
     assert payload["conversation_id"] == str(conversation_id)
     assert payload["title"] == "Policy summary"
+    assert payload["prompt_tokens"] == 12
+    assert payload["completion_tokens"] == 3
 
 
 def test_schema_extra_fields_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -545,9 +562,24 @@ def test_viewer_tool_catalog_omits_admin_keys(
         "smart_rag_api.routers.tools.enforce_rate_limit",
         _noop_rate_limit,
     )
+
+    def _empty_catalog(self: object, caller: object) -> dict[str, object]:
+        """Return an empty tool catalog.
+
+        Args:
+            self: Tool HTTP service.
+            caller: Unused caller.
+
+        Returns:
+            Empty catalog mapping.
+        """
+
+        del self, caller
+        return {}
+
     monkeypatch.setattr(
         "smart_rag_api.services.tools_http.ToolHttpService._catalog_seeds",
-        lambda self, caller: {},
+        _empty_catalog,
     )
     application = create_app()
     application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
@@ -705,7 +737,7 @@ def test_lifespan_binds_offload_executor() -> None:
     """Serving processes keep a bounded thread pool on app state."""
 
     with TestClient(create_app()) as raw:
-        executor = raw.app.state.offload_executor
+        executor = client_app_state(raw).offload_executor
         assert isinstance(executor, ThreadPoolExecutor)
         assert executor._max_workers == 8
 
@@ -950,6 +982,45 @@ class _FakeAuthTeamService:
             raw_token="mail-only-secret",  # noqa: S106 - fixture token, never a live secret
         )
 
+    def list_directory(self, caller: CallerContext) -> WorkspaceDirectory:
+        """Return a canned directory without invitation tokens.
+
+        Args:
+            caller: Authenticated caller.
+
+        Returns:
+            One member and one pending invitation.
+
+        Raises:
+            QueryAdmissionError: Members and viewers.
+        """
+
+        if caller.role not in {UserRole.OWNER, UserRole.ADMIN}:
+            raise QueryAdmissionError("forbidden")
+        return WorkspaceDirectory(
+            members=(
+                WorkspaceMember(
+                    user_id=UUID(_OWNER),
+                    email="owner@example.com",
+                    display_name="Owner",
+                    role="owner",
+                    upload_enabled=True,
+                    disabled_at=None,
+                    created_at=datetime.now(tz=UTC),
+                ),
+            ),
+            pending_invitations=(
+                PendingInvitation(
+                    invitation_id=uuid4(),
+                    email="pending@example.com",
+                    role="member",
+                    upload_enabled=False,
+                    expires_at=datetime.now(tz=UTC),
+                    created_at=datetime.now(tz=UTC),
+                ),
+            ),
+        )
+
 
 def test_submit_message_rejects_missing_idempotency_key(
     monkeypatch: pytest.MonkeyPatch,
@@ -1020,6 +1091,40 @@ def test_create_invitation_json_omits_raw_token(
     assert "raw_token" not in payload
     assert payload["email"] == "invitee@example.com"
     assert response.headers.get("x-test-invitation-token") == "mail-only-secret"
+
+
+def test_list_workspace_users_is_owner_admin_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GET /admin/users returns members for owners and 403 for members."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    monkeypatch.setattr(
+        "smart_rag_api.routers.auth_team.enforce_rate_limit",
+        _noop_rate_limit,
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_auth_team_service] = lambda: (
+        _FakeAuthTeamService()
+    )
+    with TestClient(application) as raw:
+        client = as_openapi_client(raw)
+        owner = client.get("/admin/users", headers=_identity(_OWNER, "owner"))
+        member = client.get("/admin/users", headers=_identity(_MEMBER, "member"))
+    assert owner.status_code == 200
+    payload = json_object(owner.json())
+    assert "token_hash" not in str(payload)
+    assert "raw_token" not in str(payload)
+    members = payload["members"]
+    assert isinstance(members, list)
+    assert members[0]["email"] == "owner@example.com"
+    invites = payload["pending_invitations"]
+    assert isinstance(invites, list)
+    assert invites[0]["email"] == "pending@example.com"
+    assert member.status_code == 403
+    assert json_object(member.json())["detail"] == "forbidden"
 
 
 def test_document_delete_is_owner_admin_only(

@@ -62,6 +62,8 @@ from smart_rag_core.retrieval.lightrag_qualification import DocumentStatusView
 from smart_rag_core.retrieval.rerank import RerankPassage, RerankRanking
 from smart_rag_core.retrieval.types import RetrievalCandidate
 
+from tests.unit.typed_attrs import typed_attr
+
 VERSION_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 VERSION_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
@@ -130,7 +132,7 @@ def _outcome_from_persist(
     )
 
 
-def _unready_persist(self: GraphMappingService, **kwargs: object) -> MappingOutcome:
+def unready_persist(self: GraphMappingService, **kwargs: object) -> MappingOutcome:  # pyright: ignore[reportUnusedFunction]
     """Return an unready persist outcome without touching Postgres.
 
     Args:
@@ -685,10 +687,21 @@ def test_processed_only_is_not_graph_ready(monkeypatch: pytest.MonkeyPatch) -> N
         "_load_version_language",
         _english_language,
     )
+
+    def _skip_repair(self: GraphMappingService, **_kwargs: object) -> None:
+        """Skip repair enqueue in this test.
+
+        Args:
+            self: Mapping service.
+            **_kwargs: Unused repair kwargs.
+        """
+
+        return None
+
     monkeypatch.setattr(
         GraphMappingService,
         "_enqueue_repair_only",
-        lambda self, **_kwargs: None,
+        _skip_repair,
     )
     service = GraphMappingService(
         _mapping_connection(),
@@ -872,8 +885,8 @@ def test_exact_mapping_stitches_overlapping_vendor_chunks(
     chunk_rows = cast(list[object], captured["chunk_rows"])
     assert len(chunk_rows) == 1
     row = chunk_rows[0]
-    assert row.vendor_chunk_id == "vc-a"
-    assert row.vendor_piece_ids == ("vc-a", "vc-b")
+    assert typed_attr(row, "vendor_chunk_id") == "vc-a"
+    assert typed_attr(row, "vendor_piece_ids") == ("vc-a", "vc-b")
 
 
 def test_multi_source_entity_keeps_all_passage_matches(
@@ -1031,10 +1044,21 @@ def test_unresolved_batch_does_not_use_hybrid(
         "_load_version_language",
         _english_language,
     )
+
+    def _skip_repair(self: GraphMappingService, **_kwargs: object) -> None:
+        """Skip repair enqueue in this test.
+
+        Args:
+            self: Mapping service.
+            **_kwargs: Unused repair kwargs.
+        """
+
+        return None
+
     monkeypatch.setattr(
         GraphMappingService,
         "_enqueue_repair_only",
-        lambda self, **_kwargs: None,
+        _skip_repair,
     )
     source_id = canonical_passage_source_id(
         version_id=VERSION_A,

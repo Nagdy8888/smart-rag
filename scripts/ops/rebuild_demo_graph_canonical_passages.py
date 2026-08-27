@@ -17,6 +17,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 from uuid import UUID
 
 import psycopg
@@ -36,6 +37,7 @@ from smart_rag_core.jobs.graph_source_text import (  # noqa: E402
 from smart_rag_core.observability.langsmith_tracing import (  # noqa: E402
     configure_langsmith,
 )
+from smart_rag_core.release.io import as_json_object  # noqa: E402
 from smart_rag_core.retrieval.lightrag_adapter import (  # noqa: E402
     bind_process_runtime_adapter,
 )
@@ -325,9 +327,10 @@ def require_map_only_extract(
                 raw_payload = json.loads(raw_payload)
             except json.JSONDecodeError as exc:
                 raise RuntimeError("map_only_payload_invalid") from exc
-        if not isinstance(raw_payload, Mapping):
-            raise RuntimeError("map_only_payload_invalid")
-        payload = dict(raw_payload)
+        try:
+            payload = as_json_object(raw_payload, source="map_only")
+        except ValueError as exc:
+            raise RuntimeError("map_only_payload_invalid") from exc
         checkpoint_ids = set(parse_processed_source_ids(payload))
         if checkpoint_ids != set(expected):
             raise RuntimeError(
@@ -588,7 +591,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise RuntimeError("supabase_db_url_unconfigured")
     version_id = UUID(GRAPH_VERSION_ID)
     preflight = preflight_graph_200(worker_url, version_id=version_id)
-    source_ids = tuple(str(item) for item in preflight["source_ids"])
+    raw_ids: object = preflight["source_ids"]
+    if not isinstance(raw_ids, (list, tuple)):
+        raise RuntimeError("source_ids_missing")
+    source_ids = tuple(
+        str(item) for item in cast(list[object] | tuple[object, ...], raw_ids)
+    )
     processed_rebuild = count_rebuild_processed_sources(
         operator_url,
         version_id=version_id,

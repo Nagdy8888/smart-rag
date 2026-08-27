@@ -29,9 +29,9 @@ from smart_rag_core.observability.logging import (
 from smart_rag_core.observability.query_trace.metadata import (
     QUERY_AGENT_EVAL_RUN,
     T,
-    _optional_trace_str,
-    _query_eval_tracing_scope,
     assert_query_agent_eval_langsmith_gate,
+    optional_trace_str,
+    query_eval_tracing_scope,
 )
 from smart_rag_core.observability.query_trace.redaction import (
     hashed_conversation_id,
@@ -146,18 +146,18 @@ def invoke_traced_query_agent_eval(
             )
             return thunk()
 
-        with _query_eval_tracing_scope(enabled=True):
+        with query_eval_tracing_scope(enabled=True):
             return _parent(
                 case_id=case_id,
                 graph_name=QUERY_AGENT_EVAL_RUN,
-                run_id=_optional_trace_str(extra.get("run_id")),
-                user_id_sha256=_optional_trace_str(extra.get("user_id_sha256")),
-                conversation_id_sha256=_optional_trace_str(
+                run_id=optional_trace_str(extra.get("run_id")),
+                user_id_sha256=optional_trace_str(extra.get("user_id_sha256")),
+                conversation_id_sha256=optional_trace_str(
                     extra.get("conversation_id_sha256")
                 ),
-                requested_route=_optional_trace_str(extra.get("requested_route")),
-                effective_route=_optional_trace_str(extra.get("effective_route")),
-                corrected_route=_optional_trace_str(extra.get("corrected_route")),
+                requested_route=optional_trace_str(extra.get("requested_route")),
+                effective_route=optional_trace_str(extra.get("effective_route")),
+                corrected_route=optional_trace_str(extra.get("corrected_route")),
             )
 
 

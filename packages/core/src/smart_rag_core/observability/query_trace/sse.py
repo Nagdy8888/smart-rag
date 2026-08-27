@@ -17,17 +17,17 @@ from smart_rag_core.observability.logging import (
 )
 from smart_rag_core.observability.query_trace.metadata import (
     QUERY_RUN_SSE_SPAN,
-    _normalize_query_run_result,
-    _optional_trace_str,
-    _query_eval_tracing_scope,
     assert_query_agent_eval_langsmith_gate,
+    normalize_query_run_result,
+    optional_trace_str,
+    query_eval_tracing_scope,
 )
 from smart_rag_core.observability.query_trace.redaction import (
-    _optional_cost_usd,
-    _usage_token_counts,
     hashed_user_id,
+    optional_cost_usd,
     redact_query_run_sse_inputs,
     redact_query_run_sse_outputs,
+    usage_token_counts,
 )
 from smart_rag_core.query_answer.versions import ANSWER_MODEL_ID
 from smart_rag_core.settings import SharedSettings
@@ -44,11 +44,11 @@ def _record_query_run_usage(result: Mapping[str, object]) -> None:
         reports token counts.
     """
 
-    counts = _usage_token_counts(result)
+    counts = usage_token_counts(result)
     if counts is None:
         return
     input_count, output_count = counts
-    cost = _optional_cost_usd(result.get("estimated_cost_usd"))
+    cost = optional_cost_usd(result.get("estimated_cost_usd"))
     if cost is None:
         cost = estimate_traced_chat_cost_usd(
             input_tokens=input_count,
@@ -165,19 +165,19 @@ async def invoke_traced_query_run_sse(
             model_versions,
             prompt_versions,
         )
-        result = _normalize_query_run_result(await thunk())
+        result = normalize_query_run_result(await thunk())
         _record_query_run_usage(result)
         return result
 
-    with _query_eval_tracing_scope(
+    with query_eval_tracing_scope(
         enabled=True, project_name=settings.langsmith_project
     ):
         return await _parent(
             run_id=str(extra["run_id"]),
             user_id_sha256=str(extra["user_id_sha256"]),
             user_message=user_message,
-            requested_route=_optional_trace_str(extra.get("requested_route")),
-            effective_route=_optional_trace_str(extra.get("effective_route")),
+            requested_route=optional_trace_str(extra.get("requested_route")),
+            effective_route=optional_trace_str(extra.get("effective_route")),
             model_versions=model_versions,
             prompt_versions=prompt_versions,
         )

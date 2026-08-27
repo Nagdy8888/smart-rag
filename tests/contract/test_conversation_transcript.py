@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -26,6 +27,7 @@ from tests.contract.integration_support import (
     try_connect,
 )
 from tests.unit.typed_openapi import (
+    OpenAPIClient,
     as_openapi_client,
     json_object,
     json_object_list,
@@ -154,10 +156,11 @@ def _record(
     )
 
 
+@contextmanager  # type: ignore[deprecated]
 def _client(
     monkeypatch: pytest.MonkeyPatch,
     service: _FakeTranscriptService,
-) -> Iterator[object]:
+) -> Iterator[OpenAPIClient]:
     """Yield an OpenAPI client with the fake transcript service.
 
     Args:
@@ -206,7 +209,7 @@ def test_creator_receives_newest_first_user_and_assistant_only(
     )
     service = _FakeTranscriptService((newer, older))
     conversation_id = uuid4()
-    for client in _client(monkeypatch, service):
+    with _client(monkeypatch, service) as client:
         response = client.get(
             f"/conversations/{conversation_id}/messages",
             headers=_identity(),
@@ -233,7 +236,7 @@ def test_second_page_via_before_has_no_overlap(
     third = _record(role="user", content="m3", created_at=now - timedelta(seconds=2))
     service = _FakeTranscriptService((first, second, third))
     conversation_id = uuid4()
-    for client in _client(monkeypatch, service):
+    with _client(monkeypatch, service) as client:
         page_one = client.get(
             f"/conversations/{conversation_id}/messages?limit=2",
             headers=_identity(),
@@ -259,7 +262,7 @@ def test_other_user_receives_idor_404(monkeypatch: pytest.MonkeyPatch) -> None:
     """Foreign conversations return generic 404."""
 
     service = _FakeTranscriptService(error=QueryAdmissionError("not_found"))
-    for client in _client(monkeypatch, service):
+    with _client(monkeypatch, service) as client:
         response = client.get(
             f"/conversations/{uuid4()}/messages",
             headers=_identity(str(uuid4()), "member"),
@@ -282,7 +285,7 @@ def test_limit_is_clamped_at_one_hundred(monkeypatch: pytest.MonkeyPatch) -> Non
 
     service = _FakeTranscriptService(())
     conversation_id = uuid4()
-    for client in _client(monkeypatch, service):
+    with _client(monkeypatch, service) as client:
         rejected = client.get(
             f"/conversations/{conversation_id}/messages?limit=101",
             headers=_identity(),
@@ -300,7 +303,7 @@ def test_deleted_conversation_receives_404(monkeypatch: pytest.MonkeyPatch) -> N
     """Deleted conversations return the same generic 404."""
 
     service = _FakeTranscriptService(error=QueryAdmissionError("conversation_deleted"))
-    for client in _client(monkeypatch, service):
+    with _client(monkeypatch, service) as client:
         response = client.get(
             f"/conversations/{uuid4()}/messages",
             headers=_identity(),

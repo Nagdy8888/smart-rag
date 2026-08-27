@@ -17,11 +17,9 @@ from smart_rag_core.evaluation.agent_eval import (
     case_to_reference,
     decimal_sum,
     deterministic_evaluators,
-    failed_target_output,
     hard_failure_reasons,
     judge_evaluator,
     median_latency_ms,
-    output_from_graph_state,
     parse_target_output,
     sanitize_experiment_prefix,
     score_all,
@@ -33,8 +31,6 @@ from smart_rag_core.evaluation.langsmith_agent_runner.dataset import (
     sync_langsmith_dataset,
 )
 from smart_rag_core.evaluation.langsmith_agent_runner.types import (
-    ALLOWED_EVALUATOR_KEYS,
-    AdmittedEvalRun,
     OncePerCaseJudge,
 )
 from smart_rag_core.evaluation.online import (
@@ -389,28 +385,6 @@ def build_local_summary(
     )
 
 
-def _assert_no_unbudgeted_evaluators(metadata: Mapping[str, Any]) -> None:
-    """Fail when the dataset binds unknown extra evaluators.
-
-    Args:
-        metadata: Dataset metadata.
-
-    Raises:
-        AgentEvalError: Unbudgeted evaluator names are present.
-    """
-
-    bound: list[str] = []
-    for key in ("evaluators", "dataset_evaluators", "workspace_evaluators"):
-        raw = metadata.get(key)
-        if isinstance(raw, str) and raw:
-            bound.append(raw)
-        elif isinstance(raw, Sequence) and not isinstance(raw, (str, bytes)):
-            bound.extend(str(item) for item in cast(Sequence[object], raw) if item)
-    unknown = [item for item in bound if item not in ALLOWED_EVALUATOR_KEYS]
-    if unknown:
-        raise AgentEvalError("unbudgeted_dataset_evaluators")
-
-
 def _ordered_classes(selection: AgentEvalSelection) -> tuple[str, ...]:
     """Return unique query classes in selection order.
 
@@ -446,46 +420,3 @@ def _experiment_url(result: object) -> str | None:
         if isinstance(value, str) and value.startswith("https://"):
             return value
     return None
-
-
-def _coerce_output(
-    case_id: str,
-    admitted: AdmittedEvalRun,
-    result: object,
-) -> AgentEvalOutput:
-    """Normalize an invoke result into ``AgentEvalOutput``.
-
-    Args:
-        case_id: Case identifier.
-        admitted: Admitted run handles.
-        result: Typed output, JSON mapping, or final graph state.
-
-    Returns:
-        Typed evaluation output.
-    """
-
-    if isinstance(result, AgentEvalOutput):
-        return result
-    if isinstance(result, Mapping) and "completed" in result:
-        return parse_target_output(cast(Mapping[str, Any], result))
-    if isinstance(result, Mapping):
-        mapped = cast(Mapping[str, Any], result)
-        fusion = mapped.get("fusion")
-        bm25 = None
-        graph_degraded = False
-        if isinstance(fusion, Mapping):
-            fusion_map = cast(Mapping[str, Any], fusion)
-            reason = fusion_map.get("fallback_reason")
-            if isinstance(reason, str) and reason:
-                bm25 = reason
-                if "graph" in reason:
-                    graph_degraded = True
-        return output_from_graph_state(
-            case_id,
-            mapped,
-            run_id=admitted.run_id,
-            conversation_id=admitted.conversation_id,
-            bm25_fallback=bm25,
-            graph_degraded=graph_degraded,
-        )
-    return failed_target_output(case_id, failure_kind="target_output_invalid")

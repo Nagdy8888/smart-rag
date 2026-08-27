@@ -6,6 +6,7 @@ import asyncio
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
+from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 from smart_rag_core.query_routing.branches import execute_branches
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.models import BranchKind
@@ -47,6 +48,8 @@ def _context(
 
 class _FakeHybrid:
     """Hybrid double that supplies an authorized chunk loader."""
+
+    query_budget: QueryRetrieveBudget | None = None
 
     def __init__(self, rows: dict[UUID, ChunkContext]) -> None:
         """Bind fixture rows.
@@ -116,6 +119,8 @@ class _FakeHybrid:
 
 class _FakeGraph:
     """Async graph double that returns one locator without citation text."""
+
+    query_budget: QueryRetrieveBudget | None = None
 
     def __init__(self, chunk_id: UUID, document_id: UUID, version_id: UUID) -> None:
         """Bind locator identity.

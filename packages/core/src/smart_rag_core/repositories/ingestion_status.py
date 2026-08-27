@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg
@@ -61,9 +61,10 @@ class IngestionStatusRepository:
             row = cursor.fetchone()
         if row is None:
             return None
-        payload = row.get("status_payload")
+        payload: object = row.get("status_payload")
         if not isinstance(payload, dict):
             return None
-        result = dict(payload)
-        result["recent_jobs"] = row.get("recent_jobs") or []
+        result = cast(dict[str, Any], payload)
+        jobs: object = row.get("recent_jobs") or []
+        result["recent_jobs"] = jobs if isinstance(jobs, list) else []
         return result

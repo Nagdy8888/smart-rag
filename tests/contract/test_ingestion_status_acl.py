@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import cast
 from uuid import UUID, uuid4
 
 import psycopg
 import pytest
 
 from tests.contract.integration_support import resolve_supabase_db_url, try_connect
-from tests.contract.test_rls_matrix import _auth_version, _insert_profile
+from tests.contract.test_rls_matrix import rls_auth_version, rls_insert_profile
 
 
 @pytest.fixture
@@ -38,9 +39,9 @@ def test_member_cannot_read_restricted_version_status_by_id(
     version_id = uuid4()
 
     with db_connection.cursor() as cursor:
-        _insert_profile(cursor, user_id=owner_id, role="owner")
-        _insert_profile(cursor, user_id=member_a, role="member")
-        _insert_profile(cursor, user_id=member_b, role="member")
+        rls_insert_profile(cursor, user_id=owner_id, role="owner")
+        rls_insert_profile(cursor, user_id=member_a, role="member")
+        rls_insert_profile(cursor, user_id=member_b, role="member")
         cursor.execute(
             """
             INSERT INTO app.documents (id, title, visibility, created_by)
@@ -66,7 +67,7 @@ def test_member_cannot_read_restricted_version_status_by_id(
             """,
             (document_id, member_a, owner_id),
         )
-        authz = _auth_version(cursor)
+        authz = rls_auth_version(cursor)
         cursor.execute("SET ROLE app_api")
         cursor.execute(
             """
@@ -102,6 +103,6 @@ def test_member_cannot_read_restricted_version_status_by_id(
     assert granted is not None
     payload = granted[0]
     assert isinstance(payload, dict)
-    assert UUID(str(payload["version_id"])) == version_id
+    assert UUID(str(cast(dict[str, object], payload)["version_id"])) == version_id
     assert denied is None
     assert owner_row is not None

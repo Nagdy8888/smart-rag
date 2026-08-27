@@ -276,9 +276,7 @@ class BackendSettings(SharedSettings):
             if self.app_env is Environment.TEST:
                 self.supabase_url = AnyHttpUrl("http://127.0.0.1:54321")
             else:
-                raise ValueError(
-                    "SUPABASE_URL is required when APP_ENV is not test"
-                )
+                raise ValueError("SUPABASE_URL is required when APP_ENV is not test")
         return self
 
     @model_validator(mode="after")

@@ -15,10 +15,10 @@ import psycopg
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ensure_app_runtime_role import (
     GRANTED_ROLES,
-    _parse_env,
-    _upsert_env,
     ensure_role,
+    parse_env,
     resolve_runtime_password,
+    upsert_env,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -128,8 +128,8 @@ def main() -> int:
         ``.env.compose`` keys. Never prints passwords or full URIs.
     """
 
-    local_env = _parse_env(REPO_ROOT / ".env")
-    compose_env = _parse_env(REPO_ROOT / ".env.compose")
+    local_env = parse_env(REPO_ROOT / ".env")
+    compose_env = parse_env(REPO_ROOT / ".env.compose")
     admin_dsn = _require(local_env, "STAGING_SUPABASE_SESSION_URL")
     transaction_dsn = _require(local_env, "STAGING_SUPABASE_TRANSACTION_URL")
     supabase_url = (
@@ -164,13 +164,13 @@ def main() -> int:
         raise RuntimeError("worker_dsn_still_postgres")
 
     compose_path = REPO_ROOT / ".env.compose"
-    _upsert_env(compose_path, "SUPABASE_URL", supabase_url)
-    _upsert_env(compose_path, "NEXT_PUBLIC_SUPABASE_URL", supabase_url)
-    _upsert_env(compose_path, "API_SUPABASE_DB_URL", api_dsn)
-    _upsert_env(compose_path, "WORKER_SUPABASE_DB_URL", worker_dsn)
-    _upsert_env(compose_path, "LANGGRAPH_CHECKPOINT_URL", worker_dsn)
-    _upsert_env(compose_path, "LIGHTRAG_DB_URL", worker_dsn)
-    _upsert_env(compose_path, "OPERATOR_SUPABASE_DB_URL", admin_dsn)
+    upsert_env(compose_path, "SUPABASE_URL", supabase_url)
+    upsert_env(compose_path, "NEXT_PUBLIC_SUPABASE_URL", supabase_url)
+    upsert_env(compose_path, "API_SUPABASE_DB_URL", api_dsn)
+    upsert_env(compose_path, "WORKER_SUPABASE_DB_URL", worker_dsn)
+    upsert_env(compose_path, "LANGGRAPH_CHECKPOINT_URL", worker_dsn)
+    upsert_env(compose_path, "LIGHTRAG_DB_URL", worker_dsn)
+    upsert_env(compose_path, "OPERATOR_SUPABASE_DB_URL", admin_dsn)
     anon_key = (
         local_env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
         or local_env.get("SUPABASE_ANON_KEY")
@@ -178,10 +178,10 @@ def main() -> int:
         or ""
     ).strip()
     if anon_key:
-        _upsert_env(compose_path, "NEXT_PUBLIC_SUPABASE_ANON_KEY", anon_key)
-    _upsert_env(compose_path, "APP_ENV", compose_env.get("APP_ENV", "local") or "local")
-    _upsert_env(compose_path, "MOCK_MODEL_MODE", "false")
-    _upsert_env(compose_path, "LANGSMITH_TRACING", "true")
+        upsert_env(compose_path, "NEXT_PUBLIC_SUPABASE_ANON_KEY", anon_key)
+    upsert_env(compose_path, "APP_ENV", compose_env.get("APP_ENV", "local") or "local")
+    upsert_env(compose_path, "MOCK_MODEL_MODE", "false")
+    upsert_env(compose_path, "LANGSMITH_TRACING", "true")
     print("wrote=.env.compose")
     print("SUPABASE_URL=hosted")
     print("NEXT_PUBLIC_SUPABASE_URL=hosted")

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  addChatTokens,
   applyAdmission,
   applySseFrame,
+  chatTokenTotals,
   createChatViewState,
   hasKeptAnswer,
   resumeAfterSequence,
   shouldShowChatFailureBanner,
+  startNextChatRun,
 } from "./chat-view";
 import { parseSseBlock } from "./sse";
 
@@ -57,6 +60,39 @@ describe("chat view", () => {
     );
     expect(state.diagnostics.promptTokens).toBe(1234);
     expect(state.diagnostics.completionTokens).toBe(88);
+    expect(chatTokenTotals(state)).toEqual({
+      promptTokens: 1234,
+      completionTokens: 88,
+    });
+  });
+
+  it("carries conversation totals across questions and title usage", () => {
+    let state = createChatViewState("first");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: usage\nid: 2\ndata: {"prompt_tokens":12506,"completion_tokens":501}',
+      ),
+    );
+    state = addChatTokens(state, 700, 74);
+    expect(chatTokenTotals(state)).toEqual({
+      promptTokens: 13206,
+      completionTokens: 575,
+    });
+    const next = startNextChatRun(state, "second");
+    expect(next.diagnostics.promptTokens).toBe(0);
+    expect(next.chatPromptTokens).toBe(13206);
+    expect(next.chatCompletionTokens).toBe(575);
+    const second = applySseFrame(
+      next,
+      parseSseBlock(
+        'event: usage\nid: 1\ndata: {"prompt_tokens":258,"completion_tokens":32}',
+      ),
+    );
+    expect(chatTokenTotals(second)).toEqual({
+      promptTokens: 13464,
+      completionTokens: 607,
+    });
   });
 
   it("logs unknown events and continues", () => {

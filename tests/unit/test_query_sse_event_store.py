@@ -7,12 +7,14 @@ from typing import Any
 
 import pytest
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.sse import store as sse_store_mod
 from smart_rag_core.sse.store import (
     EVENT_STORE_LOCK_TIMEOUT_SQL,
     PostgresRunEventStore,
-    _raise_store_error,
     sqlstate_of,
 )
+
+from tests.unit.typed_attrs import typed_attr
 
 
 def test_postgres_event_store_reuses_and_closes_session(monkeypatch: Any) -> None:
@@ -67,9 +69,9 @@ def test_postgres_event_store_reuses_and_closes_session(monkeypatch: Any) -> Non
     monkeypatch.setattr("smart_rag_core.sse.store.psycopg.connect", _connect)
     store = PostgresRunEventStore("postgresql://hosted")
 
-    with store._transaction():
+    with typed_attr(store, "_transaction")():
         pass
-    with store._transaction():
+    with typed_attr(store, "_transaction")():
         pass
     store.close()
 
@@ -109,8 +111,10 @@ def test_raise_store_error_maps_lock_sqlstates() -> None:
         sqlstate = "57014"
 
     with pytest.raises(QueryAdmissionError) as lock_exc:
-        _raise_store_error(_LockError("lock timeout"))
+        typed_attr(sse_store_mod, "_raise_store_error")(_LockError("lock timeout"))
     assert lock_exc.value.reason == "lock_timeout"
     with pytest.raises(QueryAdmissionError) as cancel_exc:
-        _raise_store_error(_CancelError("statement timeout"))
+        typed_attr(sse_store_mod, "_raise_store_error")(
+            _CancelError("statement timeout")
+        )
     assert cancel_exc.value.reason == "statement_timeout"

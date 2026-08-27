@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
+import psycopg
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.nodes.answer import generate_answer_node
 from smart_rag_agents.query.nodes.company_scope import execute_branches_node
@@ -59,6 +61,8 @@ class _DebitHybrid:
         if self.query_budget is None:
             raise AssertionError("query_budget must be bound before retrieve")
         self.query_budget.remaining_model_calls -= 2
+        self.query_budget.prompt_tokens += 120
+        self.query_budget.completion_tokens += 4
         return SimpleNamespace(
             ranked_ids=(UUID("00000000-0000-0000-0000-000000000001"),),
             evidence=(),
@@ -117,6 +121,8 @@ def test_execute_branches_node_writes_remaining_model_calls() -> None:
     updated = execute_branches_node(state, QueryGraphDeps(hybrid_retriever=hybrid))
     assert updated["remaining_model_calls"] == 4
     assert updated["status"] == "branches_executed"
+    assert updated["prompt_tokens"] == 120
+    assert updated["completion_tokens"] == 4
     assert hybrid.query_budget is not None
     assert hybrid.query_budget.remaining_model_calls == 4
     written = AuthorizedRuntimeContext.from_mapping(updated["authorized_runtime"])
@@ -188,6 +194,65 @@ def test_prepare_query_node_writes_profile_reservation_version() -> None:
     assert written.remaining_usd == Decimal("3.52")
 
 
+def test_prepare_query_node_accumulates_profile_tokens() -> None:
+    """Ask Run Details must include provider tokens from the profile call."""
+
+    runtime = _runtime()
+    prep = prepare_query("hi friend", runtime=runtime).model_copy(
+        update={"model_calls": 1}
+    )
+    state = pending_query_state(
+        runtime.model_dump(mode="json"),
+        user_query="hi friend",
+    )
+    state["status"] = "memory_loaded"
+
+    class _Caller:
+        """Unused callable that already stashed provider tokens."""
+
+        last_prompt_tokens = 88
+        last_completion_tokens = 12
+
+        def __call__(self, query: str, memory: object) -> object:
+            """Reject invocation because ``prepare_query`` is patched.
+
+            Args:
+                query: Unused.
+                memory: Unused.
+
+            Returns:
+                Never.
+
+            Raises:
+                AssertionError: Always.
+            """
+
+            del query, memory
+            raise AssertionError("patched prepare_query must not invoke the caller")
+
+    def _prepare(query: str, **kwargs: object) -> object:
+        """Return a preparation that spent the one profile call.
+
+        Args:
+            query: Unused original query.
+            **kwargs: Unused consume hook.
+
+        Returns:
+            Preparation with ``model_calls=1``.
+        """
+
+        del query, kwargs
+        return prep
+
+    with patch("smart_rag_agents.query.nodes.prepare.prepare_query", _prepare):
+        updated = prepare_query_node(
+            state,
+            QueryGraphDeps(model_caller=_Caller()),  # type: ignore[arg-type]
+        )
+    assert updated["prompt_tokens"] == 88
+    assert updated["completion_tokens"] == 12
+
+
 def test_answer_consume_uses_runtime_version_after_profile() -> None:
     """The answer call must send the post-profile reservation version."""
 
@@ -234,7 +299,7 @@ def test_answer_consume_uses_runtime_version_after_profile() -> None:
     deps = QueryGraphDeps(
         model_gateway=SimpleNamespace(),
         general_chat_prompt_text="general",
-        connection=SimpleNamespace(),
+        connection=cast(psycopg.Connection, SimpleNamespace()),
     )
     with patch(
         "smart_rag_agents.query.nodes.answer.execute_counted_model_call",

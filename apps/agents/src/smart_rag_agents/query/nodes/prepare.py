@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from smart_rag_core.query_admission.ceilings import assert_call_available
 from smart_rag_core.query_admission.exceptions import QueryCeilingError
 from smart_rag_core.query_admission.service import ReservationConsumeResult
@@ -16,6 +18,7 @@ from smart_rag_agents.query.nodes.shared import (
     runtime_from_state,
     skip_closed_nodes,
 )
+from smart_rag_agents.query.nodes.tokens import accumulated_tokens, tokens_from_caller
 from smart_rag_agents.query.state import QueryGraphState
 
 
@@ -28,8 +31,9 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
 
     State outputs:
         ``preparation`` mapping, decremented ``remaining_model_calls``
-        when the one prep call ran, and ``authorized_runtime`` with the
-        post-profile reservation version.
+        when the one prep call ran, accumulated ``prompt_tokens`` /
+        ``completion_tokens`` from that call, and ``authorized_runtime``
+        with the post-profile reservation version.
 
     Persistence writes:
         Counted ``profile`` usage when a model call is consumed. The usage
@@ -83,11 +87,14 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             on_reservation_consume=consumed.append,
         )
     except QueryRoutingError as exc:
-        return {
-            **state,
-            "status": "routing_rejected",
-            "detail": exc.reason,
-        }
+        return cast(
+            QueryGraphState,
+            {
+                **state,
+                "status": "routing_rejected",
+                "detail": exc.reason,
+            },
+        )
     if preparation.model_calls == 1:
         try:
             remaining_calls = assert_call_available(remaining_calls)
@@ -96,20 +103,27 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     authorized = context
     if consumed:
         authorized = runtime_after_consume(context, consumed[0])
-    return {
-        **state,
-        "status": "prepared",
-        "authorized_runtime": authorized.model_dump(mode="json"),
-        "preparation": preparation.model_dump(mode="json"),
-        "remaining_model_calls": remaining_calls,
-        "keyword_extract_count": 0,
-        "catalog_llm_call_count": 0,
-        "knowledge_scope": preparation.knowledge_scope.value,
-        "no_retrieval_answer_mode": None,
-        "scope_degradation_reason": (
-            None
-            if preparation.scope_degradation_reason is None
-            else preparation.scope_degradation_reason.value
-        ),
-        "detail": "query prepared; answering is not implemented",
-    }
+    added_prompt, added_completion = (0, 0)
+    if preparation.model_calls == 1:
+        added_prompt, added_completion = tokens_from_caller(deps.model_caller)
+    return cast(
+        QueryGraphState,
+        {
+            **state,
+            "status": "prepared",
+            "authorized_runtime": authorized.model_dump(mode="json"),
+            "preparation": preparation.model_dump(mode="json"),
+            "remaining_model_calls": remaining_calls,
+            "keyword_extract_count": 0,
+            "catalog_llm_call_count": 0,
+            "knowledge_scope": preparation.knowledge_scope.value,
+            "no_retrieval_answer_mode": None,
+            "scope_degradation_reason": (
+                None
+                if preparation.scope_degradation_reason is None
+                else preparation.scope_degradation_reason.value
+            ),
+            "detail": "query prepared; answering is not implemented",
+            **accumulated_tokens(state, added_prompt, added_completion),
+        },
+    )

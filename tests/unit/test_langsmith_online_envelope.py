@@ -31,7 +31,7 @@ from smart_rag_core.evaluation.online_suite import (
 from smart_rag_core.evaluation.schema import DatasetSplit
 
 from tests.support.online_eval import (
-    _output,
+    eval_output,
 )
 
 
@@ -109,7 +109,7 @@ def test_envelope_rejects_secrets() -> None:
     """JWTs and API-key-like strings cannot enter the dedicated envelope."""
 
     case = load_online_eval_selection(limit=1).cases[0]
-    leaked = _output(
+    leaked = eval_output(
         answer_text="bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.aaaaaaaabbbbbbbb"
     )
     with pytest.raises(OnlineEnvelopeError):

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
@@ -19,6 +20,18 @@ class EventAppendMixin:
     """Mixin: persist one catalog event and log sanitized append failures."""
 
     _store: RunEventStore
+
+    if TYPE_CHECKING:
+
+        def _has_terminal(self, caller: CallerContext, run_id: UUID) -> bool:
+            """Return whether a terminal event exists. Provided by ReplayCancelMixin."""
+
+            ...
+
+        def _settle_reservation(self, caller: CallerContext, run_id: UUID) -> None:
+            """True-up the reservation once. Provided by RunSettlementMixin."""
+
+            ...
 
     def _log_append_failure(
         self,

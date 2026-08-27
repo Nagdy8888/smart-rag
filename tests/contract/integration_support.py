@@ -141,7 +141,7 @@ def local_supabase_status() -> dict[str, str]:
     return cast(dict[str, str], untyped)
 
 
-def _local_supabase_runtime_ready(connection: psycopg.Connection) -> bool:
+def local_supabase_runtime_ready(connection: psycopg.Connection) -> bool:
     """Return whether a ``postgres`` database has the Smart RAG runtime.
 
     A reachable TCP port is not enough for contract isolation. Vanilla or
@@ -192,7 +192,7 @@ def try_connect(url: str, *, connect_timeout: int = 3) -> psycopg.Connection | N
     except psycopg.Error:
         return None
     try:
-        if not _local_supabase_runtime_ready(connection):
+        if not local_supabase_runtime_ready(connection):
             connection.close()
             return None
         connection.rollback()

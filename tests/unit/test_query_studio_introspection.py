@@ -11,9 +11,9 @@ from smart_rag_agents.query.studio_live import (
 )
 
 from tests.support.studio_live import (
-    _REPO_ROOT,
     CANARY,
-    _IntrospectionRuntime,
+    STUDIO_REPO_ROOT,
+    IntrospectionRuntime,
 )
 
 
@@ -52,13 +52,13 @@ def test_introspection_opens_zero_sockets(monkeypatch: pytest.MonkeyPatch) -> No
     )
     monkeypatch.setattr(
         "smart_rag_core.security.jwks.httpx.Client",
-        lambda *a, **k: (_ for _ in ()).throw(AssertionError("jwks")),
+        boom,
     )
 
     async def _run() -> None:
         """Compile the introspection graph and inspect topology."""
 
-        async with make_graph(_IntrospectionRuntime()) as graph:  # type: ignore[arg-type]
+        async with make_graph(IntrospectionRuntime()) as graph:  # type: ignore[arg-type]
             nodes = set(graph.get_graph().nodes)
             assert "seed_studio_live_runtime" in nodes
             assert "emit_studio_response" in nodes
@@ -72,9 +72,10 @@ def test_live_modules_do_not_import_backend_or_print_token() -> None:
     """Agents live modules stay import-safe and do not mention service_role."""
 
     paths = [
-        _REPO_ROOT / "apps/agents/src/smart_rag_agents/query/studio_live.py",
-        _REPO_ROOT / "apps/agents/src/smart_rag_agents/query/live_runtime.py",
-        _REPO_ROOT / "packages/core/src/smart_rag_core/security/profile_snapshot.py",
+        STUDIO_REPO_ROOT / "apps/agents/src/smart_rag_agents/query/studio_live.py",
+        STUDIO_REPO_ROOT / "apps/agents/src/smart_rag_agents/query/live_runtime.py",
+        STUDIO_REPO_ROOT
+        / "packages/core/src/smart_rag_core/security/profile_snapshot.py",
     ]
     haystack = "\n".join(path.read_text(encoding="utf-8") for path in paths)
     assert "from smart_rag_api" not in haystack
@@ -89,7 +90,7 @@ def test_query_studio_registration_unchanged() -> None:
     """The unbound Studio graph entry must stay on ``studio.py:graph``."""
 
     payload = json.loads(
-        (_REPO_ROOT / "apps/agents/langgraph.json").read_text(encoding="utf-8")
+        (STUDIO_REPO_ROOT / "apps/agents/langgraph.json").read_text(encoding="utf-8")
     )
     assert (
         payload["graphs"]["query_studio"]

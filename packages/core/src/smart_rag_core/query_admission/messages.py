@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import NoReturn
 from uuid import UUID
 
 import psycopg
@@ -13,7 +14,7 @@ from smart_rag_core.security.identity import CallerContext
 _REASON_PREFIX = "query_message:"
 
 
-def _raise_message_error(exc: BaseException) -> None:
+def _raise_message_error(exc: BaseException) -> NoReturn:
     """Map a Postgres error to ``QueryAdmissionError``.
 
     Args:

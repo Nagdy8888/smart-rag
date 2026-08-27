@@ -399,6 +399,7 @@ def redact_gateway_outputs(outputs: object) -> dict[str, Any]:
         "cached_input_tokens",
         "output_tokens",
         "total_tokens",
+        "prompt_tokens",
         "model_calls",
     ):
         value = getattr(raw, field, None)

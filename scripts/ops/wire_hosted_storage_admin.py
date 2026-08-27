@@ -15,9 +15,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+from smart_rag_core.release.io import as_json_list, as_json_object
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ensure_app_runtime_role import _parse_env, _upsert_env
+from ensure_app_runtime_role import parse_env, upsert_env
 
 REPO = Path(__file__).resolve().parents[2]
 MANAGEMENT = "https://api.supabase.com/v1"
@@ -95,15 +96,23 @@ def _fetch_service_role(*, access_token: str, project_ref: str) -> str:
                 },
             )
         response.raise_for_status()
-        payload = response.json()
-        items = payload if isinstance(payload, list) else payload.get("keys", [])
-        if not isinstance(items, list):
-            raise RuntimeError("api_keys_not_list")
+        payload: object = response.json()
+        try:
+            items = as_json_list(payload)
+        except ValueError:
+            mapped_payload = as_json_object(payload)
+            keys_raw: object = mapped_payload.get("keys", [])
+            try:
+                items = as_json_list(keys_raw)
+            except ValueError:
+                items = []
         for item in items:
-            if not isinstance(item, dict):
+            try:
+                mapped = as_json_object(item)
+            except ValueError:
                 continue
-            if item.get("name") == "service_role" and item.get("type") == "legacy":
-                key = str(item.get("api_key") or item.get("key") or "")
+            if mapped.get("name") == "service_role" and mapped.get("type") == "legacy":
+                key = str(mapped.get("api_key") or mapped.get("key") or "")
                 if key.startswith("eyJ"):
                     return key
     raise RuntimeError("hosted_service_role_unavailable")
@@ -116,8 +125,8 @@ def main() -> int:
         Process exit code.
     """
 
-    env = _parse_env(REPO / ".env")
-    env.update(_parse_env(REPO / ".env.compose"))
+    env = parse_env(REPO / ".env")
+    env.update(parse_env(REPO / ".env.compose"))
     access_token = env.get("SUPABASE_ACCESS_TOKEN", "").strip()
     if not access_token:
         print("missing_SUPABASE_ACCESS_TOKEN", file=sys.stderr)
@@ -131,8 +140,8 @@ def main() -> int:
     print(f"service_role_claims={claims}", flush=True)
     print(f"service_role_len={len(service_role)}", flush=True)
     compose = REPO / ".env.compose"
-    _upsert_env(compose, "SUPABASE_STORAGE_ADMIN_SECRET", service_role)
-    _upsert_env(compose, "SUPABASE_SERVICE_ROLE_KEY", service_role)
+    upsert_env(compose, "SUPABASE_STORAGE_ADMIN_SECRET", service_role)
+    upsert_env(compose, "SUPABASE_SERVICE_ROLE_KEY", service_role)
     print("wrote_hosted_storage_admin=.env.compose", flush=True)
     return 0
 

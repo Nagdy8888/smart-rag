@@ -17,7 +17,8 @@ from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import UserRole
 
-from tests.unit.test_scope_graph_routes import _COMPANY_ONLY_NODES, _SpyHybrid
+from tests.support.typed_graph import compile_state_graph
+from tests.unit.test_scope_graph_routes import COMPANY_ONLY_NODES, SpyHybrid
 
 _GENERAL_REQUIRED = {
     "enforce_admission",
@@ -92,7 +93,7 @@ def _runtime() -> AuthorizedRuntimeContext:
 def _collect_route(
     query: str,
     *,
-    hybrid: _SpyHybrid | None = None,
+    hybrid: SpyHybrid | None = None,
 ) -> tuple[list[tuple[str, dict[str, object]]], list[str], list[str]]:
     """Stream one admitted run and map v2 parts to catalog drafts.
 
@@ -104,7 +105,9 @@ def _collect_route(
         Catalog drafts, start stages, and completed/failed stages.
     """
 
-    compiled = build_query_graph(QueryGraphDeps(hybrid_retriever=hybrid)).compile()
+    compiled = compile_state_graph(
+        build_query_graph(QueryGraphDeps(hybrid_retriever=hybrid))
+    )
     state = pending_query_state(_runtime().model_dump(mode="json"), user_query=query)
     mapper = QuerySseMapper()
     drafts: list[tuple[str, dict[str, object]]] = []
@@ -155,7 +158,7 @@ def test_general_route_skips_company_nodes_and_tools() -> None:
     drafts, starts, terminals = _collect_route(query)
     _assert_one_start_at_most_one_terminal(starts, terminals)
     assert _GENERAL_REQUIRED <= set(starts)
-    assert _COMPANY_ONLY_NODES.isdisjoint(starts)
+    assert COMPANY_ONLY_NODES.isdisjoint(starts)
     assert "mixed_scope" not in starts
     assert "invalid_scope" not in starts
     assert not any(item[0] == "tool_progress" for item in drafts)
@@ -182,7 +185,7 @@ def test_mixed_route_skips_company_nodes() -> None:
     drafts, starts, terminals = _collect_route(query)
     _assert_one_start_at_most_one_terminal(starts, terminals)
     assert _MIXED_REQUIRED <= set(starts)
-    assert _COMPANY_ONLY_NODES.isdisjoint(starts)
+    assert COMPANY_ONLY_NODES.isdisjoint(starts)
     assert "general_scope" not in starts
     assert query not in str(drafts)
 
@@ -190,7 +193,7 @@ def test_mixed_route_skips_company_nodes() -> None:
 def test_company_route_visits_retrieve_and_skips_direct_scopes() -> None:
     """Document questions enter company retrieve, not general/mixed."""
 
-    hybrid = _SpyHybrid()
+    hybrid = SpyHybrid()
     query = "What is our refund period?"
     drafts, starts, terminals = _collect_route(query, hybrid=hybrid)
     _assert_one_start_at_most_one_terminal(starts, terminals)
@@ -202,7 +205,9 @@ def test_company_route_visits_retrieve_and_skips_direct_scopes() -> None:
     assert query not in str(drafts)
     types = [item[0] for item in drafts]
     terminals_proto = [
-        item[0] for item in drafts if item[0] in {"completed", "cancelled", "error", "partial"}
+        item[0]
+        for item in drafts
+        if item[0] in {"completed", "cancelled", "error", "partial"}
     ]
     assert len(terminals_proto) <= 1
     if "token_delta" in types:

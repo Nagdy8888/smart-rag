@@ -82,7 +82,7 @@ class _ConnectionContext(Protocol):
         ...
 
 
-def _flatten_channel_candidates(
+def flatten_channel_candidates(
     dense_lists: tuple[tuple[RetrievalCandidate, ...], ...],
     bm25_candidates: tuple[RetrievalCandidate, ...],
     term_lists: tuple[tuple[RetrievalCandidate, ...], ...],
@@ -99,7 +99,7 @@ def _flatten_channel_candidates(
     """
 
     flatten = cast(
-        _FlattenFn, module_attr(hybrid_run_mod, "_flatten_channel_candidates")
+        _FlattenFn, module_attr(hybrid_run_mod, "flatten_channel_candidates")
     )
     return flatten(dense_lists, bm25_candidates, term_lists)
 
@@ -297,7 +297,7 @@ def test_flatten_channel_candidates_dedupes_first_seen() -> None:
         channel_rank=3,
         channel_score=0.1,
     )
-    flat = _flatten_channel_candidates(((first,),), (bm25_dup, second), ())
+    flat = flatten_channel_candidates(((first,),), (bm25_dup, second), ())
     assert tuple(item.chunk_id for item in flat) == (first.chunk_id, second.chunk_id)
 
 
@@ -813,7 +813,7 @@ def test_load_temporal_records_uses_app_api_role(
     records = loader((_candidate(version_id=version_id),))
     assert roles == ["SET ROLE app_api"]
     assert "SET ROLE postgres" not in roles
-    assert len(records) == 1
+    assert len(cast(dict[object, object], records)) == 1
 
 
 def test_locators_from_provenance_round_trip_sheet_and_url() -> None:
@@ -906,6 +906,8 @@ def test_retrieve_embed_and_rerank_debit_remaining() -> None:
     assert budget.usage_kinds == ["embedding", "rerank"]
     assert budget.remaining_model_calls == 5
     assert budget.remaining_usd == Decimal("2.58")
+    assert budget.prompt_tokens == 1
+    assert budget.completion_tokens == 1
 
 
 def test_retrieve_rerank_fails_closed_when_reservation_short() -> None:

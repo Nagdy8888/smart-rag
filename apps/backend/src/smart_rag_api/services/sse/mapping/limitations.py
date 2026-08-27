@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from smart_rag_core.query_routing.constants import LIMITATION_VERIFIER_OMITTED_LINKS
 
 
@@ -20,7 +22,8 @@ def limitation_from_update(
     verification = update.get("verification")
     if not isinstance(verification, dict):
         return None
-    omitted = verification.get("omitted_link_ids")
+    typed_verification = cast(dict[object, object], verification)
+    omitted = typed_verification.get("omitted_link_ids")
     if omitted:
         return ("limitation", {"code": LIMITATION_VERIFIER_OMITTED_LINKS})
     return None

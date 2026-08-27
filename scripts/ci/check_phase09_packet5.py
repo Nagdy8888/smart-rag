@@ -19,7 +19,7 @@ from smart_rag_core.release.constants import (
     PACKET8_OVERLAY_FILE,
     PRIVATE_COMPOSE_SERVICES,
 )
-from smart_rag_core.release.io import as_json_object, dump_canonical_json
+from smart_rag_core.release.io import as_json_object, dump_canonical_json, json_int
 from smart_rag_core.release.packet4 import (
     API_EXPECTED_JWT_ISSUER,
     LOCAL_GOTRUE_JWT_ISSUER,
@@ -504,11 +504,11 @@ def main(argv: list[str] | None = None) -> int:
             detach = _detach_overlay()
             overlay_report["detached"] = True
             overlay_report["detach"] = detach
-            if int(detach["returncode"]) != 0:
+            if json_int(detach.get("returncode")) != 0:
                 raise Phase09Packet5GateError("overlay detach failed")
         health_before = _health()
         overlay_report["health"] = health_before
-        if int(health_before["returncode"]) != 0:
+        if json_int(health_before.get("returncode")) != 0:
             raise Phase09Packet5GateError("candidate health failed")
         if _overlay_published(_compose_publishers()):
             raise Phase09Packet5GateError("private ports still published")
@@ -567,13 +567,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         jwt_blocked = jwt.get("classification") == "Blocked"
         parade_recovered = (
-            int(start_parade["returncode"]) == 0
+            json_int(start_parade.get("returncode")) == 0
             and parade_up.get("passed") is True
             and isinstance(parade_before.get("bm25_chunks"), int)
             and parade_after.get("bm25_chunks") == parade_before.get("bm25_chunks")
         )
         fill_recovered = (
-            fill.get("passed") is True and int(fill_restart["returncode"]) == 0
+            fill.get("passed") is True and json_int(fill_restart.get("returncode")) == 0
         )
         fill["recovered"] = fill_recovered
         fill["passed"] = fill_recovered
@@ -585,7 +585,7 @@ def main(argv: list[str] | None = None) -> int:
             "named_acl_users": False,
         }
         identity_held = image_ids == expected_image_ids()
-        health_after_passed = int(health_after["returncode"]) == 0
+        health_after_passed = json_int(health_after.get("returncode")) == 0
         acceptance = _acceptance_rows(
             suites=suite_rows,
             worker=worker,

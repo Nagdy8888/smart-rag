@@ -2,7 +2,7 @@
 
 import psycopg
 
-from smart_rag_core.retrieval.hybrid_run.channels import _flatten_channel_candidates
+from smart_rag_core.retrieval.hybrid_run.channels import flatten_channel_candidates
 from smart_rag_core.retrieval.hybrid_run.retriever import HybridRetriever
 from smart_rag_core.retrieval.hybrid_run.types import (
     EvidenceLocator,
@@ -15,6 +15,6 @@ __all__ = [
     "EvidenceUnit",
     "HybridRetriever",
     "HybridRunResult",
-    "_flatten_channel_candidates",
+    "flatten_channel_candidates",
     "psycopg",
 ]

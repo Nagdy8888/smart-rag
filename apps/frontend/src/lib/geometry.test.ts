@@ -127,6 +127,8 @@ describe("Ask independent scroll source lock", () => {
     expect(chat).not.toMatch(/\.answer\s*\{[\s\S]*?overflow:\s*auto/);
     expect(chat).not.toMatch(/\.stage\s*\{[\s\S]*?max-width:\s*880px/);
     expect(chat).toMatch(/\.composer\s*\{[\s\S]*?width:\s*100%/);
+    expect(chat).toMatch(/\.composerSend\s*\{[\s\S]*?width:\s*36px/);
+    expect(chat).toMatch(/\.composerSend\[aria-busy="true"\]/);
     expect(chat).toMatch(/\.railBody\[hidden\]\s*\{[\s\S]*?display:\s*none/);
     expect(chat).toMatch(/\.workspaceSessionsExpanded\s*\{[\s\S]*?280px/);
     expect(ui).toMatch(/\.fieldFull\s*\{[\s\S]*?max-width:\s*none/);

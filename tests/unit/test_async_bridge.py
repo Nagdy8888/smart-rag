@@ -35,7 +35,10 @@ def test_run_coro_blocking_from_running_loop() -> None:
             Inner coroutine result.
         """
 
-        return int(run_coro_blocking(_value()))
+        raw = run_coro_blocking(_value())
+        if not isinstance(raw, int):
+            raise TypeError("expected int")
+        return raw
 
     assert asyncio.run(_outer()) == 7
 

@@ -39,6 +39,9 @@ class QueryRetrieveBudget:
         reservation_id: Run-local reservation when ``connection`` is set.
         expected_version: Optimistic reservation version.
         usage_kinds: Debited kinds in call order (tests and audit).
+        prompt_tokens: Provider prompt tokens recorded on this ledger.
+        completion_tokens: Provider completion tokens recorded on this
+            ledger.
     """
 
     remaining_model_calls: int
@@ -48,7 +51,9 @@ class QueryRetrieveBudget:
     run_id: UUID | None = None
     reservation_id: UUID | None = None
     expected_version: int = 1
-    usage_kinds: list[str] = field(default_factory=list)
+    usage_kinds: list[str] = field(default_factory=lambda: list[str]())
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 
 def assert_retrieve_kind_available(
@@ -112,3 +117,24 @@ def debit_retrieve_budget(
         remaining_usd if remaining_usd is not None else budget.remaining_usd - usd_cap
     )
     budget.usage_kinds.append(usage_kind)
+
+
+def add_recorded_tokens(
+    budget: QueryRetrieveBudget, prompt_tokens: int, completion_tokens: int
+) -> None:
+    """Add provider-reported tokens onto the retrieve ledger.
+
+    Args:
+        budget: Mutable retrieve ledger.
+        prompt_tokens: Provider prompt tokens from one gateway call.
+        completion_tokens: Provider completion tokens from one gateway
+            call. Embeddings typically report 0.
+
+    Side Effects:
+        Increments ``budget.prompt_tokens`` and ``budget.completion_tokens``.
+        Negative values are stored as 0 so a malformed adapter cannot
+        shrink the run total.
+    """
+
+    budget.prompt_tokens += max(0, prompt_tokens)
+    budget.completion_tokens += max(0, completion_tokens)

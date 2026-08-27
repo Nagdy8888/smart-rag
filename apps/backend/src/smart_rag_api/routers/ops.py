@@ -7,8 +7,8 @@ from smart_rag_core.security.identity import UserRole
 from smart_rag_core.settings import BackendSettings
 
 from smart_rag_api.dependencies.identity import CallerContextDep
-from smart_rag_api.schemas.fastapi_security import MetaResponse
 from smart_rag_api.dependencies.services import clear_rate_limit_degraded
+from smart_rag_api.schemas.fastapi_security import MetaResponse
 from smart_rag_api.services.readiness import (
     ReadinessResponse,
     build_readiness,
@@ -62,9 +62,7 @@ def _build_request_readiness(request: Request) -> ReadinessResponse:
     """
 
     degraded = bool(getattr(request.app.state, "rate_limit_degraded", False))
-    payload = _compose_request_readiness(
-        request, rate_limit_degraded=degraded
-    )
+    payload = _compose_request_readiness(request, rate_limit_degraded=degraded)
     if degraded and valkey_probes_ok(payload):
         clear_rate_limit_degraded(request)
         payload = _compose_request_readiness(request, rate_limit_degraded=False)

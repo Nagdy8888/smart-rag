@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from smart_rag_core.query_answer.models import AnswerPayload
 
 from smart_rag_api.services.sse.mapping.contracts import (
@@ -68,13 +70,15 @@ class QuerySseMapper:
         if not isinstance(chunk, dict):
             return []
         events: list[tuple[str, dict[str, object]]] = []
-        for raw_name, raw_update in chunk.items():
+        typed_chunk = cast(dict[object, object], chunk)
+        for raw_name, raw_update in typed_chunk.items():
             node_name = str(raw_name)
             update: dict[str, object] = {}
             if isinstance(raw_update, dict):
+                typed_update = cast(dict[object, object], raw_update)
                 update = {
                     str(key): value
-                    for key, value in raw_update.items()
+                    for key, value in typed_update.items()
                     if str(key) not in {"passage", "snippet", "html", "traceback"}
                 }
             events.append(status_event(node_name, update))

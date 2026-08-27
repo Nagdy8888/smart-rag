@@ -514,7 +514,11 @@ def index_hybrid_content(
             "hybrid",
             stage,
             UUID(str(state["job_id"])),
-            **counts,
+            counts={
+                key: value
+                for key, value in counts.items()
+                if key not in {"error_category", "reason_code"}
+            },
         )
 
     with psycopg.connect(postgres_url) as connection:

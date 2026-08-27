@@ -12,7 +12,7 @@ import { throwIfNotOk } from "./errors";
 import type { ApiAuth } from "./headers";
 import { paidMutationHeaders, resumeHeaders } from "./headers";
 import { apiUrl, readJsonObject } from "./http";
-import { parseRunResponse } from "./parsers";
+import { parseConversationResponse, parseRunResponse } from "./parsers";
 
 /**
  * List conversations the caller may read.
@@ -32,7 +32,12 @@ export async function listConversations(
   if (!Array.isArray(parsed)) {
     return [];
   }
-  return parsed as ConversationResponse[];
+  return parsed.flatMap((item) => {
+    if (item === null || typeof item !== "object") {
+      return [];
+    }
+    return [parseConversationResponse(item as Record<string, unknown>)];
+  });
 }
 
 /**
@@ -56,18 +61,7 @@ export async function createConversation(
   });
   const body = await readJsonObject(response);
   throwIfNotOk(response, body);
-  return {
-    conversation_id: String(body.conversation_id ?? ""),
-    creator_user_id: String(body.creator_user_id ?? ""),
-    title:
-      body.title === null || body.title === undefined
-        ? null
-        : String(body.title),
-    created_at:
-      body.created_at === null || body.created_at === undefined
-        ? null
-        : String(body.created_at),
-  };
+  return parseConversationResponse(body);
 }
 
 /**
@@ -89,7 +83,7 @@ export async function fetchConversation(
   });
   const body = await readJsonObject(response);
   throwIfNotOk(response, body);
-  return body as unknown as ConversationResponse;
+  return parseConversationResponse(body);
 }
 
 /**
@@ -157,7 +151,7 @@ export async function fetchRun(
  * @param auth - Access token.
  * @param conversationId - Conversation UUID.
  * @param fetchImpl - Injected fetch.
- * @returns Conversation with the persisted title.
+ * @returns Conversation with the persisted title and this call's tokens.
  * @throws ClassifiedApiError on non-OK responses.
  */
 export async function generateConversationTitle(
@@ -174,18 +168,7 @@ export async function generateConversationTitle(
   );
   const body = await readJsonObject(response);
   throwIfNotOk(response, body);
-  return {
-    conversation_id: String(body.conversation_id ?? ""),
-    creator_user_id: String(body.creator_user_id ?? ""),
-    title:
-      body.title === null || body.title === undefined
-        ? null
-        : String(body.title),
-    created_at:
-      body.created_at === null || body.created_at === undefined
-        ? null
-        : String(body.created_at),
-  };
+  return parseConversationResponse(body);
 }
 
 /**

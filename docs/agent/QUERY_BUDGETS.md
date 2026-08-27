@@ -2,7 +2,7 @@
 title: Query budget engineering defaults
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-08-27
 audience: engineering
 phase_packet: Phase 6 Packet 1
 ---
@@ -32,6 +32,18 @@ uses the Hybrid 25-second envelope for both.
 | verifier | 0.20 | 4000 | 1000 |
 
 Timeout-after-send records the kind cap. The attempt is never under-counted.
+
+Successful sends record provider-reported prompt and completion tokens on
+`llm_usage` when a durable consume ran. Retrieve-time Hybrid embed/rerank
+and LightRAG query callbacks also add those actuals to
+`QueryRetrieveBudget.prompt_tokens` / `completion_tokens` even when the
+durable path is unbound, then company-scope and correction write the
+ledger onto LangGraph state. Ask Run Details reads the SSE `usage` event
+emitted after verify, which is that accumulated run total (profile,
+search, answer, verifier). Ask Run Details shows that as **This run**.
+**This chat** adds earlier questions in the live session plus
+conversation-title generation (`POST /conversations/{id}/title`). Title
+tokens are not reserved against the query-run envelope.
 
 Retrieve-time batched query embedding (`embedding`), OpenAI rerank
 (`rerank`), and LightRAG query callbacks (`lightrag` or `embedding`)

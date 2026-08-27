@@ -29,6 +29,7 @@ from tests.contract.integration_support import (
     resolve_supabase_db_url,
     try_connect,
 )
+from tests.unit.typed_attrs import typed_attr
 
 
 def _require_postgres() -> psycopg.Connection:
@@ -399,7 +400,7 @@ def test_dead_letter_rejects_stolen_lease(
     worker_connection.execute("SET ROLE app_worker")
     worker_connection.commit()
     with pytest.raises(JobLeaseError, match="dead_letter_lease_rejected"):
-        repo._move_to_dead_letter(
+        typed_attr(repo, "_move_to_dead_letter")(
             claimed,
             lease_token=original_token,
             error_category=JobErrorCategory.PERMANENT,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from uuid import UUID
 
 import psycopg
@@ -34,6 +35,36 @@ from smart_rag_core.query_answer.versions import (
 from smart_rag_core.security.identity import CallerContext
 
 from smart_rag_api.services.keyset import parse_created_at_id_cursor
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationTitleResult:
+    """Title-refresh outcome including provider usage for this call.
+
+    Attributes:
+        record: Conversation after the title write or skip.
+        prompt_tokens: Provider prompt tokens. 0 when the model was skipped
+            or failed before a billed response.
+        completion_tokens: Provider completion tokens. 0 when skipped or
+            failed.
+    """
+
+    record: ConversationRecord
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+def _non_negative_tokens(value: int) -> int:
+    """Clamp a provider usage field to a non-negative integer.
+
+    Args:
+        value: Provider-reported token count.
+
+    Returns:
+        ``value`` when ``>= 0``, otherwise ``0``.
+    """
+
+    return max(0, value)
 
 
 class ConversationService:
@@ -152,7 +183,7 @@ class ConversationService:
         *,
         conversation_id: UUID,
         gateway: ModelGateway,
-    ) -> ConversationRecord:
+    ) -> ConversationTitleResult:
         """Fill the session title from a bounded LLM summary when needed.
 
         Args:
@@ -161,7 +192,8 @@ class ConversationService:
             gateway: Process model gateway.
 
         Returns:
-            Conversation with the persisted title. On model failure the
+            Conversation plus this call's provider tokens. Tokens are 0
+            when the model was skipped or failed. On model failure the
             existing fallback title is kept.
 
         Raises:
@@ -171,6 +203,7 @@ class ConversationService:
         Side Effects:
             May call the model gateway once and update
             ``app.conversations.title``. Failure keeps the prior title.
+            Title tokens are not reserved against the query-run envelope.
         """
 
         with psycopg.connect(self._postgres_url) as connection:
@@ -181,13 +214,11 @@ class ConversationService:
             current = get_conversation(
                 connection, caller=caller, conversation_id=conversation_id
             )
-        excerpt = title_generation_excerpt(
-            source.current_title, source.user_excerpt
-        )
+        excerpt = title_generation_excerpt(source.current_title, source.user_excerpt)
         if excerpt == "":
-            return current
+            return ConversationTitleResult(record=current)
         if not needs_llm_conversation_title(source.current_title, excerpt):
-            return current
+            return ConversationTitleResult(record=current)
         fallback = compact_conversation_title(excerpt)
         try:
             response = await gateway.generate_conversation_title(
@@ -213,7 +244,7 @@ class ConversationService:
             ValueError,
             OSError,
         ):
-            return current
+            return ConversationTitleResult(record=current)
         with psycopg.connect(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             record = update_conversation_title(
@@ -223,4 +254,8 @@ class ConversationService:
                 title=title,
             )
             connection.commit()
-        return record
+        return ConversationTitleResult(
+            record=record,
+            prompt_tokens=_non_negative_tokens(response.input_tokens),
+            completion_tokens=_non_negative_tokens(response.output_tokens),
+        )

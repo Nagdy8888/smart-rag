@@ -16,6 +16,8 @@ from smart_rag_api.schemas.graph_inspect import (
 )
 from smart_rag_core.security.identity import CallerContext
 
+from tests.unit.typed_attrs import ignore_args, typed_attr
+
 
 class _TestHttpClient(Protocol):
     """Typed TestClient surface used by inspection OpenAPI tests."""
@@ -145,9 +147,9 @@ def test_graph_inspect_route_is_registered() -> None:
 def test_graph_inspect_is_a_preauth_mutation_prefix() -> None:
     """``POST /graph/inspect`` is covered by hashed-IP pre-auth limits."""
 
-    from smart_rag_api.middleware.preauth import _MUTATION_PREFIXES
+    from smart_rag_api.middleware import preauth
 
-    assert "/graph/" in _MUTATION_PREFIXES
+    assert "/graph/" in typed_attr(preauth, "_MUTATION_PREFIXES")
 
 
 def test_unauthenticated_inspect_is_unauthorized() -> None:
@@ -177,7 +179,7 @@ def test_member_may_call_inspect(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         "smart_rag_api.routers.graph_inspect.enforce_rate_limit",
-        lambda *args, **kwargs: None,
+        ignore_args,
     )
     with TestClient(create_app()) as raw:
         client = _http_client(raw)

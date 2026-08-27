@@ -312,14 +312,9 @@ def rule_comparison_or_multipart(ctx: MatrixContext) -> MatrixDecision | None:
 
     if not (ctx.prep.comparison or ctx.extract_query_type is QueryType.MULTI_PART):
         return None
-    from smart_rag_core.query_profile.extract import DeterministicExtract
 
     extract = extract_deterministic(ctx.prep.original)
-    det = (
-        extract
-        if isinstance(extract, DeterministicExtract)
-        else extract_deterministic(ctx.prep.original)
-    )
+    det = extract
     subs = _assert_subquestions(ctx.prep.decomposition or det.subquestions)
     wants_table = comparison_wants_table(ctx.prep.original, det)
     wants_rel = comparison_wants_relationship(ctx.prep.original, det)

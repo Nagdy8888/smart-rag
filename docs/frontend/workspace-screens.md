@@ -149,7 +149,7 @@ flowchart TB
 
 - Full-width block, no bubble. Body scale, 72ch measure.
 - Citation chips, then a 12px muted meta row (relative time, route badge when known, and this run’s prompt/completion tokens from SSE `usage` when either count is greater than zero).
-- Live runs append to the same list: the in-flight question is a user bubble; the stream is the last assistant block.
+- Live runs append to the same list: the in-flight question is a user bubble; the stream is the last assistant block. After `GET /conversations/{id}/messages` returns that turn, omit the live copy when decoded persisted `content` already matches (API text is HTML-escaped; SSE `answerText` is not).
 - Do not show a streaming caret or a pre-verification typewriter. After verification, reveal already-authoritative verified text under ADR-verified-answer-paced-reveal (skip, reduced motion, and historical messages show the full text immediately).
 - Partial/cancelled/error retains existing text and adds a StatusBanner below.
 - Footer order: citations, feedback, then collapsed “Run details”.
@@ -200,12 +200,12 @@ flowchart LR
 
 - Elevated card: white, 16px radius, border, `--shadow-composer`, 12px padding.
 - Auto-growing textarea (1–8 rows), borderless inside the card, placeholder exactly “Ask anything about your documents…”.
-- Footer: left hint exactly “Enter to send · Shift+Enter for a new line” (hidden below 480px); right 36px circular primary icon-button (arrow-up, `aria-label="Send"`), pending “Sending…”.
+- Footer: left hint exactly “Enter to send · Shift+Enter for a new line” (hidden below 480px); right 36px circular primary icon-button (arrow-up, `aria-label="Send"`). While pending, keep the same 36px circle, a spinner, and an accessible `Sending…` name. Do not squeeze visible “Sending…” text into the circle. No control gradient.
 - Character counter appears only when remaining is under 1000, as “N characters left”. No attachments sentence.
 - Running state replaces Send with Secondary/quiet-danger “Stop”.
 - `Enter` submits, `Shift+Enter` inserts newline; IME composition never submits.
 - Disabled reason appears immediately above composer in a StatusBanner, not only tooltip.
-- Draft lives in the composer. It remains after admission failure; clears only after successful admission.
+- Draft lives in the composer. The field clears as soon as Send is accepted so the question is not shown twice (bubble plus input) while create/admit or the stream is in flight. The draft is restored if conversation create or admission fails. `onSubmit` returns at stream handoff and must not wait for the verified answer.
 
 #### `ReconnectState`
 
@@ -237,7 +237,7 @@ flowchart LR
 - Tools, cache, coverage, and ignored stream events appear only when the stream supplied a value.
 - Do not show heartbeat counts, raw node names such as `verify_answer`, or placeholder `none` diagnostics.
 - Terminal text must never say “running” when `runId` is null.
-- Per-run tokens use `formatRunTokenUsage` (`412 prompt · 88 completion`) from SSE `usage` as “This run”. Account USD uses `formatUsd` on `GET /usage/me` as “Your account.”
+- Per-run tokens use `formatRunTokenUsage` (`412 prompt · 88 completion`) from SSE `usage` as “This run”, plus a total of prompt + completion. The total is the provider-reported sum for this question (profile, search, answer, verifier). “This chat” is that run plus earlier questions in the live conversation and `POST /conversations/{id}/title` tokens. Switching conversations resets the chat total. Account USD uses `formatUsd` on `GET /usage/me` as “Your account.”
 - “Your account” labels `/usage/me`; never “Company total.”
 - IDs use monospace and Copy buttons with real clipboard feedback.
 - No raw traces, prompts, provider secrets, source text, nDCG, or invented latency.

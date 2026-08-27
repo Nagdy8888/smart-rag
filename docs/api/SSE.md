@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-08-27
 audience: engineering, frontend
 ---
 
@@ -83,7 +83,7 @@ tracebacks, secrets, source HTML, or passages.
 | `citation_preview` | Citation IDs and ranks. No passage text. |
 | `answer_origin` | Additive origin (`origin` only). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
 | `token_delta` | Generated token delta. Never retrieved source. |
-| `usage` | Accumulated provider prompt and completion tokens for the run. Emitted after verify, before the terminal. Counts are 0 when no model ran. No prompts. |
+| `usage` | Accumulated provider prompt and completion tokens for this query run (profile, search, answer, verifier). Emitted after verify, before the terminal. Counts are 0 when no model ran. Conversation-title generation is not in this event; Ask Run Details adds it under **This chat**. No prompts. |
 | `completed` | Success terminal. |
 | `cancelled` | Cancel terminal. |
 | `error` | Sanitized `{code}`. |

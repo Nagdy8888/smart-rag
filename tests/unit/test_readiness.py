@@ -225,15 +225,16 @@ def test_rate_limit_degraded_latch_clears_when_valkey_recovers() -> None:
     from smart_rag_api.main import create_app
     from smart_rag_core.runtime.valkey import MemoryValkeyClient
 
-    from tests.unit.typed_openapi import as_openapi_client
+    from tests.unit.typed_openapi import as_openapi_client, client_app_state
 
     with TestClient(create_app()) as raw:
-        raw.app.state.rate_limit_degraded = True
-        raw.app.state.valkey_limits_client = MemoryValkeyClient()
-        raw.app.state.valkey_cache_client = MemoryValkeyClient()
+        state = client_app_state(raw)
+        state.rate_limit_degraded = True
+        state.valkey_limits_client = MemoryValkeyClient()
+        state.valkey_cache_client = MemoryValkeyClient()
         response = as_openapi_client(raw).get("/health/ready")
         assert response.status_code == 200
-        assert raw.app.state.rate_limit_degraded is False
+        assert state.rate_limit_degraded is False
 
 
 def test_rate_limit_degraded_latch_stays_when_valkey_is_down() -> None:
@@ -243,12 +244,13 @@ def test_rate_limit_degraded_latch_stays_when_valkey_is_down() -> None:
     from smart_rag_api.main import create_app
     from smart_rag_core.runtime.valkey import MemoryValkeyClient
 
-    from tests.unit.typed_openapi import as_openapi_client
+    from tests.unit.typed_openapi import as_openapi_client, client_app_state
 
     with TestClient(create_app()) as raw:
-        raw.app.state.rate_limit_degraded = True
-        raw.app.state.valkey_limits_client = MemoryValkeyClient(fail_closed=True)
-        raw.app.state.valkey_cache_client = MemoryValkeyClient(fail_closed=True)
+        state = client_app_state(raw)
+        state.rate_limit_degraded = True
+        state.valkey_limits_client = MemoryValkeyClient(fail_closed=True)
+        state.valkey_cache_client = MemoryValkeyClient(fail_closed=True)
         response = as_openapi_client(raw).get("/health/ready")
         assert response.status_code == 200
-        assert raw.app.state.rate_limit_degraded is True
+        assert state.rate_limit_degraded is True

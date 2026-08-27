@@ -9,7 +9,7 @@ from smart_rag_core.retrieval.rerank import RerankPassage
 from smart_rag_core.retrieval.types import RetrievalCandidate
 
 
-def _evidence_units(
+def evidence_units(
     passages: tuple[RerankPassage, ...],
     contexts: tuple[ChunkContext, ...],
 ) -> tuple[EvidenceUnit, ...]:
@@ -44,7 +44,7 @@ def _evidence_units(
     return tuple(units)
 
 
-def _evidence_units_from_context(
+def evidence_units_from_context(
     fused: tuple[RetrievalCandidate, ...],
     contexts: tuple[ChunkContext, ...],
 ) -> tuple[EvidenceUnit, ...]:

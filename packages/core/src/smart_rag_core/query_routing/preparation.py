@@ -200,7 +200,9 @@ def prepare_query(
 
     Side Effects:
         At most one gateway consume plus ``llm_usage`` row when a model runs.
-        Never opens retrieval, catalog search, or LightRAG keyword extract.
+        Successful profile calls record provider-reported tokens, not the
+        kind cap, unless timeout-after-send forces the cap. Never opens
+        retrieval, catalog search, or LightRAG keyword extract.
     """
 
     original = sanitize_user_text(query)
@@ -226,6 +228,32 @@ def prepare_query(
 
                 return model_caller(original, tuple(memory))
 
+            def _usage_from_result(
+                _result: PreparationModelPayload,
+            ) -> tuple[int | None, int | None, None]:
+                """Read provider tokens stashed by the profile caller.
+
+                Args:
+                    _result: Combined rewrite-plus-profile payload. Unused.
+
+                Returns:
+                    Prompt tokens, completion tokens, and no measured USD.
+                """
+
+                prompt = getattr(model_caller, "last_prompt_tokens", None)
+                completion = getattr(model_caller, "last_completion_tokens", None)
+                recorded_prompt = (
+                    prompt
+                    if isinstance(prompt, int) and not isinstance(prompt, bool)
+                    else None
+                )
+                recorded_completion = (
+                    completion
+                    if isinstance(completion, int) and not isinstance(completion, bool)
+                    else None
+                )
+                return recorded_prompt, recorded_completion, None
+
             try:
                 if connection is None:
                     payload = _send()
@@ -248,6 +276,7 @@ def prepare_query(
                         model_id=model_id,
                         provider_attempt_id=str(uuid4()),
                         send=_send,
+                        usage_from_result=_usage_from_result,
                     )
                     if on_reservation_consume is not None:
                         on_reservation_consume(consumed)

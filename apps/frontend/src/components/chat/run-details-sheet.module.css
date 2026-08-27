@@ -105,6 +105,10 @@
   gap: 10px;
 }
 
+.metricTotal {
+  grid-column: 1 / -1;
+}
+
 .metric {
   display: flex;
   flex-direction: column;

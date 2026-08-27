@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 import numpy as np
 
@@ -29,6 +31,37 @@ from smart_rag_core.retrieval.graph import (
     LIGHTRAG_LLM_TIMEOUT_SECONDS,
     LIGHTRAG_PINNED_VERSION,
 )
+
+_CALLBACK_USAGE: ContextVar[tuple[int, int, Decimal | None]] = ContextVar(
+    "lightrag_callback_usage",
+    default=(0, 0, None),
+)
+
+
+def remember_callback_usage(
+    prompt: int, completion: int, cost: Decimal | None = None
+) -> None:
+    """Store provider usage for the current asyncio task.
+
+    Args:
+        prompt: Provider prompt tokens from this callback.
+        completion: Provider completion tokens from this callback.
+        cost: Optional estimated USD. ``None`` when the adapter has none.
+    """
+
+    _CALLBACK_USAGE.set((max(0, prompt), max(0, completion), cost))
+
+
+def take_callback_usage() -> tuple[int, int, Decimal | None]:
+    """Return the current-task LightRAG callback usage.
+
+    Returns:
+        Prompt tokens, completion tokens, and optional USD from the most
+        recent callback on this asyncio task. Concurrent tasks do not
+        share this value.
+    """
+
+    return _CALLBACK_USAGE.get()
 
 
 @dataclass
@@ -86,6 +119,11 @@ class CountedLightRagCallbacks:
             callbacks emit ``[graph] extract_batch`` count lines.
         last_embed_latency_ms: Wall time of the most recent embedding call.
         last_embed_batch_size: Input count of the most recent embedding call.
+        last_prompt_tokens: Provider prompt tokens from the most recent
+            callback on this instance.
+        last_completion_tokens: Provider completion tokens from the most
+            recent callback on this instance.
+        last_cost_usd: Optional estimated USD from that callback.
     """
 
     embedding_gateway: EmbeddingGateway
@@ -97,6 +135,9 @@ class CountedLightRagCallbacks:
     ingest_job_id: str | None = None
     last_embed_latency_ms: int = 0
     last_embed_batch_size: int = 0
+    last_prompt_tokens: int = 0
+    last_completion_tokens: int = 0
+    last_cost_usd: Decimal | None = None
 
     async def embedding_texts(self, texts: list[str]) -> np.ndarray:
         """Embed one batch through the shared async gateway.
@@ -120,6 +161,7 @@ class CountedLightRagCallbacks:
 
         if not texts:
             raise ValueError("lightrag_embedding_batch_empty")
+        self._reset_usage()
         self._run_pre_provider_hook()
         request = EmbeddingRequest(
             operation_key=f"lightrag-embed-{LIGHTRAG_PINNED_VERSION}",
@@ -138,6 +180,7 @@ class CountedLightRagCallbacks:
         self.last_embed_batch_size = len(texts)
         self.last_embed_latency_ms = int((time.monotonic() - started) * 1000)
         self.counts.embed += 1
+        self._remember_response_usage(response)
         return np.asarray(response.vectors, dtype=np.float32)
 
     async def extract_llm(
@@ -167,6 +210,7 @@ class CountedLightRagCallbacks:
         """
 
         del history_messages
+        self._reset_usage()
         self._run_pre_provider_hook()
         gate = self.extract_gate
         if gate is not None:
@@ -193,6 +237,7 @@ class CountedLightRagCallbacks:
                 ),
             )
         )
+        self._remember_response_usage(response)
         return response.content
 
     async def keyword_llm(
@@ -217,6 +262,7 @@ class CountedLightRagCallbacks:
         """
 
         del history_messages
+        self._reset_usage()
         self._run_pre_provider_hook()
         self.counts.keyword_extract += 1
         response = await self.model_gateway.generate_lightrag_llm(
@@ -226,6 +272,7 @@ class CountedLightRagCallbacks:
                 system_prompt=system_prompt or "",
             )
         )
+        self._remember_response_usage(response)
         return response.content
 
     async def query_llm(
@@ -251,6 +298,7 @@ class CountedLightRagCallbacks:
         """
 
         del history_messages
+        self._reset_usage()
         self._run_pre_provider_hook()
         self.counts.answer_generate += 1
         response = await self.model_gateway.generate_lightrag_llm(
@@ -260,6 +308,7 @@ class CountedLightRagCallbacks:
                 system_prompt=system_prompt or "",
             )
         )
+        self._remember_response_usage(response)
         return response.content
 
     async def rerank_model(
@@ -282,6 +331,45 @@ class CountedLightRagCallbacks:
 
         self.counts.rerank += 1
         raise RuntimeError("lightrag_native_rerank_not_qualified")
+
+    def _reset_usage(self) -> None:
+        """Clear stashed tokens before a callback so failures cannot leak.
+
+        Side Effects:
+            Zeros instance last-usage fields and the task-local ContextVar.
+        """
+
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
+        self.last_cost_usd = None
+        remember_callback_usage(0, 0, None)
+
+    def _remember_response_usage(self, response: object) -> None:
+        """Stash provider usage from one gateway response.
+
+        Args:
+            response: Embedding or LightRAG LLM gateway response.
+        """
+
+        input_tokens = getattr(response, "input_tokens", None)
+        prompt_tokens = getattr(response, "prompt_tokens", None)
+        output_tokens = getattr(response, "output_tokens", None)
+        if isinstance(input_tokens, int) and not isinstance(input_tokens, bool):
+            recorded_prompt = max(0, input_tokens)
+        elif isinstance(prompt_tokens, int) and not isinstance(prompt_tokens, bool):
+            recorded_prompt = max(0, prompt_tokens)
+        else:
+            recorded_prompt = 0
+        if isinstance(output_tokens, int) and not isinstance(output_tokens, bool):
+            recorded_completion = max(0, output_tokens)
+        else:
+            recorded_completion = 0
+        cost = getattr(response, "estimated_cost_usd", None)
+        recorded_cost = cost if isinstance(cost, Decimal) else None
+        self.last_prompt_tokens = recorded_prompt
+        self.last_completion_tokens = recorded_completion
+        self.last_cost_usd = recorded_cost
+        remember_callback_usage(recorded_prompt, recorded_completion, recorded_cost)
 
     def _run_pre_provider_hook(self) -> None:
         """Invoke the optional lock/lease guard before a provider call.

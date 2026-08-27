@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
@@ -23,20 +24,23 @@ FIXTURE = (
 def test_representative_plans_match_pre_split_snapshots() -> None:
     """Recompiled plans equal the fixtures captured before the split."""
 
-    snapshots = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    snapshots = cast(
+        dict[str, dict[str, object]],
+        json.loads(FIXTURE.read_text(encoding="utf-8")),
+    )
     assert snapshots
     for name, payload in snapshots.items():
         query = str(payload["query"])
-        extra: dict[str, object] = {}
-        if name == "whole_document_insufficient":
-            extra["section_coverage_ratio"] = 0.5
         runtime = (
             _runtime(Phase6RouteFamily.HYBRID)
             if name == "envelope_cannot_enlarge"
             else _runtime()
         )
         prep = prepare_query(query, runtime=runtime)
-        plan = compile_retrieval_plan(prep, runtime, **extra)
+        if name == "whole_document_insufficient":
+            plan = compile_retrieval_plan(prep, runtime, section_coverage_ratio=0.5)
+        else:
+            plan = compile_retrieval_plan(prep, runtime)
         expected = RetrievalPlan.model_validate(payload["plan"])
         assert plan == expected, name
         assert plan.model_dump(mode="json") == expected.model_dump(mode="json"), name

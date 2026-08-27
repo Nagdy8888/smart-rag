@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import psycopg
@@ -13,7 +14,7 @@ from smart_rag_core.query_admission.service import (
     true_up_query_reservation,
 )
 from smart_rag_core.security.identity import CallerContext
-from smart_rag_core.sse.store import RunEventStore
+from smart_rag_core.sse.store import PersistedRunEvent, RunEventStore
 
 from smart_rag_api.services.sse.constants import NON_STARTABLE_STATUSES
 
@@ -27,6 +28,24 @@ class RunSettlementMixin:
     _postgres_url: str | None
     _settled_run_ids: set[UUID]
     _sse_schema_version: str
+
+    if TYPE_CHECKING:
+
+        def _append(
+            self,
+            caller: CallerContext,
+            run_id: UUID,
+            event_type: str,
+            payload: dict[str, object],
+        ) -> PersistedRunEvent | None:
+            """Persist one catalog event. Provided by EventAppendMixin."""
+
+            ...
+
+        def _has_terminal(self, caller: CallerContext, run_id: UUID) -> bool:
+            """Return whether a terminal event exists. Provided by ReplayCancelMixin."""
+
+            ...
 
     def _ensure_schema(self, caller: CallerContext, run_id: UUID) -> None:
         """Persist ``schema`` as sequence 1 when the log is empty.

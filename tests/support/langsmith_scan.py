@@ -14,11 +14,11 @@ from tests.unit.typed_attrs import module_attr
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-_ALLOWED_OPENAI_CTOR = {
+ALLOWED_OPENAI_CTOR = {
     Path("packages/core/src/smart_rag_core/observability/langsmith_tracing.py"),
 }
 
-_ALLOWED_RESPONSES_CREATE = {
+ALLOWED_RESPONSES_CREATE = {
     Path("packages/core/src/smart_rag_core/gateways/openai_rerank.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_answer.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_lightrag.py"),
@@ -26,7 +26,7 @@ _ALLOWED_RESPONSES_CREATE = {
     Path("packages/core/src/smart_rag_core/gateways/openai_profile.py"),
 }
 
-_ALLOWED_EMBEDDINGS_CREATE = {
+ALLOWED_EMBEDDINGS_CREATE = {
     Path("packages/core/src/smart_rag_core/observability/langsmith_tracing.py"),
 }
 
@@ -43,7 +43,7 @@ CANARY_EMAIL = "canary.user@example.com"
 CANARY_PASSAGE = "SECRET_COMPANY_PASSAGE_DO_NOT_EXPORT"
 
 
-def _tracing_context(
+def tracing_context_source(
     *, enabled: bool, client: object
 ) -> AbstractContextManager[object]:
     """Return LangSmith ``tracing_context`` with a known callable type.
@@ -63,7 +63,7 @@ def _tracing_context(
     return factory(enabled=enabled, client=client)
 
 
-def _python_files() -> tuple[Path, ...]:
+def scanned_python_files() -> tuple[Path, ...]:
     """Return authored production Python files under packages, apps, and scripts.
 
     Returns:
@@ -80,7 +80,7 @@ def _python_files() -> tuple[Path, ...]:
     return tuple(sorted(files))
 
 
-def _call_name(node: ast.AST) -> str | None:
+def call_name(node: ast.AST) -> str | None:
     """Return a dotted call name when the callee is a Name or Attribute.
 
     Args:

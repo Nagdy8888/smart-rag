@@ -35,16 +35,16 @@ from smart_rag_core.settings import (
 
 from tests.support.langsmith import RecordingLangSmithClient
 from tests.support.langsmith_scan import (
-    _ALLOWED_EMBEDDINGS_CREATE,
-    _ALLOWED_OPENAI_CTOR,
-    _ALLOWED_RESPONSES_CREATE,
+    ALLOWED_EMBEDDINGS_CREATE,
+    ALLOWED_OPENAI_CTOR,
+    ALLOWED_RESPONSES_CREATE,
     CANARY_EMAIL,
     CANARY_PASSAGE,
     CANARY_TOKEN,
     REPO_ROOT,
-    _call_name,
-    _python_files,
-    _tracing_context,
+    call_name,
+    scanned_python_files,
+    tracing_context_source,
 )
 
 
@@ -297,7 +297,7 @@ def test_mock_generate_is_traced_without_prompt_body() -> None:
     recorder = RecordingLangSmithClient()
     gateway = create_model_gateway(AgentSettings())
     request = ModelRequest(prompt=f"probe {CANARY_PASSAGE}")
-    with _tracing_context(enabled=True, client=recorder):
+    with tracing_context_source(enabled=True, client=recorder):
         asyncio.run(gateway.generate(request))
     names = [item["name"] for item in recorder.created]
     assert "model.generate" in names
@@ -315,7 +315,7 @@ def test_tracing_disabled_creates_no_runs() -> None:
 
     recorder = RecordingLangSmithClient()
     gateway = create_model_gateway(AgentSettings())
-    with _tracing_context(enabled=False, client=recorder):
+    with tracing_context_source(enabled=False, client=recorder):
         asyncio.run(gateway.generate(ModelRequest(prompt="foundation probe")))
     assert recorder.created == []
 
@@ -331,7 +331,7 @@ def test_mock_embed_is_traced_without_input_text() -> None:
         model="text-embedding-3-large",
         dimensions=8,
     )
-    with _tracing_context(enabled=True, client=recorder):
+    with tracing_context_source(enabled=True, client=recorder):
         asyncio.run(gateway.embed(request))
     names = [item["name"] for item in recorder.created]
     assert "embedding.embed" in names
@@ -361,7 +361,7 @@ def test_production_openai_calls_use_traced_helpers() -> None:
     openai_ctors: list[str] = []
     responses_creates: list[str] = []
     embeddings_creates: list[str] = []
-    for relative in _python_files():
+    for relative in scanned_python_files():
         tree = ast.parse(
             (REPO_ROOT / relative).read_text(encoding="utf-8"),
             filename=str(relative),
@@ -369,17 +369,17 @@ def test_production_openai_calls_use_traced_helpers() -> None:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            name = _call_name(node)
+            name = call_name(node)
             if name is None:
                 continue
             if name in {"OpenAI", "openai.OpenAI", "AsyncOpenAI", "openai.AsyncOpenAI"}:
-                if relative not in _ALLOWED_OPENAI_CTOR:
+                if relative not in ALLOWED_OPENAI_CTOR:
                     openai_ctors.append(f"{relative}:{node.lineno}:{name}")
             if name.endswith("responses.create"):
-                if relative not in _ALLOWED_RESPONSES_CREATE:
+                if relative not in ALLOWED_RESPONSES_CREATE:
                     responses_creates.append(f"{relative}:{node.lineno}:{name}")
             if name.endswith("embeddings.create"):
-                if relative not in _ALLOWED_EMBEDDINGS_CREATE:
+                if relative not in ALLOWED_EMBEDDINGS_CREATE:
                     embeddings_creates.append(f"{relative}:{node.lineno}:{name}")
     assert openai_ctors == []
     assert responses_creates == []
@@ -429,12 +429,14 @@ def test_redact_gateway_outputs_accepts_embedding_response() -> None:
         provider_request_id="req-1",
         fixture_provenance="openai://text-embedding-3-large",
         estimated_cost_usd=Decimal("0"),
+        prompt_tokens=12,
     )
     payload = redact_gateway_outputs(response)
     assert payload["mode"] == "openai"
     assert payload["vector_count"] == 1
     assert payload["vector_dimensions"] == 2
     assert payload["request_id"] == "req-1"
+    assert payload["prompt_tokens"] == 12
 
 
 def test_responses_redactor_accepts_raw_general_chat_tuple() -> None:
@@ -517,7 +519,7 @@ def test_general_chat_trace_closes_for_raw_tuple_output() -> None:
             4,
         )
 
-    with _tracing_context(enabled=True, client=recorder):
+    with tracing_context_source(enabled=True, client=recorder):
         result = _general_chat()
 
     assert result[1] == "resp-general-trace"

@@ -21,7 +21,7 @@ RUNTIME_WRAPPER_ENV = "APP_RUNTIME_DB_PASSWORD"
 GRANTED_ROLES = ("app_api", "app_worker", "app_checkpointer", "app_lightrag")
 
 
-def _parse_env(path: Path) -> dict[str, str]:
+def parse_env(path: Path) -> dict[str, str]:
     """Parse KEY=VALUE lines from one gitignored env file.
 
     Args:
@@ -43,7 +43,7 @@ def _parse_env(path: Path) -> dict[str, str]:
     return values
 
 
-def _upsert_env(path: Path, key: str, value: str) -> None:
+def upsert_env(path: Path, key: str, value: str) -> None:
     """Insert or replace one key without rewriting unrelated lines.
 
     Args:
@@ -84,8 +84,8 @@ def resolve_runtime_password() -> str:
     """
 
     process_value = os.environ.get(RUNTIME_WRAPPER_ENV, "").strip()
-    compose_values = _parse_env(REPO_ROOT / ".env.compose")
-    local_values = _parse_env(REPO_ROOT / ".env")
+    compose_values = parse_env(REPO_ROOT / ".env.compose")
+    local_values = parse_env(REPO_ROOT / ".env")
     password = (
         process_value
         or compose_values.get(RUNTIME_WRAPPER_ENV, "").strip()
@@ -94,7 +94,7 @@ def resolve_runtime_password() -> str:
     if not password:
         password = secrets.token_urlsafe(24)
     for name in (".env", ".env.compose"):
-        _upsert_env(REPO_ROOT / name, RUNTIME_WRAPPER_ENV, password)
+        upsert_env(REPO_ROOT / name, RUNTIME_WRAPPER_ENV, password)
     return password
 
 

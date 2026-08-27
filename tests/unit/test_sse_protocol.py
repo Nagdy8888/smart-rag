@@ -30,7 +30,7 @@ from tests.unit.typed_openapi import as_openapi_client, json_object
 
 
 @pytest.fixture(autouse=True)
-def _permit_test_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+def permit_test_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     """Allow ``X-Test-*`` headers for SSE HTTP protocol tests.
 
     Bypass requires ``APP_ENV=test`` and ``ALLOW_TEST_IDENTITY=true``.

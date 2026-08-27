@@ -7,10 +7,10 @@ from uuid import UUID
 
 import psycopg
 
-_NOW = datetime(2026, 8, 16, 12, 0, tzinfo=UTC)
+QUERY_MEMORY_NOW = datetime(2026, 8, 16, 12, 0, tzinfo=UTC)
 
 
-def _complete_run(
+def complete_query_run(
     cursor: psycopg.Cursor,
     run_id: UUID,
     *,

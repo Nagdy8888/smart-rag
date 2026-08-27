@@ -207,6 +207,24 @@ describe("pending buttons and confirm dialog", () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it("keeps icon pending as a spinner with an accessible Sending name", () => {
+    render(
+      <Button
+        size="icon"
+        variant="primary"
+        pending
+        pendingLabel="Sending…"
+        aria-label="Sending…"
+      >
+        Go
+      </Button>,
+    );
+    const control = screen.getByRole("button", { name: "Sending…" });
+    expect(control).toBeDisabled();
+    expect(control).toHaveAttribute("aria-busy", "true");
+    expect(control.querySelector("[aria-hidden='true']")).not.toBeNull();
+  });
+
   it("renders a PageHeader lead without a duplicate title heading", () => {
     render(
       <PageHeader title="Documents" description="Current versions only." />,

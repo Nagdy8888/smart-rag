@@ -48,7 +48,7 @@ def _insert_auth_user(cursor: psycopg.Cursor, user_id: uuid.UUID, email: str) ->
     )
 
 
-def _auth_version(cursor: psycopg.Cursor) -> int:
+def rls_auth_version(cursor: psycopg.Cursor) -> int:
     """Read the current server-owned authorization generation.
 
     Args:
@@ -64,7 +64,7 @@ def _auth_version(cursor: psycopg.Cursor) -> int:
     return int(row[0])
 
 
-def _insert_profile(
+def rls_insert_profile(
     cursor: psycopg.Cursor,
     *,
     user_id: uuid.UUID,
@@ -294,7 +294,7 @@ def test_rls_matrix_documents_conversations_and_audit(
             (conversation_a, user_a),
         )
 
-        auth_version = _auth_version(cursor)
+        auth_version = rls_auth_version(cursor)
 
         cursor.execute("SET ROLE app_api")
 
@@ -350,7 +350,7 @@ def test_rls_matrix_documents_conversations_and_audit(
             """,
             (restricted_doc, user_a, user_a),
         )
-        auth_version = _auth_version(cursor)
+        auth_version = rls_auth_version(cursor)
 
         cursor.execute("SET ROLE app_api")
 
@@ -535,7 +535,7 @@ def test_visibility_change_bumps_authorization_and_bm25_job(
             (user_id,),
         )
 
-        before_version = _auth_version(cursor)
+        before_version = rls_auth_version(cursor)
 
         cursor.execute(
             """
@@ -569,7 +569,7 @@ def test_visibility_change_bumps_authorization_and_bm25_job(
             (document_id,),
         )
 
-        after_version = _auth_version(cursor)
+        after_version = rls_auth_version(cursor)
         assert after_version == before_version + 1
 
         cursor.execute(
@@ -616,18 +616,18 @@ def test_full_role_acl_conversation_and_context_matrix(
     member_conversation = uuid.uuid4()
 
     with db_connection.cursor() as cursor:
-        _insert_profile(cursor, user_id=users["owner"], role="owner")
-        _insert_profile(cursor, user_id=users["admin"], role="admin")
-        _insert_profile(cursor, user_id=users["member"], role="member")
-        _insert_profile(
+        rls_insert_profile(cursor, user_id=users["owner"], role="owner")
+        rls_insert_profile(cursor, user_id=users["admin"], role="admin")
+        rls_insert_profile(cursor, user_id=users["member"], role="member")
+        rls_insert_profile(
             cursor,
             user_id=users["upload_member"],
             role="member",
             upload_enabled=True,
             mfa_enrolled=True,
         )
-        _insert_profile(cursor, user_id=users["viewer"], role="viewer")
-        _insert_profile(
+        rls_insert_profile(cursor, user_id=users["viewer"], role="viewer")
+        rls_insert_profile(
             cursor,
             user_id=users["disabled"],
             role="member",
@@ -654,7 +654,7 @@ def test_full_role_acl_conversation_and_context_matrix(
             """,
             (member_conversation, users["member"]),
         )
-        authorization_version = _auth_version(cursor)
+        authorization_version = rls_auth_version(cursor)
 
         cursor.execute("SET ROLE app_api")
 
@@ -734,7 +734,7 @@ def test_full_role_acl_conversation_and_context_matrix(
             grantee_user_id=users["viewer"],
             grant=True,
         )
-        granted_version = _auth_version(cursor)
+        granted_version = rls_auth_version(cursor)
         assert granted_version == authorization_version + 1
         assert restricted_document in _visible_document_ids(
             cursor, users["viewer"], "viewer", granted_version
@@ -749,7 +749,7 @@ def test_full_role_acl_conversation_and_context_matrix(
             grantee_user_id=users["viewer"],
             grant=True,
         )
-        assert _auth_version(cursor) == granted_version
+        assert rls_auth_version(cursor) == granted_version
 
         assert _set_document_acl(
             cursor,
@@ -760,7 +760,7 @@ def test_full_role_acl_conversation_and_context_matrix(
             grantee_user_id=users["viewer"],
             grant=False,
         )
-        revoked_version = _auth_version(cursor)
+        revoked_version = rls_auth_version(cursor)
         assert revoked_version == granted_version + 1
         assert not _visible_document_ids(
             cursor, users["viewer"], "viewer", granted_version
@@ -802,8 +802,8 @@ def test_graph_downgrade_and_current_version_matrix(
     old_version = uuid.uuid4()
 
     with db_connection.cursor() as cursor:
-        _insert_profile(cursor, user_id=admin_user, role="admin")
-        _insert_profile(cursor, user_id=member_user, role="member")
+        rls_insert_profile(cursor, user_id=admin_user, role="admin")
+        rls_insert_profile(cursor, user_id=member_user, role="member")
         cursor.execute(
             """
             INSERT INTO app.documents (
@@ -837,7 +837,7 @@ def test_graph_downgrade_and_current_version_matrix(
             """,
             (current_version, document_id),
         )
-        authorization_version = _auth_version(cursor)
+        authorization_version = rls_auth_version(cursor)
         cursor.execute("SET ROLE app_api")
 
         cursor.execute(
@@ -888,7 +888,7 @@ def test_graph_downgrade_and_current_version_matrix(
             (admin_user, authorization_version, document_id),
         )
         assert cursor.fetchone() == ("restricted", False)
-        restricted_version = _auth_version(cursor)
+        restricted_version = rls_auth_version(cursor)
         assert restricted_version == authorization_version + 1
 
         cursor.execute("SAVEPOINT restricted_graph")
@@ -930,8 +930,8 @@ def test_reused_connection_identity_is_bound_to_rpc_arguments() -> None:
 
     try:
         with connection.cursor() as cursor:
-            _insert_profile(cursor, user_id=user_a, role="member")
-            _insert_profile(cursor, user_id=user_b, role="member")
+            rls_insert_profile(cursor, user_id=user_a, role="member")
+            rls_insert_profile(cursor, user_id=user_b, role="member")
             cursor.execute(
                 """
                 INSERT INTO app.documents (id, title, visibility, created_by)
@@ -952,7 +952,7 @@ def test_reused_connection_identity_is_bound_to_rpc_arguments() -> None:
                 """,
                 (restricted_document, user_a, user_a),
             )
-            authorization_version = _auth_version(cursor)
+            authorization_version = rls_auth_version(cursor)
             cursor.execute("SELECT pg_backend_pid()")
             pid_row = cursor.fetchone()
             assert pid_row is not None

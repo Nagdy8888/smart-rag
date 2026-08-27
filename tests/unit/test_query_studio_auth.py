@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from langchain_core.messages import HumanMessage
+from pydantic import SecretStr
 from smart_rag_agents.query.studio_live import (
     DETAIL_DISABLED,
     DETAIL_PROFILE,
@@ -21,10 +22,11 @@ from smart_rag_core.settings import AgentSettings, BackendSettings
 
 from tests.support.studio_live import (
     CANARY,
-    _config,
-    _hooks,
-    _snapshot,
-    _verified_token,
+    studio_config,
+    studio_hooks,
+    studio_query_state,
+    studio_snapshot,
+    studio_verified_token,
 )
 
 
@@ -34,7 +36,7 @@ def test_agent_settings_do_not_inherit_backend_and_redact_token() -> None:
     assert not issubclass(AgentSettings, BackendSettings)
     settings = AgentSettings(
         langgraph_studio_live_enabled=True,
-        langgraph_studio_access_token=CANARY,
+        langgraph_studio_access_token=SecretStr(CANARY),
     )
     assert settings.langgraph_studio_live_enabled is True
     assert settings.langgraph_studio_access_token is not None
@@ -47,8 +49,8 @@ def test_unbound_seed_rejects_without_synthetic_admit() -> None:
     """Disabled/unbound live seed never mints ``studio_local``."""
 
     result = seed_studio_live_unbound(
-        {"user_query": "What is the status of INV-SR-1001?"},
-        _config(),  # type: ignore[arg-type]
+        studio_query_state("What is the status of INV-SR-1001?"),
+        studio_config(),  # type: ignore[arg-type]
     )
     assert result["status"] == "admission_rejected"
     assert result["detail"] == DETAIL_DISABLED
@@ -71,19 +73,19 @@ def test_disabled_and_missing_token_reject_before_verify() -> None:
         """
 
         calls.append(f"verify:{raw}")
-        return _verified_token()
+        return studio_verified_token()
 
     disabled = run_studio_live_seed(
-        {"user_query": "hello"},
-        _config(),  # type: ignore[arg-type]
-        _hooks(enabled=False, verify=verify),
+        studio_query_state("hello"),
+        studio_config(),  # type: ignore[arg-type]
+        studio_hooks(enabled=False, verify=verify),
     )
     assert disabled["status"] == "admission_rejected"
     assert disabled["authorized_runtime"] is None
     missing = run_studio_live_seed(
-        {"user_query": "hello"},
-        _config(),  # type: ignore[arg-type]
-        _hooks(token=None, verify=verify),
+        studio_query_state("hello"),
+        studio_config(),  # type: ignore[arg-type]
+        studio_hooks(token=None, verify=verify),
     )
     assert missing["detail"] == DETAIL_TOKEN_MISSING
     assert calls == []
@@ -105,13 +107,13 @@ def test_invalid_token_rejects_before_profile_or_admit() -> None:
         """
 
         calls.append(f"profile:{user_id}")
-        return _snapshot()
+        return studio_snapshot()
 
-    hooks = _hooks(verify=JwksVerificationError("expired"))
+    hooks = studio_hooks(verify=JwksVerificationError("expired"))
     hooks.load_profile = load_profile
     result = run_studio_live_seed(
-        {"user_query": "hello", "messages": [HumanMessage(content="hello", id="m1")]},
-        _config(),  # type: ignore[arg-type]
+        studio_query_state("hello", messages=[HumanMessage(content="hello", id="m1")]),
+        studio_config(),  # type: ignore[arg-type]
         hooks,
     )
     assert result["status"] == "admission_rejected"
@@ -141,21 +143,21 @@ def test_revoked_and_disabled_profile_reject_before_admit() -> None:
         raise AssertionError(kwargs)
 
     revoked = run_studio_live_seed(
-        {"user_query": "hello"},
-        _config(),  # type: ignore[arg-type]
-        _hooks(revoked=True, admit=admit),
+        studio_query_state("hello"),
+        studio_config(),  # type: ignore[arg-type]
+        studio_hooks(revoked=True, admit=admit),
     )
     assert revoked["detail"] == DETAIL_REVOKED
     disabled = run_studio_live_seed(
-        {"user_query": "hello"},
-        _config(),  # type: ignore[arg-type]
-        _hooks(profile=_snapshot(disabled=True), admit=admit),
+        studio_query_state("hello"),
+        studio_config(),  # type: ignore[arg-type]
+        studio_hooks(profile=studio_snapshot(disabled=True), admit=admit),
     )
     assert disabled["detail"] == DETAIL_PROFILE
     missing = run_studio_live_seed(
-        {"user_query": "hello"},
-        _config(),  # type: ignore[arg-type]
-        _hooks(profile=None, admit=admit),
+        studio_query_state("hello"),
+        studio_config(),  # type: ignore[arg-type]
+        studio_hooks(profile=None, admit=admit),
     )
     assert missing["detail"] == DETAIL_PROFILE
     assert calls == []

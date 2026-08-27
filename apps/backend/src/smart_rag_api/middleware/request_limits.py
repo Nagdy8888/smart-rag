@@ -59,13 +59,15 @@ def _install_receive_byte_limit(request: Request, maximum: int) -> None:
         message = await original_receive()
         if message["type"] == "http.request":
             chunk = message.get("body", b"")
-            if isinstance(chunk, bytes | bytearray | memoryview):
+            if isinstance(chunk, (bytes, bytearray)):
                 received += len(chunk)
-                if received > maximum:
-                    raise _BodyLimitExceeded()
+            elif isinstance(chunk, memoryview):
+                received += chunk.nbytes
+            if received > maximum:
+                raise _BodyLimitExceeded()
         return message
 
-    request._receive = limited_receive
+    request._receive = limited_receive  # pyright: ignore[reportPrivateUsage]
 
 
 def _payload_too_large() -> JSONResponse:

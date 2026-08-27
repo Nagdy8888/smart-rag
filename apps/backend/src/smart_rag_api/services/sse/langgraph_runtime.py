@@ -4,9 +4,24 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.settings import SharedSettings
+
+
+class StreamCancelFlag(Protocol):
+    """Cooperative cancel handle used while opening ``astream``."""
+
+    def is_set(self) -> bool:
+        """Return whether the owner cancelled the live run.
+
+        Returns:
+            True when deps should observe cooperative cancel.
+        """
+
+        ...
 
 
 class LangGraphRuntimeFactory:
@@ -58,7 +73,9 @@ class LangGraphRuntimeFactory:
 
         if self._bindings is not None:
             return self._bindings
-        self._bindings = build_query_process_bindings(settings=settings)
+        self._bindings = build_query_process_bindings(
+            settings=cast(SharedSettings | None, settings),
+        )
         return self._bindings
 
     def bind_memory_store(self, settings: object) -> tuple[Any, Any]:
@@ -145,7 +162,9 @@ class LangGraphRuntimeFactory:
             return self._compiled
         from smart_rag_agents.query.graph import compile_query_graph
 
-        self._compiled = compile_query_graph(checkpointer=checkpointer)
+        self._compiled = compile_query_graph(
+            checkpointer=cast(BaseCheckpointSaver[str] | None, checkpointer),
+        )
         self._compiled_checkpointer_id = marker
         self.compile_count += 1
         return self._compiled
@@ -156,7 +175,7 @@ async def open_langgraph_astream(
     settings: object,
     context: AuthorizedRuntimeContext,
     message: str,
-    cancel_event: object,
+    cancel_event: StreamCancelFlag,
     process_bindings: Callable[[object], Any],
     bind_memory_store: Callable[[object], Any],
     ensure_async_checkpointer: Callable[[object], Awaitable[Any]],
@@ -213,10 +232,13 @@ async def open_langgraph_astream(
     from smart_rag_api.services.sse.stream_dispatch import production_astream_options
 
     stream_method: Callable[..., AsyncIterator[object]] = compiled.astream  # type: ignore[reportUnknownMemberType]
-    stream_iter = stream_method(
-        state,
-        cast(Any, config),
-        context=QueryGraphContext(deps=deps),
-        **production_astream_options(),
+    stream_iter = cast(
+        AsyncIterator[object],
+        stream_method(
+            state,
+            cast(Any, config),
+            context=QueryGraphContext(deps=deps),
+            **production_astream_options(),
+        ),
     )
     return connection, stream_iter, deps

@@ -52,6 +52,10 @@ export type ChatViewState = {
   answerOrigin: string | null;
   clarificationRequired: boolean;
   progress: RunProgressState;
+  /** Completed prior runs and title tokens in this live conversation. */
+  chatPromptTokens: number;
+  /** Completed prior runs and title tokens in this live conversation. */
+  chatCompletionTokens: number;
 };
 
 /**
@@ -100,6 +104,77 @@ export function createChatViewState(idempotencyKey: string): ChatViewState {
     answerOrigin: null,
     clarificationRequired: false,
     progress: emptyRunProgress(),
+    chatPromptTokens: 0,
+    chatCompletionTokens: 0,
+  };
+}
+
+/**
+ * Start a new question while keeping this conversation's token totals.
+ *
+ * Prior run usage is folded into `chatPromptTokens` / `chatCompletionTokens`
+ * so Run Details can show both this question and the whole chat.
+ *
+ * @param previous - Terminal or empty view from the same conversation.
+ * @param idempotencyKey - Client key for the next admit.
+ * @returns Empty run state that still carries conversation token totals.
+ */
+export function startNextChatRun(
+  previous: ChatViewState,
+  idempotencyKey: string,
+): ChatViewState {
+  const next = createChatViewState(idempotencyKey);
+  return {
+    ...next,
+    chatPromptTokens: previous.chatPromptTokens + previous.diagnostics.promptTokens,
+    chatCompletionTokens:
+      previous.chatCompletionTokens + previous.diagnostics.completionTokens,
+  };
+}
+
+/**
+ * Add billed tokens that are not part of the current query-run SSE envelope.
+ *
+ * Used for `POST /conversations/{id}/title` provider usage.
+ *
+ * @param state - Current view.
+ * @param promptTokens - Provider prompt tokens to add. Negative values are ignored.
+ * @param completionTokens - Provider completion tokens to add. Negative values are ignored.
+ * @returns View with conversation totals increased.
+ */
+export function addChatTokens(
+  state: ChatViewState,
+  promptTokens: number,
+  completionTokens: number,
+): ChatViewState {
+  const prompt = Number.isFinite(promptTokens) && promptTokens > 0 ? promptTokens : 0;
+  const completion =
+    Number.isFinite(completionTokens) && completionTokens > 0 ? completionTokens : 0;
+  if (prompt === 0 && completion === 0) {
+    return state;
+  }
+  return {
+    ...state,
+    chatPromptTokens: state.chatPromptTokens + prompt,
+    chatCompletionTokens: state.chatCompletionTokens + completion,
+  };
+}
+
+/**
+ * Conversation-wide prompt and completion tokens for the live Ask session.
+ *
+ * Sums completed prior runs, the session title, and the current run.
+ *
+ * @param state - Current view.
+ * @returns Prompt and completion totals for this chat.
+ */
+export function chatTokenTotals(state: ChatViewState): {
+  promptTokens: number;
+  completionTokens: number;
+} {
+  return {
+    promptTokens: state.chatPromptTokens + state.diagnostics.promptTokens,
+    completionTokens: state.chatCompletionTokens + state.diagnostics.completionTokens,
   };
 }
 

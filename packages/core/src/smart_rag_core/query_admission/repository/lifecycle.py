@@ -9,7 +9,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
-from smart_rag_core.query_admission.repository.errors import _raise_admission
+from smart_rag_core.query_admission.repository.errors import raise_admission
 from smart_rag_core.query_admission.repository.records import QueryRunRecord
 from smart_rag_core.security.identity import CallerContext
 
@@ -52,7 +52,7 @@ def heartbeat_query_run(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("heartbeat_returned_no_row")
     return row[0]
@@ -82,7 +82,7 @@ def reconcile_expired_query_runs(
             cursor.execute("SELECT app.reconcile_expired_query_runs()")
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         return 0
     return int(row[0])
@@ -129,7 +129,7 @@ def cancel_query_run(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("not_found")
     reservation = row.get("reservation_id")
@@ -184,7 +184,7 @@ def fail_query_run(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("not_found")
     reservation = row.get("reservation_id")

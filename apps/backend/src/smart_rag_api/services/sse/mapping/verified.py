@@ -92,9 +92,7 @@ def emit_verified_events(
         isinstance(raw_status, str) and raw_status in PARTIAL_STATUSES
     ) or answer_status in {"partial", "refused"}:
         reason = (
-            raw_status
-            if isinstance(raw_status, str) and raw_status
-            else answer_status
+            raw_status if isinstance(raw_status, str) and raw_status else answer_status
         )
         if raw_status == "verified_partial" or answer_status == "partial":
             events.append(("deadline", {"route_family": None}))

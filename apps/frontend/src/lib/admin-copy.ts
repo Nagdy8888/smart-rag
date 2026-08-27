@@ -4,13 +4,13 @@
 
 import { OWNER_BOOTSTRAP_UNAVAILABLE } from "./auth/copy";
 
-/** No member-list HTTP. Identify users from `GET /me` and audit when available. */
-export const NO_MEMBER_DIRECTORY_COPY =
-  "There is no member directory. Identify people from invitations you send and from your own profile.";
-
 /** Offboarding cannot be undone from this UI. */
 export const OFFBOARD_IRREVERSIBLE_COPY =
   "Offboarding cannot be undone from this console. The person is disabled and their sessions end.";
+
+/** Team listing is owner/admin only. */
+export const WORKSPACE_PEOPLE_COPY =
+  "People who already have a workspace account, plus invitations that have not been accepted yet.";
 
 /** Frame 14 budget editor / critical-reserve sliders. GAP-07-11 has no HTTP. */
 export const BUDGET_EDITOR_UNAVAILABLE =

@@ -13,7 +13,7 @@ from smart_rag_core.observability.langsmith_deletion import (
     process_langsmith_deletion_requests,
 )
 
-from tests.support.query_memory import _NOW
+from tests.support.query_memory import QUERY_MEMORY_NOW
 from tests.support.query_postgres import (
     admit as _admit,
 )
@@ -58,17 +58,21 @@ def test_langsmith_deletion_request_retries_within_sla(
               %s
             )
             """,
-            (str(conversation_id), _NOW + timedelta(hours=24), _NOW),
+            (
+                str(conversation_id),
+                QUERY_MEMORY_NOW + timedelta(hours=24),
+                QUERY_MEMORY_NOW,
+            ),
         )
     transport = RecordingLangSmithDeletionTransport(fail_times=1)
     recorded, retried, expired = process_langsmith_deletion_requests(
-        db_connection, transport=transport, now=_NOW
+        db_connection, transport=transport, now=QUERY_MEMORY_NOW
     )
     assert recorded == 0
     assert retried >= 1
     assert expired == 0
     recorded, retried, expired = process_langsmith_deletion_requests(
-        db_connection, transport=transport, now=_NOW + timedelta(minutes=2)
+        db_connection, transport=transport, now=QUERY_MEMORY_NOW + timedelta(minutes=2)
     )
     assert recorded >= 1
     with db_connection.cursor() as cursor:
@@ -83,11 +87,14 @@ def test_langsmith_deletion_request_retries_within_sla(
             )
             VALUES ('deadbeef', ARRAY['def456'], 'pending', %s, %s)
             """,
-            (_NOW - timedelta(hours=1), _NOW + timedelta(hours=25)),
+            (
+                QUERY_MEMORY_NOW - timedelta(hours=1),
+                QUERY_MEMORY_NOW + timedelta(hours=25),
+            ),
         )
     late = RecordingLangSmithDeletionTransport()
     recorded, retried, expired = process_langsmith_deletion_requests(
-        db_connection, transport=late, now=_NOW + timedelta(hours=25)
+        db_connection, transport=late, now=QUERY_MEMORY_NOW + timedelta(hours=25)
     )
     assert expired >= 1
     assert ("def456",) not in late.calls

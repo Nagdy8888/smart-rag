@@ -23,13 +23,13 @@ from smart_rag_core.ingestion.chunking.types import (
     ChunkKind,
     ChunkProvenance,
 )
+from smart_rag_core.ingestion.embeddings import service as embedding_service_mod
 from smart_rag_core.ingestion.embeddings.mock_vectors import mock_embedding_vector
 from smart_rag_core.ingestion.embeddings.policy import EMBEDDING_DIMENSIONS
 from smart_rag_core.ingestion.embeddings.service import (
     EmbeddingBatchInput,
     EmbeddingGateError,
     EmbeddingService,
-    _chunk_set_hash,
 )
 from smart_rag_core.security.external_processing import (
     CategoryDisposition,
@@ -38,7 +38,7 @@ from smart_rag_core.security.external_processing import (
 )
 from smart_rag_core.settings import AgentSettings
 
-from tests.unit.typed_attrs import module_attr
+from tests.unit.typed_attrs import module_attr, typed_attr
 
 
 def _chunk(text: str) -> CanonicalChunk:
@@ -364,7 +364,7 @@ def test_embedding_service_skips_provider_when_ledger_completed() -> None:
     """A completed ledger row with vectors must not call the embedding provider."""
 
     chunk = _chunk("annual leave policy")
-    chunk_set_hash = _chunk_set_hash((chunk,))
+    chunk_set_hash = typed_attr(embedding_service_mod, "_chunk_set_hash")((chunk,))
     vector = list(mock_embedding_vector("annual leave policy"))
     ledger_id = uuid4()
     called = {"embed": 0}
@@ -478,7 +478,7 @@ def test_embedding_service_fails_closed_when_completed_vectors_missing() -> None
     """Completed ledger rows without vectors must not call the provider."""
 
     chunk = _chunk("annual leave policy")
-    chunk_set_hash = _chunk_set_hash((chunk,))
+    chunk_set_hash = typed_attr(embedding_service_mod, "_chunk_set_hash")((chunk,))
 
     class _Cursor:
         """Cursor that returns a completed row with no vectors."""
@@ -839,8 +839,11 @@ def test_openai_adapter_rejects_wrong_dimension() -> None:
 def test_embed_inputs_in_batches_emits_count_only_progress() -> None:
     """Gateway calls split on the default batch size without copying canary text."""
 
-    from smart_rag_core.ingestion.embeddings.service import _embed_inputs_in_batches
     from smart_rag_core.ingestion.limits import DEFAULT_EMBEDDING_BATCH_SIZE
+
+    embed_inputs_in_batches = typed_attr(
+        embedding_service_mod, "_embed_inputs_in_batches"
+    )
 
     gateway = EmbeddingGateway(MockEmbeddingAdapter(fixture_id="test"))
     canary = "SECRET_COMPANY_PASSAGE_DO_NOT_EXPORT"
@@ -857,7 +860,7 @@ def test_embed_inputs_in_batches_emits_count_only_progress() -> None:
 
         seen.append((stage, dict(counts)))
 
-    response = _embed_inputs_in_batches(
+    response = embed_inputs_in_batches(
         gateway,
         operation_key="op-batch",
         contextual_inputs=texts,

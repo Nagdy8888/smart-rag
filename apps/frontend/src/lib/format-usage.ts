@@ -35,10 +35,10 @@ export function formatTokenCount(value: number): string {
 }
 
 /**
- * Format one run's prompt and completion tokens for the answer meta row.
+ * Format prompt and completion tokens for Ask usage rows.
  *
- * @param promptTokens - Provider prompt tokens for the current run.
- * @param completionTokens - Provider completion tokens for the current run.
+ * @param promptTokens - Provider prompt tokens.
+ * @param completionTokens - Provider completion tokens.
  * @returns Example: `412 prompt · 88 completion`. Null when both are zero.
  */
 export function formatRunTokenUsage(

@@ -778,7 +778,7 @@
     {
       "action_id": "admin.tab.curation",
       "route": "/admin?tab=curation",
-      "label": "Curation",
+      "label": "Names & aliases",
       "control_kind": "local-state",
       "contract_owner": "frontend-shell",
       "contract": "URL tab state",
@@ -876,7 +876,7 @@
     {
       "action_id": "admin.curation.glossary",
       "route": "/admin?tab=curation",
-      "label": "Glossary",
+      "label": "Word aliases",
       "control_kind": "local-state",
       "contract_owner": "fastapi",
       "contract": "inner tab",
@@ -890,7 +890,7 @@
     {
       "action_id": "admin.curation.rules",
       "route": "/admin?tab=curation",
-      "label": "Entity rules",
+      "label": "People & things",
       "control_kind": "local-state",
       "contract_owner": "fastapi",
       "contract": "inner tab",

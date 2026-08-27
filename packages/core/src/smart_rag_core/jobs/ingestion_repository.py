@@ -6,7 +6,7 @@ import json
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg
@@ -437,9 +437,9 @@ def configurable_job_lease_token(
     """
 
     mapping = _as_mapping(config)
-    configurable = mapping.get("configurable", mapping)
+    configurable: object = mapping.get("configurable", mapping)
     if isinstance(configurable, dict):
-        token = configurable.get("job_lease_token")
+        token = cast(dict[str, object], configurable).get("job_lease_token")
         if isinstance(token, str) and token.strip():
             return token
     return fallback
@@ -457,10 +457,10 @@ def configurable_lease_lost(config: Mapping[str, object] | object) -> bool:
     """
 
     mapping = _as_mapping(config)
-    configurable = mapping.get("configurable", mapping)
+    configurable: object = mapping.get("configurable", mapping)
     if not isinstance(configurable, dict):
         return False
-    event = configurable.get("lease_lost")
+    event = cast(dict[str, object], configurable).get("lease_lost")
     is_set = getattr(event, "is_set", None)
     return bool(callable(is_set) and is_set())
 
@@ -476,12 +476,12 @@ def _as_mapping(config: Mapping[str, object] | object) -> Mapping[str, object]:
     """
 
     if isinstance(config, Mapping):
-        return config
+        return cast(Mapping[str, object], config)
     getter = getattr(config, "get", None)
     if callable(getter):
         configurable = getter("configurable", {})
         if isinstance(configurable, dict):
-            return {"configurable": configurable}
+            return {"configurable": cast(dict[str, object], configurable)}
     return {}
 
 

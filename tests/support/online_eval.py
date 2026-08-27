@@ -39,7 +39,7 @@ FORBIDDEN_IMPORT_PREFIXES = (
 )
 
 
-def _load_perform_eval() -> Any:
+def load_perform_eval() -> Any:
     """Import the standalone evaluator without treating scripts as a package.
 
     Returns:
@@ -57,7 +57,7 @@ def _load_perform_eval() -> Any:
     return module.perform_eval
 
 
-def _output(**kwargs: object) -> AgentEvalOutput:
+def eval_output(**kwargs: object) -> AgentEvalOutput:
     """Build one evaluation output with safe defaults.
 
     Args:
@@ -84,7 +84,7 @@ def _output(**kwargs: object) -> AgentEvalOutput:
     return AgentEvalOutput.model_validate(payload)
 
 
-def _reference(**kwargs: object) -> AgentEvalReference:
+def eval_reference(**kwargs: object) -> AgentEvalReference:
     """Build one reference payload with safe defaults.
 
     Args:
@@ -107,7 +107,7 @@ def _reference(**kwargs: object) -> AgentEvalReference:
     return AgentEvalReference.model_validate(payload)
 
 
-def _eval_run(
+def eval_run(
     output: AgentEvalOutput,
     reference: AgentEvalReference,
     *,

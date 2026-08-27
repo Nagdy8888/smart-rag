@@ -2,7 +2,7 @@
 title: LangSmith tracing for model and embedding calls
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-08-27
 audience: engineering, operators, security
 ---
 
@@ -87,6 +87,13 @@ there is logged and never raised.
 `assert_langsmith_export_permitted` with `ContentClass.REAL_COMPANY`
 must pass before company-document content can be traced. A denied gate
 is a hard stop, not a silent untraced success.
+
+Ask Run Details **This run** is the LangGraph SSE `usage` total for the
+current question (profile, Hybrid embed/rerank, LightRAG query callbacks,
+answer, verifier). Compare that number to the LangSmith **query.run.sse**
+parent or the sum of those child spans. **This chat** is that total plus
+earlier questions in the live Ask session and the conversation-title
+OpenAI call after the first completed or partial turn.
 
 Interpret stream close this way:
 

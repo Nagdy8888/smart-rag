@@ -145,11 +145,14 @@ def redact_ingest_parent_outputs(outputs: object) -> dict[str, Any]:
     """
 
     raw: object = outputs
-    if isinstance(outputs, Mapping):
-        mapped = dict(outputs)
+    if isinstance(outputs, dict):
+        mapped: dict[str, object] = {
+            str(key): value
+            for key, value in cast(dict[object, object], outputs).items()
+        }
         raw = mapped.get("output", mapped)
     if isinstance(raw, Mapping):
-        status = raw.get("status")
+        status = cast(Mapping[str, object], raw).get("status")
         if isinstance(status, str) and 0 < len(status) <= 64 and status.isascii():
             token = status.replace("-", "_")
             if token.replace("_", "").isalnum():
@@ -188,7 +191,7 @@ def _ingest_tracing_scope(*, enabled: bool) -> AbstractContextManager[object]:
         return nullcontext()
     factory = cast(
         Callable[..., AbstractContextManager[object]],
-        langsmith.tracing_context,
+        langsmith.tracing_context,  # pyright: ignore[reportUnknownMemberType]
     )
     return factory(enabled=True)
 

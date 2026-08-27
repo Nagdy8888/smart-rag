@@ -14,48 +14,48 @@ from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.retrieval.temporal import TemporalDocument, TemporalIntent
 from smart_rag_core.retrieval.types import RetrievalCandidate
 
-_FUSION_LIST_CAP = 3
-_EMBED_TEXT_CAP = 4
+FUSION_LIST_CAP = 3
+EMBED_TEXT_CAP = 4
 
-_CandidateList = tuple[RetrievalCandidate, ...]
-_VariantLists = tuple[_CandidateList, ...]
-_DenseRetrieveCall = Callable[..., object]
-_TermRetrieveCall = Callable[..., object]
-_Bm25RetrieveCall = Callable[..., object]
-_ChannelJob = Callable[[], object]
+CandidateList = tuple[RetrievalCandidate, ...]
+VariantLists = tuple[CandidateList, ...]
+DenseRetrieveCall = Callable[..., object]
+TermRetrieveCall = Callable[..., object]
+Bm25RetrieveCall = Callable[..., object]
+ChannelJob = Callable[[], object]
 
 
-class _DenseRetrieverLike(Protocol):
+class DenseRetrieverLike(Protocol):
     """Object with a dense ``retrieve`` method used by Hybrid channel jobs.
 
     Attributes:
         retrieve: Bound dense retrieve callable or test double.
     """
 
-    retrieve: _DenseRetrieveCall
+    retrieve: DenseRetrieveCall
 
 
-class _Bm25RetrieverLike(Protocol):
+class Bm25RetrieverLike(Protocol):
     """Object with a BM25 ``retrieve`` method used by Hybrid channel jobs.
 
     Attributes:
         retrieve: Bound BM25 retrieve callable or test double.
     """
 
-    retrieve: _Bm25RetrieveCall
+    retrieve: Bm25RetrieveCall
 
 
-class _TermRetrieverLike(Protocol):
+class TermRetrieverLike(Protocol):
     """Object with a term ``retrieve`` method used by Hybrid channel jobs.
 
     Attributes:
         retrieve: Bound term retrieve callable or test double.
     """
 
-    retrieve: _TermRetrieveCall
+    retrieve: TermRetrieveCall
 
 
-class _AssembleHybridKwargs(TypedDict):
+class AssembleHybridKwargs(TypedDict):
     """Keyword arguments shared by both Hybrid assemble calls in one retrieve.
 
     Attributes:
@@ -80,9 +80,9 @@ class _AssembleHybridKwargs(TypedDict):
         deadline_exhausted: True when a parallel channel missed the slice.
     """
 
-    dense_variants: _VariantLists
-    bm25_variants: _VariantLists
-    term_variants: _VariantLists
+    dense_variants: VariantLists
+    bm25_variants: VariantLists
+    term_variants: VariantLists
     bm25_fallback: RetrievalFallbackReason
     temporal_intent: TemporalIntent
     target_date: date | None

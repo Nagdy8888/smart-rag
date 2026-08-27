@@ -225,7 +225,7 @@ def _trailing_chunk() -> dict[str, object]:
 def _patch_recording_executor(
     monkeypatch: Any,
     executor: LangGraphQueryRunExecutor,
-    compiled: _RecordingCompiled,
+    compiled: _RecordingCompiled | _FakeCompiled,
 ) -> tuple[list[str], list[str]]:
     """Patch process bindings so execute uses a recording compiled graph.
 
@@ -248,11 +248,20 @@ def _patch_recording_executor(
             Settings stand-in with tracing disabled.
         """
 
+        def _allow_unsigned() -> bool:
+            """Permit unsigned local providers in fixture settings.
+
+            Returns:
+                Always True for unit tests.
+            """
+
+            return True
+
         return SimpleNamespace(
             langsmith_tracing=False,
             mock_model_mode=True,
             subprocessor_matrix_verified=True,
-            allows_unsigned_local_live_providers=lambda: True,
+            allows_unsigned_local_live_providers=_allow_unsigned,
             supabase_db_url=None,
         )
 
@@ -265,7 +274,7 @@ def _patch_recording_executor(
 
         del kwargs
 
-    def _compile(*args: object, **kwargs: object) -> _RecordingCompiled:
+    def _compile(*args: object, **kwargs: object) -> object:
         """Return the recording compiled graph.
 
         Args:
@@ -303,10 +312,18 @@ def _patch_recording_executor(
         """
 
         del dsn
-        return SimpleNamespace(
-            commit=lambda: commits.append("commit"),
-            close=lambda: commits.append("close"),
-        )
+
+        def _commit() -> None:
+            """Record one commit call."""
+
+            commits.append("commit")
+
+        def _close() -> None:
+            """Record one close call."""
+
+            commits.append("close")
+
+        return SimpleNamespace(commit=_commit, close=_close)
 
     def _deps(**kwargs: object) -> object:
         """Return a dummy graph-deps object.
@@ -368,6 +385,19 @@ def _patch_recording_executor(
         del args, kwargs
         settlements.append("persist")
 
+    def _trace_meta(**kwargs: object) -> dict[str, object]:
+        """Return empty query-run trace metadata.
+
+        Args:
+            **kwargs: Unused trace fields.
+
+        Returns:
+            Empty mapping.
+        """
+
+        del kwargs
+        return {}
+
     monkeypatch.setattr(
         "smart_rag_core.settings.load_backend_settings",
         _settings,
@@ -375,6 +405,10 @@ def _patch_recording_executor(
     monkeypatch.setattr(
         "smart_rag_core.observability.governance_gate.assert_langsmith_export_permitted",
         _permit_export,
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.observability.query_run_trace.query_run_trace_metadata",
+        _trace_meta,
     )
     graph_mod = sys.modules[_compile_query_graph.__module__]
     monkeypatch.setattr(graph_mod, "compile_query_graph", _compile)
@@ -392,3 +426,14 @@ def _patch_recording_executor(
     monkeypatch.setattr(executor, "_maybe_summarize", _summarize)
     monkeypatch.setattr(executor, "_persist_assistant_answer", _persist)
     return commits, settlements
+
+
+caller = _caller
+runtime = _runtime
+FakeCompiled = _FakeCompiled
+RecordingAsyncStream = _RecordingAsyncStream
+RecordingCompiled = _RecordingCompiled
+verified_chunk = _verified_chunk
+empty_verified_chunk = _empty_verified_chunk
+trailing_chunk = _trailing_chunk
+patch_recording_executor = _patch_recording_executor

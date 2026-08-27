@@ -22,7 +22,7 @@ from smart_rag_core.query_routing.serde import preparation_from_state
 from smart_rag_core.query_routing.signals import is_no_retrieval
 
 from tests.fixtures.query_routing_matrix_cases import MATRIX_ROUTE_CASES
-from tests.support.query_routing import _kinds, _plan, _prep
+from tests.support.query_routing import routing_kinds, routing_plan, routing_prep
 from tests.support.query_runtime import authorized_runtime as _runtime
 
 
@@ -41,23 +41,23 @@ def test_matrix_routes(
     """Every listed route, limitation, mixed, and Composite case is deterministic."""
 
     del case_id
-    plan = _plan(query)
+    plan = routing_plan(query)
     assert plan.effective_route is family
-    assert required_kinds <= _kinds(plan)
+    assert required_kinds <= routing_kinds(plan)
     assert limitations <= set(plan.limitations)
     assert plan.catalog_llm_call_count == 0
     assert plan.prove_complement is False
     assert plan.branch_concurrency == BRANCH_CONCURRENCY
-    if BranchKind.GRAPH_LOCAL in _kinds(plan) or BranchKind.GRAPH_HYBRID in _kinds(
+    if BranchKind.GRAPH_LOCAL in routing_kinds(
         plan
-    ):
+    ) or BranchKind.GRAPH_HYBRID in routing_kinds(plan):
         assert "temporal_graph_limitation" not in plan.limitations
     if family is Phase6RouteFamily.NO_RETRIEVAL:
         assert plan.company_claim_forbidden is True
         assert plan.no_retrieval_answer_mode is not None
-        assert BranchKind.HYBRID not in _kinds(plan)
-        assert BranchKind.GRAPH_LOCAL not in _kinds(plan)
-        assert BranchKind.STRUCTURED_TABLE not in _kinds(plan)
+        assert BranchKind.HYBRID not in routing_kinds(plan)
+        assert BranchKind.GRAPH_LOCAL not in routing_kinds(plan)
+        assert BranchKind.STRUCTURED_TABLE not in routing_kinds(plan)
     else:
         assert plan.knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
         assert plan.no_retrieval_answer_mode is None
@@ -66,7 +66,9 @@ def test_matrix_routes(
 def test_historical_relationship_never_has_graph_branch() -> None:
     """Historical relationships stay Hybrid with temporal_graph_limitation."""
 
-    plan = _plan("Which team owns the widget after the handoff as of 2020-01-01?")
+    plan = routing_plan(
+        "Which team owns the widget after the handoff as of 2020-01-01?"
+    )
     assert plan.effective_route is Phase6RouteFamily.HYBRID
     assert plan.temporal_graph_limitation is True
     assert plan.historical_relationship is True
@@ -76,18 +78,18 @@ def test_historical_relationship_never_has_graph_branch() -> None:
             BranchKind.GRAPH_HYBRID,
             BranchKind.GRAPH_GLOBAL_STEERING,
         }
-        & _kinds(plan)
+        & routing_kinds(plan)
     )
 
 
 def test_whole_document_requires_section_coverage_one() -> None:
     """Whole-document claims require exactly ``section_coverage_ratio=1.0``."""
 
-    plan = _plan("Summarize document p4-src-0001")
+    plan = routing_plan("Summarize document p4-src-0001")
     assert plan.whole_document_summary is True
     assert plan.section_coverage_required == WHOLE_DOCUMENT_SECTION_COVERAGE
     refused = compile_retrieval_plan(
-        _prep("Summarize document p4-src-0001"),
+        routing_prep("Summarize document p4-src-0001"),
         _runtime(),
         section_coverage_ratio=0.5,
     )
@@ -98,10 +100,10 @@ def test_whole_document_requires_section_coverage_one() -> None:
 def test_negation_never_combined_or_complement() -> None:
     """Negation stays Hybrid and cannot prove a complement from top-k."""
 
-    plan = _plan("What is not allowed for INV-SR-1001?")
+    plan = routing_plan("What is not allowed for INV-SR-1001?")
     assert plan.effective_route is Phase6RouteFamily.HYBRID
     assert plan.prove_complement is False
-    assert BranchKind.GRAPH_LOCAL not in _kinds(plan)
+    assert BranchKind.GRAPH_LOCAL not in routing_kinds(plan)
     with pytest.raises(ValidationError):
         RetrievalPlan.model_validate({**plan.model_dump(), "prove_complement": True})
 
@@ -109,7 +111,7 @@ def test_negation_never_combined_or_complement() -> None:
 def test_media_refusal_cannot_answer() -> None:
     """Unsupported media cannot become an answer family."""
 
-    plan = _plan("Describe the unlabeled chart in the figure")
+    plan = routing_plan("Describe the unlabeled chart in the figure")
     assert plan.effective_route is Phase6RouteFamily.SCOPED_REFUSAL
     assert plan.media_answer_forbidden is True
 
@@ -117,7 +119,7 @@ def test_media_refusal_cannot_answer() -> None:
 def test_no_retrieval_forbids_company_claim() -> None:
     """NoRetrieval cannot make company-knowledge claims."""
 
-    plan = _plan("Hello")
+    plan = routing_plan("Hello")
     assert plan.effective_route is Phase6RouteFamily.NO_RETRIEVAL
     assert plan.company_claim_forbidden is True
     with pytest.raises(ValidationError):
@@ -136,7 +138,7 @@ def test_greeting_prefix_does_not_hide_company_question() -> None:
 def test_graph_only_is_inspection_not_answer() -> None:
     """Graph-only remains inspection and cannot be an answer fallback."""
 
-    plan = _plan("Inspect the current graph workspace")
+    plan = routing_plan("Inspect the current graph workspace")
     assert plan.effective_route is Phase6RouteFamily.GRAPH_INSPECTION
     assert plan.graph_as_answer_forbidden is True
     with pytest.raises(ValidationError):
@@ -148,7 +150,7 @@ def test_graph_only_is_inspection_not_answer() -> None:
 def test_caption_media_may_use_hybrid() -> None:
     """Caption/OCR language lets a media query take ordinary Hybrid."""
 
-    plan = _plan("What does the caption say under the unlabeled figure?")
+    plan = routing_plan("What does the caption say under the unlabeled figure?")
     assert plan.effective_route is Phase6RouteFamily.HYBRID
     assert plan.media_answer_forbidden is False
 
@@ -157,13 +159,13 @@ def test_client_combined_cannot_enlarge_hybrid_reservation() -> None:
     """A Combined matrix result cannot enlarge a Hybrid reservation."""
 
     plan = compile_retrieval_plan(
-        _prep("Which team owns INV-SR-1001 related to procurement?"),
+        routing_prep("Which team owns INV-SR-1001 related to procurement?"),
         _runtime(Phase6RouteFamily.HYBRID),
     )
     assert plan.requested_route is Phase6RouteFamily.HYBRID
     assert plan.effective_route is Phase6RouteFamily.HYBRID
     assert plan.fallback_reason == "envelope_cannot_enlarge"
-    assert BranchKind.GRAPH_LOCAL not in _kinds(plan)
+    assert BranchKind.GRAPH_LOCAL not in routing_kinds(plan)
 
 
 def test_production_manual_override_rejected() -> None:
@@ -171,7 +173,7 @@ def test_production_manual_override_rejected() -> None:
 
     with pytest.raises(QueryRoutingError, match="production_manual_override"):
         compile_retrieval_plan(
-            _prep("What is the status of INV-SR-1001?"),
+            routing_prep("What is the status of INV-SR-1001?"),
             _runtime(),
             requested_manual_route="combined",
         )
@@ -180,7 +182,7 @@ def test_production_manual_override_rejected() -> None:
 def test_fourth_subquestion_rejected() -> None:
     """A fourth subquestion fails closed instead of silently truncating."""
 
-    prep = _prep("Compare PRJ-ALPHA leave days and notice period.")
+    prep = routing_prep("Compare PRJ-ALPHA leave days and notice period.")
     with pytest.raises(ValidationError):
         preparation_from_state(
             {

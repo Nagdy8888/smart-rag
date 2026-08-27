@@ -16,6 +16,7 @@ import type { CitationResponse, ConversationMessage } from "../../lib/types";
 import { formatRunTokenUsage } from "../../lib/format-usage";
 import { routeLabel } from "../../lib/run-details";
 import { formatRelativeTime } from "../../lib/relative-time";
+import { displayText } from "../../lib/safe-text";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { CitationChip } from "../ui/citation-chip";
@@ -118,6 +119,27 @@ export function answerTerminalNote(
 }
 
 /**
+ * Return whether persisted transcript text is the same live Ask string.
+ *
+ * `GET /conversations/{id}/messages` HTML-escapes content. SSE `answerText`
+ * and the composer question are already decoded. Compare decoded strings so
+ * apostrophes and quotes do not keep a second copy of the same turn.
+ *
+ * @param persisted - Escaped history `content`, or undefined when missing.
+ * @param live - Decoded live question or verified answer.
+ * @returns True when both sides display the same non-empty text.
+ */
+export function transcriptTextMatches(
+  persisted: string | undefined,
+  live: string,
+): boolean {
+  if (persisted === undefined || live === "") {
+    return false;
+  }
+  return displayText(persisted) === displayText(live);
+}
+
+/**
  * Render citation chips for a company or legacy-null origin.
  *
  * @param citations - Authorized citations.
@@ -170,7 +192,9 @@ function CitationRow({
  * @returns Answer column. Origin is never inferred from the route pill.
  * @remarks
  * Render-isolation contract: this column is the only subtree that should
- * re-render on SSE `token_delta` batches.
+ * re-render on SSE `token_delta` batches. After transcript refetch, live
+ * question/answer chrome is omitted when decoded persisted content already
+ * matches so apostrophes cannot keep a second copy of the same turn.
  */
 export const AnswerSurface = memo(function AnswerSurface({
   messages = [],
@@ -219,14 +243,15 @@ export const AnswerSurface = memo(function AnswerSurface({
   const lastHistAssistant = [...messages]
     .reverse()
     .find((item) => item.role === "assistant");
-  const showLiveUser = question !== "" && lastHistUser?.content !== question;
+  const showLiveUser =
+    question !== "" && !transcriptTextMatches(lastHistUser?.content, question);
   const showProgress =
     progressItems.length > 0 ||
     statusLine !== null ||
     (chat !== null && chat.terminal === null && chat.runId !== null);
   const showLiveAssistant =
     (showProgress || answer !== "") &&
-    lastHistAssistant?.content !== answer;
+    !transcriptTextMatches(lastHistAssistant?.content, answer);
   const empty =
     !messagesPending &&
     !messagesError &&

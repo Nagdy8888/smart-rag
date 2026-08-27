@@ -12,7 +12,7 @@ from smart_rag_core.query_admission.exceptions import (
 _REASON_PREFIX = "query_admission:"
 
 
-def _raise_admission(exc: BaseException) -> NoReturn:
+def raise_admission(exc: BaseException) -> NoReturn:
     """Map a Postgres exception to a typed admission/budget error.
 
     Args:

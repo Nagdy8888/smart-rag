@@ -9,7 +9,7 @@ import psycopg
 import pytest
 
 from tests.contract.integration_support import resolve_supabase_db_url, try_connect
-from tests.contract.test_rls_matrix import _auth_version, _insert_profile
+from tests.contract.test_rls_matrix import rls_auth_version, rls_insert_profile
 
 
 @pytest.fixture
@@ -38,8 +38,8 @@ def test_delete_visible_document_excludes_retrieval_and_hides_from_members(
     hidden_id = uuid4()
 
     with db_connection.cursor() as cursor:
-        _insert_profile(cursor, user_id=owner_id, role="owner")
-        _insert_profile(cursor, user_id=member_id, role="member")
+        rls_insert_profile(cursor, user_id=owner_id, role="owner")
+        rls_insert_profile(cursor, user_id=member_id, role="member")
         cursor.execute(
             """
             INSERT INTO app.documents (id, title, visibility, created_by)
@@ -69,7 +69,7 @@ def test_delete_visible_document_excludes_retrieval_and_hides_from_members(
             """,
             (version_id, document_id),
         )
-        authz = _auth_version(cursor)
+        authz = rls_auth_version(cursor)
         cursor.execute("SET ROLE app_api")
         cursor.execute("SAVEPOINT member_delete")
         with pytest.raises(psycopg.errors.RaiseException, match="documents:forbidden"):

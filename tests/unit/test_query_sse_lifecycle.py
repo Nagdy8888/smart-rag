@@ -20,26 +20,29 @@ from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.sse.store import MemoryRunEventStore
 
 from tests.support.query_sse import (
-    _caller,
-    _empty_verified_chunk,
-    _patch_recording_executor,
-    _RecordingAsyncStream,
-    _RecordingCompiled,
-    _runtime,
-    _trailing_chunk,
-    _verified_chunk,
+    RecordingAsyncStream,
+    RecordingCompiled,
+    empty_verified_chunk,
+    patch_recording_executor,
+    trailing_chunk,
+    verified_chunk,
 )
+from tests.support.query_sse import (
+    caller as make_caller,
+)
+from tests.support.query_sse import (
+    runtime as make_runtime,
+)
+from tests.unit.typed_attrs import set_attr, typed_attr
 
 
 def test_successful_stream_drains_and_skips_aclose(monkeypatch: Any) -> None:
     """A terminal plus trailing chunk exhausts naturally without aclose."""
 
-    stream = _RecordingAsyncStream(
-        (_verified_chunk("VISIBLE_FINAL"), _trailing_chunk())
-    )
+    stream = RecordingAsyncStream((verified_chunk("VISIBLE_FINAL"), trailing_chunk()))
     executor = LangGraphQueryRunExecutor()
-    commits, settlements = _patch_recording_executor(
-        monkeypatch, executor, _RecordingCompiled(stream)
+    commits, settlements = patch_recording_executor(
+        monkeypatch, executor, RecordingCompiled(stream)
     )
 
     async def _collect() -> list[str]:
@@ -51,7 +54,7 @@ def test_successful_stream_drains_and_skips_aclose(monkeypatch: Any) -> None:
 
         events: list[str] = []
         async for event_type, _payload in executor.execute(
-            context=_runtime(),
+            context=make_runtime(),
             message="hello",
             cancel_event=asyncio.Event(),
         ):
@@ -71,7 +74,7 @@ def test_successful_stream_drains_and_skips_aclose(monkeypatch: Any) -> None:
 def test_mid_stream_cancel_closes_once(monkeypatch: Any) -> None:
     """Cancel after the first yield closes the unfinished stream once."""
 
-    stream = _RecordingAsyncStream(
+    stream = RecordingAsyncStream(
         (
             {
                 "generate_answer": {
@@ -81,13 +84,13 @@ def test_mid_stream_cancel_closes_once(monkeypatch: Any) -> None:
                     ).model_dump(mode="json"),
                 }
             },
-            _verified_chunk("later"),
-            _trailing_chunk(),
+            verified_chunk("later"),
+            trailing_chunk(),
         )
     )
     executor = LangGraphQueryRunExecutor()
-    _commits, settlements = _patch_recording_executor(
-        monkeypatch, executor, _RecordingCompiled(stream)
+    _commits, settlements = patch_recording_executor(
+        monkeypatch, executor, RecordingCompiled(stream)
     )
 
     async def _collect() -> list[str]:
@@ -100,7 +103,7 @@ def test_mid_stream_cancel_closes_once(monkeypatch: Any) -> None:
         events: list[str] = []
         cancel = asyncio.Event()
         async for event_type, _payload in executor.execute(
-            context=_runtime(),
+            context=make_runtime(),
             message="hello",
             cancel_event=cancel,
         ):
@@ -120,11 +123,11 @@ def test_mid_stream_cancel_closes_once(monkeypatch: Any) -> None:
 def test_graph_error_is_one_error_terminal(monkeypatch: Any) -> None:
     """A natural empty verified answer is one error and no success settlement."""
 
-    stream = _RecordingAsyncStream((_empty_verified_chunk(), _trailing_chunk()))
+    stream = RecordingAsyncStream((empty_verified_chunk(), trailing_chunk()))
     executor = LangGraphQueryRunExecutor()
     summarize_calls: list[str] = []
-    _commits, settlements = _patch_recording_executor(
-        monkeypatch, executor, _RecordingCompiled(stream)
+    _commits, settlements = patch_recording_executor(
+        monkeypatch, executor, RecordingCompiled(stream)
     )
 
     def _record_summary(*args: object, **kwargs: object) -> None:
@@ -149,7 +152,7 @@ def test_graph_error_is_one_error_terminal(monkeypatch: Any) -> None:
 
         events: list[str] = []
         async for event_type, _payload in executor.execute(
-            context=_runtime(),
+            context=make_runtime(),
             message="hello",
             cancel_event=asyncio.Event(),
         ):
@@ -178,8 +181,8 @@ def test_consumer_disconnect_leaves_executor_resumable() -> None:
         executor=executor,
         sse_schema_version="1",
     )
-    caller = _caller()
-    runtime = _runtime()
+    caller = make_caller()
+    runtime = make_runtime()
     service.remember_admitted(caller, runtime, message="hello")
 
     async def _disconnect_then_resume() -> list[str]:
@@ -230,8 +233,8 @@ def test_cancel_grace_hard_cancels_lingering_task() -> None:
         executor=FixtureQueryRunExecutor(),
         sse_schema_version="1",
     )
-    caller = _caller()
-    runtime = _runtime()
+    caller = make_caller()
+    runtime = make_runtime()
     service.remember_admitted(caller, runtime, message="hello")
     live = registry.get_or_create(runtime.run_id)
     live.started = True
@@ -263,21 +266,21 @@ def test_cancel_grace_hard_cancels_lingering_task() -> None:
 def test_executor_compiles_once_per_checkpointer(monkeypatch: Any) -> None:
     """Static topology compiles once across two execute() calls."""
 
-    compiled = _RecordingCompiled(_RecordingAsyncStream((_verified_chunk("ONE"),)))
+    compiled = RecordingCompiled(RecordingAsyncStream((verified_chunk("ONE"),)))
     executor = LangGraphQueryRunExecutor()
-    _patch_recording_executor(monkeypatch, executor, compiled)
+    patch_recording_executor(monkeypatch, executor, compiled)
 
     async def _twice() -> None:
         """Run two execute() loops on one executor."""
 
         cancel = asyncio.Event()
         async for _event in executor.execute(
-            context=_runtime(), message="one", cancel_event=cancel
+            context=make_runtime(), message="one", cancel_event=cancel
         ):
             pass
-        compiled.stream = _RecordingAsyncStream((_verified_chunk("TWO"),))
+        set_attr(compiled, "_stream", RecordingAsyncStream((verified_chunk("TWO"),)))
         async for _event in executor.execute(
-            context=_runtime(), message="two", cancel_event=cancel
+            context=make_runtime(), message="two", cancel_event=cancel
         ):
             pass
 
@@ -297,8 +300,8 @@ def test_one_heartbeat_writer_and_none_after_terminal() -> None:
         sse_schema_version="1",
         heartbeat_interval_seconds=0.05,
     )
-    caller = _caller()
-    runtime = _runtime()
+    caller = make_caller()
+    runtime = make_runtime()
     service.remember_admitted(caller, runtime, message="hello")
 
     async def _hold() -> int:
@@ -362,15 +365,15 @@ def test_graph_chunk_is_parsed_once(monkeypatch: Any) -> None:
         "smart_rag_api.services.sse.stream_dispatch.parse_stream_part",
         _count,
     )
-    stream = _RecordingAsyncStream((_verified_chunk("ONCE"),))
+    stream = RecordingAsyncStream((verified_chunk("ONCE"),))
     executor = LangGraphQueryRunExecutor()
-    _patch_recording_executor(monkeypatch, executor, _RecordingCompiled(stream))
+    patch_recording_executor(monkeypatch, executor, RecordingCompiled(stream))
 
     async def _drain() -> None:
         """Consume the patched executor."""
 
         async for _event in executor.execute(
-            context=_runtime(),
+            context=make_runtime(),
             message="hello",
             cancel_event=asyncio.Event(),
         ):
@@ -433,8 +436,8 @@ def test_append_async_keeps_event_loop_responsive() -> None:
         executor=FixtureQueryRunExecutor(),
         sse_schema_version="1",
     )
-    caller = _caller()
-    runtime = _runtime()
+    caller = make_caller()
+    runtime = make_runtime()
     service.remember_admitted(caller, runtime, message="hello")
 
     async def _probe() -> float:
@@ -445,7 +448,7 @@ def test_append_async_keeps_event_loop_responsive() -> None:
         """
 
         append_task = asyncio.create_task(
-            service._append_async(
+            typed_attr(service, "_append_async")(
                 caller,
                 runtime.run_id,
                 "status",
@@ -509,11 +512,13 @@ def test_append_lock_failure_logs_sanitized_fields(
         executor=FixtureQueryRunExecutor(),
         sse_schema_version="1",
     )
-    caller = _caller()
-    runtime = _runtime()
+    caller = make_caller()
+    runtime = make_runtime()
     service.remember_admitted(caller, runtime, message="hello")
-    with caplog.at_level(logging.INFO, logger="smart_rag_api.services.sse.event_append"):
-        persisted = service._append(
+    with caplog.at_level(
+        logging.INFO, logger="smart_rag_api.services.sse.event_append"
+    ):
+        persisted = typed_attr(service, "_append")(
             caller,
             runtime.run_id,
             "heartbeat",

@@ -19,7 +19,7 @@ from smart_rag_core.release.constants import (
     PRIVATE_COMPOSE_SERVICES,
     TMP_SCAN_DIR,
 )
-from smart_rag_core.release.io import as_json_object, dump_canonical_json
+from smart_rag_core.release.io import as_json_object, dump_canonical_json, json_int
 from smart_rag_core.release.packet4 import (
     Phase09Packet4GateError,
     assert_mock_model_mode,
@@ -410,10 +410,10 @@ def main(argv: list[str] | None = None) -> int:
         published = _overlay_published()
         if published:
             detach = _detach_overlay()
-            if int(detach["returncode"]) != 0:
+            if json_int(detach.get("returncode")) != 0:
                 raise Phase09Packet6GateError("overlay detach failed")
         health_before = _health()
-        if int(health_before["returncode"]) != 0:
+        if json_int(health_before.get("returncode")) != 0:
             raise Phase09Packet6GateError("candidate health failed")
         suite_rows = [_run_suite(suite) for suite in PYTEST_SUITES]
         a_pytest = suite_rows[0]["classification"] == "Passed"
@@ -463,7 +463,8 @@ def main(argv: list[str] | None = None) -> int:
             and inject == 0
             and process_exit_ok(reproject.get("worker_returncode"))
             and isinstance(after_rows.get("bm25_chunks"), int)
-            and int(after_rows["bm25_chunks"]) > 0
+            and not isinstance(after_rows.get("bm25_chunks"), bool)
+            and json_int(after_rows.get("bm25_chunks")) > 0
             and reproject.get("sql_stamped_hybrid_or_graph_ready") is not True
         )
         health_after = _health()
@@ -552,7 +553,7 @@ def main(argv: list[str] | None = None) -> int:
                 "check": "P09-06-E",
                 "classification": classify_p0906_e(
                     identity_held=image_ids == expected_image_ids(),
-                    health_after_passed=int(health_after["returncode"]) == 0,
+                    health_after_passed=json_int(health_after.get("returncode")) == 0,
                     claimed_full_envelope=False,
                     claimed_managed_ec2=False,
                 ),

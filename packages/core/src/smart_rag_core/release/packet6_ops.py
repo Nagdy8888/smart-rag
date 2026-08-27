@@ -14,7 +14,7 @@ import psycopg
 
 from smart_rag_core.release.compose import run_compose
 from smart_rag_core.release.constants import TMP_SCAN_DIR
-from smart_rag_core.release.io import as_json_object
+from smart_rag_core.release.io import as_json_object, json_int
 from smart_rag_core.release.packet6 import (
     DISPOSABLE_RESTORE_DATABASE,
     PARADEDB_BOOTSTRAP_SQL,
@@ -531,7 +531,8 @@ def apply_paradedb_bootstrap_ddl(repo_root: Path) -> dict[str, object]:
         )
     return {
         "files": rows,
-        "passed": bool(rows) and all(int(row["returncode"]) == 0 for row in rows),
+        "passed": bool(rows)
+        and all(json_int(row.get("returncode")) == 0 for row in rows),
         "paradedb_used_as_canonical": False,
         "image_rebuilt": False,
     }

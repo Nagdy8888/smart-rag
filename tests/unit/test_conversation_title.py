@@ -15,14 +15,14 @@ from smart_rag_core.query_answer.versions import (
     CONVERSATION_TITLE_PROMPT_VERSION,
 )
 
-from tests.support.answer_verifier import _prompt_digest
+from tests.support.answer_verifier import verifier_prompt_digest
 
 
 def test_conversation_title_prompt_hash_matches_file() -> None:
     """Pinned title prompt digest matches the LF-normalized markdown file."""
 
     assert CONVERSATION_TITLE_PROMPT_VERSION == "conversation_title_v1"
-    assert CONVERSATION_TITLE_PROMPT_SHA256 == _prompt_digest(
+    assert CONVERSATION_TITLE_PROMPT_SHA256 == verifier_prompt_digest(
         "conversation_title_v1.md"
     )
 
@@ -58,7 +58,9 @@ def test_needs_llm_title_only_for_fallback() -> None:
         needs_llm_conversation_title("Summarize the policy", "Summarize the policy")
         is True
     )
-    assert needs_llm_conversation_title("Vacation policy", "Summarize the policy") is False
+    assert (
+        needs_llm_conversation_title("Vacation policy", "Summarize the policy") is False
+    )
 
 
 def test_title_schema_and_mock_payload_are_title_only() -> None:
@@ -66,6 +68,8 @@ def test_title_schema_and_mock_payload_are_title_only() -> None:
 
     schema = conversation_title_json_schema()
     assert schema["required"] == ["title"]
-    assert "answer_text" not in schema["properties"]
+    properties = schema["properties"]
+    assert isinstance(properties, dict)
+    assert "answer_text" not in properties
     payload = mock_conversation_title_payload("  What is PTO?\n")
     assert payload == {"title": "What is PTO?"}

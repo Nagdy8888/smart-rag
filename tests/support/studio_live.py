@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import cast
 from uuid import UUID, uuid4
 
 from smart_rag_agents.query.live_runtime import QueryGraphProcessBindings
+from smart_rag_agents.query.studio import StudioQueryState
 from smart_rag_agents.query.studio_live import (
     StudioLiveHooks,
 )
@@ -17,14 +20,38 @@ from smart_rag_core.security.identity import UserRole
 from smart_rag_core.security.jwks import JwksVerificationError, VerifiedAccessToken
 from smart_rag_core.security.profile_snapshot import ProfileSnapshot
 
+from tests.support.query_runtime import RefusingHybridRetriever
+
 CANARY = "studio-live-canary-token-9f3a"
 
 _USER_ID = "11111111-1111-4111-8111-111111111111"
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+STUDIO_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-class _IntrospectionRuntime:
+def studio_query_state(
+    user_query: str,
+    *,
+    messages: object | None = None,
+) -> StudioQueryState:
+    """Build a partial Studio seed mapping accepted by live seed helpers.
+
+    Args:
+        user_query: Original user text.
+        messages: Optional LangChain messages channel.
+
+    Returns:
+        Mapping widened to ``StudioQueryState``. Tests seed only ``user_query``
+        and messages; remaining TypedDict keys are filled by the seed path.
+    """
+
+    payload: dict[str, object] = {"user_query": user_query}
+    if messages is not None:
+        payload["messages"] = messages
+    return cast(StudioQueryState, payload)
+
+
+class IntrospectionRuntime:
     """Agent Server introspection stub. ``execution_runtime`` is None."""
 
     access_context = "assistants.read"
@@ -42,7 +69,7 @@ class _IntrospectionRuntime:
         return None
 
 
-class _ExecutionRuntime:
+class ExecutionRuntime:
     """Agent Server execution stub."""
 
     access_context = "threads.create_run"
@@ -51,7 +78,7 @@ class _ExecutionRuntime:
     context = None
 
     @property
-    def execution_runtime(self) -> _ExecutionRuntime:
+    def execution_runtime(self) -> ExecutionRuntime:
         """Return self as the execution runtime.
 
         Returns:
@@ -61,7 +88,7 @@ class _ExecutionRuntime:
         return self
 
 
-class _FakeConnection:
+class FakeConnection:
     """Track close() without opening Postgres."""
 
     def __init__(self) -> None:
@@ -91,24 +118,7 @@ class _FakeConnection:
         return None
 
 
-class _DummyHybrid:
-    """Truthy Hybrid that must not retrieve in these tests."""
-
-    def retrieve(self, **kwargs: object) -> object:
-        """Refuse retrieve.
-
-        Args:
-            **kwargs: Ignored.
-
-        Raises:
-            AssertionError: Always.
-        """
-
-        del kwargs
-        raise AssertionError("hybrid retrieve must not run in this test")
-
-
-def _verified_token(*, subject: str = _USER_ID) -> VerifiedAccessToken:
+def studio_verified_token(*, subject: str = _USER_ID) -> VerifiedAccessToken:
     """Return a verified JWT fixture.
 
     Args:
@@ -133,7 +143,7 @@ def _verified_token(*, subject: str = _USER_ID) -> VerifiedAccessToken:
     )
 
 
-def _snapshot(
+def studio_snapshot(
     *,
     role: UserRole = UserRole.MEMBER,
     authorization_version: int = 1,
@@ -161,7 +171,7 @@ def _snapshot(
     )
 
 
-def _admitted_context(
+def admitted_studio_context(
     *,
     payload_hash: str,
     conversation_id: UUID,
@@ -207,7 +217,7 @@ def _admitted_context(
     )
 
 
-def _bindings() -> QueryGraphProcessBindings:
+def studio_bindings() -> QueryGraphProcessBindings:
     """Return dummy process bindings that do not open sockets.
 
     Returns:
@@ -215,7 +225,7 @@ def _bindings() -> QueryGraphProcessBindings:
     """
 
     return QueryGraphProcessBindings(
-        hybrid_retriever=_DummyHybrid(),
+        hybrid_retriever=RefusingHybridRetriever(),
         model_gateway=object(),
         graph_retriever=None,
         table_executor=None,
@@ -228,7 +238,7 @@ def _bindings() -> QueryGraphProcessBindings:
     )
 
 
-def _hooks(
+def studio_hooks(
     *,
     enabled: bool = True,
     token: str | None = CANARY,
@@ -257,7 +267,7 @@ def _hooks(
         Hooks that record no token on returned state.
     """
 
-    snapshot = _snapshot() if profile == "ok" else profile
+    snapshot = studio_snapshot() if profile == "ok" else profile
 
     def token_getter() -> str | None:
         """Return the fixture token.
@@ -285,8 +295,11 @@ def _hooks(
         if isinstance(verify, JwksVerificationError):
             raise verify
         if callable(verify):
-            return verify(raw)
-        return _verified_token()
+            verified = verify(raw)
+            if not isinstance(verified, VerifiedAccessToken):
+                raise TypeError("verified_token_required")
+            return verified
+        return studio_verified_token()
 
     def load_profile(user_id: str) -> ProfileSnapshot | None:
         """Return the fixture snapshot.
@@ -300,7 +313,7 @@ def _hooks(
 
         _ = user_id
         if snapshot == "ok":
-            return _snapshot()
+            return studio_snapshot()
         return snapshot  # type: ignore[return-value]
 
     def is_revoked(
@@ -333,12 +346,12 @@ def _hooks(
         conversation_id = kwargs["conversation_id"]
         payload_hash = str(kwargs["payload_hash"])
         assert isinstance(conversation_id, UUID)
-        return _admitted_context(
+        return admitted_studio_context(
             payload_hash=payload_hash,
             conversation_id=conversation_id,
         )
 
-    def default_open() -> _FakeConnection:
+    def default_open() -> FakeConnection:
         """Refuse accidental factory open in seed-only tests.
 
         Raises:
@@ -371,11 +384,15 @@ def _hooks(
         admit=admit if callable(admit) else default_admit,
         assert_export_permitted=export_gate,
         open_connection=open_connection if callable(open_connection) else default_open,
-        build_bindings=build_bindings if callable(build_bindings) else _bindings,
+        build_bindings=(
+            cast(Callable[[], QueryGraphProcessBindings], build_bindings)
+            if callable(build_bindings)
+            else studio_bindings
+        ),
     )
 
 
-def _config(thread_id: str = "thread-live-a") -> dict[str, object]:
+def studio_config(thread_id: str = "thread-live-a") -> dict[str, object]:
     """Return a Studio runnable config.
 
     Args:

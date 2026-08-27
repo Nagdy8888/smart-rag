@@ -96,6 +96,7 @@ export function sessionQueryKeys(accessToken: string | null) {
     tools: (query = "") => ["tools", scope, query] as const,
     entityRules: ["entity-rules", scope] as const,
     usageCompany: ["usage-company", scope] as const,
+    workspaceUsers: ["workspace-users", scope] as const,
     consoleReady: (role: string | null) =>
       ["console-ready", scope, role ?? "pending"] as const,
   };

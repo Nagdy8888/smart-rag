@@ -57,8 +57,10 @@ def _as_known_mode(raw: object) -> Literal["updates", "custom"] | None:
         ``updates`` or ``custom`` only.
     """
 
-    if raw == "updates" or raw == "custom":
-        return raw
+    if raw == "updates":
+        return "updates"
+    if raw == "custom":
+        return "custom"
     return None
 
 
@@ -133,7 +135,11 @@ def _parse_v1_tuple(raw_chunk: tuple[object, ...]) -> ParsedStreamPart | None:
             data=inner[1],
         )
     if isinstance(tail, dict):
-        return ParsedStreamPart(mode="updates", namespace=namespace, data=tail)
+        return ParsedStreamPart(
+            mode="updates",
+            namespace=namespace,
+            data=cast(object, tail),
+        )
     return None
 
 
@@ -178,12 +184,11 @@ def updates_mapping_from_part(
         String-keyed mapping, or None when the part is not updates data.
     """
 
-    if part.mode != "updates" or not isinstance(part.data, dict):
+    raw_data: object = part.data
+    if part.mode != "updates" or not isinstance(raw_data, dict):
         return None
-    return {
-        str(key): value
-        for key, value in cast(dict[object, object], part.data).items()
-    }
+    typed_data = cast(dict[object, object], raw_data)
+    return {str(key): value for key, value in typed_data.items()}
 
 
 def custom_mapping_from_part(
@@ -198,12 +203,11 @@ def custom_mapping_from_part(
         String-keyed mapping, or None when the part is not custom data.
     """
 
-    if part.mode != "custom" or not isinstance(part.data, dict):
+    raw_data: object = part.data
+    if part.mode != "custom" or not isinstance(raw_data, dict):
         return None
-    return {
-        str(key): value
-        for key, value in cast(dict[object, object], part.data).items()
-    }
+    typed_data = cast(dict[object, object], raw_data)
+    return {str(key): value for key, value in typed_data.items()}
 
 
 def updates_mapping_from_chunk(raw_chunk: object) -> dict[str, object] | None:

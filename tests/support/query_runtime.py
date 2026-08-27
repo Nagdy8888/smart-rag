@@ -6,9 +6,39 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
+from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
-from smart_rag_core.security.identity import UserRole
+from smart_rag_core.security.identity import CallerContext, UserRole
+
+
+class RefusingHybridRetriever:
+    """Hybrid adapter that is truthy but must never retrieve in tests."""
+
+    query_budget: QueryRetrieveBudget | None = None
+
+    def retrieve(
+        self,
+        *,
+        query: str,
+        caller: CallerContext,
+        profile: object | None = None,
+        deadline_seconds: float | None = None,
+    ) -> object:
+        """Refuse retrieve so tests prove Hybrid never ran.
+
+        Args:
+            query: Unused branch query.
+            caller: Unused caller.
+            profile: Unused profile.
+            deadline_seconds: Unused remaining slice.
+
+        Raises:
+            AssertionError: Always.
+        """
+
+        del query, caller, profile, deadline_seconds
+        raise AssertionError("hybrid retrieve must not run in this test")
 
 
 def authorized_runtime(

@@ -15,7 +15,9 @@ from smart_rag_core.sse.sanitize import validate_sse_payload
 def test_legacy_status_without_phase_validates() -> None:
     """Persisted status rows without ``phase`` remain legal."""
 
-    payload = StatusPayload.model_validate({"stage": "verify_answer", "status": "running"})
+    payload = StatusPayload.model_validate(
+        {"stage": "verify_answer", "status": "running"}
+    )
     assert payload.phase is None
     validate_sse_payload("status", {"stage": "verify_answer", "status": "running"})
 
@@ -47,7 +49,9 @@ def test_tool_progress_requires_tool_key_and_phase() -> None:
         {"tool_key": "web_search", "phase": "started"}
     )
     assert payload.tool_key == "web_search"
-    validate_sse_payload("tool_progress", {"tool_key": "web_search", "phase": "started"})
+    validate_sse_payload(
+        "tool_progress", {"tool_key": "web_search", "phase": "started"}
+    )
     with pytest.raises(ValidationError):
         ToolProgressPayload.model_validate(
             {"tool_key": "web_search", "phase": "started", "args": "{}"}

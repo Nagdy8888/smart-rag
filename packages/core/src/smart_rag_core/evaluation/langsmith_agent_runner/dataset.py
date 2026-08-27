@@ -17,8 +17,8 @@ from smart_rag_core.evaluation.agent_eval import (
     case_to_reference,
 )
 from smart_rag_core.evaluation.langsmith_agent_runner.types import (
-    _DATASET_METADATA_KEYS,
     ALLOWED_EVALUATOR_KEYS,
+    DATASET_METADATA_KEYS,
     REPO_ROOT,
     LangSmithEvalClient,
 )
@@ -108,7 +108,7 @@ def sync_langsmith_dataset(
         )
     existing = client.read_dataset(dataset_name=name)
     remote_meta = _object_mapping(getattr(existing, "metadata", None))
-    for key in _DATASET_METADATA_KEYS:
+    for key in DATASET_METADATA_KEYS:
         if remote_meta.get(key) != metadata[key]:
             raise AgentEvalError("langsmith_dataset_drift")
     _assert_no_unbudgeted_evaluators(remote_meta)

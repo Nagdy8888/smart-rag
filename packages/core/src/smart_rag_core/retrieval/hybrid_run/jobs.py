@@ -11,15 +11,15 @@ from uuid import UUID
 import psycopg
 
 from smart_rag_core.retrieval.hybrid_run.channels import (
-    _collect_dense_lists,
-    _collect_term_lists,
+    collect_dense_lists,
+    collect_term_lists,
 )
 from smart_rag_core.retrieval.hybrid_run.types import (
-    _Bm25RetrieverLike,
-    _ChannelJob,
-    _DenseRetrieverLike,
-    _TermRetrieverLike,
-    _VariantLists,
+    Bm25RetrieverLike,
+    ChannelJob,
+    DenseRetrieverLike,
+    TermRetrieverLike,
+    VariantLists,
 )
 from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.retrieval.temporal import TemporalDocument
@@ -53,7 +53,7 @@ class HybridChannelJobsMixin:
         query: str,
         texts: tuple[str, ...],
         vectors: tuple[tuple[float, ...], ...],
-    ) -> dict[str, _ChannelJob]:
+    ) -> dict[str, ChannelJob]:
         """Build parallel dense/BM25/term jobs from bound retrievers.
 
         Args:
@@ -66,12 +66,12 @@ class HybridChannelJobsMixin:
             Zero-argument jobs for ``run_channels_parallel``.
         """
 
-        jobs: dict[str, _ChannelJob] = {}
+        jobs: dict[str, ChannelJob] = {}
         dense = self._dense
         if dense is not None:
-            dense_retriever = cast(_DenseRetrieverLike, dense)
+            dense_retriever = cast(DenseRetrieverLike, dense)
 
-            def _dense_job() -> _VariantLists:
+            def _dense_job() -> VariantLists:
                 """Run dense retrieve per fused query text.
 
                 Returns:
@@ -82,13 +82,13 @@ class HybridChannelJobsMixin:
                     from smart_rag_core.retrieval.dense import DenseRetriever
 
                     with self._channel_supabase() as connection:
-                        return _collect_dense_lists(
+                        return collect_dense_lists(
                             DenseRetriever(connection).retrieve,
                             caller=caller,
                             texts=texts,
                             vectors=vectors,
                         )
-                return _collect_dense_lists(
+                return collect_dense_lists(
                     dense_retriever.retrieve,
                     caller=caller,
                     texts=texts,
@@ -98,7 +98,7 @@ class HybridChannelJobsMixin:
             jobs["dense"] = _dense_job
         bm25 = self._bm25
         if bm25 is not None:
-            bm25_retriever = cast(_Bm25RetrieverLike, bm25)
+            bm25_retriever = cast(Bm25RetrieverLike, bm25)
 
             def _bm25_job() -> Bm25RetrievalResult:
                 """Run one BM25 scan over the original query.
@@ -140,9 +140,9 @@ class HybridChannelJobsMixin:
             )
         term = self._term
         if term is not None:
-            term_retriever = cast(_TermRetrieverLike, term)
+            term_retriever = cast(TermRetrieverLike, term)
 
-            def _term_job() -> _VariantLists:
+            def _term_job() -> VariantLists:
                 """Run term retrieve per fused query text.
 
                 Returns:
@@ -153,12 +153,12 @@ class HybridChannelJobsMixin:
                     from smart_rag_core.retrieval.terms import TermRetriever
 
                     with self._channel_supabase() as connection:
-                        return _collect_term_lists(
+                        return collect_term_lists(
                             TermRetriever(connection).retrieve,
                             caller=caller,
                             texts=texts,
                         )
-                return _collect_term_lists(
+                return collect_term_lists(
                     term_retriever.retrieve,
                     caller=caller,
                     texts=texts,

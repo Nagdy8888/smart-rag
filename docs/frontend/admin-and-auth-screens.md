@@ -47,17 +47,20 @@ Exact pages:
 
 - Topbar title “Admin”. No trailing period.
 - Description: “Manage access, tools, retrieval curation, and usage.”
-- Horizontal Tabs: Team & access, Tools, Curation, Usage.
+- Horizontal Tabs: Team & access, Tools, Names & aliases, Usage.
 - Page fills the console column (`width: 100%`, maximum 1440px, matching Documents).
 - Team & access places Invite and Offboard in a two-column grid from 801px.
 - Member/viewer never see this route in nav; direct page visit renders a safe permission ErrorState after real server confirmation.
 
 #### Team & access
 
-- First Card “Invite user”: email Input, role Select, upload access Checkbox, Primary “Send invitation.”
+- Lead copy explains workspace people plus unaccepted invitations.
+- Workspace people table from `GET /admin/users`: email, role, upload, status, user id, Offboard (not self, not already disabled). Hostile emails stay `UserText`.
+- Pending invitations table from the same GET. Never `token_hash`.
+- Invite card: email Input, role Select, upload access Checkbox, Primary “Send invitation.”
 - Success shows invitation ID and expiry only; never token.
-- Second Card “Offboard user”: danger section, user ID Input, consequence copy, quiet-danger “Review offboarding,” then ConfirmDialog.
-- No member directory, avatars, owner-bootstrap wizard, MFA/AAL2 copy, or fake invitation list.
+- Offboard card remains for a known user ID: danger section, consequence copy, quiet-danger “Review offboarding,” then ConfirmDialog.
+- No avatars, owner-bootstrap wizard, or MFA/AAL2 copy.
 
 #### Tools
 
@@ -67,11 +70,14 @@ Exact pages:
 - Full manifest fields open in Drawer through “View details.”
 - No tool seeding form in ordinary UI.
 
-#### Curation
+#### Names & aliases
 
-- Two Tabs inside content: Glossary and Entity rules.
-- Glossary: import form, result/status, then real Approve/Rollback actions.
-- Entity rules: DataTable with canonical type, aliases, status, row version, overflow actions Edit/Approve/Revoke.
+- Lead copy: teach search the company’s language. Word aliases match nicknames
+  to official terms. People and things tell the graph which names are the same
+  and which must never merge.
+- Two Tabs inside content: Word aliases (glossary) and People & things (entity rules).
+- Word aliases: import form, result/status, then real Approve/Rollback actions.
+- People & things: DataTable with canonical type, aliases, status, row version, overflow actions Edit/Approve/Revoke.
 - “Suggest rule” Secondary action opens Dialog backed by the real suggestions endpoint.
 - Edit uses real PATCH and shows conflict banner on stale row version with “Reload rule.”
 - No bulk action without an existing endpoint.

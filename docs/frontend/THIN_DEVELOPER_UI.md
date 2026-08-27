@@ -76,9 +76,9 @@ SSE payloads are extra=forbid and do **not** include BM25 index/lag bytes.
 Chat diagnostics collect route correction, limitation codes, cache status,
 coverage score, optional tool keys, citation ids, usage tokens, and heartbeat
 count. The Run details sheet shows only real user-facing rows: status, search
-mode, correction when it happened, tools/cache/coverage when present, usage,
-and the run id. Heartbeat count stays in reducer state and is not a product
-row.
+mode, correction when it happened, tools/cache/coverage when present, this-run
+and this-chat usage, and the run id. Heartbeat count stays in reducer state
+and is not a product row.
 
 BM25 projection/index/lag/pending/failed/dead-letter come from
 `GET /ingestion/versions/{version_id}/status`. Graph ready is never inferred

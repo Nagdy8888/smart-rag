@@ -5,7 +5,7 @@
  * not import this file.
  */
 
-export type { AcceptInvitationResponse, CreateInvitationRequest, CreateInvitationResponse, CurrentUserResponse, InviteRole, MetaResponse, OffboardResponse } from "./types/auth";
+export type { AcceptInvitationResponse, CreateInvitationRequest, CreateInvitationResponse, CurrentUserResponse, InviteRole, MetaResponse, OffboardResponse, PendingInvitation, WorkspaceDirectoryResponse, WorkspaceMember } from "./types/auth";
 export { INVITE_ROLES } from "./types/auth";
 export type { DependencyStatus, ReadinessResponse } from "./types/readiness";
 export type { AnswerOrigin, CitationResponse, ConversationMessage, ConversationMessagesResponse, ConversationResponse, FeedbackResponse, FeedbackTag, RunResponse, SubmitMessageResponse } from "./types/chat";

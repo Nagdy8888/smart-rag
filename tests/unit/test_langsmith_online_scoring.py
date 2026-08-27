@@ -25,44 +25,44 @@ from smart_rag_core.evaluation.online_provision import (
 from tests.support.online_eval import (
     EVALUATOR_PATH,
     FORBIDDEN_IMPORT_PREFIXES,
-    _eval_run,
-    _load_perform_eval,
-    _output,
-    _reference,
+    eval_output,
+    eval_reference,
+    eval_run,
+    load_perform_eval,
 )
 
 
 def test_perform_eval_matches_score_all_fixtures() -> None:
     """Standalone hosted scores equal ``score_all`` on the same fixtures."""
 
-    perform_eval = _load_perform_eval()
+    perform_eval = load_perform_eval()
     cases = (
         (
-            _output(),
-            _reference(),
+            eval_output(),
+            eval_reference(),
         ),
         (
-            _output(cited_chunk_ids=(), selected_evidence_ids=()),
-            _reference(visible_chunk_ids=(), forbidden_evidence_ids=("hidden",)),
+            eval_output(cited_chunk_ids=(), selected_evidence_ids=()),
+            eval_reference(visible_chunk_ids=(), forbidden_evidence_ids=("hidden",)),
         ),
         (
-            _output(
+            eval_output(
                 cited_chunk_ids=("hidden",),
                 selected_evidence_ids=("hidden",),
             ),
-            _reference(
+            eval_reference(
                 visible_chunk_ids=("visible",),
                 forbidden_evidence_ids=("hidden",),
             ),
         ),
         (
-            _output(
+            eval_output(
                 effective_route="scoped_refusal",
                 answer_status="refused",
                 answer_text="",
                 remaining_model_calls=0,
             ),
-            _reference(
+            eval_reference(
                 expected_route="refusal",
                 refusal_kind="acl_filtered",
                 acceptable_answers=(),
@@ -74,43 +74,43 @@ def test_perform_eval_matches_score_all_fixtures() -> None:
                 "p4-acl_negative-0003",
                 failure_kind="graph_invoke_failed",
             ),
-            _reference(),
+            eval_reference(),
         ),
         (
-            _output(deadline_exceeded=True),
-            _reference(),
+            eval_output(deadline_exceeded=True),
+            eval_reference(),
         ),
     )
     for output, reference in cases:
         expected = score_all(output, reference)
-        got = perform_eval(_eval_run(output, reference))
+        got = perform_eval(eval_run(output, reference))
         assert got == expected
 
 
 def test_perform_eval_fail_closed_on_malformed_and_child_spans() -> None:
     """Wrong name, schema, redaction class, or missing counters score zero."""
 
-    perform_eval = _load_perform_eval()
-    ok = _eval_run(_output(), _reference())
+    perform_eval = load_perform_eval()
+    ok = eval_run(eval_output(), eval_reference())
     child = dict(ok)
     child["name"] = "query.agent.eval"
     assert perform_eval(child)["target_completed"] == 0.0
-    wrong_schema = _eval_run(
-        _output(),
-        _reference(),
+    wrong_schema = eval_run(
+        eval_output(),
+        eval_reference(),
         schema_version="agent-eval-v1",
     )
     assert perform_eval(wrong_schema)["route_correct"] == 0.0
-    not_synthetic = _eval_run(
-        _output(),
-        _reference(),
+    not_synthetic = eval_run(
+        eval_output(),
+        eval_reference(),
         redaction_class="real_company",
     )
     assert perform_eval(not_synthetic)["acl_leak_free"] == 0.0
     assert perform_eval("not-a-run")["bounds_respected"] == 0.0
-    missing = _eval_run(
-        _output(remaining_model_calls=None),
-        _reference(),
+    missing = eval_run(
+        eval_output(remaining_model_calls=None),
+        eval_reference(),
     )
     assert perform_eval(missing)["bounds_respected"] == 0.0
 

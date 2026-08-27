@@ -12,8 +12,9 @@ import {
   type ApiFailure,
 } from "../../../lib/api";
 import {
+  addChatTokens,
   applyAdmission,
-  createChatViewState,
+  startNextChatRun,
   type ChatViewState,
 } from "../../../lib/chat-view";
 import { conversationTitleFromPrompt } from "../../../lib/conversation-title";
@@ -54,10 +55,89 @@ export type StartChatSendDeps = {
 };
 
 /**
+ * Consume an admitted SSE body, settle title, and reconnect. Does not
+ * block composer `onSubmit` settlement.
+ *
+ * @param deps - Live send deps.
+ * @param response - Open `GET /runs/{id}/events` body.
+ * @param current - View after admission or resume.
+ * @param controller - Abort from Stop, New chat, or a replacement send.
+ * @param conversationId - Conversation to title after a terminal.
+ */
+async function finishAdmittedStream(
+  deps: StartChatSendDeps,
+  response: Response,
+  current: ChatViewState,
+  controller: AbortController,
+  conversationId: string,
+): Promise<void> {
+  try {
+    const next = await consumeSse(
+      response,
+      current,
+      controller.signal,
+      deps.setChat,
+      (sequence) => {
+        deps.sequenceRef.current = sequence;
+      },
+    );
+    if (controller.signal.aborted) {
+      deps.setChat(next);
+      return;
+    }
+    deps.setChat(next);
+    deps.sequenceRef.current = next.lastSequence;
+    if (next.terminal !== null) {
+      deps.idempotencyRef.current = newIdempotencyKey();
+      deps.setChat((prev) => ({
+        ...prev,
+        idempotencyKey: deps.idempotencyRef.current as string,
+      }));
+      const titleAuth = deps.auth;
+      void deps.queryClient
+        .invalidateQueries({
+          queryKey: deps.keys.conversationMessages(conversationId),
+        })
+        .then(async () => {
+          if (
+            (next.terminal !== "completed" && next.terminal !== "partial") ||
+            titleAuth === null
+          ) {
+            return;
+          }
+          const titled = await generateConversationTitle(titleAuth, conversationId);
+          deps.setChat((prev) =>
+            addChatTokens(
+              prev,
+              titled.prompt_tokens ?? 0,
+              titled.completion_tokens ?? 0,
+            ),
+          );
+          await deps.queryClient.invalidateQueries({
+            queryKey: deps.keys.conversations,
+          });
+        })
+        .catch(() => undefined);
+    } else if (!controller.signal.aborted) {
+      deps.setDisconnected(true);
+      void deps.autoResumeRef.current?.(next, controller);
+    }
+  } catch (error) {
+    if (controller.signal.aborted || isAbortError(error)) {
+      return;
+    }
+    deps.setDisconnected(true);
+    void deps.autoResumeRef.current?.(deps.chatRef.current, controller);
+  }
+}
+
+/**
  * Create the send function used by `useChatRun`.
  *
  * @param deps - Live refs and setters. The function reads latest refs on call.
  * @returns Send handler. Returns false when locked, blocked, or admit fails.
+ *   Returns true as soon as the stream is handed off so the composer does
+ *   not wait for the verified answer.
  */
 export function createChatSend(deps: StartChatSendDeps): (text: string) => Promise<boolean> {
   return async (text: string): Promise<boolean> => {
@@ -72,7 +152,8 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
     }
     deps.sendLockRef.current = true;
     deps.setSending(true);
-    let admitted = false;
+    deps.setLastUserMessage(text.trim());
+    let streamHandedOff = false;
     let activeConversationId = deps.conversationId;
     if (activeConversationId === null) {
       try {
@@ -83,6 +164,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
         activeConversationId = created.conversation_id;
         if (activeConversationId === "" || activeConversationId === "undefined") {
           deps.setFailure({ kind: "server", status: 500 });
+          deps.setLastUserMessage("");
           deps.sendLockRef.current = false;
           deps.setSending(false);
           return false;
@@ -95,12 +177,18 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
             ? error.failure
             : { kind: "server", status: 500 },
         );
+        deps.setLastUserMessage("");
         deps.sendLockRef.current = false;
         deps.setSending(false);
         return false;
       }
     }
-    deps.setLastUserMessage(text.trim());
+    if (activeConversationId === null) {
+      deps.setLastUserMessage("");
+      deps.sendLockRef.current = false;
+      deps.setSending(false);
+      return false;
+    }
     deps.setDisconnected(false);
     deps.setReconnectAttempt(0);
     deps.setReconnectExhausted(false);
@@ -110,10 +198,9 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
     deps.abortRef.current = controller;
     let current = deps.chatRef.current;
     if (current.runId === null || current.terminal !== null) {
-      if (deps.idempotencyRef.current === null) {
-        deps.idempotencyRef.current = newIdempotencyKey();
-      }
-      current = createChatViewState(deps.idempotencyRef.current);
+      const nextKey = deps.idempotencyRef.current ?? newIdempotencyKey();
+      deps.idempotencyRef.current = nextKey;
+      current = startNextChatRun(current, nextKey);
       deps.setChat(current);
       deps.setFailure(null);
     }
@@ -132,10 +219,12 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
         controller.signal,
       );
       if (controller.signal.aborted) {
-        return admitted;
+        deps.setLastUserMessage("");
+        return false;
       }
       if (started.failure) {
         deps.setFailure(started.failure);
+        deps.setLastUserMessage("");
         return false;
       }
       if (started.admission !== null) {
@@ -149,66 +238,33 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
         });
         deps.setChat(current);
         deps.setSending(false);
-        admitted = true;
       }
-      current = await consumeSse(
+      streamHandedOff = true;
+      void finishAdmittedStream(
+        deps,
         started.response,
         current,
-        controller.signal,
-        deps.setChat,
-        (sequence) => {
-          deps.sequenceRef.current = sequence;
-        },
-      );
-      if (controller.signal.aborted) {
-        deps.setChat(current);
-        return admitted;
-      }
-      deps.setChat(current);
-      deps.sequenceRef.current = current.lastSequence;
-      if (current.terminal !== null) {
-        deps.idempotencyRef.current = newIdempotencyKey();
-        deps.setChat((prev) => ({
-          ...prev,
-          idempotencyKey: deps.idempotencyRef.current as string,
-        }));
-        if (activeConversationId !== null) {
-          const titledConversationId = activeConversationId;
-          const titleAuth = deps.auth;
-          void deps.queryClient
-            .invalidateQueries({
-              queryKey: deps.keys.conversationMessages(titledConversationId),
-            })
-            .then(async () => {
-              if (
-                (current.terminal !== "completed" &&
-                  current.terminal !== "partial") ||
-                titleAuth === null
-              ) {
-                return;
-              }
-              await generateConversationTitle(titleAuth, titledConversationId);
-              await deps.queryClient.invalidateQueries({
-                queryKey: deps.keys.conversations,
-              });
-            })
-            .catch(() => undefined);
-        }
-      } else if (!controller.signal.aborted) {
-        deps.setDisconnected(true);
-        void deps.autoResumeRef.current?.(current, controller);
-      }
-      return admitted;
+        controller,
+        activeConversationId,
+      ).finally(() => {
+        deps.sendLockRef.current = false;
+        deps.setSending(false);
+      });
+      return true;
     } catch (error) {
       if (controller.signal.aborted || isAbortError(error)) {
-        return admitted;
+        deps.setLastUserMessage("");
+        return false;
       }
       deps.setDisconnected(true);
       void deps.autoResumeRef.current?.(deps.chatRef.current, controller);
-      return admitted;
+      deps.setLastUserMessage("");
+      return false;
     } finally {
-      deps.sendLockRef.current = false;
-      deps.setSending(false);
+      if (!streamHandedOff) {
+        deps.sendLockRef.current = false;
+        deps.setSending(false);
+      }
     }
   };
 }

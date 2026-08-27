@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 
@@ -13,6 +13,78 @@ from smart_rag_api.services.sse.stream_dispatch import dispatch_stream_part
 
 if TYPE_CHECKING:
     from smart_rag_api.services.query_sse_mapping import QuerySseMapper
+
+
+class StreamCancelEvent(Protocol):
+    """Cooperative cancel flag observed while draining ``astream``."""
+
+    def is_set(self) -> bool:
+        """Return whether the owner cancelled the live run.
+
+        Returns:
+            True when consume must stop without a successful terminal.
+        """
+
+        ...
+
+
+class StreamCommitConnection(Protocol):
+    """Open ``app_api`` connection that can commit after each chunk."""
+
+    def commit(self) -> object:
+        """Commit the current transaction.
+
+        Returns:
+            Driver commit result. Ignored by the consume loop.
+        """
+
+        ...
+
+
+class StreamTerminationSink(Protocol):
+    """Callable that records the executor termination summary."""
+
+    def __call__(
+        self,
+        *,
+        reason: str,
+        terminal_event_type: str | None = None,
+        stream_exhausted: bool | None = None,
+    ) -> None:
+        """Store a sanitized stream-termination summary.
+
+        Args:
+            reason: ``completed``, ``partial``, ``cancelled``, or ``error``.
+            terminal_event_type: First SSE terminal type, if any.
+            stream_exhausted: Override for natural ``astream`` exhaustion.
+        """
+
+        ...
+
+
+class StreamSuccessfulTerminalCommit(Protocol):
+    """Callable that persists summary/assistant rows after completed/partial."""
+
+    def __call__(
+        self,
+        context: AuthorizedRuntimeContext,
+        mapper: QuerySseMapper,
+        settings: object,
+        *,
+        remaining_model_calls: int,
+        terminal_status: str,
+    ) -> None:
+        """Write post-terminal persistence for a successful run.
+
+        Args:
+            context: Authorized run context.
+            mapper: Mapper that emitted the verified terminal.
+            settings: Backend settings loaded once for this execute().
+            remaining_model_calls: Remaining counted calls after the graph.
+            terminal_status: Last node status.
+        """
+
+        ...
 
 
 @dataclass
@@ -82,10 +154,10 @@ async def iter_mapped_langgraph_updates(
     mapper: QuerySseMapper,
     context: AuthorizedRuntimeContext,
     settings: object,
-    cancel_event: object,
-    connection: object,
-    commit_successful_terminal: object,
-    set_termination: object,
+    cancel_event: StreamCancelEvent,
+    connection: StreamCommitConnection,
+    commit_successful_terminal: StreamSuccessfulTerminalCommit,
+    set_termination: StreamTerminationSink,
     last_remaining_calls: int,
     last_status: str,
 ) -> AsyncIterator[tuple[str, dict[str, object]] | MappedStreamResult]:
@@ -152,12 +224,13 @@ async def iter_mapped_langgraph_updates(
                     reason = (
                         "error"
                         if event_type == "error"
-                        else (
-                            "cancelled" if event_type == "cancelled" else event_type
-                        )
+                        else ("cancelled" if event_type == "cancelled" else event_type)
                     )
                     set_termination(reason=reason, terminal_event_type=event_type)
-                if event_type in {"completed", "partial"} and not successful_terminal_committed:
+                if (
+                    event_type in {"completed", "partial"}
+                    and not successful_terminal_committed
+                ):
                     successful_terminal_committed = True
                     commit_successful_terminal(
                         context,
@@ -178,7 +251,10 @@ async def iter_mapped_langgraph_updates(
                     terminal_event_type=event_type,
                     stream_exhausted=True,
                 )
-            if event_type in {"completed", "partial"} and not successful_terminal_committed:
+            if (
+                event_type in {"completed", "partial"}
+                and not successful_terminal_committed
+            ):
                 successful_terminal_committed = True
                 commit_successful_terminal(
                     context,

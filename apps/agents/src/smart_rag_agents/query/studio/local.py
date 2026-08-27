@@ -39,12 +39,8 @@ def studio_usage_label(state: QueryGraphState) -> str:
         ``N prompt · M completion``, or empty when both counts are zero.
     """
 
-    prompt = state.get("prompt_tokens")
-    completion = state.get("completion_tokens")
-    if not isinstance(prompt, int) or isinstance(prompt, bool):
-        return ""
-    if not isinstance(completion, int) or isinstance(completion, bool):
-        return ""
+    prompt = state["prompt_tokens"]
+    completion = state["completion_tokens"]
     if prompt <= 0 and completion <= 0:
         return ""
     return f"{prompt:,} prompt · {completion:,} completion"

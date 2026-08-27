@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from smart_rag_core.query_admission.service import (
@@ -74,8 +74,9 @@ def test_enqueue_query_reservation_true_up_job_uses_hourly_key() -> None:
     assert inserted == job_id
     params = captured["params"]
     assert isinstance(params, tuple)
-    assert params[0] == "query_reservation_true_up:2026-08-19T14"
+    typed_params = cast(tuple[object, ...], params)
+    assert typed_params[0] == "query_reservation_true_up:2026-08-19T14"
     assert "query_reservation_true_up" in str(captured["sql"])
-    assert '"kind": "query_reservation_true_up"' in str(params[1]) or (
-        "query_reservation_true_up" in str(params[1])
+    assert '"kind": "query_reservation_true_up"' in str(typed_params[1]) or (
+        "query_reservation_true_up" in str(typed_params[1])
     )

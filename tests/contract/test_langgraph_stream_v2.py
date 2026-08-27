@@ -13,6 +13,8 @@ from smart_rag_api.services.sse.stream_parts import (
     updates_mapping_from_part,
 )
 
+from tests.support.typed_graph import untyped
+
 
 class _ProbeState(TypedDict):
     """Minimal state used only to observe the installed stream shape."""
@@ -39,7 +41,7 @@ def test_pinned_langgraph_v2_emits_custom_then_updates() -> None:
     """Installed 1.2.11 yields ``{type, ns, data}`` with custom before updates."""
 
     assert langgraph_version == "1.2.11"
-    graph = StateGraph(_ProbeState)
+    graph = untyped(StateGraph(_ProbeState))
     graph.add_node("increment", _increment)
     graph.add_edge(START, "increment")
     graph.add_edge("increment", END)

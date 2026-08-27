@@ -7,6 +7,7 @@ from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.tools.exceptions import ToolError
 from smart_rag_core.tools.models import SelectionPolicy
+from smart_rag_core.tools.progress import ToolProgressReporter
 from smart_rag_core.tools.service import resolve_optional_tools
 
 from smart_rag_agents.query.deps import QueryGraphDeps
@@ -19,7 +20,7 @@ from smart_rag_agents.query.nodes.shared import runtime_from_state, skip_closed_
 from smart_rag_agents.query.state import QueryGraphState
 
 
-def _tool_progress_reporter() -> object:
+def _tool_progress_reporter() -> ToolProgressReporter:
     """Build the LangGraph optional-tool progress adapter.
 
     Imported lazily so ``nodes`` can load without the streaming package.

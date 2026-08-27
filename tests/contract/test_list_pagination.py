@@ -10,7 +10,7 @@ import psycopg
 import pytest
 
 from tests.contract.integration_support import resolve_supabase_db_url, try_connect
-from tests.contract.test_rls_matrix import _auth_version, _insert_profile
+from tests.contract.test_rls_matrix import rls_auth_version, rls_insert_profile
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def test_list_visible_documents_page_is_keyset_bounded(
     stamp = datetime.now(tz=UTC) + timedelta(days=36500)
 
     with db_connection.cursor() as cursor:
-        _insert_profile(cursor, user_id=owner_id, role="owner")
+        rls_insert_profile(cursor, user_id=owner_id, role="owner")
         cursor.execute(
             """
             INSERT INTO app.documents (id, title, visibility, created_by, created_at)
@@ -60,7 +60,7 @@ def test_list_visible_documents_page_is_keyset_bounded(
                 stamp - timedelta(seconds=2),
             ),
         )
-        authz = _auth_version(cursor)
+        authz = rls_auth_version(cursor)
         cursor.execute("SET ROLE app_api")
         cursor.execute(
             """

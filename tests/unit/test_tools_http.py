@@ -52,7 +52,9 @@ def test_search_overlays_disabled_seed_for_owner(
 ) -> None:
     """Owner/admin still see a seed-disabled tool with ``active=false``."""
 
-    monkeypatch.setattr(ToolHttpService, "_catalog_seeds", _fixed_seeds({"export_csv": False}))
+    monkeypatch.setattr(
+        ToolHttpService, "_catalog_seeds", _fixed_seeds({"export_csv": False})
+    )
     service = ToolHttpService("postgresql://unused")
     cards = service.search(_OWNER)
     csv_card = next(item for item in cards if item.tool_key == "export_csv")
@@ -64,7 +66,9 @@ def test_search_hides_disabled_seed_from_member(
 ) -> None:
     """Members do not learn the name of a seed-disabled tool."""
 
-    monkeypatch.setattr(ToolHttpService, "_catalog_seeds", _fixed_seeds({"export_csv": False}))
+    monkeypatch.setattr(
+        ToolHttpService, "_catalog_seeds", _fixed_seeds({"export_csv": False})
+    )
     service = ToolHttpService("postgresql://unused")
     keys = {item.tool_key for item in service.search(_MEMBER)}
     assert "export_csv" not in keys
@@ -101,6 +105,9 @@ def test_permission_rpc_upserts_and_lists_seeds() -> None:
     """Migration upserts role permissions and lists catalog seed flags."""
 
     source = _MIGRATION.read_text(encoding="utf-8")
-    assert "ON CONFLICT (tool_id, role) WHERE user_id IS NULL AND role IS NOT NULL" in source
+    assert (
+        "ON CONFLICT (tool_id, role) WHERE user_id IS NULL AND role IS NOT NULL"
+        in source
+    )
     assert "app.list_tool_catalog_seeds" in source
     assert "GRANT EXECUTE ON FUNCTION app.list_tool_catalog_seeds" in source

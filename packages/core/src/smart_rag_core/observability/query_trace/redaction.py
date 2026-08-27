@@ -161,7 +161,7 @@ def _optional_token_count(value: object) -> int | None:
     return None
 
 
-def _optional_cost_usd(value: object) -> Decimal | None:
+def optional_cost_usd(value: object) -> Decimal | None:
     """Return a non-negative USD estimate.
 
     Args:
@@ -216,7 +216,7 @@ def _attach_hashed_text(
         payload[display_key] = value
 
 
-def _usage_token_counts(typed: Mapping[str, object]) -> tuple[int, int] | None:
+def usage_token_counts(typed: Mapping[str, object]) -> tuple[int, int] | None:
     """Read prompt/completion token totals from a summary mapping.
 
     Args:
@@ -248,14 +248,14 @@ def _attach_usage_fields(payload: dict[str, Any], typed: Mapping[str, object]) -
         typed: Termination summary or traceable return wrapper.
     """
 
-    counts = _usage_token_counts(typed)
+    counts = usage_token_counts(typed)
     if counts is None:
         return
     input_count, output_count = counts
     payload["input_tokens"] = input_count
     payload["output_tokens"] = output_count
     payload["total_tokens"] = input_count + output_count
-    cost = _optional_cost_usd(typed.get("estimated_cost_usd"))
+    cost = optional_cost_usd(typed.get("estimated_cost_usd"))
     if cost is None:
         cost = estimate_traced_chat_cost_usd(
             input_tokens=input_count,

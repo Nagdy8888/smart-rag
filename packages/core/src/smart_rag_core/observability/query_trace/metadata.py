@@ -21,9 +21,9 @@ from smart_rag_core.observability.logging import (
     current_correlation_ids,
 )
 from smart_rag_core.observability.query_trace.redaction import (
-    _optional_cost_usd,
-    _usage_token_counts,
     hashed_user_id,
+    optional_cost_usd,
+    usage_token_counts,
 )
 from smart_rag_core.security.external_processing import ContentClass
 from smart_rag_core.settings import SharedSettings
@@ -126,7 +126,7 @@ def query_run_trace_metadata(
     return payload
 
 
-def _optional_trace_str(value: object) -> str | None:
+def optional_trace_str(value: object) -> str | None:
     """Return a string metadata value or None.
 
     Args:
@@ -141,7 +141,7 @@ def _optional_trace_str(value: object) -> str | None:
     return None
 
 
-def _query_eval_tracing_scope(
+def query_eval_tracing_scope(
     *, enabled: bool, project_name: str | None = None
 ) -> AbstractContextManager[object]:
     """Open ``langsmith.tracing_context`` when export is on and no scope exists.
@@ -190,7 +190,7 @@ def assert_query_agent_eval_langsmith_gate(settings: SharedSettings) -> None:
     )
 
 
-def _normalize_query_run_result(result: Mapping[str, object]) -> dict[str, object]:
+def normalize_query_run_result(result: Mapping[str, object]) -> dict[str, object]:
     """Copy token aliases onto the raw parent return for usage extraction.
 
     Args:
@@ -202,13 +202,13 @@ def _normalize_query_run_result(result: Mapping[str, object]) -> dict[str, objec
     """
 
     payload = dict(result)
-    counts = _usage_token_counts(payload)
+    counts = usage_token_counts(payload)
     if counts is None:
         return payload
     input_count, output_count = counts
     payload["input_tokens"] = input_count
     payload["output_tokens"] = output_count
-    cost = _optional_cost_usd(payload.get("estimated_cost_usd"))
+    cost = optional_cost_usd(payload.get("estimated_cost_usd"))
     if cost is None:
         cost = estimate_traced_chat_cost_usd(
             input_tokens=input_count,

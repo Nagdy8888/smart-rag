@@ -91,6 +91,7 @@ class LightRagGraphStorage(Protocol):
 class LightRagRuntime(Protocol):
     """Narrow LightRAG instance surface used by the qualification harness."""
 
+    workspace: str
     chunk_entity_relation_graph: LightRagGraphStorage
 
     async def initialize_storages(self) -> None:

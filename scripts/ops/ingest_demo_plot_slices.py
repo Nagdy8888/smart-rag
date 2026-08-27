@@ -13,6 +13,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from typing import LiteralString, cast
 
 import httpx
 import psycopg
@@ -137,7 +138,7 @@ def _json_object(payload: object, source: str) -> dict[str, object]:
 
     if not isinstance(payload, dict):
         raise RuntimeError(f"{source} was not a JSON object")
-    return payload
+    return cast(dict[str, object], payload)
 
 
 def _enroll_totp(
@@ -174,7 +175,8 @@ def _enroll_totp(
     totp = body.get("totp")
     if not isinstance(totp, dict):
         raise RuntimeError("GoTrue enroll omitted totp")
-    secret = str(totp.get("secret", ""))
+    totp_obj = cast(dict[str, object], totp)
+    secret = str(totp_obj.get("secret", ""))
     factor_id = str(body.get("id", ""))
     challenge = client.post(
         f"{auth_url}/auth/v1/factors/{factor_id}/challenge",
@@ -329,7 +331,7 @@ def reset_failed_graph_extract(
     with psycopg.connect(operator_url, connect_timeout=15) as connection:
         connection.execute("SET ROLE postgres")
         deleted: dict[str, int] = {}
-        for sql, key in (
+        statements: tuple[tuple[LiteralString, LiteralString], ...] = (
             (
                 "DELETE FROM lightrag.lightrag_doc_status WHERE id = %s",
                 "doc_status",
@@ -355,8 +357,9 @@ def reset_failed_graph_extract(
                 "DELETE FROM lightrag.lightrag_full_relations WHERE id = %s",
                 "full_relations",
             ),
-        ):
-            cursor = connection.execute(psycopg_sql.SQL(sql), (version_id,))
+        )
+        for statement, key in statements:
+            cursor = connection.execute(psycopg_sql.SQL(statement), (version_id,))
             deleted[key] = int(cursor.rowcount or 0)
         workspace = connection.execute(
             """
@@ -717,7 +720,7 @@ def _poll_until_terminal(
             payload_status = _json_object(response.json(), "status")
             version = payload_status.get("version")
             if isinstance(version, dict):
-                public_status = str(version.get("status", ""))
+                public_status = str(cast(dict[str, object], version).get("status", ""))
             else:
                 public_status = str(payload_status.get("status", ""))
         jobs = _version_jobs(operator_url=operator_url, version_id=version_id)

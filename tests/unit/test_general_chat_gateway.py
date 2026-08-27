@@ -77,7 +77,9 @@ def test_live_general_chat_adapter_keeps_store_false() -> None:
     """The live adapter pins store=False and the existing answer model id."""
 
     source = inspect.getsource(inspect.unwrap(execute_openai_general_chat))
-    assert inspect.unwrap(execute_openai_general_chat) is not execute_openai_general_chat
+    assert (
+        inspect.unwrap(execute_openai_general_chat) is not execute_openai_general_chat
+    )
     assert "store=False" in source
     assert "max_retries=0" in source
     assert "ALLOWED_ANSWER_MODEL_IDS" in source

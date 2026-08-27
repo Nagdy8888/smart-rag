@@ -58,6 +58,7 @@ keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGA
 | GET | `/ops/ready` | owner/admin | named dependency probes | Full operator payload |
 | GET | `/api/meta` | public | handshake fields | Packet 6 enforces `min_client_version` |
 | GET | `/me` | authenticated | live profile role | Client role claims ignored |
+| GET | `/admin/users` | owner/admin | `app.list_workspace_members` + `app.list_pending_team_invitations` | LOW_RISK_READ 120. Max 200 each. No `token_hash`. Members 403. See [ADR-workspace-member-list.md](../adr/ADR-workspace-member-list.md) |
 | POST | `/admin/invitations` | owner/admin | live role + privileged Auth settings | AUTH_ADJACENT. JSON omits `raw_token` (mail only). Only **owner** may invite `owner`. `APP_ENV=test` may set `X-Test-Invitation-Token` |
 | POST | `/invitations/accept` | authenticated | JWT/test email, not body email | AUTH_ADJACENT |
 | POST | `/admin/users/{user_id}/offboard` | owner/admin AAL2 | `apply_offboarding_security` | AUTH_ADJACENT |
@@ -70,7 +71,7 @@ keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGA
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
 | DELETE | `/conversations/{id}` | creator or owner/admin | **204**; foreign/tombstoned **404** | Immediate purge; see [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) |
 | GET | `/conversations/{id}/messages` | creator | `app.list_conversation_messages` | `limit` default 50 max 100; `before` UUID keyset. 200 `{items:[{message_id, role, content, created_at}], next_before_id}`. Roles `user`/`assistant` only. Full content, HTML-escaped. Foreign/deleted/missing → generic **404** `not_found`. LOW_RISK_READ. |
-| POST | `/conversations/{id}/title` | creator | `app.get_conversation_title_source` then optional `app.update_conversation_title` | COST_MUTATION. One bounded `conversation_title_v1` call while the stored title is still the first-prompt fallback. Model failure keeps the fallback. Same generic **404** as GET. See [ADR-llm-conversation-titles.md](../adr/ADR-llm-conversation-titles.md). |
+| POST | `/conversations/{id}/title` | creator | `app.get_conversation_title_source` then optional `app.update_conversation_title` | COST_MUTATION. One bounded `conversation_title_v1` call while the stored title is still the first-prompt fallback. Model failure keeps the fallback. JSON includes `prompt_tokens` and `completion_tokens` for this call (0 when skipped). Same generic **404** as GET. See [ADR-llm-conversation-titles.md](../adr/ADR-llm-conversation-titles.md). |
 | POST | `/conversations/{id}/messages` | creator | handshake then idempotent Auto admit **composite** | **Requires** `Idempotency-Key` header or body `idempotency_key` (400 if missing). JSON Accept → 202 `{run_id, stream_path}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) |
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
 | POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |

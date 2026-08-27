@@ -119,8 +119,8 @@ separate loader. Do not copy the secret back onto the worker service.
 ## Verification
 
 ```bash
-# From repo root, with APP_RUNTIME_DB_PASSWORD set in a gitignored env file:
-docker compose config
+# CI and local interpolation proof (placeholders in tracked .env.example):
+docker compose --env-file .env.example config --quiet
 ```
 
 Confirm interpolated `api` / `worker` `SUPABASE_DB_URL` values do not

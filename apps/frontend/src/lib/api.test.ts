@@ -19,8 +19,9 @@ import {
   listDocuments,
   listTables,
   nextDocumentCursor,
-  listCitations,
-  listTools,
+    listCitations,
+    listTools,
+    listWorkspaceUsers,
   patchEntityRule,
   offboardUser,
   paidMutationHeaders,
@@ -1102,6 +1103,51 @@ describe("administration clients", () => {
     expect(created.invitation_id).toBe("inv-1");
     expect(created.email).toContain("<img");
   });
+
+  it("listWorkspaceUsers drops token fields and classifies member 403", async () => {
+    const okFetch: typeof fetch = async (_input, init) => {
+      expectBearerOnly(init?.headers as Record<string, string>);
+      expect(String(_input)).toContain("/admin/users");
+      expect(String(_input)).not.toContain("/offboard");
+      return new Response(
+        JSON.stringify({
+          members: [
+            {
+              user_id: "u-1",
+              email: "<img src=x onerror=alert(1)>@evil.test",
+              display_name: null,
+              role: "member",
+              upload_enabled: false,
+              disabled_at: null,
+              created_at: "2026-08-01T00:00:00Z",
+            },
+          ],
+          pending_invitations: [
+            {
+              invitation_id: "inv-1",
+              email: "pending@example.com",
+              role: "viewer",
+              upload_enabled: false,
+              expires_at: "2026-09-01T00:00:00Z",
+              token_hash: "should-drop",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const listed = await listWorkspaceUsers({ accessToken: "jwt-token" }, okFetch);
+    expect(listed.members[0]?.email).toContain("<img");
+    expect(listed.pending_invitations[0]).not.toHaveProperty("token_hash");
+    const forbidden: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    await expect(
+      listWorkspaceUsers({ accessToken: "jwt-token" }, forbidden),
+    ).rejects.toThrow("forbidden");
+  });
 });
 
 describe("fetchReady", () => {
@@ -1409,6 +1455,33 @@ describe("generateConversationTitle", () => {
       creator_user_id: "u1",
       title: "Vacation policy",
       created_at: "2026-08-17T00:00:00Z",
+      prompt_tokens: 0,
+      completion_tokens: 0,
+    });
+  });
+
+  it("returns title-call provider tokens when present", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          title: "Vacation policy",
+          created_at: "2026-08-17T00:00:00Z",
+          prompt_tokens: 700,
+          completion_tokens: 74,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    await expect(
+      generateConversationTitle({ accessToken: "jwt-token" }, "conv-1", fetchImpl),
+    ).resolves.toEqual({
+      conversation_id: "conv-1",
+      creator_user_id: "u1",
+      title: "Vacation policy",
+      created_at: "2026-08-17T00:00:00Z",
+      prompt_tokens: 700,
+      completion_tokens: 74,
     });
   });
 });

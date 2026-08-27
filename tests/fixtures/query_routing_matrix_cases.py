@@ -5,7 +5,7 @@ from __future__ import annotations
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.models import BranchKind
 
-from tests.support.query_routing import _NO_LIMITATIONS
+from tests.support.query_routing import NO_LIMITATIONS
 
 MATRIX_ROUTE_CASES: tuple[
     tuple[str, str, Phase6RouteFamily, set[BranchKind], set[str]],
@@ -16,21 +16,21 @@ MATRIX_ROUTE_CASES: tuple[
         "What is the status of INV-SR-1001?",
         Phase6RouteFamily.HYBRID,
         {BranchKind.HYBRID},
-        _NO_LIMITATIONS,
+        NO_LIMITATIONS,
     ),
     (
         "hybrid-orion-alias-policy",
         "Define the Orion widget alias policy date.",
         Phase6RouteFamily.HYBRID,
         {BranchKind.HYBRID},
-        _NO_LIMITATIONS,
+        NO_LIMITATIONS,
     ),
     (
         "combined-invoice-team-ownership",
         "Which team owns INV-SR-1001 related to procurement?",
         Phase6RouteFamily.COMBINED,
         {BranchKind.HYBRID, BranchKind.GRAPH_LOCAL},
-        _NO_LIMITATIONS,
+        NO_LIMITATIONS,
     ),
     (
         "hybrid-historical-handoff-2020",
@@ -44,7 +44,7 @@ MATRIX_ROUTE_CASES: tuple[
         "Summarize ordinary safety themes.",
         Phase6RouteFamily.HYBRID,
         {BranchKind.HYBRID},
-        _NO_LIMITATIONS,
+        NO_LIMITATIONS,
     ),
     (
         "combined-corpus-safety-landscape",
@@ -79,21 +79,21 @@ MATRIX_ROUTE_CASES: tuple[
         "Compare PRJ-ALPHA leave days and notice period.",
         Phase6RouteFamily.HYBRID,
         {BranchKind.HYBRID},
-        _NO_LIMITATIONS,
+        NO_LIMITATIONS,
     ),
     (
         "composite-invoice-policy-and-q1",
         "Compare INV-SR-1001 policy and sum the Q1 sheet",
         Phase6RouteFamily.COMPOSITE,
         {BranchKind.HYBRID, BranchKind.STRUCTURED_TABLE},
-        _NO_LIMITATIONS,
+        NO_LIMITATIONS,
     ),
     (
         "table-q1-sheet-totals",
         "sum the Q1 sheet totals",
         Phase6RouteFamily.STRUCTURED_TABLE,
         {BranchKind.STRUCTURED_TABLE},
-        _NO_LIMITATIONS,
+        NO_LIMITATIONS,
     ),
     (
         "inspection-current-graph-workspace",

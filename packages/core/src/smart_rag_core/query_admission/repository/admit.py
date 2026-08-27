@@ -12,7 +12,7 @@ from psycopg.rows import dict_row
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
-from smart_rag_core.query_admission.repository.errors import _raise_admission
+from smart_rag_core.query_admission.repository.errors import raise_admission
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import CallerContext, UserRole
 
@@ -87,7 +87,7 @@ def admit_query_run(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("admit_returned_no_row")
     context = AuthorizedRuntimeContext(

@@ -66,9 +66,7 @@ def dispatch_stream_part(
         return DispatchedStreamPart(drafts=(), node_updates=())
     if part.mode == "custom":
         mapping = custom_mapping_from_part(part)
-        drafts = mapper.consume_custom(
-            mapping if mapping is not None else part.data
-        )
+        drafts = mapper.consume_custom(mapping if mapping is not None else part.data)
         return DispatchedStreamPart(drafts=tuple(drafts), node_updates=())
     updates = updates_mapping_from_part(part)
     if updates is None:

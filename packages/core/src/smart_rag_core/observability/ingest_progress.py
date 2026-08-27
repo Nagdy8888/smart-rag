@@ -31,7 +31,8 @@ def log_ingest_progress(
     *,
     error_category: JobErrorCategory | str | None = None,
     reason_code: str | None = None,
-    **counts: object,
+    counts: Mapping[str, object] | None = None,
+    **extra_counts: object,
 ) -> None:
     """Emit one JSON-log message starting with ``[hybrid]`` or ``[graph]``.
 
@@ -42,7 +43,9 @@ def log_ingest_progress(
         error_category: Optional job error category on failure lines.
         reason_code: Optional short failure token. Non-token values are
             replaced with ``invalid_reason`` so plot text cannot ride along.
-        **counts: Integer or bool counters (chunks, batch_index, batch_count).
+        counts: Optional integer or bool counters. Prefer this mapping over
+            ``**extra_counts`` when keys come from a dynamic dict.
+        **extra_counts: Integer or bool counters (chunks, batch_index).
             Non-numeric values are ignored so callers cannot log filenames.
 
     Raises:
@@ -58,7 +61,9 @@ def log_ingest_progress(
     if _STAGE_TOKEN.fullmatch(stage) is None:
         raise ValueError("ingest_progress_stage_invalid")
     parts = [f"[{pipeline}]", f"job={job_id}", f"stage={stage}"]
-    for key, value in sorted(counts.items()):
+    merged_counts: dict[str, object] = dict(counts or {})
+    merged_counts.update(extra_counts)
+    for key, value in sorted(merged_counts.items()):
         if _STAGE_TOKEN.fullmatch(key) is None:
             continue
         if isinstance(value, bool):

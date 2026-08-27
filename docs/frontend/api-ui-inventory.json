@@ -21,6 +21,7 @@
     "/admin/tools",
     "/admin/tools/{tool_key}/enable",
     "/admin/tools/{tool_key}/permissions",
+    "/admin/users",
     "/admin/users/{user_id}/offboard",
     "/api/meta",
     "/conversations",

@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { INFERENCE_LINKS_UNAVAILABLE } from "../../lib/citation-drawer";
-import type { ChatViewState } from "../../lib/chat-view";
+import { chatTokenTotals, type ChatViewState } from "../../lib/chat-view";
 import { formatRunTokenUsage, formatUsd } from "../../lib/format-usage";
 import {
   cacheStatusLabel,
@@ -44,6 +44,58 @@ export type RunDetailsSheetProps = {
 };
 
 const TOKEN_GROUPING = new Intl.NumberFormat("en-US");
+
+type TokenMetricsSectionProps = {
+  label: string;
+  promptTokens: number;
+  completionTokens: number;
+  summary: string;
+};
+
+/**
+ * Prompt, completion, and total token metrics for one usage scope.
+ *
+ * @param props - Visible label, provider counts, and helper copy.
+ * @returns Metrics grid, or null when both counts are zero.
+ */
+function TokenMetricsSection({
+  label,
+  promptTokens,
+  completionTokens,
+  summary,
+}: TokenMetricsSectionProps) {
+  const usage = formatRunTokenUsage(promptTokens, completionTokens);
+  if (usage === null) {
+    return null;
+  }
+  return (
+    <section aria-label={label} role="region">
+      <p className={styles.kicker}>{label}</p>
+      <div className={styles.metrics}>
+        <div className={styles.metric}>
+          <span className={styles.metricValue}>
+            {TOKEN_GROUPING.format(promptTokens)}
+          </span>
+          <span className={styles.metricLabel}>Prompt tokens</span>
+        </div>
+        <div className={styles.metric}>
+          <span className={styles.metricValue}>
+            {TOKEN_GROUPING.format(completionTokens)}
+          </span>
+          <span className={styles.metricLabel}>Answer tokens</span>
+        </div>
+        <div className={`${styles.metric} ${styles.metricTotal}`}>
+          <span className={styles.metricValue}>
+            {TOKEN_GROUPING.format(promptTokens + completionTokens)}
+          </span>
+          <span className={styles.metricLabel}>Total tokens</span>
+        </div>
+      </div>
+      <p className={styles.summary}>{summary}</p>
+      <p className={styles.srOnly}>{usage}</p>
+    </section>
+  );
+}
 
 /**
  * Copy a technical id and report clipboard success or failure.
@@ -123,9 +175,14 @@ export function RunDetailsSheet({
   const changeReason = correctionReasonLabel(diagnostics.correctionReason);
   const cacheLabel = cacheStatusLabel(diagnostics.cacheStatus);
   const usageUsd = formatUsd(companyUsd);
+  const chatTotals = chatTokenTotals(chat);
   const runUsage = formatRunTokenUsage(
     diagnostics.promptTokens,
     diagnostics.completionTokens,
+  );
+  const chatUsage = formatRunTokenUsage(
+    chatTotals.promptTokens,
+    chatTotals.completionTokens,
   );
   const hasRun = chat.runId !== null;
   const body = (
@@ -177,26 +234,18 @@ export function RunDetailsSheet({
           {changeReason ? <UserText value={changeReason} /> : null}
         </p>
       ) : null}
-      {runUsage ? (
-        <section aria-label="This run">
-          <p className={styles.kicker}>This run</p>
-          <div className={styles.metrics}>
-            <div className={styles.metric}>
-              <span className={styles.metricValue}>
-                {TOKEN_GROUPING.format(diagnostics.promptTokens)}
-              </span>
-              <span className={styles.metricLabel}>Prompt tokens</span>
-            </div>
-            <div className={styles.metric}>
-              <span className={styles.metricValue}>
-                {TOKEN_GROUPING.format(diagnostics.completionTokens)}
-              </span>
-              <span className={styles.metricLabel}>Answer tokens</span>
-            </div>
-          </div>
-          <p className={styles.srOnly}>{runUsage}</p>
-        </section>
-      ) : null}
+      <TokenMetricsSection
+        label="This run"
+        promptTokens={diagnostics.promptTokens}
+        completionTokens={diagnostics.completionTokens}
+        summary="Profile, search, answer, and verifier tokens for this question."
+      />
+      <TokenMetricsSection
+        label="This chat"
+        promptTokens={chatTotals.promptTokens}
+        completionTokens={chatTotals.completionTokens}
+        summary="Every question in this conversation, including this run and the session title."
+      />
       {usageUsd === "—" ? null : (
         <section className={styles.spend} aria-label="Your account">
           <p className={styles.kicker}>Your account</p>
@@ -243,6 +292,7 @@ export function RunDetailsSheet({
       <p className={styles.footnote}>{INFERENCE_LINKS_UNAVAILABLE}</p>
       <p className={styles.srOnly} data-testid="usage-strip">
         {runUsage ? `This run ${runUsage}. ` : null}
+        {chatUsage ? `This chat ${chatUsage}. ` : null}
         Your account {usageUsd}.
       </p>
     </div>

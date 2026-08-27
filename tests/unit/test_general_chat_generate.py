@@ -8,6 +8,7 @@ from smart_rag_core.query_answer.generate import (
     CLARIFICATION_TEXT,
     DEGRADED_NO_COMPANY_SEARCH,
     GREETING_TEXT,
+    GeneralChatCaller,
     generate_answer,
 )
 from smart_rag_core.query_answer.models import AnswerPayload
@@ -78,7 +79,7 @@ def _generate(
     company_claim_forbidden: bool = True,
     knowledge_scope: KnowledgeScope | None = None,
     mode: NoRetrievalAnswerMode | None = None,
-    general_caller: object | None = None,
+    general_caller: GeneralChatCaller | None = None,
     already_generated: int = 0,
 ) -> AnswerPayload:
     """Call ``generate_answer`` with packet-12 defaults.

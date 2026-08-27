@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.security.identity import UserRole
 from smart_rag_core.settings import Environment
 
 from smart_rag_api.auth_admin.invitations import InvitationServiceError
@@ -21,6 +22,9 @@ from smart_rag_api.schemas.fastapi_security import (
     CreateInvitationResponse,
     CurrentUserResponse,
     OffboardResponse,
+    PendingInvitationResponse,
+    WorkspaceDirectoryResponse,
+    WorkspaceMemberResponse,
 )
 from smart_rag_api.services.auth_rate_limits import RateLimitKind
 from smart_rag_api.services.auth_team import AuthTeamService
@@ -61,6 +65,68 @@ def current_user(caller: CallerContextDep) -> CurrentUserResponse:
         authorization_version=caller.authorization_version,
         upload_enabled=caller.upload_enabled,
         mfa_enrolled=False,
+    )
+
+
+@router.get("/admin/users", response_model=WorkspaceDirectoryResponse)
+def list_workspace_users_route(
+    request: Request,
+    caller: CallerContextDep,
+    service: Annotated[AuthTeamService, Depends(get_auth_team_service)],
+) -> WorkspaceDirectoryResponse:
+    """List workspace members and unaccepted invitations. Owner/admin only.
+
+    Args:
+        request: Active request.
+        caller: Authenticated caller.
+        service: Injected auth/team service.
+
+    Returns:
+        Bounded directory. Invitation tokens are never included.
+
+    Raises:
+        HTTPException: 403 for members/viewers.
+    """
+
+    if caller.role not in {UserRole.OWNER, UserRole.ADMIN}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="forbidden",
+        )
+    enforce_rate_limit(
+        request,
+        bucket_key=f"workspace-users:{caller.user_id}",
+        kind=RateLimitKind.LOW_RISK_READ,
+        max_attempts=120,
+    )
+    try:
+        directory = service.list_directory(caller)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    return WorkspaceDirectoryResponse(
+        members=[
+            WorkspaceMemberResponse(
+                user_id=item.user_id,
+                email=item.email,
+                display_name=item.display_name,
+                role=item.role,
+                upload_enabled=item.upload_enabled,
+                disabled_at=item.disabled_at,
+                created_at=item.created_at,
+            )
+            for item in directory.members
+        ],
+        pending_invitations=[
+            PendingInvitationResponse(
+                invitation_id=item.invitation_id,
+                email=item.email,
+                role=item.role,
+                upload_enabled=item.upload_enabled,
+                expires_at=item.expires_at,
+                created_at=item.created_at,
+            )
+            for item in directory.pending_invitations
+        ],
     )
 
 

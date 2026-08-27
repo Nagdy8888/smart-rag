@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 import psycopg
+from psycopg import sql
 
 JOB_ID = UUID("681cc466-9216-442a-ac7a-189328660316")
 VERSION_ID = UUID("b09fccc3-ca75-42d7-90fc-d05c8c9cef5d")
@@ -51,8 +52,13 @@ def main() -> None:
         print("promo_tables", sagas)
         for table in sagas:
             name = table[0]
+            if not isinstance(name, str) or not name.replace("_", "").isalnum():
+                continue
             rows = connection.execute(
-                f"SELECT * FROM app.{name} WHERE version_id = %s OR saga_idempotency_key LIKE %s LIMIT 5",  # noqa: S608
+                sql.SQL(
+                    "SELECT * FROM {}.{} WHERE version_id = %s "
+                    "OR saga_idempotency_key LIKE %s LIMIT 5"
+                ).format(sql.Identifier("app"), sql.Identifier(name)),
                 (VERSION_ID, f"%{JOB_ID}%"),
             ).fetchall()
             print(name, rows)

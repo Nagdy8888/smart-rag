@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.branches import execute_branches
@@ -24,7 +25,7 @@ from smart_rag_core.query_routing.models import (
     CorrectionKind,
 )
 from smart_rag_core.query_routing.preparation import prepare_query
-from smart_rag_core.security.identity import UserRole
+from smart_rag_core.security.identity import CallerContext, UserRole
 
 
 def _runtime(
@@ -293,11 +294,13 @@ def test_hybrid_envelope_blocks_combined_escalation() -> None:
 class _FakeHybrid:
     """Test double returning a weak coverage Hybrid result."""
 
+    query_budget: QueryRetrieveBudget | None = None
+
     def retrieve(
         self,
         *,
         query: str,
-        caller: object,
+        caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
     ) -> object:
@@ -356,11 +359,11 @@ def test_execute_then_one_correction_reuses_hybrid_ids() -> None:
 def test_insufficient_evidence_after_correction_ends() -> None:
     """Exhausted retrieval after correction routes to END, not fusion."""
 
-    from smart_rag_agents.query.graph import _route_after_correction
+    from smart_rag_agents.query.nodes.topology import route_after_correction
     from smart_rag_agents.query.state import pending_query_state
 
     state = pending_query_state()
     state["status"] = "insufficient_evidence"
-    assert _route_after_correction(state) == "end"
+    assert route_after_correction(state) == "end"
     state["status"] = "correction_applied"
-    assert _route_after_correction(state) == "fuse_evidence"
+    assert route_after_correction(state) == "fuse_evidence"

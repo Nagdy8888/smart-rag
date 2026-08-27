@@ -24,6 +24,8 @@ def test_parse_v2_custom_and_updates() -> None:
     updates = parse_stream_part(
         {"type": "updates", "ns": (), "data": {"increment": {"value": 1}}}
     )
+    assert custom is not None
+    assert updates is not None
     assert custom == ParsedStreamPart(
         mode="custom",
         namespace=(),

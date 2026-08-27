@@ -78,7 +78,12 @@ class ConversationCreateRequest(BaseModel):
 
 
 class ConversationResponse(BaseModel):
-    """Conversation JSON. Title is escaped untrusted text."""
+    """Conversation JSON. Title is escaped untrusted text.
+
+    ``prompt_tokens`` and ``completion_tokens`` are provider usage for this
+    HTTP response. They are meaningful on ``POST /conversations/{id}/title``
+    (0 when the model was skipped or failed). List, get, and create return 0.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -86,6 +91,8 @@ class ConversationResponse(BaseModel):
     creator_user_id: UUID
     title: str | None
     created_at: datetime | None = None
+    prompt_tokens: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
 
 
 class ConversationMessage(BaseModel):
@@ -367,3 +374,39 @@ class OffboardResponse(BaseModel):
     request_id: UUID
     subject_user_id: UUID
     completed_at: datetime
+
+
+class WorkspaceMemberResponse(BaseModel):
+    """One workspace profile for owner/admin Team listing."""
+
+    model_config = ConfigDict(frozen=True)
+
+    user_id: UUID
+    email: str
+    display_name: str | None
+    role: str
+    upload_enabled: bool
+    disabled_at: datetime | None
+    created_at: datetime | None = None
+
+
+class PendingInvitationResponse(BaseModel):
+    """One unaccepted invitation. The token hash is never included."""
+
+    model_config = ConfigDict(frozen=True)
+
+    invitation_id: UUID
+    email: str
+    role: str
+    upload_enabled: bool
+    expires_at: datetime
+    created_at: datetime | None = None
+
+
+class WorkspaceDirectoryResponse(BaseModel):
+    """Bounded owner/admin directory. Max 200 members and 200 invitations."""
+
+    model_config = ConfigDict(frozen=True)
+
+    members: list[WorkspaceMemberResponse]
+    pending_invitations: list[PendingInvitationResponse]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -71,10 +72,13 @@ def test_entrypoints_import_without_network_or_provider_construction() -> None:
         import smart_rag_agents.ingestion.graph
         """
     )
+    child_env = os.environ.copy()
+    child_env.setdefault("SUPABASE_URL", "http://127.0.0.1:54321")
     completed = subprocess.run(  # noqa: S603 - fixed interpreter and probe
         (sys.executable, "-c", probe),
         check=False,
         capture_output=True,
         text=True,
+        env=child_env,
     )
     assert completed.returncode == 0, completed.stderr

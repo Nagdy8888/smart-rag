@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TypedDict
+from typing import Literal, TypedDict, cast
 
 from langgraph.graph import END, START, StateGraph
 from smart_rag_agents.query.graph import compile_query_graph
@@ -20,8 +20,12 @@ from smart_rag_api.services.query_sse_mapping import (
 )
 from smart_rag_core.query_answer.models import AnswerPayload
 
+from tests.support.typed_graph import untyped
 
-def _payload(text: str, *, status: str = "complete") -> dict[str, object]:
+
+def _payload(
+    text: str, *, status: Literal["complete", "partial", "refused"] = "complete"
+) -> dict[str, object]:
     """Build a dumpable answer mapping.
 
     Args:
@@ -103,9 +107,7 @@ def test_mapper_emits_one_answer_origin_before_token_delta() -> None:
     types = [item[0] for item in events]
     assert types.count("answer_origin") == 1
     assert types.index("answer_origin") < types.index("token_delta")
-    assert events[types.index("answer_origin")][1] == {
-        "origin": "general_knowledge"
-    }
+    assert events[types.index("answer_origin")][1] == {"origin": "general_knowledge"}
     assert "citation_preview" not in types
     historical = QuerySseMapper().consume_chunk(
         {
@@ -213,7 +215,7 @@ def test_compiled_graph_updates_are_node_keyed() -> None:
         """
 
         chunks: list[object] = []
-        async for chunk in compiled.astream(
+        async for chunk in untyped(compiled).astream(
             pending_query_state(),
             stream_mode="updates",
         ):
@@ -226,13 +228,14 @@ def test_compiled_graph_updates_are_node_keyed() -> None:
     assert chunks
     for chunk in chunks:
         assert isinstance(chunk, dict)
-        assert chunk
-        assert all(isinstance(key, str) for key in chunk)
-        dumped = str(chunk)
+        typed_chunk = cast(dict[str, object], chunk)
+        assert typed_chunk
+        assert all(isinstance(key, str) for key in typed_chunk)
+        dumped = str(typed_chunk)
         assert (
             "answer_text" not in dumped
-            or "generate_answer" in chunk
-            or "verify_answer" in chunk
+            or "generate_answer" in typed_chunk
+            or "verify_answer" in typed_chunk
         )
 
 
@@ -277,7 +280,7 @@ def test_mini_compiled_graph_does_not_emit_draft_before_verify() -> None:
             "answer": _payload("MINI_PUBLIC_FINAL"),
         }
 
-    builder = StateGraph(_State)
+    builder = untyped(StateGraph(_State))
     builder.add_node("generate_answer", generate_answer)
     builder.add_node("verify_answer", verify_answer)
     builder.add_edge(START, "generate_answer")

@@ -55,9 +55,7 @@ def title_generation_excerpt(current_title: str | None, user_excerpt: str) -> st
     return compact
 
 
-def needs_llm_conversation_title(
-    current_title: str | None, user_excerpt: str
-) -> bool:
+def needs_llm_conversation_title(current_title: str | None, user_excerpt: str) -> bool:
     """Return whether the stored title is still a first-prompt fallback.
 
     Args:

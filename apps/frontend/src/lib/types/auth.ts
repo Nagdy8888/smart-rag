@@ -50,3 +50,30 @@ export type OffboardResponse = {
   subject_user_id: string;
   completed_at: string;
 };
+
+/** One `GET /admin/users` member row. */
+export type WorkspaceMember = {
+  user_id: string;
+  email: string;
+  display_name: string | null;
+  role: string;
+  upload_enabled: boolean;
+  disabled_at: string | null;
+  created_at: string | null;
+};
+
+/** One unaccepted invitation. Token hash is never present. */
+export type PendingInvitation = {
+  invitation_id: string;
+  email: string;
+  role: string;
+  upload_enabled: boolean;
+  expires_at: string;
+  created_at: string | null;
+};
+
+/** Owner/admin workspace directory. */
+export type WorkspaceDirectoryResponse = {
+  members: WorkspaceMember[];
+  pending_invitations: PendingInvitation[];
+};

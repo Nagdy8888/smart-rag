@@ -114,6 +114,12 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |
 | `RATE_LIMIT_RETRY_AFTER_SECONDS` | 1–3600; `60` | public | `Retry-After` on limiter 429/503 |
 
+Tracked [`.env.example`](../../.env.example) includes non-secret
+`app_runtime` placeholders for `API_SUPABASE_DB_URL`,
+`WORKER_SUPABASE_DB_URL`, `LANGGRAPH_CHECKPOINT_URL`, and the three
+`NEXT_PUBLIC_*` keys so `docker compose --env-file .env.example config`
+succeeds in CI. Hosted secrets belong in gitignored `.env.compose`.
+
 Runtime Compose interpolates `${SUPABASE_URL:?set hosted SUPABASE_URL}`.
 There is no `host.docker.internal:54321` fallback. Wire hosted Auth with
 [`scripts/ops/wire_hosted_ingest_env.py`](../../scripts/ops/wire_hosted_ingest_env.py).

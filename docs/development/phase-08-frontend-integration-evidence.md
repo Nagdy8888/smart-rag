@@ -2478,6 +2478,7 @@ P08-22/P08-23. Do not uncheck completed historical packets.
 **Status:** PARTIAL
 
 ### Requirement and acceptance
+
 - [PASS] Same-origin auth callback (`safeNextPath`); no open redirect.
 - [PASS] Backend SSE path split under `services/sse/`; extra-forbid catalog with optional `status.phase` and `tool_progress`.
 - [PASS] Frontend god-file extraction: ChatApp ≤300; table-plan/admin-bodies barrels ≤100; AnalysisPlan ≤200; document-library/curation/auth/graph under packet budgets.
@@ -2492,6 +2493,7 @@ P08-22/P08-23. Do not uncheck completed historical packets.
 - [UNVERIFIED] Full root `frontend` / `docs` / `unit` tiers in this run.
 
 ### Changed paths
+
 - `apps/frontend/src/lib/table-plan/` — draft/validate/compile/results owners
 - `apps/frontend/src/lib/admin-bodies/` — invitation/glossary/entity-rule builders
 - `apps/frontend/src/lib/hooks/use-console-readiness.ts` — one readiness query per session-role
@@ -2503,8 +2505,9 @@ P08-22/P08-23. Do not uncheck completed historical packets.
 - `docs/api/SSE.md`, `docs/frontend/workspace-screens.md`, `docs/frontend/action-inventory.json`
 
 ### Commands
+
 | Command | Exit | Duration | Counts/result |
-|---|---:|---:|---|
+| --- | ---: | ---: | --- |
 | `pnpm --filter smart-rag-frontend exec vitest run` focused chat/tables/lib suites | 0 | ~14s | 136 passed |
 | surface/geometry/admin/auth/graph suites | 0 | ~10s | 77 passed |
 | `pnpm --filter smart-rag-frontend typecheck` | 0 | ~13s | clean |
@@ -2512,10 +2515,12 @@ P08-22/P08-23. Do not uncheck completed historical packets.
 | action inventory | 0 | | verified |
 
 ### Runtime proof
+
 - profile: local deterministic fixtures; hosted P08-22 remains BLOCKED
 - leakage marker: `SYNTHETIC_NO_LEAK_MARKER`
 
 ### Architecture
+
 - ChatApp 300 → 300 composition-only
 - table-plan.ts 504 → ≤100 barrel
 - analysis-plan.tsx 589 → ≤200
@@ -2526,18 +2531,22 @@ P08-22/P08-23. Do not uncheck completed historical packets.
 - leftover allow-list: `design-tokens.ts` token table; `chat-view.ts` / `answer-surface.tsx` still over 300
 
 ### Security, authorization, replay, fallback
+
 - Redirect matrix stays same-origin.
 - Cache keys never store the raw JWT.
 - Resume/cancel remain first-terminal-wins; reconnect does not start a second paid POST.
 
 ### Unverified or blocked
+
 - Hosted settlement, live Verifying paint, durable partial vs UI running.
 - Full Playwright visual baselines after 390px CSS split.
 - Integrity lock `--update` not run in this close.
 
 ### ADR/deviation
+
 - Presentation delay remains ADR-verified-answer-paced-reveal only.
 - P08-22/P08-23 not renumbered or checked.
 
 ### Rollback
+
 - Revert the frontend/backend modularization and presentation owners. Keep Phase 6 graph-node dirty-tree work untouched.

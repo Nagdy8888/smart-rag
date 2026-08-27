@@ -14,6 +14,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from typing import cast
 
 import httpx
 import psycopg
@@ -56,7 +57,7 @@ def _json_object(payload: object, source: str) -> dict[str, object]:
 
     if not isinstance(payload, dict):
         raise RuntimeError(f"{source} was not a JSON object")
-    return payload
+    return cast(dict[str, object], payload)
 
 
 def _create_uploader(status: dict[str, str]) -> tuple[str, str, str]:
@@ -122,7 +123,8 @@ def _enroll_totp(
     totp = body.get("totp")
     if not isinstance(totp, dict):
         raise RuntimeError("GoTrue enroll omitted totp")
-    secret = str(totp.get("secret", ""))
+    totp_obj = cast(dict[str, object], totp)
+    secret = str(totp_obj.get("secret", ""))
     factor_id = str(body.get("id", ""))
     challenge = client.post(
         f"{auth_url}/auth/v1/factors/{factor_id}/challenge",
@@ -189,30 +191,6 @@ def _mark_scan_job_synthetic(job_id: str) -> None:
             if cursor.rowcount != 1:
                 raise RuntimeError(f"scan job {job_id} not updated")
         connection.commit()
-
-
-def _job_snapshot(job_id: str) -> dict[str, object]:
-    """Read durable job status for logging."""
-
-    with psycopg.connect(DB_URL, connect_timeout=10) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT status::text, job_kind, last_error, attempt_count
-                FROM app.ingestion_jobs
-                WHERE id = %s::uuid
-                """,
-                (job_id,),
-            )
-            row = cursor.fetchone()
-    if row is None:
-        return {}
-    return {
-        "status": row[0],
-        "job_kind": row[1],
-        "last_error": row[2],
-        "attempt_count": row[3],
-    }
 
 
 def _version_jobs(version_id: str) -> list[dict[str, object]]:
@@ -361,7 +339,7 @@ def main() -> int:
             payload_status = _json_object(response.json(), "status")
             version = payload_status.get("version")
             if isinstance(version, dict):
-                public_status = str(version.get("status", ""))
+                public_status = str(cast(dict[str, object], version).get("status", ""))
             else:
                 public_status = str(payload_status.get("status", ""))
             jobs = _version_jobs(version_id)

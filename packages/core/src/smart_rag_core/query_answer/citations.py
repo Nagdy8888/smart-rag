@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -10,6 +11,8 @@ import psycopg
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.security.identity import CallerContext
+
+LOGGER = logging.getLogger(__name__)
 
 
 def citation_provenance_payload(
@@ -130,6 +133,77 @@ def persist_answer_citations(
                 ids.append(UUID(str(row[0])))
             index += 1
     return tuple(ids)
+
+
+def maybe_persist_verified_citations(
+    connection: psycopg.Connection | None,
+    *,
+    caller: CallerContext | None,
+    run_id: UUID | None,
+    fusion: FusionResult,
+    answer: AnswerPayload,
+) -> tuple[UUID, ...]:
+    """Insert verified citations once per run when a durable connection exists.
+
+    Args:
+        connection: Per-run ``app_api`` connection. Skips when ``None``.
+        caller: Server-derived caller for role context.
+        run_id: Admitted query run.
+        fusion: Combined ranking result for provenance jsonb.
+        answer: Verified answer payload.
+
+    Returns:
+        Inserted citation UUIDs, or an empty tuple when skipped or already
+        persisted.
+
+    Side Effects:
+        Inserts into ``app.citations`` at most once per ``run_id``. Does not
+        commit; the SSE consume loop commits after verify.
+    """
+
+    if connection is None or caller is None or run_id is None:
+        return ()
+    if not answer.citations and not answer.table_citations:
+        return ()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1
+                FROM app.citations
+                WHERE run_id = %s::uuid
+                LIMIT 1
+                """,
+                (str(run_id),),
+            )
+            if cursor.fetchone() is not None:
+                return ()
+    except psycopg.Error:
+        LOGGER.info(
+            "citation persist skipped",
+            extra={
+                "event": "query.verify.citation_existence_check_failed",
+                "run_id": str(run_id),
+            },
+        )
+        return ()
+    try:
+        return persist_answer_citations(
+            connection,
+            caller=caller,
+            run_id=run_id,
+            fusion=fusion,
+            answer=answer,
+        )
+    except psycopg.Error:
+        LOGGER.info(
+            "citation persist skipped",
+            extra={
+                "event": "query.verify.citation_persist_failed",
+                "run_id": str(run_id),
+            },
+        )
+        return ()
 
 
 def _json(payload: dict[str, object]) -> str:

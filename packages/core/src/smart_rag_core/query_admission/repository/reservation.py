@@ -13,7 +13,7 @@ from smart_rag_core.query_admission.exceptions import (
     QueryAdmissionError,
     QueryBudgetError,
 )
-from smart_rag_core.query_admission.repository.errors import _raise_admission
+from smart_rag_core.query_admission.repository.errors import raise_admission
 from smart_rag_core.security.identity import CallerContext
 
 
@@ -94,7 +94,7 @@ def consume_query_reservation(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryBudgetError("consume_returned_no_row")
     return ReservationConsumeResult(
@@ -148,7 +148,7 @@ def true_up_query_reservation(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("true_up_returned_no_row")
     return TrueUpResult(

@@ -9,6 +9,8 @@ from smart_rag_agents.query.graph import (
 )
 from smart_rag_agents.query.runtime.bound_nodes import bind_query_nodes
 
+from tests.support.typed_graph import compile_state_graph
+
 
 def test_bound_nodes_expose_every_production_wrapper() -> None:
     """Each production stage except admission has a bound callable."""
@@ -22,9 +24,13 @@ def test_production_and_studio_graphs_register_the_same_core_stages() -> None:
     """Studio compile adds seed/emit nodes without renaming core stages."""
 
     expected = set(production_stage_names())
-    production = set(build_query_graph().compile().get_graph().nodes)
-    local = set(build_query_graph(studio_local=True).compile().get_graph().nodes)
-    live = set(build_query_graph(studio_live=True).compile().get_graph().nodes)
+    production = set(compile_state_graph(build_query_graph()).get_graph().nodes)
+    local = set(
+        compile_state_graph(build_query_graph(studio_local=True)).get_graph().nodes
+    )
+    live = set(
+        compile_state_graph(build_query_graph(studio_live=True)).get_graph().nodes
+    )
     assert expected <= production
     assert expected <= local
     assert expected <= live

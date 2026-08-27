@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
@@ -12,7 +12,7 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.sse.sanitize import sanitize_error_payload
-from smart_rag_core.sse.store import RunEventStore
+from smart_rag_core.sse.store import PersistedRunEvent, RunEventStore
 
 from smart_rag_api.services.sse.chunks import (
     coerce_stream_token_count,
@@ -32,6 +32,38 @@ class RunOrchestrationMixin:
     _executor: QueryRunExecutor
     _postgres_url: str | None
     _heartbeat_interval_seconds: float
+
+    if TYPE_CHECKING:
+
+        def _ensure_schema(self, caller: CallerContext, run_id: UUID) -> None:
+            """Persist the first schema event. Provided by RunSettlementMixin."""
+
+        def _load_durable_start(
+            self, caller: CallerContext, run_id: UUID
+        ) -> tuple[str, AuthorizedRuntimeContext] | None:
+            """Load durable start input. Provided by RunSettlementMixin."""
+
+        def _emit_worker_unavailable(self, caller: CallerContext, run_id: UUID) -> None:
+            """Persist worker_unavailable. Provided by RunSettlementMixin."""
+
+        def _cancel_tasks(self, live: LiveQueryRun) -> None:
+            """Cancel live tasks. Provided by ReplayCancelMixin."""
+
+        def _has_terminal(self, caller: CallerContext, run_id: UUID) -> bool:
+            """Return whether a terminal event exists. Provided by ReplayCancelMixin."""
+
+            ...
+
+        async def _append_async(
+            self,
+            caller: CallerContext,
+            run_id: UUID,
+            event_type: str,
+            payload: dict[str, object],
+        ) -> PersistedRunEvent | None:
+            """Persist one catalog event off the loop. Provided by EventAppendMixin."""
+
+            ...
 
     def _start_once(
         self,
@@ -149,9 +181,7 @@ class RunOrchestrationMixin:
                     message=message,
                     cancel_event=live.cancel_event,
                 ):
-                    await self._append_async(
-                        caller, record.run_id, event_type, payload
-                    )
+                    await self._append_async(caller, record.run_id, event_type, payload)
                     if event_type == "token_delta":
                         delta = payload.get("delta")
                         if isinstance(delta, str) and delta:
@@ -166,9 +196,7 @@ class RunOrchestrationMixin:
                             completion_tokens = event_completion
                 if not self._has_terminal(caller, record.run_id):
                     if live.cancel_event.is_set():
-                        await self._append_async(
-                            caller, record.run_id, "cancelled", {}
-                        )
+                        await self._append_async(caller, record.run_id, "cancelled", {})
                     else:
                         await self._append_async(
                             caller,

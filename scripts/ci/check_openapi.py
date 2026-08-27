@@ -21,6 +21,11 @@ def main() -> int:
         ``0`` when the snapshot matches the running app schema, else ``1``.
     """
 
+    from smart_rag_core.settings.base import setdefault_process_environ
+
+    # CI has no developer `.env`. App construction at import requires an
+    # explicit Auth origin when ``APP_ENV`` is not ``test``.
+    setdefault_process_environ("SUPABASE_URL", "http://127.0.0.1:54321")
     sys.path.insert(0, str(ROOT / "apps" / "backend" / "src"))
     from smart_rag_api.main import app
 
@@ -33,6 +38,7 @@ def main() -> int:
         "/me",
         "/admin/invitations",
         "/invitations/accept",
+        "/admin/users",
         "/admin/users/{user_id}/offboard",
         "/documents",
         "/documents/{document_id}",

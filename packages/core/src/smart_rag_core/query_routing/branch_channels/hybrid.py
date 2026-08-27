@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, cast
 from uuid import UUID
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
@@ -119,7 +119,7 @@ def chunk_loader(
     loader = factory(caller)
     if not callable(loader):
         return None
-    return loader
+    return cast(ContextFn, loader)
 
 
 def load_chunk_contexts(
@@ -230,7 +230,9 @@ def hybrid_evidence(
     by_id = load_chunk_contexts(ranked, chunk_loader)
     for index, chunk_id in enumerate(ranked, start=1):
         record = by_id.get(chunk_id)
-        text = record.raw_text if record is not None else ""
+        if record is None:
+            continue
+        text = record.raw_text
         if not text.strip():
             continue
         records.append(

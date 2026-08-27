@@ -40,14 +40,14 @@ from smart_rag_core.retrieval.frozen_profile import (
 )
 from smart_rag_core.security.identity import CallerContext, UserRole
 
-from tests.support.query_routing import _plan, _prep
+from tests.support.query_routing import routing_plan, routing_prep
 from tests.support.query_runtime import authorized_runtime as _runtime
 
 
 def test_preparation_contains_every_required_field() -> None:
     """One typed preparation result contains every required field."""
 
-    prep = _prep("What is the status of INV-SR-1001?")
+    prep = routing_prep("What is the status of INV-SR-1001?")
     dumped = prep.model_dump()
     assert REQUIRED_PREPARATION_FIELDS <= set(dumped)
     assert prep.original == prep.original_fallback_variant
@@ -67,7 +67,7 @@ def test_profile_schema_omission_fails() -> None:
 def test_original_query_loss_fails() -> None:
     """The original query cannot be replaced by the rewrite fallback."""
 
-    prep = _prep("What is the status of INV-SR-1001?")
+    prep = routing_prep("What is the status of INV-SR-1001?")
     with pytest.raises(ValidationError):
         preparation_from_state(
             {**prep.model_dump(mode="json"), "original_fallback_variant": "rewritten"}
@@ -159,9 +159,9 @@ def test_coverage_threshold_not_retuned() -> None:
     assert PROVISIONAL_COVERAGE_THRESHOLD == 0.65
     for query_class in QueryClass:
         assert coverage_threshold_for(query_class) == pytest.approx(0.65)
-    prep = _prep("What is the status of INV-SR-1001?")
+    prep = routing_prep("What is the status of INV-SR-1001?")
     assert frozen_coverage_threshold(prep) == pytest.approx(0.65)
-    plan = _plan("What is the status of INV-SR-1001?")
+    plan = routing_plan("What is the status of INV-SR-1001?")
     with pytest.raises(ValidationError):
         RetrievalPlan.model_validate({**plan.model_dump(), "coverage_threshold": 0.40})
     with pytest.raises(ValidationError):
@@ -200,8 +200,8 @@ def test_unauthorized_blindness_suppressed() -> None:
 def test_branch_fan_out_rejected() -> None:
     """Server concurrency cannot be raised above two."""
 
-    plan = _plan("What is the status of INV-SR-1001?")
-    prep = _prep("What is the status of INV-SR-1001?")
+    plan = routing_plan("What is the status of INV-SR-1001?")
+    prep = routing_prep("What is the status of INV-SR-1001?")
     with pytest.raises(QueryRoutingError, match="branch_fan_out"):
         execute_branches(plan, prep, _runtime(), branch_concurrency=8)
 
@@ -211,7 +211,9 @@ def test_historical_execute_rejects_graph_path() -> None:
 
     from smart_rag_core.query_routing.models import BranchSpec
 
-    prep = _prep("Which team owns the widget after the handoff as of 2020-01-01?")
+    prep = routing_prep(
+        "Which team owns the widget after the handoff as of 2020-01-01?"
+    )
     plan = compile_retrieval_plan(prep, _runtime())
     poisoned = plan.model_copy(
         update={
@@ -235,8 +237,8 @@ def test_historical_execute_rejects_graph_path() -> None:
 def test_unbound_combined_degrades_without_graph_prose() -> None:
     """Missing LightRAG degrades Combined to Hybrid with graph_unavailable."""
 
-    plan = _plan("Which team owns INV-SR-1001 related to procurement?")
-    prep = _prep("Which team owns INV-SR-1001 related to procurement?")
+    plan = routing_plan("Which team owns INV-SR-1001 related to procurement?")
+    prep = routing_prep("Which team owns INV-SR-1001 related to procurement?")
     results = execute_branches(plan, prep, _runtime())
     graphish = [
         item

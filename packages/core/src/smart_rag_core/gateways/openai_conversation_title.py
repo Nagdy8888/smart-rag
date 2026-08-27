@@ -133,7 +133,8 @@ def _parse_conversation_title_response(
         raise OpenAIAnswerError("conversation_title_schema_invalid") from error
     if not isinstance(loaded, dict):
         raise OpenAIAnswerError("conversation_title_schema_invalid")
-    title = loaded.get("title")
+    parsed = cast(dict[str, object], loaded)
+    title = parsed.get("title")
     if not isinstance(title, str) or not title.strip():
         raise OpenAIAnswerError("conversation_title_schema_invalid")
-    return cast(dict[str, object], loaded), request_id, input_tokens, output_tokens
+    return parsed, request_id, input_tokens, output_tokens

@@ -88,11 +88,13 @@ def ready_payload(*, timeout_seconds: float = 8.0) -> dict[str, object]:
     deps_raw = payload.get("dependencies")
     names: dict[str, str] = {}
     if isinstance(deps_raw, list):
-        for item in deps_raw:
-            if not isinstance(item, dict):
+        for item in cast(list[object], deps_raw):
+            try:
+                typed_item = as_json_object(item, source="ready.dep")
+            except ValueError:
                 continue
-            name = item.get("name")
-            status = item.get("status")
+            name = typed_item.get("name")
+            status = typed_item.get("status")
             if isinstance(name, str) and isinstance(status, str):
                 names[name] = status
     return {
@@ -127,7 +129,10 @@ def wait_dependency(
     while time.monotonic() < deadline:
         payload = ready_payload()
         deps = payload.get("dependencies")
-        mapping = deps if isinstance(deps, dict) else {}
+        try:
+            mapping = as_json_object(deps, source="ready.deps")
+        except ValueError:
+            mapping = {}
         last = str(mapping.get(name, ""))
         query_ready = payload.get("query_ready")
         if last == expected:
@@ -176,7 +181,11 @@ def snapshot_canonical(db_url: str) -> dict[str, object]:
         "budget_reservations",
         "lightrag_doc_status",
     )
-    counts = {key: int(value) for key, value in zip(keys, row, strict=True)}
+    counts: dict[str, object] = {}
+    for key, value in zip(keys, row, strict=True):
+        counts[key] = (
+            value if isinstance(value, int) and not isinstance(value, bool) else 0
+        )
     counts["passed"] = True
     return counts
 

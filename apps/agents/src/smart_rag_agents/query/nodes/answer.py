@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import cast
 from uuid import uuid4
 
 from smart_rag_core.query_admission.ceilings import (
@@ -312,15 +313,18 @@ def generate_answer_node(
         and answer.answer_origin not in general_origins
     ):
         status = "insufficient_evidence"
-    return {
-        **state,
-        "status": status,
-        "detail": "one answer generated from canonical evidence",
-        "answer": answer.model_dump(mode="json"),
-        "remaining_model_calls": remaining,
-        "answer_call_count": answer_calls,
-        "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
-        "keyword_extract_count": 0,
-        **accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
-        **runtime_update,
-    }
+    return cast(
+        QueryGraphState,
+        {
+            **state,
+            "status": status,
+            "detail": "one answer generated from canonical evidence",
+            "answer": answer.model_dump(mode="json"),
+            "remaining_model_calls": remaining,
+            "answer_call_count": answer_calls,
+            "catalog_llm_call_count": int(state.get("catalog_llm_call_count") or 0),
+            "keyword_extract_count": 0,
+            **accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
+            **runtime_update,
+        },
+    )

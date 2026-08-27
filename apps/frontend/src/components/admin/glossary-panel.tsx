@@ -57,12 +57,13 @@ export function GlossaryPanel({ curation }: GlossaryPanelProps) {
   const [alias, setAlias] = useState("");
 
   return (
-    <section className={styles.panel} aria-label="Glossary import">
-      <h2>Glossary import</h2>
+    <section className={styles.panel} aria-label="Word aliases">
+      <h2>Word aliases</h2>
       <p className={styles.panelLead}>
-        Import one term, then approve it to add aliases to search. Rollback
-        removes that import’s search projection. Entry keys may use letters,
-        numbers, dots, underscores, colons, or hyphens.
+        Add a company term and optional nickname, then approve it so questions
+        using either wording still find the right documents. Rollback removes
+        that import from search. Entry keys may use letters, numbers, dots,
+        underscores, colons, or hyphens.
       </p>
       <div className={styles.formGrid}>
         <Input

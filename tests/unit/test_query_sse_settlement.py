@@ -16,9 +16,12 @@ from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.sse.store import MemoryRunEventStore
 
 from tests.support.query_sse import (
-    _caller,
-    _runtime,
+    caller as make_caller,
 )
+from tests.support.query_sse import (
+    runtime as make_runtime,
+)
+from tests.unit.typed_attrs import typed_attr
 
 
 def test_sse_service_settles_reservation_once_on_terminal(monkeypatch: Any) -> None:
@@ -106,8 +109,8 @@ def test_sse_service_settles_reservation_once_on_terminal(monkeypatch: Any) -> N
         sse_schema_version="1",
         postgres_url="postgresql://example",
     )
-    caller = _caller()
-    runtime = _runtime()
+    caller = make_caller()
+    runtime = make_runtime()
     service.remember_admitted(caller, runtime, message="hello")
 
     async def _drain() -> list[str]:
@@ -129,7 +132,9 @@ def test_sse_service_settles_reservation_once_on_terminal(monkeypatch: Any) -> N
         "event: completed" in frame or "event: error" in frame for frame in frames
     )
     assert calls == [runtime.reservation_id]
-    service._append(caller, runtime.run_id, "error", {"code": "run_failed"})
+    typed_attr(service, "_append")(
+        caller, runtime.run_id, "error", {"code": "run_failed"}
+    )
     assert calls == [runtime.reservation_id]
 
 
@@ -145,8 +150,8 @@ def test_sse_service_fallthrough_without_terminal_is_error_not_completed() -> No
         executor=executor,
         sse_schema_version="1",
     )
-    caller = _caller()
-    runtime = _runtime()
+    caller = make_caller()
+    runtime = make_runtime()
     service.remember_admitted(caller, runtime, message="hello")
 
     async def _drain() -> list[str]:

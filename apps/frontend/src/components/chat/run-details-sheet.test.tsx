@@ -87,6 +87,19 @@ describe("RunDetailsSheet", () => {
     expect(details).toHaveTextContent("Composite");
     expect(details).toHaveTextContent("Searches documents, tables, and relationships.");
     expect(details).toHaveTextContent("258 prompt · 32 completion");
+    expect(details).toHaveTextContent("290");
+    expect(details).toHaveTextContent("Total tokens");
+    expect(details).toHaveTextContent("This run");
+    expect(details).toHaveTextContent("This chat");
+    expect(details).toHaveTextContent(
+      "Profile, search, answer, and verifier tokens for this question.",
+    );
+    expect(details).toHaveTextContent(
+      "Every question in this conversation, including this run and the session title.",
+    );
+    expect(details).not.toHaveTextContent(
+      "Session title generation is billed separately.",
+    );
     expect(details).toHaveTextContent("$3.20");
     expect(details).toHaveTextContent("run-1");
     expect(details).not.toHaveTextContent("Requested route");
@@ -133,5 +146,25 @@ describe("RunDetailsSheet", () => {
     expect(await screen.findByRole("button", { name: "Copy run-1" })).toHaveTextContent(
       "Copied",
     );
+  });
+
+  it("shows this run and the whole-chat total when later questions exist", () => {
+    const chat: ChatViewState = {
+      ...completedComposite(),
+      chatPromptTokens: 700,
+      chatCompletionTokens: 74,
+    };
+    renderSheet(chat);
+    const details = screen.getByTestId("advanced-diagnostics");
+    const thisRun = screen.getByRole("region", { name: "This run" });
+    const thisChat = screen.getByRole("region", { name: "This chat" });
+    expect(thisRun).toHaveTextContent("258");
+    expect(thisRun).toHaveTextContent("32");
+    expect(thisRun).toHaveTextContent("290");
+    expect(thisChat).toHaveTextContent("958");
+    expect(thisChat).toHaveTextContent("106");
+    expect(thisChat).toHaveTextContent("1,064");
+    expect(details).toHaveTextContent("This run 258 prompt · 32 completion");
+    expect(details).toHaveTextContent("This chat 958 prompt · 106 completion");
   });
 });

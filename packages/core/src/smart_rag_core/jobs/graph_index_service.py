@@ -8,8 +8,9 @@ when maps verify and the pointer already names this workspace.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from decimal import Decimal
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias, cast
 from uuid import UUID
 
 import psycopg
@@ -445,7 +446,8 @@ class GraphIndexService:
             bind(workspace)
         ensure = getattr(adapter, "ensure_pipeline_status", None)
         if callable(ensure):
-            await ensure()
+            typed_ensure = cast(Callable[[], Awaitable[None]], ensure)
+            await typed_ensure()
 
     async def _index(
         self,

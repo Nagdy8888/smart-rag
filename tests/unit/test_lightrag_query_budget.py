@@ -11,12 +11,16 @@ from smart_rag_core.gateways.embedding import create_embedding_gateway
 from smart_rag_core.gateways.model import create_model_gateway
 from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 from smart_rag_core.query_admission.exceptions import QueryBudgetError
+from smart_rag_core.retrieval import lightrag_adapter as lightrag_adapter_mod
 from smart_rag_core.retrieval.lightrag_adapter import (
-    _QUERY_RETRIEVE_BUDGET,
     install_query_budget_consume,
 )
 from smart_rag_core.retrieval.lightrag_callbacks import CountedLightRagCallbacks
 from smart_rag_core.settings import AgentSettings
+
+from tests.unit.typed_attrs import typed_attr
+
+_QUERY_RETRIEVE_BUDGET = typed_attr(lightrag_adapter_mod, "_QUERY_RETRIEVE_BUDGET")
 
 
 def _callbacks() -> CountedLightRagCallbacks:
@@ -62,6 +66,9 @@ def test_lightrag_embedding_callback_debits_retrieve_budget() -> None:
     assert budget.usage_kinds == ["embedding"]
     assert budget.remaining_model_calls == 7
     assert budget.remaining_usd == Decimal("3.18")
+    assert budget.prompt_tokens == 0
+    assert budget.completion_tokens == 0
+    assert callbacks.last_prompt_tokens == 0
 
 
 def test_lightrag_callback_fails_closed_when_reservation_short() -> None:

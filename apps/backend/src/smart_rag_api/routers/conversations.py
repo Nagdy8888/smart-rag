@@ -16,6 +16,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse, StreamingResponse
+from smart_rag_core.conversations import ConversationRecord
 from smart_rag_core.gateways.model import ModelGateway
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 
@@ -40,9 +41,7 @@ from smart_rag_api.services.client_handshake import enforce_client_handshake
 from smart_rag_api.services.conversation_transcript import (
     ConversationTranscriptService,
 )
-from smart_rag_api.services.conversations import (
-    ConversationService,
-)
+from smart_rag_api.services.conversations import ConversationService
 from smart_rag_api.services.http_errors import raise_admission_http
 from smart_rag_api.services.query_runs import QueryRunService
 from smart_rag_api.services.sse_stream import (
@@ -52,6 +51,35 @@ from smart_rag_api.services.sse_stream import (
 )
 
 router = APIRouter(prefix="/conversations", tags=["chat"])
+
+
+def _conversation_response(
+    record: ConversationRecord,
+    *,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+) -> ConversationResponse:
+    """Map a persisted conversation to JSON.
+
+    Args:
+        record: Conversation row.
+        prompt_tokens: Provider prompt tokens for this HTTP response. 0 on
+            list, get, and create. Title POST returns the billed count or 0
+            when the model was skipped.
+        completion_tokens: Provider completion tokens for this HTTP response.
+
+    Returns:
+        Frozen conversation JSON.
+    """
+
+    return ConversationResponse(
+        conversation_id=record.conversation_id,
+        creator_user_id=record.creator_user_id,
+        title=record.title,
+        created_at=record.created_at,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
 
 
 def get_conversation_service(
@@ -135,12 +163,7 @@ def create_conversation_route(
         record = service.create(caller, title=body.title)
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
-    return ConversationResponse(
-        conversation_id=record.conversation_id,
-        creator_user_id=record.creator_user_id,
-        title=record.title,
-        created_at=record.created_at,
-    )
+    return _conversation_response(record)
 
 
 @router.get("", response_model=list[ConversationResponse])
@@ -174,15 +197,7 @@ def list_conversations_route(
         records = service.list(caller, limit=limit, cursor=cursor)
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
-    return [
-        ConversationResponse(
-            conversation_id=item.conversation_id,
-            creator_user_id=item.creator_user_id,
-            title=item.title,
-            created_at=item.created_at,
-        )
-        for item in records
-    ]
+    return [_conversation_response(item) for item in records]
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)
@@ -214,12 +229,7 @@ def get_conversation_route(
         record = service.get(caller, conversation_id=conversation_id)
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
-    return ConversationResponse(
-        conversation_id=record.conversation_id,
-        creator_user_id=record.creator_user_id,
-        title=record.title,
-        created_at=record.created_at,
-    )
+    return _conversation_response(record)
 
 
 @router.post(
@@ -248,7 +258,9 @@ async def generate_conversation_title_route(
         gateway: Process model gateway.
 
     Returns:
-        Conversation with the persisted title.
+        Conversation JSON. ``prompt_tokens`` and ``completion_tokens`` are
+        this title call's provider usage, or 0 when the model was skipped
+        or failed.
 
     Raises:
         HTTPException: 404 for missing, tombstoned, or foreign conversations.
@@ -261,18 +273,17 @@ async def generate_conversation_title_route(
         max_attempts=20,
     )
     try:
-        record = await service.generate_title(
+        result = await service.generate_title(
             caller,
             conversation_id=conversation_id,
             gateway=gateway,
         )
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
-    return ConversationResponse(
-        conversation_id=record.conversation_id,
-        creator_user_id=record.creator_user_id,
-        title=record.title,
-        created_at=record.created_at,
+    return _conversation_response(
+        result.record,
+        prompt_tokens=result.prompt_tokens,
+        completion_tokens=result.completion_tokens,
     )
 
 

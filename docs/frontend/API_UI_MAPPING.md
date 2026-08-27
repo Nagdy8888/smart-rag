@@ -99,7 +99,7 @@ Heartbeat interval is **15** seconds. Forbidden payload keys include
 | `citation_preview` | `citation_ids`, `ranks` | no |
 | `answer_origin` | `origin` | no |
 | `token_delta` | `delta` | no |
-| `usage` | `prompt_tokens`, `completion_tokens` | no |
+| `usage` | `prompt_tokens`, `completion_tokens` (this query run) | no |
 | `completed` | empty | **yes** |
 | `cancelled` | empty | **yes** |
 | `error` | `code` | **yes** |
@@ -162,6 +162,7 @@ ParadeDB `down` on ready is Hybrid degrade, not BM25-snippet success.
 | Method | Path | Fields | Authz |
 | --- | --- | --- | --- |
 | GET | `/me` | `user_id`, `role`, `authorization_version`, `upload_enabled`; deprecated `mfa_enrolled` is always false and unused | any active member |
+| GET | `/admin/users` | `members` (≤200: `user_id`, `email`, `display_name`, `role`, `upload_enabled`, `disabled_at`, `created_at`) and `pending_invitations` (≤200: `invitation_id`, `email`, `role`, `upload_enabled`, `expires_at`, `created_at`). Never `token_hash` or `raw_token` | owner/admin; members 403 |
 | POST | `/admin/invitations` | req `email`, `role`, `upload_enabled`; resp `invitation_id`, `email`, `role`, `upload_enabled`, `expires_at` (token by mail only; `APP_ENV=test` may set `X-Test-Invitation-Token`) | owner/admin; only owner may invite owner |
 | POST | `/invitations/accept` | req `token`; resp `invitation_id` | authenticated; email from JWT |
 | POST | `/admin/users/{user_id}/offboard` | resp `request_id`, `subject_user_id`, `completed_at` | owner/admin |
@@ -199,7 +200,7 @@ source-preview/download HTTP route.
 | DELETE | `/conversations/{conversation_id}` | **204**; foreign/tombstone **404**; immediate purge |
 | POST | `/conversations/{conversation_id}/messages` | handshake + admit; **requires** Idempotency-Key or body key |
 | GET | `/conversations/{conversation_id}/messages` | creator-only transcript; `limit` 1–100 default 50; `before` keyset; 200 `{items, next_before_id}`; foreign/deleted **404** |
-| POST | `/conversations/{conversation_id}/title` | creator-only LLM session title; 200 same shape as GET conversation; no-op when title is already a summary; foreign/deleted **404** |
+| POST | `/conversations/{conversation_id}/title` | creator-only LLM session title; 200 same shape as GET conversation plus `prompt_tokens`/`completion_tokens` for this call (0 when skipped); no-op when title is already a summary; foreign/deleted **404** |
 | GET | `/runs/{run_id}` | creator only; IDOR 404 |
 | POST | `/runs/{run_id}/cancel` | creator |
 | GET | `/runs/{run_id}/events` | Bearer SSE resume |
@@ -383,7 +384,7 @@ where listed.
 | E Accept | token | `POST /invitations/accept` | JWT email, not body email | AUTH_ADJACENT |
 | E Offboard | user_id | `POST /admin/users/{user_id}/offboard` | owner/admin; no MFA | AUTH_ADJACENT |
 | E Owner setup | bootstrap | GAP-07-08 | none | omitted; no chrome |
-| E Member directory | list | none | none | no HTTP; do not mock |
+| E Member directory | list | `GET /admin/users` | owner/admin; members 403 | bounded; no tokens; see [ADR-workspace-member-list.md](../adr/ADR-workspace-member-list.md) |
 
 ### Chat, SSE, citations, feedback
 
@@ -411,7 +412,7 @@ where listed.
 | F Source drawer | preview/download | GAP-07-09 | — | IDs/provenance only |
 | F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | polarity catalogs, unmerged |
 | F Usage strip | account totals | `GET /usage/me` | caller | no prompt text |
-| F Run tokens | prompt / completion | SSE `usage` | creator | hidden when both are 0 |
+| F Run tokens | this run / this chat | SSE `usage`; title POST tokens on this chat | creator | this chat includes later questions in the live session |
 | F Profile rewrite / candidates / BM25 bytes / rerank / inferences / latency | — | GAP-07-02 | — | do not invent |
 | G 426/402/429/503 | banners | HTTP details above | — | no paid retry on 426/402 |
 

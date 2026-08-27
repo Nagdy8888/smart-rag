@@ -21,10 +21,11 @@ from smart_rag_core.security.profile_snapshot import ProfileSnapshot
 
 from tests.support.studio_live import (
     CANARY,
-    _admitted_context,
-    _config,
-    _hooks,
-    _snapshot,
+    admitted_studio_context,
+    studio_config,
+    studio_hooks,
+    studio_query_state,
+    studio_snapshot,
 )
 
 
@@ -32,14 +33,14 @@ def test_valid_mocked_admit_is_never_studio_local() -> None:
     """A mocked JWT/profile/admit returns a real Composite context."""
 
     result = run_studio_live_seed(
-        {
-            "user_query": "What is the status of INV-SR-1001?",
-            "messages": [
+        studio_query_state(
+            "What is the status of INV-SR-1001?",
+            messages=[
                 HumanMessage(content="What is the status of INV-SR-1001?", id="turn-1")
             ],
-        },
-        _config("thread-live-a"),  # type: ignore[arg-type]
-        _hooks(),
+        ),
+        studio_config("thread-live-a"),  # type: ignore[arg-type]
+        studio_hooks(),
     )
     assert result["status"] == "pending"
     runtime = result["authorized_runtime"]
@@ -71,7 +72,7 @@ def test_same_human_message_reuses_idempotency_key() -> None:
         keys.append(key)
         conversation_id = kwargs["conversation_id"]
         assert isinstance(conversation_id, UUID)
-        return _admitted_context(
+        return admitted_studio_context(
             payload_hash=str(kwargs["payload_hash"]),
             conversation_id=conversation_id,
         )
@@ -80,9 +81,9 @@ def test_same_human_message_reuses_idempotency_key() -> None:
         "user_query": "same question",
         "messages": [HumanMessage(content="same question", id="stable-msg")],
     }
-    hooks = _hooks(admit=admit)
-    first = run_studio_live_seed(state, _config("thread-retry"), hooks)  # type: ignore[arg-type]
-    second = run_studio_live_seed(state, _config("thread-retry"), hooks)  # type: ignore[arg-type]
+    hooks = studio_hooks(admit=admit)
+    first = run_studio_live_seed(state, studio_config("thread-retry"), hooks)  # type: ignore[arg-type]
+    second = run_studio_live_seed(state, studio_config("thread-retry"), hooks)  # type: ignore[arg-type]
     assert first["authorized_runtime"] is not None
     assert second["authorized_runtime"] is not None
     assert keys[0] == keys[1]
@@ -118,25 +119,29 @@ def test_new_turn_gets_a_different_idempotency_key() -> None:
         keys.append(key)
         conversation_id = kwargs["conversation_id"]
         assert isinstance(conversation_id, UUID)
-        return _admitted_context(
+        return admitted_studio_context(
             payload_hash=str(kwargs["payload_hash"]),
             conversation_id=conversation_id,
         )
 
-    hooks = _hooks(admit=admit)
+    hooks = studio_hooks(admit=admit)
     run_studio_live_seed(
-        {"messages": [HumanMessage(content="same text", id="turn-1")]},
-        _config("thread-new"),  # type: ignore[arg-type]
+        studio_query_state(
+            "",
+            messages=[HumanMessage(content="same text", id="turn-1")],
+        ),
+        studio_config("thread-new"),  # type: ignore[arg-type]
         hooks,
     )
     run_studio_live_seed(
-        {
-            "messages": [
+        studio_query_state(
+            "",
+            messages=[
                 HumanMessage(content="same text", id="turn-1"),
                 HumanMessage(content="same text", id="turn-2"),
-            ]
-        },
-        _config("thread-new"),  # type: ignore[arg-type]
+            ],
+        ),
+        studio_config("thread-new"),  # type: ignore[arg-type]
         hooks,
     )
     assert keys[0] != keys[1]
@@ -165,7 +170,7 @@ def test_role_and_version_are_rechecked_each_turn() -> None:
         """
 
         _ = user_id
-        return _snapshot(
+        return studio_snapshot(
             role=current["role"],  # type: ignore[arg-type]
             authorization_version=int(current["version"]),
         )
@@ -184,17 +189,17 @@ def test_role_and_version_are_rechecked_each_turn() -> None:
         seen.append((caller.role, caller.authorization_version))  # type: ignore[attr-defined]
         conversation_id = kwargs["conversation_id"]
         assert isinstance(conversation_id, UUID)
-        return _admitted_context(
+        return admitted_studio_context(
             payload_hash=str(kwargs["payload_hash"]),
             conversation_id=conversation_id,
         )
 
-    hooks = _hooks(admit=admit)
+    hooks = studio_hooks(admit=admit)
     hooks.load_profile = load_profile
-    run_studio_live_seed({"user_query": "first"}, _config(), hooks)  # type: ignore[arg-type]
+    run_studio_live_seed(studio_query_state("first"), studio_config(), hooks)  # type: ignore[arg-type]
     current["role"] = UserRole.ADMIN
     current["version"] = 4
-    run_studio_live_seed({"user_query": "second"}, _config(), hooks)  # type: ignore[arg-type]
+    run_studio_live_seed(studio_query_state("second"), studio_config(), hooks)  # type: ignore[arg-type]
     assert seen == [(UserRole.MEMBER, 1), (UserRole.ADMIN, 4)]
 
 

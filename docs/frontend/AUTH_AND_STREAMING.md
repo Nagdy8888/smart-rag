@@ -38,7 +38,7 @@ convenience. FastAPI still authorizes every Bearer call.
 | `/auth/reset` | `updateUser({ password })` | After recovery `next=/auth/reset` |
 | `/invitations/accept` | `POST /invitations/accept` `{ token }` | Email from JWT, not the form |
 | `/` | Ask | Packet 15 rebuild. No route POST field. See [CORE_RAG_SURFACES.md](./CORE_RAG_SURFACES.md) |
-| `/admin` | Team/Tools/Curation/Usage tabs | Convenience only. FastAPI still authorizes. Legacy `/team`, `/tools`, `/curation`, and `/usage` redirect here |
+| `/admin` | Team & access / Tools / Names & aliases / Usage tabs | Convenience only. FastAPI still authorizes. Legacy `/team`, `/tools`, `/curation`, and `/usage` redirect here |
 | `/account` | Read-only `GET /me` | Legacy `/profile` redirects here. No MFA field |
 
 `/review-fixtures` and `/unavailable/*` are not product routes; they 404.

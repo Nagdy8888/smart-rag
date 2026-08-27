@@ -10,6 +10,10 @@ export type ConversationResponse = {
   creator_user_id: string;
   title: string | null;
   created_at: string | null;
+  /** Provider prompt tokens. Set on title POST; 0/omitted on list/get/create. */
+  prompt_tokens?: number;
+  /** Provider completion tokens. Set on title POST; 0/omitted on list/get/create. */
+  completion_tokens?: number;
 };
 
 /** One `GET /conversations/{id}/messages` item. Content is escaped text. */

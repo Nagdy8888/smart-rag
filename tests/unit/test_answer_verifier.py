@@ -40,11 +40,11 @@ from smart_rag_core.query_fusion.models import (
 )
 
 from tests.support.answer_verifier import (
-    _fusion,
-    _passage,
-    _prompt_digest,
-    _table,
-    _uid,
+    verifier_fusion,
+    verifier_passage,
+    verifier_prompt_digest,
+    verifier_table,
+    verifier_uid,
 )
 
 
@@ -54,10 +54,10 @@ def test_answer_and_verifier_prompt_hashes() -> None:
     assert ANSWER_PROMPT_VERSION == "answer_v1"
     assert VERIFIER_PROMPT_VERSION == "verifier_v1"
     assert GENERAL_CHAT_PROMPT_VERSION == "general_chat_v1"
-    assert ANSWER_PROMPT_SHA256 == _prompt_digest("answer_v1.md")
-    assert VERIFIER_PROMPT_SHA256 == _prompt_digest("verifier_v1.md")
-    assert GENERAL_CHAT_PROMPT_SHA256 == _prompt_digest("general_chat_v1.md")
-    assert CONVERSATION_TITLE_PROMPT_SHA256 == _prompt_digest(
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v1.md")
+    assert VERIFIER_PROMPT_SHA256 == verifier_prompt_digest("verifier_v1.md")
+    assert GENERAL_CHAT_PROMPT_SHA256 == verifier_prompt_digest("general_chat_v1.md")
+    assert CONVERSATION_TITLE_PROMPT_SHA256 == verifier_prompt_digest(
         "conversation_title_v1.md"
     )
 
@@ -65,22 +65,24 @@ def test_answer_and_verifier_prompt_hashes() -> None:
 def test_unsupported_link_is_removed_not_softened() -> None:
     """Unsupported links are omitted or refused, never left as uncited claims."""
 
-    fusion = _fusion(_passage(1, text="Atlas Controller is a Project Atlas product."))
+    fusion = verifier_fusion(
+        verifier_passage(1, text="Atlas Controller is a Project Atlas product.")
+    )
     payload = AnswerPayload(
         answer_text="Supplier Z funds Atlas.",
-        citations=(AnswerCitation(chunk_id=_uid(1)),),
+        citations=(AnswerCitation(chunk_id=verifier_uid(1)),),
         atomic_links=(
             AtomicLink(
                 link_id="ok",
                 claim="Atlas Controller is a Project Atlas product.",
-                chunk_ids=(_uid(1),),
+                chunk_ids=(verifier_uid(1),),
                 kind="inference_link",
                 priority=1,
             ),
             AtomicLink(
                 link_id="bad",
                 claim="Supplier Z funds Atlas.",
-                chunk_ids=(_uid(999),),
+                chunk_ids=(verifier_uid(999),),
                 kind="inference_link",
                 priority=2,
             ),
@@ -103,28 +105,32 @@ def test_unsupported_link_is_removed_not_softened() -> None:
 def test_composed_inference_need_not_appear_verbatim() -> None:
     """A fully supported chain stays a labeled inference without verbatim overlap."""
 
-    fusion = _fusion(
-        _passage(1, text="Atlas Controller is a Project Atlas product."),
-        _passage(2, text="Supplier A manufactures the Atlas Controller."),
+    fusion = verifier_fusion(
+        verifier_passage(1, text="Atlas Controller is a Project Atlas product."),
+        verifier_passage(2, text="Supplier A manufactures the Atlas Controller."),
     )
     payload = AnswerPayload(
         answer_text="Supplier A supplies a Project Atlas product.",
         citations=(
-            AnswerCitation(chunk_id=_uid(1), atomic_link_id="l1", inference=True),
-            AnswerCitation(chunk_id=_uid(2), atomic_link_id="l2", inference=True),
+            AnswerCitation(
+                chunk_id=verifier_uid(1), atomic_link_id="l1", inference=True
+            ),
+            AnswerCitation(
+                chunk_id=verifier_uid(2), atomic_link_id="l2", inference=True
+            ),
         ),
         atomic_links=(
             AtomicLink(
                 link_id="l1",
                 claim="Atlas Controller is a Project Atlas product.",
-                chunk_ids=(_uid(1),),
+                chunk_ids=(verifier_uid(1),),
                 kind="inference_link",
                 priority=1,
             ),
             AtomicLink(
                 link_id="l2",
                 claim="Supplier A manufactures the Atlas Controller.",
-                chunk_ids=(_uid(2),),
+                chunk_ids=(verifier_uid(2),),
                 kind="inference_link",
                 priority=2,
             ),
@@ -156,7 +162,7 @@ def test_seventh_verifier_link_does_not_trigger_another_call() -> None:
         AtomicLink(
             link_id=f"link-{index}",
             claim=f"claim {index}",
-            chunk_ids=(_uid(1),),
+            chunk_ids=(verifier_uid(1),),
             kind="inference_link" if index <= 6 else "fact",
             priority=index,
         )
@@ -212,10 +218,16 @@ def test_verifier_omits_unsupported_verdicts() -> None:
         answer_text="two links",
         atomic_links=(
             AtomicLink(
-                link_id="keep", claim="supported", chunk_ids=(_uid(1),), priority=1
+                link_id="keep",
+                claim="supported",
+                chunk_ids=(verifier_uid(1),),
+                priority=1,
             ),
             AtomicLink(
-                link_id="drop", claim="unsupported", chunk_ids=(_uid(1),), priority=2
+                link_id="drop",
+                claim="unsupported",
+                chunk_ids=(verifier_uid(1),),
+                priority=2,
             ),
         ),
         status="complete",
@@ -256,11 +268,11 @@ def test_verifier_omits_unsupported_verdicts() -> None:
 def test_citation_span_and_table_range_mismatch_fail() -> None:
     """Deterministic checks require span/range alignment with canonical sources."""
 
-    fusion = _fusion(_passage(1, text="The refund period is 30 days."))
-    table = _table()
+    fusion = verifier_fusion(verifier_passage(1, text="The refund period is 30 days."))
+    table = verifier_table()
     payload = AnswerPayload(
         answer_text="bad spans",
-        citations=(AnswerCitation(chunk_id=_uid(1), span="90-day refund"),),
+        citations=(AnswerCitation(chunk_id=verifier_uid(1), span="90-day refund"),),
         table_citations=(
             AnswerCitation(table_id=table.table_id, source_ranges=("Sheet9!Z9",)),
         ),
@@ -285,9 +297,9 @@ def test_empty_graph_citation_text_cannot_pass_complete() -> None:
         effective_route="combined",
         evidence=(
             ScoredPassage(
-                chunk_id=_uid(1),
-                document_id=_uid(10_001),
-                version_id=_uid(20_001),
+                chunk_id=verifier_uid(1),
+                document_id=verifier_uid(10_001),
+                version_id=verifier_uid(20_001),
                 citation_text="",
                 hybrid_rank=None,
                 graph_rank=1,
@@ -300,7 +312,7 @@ def test_empty_graph_citation_text_cannot_pass_complete() -> None:
     )
     payload = AnswerPayload(
         answer_text="Atlas is a product.",
-        citations=(AnswerCitation(chunk_id=_uid(1), span=""),),
+        citations=(AnswerCitation(chunk_id=verifier_uid(1), span=""),),
         status="complete",
     )
     checked, failures = deterministic_check_answer(payload, fusion=fusion, tables=())
@@ -312,12 +324,12 @@ def test_empty_graph_citation_text_cannot_pass_complete() -> None:
 def test_citation_provenance_uses_existing_jsonb() -> None:
     """Fusion scores land in ``app.citations.provenance`` without a new table."""
 
-    fusion = _fusion(_passage(1, text="The refund period is 30 days."))
+    fusion = verifier_fusion(verifier_passage(1, text="The refund period is 30 days."))
     answer = mock_answer_payload(fusion, (), user_query="refund")
     payload = citation_provenance_payload(
         fusion=fusion,
         answer=answer,
-        chunk_id=_uid(1),
+        chunk_id=verifier_uid(1),
         table_id=None,
         atomic_link_id="link-1",
         inference=False,

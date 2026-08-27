@@ -3,11 +3,47 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Protocol, cast, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from smart_rag_api.main import create_app
+
+
+def fastapi_app(client: TestClient) -> FastAPI:
+    """Return the FastAPI application bound to an entered TestClient.
+
+    Starlette types ``TestClient.app`` as a generic ASGI callable. Tests that
+    read or write ``app.state`` need the concrete FastAPI instance.
+
+    Args:
+        client: Entered FastAPI TestClient.
+
+    Returns:
+        The wrapped FastAPI app.
+
+    Raises:
+        TypeError: If ``client.app`` is not a FastAPI instance.
+    """
+
+    application = client.app
+    if not isinstance(application, FastAPI):
+        raise TypeError("expected FastAPI application")
+    return application
+
+
+def client_app_state(client: TestClient) -> Any:
+    """Return ``app.state`` from an entered TestClient.
+
+    Args:
+        client: Entered FastAPI TestClient.
+
+    Returns:
+        Starlette application state. Attribute types are untyped by Starlette.
+    """
+
+    return fastapi_app(client).state
 
 
 def json_object(value: object) -> dict[str, object]:

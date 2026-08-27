@@ -14,9 +14,13 @@ import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
-from smart_rag_core.release.io import dump_canonical_json, load_json_object
+from smart_rag_core.release.io import (
+    as_json_object,
+    dump_canonical_json,
+    load_json_object,
+)
 from smart_rag_core.release.packet2 import Classification
 from smart_rag_core.release.phase10_constants import (
     INTENDED_TOPOLOGY_FILE,
@@ -238,8 +242,12 @@ def live_runtime_assertions_passed(payload: Mapping[str, object]) -> bool:
     volumes = payload.get("volumes")
     if not isinstance(volumes, list) or not volumes:
         return False
-    for item in volumes:
-        if not isinstance(item, dict) or item.get("encrypted") is not True:
+    for item in cast(list[object], volumes):
+        try:
+            typed_item = as_json_object(item, source="volume")
+        except ValueError:
+            return False
+        if typed_item.get("encrypted") is not True:
             return False
     return True
 
@@ -261,12 +269,14 @@ def live_network_scan_passed(payload: Mapping[str, object]) -> bool:
     if not isinstance(results, list) or not results:
         return False
     seen: set[int] = set()
-    for item in results:
-        if not isinstance(item, dict):
+    for item in cast(list[object], results):
+        try:
+            typed_item = as_json_object(item, source="scan")
+        except ValueError:
             return False
-        port = item.get("port")
-        opened = item.get("open")
-        if not isinstance(port, int):
+        port = typed_item.get("port")
+        opened = typed_item.get("open")
+        if not isinstance(port, int) or isinstance(port, bool):
             return False
         seen.add(port)
         if port in _PRIVATE_SCAN_PORTS and opened is True:
@@ -290,7 +300,7 @@ def live_vercel_secret_found(payload: Mapping[str, object]) -> bool:
         return True
     keys = payload.get("env_keys_only")
     if isinstance(keys, list):
-        dumped = " ".join(str(item) for item in keys).upper()
+        dumped = " ".join(str(item) for item in cast(list[object], keys)).upper()
         if "SERVICE_ROLE" in dumped or "DATABASE_URL" in dumped:
             return True
     return False

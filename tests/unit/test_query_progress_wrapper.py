@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -9,7 +10,7 @@ from uuid import uuid4
 import pytest
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.graph import build_query_graph, production_stage_names
-from smart_rag_agents.query.state import pending_query_state
+from smart_rag_agents.query.state import QueryGraphState, pending_query_state
 from smart_rag_agents.query.streaming.progress import (
     PRODUCTION_PROGRESS_STAGES,
     wrap_progress_node,
@@ -22,6 +23,8 @@ from smart_rag_api.services.sse.stream_parts import (
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import UserRole
+
+from tests.support.typed_graph import compile_state_graph
 
 
 def _runtime() -> AuthorizedRuntimeContext:
@@ -71,7 +74,7 @@ def _stream_progress(query: str) -> tuple[list[str], list[str]]:
         ``(start_stages, update_nodes)`` in stream order.
     """
 
-    compiled = build_query_graph(QueryGraphDeps()).compile()
+    compiled = compile_state_graph(build_query_graph(QueryGraphDeps()))
     state = pending_query_state(_runtime().model_dump(mode="json"), user_query=query)
     starts: list[str] = []
     updates: list[str] = []
@@ -134,12 +137,22 @@ def test_closed_state_noop_emits_zero_starts(monkeypatch: pytest.MonkeyPatch) ->
     """Closed-state pass-through must not write a start event."""
 
     written: list[object] = []
+
+    def _writer() -> Callable[[object], None]:
+        """Return a capturing stream writer.
+
+        Returns:
+            Writer that records payloads.
+        """
+
+        return written.append
+
     monkeypatch.setattr(
         "smart_rag_agents.query.streaming.progress.get_stream_writer",
-        lambda: written.append,
+        _writer,
     )
 
-    def passthrough(state: dict[str, object]) -> dict[str, object]:
+    def passthrough(state: QueryGraphState) -> QueryGraphState:
         """Return state unchanged.
 
         Args:
@@ -163,14 +176,45 @@ def test_wrapper_rejects_unknown_stage_and_preserves_exceptions(
 ) -> None:
     """Unknown stages fail closed; node exceptions are not swallowed."""
 
+    def _ignore(_payload: object) -> None:
+        """Drop progress payloads.
+
+        Args:
+            _payload: Unused writer payload.
+        """
+
+        return None
+
+    def _writer() -> Callable[[object], None]:
+        """Return a silent stream writer.
+
+        Returns:
+            No-op writer.
+        """
+
+        return _ignore
+
     monkeypatch.setattr(
         "smart_rag_agents.query.streaming.progress.get_stream_writer",
-        lambda: (lambda _payload: None),
+        _writer,
     )
-    with pytest.raises(ValueError, match="progress_stage_unknown"):
-        wrap_progress_node("admission", lambda state: state)
 
-    def boom(state: dict[str, object]) -> dict[str, object]:
+    def identity(state: QueryGraphState) -> QueryGraphState:
+        """Return state unchanged.
+
+        Args:
+            state: Graph state.
+
+        Returns:
+            The same state.
+        """
+
+        return state
+
+    with pytest.raises(ValueError, match="progress_stage_unknown"):
+        wrap_progress_node("admission", identity)
+
+    def boom(state: QueryGraphState) -> QueryGraphState:
         """Raise to prove the wrapper does not catch.
 
         Args:

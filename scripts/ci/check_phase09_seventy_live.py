@@ -6,6 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from smart_rag_core.release.io import as_json_object
 from smart_rag_core.release.old_api_smoke import issue_smoke_access_token
 from smart_rag_core.release.packet4_seventy_live import measure_live_seventy_pause
 
@@ -32,12 +33,14 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write("live 70% probe: local Auth bootstrap failed\n")
         return 0
     payload = measure_live_seventy_pause(REPO_ROOT, token=token)
-    seventy = payload.get("seventy_percent")
+    seventy_raw: object = payload.get("seventy_percent")
     classification = "Blocked"
-    if isinstance(seventy, dict):
-        raw = seventy.get("classification")
-        if isinstance(raw, str):
-            classification = raw
+    try:
+        raw = as_json_object(seventy_raw).get("classification")
+    except ValueError:
+        raw = None
+    if isinstance(raw, str):
+        classification = raw
     print(
         "seventy_percent_pause "
         f"classification={classification} "

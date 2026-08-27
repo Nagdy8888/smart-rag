@@ -37,7 +37,7 @@ ALLOWED_EVALUATOR_KEYS = frozenset(
     }
 )
 
-_DATASET_METADATA_KEYS = (
+DATASET_METADATA_KEYS = (
     "schema_version",
     "label_revision",
     "split",

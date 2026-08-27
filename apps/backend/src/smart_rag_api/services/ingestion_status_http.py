@@ -140,7 +140,7 @@ def _as_job_list(value: object) -> list[object]:
     """
 
     if isinstance(value, list):
-        return value
+        return cast(list[object], value)
     return []
 
 

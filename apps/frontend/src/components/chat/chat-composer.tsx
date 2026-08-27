@@ -51,7 +51,8 @@ export type ChatComposerProps = {
  * @remarks
  * Render-isolation contract: parent must not pass stream token text or
  * other `chat` fields except the stable `sending`/`running` booleans and
- * reconnect flags.
+ * reconnect flags. The field clears as soon as Send is accepted; a false
+ * `onSubmit` result restores the draft.
  */
 export const ChatComposer = memo(function ChatComposer({
   onSubmit,
@@ -81,15 +82,23 @@ export const ChatComposer = memo(function ChatComposer({
   const rows = Math.min(8, Math.max(1, draft.split("\n").length));
 
   /**
-   * Submit the draft and clear it only after a successful callback.
+   * Submit the draft immediately so the question is not duplicated in the
+   * field while create/admit is in flight. Restore the snapshot if send
+   * returns false (create or admission failed).
    */
   async function handleSubmit(): Promise<void> {
     if (running || sending || disabled || !sendable) {
       return;
     }
-    const result = await onSubmit(draft);
-    if (result !== false) {
-      setDraft("");
+    const snapshot = draft;
+    setDraft("");
+    try {
+      const result = await onSubmit(snapshot);
+      if (result === false) {
+        setDraft(snapshot);
+      }
+    } catch {
+      setDraft(snapshot);
     }
   }
 

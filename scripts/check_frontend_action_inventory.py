@@ -16,6 +16,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INVENTORY_PATH = REPO_ROOT / "docs" / "frontend" / "action-inventory.json"
@@ -120,23 +121,27 @@ def check_inventory() -> list[str]:
     """
 
     failures: list[str] = []
-    payload = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+    loaded: object = json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        return ["action-inventory.json is not an object"]
+    payload = cast(dict[str, object], loaded)
     actions = payload.get("actions")
     if not isinstance(actions, list):
         return ["action-inventory.json missing actions array"]
 
     ids: list[str] = []
     by_id: dict[str, dict[str, object]] = {}
-    for raw in actions:
+    for raw in cast(list[object], actions):
         if not isinstance(raw, dict):
             failures.append("inventory row is not an object")
             continue
-        action_id = raw.get("action_id")
+        mapped = cast(dict[str, object], raw)
+        action_id = mapped.get("action_id")
         if not isinstance(action_id, str) or action_id == "":
             failures.append("inventory row missing action_id")
             continue
         ids.append(action_id)
-        by_id[action_id] = raw
+        by_id[action_id] = mapped
 
     duplicates = sorted({item for item in ids if ids.count(item) > 1})
     if duplicates:

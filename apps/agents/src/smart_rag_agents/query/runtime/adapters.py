@@ -460,6 +460,109 @@ def bind_table_executor(postgres_url: str) -> TableExecuteLike:
     return execute
 
 
+class BoundProfileModelCaller:
+    """Sync profile thunk that stashes provider tokens after each call.
+
+    Attributes:
+        last_prompt_tokens: Provider prompt tokens from the last call.
+        last_completion_tokens: Provider completion tokens from the last
+            call.
+    """
+
+    def __init__(
+        self,
+        *,
+        gateway: object,
+        prompt_text: str,
+        model_id: str,
+        cancel_check: Callable[[], bool] | None,
+        remaining_deadline_seconds: float,
+    ) -> None:
+        """Bind gateway and prompt pins for one process-scoped caller.
+
+        Args:
+            gateway: ``ModelGateway`` with ``generate_query_profile``.
+            prompt_text: Pinned profile prompt body.
+            model_id: Allow-listed profile model id.
+            cancel_check: Cooperative cancellation probe.
+            remaining_deadline_seconds: Client timeout bound.
+        """
+
+        self._gateway = gateway
+        self._prompt_text = prompt_text
+        self._model_id = model_id
+        self._cancel_check = cancel_check
+        self._remaining_deadline_seconds = remaining_deadline_seconds
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
+
+    def __call__(
+        self, query: str, memory: tuple[MemoryRecord, ...]
+    ) -> PreparationModelPayload:
+        """Invoke one counted profile call and validate the payload.
+
+        Args:
+            query: Original user text.
+            memory: Bounded untrusted memory records.
+
+        Returns:
+            Schema-valid preparation payload.
+
+        Raises:
+            ValueError: Malformed or extra-field payload.
+            ModelGatewayUnavailableError: Timeout, cancel, or provider
+                failure.
+        """
+
+        from smart_rag_agents.query.gateway.sync_bridge import run_coro
+
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
+        profile_gateway = cast(_ProfileGatewayLike, self._gateway)
+        recent_memory = "\n".join(item.delimited for item in memory)[:4000]
+        request = QueryProfileModelRequest(
+            query=query[:2000] or "query",
+            prompt_text=self._prompt_text,
+            prompt_version=PROFILE_PROMPT_VERSION,
+            prompt_sha256=PROFILE_PROMPT_SHA256,
+            model_id=self._model_id,
+            remaining_deadline_seconds=self._remaining_deadline_seconds,
+            recent_memory=recent_memory,
+        )
+        try:
+            response = run_coro(
+                lambda: profile_gateway.generate_query_profile(request),
+                cancel_check=self._cancel_check,
+                timeout_seconds=self._remaining_deadline_seconds,
+            )
+        except AnswerError as exc:
+            raise ModelGatewayUnavailableError(
+                str(exc) or "profile_unavailable"
+            ) from exc
+        prompt = getattr(response, "input_tokens", 0)
+        completion = getattr(response, "output_tokens", 0)
+        self.last_prompt_tokens = (
+            prompt if isinstance(prompt, int) and not isinstance(prompt, bool) else 0
+        )
+        self.last_completion_tokens = (
+            completion
+            if isinstance(completion, int) and not isinstance(completion, bool)
+            else 0
+        )
+        raw: object = getattr(response, "payload", None)
+        if not isinstance(raw, dict):
+            raise ValueError("profile_malformed")
+        typed: dict[str, object] = {
+            str(key): value for key, value in cast(dict[object, object], raw).items()
+        }
+        if "scope_degradation_reason" in typed:
+            raise ValueError("profile_malformed")
+        try:
+            return PreparationModelPayload.model_validate(typed)
+        except Exception as exc:
+            raise ValueError("profile_malformed") from exc
+
+
 def bind_profile_model_caller(
     *,
     gateway: object,
@@ -480,59 +583,14 @@ def bind_profile_model_caller(
     Returns:
         Sync ``PrepModelCaller``. Malformed payloads raise ``ValueError``.
         Provider/timeout failures raise ``ModelGatewayUnavailableError``.
+        Successful calls stash ``last_prompt_tokens`` and
+        ``last_completion_tokens`` on the returned callable.
     """
 
-    def _caller(
-        query: str, memory: tuple[MemoryRecord, ...]
-    ) -> PreparationModelPayload:
-        """Invoke one counted profile call and validate the payload.
-
-        Args:
-            query: Original user text.
-            memory: Bounded untrusted memory records.
-
-        Returns:
-            Schema-valid preparation payload.
-
-        Raises:
-            ValueError: Malformed or extra-field payload.
-            ModelGatewayUnavailableError: Timeout, cancel, or provider failure.
-        """
-
-        from smart_rag_agents.query.gateway.sync_bridge import run_coro
-
-        profile_gateway = cast(_ProfileGatewayLike, gateway)
-        recent_memory = "\n".join(item.delimited for item in memory)[:4000]
-        request = QueryProfileModelRequest(
-            query=query[:2000] or "query",
-            prompt_text=prompt_text,
-            prompt_version=PROFILE_PROMPT_VERSION,
-            prompt_sha256=PROFILE_PROMPT_SHA256,
-            model_id=model_id,
-            remaining_deadline_seconds=remaining_deadline_seconds,
-            recent_memory=recent_memory,
-        )
-        try:
-            response = run_coro(
-                lambda: profile_gateway.generate_query_profile(request),
-                cancel_check=cancel_check,
-                timeout_seconds=remaining_deadline_seconds,
-            )
-        except AnswerError as exc:
-            raise ModelGatewayUnavailableError(
-                str(exc) or "profile_unavailable"
-            ) from exc
-        raw: object = getattr(response, "payload", None)
-        if not isinstance(raw, dict):
-            raise ValueError("profile_malformed")
-        typed: dict[str, object] = {
-            str(key): value for key, value in cast(dict[object, object], raw).items()
-        }
-        if "scope_degradation_reason" in typed:
-            raise ValueError("profile_malformed")
-        try:
-            return PreparationModelPayload.model_validate(typed)
-        except Exception as exc:
-            raise ValueError("profile_malformed") from exc
-
-    return _caller
+    return BoundProfileModelCaller(
+        gateway=gateway,
+        prompt_text=prompt_text,
+        model_id=model_id,
+        cancel_check=cancel_check,
+        remaining_deadline_seconds=remaining_deadline_seconds,
+    )

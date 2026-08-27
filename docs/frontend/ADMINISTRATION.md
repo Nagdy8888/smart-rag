@@ -9,8 +9,8 @@ packet: P08-19
 
 # Administration surfaces (Phase 8 packet 19)
 
-One role-aware `/admin` workspace with tabs Team & access, Tools, Curation,
-and Usage. Account is a separate `/account` page from `GET /me`. Bookmark
+One role-aware `/admin` workspace with tabs Team & access, Tools, Names &
+aliases, and Usage. Account is a separate `/account` page from `GET /me`. Bookmark
 routes `/team`, `/tools`, `/curation`, `/usage`, and `/profile` redirect.
 Stitch frames 02/08/11/12/13/14 are unused as product routes.
 
@@ -31,9 +31,9 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 
 | Route | Surface | Contract |
 | --- | --- | --- |
-| `/admin?tab=team` | Invite create + offboard by `user_id`. No member directory | `POST /admin/invitations`, `POST /admin/users/{user_id}/offboard`. Accept remains `/invitations/accept` |
+| `/admin?tab=team` | Workspace people, pending invitations, invite, offboard | `GET /admin/users`, `POST /admin/invitations`, `POST /admin/users/{user_id}/offboard`. Accept remains `/invitations/accept` |
 | `/admin?tab=tools` | Catalog search, enable/permissions, details drawer. No seed form | `GET /tools?q=`, `POST /admin/tools/{tool_key}/enable`, `POST /admin/tools/{tool_key}/permissions` |
-| `/admin?tab=curation` | Glossary import/approve/rollback + entity rules including PATCH and suggest | `/admin/glossary/imports*`, `/admin/graph/entity-rules*` |
+| `/admin?tab=curation` | Word aliases (glossary import) and people/things (entity rules) | `/admin/glossary/imports*`, `/admin/graph/entity-rules*` |
 | `/admin?tab=usage` | Caller totals; company totals for owner/admin. Rate-degraded banner only when `rate_limit_degraded` | `GET /usage/me`, `GET /usage/company`. Totals only, no prompt text |
 | `/account` | Read-only four `/me` fields. `/profile` redirects here | `user_id`, `role`, `authorization_version`, `upload_enabled`. Sign out stays in the shell menu |
 
@@ -53,13 +53,15 @@ flowchart TD
   anyMember["any active member"] --> meGet["GET /me"]
   anyMember --> usageMe["GET /usage/me"]
   anyMember --> toolsGet["GET /tools"]
-  ownerAdmin["owner or admin"] --> invitePost["POST /admin/invitations"]
+  ownerAdmin["owner or admin"] --> listUsers["GET /admin/users"]
+  ownerAdmin --> invitePost["POST /admin/invitations"]
   ownerAdmin --> offboardPost["POST /admin/users/user_id/offboard"]
   ownerAdmin --> toolAdmin["POST /admin/tools enable permissions"]
   ownerAdmin --> glossaryPost["POST /admin/glossary/imports"]
   ownerAdmin --> rulesGet["GET /admin/graph/entity-rules"]
   ownerAdmin --> usageCompany["GET /usage/company"]
-  memberViewer["member or viewer"] --> admin403["GET /admin/graph/entity-rules 403"]
+  memberViewer["member or viewer"] --> users403["GET /admin/users 403"]
+  memberViewer --> admin403["GET /admin/graph/entity-rules 403"]
   memberViewer --> company403["GET /usage/company 403"]
   memberViewer --> mutate403["admin mutations 403"]
 ```
@@ -79,11 +81,14 @@ These have no product control and no `*-unavailable` panel:
 | GAP-07-13 | Company settings CRUD: no save control on Account |
 | GAP-07-19 | Profile name/locale editor: Account shows four `/me` fields only |
 
-No member-list HTTP. Offboard subjects are identified by known `user_id`.
-Do not invent a directory.
+Offboard subjects come from `GET /admin/users` or a known `user_id`. Invitation
+tokens remain mail-only.
 
 ## Honest contracts
 
+- `GET /admin/users` lists at most 200 workspace members and 200 pending
+  invitations for owner/admin. Emails and names are untrusted `UserText`.
+  JSON never includes `token_hash` or `raw_token`. Members receive 403.
 - Invitation create body is `{ email, role, upload_enabled }`. Roles are
   `owner` \| `admin` \| `member` \| `viewer`. The one-time token is
   mail-only; JSON never includes `raw_token`. Success UI shows invitation ID

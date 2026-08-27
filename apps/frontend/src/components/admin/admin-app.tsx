@@ -1,5 +1,5 @@
 /**
- * Admin workspace: Team, Tools, Curation, and Usage behind `?tab=`.
+ * Admin workspace: Team, Tools, Names & aliases, and Usage behind `?tab=`.
  * Member/viewer visits confirm denial with an owner/admin GET before chrome.
  */
 
@@ -25,7 +25,7 @@ import styles from "./admin-shell.module.css";
 const TAB_LABELS: Record<AdminTab, string> = {
   team: "Team & access",
   tools: "Tools",
-  curation: "Curation",
+  curation: "Names & aliases",
   usage: "Usage",
 };
 
@@ -91,7 +91,7 @@ export function AdminApp() {
   if (gateQuery.isPending) {
     return (
       <div className={styles.page}>
-        <PageHeader description="Manage access, tools, retrieval curation, and usage." />
+        <PageHeader description="Manage people, tools, search names, and usage." />
         <Spinner label="Checking access" />
       </div>
     );
@@ -122,7 +122,7 @@ export function AdminApp() {
 
   return (
     <div className={styles.page}>
-      <PageHeader description="Manage access, tools, retrieval curation, and usage." />
+      <PageHeader description="Manage people, tools, search names, and usage." />
       <HandshakeBanner />
       <div role="tablist" aria-label="Admin sections" className={styles.tabList}>
         {ADMIN_TABS.map((id, index) => {

@@ -25,9 +25,7 @@ class CustomProgressDecoder:
 
         self.open_starts: set[str] = set()
 
-    def consume_custom(
-        self, data: object
-    ) -> list[tuple[str, dict[str, object]]]:
+    def consume_custom(self, data: object) -> list[tuple[str, dict[str, object]]]:
         """Translate one custom mapping into zero or one catalog draft.
 
         Extra keys, unknown kinds, and malformed values are dropped. Payload
@@ -44,8 +42,7 @@ class CustomProgressDecoder:
             log_dropped_custom(reason="not_mapping", kind=None, extra_keys=())
             return []
         typed = {
-            str(key): value
-            for key, value in cast(dict[object, object], data).items()
+            str(key): value for key, value in cast(dict[object, object], data).items()
         }
         kind = typed.get("kind")
         kind_label = kind if isinstance(kind, str) else None

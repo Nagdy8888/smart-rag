@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from smart_rag_core.query_admission.repository.records import QueryRunRecord
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.sse.catalog import TERMINAL_SSE_EVENT_TYPES, StatusPayload
-from smart_rag_core.sse.framing import iter_known_sse_events
+from smart_rag_core.sse.framing import ParsedSseEvent, iter_known_sse_events
 from smart_rag_core.sse.sanitize import validate_sse_payload
 from smart_rag_core.sse.store import MemoryRunEventStore
 
@@ -39,7 +39,7 @@ def _caller() -> CallerContext:
     )
 
 
-def _load_events(name: str) -> list[object]:
+def _load_events(name: str) -> list[ParsedSseEvent]:
     """Parse one checked-in SSE fixture.
 
     Args:

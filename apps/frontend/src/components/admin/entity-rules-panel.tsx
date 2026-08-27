@@ -69,9 +69,9 @@ export function EntityRulesPanel({ curation }: EntityRulesPanelProps) {
   }
 
   return (
-    <section className={styles.panel} aria-label="Entity rules">
+    <section className={styles.panel} aria-label="People and things">
       <div className={styles.row}>
-        <h2>Entity rules</h2>
+        <h2>People and things</h2>
         <Button
           type="button"
           data-action-id="admin.entity_rule.suggest"
@@ -80,6 +80,11 @@ export function EntityRulesPanel({ curation }: EntityRulesPanelProps) {
           Suggest rule
         </Button>
       </div>
+      <p className={styles.panelLead}>
+        Use this when two names are the same person, team, or product, or when
+        two similar names must stay separate. Approved rules apply on the next
+        graph rebuild.
+      </p>
       {curation.suggestOpen || curation.editRule ? (
         <div className={styles.formGrid}>
           <Input
@@ -133,7 +138,7 @@ export function EntityRulesPanel({ curation }: EntityRulesPanelProps) {
         />
       ) : (
         <DataTable
-          caption="Entity rules"
+          caption="People and things"
           rows={curation.rules}
           getRowId={(row) => row.id}
           columns={[

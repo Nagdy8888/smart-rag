@@ -2,9 +2,45 @@
  * Shared JSON parsers for run, feedback, and document rows.
  */
 
-import type { DocumentResponse, FeedbackResponse, RunResponse } from "../types";
+import type { ConversationResponse, DocumentResponse, FeedbackResponse, RunResponse } from "../types";
 
 import { DOCUMENT_LIST_PAGE_SIZE } from "./documents-constants";
+
+/**
+ * Parse a non-negative token count from JSON.
+ *
+ * @param value - Unknown JSON field.
+ * @returns Truncated integer >= 0, else 0.
+ */
+export function parseTokenCount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+  return Math.trunc(value);
+}
+
+/**
+ * Parse a conversation JSON body.
+ *
+ * @param body - FastAPI object.
+ * @returns Conversation identifiers, escaped title, and this-response tokens.
+ */
+export function parseConversationResponse(
+  body: Record<string, unknown>,
+): ConversationResponse {
+  return {
+    conversation_id: String(body.conversation_id ?? ""),
+    creator_user_id: String(body.creator_user_id ?? ""),
+    title:
+      body.title === null || body.title === undefined ? null : String(body.title),
+    created_at:
+      body.created_at === null || body.created_at === undefined
+        ? null
+        : String(body.created_at),
+    prompt_tokens: parseTokenCount(body.prompt_tokens),
+    completion_tokens: parseTokenCount(body.completion_tokens),
+  };
+}
 
 /**
  * Parse an owned run JSON body.

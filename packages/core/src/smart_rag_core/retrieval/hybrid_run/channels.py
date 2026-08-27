@@ -7,8 +7,8 @@ from typing import TypeGuard, cast
 from uuid import UUID
 
 from smart_rag_core.retrieval.hybrid_run.types import (
-    _CandidateList,
-    _VariantLists,
+    CandidateList,
+    VariantLists,
 )
 from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.retrieval.rerank import (
@@ -25,7 +25,7 @@ from smart_rag_core.retrieval.types import (
 from smart_rag_core.security.identity import CallerContext
 
 
-def _is_candidate_tuple(value: object) -> TypeGuard[_CandidateList]:
+def _is_candidate_tuple(value: object) -> TypeGuard[CandidateList]:
     """Return whether ``value`` is a tuple of retrieval candidates.
 
     Args:
@@ -42,7 +42,7 @@ def _is_candidate_tuple(value: object) -> TypeGuard[_CandidateList]:
     return not items or isinstance(items[0], RetrievalCandidate)
 
 
-def _is_variant_tuple(value: object) -> TypeGuard[_VariantLists]:
+def _is_variant_tuple(value: object) -> TypeGuard[VariantLists]:
     """Return whether ``value`` is a tuple of per-variant candidate lists.
 
     Args:
@@ -58,13 +58,13 @@ def _is_variant_tuple(value: object) -> TypeGuard[_VariantLists]:
     return isinstance(items[0], tuple)
 
 
-def _collect_dense_lists(
+def collect_dense_lists(
     retrieve: Callable[..., object],
     *,
     caller: CallerContext,
     texts: tuple[str, ...],
     vectors: tuple[tuple[float, ...], ...],
-) -> _VariantLists:
+) -> VariantLists:
     """Run dense retrieve once per fused query vector.
 
     Args:
@@ -77,22 +77,22 @@ def _collect_dense_lists(
         Per-variant dense candidate lists.
     """
 
-    lists: list[_CandidateList] = []
+    lists: list[CandidateList] = []
     for _text, vector in zip(texts, vectors, strict=False):
         result = retrieve(caller=caller, query_embedding=list(vector))
         if isinstance(result, DenseRetrievalResult):
             lists.append(result.candidates)
         elif isinstance(result, tuple):
-            lists.append(cast(_CandidateList, result))
+            lists.append(cast(CandidateList, result))
     return tuple(lists)
 
 
-def _collect_term_lists(
+def collect_term_lists(
     retrieve: Callable[..., object],
     *,
     caller: CallerContext,
     texts: tuple[str, ...],
-) -> _VariantLists:
+) -> VariantLists:
     """Run term retrieve once per fused query text.
 
     Args:
@@ -104,17 +104,17 @@ def _collect_term_lists(
         Per-variant term candidate lists.
     """
 
-    lists: list[_CandidateList] = []
+    lists: list[CandidateList] = []
     for text in texts:
         result = retrieve(caller=caller, query_text=text)
         if isinstance(result, TermRetrievalResult):
             lists.append(result.candidates)
         elif isinstance(result, tuple):
-            lists.append(cast(_CandidateList, result))
+            lists.append(cast(CandidateList, result))
     return tuple(lists)
 
 
-def _restrict_channel_candidates(
+def restrict_channel_candidates(
     dense_lists: tuple[tuple[RetrievalCandidate, ...], ...],
     bm25_result: Bm25RetrievalResult,
     term_lists: tuple[tuple[RetrievalCandidate, ...], ...],
@@ -164,7 +164,7 @@ def _restrict_channel_candidates(
     return filtered_dense, filtered_bm25, filtered_term
 
 
-def _flatten_channel_candidates(
+def flatten_channel_candidates(
     dense_lists: tuple[tuple[RetrievalCandidate, ...], ...],
     bm25_candidates: tuple[RetrievalCandidate, ...],
     term_lists: tuple[tuple[RetrievalCandidate, ...], ...],
@@ -202,9 +202,9 @@ def _flatten_channel_candidates(
     return tuple(ordered)
 
 
-def _unpack_dense(
+def unpack_dense(
     value: object,
-) -> tuple[_VariantLists, RetrievalFallbackReason]:
+) -> tuple[VariantLists, RetrievalFallbackReason]:
     """Normalize a dense channel job result.
 
     Args:
@@ -227,9 +227,9 @@ def _unpack_dense(
     return (), RetrievalFallbackReason.DENSE_UNAVAILABLE
 
 
-def _unpack_term(
+def unpack_term(
     value: object,
-) -> tuple[_VariantLists, RetrievalFallbackReason]:
+) -> tuple[VariantLists, RetrievalFallbackReason]:
     """Normalize a term channel job result.
 
     Args:
@@ -252,7 +252,7 @@ def _unpack_term(
     return (), RetrievalFallbackReason.TERM_UNAVAILABLE
 
 
-def _unpack_bm25(value: object) -> Bm25RetrievalResult:
+def unpack_bm25(value: object) -> Bm25RetrievalResult:
     """Normalize a BM25 channel job result.
 
     Args:
@@ -271,7 +271,7 @@ def _unpack_bm25(value: object) -> Bm25RetrievalResult:
     return Bm25RetrievalResult(scanned_ids=(), candidates=())
 
 
-def _compose_fallback(
+def compose_fallback(
     *,
     dense_reason: RetrievalFallbackReason,
     term_reason: RetrievalFallbackReason,
@@ -301,7 +301,7 @@ def _compose_fallback(
     return RetrievalFallbackReason.NONE
 
 
-def _identity_rerank(
+def identity_rerank(
     _query: str,
     pool: tuple[RerankPassage, ...],
     _deadline: float,

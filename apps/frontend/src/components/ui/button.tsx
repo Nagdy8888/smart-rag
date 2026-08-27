@@ -57,6 +57,10 @@ const SIZE_CLASS: Record<ButtonSize, string | undefined> = {
  *
  * @param props - Native button attributes plus visual/pending contract.
  * @returns Button element. Pending disables the control without swallowing errors.
+ * @remarks
+ * Pending sets `disabled` and `aria-busy` so duplicate submits cannot start.
+ * Icon-size pending keeps a spinner and hides the present-participle label
+ * visually; the accessible name remains the pending label.
  * @throws Never. Disabled state is visual only and not authorization.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -101,6 +105,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   }
 
   const label = pending ? (pendingLabel ?? children) : children;
+  const iconPending = pending && size === "icon";
   const hint =
     blocked && disabledReason ? (
       <span id={hintId} className={styles.fieldHint}>
@@ -119,7 +124,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {...rest}
     >
       {pending ? <span className={styles.buttonSpinner} aria-hidden="true" /> : null}
-      {label}
+      {iconPending ? (
+        <span className={styles.pendingLabelHidden}>{label}</span>
+      ) : (
+        label
+      )}
     </button>
   );
   if (hint === null) {

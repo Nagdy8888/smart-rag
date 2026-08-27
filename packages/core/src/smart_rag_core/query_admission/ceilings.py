@@ -21,6 +21,7 @@ from smart_rag_core.query_admission.envelopes import (
 from smart_rag_core.query_admission.retrieve_budget import (
     RETRIEVE_USAGE_KINDS,
     QueryRetrieveBudget,
+    add_recorded_tokens,
     assert_retrieve_kind_available,
     debit_retrieve_budget,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "USAGE_KIND_USD_CAPS",
     "QueryRetrieveBudget",
     "RouteCeiling",
+    "add_recorded_tokens",
     "assert_call_available",
     "assert_correction_available",
     "assert_deadline_open",

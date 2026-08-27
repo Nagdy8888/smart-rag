@@ -36,6 +36,25 @@ def tokens_from_gateway_response(response: object) -> tuple[int, int]:
     )
 
 
+def tokens_from_caller(caller: object | None) -> tuple[int, int]:
+    """Read stashed provider tokens from a profile caller.
+
+    Args:
+        caller: Optional callable with ``last_prompt_tokens`` /
+            ``last_completion_tokens`` attributes.
+
+    Returns:
+        Prompt and completion counts. Missing callers and fields are 0.
+    """
+
+    if caller is None:
+        return 0, 0
+    return (
+        nonneg_token_count(getattr(caller, "last_prompt_tokens", 0)),
+        nonneg_token_count(getattr(caller, "last_completion_tokens", 0)),
+    )
+
+
 def accumulated_tokens(
     state: QueryGraphState, prompt_tokens: int, completion_tokens: int
 ) -> dict[str, int]:

@@ -33,7 +33,7 @@ class CheckpointerSchemaError(RuntimeError):
     """Raised when the ``langgraph`` schema does not match the pinned library."""
 
 
-def _configure_checkpointer_connection(connection: CheckpointerConnection) -> None:
+def configure_checkpointer_connection(connection: CheckpointerConnection) -> None:
     """Bind one pooled connection to the checkpointer role and search path.
 
     Args:
@@ -153,7 +153,7 @@ def open_ingestion_checkpointer(
             "prepare_threshold": 0,
             "row_factory": dict_row,
         },
-        configure=_configure_checkpointer_connection,
+        configure=configure_checkpointer_connection,
         open=True,
     )
     try:

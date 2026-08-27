@@ -10,7 +10,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg
@@ -395,20 +395,32 @@ class EmbeddingService:
                 raw_ref = json.loads(raw_ref)
             except json.JSONDecodeError:
                 raw_ref = {}
-        result_ref = raw_ref if isinstance(raw_ref, dict) else {}
+        result_ref: dict[str, object] = {}
+        if isinstance(raw_ref, dict):
+            result_ref = {
+                str(key): value
+                for key, value in cast(dict[object, object], raw_ref).items()
+            }
         stored_hash = result_ref.get("chunk_set_hash")
         if status != "completed" or stored_hash != chunk_set_hash:
             return None
-        raw_vectors = result_ref.get("vectors")
-        if not isinstance(raw_vectors, list) or not raw_vectors:
+        raw_vectors_obj = result_ref.get("vectors")
+        if not isinstance(raw_vectors_obj, list) or not raw_vectors_obj:
             raise EmbeddingGateError("embedding_ledger_vectors_missing")
+        raw_vectors = cast(list[object], raw_vectors_obj)
         if len(raw_vectors) != expected_count:
             raise EmbeddingGateError("embedding_ledger_vectors_missing")
         parsed: list[tuple[float, ...]] = []
         for vector in raw_vectors:
             if not isinstance(vector, list) or not vector:
                 raise EmbeddingGateError("embedding_ledger_vectors_missing")
-            parsed.append(tuple(float(value) for value in vector))
+            typed_vector = cast(list[object], vector)
+            numbers: list[float] = []
+            for value in typed_vector:
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    raise EmbeddingGateError("embedding_ledger_vectors_missing")
+                numbers.append(float(value))
+            parsed.append(tuple(numbers))
         return ledger_id, tuple(parsed)
 
 

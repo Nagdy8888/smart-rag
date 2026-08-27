@@ -7,15 +7,15 @@ from smart_rag_core.query_answer.generate import generate_answer
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 
 from tests.support.answer_verifier import (
-    _fusion,
-    _passage,
+    verifier_fusion,
+    verifier_passage,
 )
 
 
 def test_graph_inspection_refuses_but_greeting_is_safe_chat() -> None:
     """Graph-only refuses while a greeting returns no company claim."""
 
-    fusion = _fusion(_passage(1, text="secret"))
+    fusion = verifier_fusion(verifier_passage(1, text="secret"))
     graph_only = generate_answer(
         fusion=fusion,
         tables=(),
@@ -27,7 +27,7 @@ def test_graph_inspection_refuses_but_greeting_is_safe_chat() -> None:
     )
     assert graph_only.status == "refused"
     greeting = generate_answer(
-        fusion=_fusion(),
+        fusion=verifier_fusion(),
         tables=(),
         user_query="hello",
         caller=None,
@@ -40,14 +40,14 @@ def test_graph_inspection_refuses_but_greeting_is_safe_chat() -> None:
     assert "uploaded documents" not in greeting.answer_text
     checked_greeting, greeting_failures = deterministic_check_answer(
         greeting,
-        fusion=_fusion(),
+        fusion=verifier_fusion(),
         tables=(),
         evidence_required=False,
     )
     assert checked_greeting.status == "complete"
     assert greeting_failures == ()
     transform = generate_answer(
-        fusion=_fusion(),
+        fusion=verifier_fusion(),
         tables=(),
         user_query="rewrite this paragraph: hello",
         caller=None,

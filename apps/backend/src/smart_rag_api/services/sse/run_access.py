@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
 from smart_rag_core.security.identity import CallerContext
-from smart_rag_core.sse.store import RunEventStore
+from smart_rag_core.sse.store import PersistedRunEvent, RunEventStore
 
-from smart_rag_api.services.sse.registry import QueryRunRegistry
+from smart_rag_api.services.sse.registry import LiveQueryRun, QueryRunRegistry
 
 
 class RunAccessMixin:
@@ -18,6 +19,29 @@ class RunAccessMixin:
 
     _store: RunEventStore
     _registry: QueryRunRegistry
+
+    if TYPE_CHECKING:
+
+        def _has_terminal(self, caller: CallerContext, run_id: UUID) -> bool:
+            """Return whether a terminal event exists. Provided by ReplayCancelMixin."""
+
+            ...
+
+        def _append(
+            self,
+            caller: CallerContext,
+            run_id: UUID,
+            event_type: str,
+            payload: dict[str, object],
+        ) -> PersistedRunEvent | None:
+            """Persist one catalog event. Provided by EventAppendMixin."""
+
+            ...
+
+        async def _cooperative_cancel(self, live: LiveQueryRun) -> None:
+            """Finish a live executor after cancel. Provided by ReplayCancelMixin."""
+
+            ...
 
     def remember_admitted(
         self,

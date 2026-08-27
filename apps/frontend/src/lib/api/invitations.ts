@@ -7,6 +7,9 @@ import type {
   CreateInvitationRequest,
   CreateInvitationResponse,
   OffboardResponse,
+  PendingInvitation,
+  WorkspaceDirectoryResponse,
+  WorkspaceMember,
 } from "../types";
 import { buildInvitationCreateBody } from "../admin-bodies";
 import { throwClassifiedAdminError } from "./admin-errors";
@@ -87,10 +90,88 @@ export async function createInvitation(
 }
 
 /**
+ * Parse one workspace member. Email and name are untrusted.
+ *
+ * @param value - JSON object.
+ * @returns Member row.
+ */
+function parseWorkspaceMember(value: unknown): WorkspaceMember {
+  const row =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const disabled = row.disabled_at;
+  const created = row.created_at;
+  return {
+    user_id: String(row.user_id ?? ""),
+    email: String(row.email ?? ""),
+    display_name:
+      typeof row.display_name === "string" && row.display_name !== ""
+        ? row.display_name
+        : null,
+    role: String(row.role ?? ""),
+    upload_enabled: Boolean(row.upload_enabled),
+    disabled_at: typeof disabled === "string" && disabled !== "" ? disabled : null,
+    created_at: typeof created === "string" && created !== "" ? created : null,
+  };
+}
+
+/**
+ * Parse one pending invitation. Token fields are dropped.
+ *
+ * @param value - JSON object.
+ * @returns Invitation row without secrets.
+ */
+function parsePendingInvitation(value: unknown): PendingInvitation {
+  const row =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const created = row.created_at;
+  return {
+    invitation_id: String(row.invitation_id ?? ""),
+    email: String(row.email ?? ""),
+    role: String(row.role ?? ""),
+    upload_enabled: Boolean(row.upload_enabled),
+    expires_at: String(row.expires_at ?? ""),
+    created_at: typeof created === "string" && created !== "" ? created : null,
+  };
+}
+
+/**
+ * List workspace members and unaccepted invitations. Owner/admin on the server.
+ *
+ * @param auth - Access token. No role header.
+ * @param fetchImpl - Injected fetch.
+ * @returns Bounded directory. Tokens are never in JSON.
+ * @throws Error `forbidden` on 403.
+ */
+export async function listWorkspaceUsers(
+  auth: ApiAuth,
+  fetchImpl: typeof fetch = fetch,
+): Promise<WorkspaceDirectoryResponse> {
+  const response = await fetchImpl(apiUrl("/admin/users"), {
+    headers: resumeHeaders(auth),
+  });
+  const body = await readJsonObject(response);
+  if (!response.ok) {
+    throwClassifiedAdminError(response.status, body, response.headers);
+  }
+  const membersRaw = body.members;
+  const invitesRaw = body.pending_invitations;
+  return {
+    members: Array.isArray(membersRaw) ? membersRaw.map(parseWorkspaceMember) : [],
+    pending_invitations: Array.isArray(invitesRaw)
+      ? invitesRaw.map(parsePendingInvitation)
+      : [],
+  };
+}
+
+/**
  * Offboard one subject. Owner/admin on the server.
  *
  * @param auth - Access token. No role header.
- * @param userId - Subject user UUID from `GET /me` (no member directory).
+ * @param userId - Subject user UUID from `GET /admin/users` or a known id.
  * @param fetchImpl - Injected fetch.
  * @returns Completed identifiers.
  * @throws Error `forbidden` on 403.

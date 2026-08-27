@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+import pytest
 from smart_rag_api.services.query_sse_mapping import (
     GENERATE_ANSWER_NODE,
     VERIFY_ANSWER_NODE,
@@ -30,9 +31,7 @@ def test_node_start_precedes_completed_and_legacy_updates_remain_valid() -> None
     """Custom start plus a later update emit started then completed."""
 
     mapper = QuerySseMapper()
-    started = mapper.consume_custom(
-        {"kind": "node_start", "stage": "verify_answer"}
-    )
+    started = mapper.consume_custom({"kind": "node_start", "stage": "verify_answer"})
     completed = mapper.consume_chunk({VERIFY_ANSWER_NODE: {"status": "verified"}})
     assert started == [
         ("status", {"stage": "verify_answer", "status": "running", "phase": "started"})
@@ -41,16 +40,16 @@ def test_node_start_precedes_completed_and_legacy_updates_remain_valid() -> None
     assert status_events[0][1]["phase"] == "completed"
     for event_type, payload in started + completed:
         assert_catalog_event(event_type, payload)
-    legacy = QuerySseMapper().consume_chunk(
-        {"prepare_query": {"status": "prepared"}}
-    )
+    legacy = QuerySseMapper().consume_chunk({"prepare_query": {"status": "prepared"}})
     assert legacy[0] == (
         "status",
         {"stage": "prepare_query", "status": "prepared", "phase": "completed"},
     )
 
 
-def test_malicious_custom_payload_emits_nothing(caplog: logging.LogCaptureFixture) -> None:
+def test_malicious_custom_payload_emits_nothing(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Extra query/result/error keys drop the custom event entirely."""
 
     mapper = QuerySseMapper()

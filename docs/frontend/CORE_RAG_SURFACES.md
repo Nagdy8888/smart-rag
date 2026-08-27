@@ -95,8 +95,17 @@ flowchart TD
   surface. `error` after tokens keeps the tokens and omits the generic
   banner. `error` with no tokens shows one “Something went wrong”
   reference and never echoes `run_failed`.
+- Ask does not keep a second live question or answer when decoded
+  `GET /conversations/{id}/messages` content already matches. API
+  `content` is HTML-escaped; SSE `answerText` is not.
+- The composer field clears as soon as Send is accepted. Create or
+  admission failure restores the draft. `send()` returns at stream
+  handoff and does not wait for the verified answer.
 - Ask shows this run’s prompt and completion tokens from SSE `usage` on
   the live answer meta row. The line is omitted when both counts are 0.
+- Run details show **This run** (the current question’s SSE `usage`) and
+  **This chat** (this run plus earlier questions in the live session and
+  the session-title call). Switching conversations resets the chat total.
 - Run details use human search-mode and status labels. Empty `none`
   rows, heartbeat counts, and raw node names stay out of the sheet.
   Route correction, tools, cache, coverage, and unknown events appear

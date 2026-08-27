@@ -44,11 +44,34 @@
 }
 
 .composerSend {
+  position: relative;
   width: 36px;
   height: 36px;
   min-width: 36px;
   min-height: 36px;
   border-radius: var(--radius-pill);
+}
+
+.composerSend[aria-busy="true"] {
+  box-shadow: 0 0 0 4px var(--color-accent-muted);
+  animation: composer-send-pulse 1.15s ease-in-out infinite;
+}
+
+@keyframes composer-send-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--color-accent-muted);
+  }
+  50% {
+    box-shadow: 0 0 0 7px var(--color-accent-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composerSend[aria-busy="true"] {
+    animation: none;
+    box-shadow: 0 0 0 4px var(--color-accent-muted);
+  }
 }
 
 .composerActions {

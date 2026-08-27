@@ -306,7 +306,8 @@ def test_post_without_content_length_is_rejected() -> None:
     response = asyncio.run(limit_request_body(request, call_next))
     assert response.status_code == 411
     assert (
-        _json_object(json.loads(response.body))["detail"] == "content_length_required"
+        _json_object(json.loads(bytes(response.body)))["detail"]
+        == "content_length_required"
     )
 
 

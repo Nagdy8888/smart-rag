@@ -412,11 +412,13 @@ class GraphWorkerLoop:
         except Exception as exc:
             reason = type(exc).__name__[:128]
             LOGGER.exception("graph job %s unhandled: %s", job_id, reason)
-            payload_raw = job.get("payload_ref")
-            isolate = (
-                isinstance(payload_raw, Mapping)
-                and payload_raw.get("isolate_candidate") is True
-            )
+            payload_raw: object = job.get("payload_ref")
+            isolate = False
+            if isinstance(payload_raw, dict):
+                isolate = (
+                    cast(dict[str, object], payload_raw).get("isolate_candidate")
+                    is True
+                )
             if not isolate:
                 try:
                     with psycopg.connect(postgres_url) as connection:

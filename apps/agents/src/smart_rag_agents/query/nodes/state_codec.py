@@ -59,7 +59,7 @@ def memory_text_from_state(raw: object) -> str:
     if not isinstance(raw, list):
         return ""
     parts: list[str] = []
-    for item in raw[:8]:
+    for item in cast(list[object], raw)[:8]:
         if not isinstance(item, dict):
             continue
         typed_item = {

@@ -322,13 +322,9 @@ class ParserSandboxLauncher:
 
 
 def _docker_available() -> bool:
-    """Compatibility alias for contract tests that probe Docker presence."""
-
-    return docker_sandbox_available()
-
-
-def docker_sandbox_available() -> bool:
     """Return whether Docker CLI responds to ``docker info``.
+
+    Contract tests look up this private name via ``typed_module_attr``.
 
     Returns:
         ``True`` when ``docker`` is on PATH and ``docker info`` exits 0.
@@ -349,6 +345,16 @@ def docker_sandbox_available() -> bool:
     except (subprocess.TimeoutExpired, OSError):
         return False
     return completed.returncode == 0
+
+
+def docker_sandbox_available() -> bool:
+    """Return whether Docker CLI responds to ``docker info``.
+
+    Returns:
+        ``True`` when ``docker`` is on PATH and ``docker info`` exits 0.
+    """
+
+    return _docker_available()
 
 
 def inprocess_parser_permitted() -> bool:

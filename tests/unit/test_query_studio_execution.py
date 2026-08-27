@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import cast
 
 import pytest
 from smart_rag_agents.query.graph import build_query_graph
@@ -17,11 +18,12 @@ from smart_rag_core.security.jwks import JwksVerificationError
 
 from tests.support.studio_live import (
     CANARY,
-    _bindings,
-    _ExecutionRuntime,
-    _FakeConnection,
-    _hooks,
+    ExecutionRuntime,
+    FakeConnection,
+    studio_bindings,
+    studio_hooks,
 )
+from tests.support.typed_graph import untyped
 
 
 def test_build_query_graph_rejects_both_studio_modes() -> None:
@@ -34,7 +36,7 @@ def test_build_query_graph_rejects_both_studio_modes() -> None:
 def test_disabled_execution_never_synthetic_admits() -> None:
     """Enabled-off execution rejects and does not mint ``studio_local``."""
 
-    hooks = _hooks(enabled=False)
+    hooks = studio_hooks(enabled=False)
 
     async def _run() -> object:
         """Invoke the disabled live graph.
@@ -43,14 +45,16 @@ def test_disabled_execution_never_synthetic_admits() -> None:
             Terminal state.
         """
 
-        async with open_studio_live_graph(_ExecutionRuntime(), hooks=hooks) as graph:  # type: ignore[arg-type]
-            return await graph.ainvoke({"user_query": "hello"})
+        async with open_studio_live_graph(ExecutionRuntime(), hooks=hooks) as graph:  # type: ignore[arg-type]
+            return await untyped(graph).ainvoke({"user_query": "hello"})
 
-    result = asyncio.run(_run())
+    result = untyped(asyncio.run(_run()))
     assert result["status"] == "admission_rejected"
     assert result["authorized_runtime"] is None
     assert DETAIL_DISABLED in str(result["detail"])
-    messages = result.get("messages") or []
+    raw_messages = result.get("messages")
+    assert isinstance(raw_messages, list)
+    messages = cast(list[object], raw_messages)
     assert messages
     assert CANARY not in json.dumps(result, default=str)
 
@@ -60,7 +64,7 @@ def test_invalid_token_execution_does_not_open_connection() -> None:
 
     opened = {"count": 0}
 
-    def open_connection() -> _FakeConnection:
+    def open_connection() -> FakeConnection:
         """Record an unexpected open.
 
         Returns:
@@ -70,7 +74,7 @@ def test_invalid_token_execution_does_not_open_connection() -> None:
         opened["count"] += 1
         raise AssertionError("opened")
 
-    hooks = _hooks(
+    hooks = studio_hooks(
         verify=JwksVerificationError("invalid"),
         open_connection=open_connection,
     )
@@ -82,10 +86,10 @@ def test_invalid_token_execution_does_not_open_connection() -> None:
             Terminal state.
         """
 
-        async with open_studio_live_graph(_ExecutionRuntime(), hooks=hooks) as graph:  # type: ignore[arg-type]
-            return await graph.ainvoke({"user_query": "hello"})
+        async with open_studio_live_graph(ExecutionRuntime(), hooks=hooks) as graph:  # type: ignore[arg-type]
+            return await untyped(graph).ainvoke({"user_query": "hello"})
 
-    result = asyncio.run(_run())
+    result = untyped(asyncio.run(_run()))
     assert result["detail"] == DETAIL_TOKEN_INVALID
     assert opened["count"] == 0
 
@@ -93,16 +97,16 @@ def test_invalid_token_execution_does_not_open_connection() -> None:
 def test_connection_closes_on_success_error_and_cancel() -> None:
     """The per-run connection closes after success, error, and cancel."""
 
-    success = _FakeConnection()
-    hooks = _hooks(
+    success = FakeConnection()
+    hooks = studio_hooks(
         open_connection=lambda: success,
-        build_bindings=_bindings,
+        build_bindings=studio_bindings,
     )
 
     async def _success() -> None:
         """Open then close the success-path connection."""
 
-        async with open_studio_live_graph(_ExecutionRuntime(), hooks=hooks) as graph:  # type: ignore[arg-type]
+        async with open_studio_live_graph(ExecutionRuntime(), hooks=hooks) as graph:  # type: ignore[arg-type]
             assert not success.closed
             nodes = set(graph.get_graph().nodes)
             assert "seed_studio_live_runtime" in nodes
@@ -110,7 +114,7 @@ def test_connection_closes_on_success_error_and_cancel() -> None:
     asyncio.run(_success())
     assert success.closed
 
-    errored = _FakeConnection()
+    errored = FakeConnection()
 
     def boom_bindings() -> QueryGraphProcessBindings:
         """Fail after the connection is open.
@@ -121,7 +125,9 @@ def test_connection_closes_on_success_error_and_cancel() -> None:
 
         raise OSError("bind failed")
 
-    error_hooks = _hooks(open_connection=lambda: errored, build_bindings=boom_bindings)
+    error_hooks = studio_hooks(
+        open_connection=lambda: errored, build_bindings=boom_bindings
+    )
 
     async def _error() -> object:
         """Compile the error-path reject graph.
@@ -131,23 +137,27 @@ def test_connection_closes_on_success_error_and_cancel() -> None:
         """
 
         async with open_studio_live_graph(
-            _ExecutionRuntime(), hooks=error_hooks
-        ) as graph:  # type: ignore[arg-type]
-            return await graph.ainvoke({"user_query": "hello"})
+            ExecutionRuntime(),  # type: ignore[arg-type]
+            hooks=error_hooks,
+        ) as graph:
+            return await untyped(graph).ainvoke({"user_query": "hello"})
 
-    result = asyncio.run(_error())
+    result = untyped(asyncio.run(_error()))
     assert result["status"] == "admission_rejected"
     assert errored.closed
 
-    cancelled = _FakeConnection()
-    cancel_hooks = _hooks(open_connection=lambda: cancelled, build_bindings=_bindings)
+    cancelled = FakeConnection()
+    cancel_hooks = studio_hooks(
+        open_connection=lambda: cancelled, build_bindings=studio_bindings
+    )
 
     async def _cancel() -> None:
         """Cancel while the live graph is yielded."""
 
         async with open_studio_live_graph(
-            _ExecutionRuntime(), hooks=cancel_hooks
-        ) as graph:  # type: ignore[arg-type]
+            ExecutionRuntime(),  # type: ignore[arg-type]
+            hooks=cancel_hooks,
+        ) as graph:
             assert graph is not None
             raise asyncio.CancelledError
 

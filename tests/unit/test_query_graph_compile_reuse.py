@@ -6,15 +6,19 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import cast
 from uuid import UUID, uuid4
 
 from smart_rag_agents.query.deps import QueryGraphContext, QueryGraphDeps
 from smart_rag_agents.query.graph import compile_query_graph
 from smart_rag_agents.query.state import pending_query_state
 from smart_rag_agents.query.studio import graph as studio_graph
+from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
-from smart_rag_core.security.identity import UserRole
+from smart_rag_core.security.identity import CallerContext, UserRole
+
+from tests.support.typed_graph import untyped
 
 _COMPANY_QUERY = "What is our refund period?"
 _EMPTY_HYBRID = SimpleNamespace(
@@ -33,6 +37,8 @@ _EMPTY_HYBRID = SimpleNamespace(
 class _TaggedHybrid:
     """Hybrid spy that records the run tag stored on this instance."""
 
+    query_budget: QueryRetrieveBudget | None = None
+
     def __init__(self, tag: str) -> None:
         """Store one isolation tag.
 
@@ -43,17 +49,27 @@ class _TaggedHybrid:
         self.tag = tag
         self.calls: list[str] = []
 
-    def retrieve(self, **kwargs: object) -> object:
+    def retrieve(
+        self,
+        *,
+        query: str,
+        caller: CallerContext,
+        profile: object | None = None,
+        deadline_seconds: float | None = None,
+    ) -> object:
         """Record a retrieve and return empty Hybrid-shaped evidence.
 
         Args:
-            **kwargs: Unused retrieve kwargs.
+            query: Unused branch query.
+            caller: Unused caller.
+            profile: Unused profile.
+            deadline_seconds: Unused remaining slice.
 
         Returns:
             Empty authorized Hybrid payload so the run can refuse later.
         """
 
-        del kwargs
+        del query, caller, profile, deadline_seconds
         self.calls.append(self.tag)
         return _EMPTY_HYBRID
 
@@ -74,7 +90,7 @@ def _runtime(*, run_id: object | None = None) -> AuthorizedRuntimeContext:
         role=UserRole.MEMBER,
         authorization_version=1,
         conversation_id=uuid4(),
-        run_id=run_id if run_id is not None else uuid4(),
+        run_id=run_id if isinstance(run_id, UUID) else uuid4(),
         reservation_id=uuid4(),
         reconnect=False,
         route_family=Phase6RouteFamily.COMPOSITE,
@@ -112,10 +128,10 @@ def _invoke_company(compiled: object, deps: QueryGraphDeps) -> str:
     state = pending_query_state(
         _runtime().model_dump(mode="json"), user_query=_COMPANY_QUERY
     )
-    invoke = compiled.invoke
+    invoke = untyped(compiled).invoke
     result = invoke(state, context=QueryGraphContext(deps=deps))
     if isinstance(result, dict):
-        return str(result.get("status") or "missing")
+        return str(cast(dict[str, object], result).get("status") or "missing")
     return "missing"
 
 
@@ -158,10 +174,11 @@ def test_two_concurrent_invokes_do_not_cross_deps() -> None:
 def test_studio_module_graph_stays_unbound() -> None:
     """Module-level Studio graph compiles without live adapters."""
 
-    result = studio_graph.invoke({"user_query": "Hi"})
+    result = cast(dict[str, object], untyped(studio_graph).invoke({"user_query": "Hi"}))
     runtime = result.get("authorized_runtime")
     assert isinstance(runtime, dict)
-    assert runtime.get("status") == "studio_local"
+    typed_runtime = cast(dict[str, object], runtime)
+    assert typed_runtime.get("status") == "studio_local"
     assert result.get("answer") is not None or result.get("status") in {
         "admission_rejected",
         "verified",

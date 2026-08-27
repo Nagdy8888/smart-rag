@@ -25,7 +25,7 @@ from smart_rag_core.release.constants import (
     SEVENTY_LIVE_ARTIFACT,
     SEVENTY_LIVE_SCHEMA_VERSION,
 )
-from smart_rag_core.release.io import as_json_object, dump_canonical_json
+from smart_rag_core.release.io import as_json_object, dump_canonical_json, json_int
 from smart_rag_core.release.old_api_smoke import MIN_CLIENT_VERSION, api_base_url
 from smart_rag_core.release.packet3 import EXPECTED_EXACT_CODE_DOCUMENT_ID
 from smart_rag_core.release.packet4 import QT_LAT_001_MS, QT_LAT_011_MS, percentile
@@ -100,12 +100,16 @@ def collect_compose_stats(repo_root: Path) -> list[dict[str, object]]:
         loaded: object = json.loads(stripped)
         if isinstance(loaded, list):
             for raw_item in cast(list[object], loaded):
-                if isinstance(raw_item, dict):
+                try:
                     rows.append(as_json_object(raw_item, source="docker-stats[]"))
+                except ValueError:
+                    continue
             return rows
-        if isinstance(loaded, dict):
+        try:
             rows.append(as_json_object(loaded, source="docker-stats"))
             return rows
+        except ValueError:
+            pass
     except (json.JSONDecodeError, ValueError):
         pass
     for line in stripped.splitlines():
@@ -116,8 +120,10 @@ def collect_compose_stats(repo_root: Path) -> list[dict[str, object]]:
             item: object = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if isinstance(item, dict):
+        try:
             rows.append(as_json_object(item, source="docker-stats-line"))
+        except ValueError:
+            continue
     return rows
 
 
@@ -283,25 +289,25 @@ def run_live_foreground(
             f"{api_base}/runs/{table_run}/events?after=0",
             paid_headers(token),
         )
-    first_token_ms = [
-        float(row["first_token_ms"])
-        for row in stream_rows
-        if isinstance(row.get("first_token_ms"), (int, float))
-        and not isinstance(row.get("first_token_ms"), bool)
-    ]
-    completion_ms = [
-        float(row["completion_ms"])
-        for row in stream_rows
-        if isinstance(row.get("completion_ms"), (int, float))
-        and not isinstance(row.get("completion_ms"), bool)
-    ]
-    heartbeat_counts = [
-        int(row["heartbeat_count"])
-        if isinstance(row.get("heartbeat_count"), int)
-        and not isinstance(row.get("heartbeat_count"), bool)
-        else 0
-        for row in stream_rows
-    ]
+    first_token_ms: list[float] = []
+    for row in stream_rows:
+        raw_first = row.get("first_token_ms")
+        if isinstance(raw_first, (int, float)) and not isinstance(raw_first, bool):
+            first_token_ms.append(float(raw_first))
+    completion_ms: list[float] = []
+    for row in stream_rows:
+        raw_completion = row.get("completion_ms")
+        if isinstance(raw_completion, (int, float)) and not isinstance(
+            raw_completion, bool
+        ):
+            completion_ms.append(float(raw_completion))
+    heartbeat_counts: list[int] = []
+    for row in stream_rows:
+        raw_heartbeats = row.get("heartbeat_count")
+        if isinstance(raw_heartbeats, int) and not isinstance(raw_heartbeats, bool):
+            heartbeat_counts.append(raw_heartbeats)
+        else:
+            heartbeat_counts.append(0)
     streams = stream_gate_payload(
         first_token_ms=first_token_ms,
         completion_ms=completion_ms,
@@ -310,7 +316,12 @@ def run_live_foreground(
         simultaneous_runs=len(run_ids),
         mock_model_mode=True,
     )
-    sse_ok = all(int(row.get("status_code") or 0) == 200 for row in stream_rows)
+    sse_ok = True
+    for row in stream_rows:
+        raw_status = row.get("status_code")
+        if json_int(raw_status) != 200:
+            sse_ok = False
+            break
     return {
         "passed": sse_ok and len(run_ids) == 5,
         "inspect_ok": inspect.status_code in {200, 403, 404},
@@ -331,7 +342,7 @@ def run_live_foreground(
             for row in stream_rows
         ],
         "jwt_eventsource_401": any(
-            int(row.get("status_code") or 0) == 401 for row in stream_rows
+            json_int(row.get("status_code")) == 401 for row in stream_rows
         ),
         "sample_is_eight_doc_subset": True,
     }
@@ -395,8 +406,11 @@ def measure_live_seventy_pause(
     cpu_values = cpu_peaks_from_stats(before) + cpu_peaks_from_stats(after)
     streams_raw = live.get("streams")
     streams: dict[str, object] = {}
-    if isinstance(streams_raw, dict):
-        streams = as_json_object(streams_raw, source="seventy.streams")
+    if streams_raw is not None:
+        try:
+            streams = as_json_object(streams_raw, source="seventy.streams")
+        except ValueError:
+            streams = {}
     completion_p95 = streams.get("completion_p95_ms")
     first_p95 = streams.get("first_token_p95_ms")
     foreground_p95: float | None = None

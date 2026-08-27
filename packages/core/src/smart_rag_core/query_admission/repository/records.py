@@ -13,7 +13,7 @@ from psycopg.rows import dict_row
 
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
-from smart_rag_core.query_admission.repository.errors import _raise_admission
+from smart_rag_core.query_admission.repository.errors import raise_admission
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import CallerContext, UserRole
 
@@ -94,7 +94,7 @@ def get_query_run(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("not_found")
     reservation = row.get("reservation_id")
@@ -144,7 +144,7 @@ def load_query_run_runtime(
             )
             row = cursor.fetchone()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     if row is None:
         raise QueryAdmissionError("not_found")
     message = row.get("user_message")
@@ -218,7 +218,7 @@ def list_run_citations(
             )
             rows = cursor.fetchall()
     except psycopg.Error as exc:
-        _raise_admission(exc)
+        raise_admission(exc)
     records: list[RunCitationRecord] = []
     for row in rows:
         provenance_raw = row.get("provenance")

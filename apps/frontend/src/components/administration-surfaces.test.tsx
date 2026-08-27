@@ -17,6 +17,7 @@ import { UsagePanel } from "./admin/usage-panel";
 const fetchMe = vi.fn();
 const createInvitation = vi.fn();
 const offboardUser = vi.fn();
+const listWorkspaceUsers = vi.fn();
 const enableTool = vi.fn();
 const listTools = vi.fn();
 const fetchUsageMe = vi.fn();
@@ -84,6 +85,7 @@ vi.mock("../lib/api", async () => {
     loadConsoleReadiness: (...args: unknown[]) => loadConsoleReadiness(...args),
     createInvitation: (...args: unknown[]) => createInvitation(...args),
     offboardUser: (...args: unknown[]) => offboardUser(...args),
+    listWorkspaceUsers: (...args: unknown[]) => listWorkspaceUsers(...args),
     enableTool: (...args: unknown[]) => enableTool(...args),
     listTools: (...args: unknown[]) => listTools(...args),
     fetchUsageMe: (...args: unknown[]) => fetchUsageMe(...args),
@@ -139,6 +141,38 @@ beforeEach(() => {
     prompt_tokens: 100,
     completion_tokens: 40,
     usage_rows: 8,
+  });
+  listWorkspaceUsers.mockResolvedValue({
+    members: [
+      {
+        user_id: "u-owner",
+        email: "owner@example.com",
+        display_name: "Owner",
+        role: "owner",
+        upload_enabled: true,
+        disabled_at: null,
+        created_at: "2026-08-01T00:00:00Z",
+      },
+      {
+        user_id: "u-member",
+        email: "<img src=x onerror=alert(1)>@evil.test",
+        display_name: null,
+        role: "member",
+        upload_enabled: false,
+        disabled_at: null,
+        created_at: "2026-08-02T00:00:00Z",
+      },
+    ],
+    pending_invitations: [
+      {
+        invitation_id: "inv-pending",
+        email: "pending@example.com",
+        role: "viewer",
+        upload_enabled: false,
+        expires_at: "2099-01-01T00:00:00Z",
+        created_at: "2026-08-03T00:00:00Z",
+      },
+    ],
   });
   listTools.mockResolvedValue([
     {
@@ -220,6 +254,7 @@ describe("AdminApp", () => {
     );
     fireEvent.click(screen.getByRole("tab", { name: "Tools" }));
     expect(routerReplace).toHaveBeenCalledWith("/admin?tab=tools");
+    expect(screen.getByRole("tab", { name: "Names & aliases" })).toBeInTheDocument();
   });
 });
 
@@ -239,7 +274,8 @@ describe("TeamAccessPanel", () => {
     expect(createInvitation).toBeDefined();
     expect(offboardUser).toBeDefined();
     expect(screen.queryByText(/bootstrap/i)).toBeNull();
-    expect(screen.queryByRole("table", { name: /member/i })).toBeNull();
+    expect(screen.queryByRole("table", { name: /workspace people/i })).toBeNull();
+    expect(screen.queryByRole("table", { name: /pending invitations/i })).toBeNull();
   });
 
   it("does not render an invitation token and keeps hostile email as text", async () => {
@@ -256,6 +292,18 @@ describe("TeamAccessPanel", () => {
     expect(screen.queryByText("once-secret")).toBeNull();
     expect(email).toHaveValue("<img src=x onerror=alert(1)>@evil.test");
     expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("lists workspace people and pending invitations for an owner", async () => {
+    renderSurface(<TeamAccessPanel />);
+    expect(await screen.findByRole("table", { name: "Workspace people" })).toBeInTheDocument();
+    expect(screen.getByText("owner@example.com")).toBeInTheDocument();
+    expect(screen.getByText("<img src=x onerror=alert(1)>@evil.test")).toBeInTheDocument();
+    expect(document.querySelector("img")).toBeNull();
+    expect(screen.getByRole("table", { name: "Pending invitations" })).toBeInTheDocument();
+    expect(screen.getByText("pending@example.com")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Offboard" })[0]!);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   it("offboards a known user id without MFA copy", async () => {
@@ -378,9 +426,19 @@ describe("CurationPanel", () => {
       upload_enabled: false,
     });
     renderSurface(<CurationPanel />);
-    expect(await screen.findByText(/Curation is limited/)).toBeInTheDocument();
+    expect(await screen.findByText(/Names and aliases are limited/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import glossary" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  });
+
+  it("explains word aliases and people-and-things for an owner", async () => {
+    renderSurface(<CurationPanel />);
+    expect(
+      await screen.findByText(/Teach search your company's language/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Word aliases" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "People & things" })).toBeInTheDocument();
+    expect(screen.getByText(/Add a company term and optional nickname/)).toBeInTheDocument();
   });
 
   it("approves an entity rule with row_version only for an owner", async () => {
@@ -399,7 +457,7 @@ describe("CurationPanel", () => {
       ],
     });
     renderSurface(<CurationPanel />);
-    fireEvent.click(await screen.findByRole("tab", { name: "Entity rules" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "People & things" }));
     fireEvent.click(await screen.findByRole("button", { name: "Rule actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Approve" }));
     expect(await screen.findByText("Rule approved.")).toBeInTheDocument();
@@ -429,7 +487,7 @@ describe("CurationPanel", () => {
     });
     patchEntityRule.mockRejectedValue(new Error("stale_row_version"));
     renderSurface(<CurationPanel />);
-    fireEvent.click(await screen.findByRole("tab", { name: "Entity rules" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "People & things" }));
     fireEvent.click(await screen.findByRole("button", { name: "Rule actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
     fireEvent.click(screen.getByRole("button", { name: "Save rule" }));

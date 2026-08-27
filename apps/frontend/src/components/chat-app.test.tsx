@@ -633,6 +633,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
       expect(createConversation).toHaveBeenCalledTimes(1);
     });
     expect(messagePosts).toEqual([]);
+    expect(screen.getByLabelText("Message")).toHaveValue("hello");
   });
 
   it("shows the session-rejected banner when conversation create is unauthorized", async () => {
@@ -990,6 +991,7 @@ describe("ChatApp Ask workspace", () => {
     await user.type(screen.getByLabelText("Message"), "Summarize the policy");
     await user.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByRole("button", { name: "Stop" });
+    expect(screen.getByLabelText("Message")).toHaveValue("");
     streamCtl.send(
       'event: status\nid: 1\ndata: {"stage":"generate_answer","status":"running","phase":"started"}\n\n',
     );
@@ -1222,6 +1224,8 @@ describe("ChatApp Ask workspace", () => {
     await user.type(await screen.findByLabelText("Message"), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("button", { name: "Sending…" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Message")).toHaveValue("");
+    expect(screen.getByText("hello")).toBeInTheDocument();
     resolveCreate?.({
       conversation_id: "conv-created",
       creator_user_id: "u1",

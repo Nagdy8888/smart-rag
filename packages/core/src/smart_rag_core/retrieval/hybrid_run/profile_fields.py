@@ -8,7 +8,7 @@ from smart_rag_core.evaluation.schema import ExpectedProfile, ProfileField, Quer
 from smart_rag_core.retrieval.temporal import TemporalIntent
 
 
-def _str_list_field(profile: ExpectedProfile | None, name: str) -> tuple[str, ...]:
+def str_list_field(profile: ExpectedProfile | None, name: str) -> tuple[str, ...]:
     """Read a list-or-string profile field.
 
     Args:
@@ -30,7 +30,7 @@ def _str_list_field(profile: ExpectedProfile | None, name: str) -> tuple[str, ..
     return ()
 
 
-def _str_field(profile: ExpectedProfile | None, name: str) -> str | None:
+def str_field(profile: ExpectedProfile | None, name: str) -> str | None:
     """Read a string profile field.
 
     Args:
@@ -50,7 +50,7 @@ def _str_field(profile: ExpectedProfile | None, name: str) -> str | None:
     return None
 
 
-def _bool_field(profile: ExpectedProfile | None, name: str) -> bool:
+def bool_field(profile: ExpectedProfile | None, name: str) -> bool:
     """Read a boolean profile field.
 
     Args:
@@ -87,7 +87,7 @@ def _profile_field(profile: ExpectedProfile | None, name: str) -> ProfileField |
     return None
 
 
-def _query_type(profile: ExpectedProfile | None) -> QueryType:
+def query_type_field(profile: ExpectedProfile | None) -> QueryType:
     """Parse an existing ``QueryType`` enum value without adding a map.
 
     Wave 1C owns QueryType mapping. This only accepts values already on
@@ -100,7 +100,7 @@ def _query_type(profile: ExpectedProfile | None) -> QueryType:
         Profile query type when it is a ``QueryType`` member, else ``factual``.
     """
 
-    raw = _str_field(profile, "query_type")
+    raw = str_field(profile, "query_type")
     if raw is None:
         return QueryType.FACTUAL
     try:
@@ -109,7 +109,7 @@ def _query_type(profile: ExpectedProfile | None) -> QueryType:
         return QueryType.FACTUAL
 
 
-def _temporal_intent(profile: ExpectedProfile | None) -> TemporalIntent:
+def temporal_intent_field(profile: ExpectedProfile | None) -> TemporalIntent:
     """Parse an allow-listed temporal intent from the profile.
 
     Args:
@@ -119,7 +119,7 @@ def _temporal_intent(profile: ExpectedProfile | None) -> TemporalIntent:
         Matching ``TemporalIntent``, or ``none``.
     """
 
-    raw = _str_field(profile, "temporal_intent")
+    raw = str_field(profile, "temporal_intent")
     if raw is None:
         return TemporalIntent.NONE
     try:
@@ -128,7 +128,7 @@ def _temporal_intent(profile: ExpectedProfile | None) -> TemporalIntent:
         return TemporalIntent.NONE
 
 
-def _target_date(profile: ExpectedProfile | None) -> date | None:
+def target_date_field(profile: ExpectedProfile | None) -> date | None:
     """Parse an ISO ``YYYY-MM-DD`` target date when present.
 
     Args:
@@ -138,7 +138,7 @@ def _target_date(profile: ExpectedProfile | None) -> date | None:
         UTC calendar date, or ``None``.
     """
 
-    raw = _str_field(profile, "target_date")
+    raw = str_field(profile, "target_date")
     if raw is None:
         return None
     try:

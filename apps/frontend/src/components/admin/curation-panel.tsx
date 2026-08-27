@@ -18,7 +18,7 @@ import tableStyles from "./admin-tables.module.css";
 const styles = { ...shellStyles, ...tableStyles };
 
 /**
- * Curation tab with Glossary and Entity rules.
+ * Curation tab: word aliases (glossary) and people/things (entity rules).
  *
  * @returns Nested tabs. Approve still posts `{ row_version }` only.
  */
@@ -33,13 +33,18 @@ export function CurationPanel() {
   if (!curation.canMutate) {
     return (
       <p className={styles.muted}>
-        Curation is limited to owners and admins.
+        Names and aliases are limited to owners and admins.
       </p>
     );
   }
 
   return (
     <div className={styles.stack}>
+      <p className={styles.panelLead}>
+        Teach search your company&apos;s language. Word aliases match nicknames
+        and codes to the official term. People and things tell the knowledge
+        graph which names are the same, and which must never be merged.
+      </p>
       {curation.error ? (
         <StatusBanner kind="error" role="alert">
           {curation.error}
@@ -72,7 +77,7 @@ export function CurationPanel() {
           data-action-id="admin.curation.glossary"
           onClick={() => setInner("glossary")}
         >
-          Glossary
+          Word aliases
         </button>
         <button
           type="button"
@@ -82,7 +87,7 @@ export function CurationPanel() {
           data-action-id="admin.curation.rules"
           onClick={() => setInner("rules")}
         >
-          Entity rules
+          People & things
         </button>
       </div>
 

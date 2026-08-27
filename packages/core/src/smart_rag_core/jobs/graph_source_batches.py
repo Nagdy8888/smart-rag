@@ -7,9 +7,9 @@ durable checkpoints keep already-processed sources.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from smart_rag_core.gateways.embedding import EmbeddingProviderError
@@ -65,10 +65,13 @@ def parse_processed_source_ids(payload: Mapping[str, Any]) -> tuple[str, ...]:
     raw = payload.get(CHECKPOINT_PAYLOAD_KEY)
     if not isinstance(raw, Mapping):
         return ()
-    ids = raw.get("processed_source_ids")
-    if not isinstance(ids, Sequence) or isinstance(ids, (str, bytes)):
+    typed_raw = cast(Mapping[str, object], raw)
+    ids_obj = typed_raw.get("processed_source_ids")
+    if not isinstance(ids_obj, Sequence) or isinstance(ids_obj, (str, bytes)):
         return ()
-    return tuple(str(item) for item in ids if str(item).strip())
+    return tuple(
+        str(item) for item in cast(Sequence[object], ids_obj) if str(item).strip()
+    )
 
 
 def remaining_batches(
@@ -388,6 +391,7 @@ async def _cleanup_batch_sources(
         )
         if not callable(status_fn):
             raise GraphIndexerError("vendor_cleanup_unverified")
-        remaining = await status_fn(document_id)
+        typed_status = cast(Callable[[object], Awaitable[object]], status_fn)
+        remaining = await typed_status(document_id)
         if remaining is not None:
             raise GraphIndexerError("vendor_cleanup_unverified")

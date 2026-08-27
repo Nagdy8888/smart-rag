@@ -14,7 +14,8 @@ from smart_rag_api.services.sse.langgraph_stream_consume import (
 from smart_rag_api.services.sse.stream_dispatch import production_astream_options
 from smart_rag_core.query_answer.models import AnswerPayload
 
-from tests.support.query_sse import _runtime
+from tests.support.query_sse import runtime
+from tests.unit.typed_attrs import ignore_args
 
 
 def _v2(mode: str, data: object) -> dict[str, object]:
@@ -105,10 +106,7 @@ def test_production_astream_options_are_v2_multi_mode() -> None:
         "version": "v2",
     }
     runtime = (
-        __import__("pathlib")
-        .Path(__file__)
-        .resolve()
-        .parents[2]
+        __import__("pathlib").Path(__file__).resolve().parents[2]
         / "apps"
         / "backend"
         / "src"
@@ -144,12 +142,12 @@ async def _collect(
     async for item in iter_mapped_langgraph_updates(
         stream_iter=_FakeStream(parts),
         mapper=mapper,
-        context=_runtime(),
+        context=runtime(),
         settings=SimpleNamespace(),
         cancel_event=cancel or asyncio.Event(),
         connection=connection,
-        commit_successful_terminal=lambda *_args, **_kwargs: None,
-        set_termination=lambda **_kwargs: None,
+        commit_successful_terminal=ignore_args,
+        set_termination=ignore_args,
         last_remaining_calls=8,
         last_status="running",
     ):
@@ -223,9 +221,7 @@ def test_required_progress_order_and_commit_before_each_part() -> None:
     assert conn.events[0] == "commit"
     assert conn.events.count("commit") == len(parts)
     first_generate_start = next(
-        index
-        for index, event in enumerate(conn.events)
-        if event == "yield:status"
+        index for index, event in enumerate(conn.events) if event == "yield:status"
     )
     assert conn.events[first_generate_start - 1] == "commit"
 
@@ -252,12 +248,12 @@ def test_cancel_after_started_does_not_fabricate_completed() -> None:
         async for item in iter_mapped_langgraph_updates(
             stream_iter=_FakeStream(parts),
             mapper=mapper,
-            context=_runtime(),
+            context=runtime(),
             settings=SimpleNamespace(),
             cancel_event=cancel,
             connection=connection,
-            commit_successful_terminal=lambda *_args, **_kwargs: None,
-            set_termination=lambda **_kwargs: None,
+            commit_successful_terminal=ignore_args,
+            set_termination=ignore_args,
             last_remaining_calls=8,
             last_status="running",
         ):
@@ -285,15 +281,17 @@ def test_reconnect_replay_does_not_call_astream(monkeypatch: Any) -> None:
     from smart_rag_core.sse.store import MemoryRunEventStore
 
     from tests.support.query_sse import (
-        _caller,
-        _patch_recording_executor,
-        _RecordingAsyncStream,
-        _RecordingCompiled,
-        _verified_chunk,
+        RecordingAsyncStream,
+        RecordingCompiled,
+        patch_recording_executor,
+        verified_chunk,
+    )
+    from tests.support.query_sse import (
+        caller as make_caller,
     )
 
-    stream = _RecordingAsyncStream((_verified_chunk("VISIBLE_FINAL"),))
-    compiled = _RecordingCompiled(stream)
+    stream = RecordingAsyncStream((verified_chunk("VISIBLE_FINAL"),))
+    compiled = RecordingCompiled(stream)
     calls = {"astream": 0}
     real_astream = compiled.astream
 
@@ -313,7 +311,7 @@ def test_reconnect_replay_does_not_call_astream(monkeypatch: Any) -> None:
 
     compiled.astream = _count  # type: ignore[method-assign]
     executor = LangGraphQueryRunExecutor()
-    _patch_recording_executor(monkeypatch, executor, compiled)
+    patch_recording_executor(monkeypatch, executor, compiled)
     store = MemoryRunEventStore()
     service = SseStreamService(
         store=store,
@@ -321,9 +319,9 @@ def test_reconnect_replay_does_not_call_astream(monkeypatch: Any) -> None:
         executor=executor,
         sse_schema_version="1",
     )
-    caller = _caller()
-    runtime = _runtime()
-    service.remember_admitted(caller, runtime, message="hello")
+    owner = make_caller()
+    context = runtime()
+    service.remember_admitted(owner, context, message="hello")
 
     async def _first_then_replay() -> list[str]:
         """Drain the live run, then replay without a new executor.
@@ -334,7 +332,7 @@ def test_reconnect_replay_does_not_call_astream(monkeypatch: Any) -> None:
 
         live_types: list[str] = []
         async for frame in service.iter_frames(
-            caller, run_id=runtime.run_id, after=0, context=runtime
+            owner, run_id=context.run_id, after=0, context=context
         ):
             if "event: completed" in frame:
                 live_types.append("completed")
@@ -342,7 +340,7 @@ def test_reconnect_replay_does_not_call_astream(monkeypatch: Any) -> None:
         assert calls["astream"] == 1
         replayed: list[str] = []
         async for frame in service.iter_frames(
-            caller, run_id=runtime.run_id, after=0, context=runtime
+            owner, run_id=context.run_id, after=0, context=context
         ):
             if "event: completed" in frame:
                 replayed.append("completed")

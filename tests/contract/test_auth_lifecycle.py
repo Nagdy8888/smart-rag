@@ -20,6 +20,7 @@ from smart_rag_api.services.profile_loader import (
 )
 
 from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.unit.typed_attrs import ignore_args
 
 
 @pytest.fixture
@@ -507,7 +508,7 @@ def test_offboarding_succeeds_at_ordinary_assurance(
     monkeypatch.setattr(
         offboarding,
         "revoke_provider_sessions",
-        lambda settings, user_id: None,
+        ignore_args,
     )
     with pytest.raises(offboarding.OffboardingError, match="authorization rejected"):
         offboarding.apply_offboarding_security(
@@ -755,7 +756,7 @@ def test_admin_cannot_invite_owner(
     monkeypatch.setattr(
         invitations,
         "send_provider_invite_email",
-        lambda *_args, **_kwargs: None,
+        ignore_args,
     )
     with pytest.raises(
         invitations.InvitationServiceError,

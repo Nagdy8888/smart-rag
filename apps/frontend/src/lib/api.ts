@@ -36,7 +36,7 @@ export {
   submitMessageBody,
 } from "./api/headers";
 export { apiUrl, readJsonObject } from "./api/http";
-export { nextDocumentCursor, parseDocumentResponse, parseFeedbackResponse, parseRunResponse } from "./api/parsers";
+export { nextDocumentCursor, parseConversationResponse, parseDocumentResponse, parseFeedbackResponse, parseRunResponse } from "./api/parsers";
 export { DOCUMENT_LIST_PAGE_SIZE } from "./api/documents-constants";
 export {
   HEALTH_READY_TIMEOUT_MS,
@@ -68,7 +68,7 @@ export {
 export { inspectGraph, searchGraphEntities } from "./api/graph";
 export { analyzeTable, listTables } from "./api/tables";
 export { fetchUsageCompany, fetchUsageMe } from "./api/usage";
-export { acceptInvitation, createInvitation, offboardUser } from "./api/invitations";
+export { acceptInvitation, createInvitation, listWorkspaceUsers, offboardUser } from "./api/invitations";
 export { enableTool, listTools, seedTool, setToolPermission } from "./api/tools";
 export { approveGlossaryImport, importGlossary, rollbackGlossaryImport } from "./api/knowledge";
 export {

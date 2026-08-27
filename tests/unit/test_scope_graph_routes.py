@@ -5,19 +5,23 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import cast
 from uuid import UUID, uuid4
 
 from smart_rag_agents.query.deps import QueryGraphDeps
-from smart_rag_agents.query.graph import _route_after_plan, build_query_graph
+from smart_rag_agents.query.graph import build_query_graph
 from smart_rag_agents.query.nodes.topology import route_after_plan
-from smart_rag_agents.query.state import pending_query_state
+from smart_rag_agents.query.state import QueryGraphState, pending_query_state
+from smart_rag_core.query_admission.ceilings import QueryRetrieveBudget
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.preparation import prepare_query
 from smart_rag_core.security.identity import CallerContext, UserRole
 
-_COMPANY_ONLY_NODES = {
+from tests.support.typed_graph import compile_state_graph
+
+COMPANY_ONLY_NODES = {
     "company_scope",
     "apply_correction",
     "fuse_evidence",
@@ -27,8 +31,10 @@ _COMPANY_ONLY_NODES = {
 }
 
 
-class _SpyHybrid:
+class SpyHybrid:
     """Record Hybrid retrieve calls and return empty authorized evidence."""
+
+    query_budget: QueryRetrieveBudget | None = None
 
     def __init__(self) -> None:
         """Create a zero-call Hybrid spy."""
@@ -70,7 +76,7 @@ class _SpyHybrid:
         )
 
 
-def _visit_nodes(query: str, *, hybrid: _SpyHybrid | None = None) -> list[str]:
+def _visit_nodes(query: str, *, hybrid: SpyHybrid | None = None) -> list[str]:
     """Compile and stream one admitted run, returning visited node names.
 
     Args:
@@ -82,12 +88,12 @@ def _visit_nodes(query: str, *, hybrid: _SpyHybrid | None = None) -> list[str]:
     """
 
     deps = QueryGraphDeps(hybrid_retriever=hybrid)
-    compiled = build_query_graph(deps).compile()
+    compiled = compile_state_graph(build_query_graph(deps))
     state = pending_query_state(_runtime().model_dump(mode="json"), user_query=query)
     visited: list[str] = []
     for chunk in compiled.stream(state, stream_mode="updates"):
         if isinstance(chunk, dict):
-            visited.extend(str(name) for name in chunk)
+            visited.extend(str(name) for name in cast(dict[object, object], chunk))
     return visited
 
 
@@ -128,7 +134,7 @@ def _runtime() -> AuthorizedRuntimeContext:
     )
 
 
-def _planned_state(query: str) -> dict[str, object]:
+def _planned_state(query: str) -> QueryGraphState:
     """Compile a retrieval plan and store it on pending graph state.
 
     Args:
@@ -150,7 +156,7 @@ def _planned_state(query: str) -> dict[str, object]:
 def test_query_graph_registers_explicit_scope_nodes() -> None:
     """The compiled topology exposes scope nodes and drops execute_branches."""
 
-    compiled = build_query_graph().compile()
+    compiled = compile_state_graph(build_query_graph())
     names = set(compiled.get_graph().nodes)
     assert "company_scope" in names
     assert "general_scope" in names
@@ -164,14 +170,14 @@ def test_query_graph_registers_explicit_scope_nodes() -> None:
 def test_greeting_and_general_plan_route_to_general_scope() -> None:
     """Greetings and world-knowledge plans skip company retrieval."""
 
-    assert _route_after_plan(_planned_state("Hello")) == "general_scope"
-    assert _route_after_plan(_planned_state("hi friend")) == "general_scope"
+    assert route_after_plan(_planned_state("Hello")) == "general_scope"
+    assert route_after_plan(_planned_state("hi friend")) == "general_scope"
     assert (
-        _route_after_plan(_planned_state("What is the capital of France?"))
+        route_after_plan(_planned_state("What is the capital of France?"))
         == "general_scope"
     )
     assert (
-        _route_after_plan(_planned_state("Rewrite this paragraph: The sky is blue."))
+        route_after_plan(_planned_state("Rewrite this paragraph: The sky is blue."))
         == "general_scope"
     )
 
@@ -180,14 +186,15 @@ def test_mixed_plan_routes_to_mixed_scope() -> None:
     """Genuine mixed conflict uses the clarification node."""
 
     query = "What is the capital of France and what is our refund period?"
-    assert _route_after_plan(_planned_state(query)) == "mixed_scope"
+    assert route_after_plan(_planned_state(query)) == "mixed_scope"
 
 
 def test_company_plan_routes_to_company_scope() -> None:
     """Document questions still enter the retrieval path."""
 
     assert (
-        _route_after_plan(_planned_state("What is our refund period?")) == "company_scope"
+        route_after_plan(_planned_state("What is our refund period?"))
+        == "company_scope"
     )
 
 
@@ -196,7 +203,7 @@ def test_missing_plan_is_invalid_scope() -> None:
 
     state = pending_query_state(user_query="Hello")
     state["status"] = "planned"
-    assert _route_after_plan(state) == "invalid_scope"
+    assert route_after_plan(state) == "invalid_scope"
     assert route_after_plan(state) == "invalid_scope"
 
 
@@ -204,11 +211,11 @@ def test_graph_inspection_and_scoped_refusal_remain_company() -> None:
     """Inspection and scoped refusal still enter the company retrieve path."""
 
     assert (
-        _route_after_plan(_planned_state("Inspect the current graph workspace"))
+        route_after_plan(_planned_state("Inspect the current graph workspace"))
         == "company_scope"
     )
     assert (
-        _route_after_plan(_planned_state("Describe the unlabeled chart in the figure"))
+        route_after_plan(_planned_state("Describe the unlabeled chart in the figure"))
         == "company_scope"
     )
 
@@ -216,12 +223,12 @@ def test_graph_inspection_and_scoped_refusal_remain_company() -> None:
 def test_general_and_mixed_paths_skip_retrievers_and_company_nodes() -> None:
     """Direct paths never call Hybrid or visit company-only nodes."""
 
-    hybrid = _SpyHybrid()
+    hybrid = SpyHybrid()
     general_nodes = _visit_nodes("Hello", hybrid=hybrid)
     assert hybrid.calls == 0
     assert "general_scope" in general_nodes
     assert "verify_answer" in general_nodes
-    assert _COMPANY_ONLY_NODES.isdisjoint(general_nodes)
+    assert COMPANY_ONLY_NODES.isdisjoint(general_nodes)
 
     mixed_nodes = _visit_nodes(
         "What is the capital of France and what is our refund period?",
@@ -230,14 +237,14 @@ def test_general_and_mixed_paths_skip_retrievers_and_company_nodes() -> None:
     assert hybrid.calls == 0
     assert "mixed_scope" in mixed_nodes
     assert "verify_answer" in mixed_nodes
-    assert _COMPANY_ONLY_NODES.isdisjoint(mixed_nodes)
+    assert COMPANY_ONLY_NODES.isdisjoint(mixed_nodes)
 
 
 def test_mixed_scope_leaves_usage_counters_unchanged() -> None:
     """Genuine mixed clarification spends no answer or verifier calls."""
 
     runtime = _runtime()
-    compiled = build_query_graph(QueryGraphDeps()).compile()
+    compiled = compile_state_graph(build_query_graph(QueryGraphDeps()))
     query = "What is the capital of France and what is our refund period?"
     out = compiled.invoke(
         pending_query_state(runtime.model_dump(mode="json"), user_query=query)
@@ -262,7 +269,7 @@ def test_successful_direct_paths_reach_verification() -> None:
 def test_company_path_visits_retrieve_then_verify() -> None:
     """Company plans still run retrieve, correction, and verification."""
 
-    hybrid = _SpyHybrid()
+    hybrid = SpyHybrid()
     nodes = _visit_nodes("What is our refund period?", hybrid=hybrid)
     assert hybrid.calls >= 1
     assert "company_scope" in nodes
@@ -273,9 +280,13 @@ def test_company_path_visits_retrieve_then_verify() -> None:
 def test_studio_graphs_use_the_same_post_plan_router() -> None:
     """Local and live Studio compile the same scope edges as production."""
 
-    production = set(build_query_graph().compile().get_graph().nodes)
-    local = set(build_query_graph(studio_local=True).compile().get_graph().nodes)
-    live = set(build_query_graph(studio_live=True).compile().get_graph().nodes)
+    production = set(compile_state_graph(build_query_graph()).get_graph().nodes)
+    local = set(
+        compile_state_graph(build_query_graph(studio_local=True)).get_graph().nodes
+    )
+    live = set(
+        compile_state_graph(build_query_graph(studio_live=True)).get_graph().nodes
+    )
     for names in (production, local, live):
         assert "company_scope" in names
         assert "general_scope" in names

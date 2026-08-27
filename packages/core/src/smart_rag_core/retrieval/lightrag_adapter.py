@@ -17,7 +17,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Protocol, TypeVar, cast
+from typing import Any, Literal, Protocol, TypeVar, cast
 from uuid import UUID, uuid4
 
 import psycopg
@@ -31,6 +31,7 @@ from smart_rag_core.ingestion.embeddings.policy import (
 )
 from smart_rag_core.query_admission.ceilings import (
     QueryRetrieveBudget,
+    add_recorded_tokens,
     assert_retrieve_kind_available,
     debit_retrieve_budget,
     usage_kind_caps,
@@ -64,7 +65,10 @@ from smart_rag_core.retrieval.graph import (
     bind_graph_source_text,
     clamp_global_steering,
 )
-from smart_rag_core.retrieval.lightrag_callbacks import CountedLightRagCallbacks
+from smart_rag_core.retrieval.lightrag_callbacks import (
+    CountedLightRagCallbacks,
+    take_callback_usage,
+)
 from smart_rag_core.retrieval.lightrag_qualification import (
     QUALIFICATION_COSINE_BETTER_THAN_THRESHOLD,
     DocumentStatusView,
@@ -631,8 +635,9 @@ async def _counted_query_callback(
         QueryBudgetError: When remaining USD cannot cover the kind cap.
 
     Side Effects:
-        Debits the ContextVar budget when bound. Unbound query/index
-        callbacks are not reservation-counted.
+        Debits the ContextVar budget when bound and records provider
+        tokens on that ledger. Unbound query/index callbacks are not
+        reservation-counted.
     """
 
     budget = _QUERY_RETRIEVE_BUDGET.get()
@@ -654,8 +659,9 @@ async def _counted_query_callback(
         and isinstance(reservation_id, UUID)
     ):
         usd_cap, prompt_cap, completion_cap = usage_kind_caps(usage_kind)
+        typed_connection = cast(psycopg.Connection[Any], connection)
         consumed = consume_query_reservation(
-            connection,
+            typed_connection,
             caller=caller,
             reservation_id=reservation_id,
             expected_version=budget.expected_version,
@@ -669,7 +675,7 @@ async def _counted_query_callback(
             result = await send()
         except TimeoutAfterSendError:
             record_query_llm_usage(
-                connection,
+                typed_connection,
                 caller=caller,
                 run_id=run_id,
                 reservation_id=reservation_id,
@@ -683,8 +689,10 @@ async def _counted_query_callback(
                 timeout_after_send=True,
             )
             raise
+        prompt, completion, measured_cost = take_callback_usage()
+        add_recorded_tokens(budget, prompt, completion)
         record_query_llm_usage(
-            connection,
+            typed_connection,
             caller=caller,
             run_id=run_id,
             reservation_id=reservation_id,
@@ -692,14 +700,21 @@ async def _counted_query_callback(
             usage_kind=usage_kind,
             model_id=model_id,
             provider_attempt_id=str(uuid4()),
-            prompt_tokens=prompt_cap,
-            completion_tokens=completion_cap,
-            cost_usd=usd_cap,
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            cost_usd=(
+                measured_cost
+                if measured_cost is not None and measured_cost > 0
+                else usd_cap
+            ),
             timeout_after_send=False,
         )
         return result
     debit_retrieve_budget(budget, usage_kind)
-    return await send()
+    result = await send()
+    prompt, completion, _cost = take_callback_usage()
+    add_recorded_tokens(budget, prompt, completion)
+    return result
 
 
 async def construct_lightrag_engine(

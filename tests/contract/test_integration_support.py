@@ -6,7 +6,7 @@ import psycopg
 import pytest
 
 from tests.contract.integration_support import (
-    _local_supabase_runtime_ready,
+    local_supabase_runtime_ready,
     refuse_hosted_destructive_dsn,
     resolve_supabase_db_url,
     try_connect,
@@ -26,7 +26,7 @@ def test_try_connect_treats_incomplete_postgres_as_unreachable() -> None:
         assert try_connect(url) is None
         return
     try:
-        ready = _local_supabase_runtime_ready(raw)
+        ready = local_supabase_runtime_ready(raw)
     finally:
         raw.close()
     wrapped = try_connect(url)

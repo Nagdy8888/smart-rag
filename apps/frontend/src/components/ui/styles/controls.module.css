@@ -49,6 +49,11 @@
   opacity: 0.6;
 }
 
+.buttonPending:disabled {
+  cursor: progress;
+  opacity: 1;
+}
+
 .buttonPrimary {
   background: var(--color-accent);
   color: var(--color-accent-fg);
@@ -102,6 +107,11 @@
   padding: 0;
 }
 
+.iconButton.buttonPending {
+  gap: 0;
+  overflow: hidden;
+}
+
 .buttonWrap {
   display: inline-flex;
   flex-direction: column;
@@ -116,10 +126,30 @@
 .buttonSpinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgb(255 255 255 / 0.35);
+  border: 2px solid rgb(255 255 255 / 0.28);
   border-top-color: currentColor;
+  border-right-color: currentColor;
   border-radius: 50%;
-  animation: ui-spin 0.8s linear infinite;
+  animation: ui-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.iconButton .buttonSpinner {
+  width: 18px;
+  height: 18px;
+  border-width: 2.5px;
+}
+
+.pendingLabelHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .field {
@@ -266,5 +296,13 @@
 @keyframes ui-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buttonSpinner {
+    animation: none;
+    border-color: currentColor;
+    opacity: 0.85;
   }
 }

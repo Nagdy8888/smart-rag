@@ -14,7 +14,9 @@ from smart_rag_core.query_routing.preparation import prepare_query
 from tests.support.query_runtime import authorized_runtime as _runtime
 
 
-def _context(query: str, *, section_coverage_ratio: float | None = None) -> MatrixContext:
+def _context(
+    query: str, *, section_coverage_ratio: float | None = None
+) -> MatrixContext:
     """Build a matrix context for one deterministic preparation.
 
     Args:
