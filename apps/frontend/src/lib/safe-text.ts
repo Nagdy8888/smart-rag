@@ -1,22 +1,56 @@
 /**
  * Untrusted-content helpers. React text nodes already escape HTML; these
- * helpers strip NULs and reject javascript: URLs so citations cannot become
- * XSS vectors in `href`.
+ * helpers strip NULs, invert API `html.escape` entities, and reject
+ * javascript: URLs so citations cannot become XSS vectors in `href`.
  */
 
 const NUL = /\u0000/g;
+const HTML_ESCAPE_ENTITY = /&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos);/g;
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+
+/**
+ * Invert Python `html.escape(..., quote=True)` without using the DOM.
+ *
+ * @param text - API-escaped or raw text.
+ * @returns Text with `&quot;`, `&amp;`, `&lt;`, `&gt;`, and `&#x27;` decoded.
+ */
+export function decodeHtmlEscapeEntities(text: string): string {
+  return text.replace(HTML_ESCAPE_ENTITY, (matched, body: string) => {
+    if (body.startsWith("#")) {
+      const code =
+        body[1] === "x" || body[1] === "X"
+          ? Number.parseInt(body.slice(2), 16)
+          : Number.parseInt(body.slice(1), 10);
+      if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) {
+        return matched;
+      }
+      return String.fromCodePoint(code);
+    }
+    return NAMED_HTML_ENTITIES[body] ?? matched;
+  });
+}
 
 /**
  * Normalize untrusted text for React text nodes.
  *
  * @param value - Model output, filename, entity label, or citation field.
- * @returns NUL-stripped text. Empty when the input is not a string.
+ * @returns NUL-stripped text with API HTML entities decoded. Empty when the
+ *   input is not a string.
+ * @remarks
+ * Security: still render through React text children. Decoding here only
+ * undoes JSON-field HTML escaping so quotes display as quotes.
  */
 export function displayText(value: unknown): string {
   if (typeof value !== "string") {
     return "";
   }
-  return value.replace(NUL, "");
+  return decodeHtmlEscapeEntities(value.replace(NUL, ""));
 }
 
 /**

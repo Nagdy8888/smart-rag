@@ -935,6 +935,25 @@ def rerank_responses_traceable(func: Any) -> Any:
     )(func)
 
 
+def conversation_title_responses_traceable(func: Any) -> Any:
+    """Apply the redacted Responses session-title span decorator.
+
+    Args:
+        func: ``execute_openai_conversation_title`` implementation.
+
+    Returns:
+        Traceable wrapper that hashes prompt and excerpt text and omits
+        API keys.
+    """
+
+    return traceable(
+        name="openai.responses.conversation_title",
+        run_type="llm",
+        process_inputs=redact_openai_call_inputs,
+        process_outputs=redact_rerank_call_outputs,
+    )(func)
+
+
 def general_chat_responses_traceable(func: Any) -> Any:
     """Apply the redacted Responses general-chat span decorator.
 

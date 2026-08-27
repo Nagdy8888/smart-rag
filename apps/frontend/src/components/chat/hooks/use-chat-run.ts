@@ -44,7 +44,9 @@ export type UseChatRunResult = {
   send(text: string): Promise<boolean>;
   reconnect(): Promise<void>;
   cancel(): Promise<void>;
-  resetRun(reason: "new-send" | "conversation-switch" | "sign-out"): void;
+  resetRun(
+    reason: "new-send" | "conversation-switch" | "select-conversation" | "sign-out",
+  ): void;
   setFailure: (failure: ApiFailure | null) => void;
 };
 
@@ -96,7 +98,13 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
   });
 
   const resetRun = useCallback(
-    (reason: "new-send" | "conversation-switch" | "sign-out") => {
+    (
+      reason:
+        | "new-send"
+        | "conversation-switch"
+        | "select-conversation"
+        | "sign-out",
+    ) => {
       abortRef.current?.abort();
       abortRef.current = null;
       clearChatRunPointer();
@@ -104,8 +112,11 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
       idempotencyRef.current = newIdempotencyKey();
       liveRunIdsRef.current.clear();
       setLiveRunCreated(false);
-      if (reason !== "new-send") {
+      if (reason !== "new-send" && reason !== "select-conversation") {
         onConversationId(null);
+        setLastUserMessage("");
+      }
+      if (reason === "select-conversation") {
         setLastUserMessage("");
       }
       setSending(false);

@@ -11,6 +11,7 @@ import { useConversationActions } from "./use-conversation-actions";
 const fetchConversationMessages = vi.fn();
 const fetchConversation = vi.fn();
 const deleteConversation = vi.fn();
+const generateConversationTitle = vi.fn();
 
 vi.mock("../../../lib/api", async () => {
   const actual = await vi.importActual<typeof import("../../../lib/api")>(
@@ -22,6 +23,8 @@ vi.mock("../../../lib/api", async () => {
       fetchConversationMessages(...args),
     fetchConversation: (...args: unknown[]) => fetchConversation(...args),
     deleteConversation: (...args: unknown[]) => deleteConversation(...args),
+    generateConversationTitle: (...args: unknown[]) =>
+      generateConversationTitle(...args),
   };
 });
 
@@ -57,6 +60,59 @@ describe("useConversationActions", () => {
     fetchConversationMessages.mockReset();
     fetchConversation.mockReset();
     deleteConversation.mockReset();
+    generateConversationTitle.mockReset();
+    generateConversationTitle.mockResolvedValue({
+      conversation_id: "conv-a",
+      creator_user_id: "u1",
+      title: "Hello summary",
+      created_at: "2026-08-01T00:00:00Z",
+    });
+  });
+
+  it("selects a session immediately without clearing the current id first", async () => {
+    let resolveFetch: ((value: { conversation_id: string }) => void) | undefined;
+    fetchConversation.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const selected: string[] = [];
+    const beginSelect = vi.fn();
+    const deletedCurrent = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useConversationActions({
+          auth: { accessToken: "jwt-token" },
+          conversationId: "conv-live",
+          keys: sessionQueryKeys("jwt-token"),
+          messagesNextBeforeId: null,
+          onSelect: (id) => {
+            selected.push(id);
+          },
+          onBeginSelect: beginSelect,
+          onDeletedCurrent: deletedCurrent,
+          onFailure: () => undefined,
+          beginPrepend: () => undefined,
+          generation: () => 0,
+        }),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.handleSelectConversation({
+        conversation_id: "conv-a",
+        creator_user_id: "u1",
+        title: "hello from the other side",
+        created_at: "2026-08-01T00:00:00Z",
+      });
+    });
+    expect(beginSelect).toHaveBeenCalledTimes(1);
+    expect(selected).toEqual(["conv-a"]);
+    expect(deletedCurrent).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveFetch?.({ conversation_id: "conv-a" });
+    });
   });
 
   it("ignores a stale A page after switching to B", async () => {
@@ -80,6 +136,7 @@ describe("useConversationActions", () => {
           keys: sessionQueryKeys("jwt-token"),
           messagesNextBeforeId: "cursor-1",
           onSelect: () => undefined,
+          onBeginSelect: () => undefined,
           onDeletedCurrent: () => undefined,
           onFailure: () => undefined,
           beginPrepend: () => undefined,
@@ -127,6 +184,7 @@ describe("useConversationActions", () => {
           keys: sessionQueryKeys("jwt-token"),
           messagesNextBeforeId: "cursor-1",
           onSelect: () => undefined,
+          onBeginSelect: () => undefined,
           onDeletedCurrent: () => undefined,
           onFailure: () => undefined,
           beginPrepend: () => undefined,
@@ -159,6 +217,7 @@ describe("useConversationActions", () => {
           keys: sessionQueryKeys("jwt-token"),
           messagesNextBeforeId: "cursor-1",
           onSelect: () => undefined,
+          onBeginSelect: () => undefined,
           onDeletedCurrent: () => undefined,
           onFailure: () => undefined,
           beginPrepend: () => undefined,
@@ -195,6 +254,7 @@ describe("useConversationActions", () => {
           keys: sessionQueryKeys("jwt-token"),
           messagesNextBeforeId: "cursor-1",
           onSelect: () => undefined,
+          onBeginSelect: () => undefined,
           onDeletedCurrent: () => undefined,
           onFailure: () => undefined,
           beginPrepend: () => undefined,

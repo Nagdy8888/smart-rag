@@ -7,6 +7,8 @@ from typing import Protocol
 from smart_rag_core.gateways.model_types import (
     AnswerModelRequest,
     AnswerModelResponse,
+    ConversationTitleModelRequest,
+    ConversationTitleModelResponse,
     EvalJudgeModelRequest,
     EvalJudgeModelResponse,
     GeneralChatModelRequest,
@@ -90,6 +92,20 @@ class ModelAdapter(Protocol):
 
         Returns:
             Structured general-chat response.
+        """
+
+        ...
+
+    async def generate_conversation_title(
+        self, request: ConversationTitleModelRequest
+    ) -> ConversationTitleModelResponse:
+        """Generate at most one session-title payload.
+
+        Args:
+            request: Validated title request.
+
+        Returns:
+            Structured title response.
         """
 
         ...

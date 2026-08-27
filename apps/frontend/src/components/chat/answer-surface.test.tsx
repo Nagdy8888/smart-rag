@@ -136,6 +136,45 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.queryByTestId("verified-answer-reveal")).not.toBeInTheDocument();
   });
 
+  it("does not treat a pending transcript as a new chat", () => {
+    render(
+      <AnswerSurface
+        messagesPending
+        question=""
+        answer=""
+        citations={[]}
+        terminal={null}
+        hrefForCitation={() => undefined}
+        onSelectCitation={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Loading conversation…")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Ask your company knowledge"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders API-escaped quotes as quotation marks", () => {
+    renderSurface({
+      messages: [
+        {
+          message_id: "m1",
+          role: "assistant",
+          content:
+            "&quot;Hello from the other side&quot; is a popular lyric",
+          created_at: "2026-08-17T00:00:00Z",
+        },
+      ],
+      question: "",
+      answer: "",
+      terminal: null,
+    });
+    expect(
+      screen.getByText('"Hello from the other side" is a popular lyric'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/&quot;/)).not.toBeInTheDocument();
+  });
+
   it("uses the dual-mode empty state", () => {
     render(
       <AnswerSurface

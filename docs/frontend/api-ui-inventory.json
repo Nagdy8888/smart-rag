@@ -26,6 +26,7 @@
     "/conversations",
     "/conversations/{conversation_id}",
     "/conversations/{conversation_id}/messages",
+    "/conversations/{conversation_id}/title",
     "/documents",
     "/documents/uploads",
     "/documents/uploads/finalize",

@@ -30,6 +30,8 @@ import styles from "./chat-transcript.module.css";
 export type AnswerSurfaceProps = {
   /** Persisted messages in ascending order. */
   messages?: ConversationMessage[];
+  /** True while the selected transcript query is in flight. */
+  messagesPending?: boolean;
   /** True when an older page is available. */
   hasEarlier?: boolean;
   /** Load the previous transcript page. */
@@ -169,6 +171,7 @@ function CitationRow({
  */
 export const AnswerSurface = memo(function AnswerSurface({
   messages = [],
+  messagesPending = false,
   hasEarlier = false,
   onLoadEarlier,
   loadingEarlier = false,
@@ -220,6 +223,7 @@ export const AnswerSurface = memo(function AnswerSurface({
     (showProgress || answer !== "") &&
     lastHistAssistant?.content !== answer;
   const empty =
+    !messagesPending &&
     messages.length === 0 &&
     !showLiveUser &&
     !showLiveAssistant &&
@@ -248,6 +252,9 @@ export const AnswerSurface = memo(function AnswerSurface({
             </Button>
           ) : null}
         </LimitationCallout>
+      ) : null}
+      {messagesPending && messages.length === 0 ? (
+        <p className={styles.muted}>Loading conversation…</p>
       ) : null}
       {empty ? (
         <EmptyState

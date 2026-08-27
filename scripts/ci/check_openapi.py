@@ -41,6 +41,7 @@ def main() -> int:
         "/conversations",
         "/conversations/{conversation_id}",
         "/conversations/{conversation_id}/messages",
+        "/conversations/{conversation_id}/title",
         "/runs/{run_id}",
         "/runs/{run_id}/cancel",
         "/runs/{run_id}/citations",

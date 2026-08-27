@@ -20,6 +20,10 @@ OPTIONAL_CATALOG_PROMPT_PATH = (
 )
 SUMMARY_PROMPT_VERSION = "summary_v1"
 SUMMARY_PROMPT_PATH = Path(__file__).resolve().parent / "summary_v1.md"
+CONVERSATION_TITLE_PROMPT_VERSION = "conversation_title_v1"
+CONVERSATION_TITLE_PROMPT_PATH = (
+    Path(__file__).resolve().parent / "conversation_title_v1.md"
+)
 
 
 def query_profile_prompt_text() -> str:
@@ -111,3 +115,16 @@ def summary_prompt_text() -> str:
     """
 
     return SUMMARY_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def conversation_title_prompt_text() -> str:
+    """Return the session-title prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return CONVERSATION_TITLE_PROMPT_PATH.read_text(encoding="utf-8")

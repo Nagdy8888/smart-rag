@@ -53,6 +53,7 @@ export {
   fetchConversation,
   fetchConversationMessages,
   fetchRun,
+  generateConversationTitle,
   listConversations,
 } from "./api/chat";
 export { cancelRun, listCitations, submitFeedback } from "./api/chat-run";

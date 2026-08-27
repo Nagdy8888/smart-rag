@@ -59,8 +59,10 @@
   margin: 0;
   max-width: 72ch;
   min-width: 0;
-  font-size: 14px;
-  line-height: var(--line-height-ar);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

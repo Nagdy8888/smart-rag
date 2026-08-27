@@ -109,7 +109,7 @@ export function useChatQueries(input: UseChatQueriesInput): UseChatQueriesResult
     conversationsPending: conversationsQuery.isPending,
     messages: messagesQuery.data?.items ?? [],
     messagesNextBeforeId: messagesQuery.data?.next_before_id ?? null,
-    messagesPending: messagesQuery.isPending,
+    messagesPending: messagesQuery.isLoading,
     citations: citationsQuery.data ?? [],
     usage: usageQuery.data ?? null,
     meta: metaQuery.data,

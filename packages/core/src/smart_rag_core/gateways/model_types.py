@@ -12,6 +12,9 @@ from smart_rag_core.query_answer.versions import (
     ANSWER_MODEL_ID,
     ANSWER_PROMPT_SHA256,
     ANSWER_PROMPT_VERSION,
+    CONVERSATION_TITLE_MODEL_ID,
+    CONVERSATION_TITLE_PROMPT_SHA256,
+    CONVERSATION_TITLE_PROMPT_VERSION,
     EVAL_JUDGE_MODEL_ID,
     EVAL_JUDGE_PROMPT_SHA256,
     EVAL_JUDGE_PROMPT_VERSION,
@@ -295,6 +298,56 @@ class GeneralChatModelResponse(BaseModel):
     Attributes:
         mode: Adapter mode.
         payload: JSON object with ``answer_text`` and ``status`` only.
+        request_id: Provider or fixture id.
+        input_tokens: Usage input tokens.
+        output_tokens: Usage output tokens.
+        model_calls: Always 1 when this response is returned.
+        retrieval_performed: Always false.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["mock", "openai"]
+    payload: dict[str, object]
+    request_id: str = Field(min_length=1, max_length=128)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    model_calls: Literal[1] = 1
+    retrieval_performed: Literal[False] = False
+
+
+class ConversationTitleModelRequest(BaseModel):
+    """Bounded session-title request. No tools or retrieval.
+
+    Attributes:
+        operation: Must be ``conversation_title``.
+        user_excerpt: First user message. Untrusted.
+        assistant_excerpt: First assistant message. Untrusted. May be empty.
+        prompt_version: Pinned title prompt version.
+        prompt_sha256: Hash of that prompt file.
+        prompt_text: Prompt body used as Responses instructions.
+        model_id: Existing allow-listed answer model.
+        remaining_deadline_seconds: Client timeout bound.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    operation: Literal["conversation_title"] = "conversation_title"
+    user_excerpt: str = Field(min_length=1, max_length=2000)
+    assistant_excerpt: str = Field(default="", max_length=2000)
+    prompt_version: str = CONVERSATION_TITLE_PROMPT_VERSION
+    prompt_sha256: str = CONVERSATION_TITLE_PROMPT_SHA256
+    prompt_text: str = Field(min_length=1, max_length=16_384)
+    model_id: str = CONVERSATION_TITLE_MODEL_ID
+    remaining_deadline_seconds: float = Field(gt=0, le=15)
+
+
+class ConversationTitleModelResponse(BaseModel):
+    """Structured session-title payload plus usage for one operation.
+
+    Attributes:
+        mode: Adapter mode.
+        payload: JSON object with ``title`` only.
         request_id: Provider or fixture id.
         input_tokens: Usage input tokens.
         output_tokens: Usage output tokens.

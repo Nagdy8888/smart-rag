@@ -4,7 +4,7 @@
  * Field names match `docs/api/openapi.foundation.json`.
  */
 
-/** `GET|POST /conversations` item. */
+/** `GET|POST /conversations` and `POST /conversations/{id}/title` item. */
 export type ConversationResponse = {
   conversation_id: string;
   creator_user_id: string;

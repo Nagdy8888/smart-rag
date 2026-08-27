@@ -21,6 +21,7 @@ Runtime v1 uses deterministic mapping; discovery is not retained.
 | `optional_catalog_v1` | 2026-08-16 | Level 0 catalog capabilities and immutable safety rules. No core retrieve tools. |
 | `summary_v1` | 2026-08-16 | Compact conversation summary for LangGraph store. Preferences only; no source copies. Counted as `usage_kind=summary`. |
 | `eval_judge_v1` | 2026-08-20 | One bounded synthetic agent-eval judge call. No retrieval, tools, retry, or holdout/private content. |
+| `conversation_title_v1` | 2026-08-26 | One-line session-rail title. No retrieval, tools, retry, or holdout/private content. |
 
 Related: [QUERY_PROFILE_EVAL.md](../../../../../docs/evaluation/QUERY_PROFILE_EVAL.md) ·
 [COMBINED_FUSION.md](../../../../../docs/agent/COMBINED_FUSION.md) ·

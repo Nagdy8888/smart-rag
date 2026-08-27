@@ -18,6 +18,22 @@ _REASON_PREFIX = "conversation:"
 
 
 @dataclass(frozen=True, slots=True)
+class ConversationTitleSource:
+    """First-turn excerpts used to generate a session title.
+
+    Attributes:
+        current_title: Raw stored title, or None.
+        user_excerpt: Oldest user message, truncated to 2000 characters.
+        assistant_excerpt: Oldest assistant message, truncated to 2000
+            characters. Empty when the first answer is not persisted yet.
+    """
+
+    current_title: str | None
+    user_excerpt: str
+    assistant_excerpt: str
+
+
+@dataclass(frozen=True, slots=True)
 class ConversationRecord:
     """Authorized conversation row.
 
@@ -247,6 +263,110 @@ def get_conversation(
                     caller.rpc_role(),
                     caller.rpc_authorization_version(),
                     conversation_id,
+                ),
+            )
+            row = cursor.fetchone()
+    except psycopg.Error as exc:
+        _raise_conversation(exc)
+    if row is None:
+        raise QueryAdmissionError("not_found")
+    return _conversation_record(row)
+
+
+def get_conversation_title_source(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    conversation_id: UUID,
+) -> ConversationTitleSource:
+    """Load creator-only title excerpts for one conversation.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived identity. Must be the creator.
+        conversation_id: Conversation primary key.
+
+    Returns:
+        Current title plus first user and assistant excerpts.
+
+    Raises:
+        QueryAdmissionError: ``not_found`` for missing, deleted, or foreign
+            conversations.
+    """
+
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT *
+                FROM app.get_conversation_title_source(%s, %s, %s, %s)
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    conversation_id,
+                ),
+            )
+            row = cursor.fetchone()
+    except psycopg.Error as exc:
+        _raise_conversation(exc)
+    if row is None:
+        raise QueryAdmissionError("not_found")
+    if not isinstance(row, dict):
+        raise QueryAdmissionError("not_found")
+    mapped = cast(dict[str, object], row)
+    raw_title = mapped.get("current_title")
+    user_excerpt = mapped.get("user_excerpt")
+    assistant_excerpt = mapped.get("assistant_excerpt")
+    return ConversationTitleSource(
+        current_title=str(raw_title) if raw_title is not None else None,
+        user_excerpt=str(user_excerpt) if user_excerpt is not None else "",
+        assistant_excerpt=(
+            str(assistant_excerpt) if assistant_excerpt is not None else ""
+        ),
+    )
+
+
+def update_conversation_title(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    conversation_id: UUID,
+    title: str,
+) -> ConversationRecord:
+    """Replace the creator-owned conversation title.
+
+    Args:
+        connection: Open ``app_api`` connection. Caller must commit.
+        caller: Server-derived identity. Must be the creator.
+        conversation_id: Conversation primary key.
+        title: Untrusted title. Stored raw; returned escaped.
+
+    Returns:
+        Updated conversation.
+
+    Raises:
+        QueryAdmissionError: ``not_found`` for missing, deleted, or foreign
+            conversations.
+
+    Side Effects:
+        Updates ``app.conversations.title``.
+    """
+
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT *
+                FROM app.update_conversation_title(%s, %s, %s, %s, %s)
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    conversation_id,
+                    title,
                 ),
             )
             row = cursor.fetchone()

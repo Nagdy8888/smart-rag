@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from smart_rag_core.conversations.title import mock_conversation_title_payload
 from smart_rag_core.gateways.model_types import (
     AnswerModelRequest,
     AnswerModelResponse,
+    ConversationTitleModelRequest,
+    ConversationTitleModelResponse,
     EvalJudgeModelRequest,
     EvalJudgeModelResponse,
     GeneralChatModelRequest,
@@ -27,6 +30,8 @@ from smart_rag_core.query_answer.verifier import mock_verifier_payload
 from smart_rag_core.query_answer.versions import (
     ANSWER_PROMPT_SHA256,
     ANSWER_PROMPT_VERSION,
+    CONVERSATION_TITLE_PROMPT_SHA256,
+    CONVERSATION_TITLE_PROMPT_VERSION,
     EVAL_JUDGE_PROMPT_SHA256,
     EVAL_JUDGE_PROMPT_VERSION,
     GENERAL_CHAT_PROMPT_SHA256,
@@ -322,6 +327,42 @@ class MockModelAdapter:
                 "status": fixture.status,
             },
             request_id=f"mock-general-chat-{self._fixture_id}",
+            input_tokens=0,
+            output_tokens=0,
+        )
+
+    async def generate_conversation_title(
+        self, request: ConversationTitleModelRequest
+    ) -> ConversationTitleModelResponse:
+        """Return a fixture session title. No network or retrieval.
+
+        Args:
+            request: Structured title request.
+
+        Returns:
+            Mock payload with ``title`` only.
+
+        Raises:
+            ValueError: If versions or the input bound fail.
+
+        Side Effects:
+            None. No network, retrieval, or tool calls.
+        """
+
+        if (
+            request.prompt_version != CONVERSATION_TITLE_PROMPT_VERSION
+            or request.prompt_sha256 != CONVERSATION_TITLE_PROMPT_SHA256
+        ):
+            raise ValueError("conversation_title_prompt_version_mismatch")
+        joined = request.user_excerpt + request.assistant_excerpt
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        return ConversationTitleModelResponse(
+            mode="mock",
+            payload=mock_conversation_title_payload(request.user_excerpt),
+            request_id=f"mock-conversation-title-{self._fixture_id}",
             input_tokens=0,
             output_tokens=0,
         )

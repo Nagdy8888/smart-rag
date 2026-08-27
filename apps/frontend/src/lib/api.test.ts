@@ -31,6 +31,7 @@ import {
   startOrResumeMessageStream,
   cancelRun,
   deleteConversation,
+  generateConversationTitle,
   deleteDocument,
   DOCUMENT_LIST_PAGE_SIZE,
   fetchMe,
@@ -1354,6 +1355,34 @@ describe("cancelRun", () => {
       status: "cancelled",
       reservation_id: null,
       created_at: null,
+    });
+  });
+});
+
+describe("generateConversationTitle", () => {
+  it("POSTs the title refresh and returns the persisted title", async () => {
+    const fetchImpl: typeof fetch = async (input, init) => {
+      expect(String(input)).toBe(
+        "http://127.0.0.1:8000/conversations/conv-1/title",
+      );
+      expect(init?.method).toBe("POST");
+      return new Response(
+        JSON.stringify({
+          conversation_id: "conv-1",
+          creator_user_id: "u1",
+          title: "Vacation policy",
+          created_at: "2026-08-17T00:00:00Z",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    await expect(
+      generateConversationTitle({ accessToken: "jwt-token" }, "conv-1", fetchImpl),
+    ).resolves.toEqual({
+      conversation_id: "conv-1",
+      creator_user_id: "u1",
+      title: "Vacation policy",
+      created_at: "2026-08-17T00:00:00Z",
     });
   });
 });

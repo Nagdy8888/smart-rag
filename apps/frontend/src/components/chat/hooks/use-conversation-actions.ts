@@ -10,6 +10,7 @@ import {
   deleteConversation,
   fetchConversation,
   fetchConversationMessages,
+  generateConversationTitle,
   isClassifiedApiError,
   type ApiAuth,
   type ApiFailure,
@@ -23,6 +24,8 @@ export type UseConversationActionsInput = {
   keys: ReturnType<typeof sessionQueryKeys>;
   messagesNextBeforeId: string | null;
   onSelect: (id: string) => void;
+  /** Clear the live run without dropping the selected conversation id. */
+  onBeginSelect: () => void;
   onDeletedCurrent: () => void;
   onFailure: (failure: ApiFailure) => void;
   beginPrepend: () => void;
@@ -56,6 +59,7 @@ export function useConversationActions(
     keys,
     messagesNextBeforeId,
     onSelect,
+    onBeginSelect,
     onDeletedCurrent,
     onFailure,
     beginPrepend,
@@ -99,19 +103,41 @@ export function useConversationActions(
       if (auth === null) {
         return;
       }
-      onDeletedCurrent();
+      if (item.conversation_id !== conversationId) {
+        onBeginSelect();
+        onSelect(item.conversation_id);
+      }
       void fetchConversation(auth, item.conversation_id).then(
         (confirmed) => {
-          onSelect(confirmed.conversation_id);
+          void generateConversationTitle(auth, confirmed.conversation_id).then(
+            () => {
+              void queryClient.invalidateQueries({
+                queryKey: keys.conversations,
+              });
+            },
+            () => undefined,
+          );
         },
         (error: unknown) => {
           if (isClassifiedApiError(error)) {
             onFailure(error.failure);
+            if (error.failure.kind === "deleted" || error.failure.kind === "auth") {
+              onDeletedCurrent();
+            }
           }
         },
       );
     },
-    [auth, onDeletedCurrent, onFailure, onSelect],
+    [
+      auth,
+      conversationId,
+      keys.conversations,
+      onBeginSelect,
+      onDeletedCurrent,
+      onFailure,
+      onSelect,
+      queryClient,
+    ],
   );
 
   const olderMessages =

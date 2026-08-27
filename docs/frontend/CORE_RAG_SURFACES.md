@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -41,7 +41,7 @@ Related: [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh
 | `/graph` | Search → chips → Inspect graph; list-first plus optional React Flow |
 | `/tables` | Manifests + guided `TableQueryPlan` builder, display-only sort, cell provenance |
 
-Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). Tables live under `apps/frontend/src/components/tables/` (`tables-app.tsx`). Graph lives under `apps/frontend/src/components/graph/` (`graph-explorer.tsx`): search hits become chips; Inspect graph POSTs `/graph/inspect`. List is the default accessible view. Canvas is optional `@xyflow/react`. There is no custom SVG neighborhood and no relationship editor. List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations`, `GET /conversations/{id}`, and creator-only `GET /conversations/{id}/messages` (newest-first keyset, rendered oldest-first; “Load earlier messages” when `next_before_id` is set). Prompt chips fill the composer only; verified `token_delta` arrives after the status line (Preparing/Retrieving/Generating/Verifying); sources open in a drawer. Draft state lives in the composer so typing does not re-render the rail. `/ops/ready` is fetched only for owner/admin; `ReadinessIndicator` owns the 15s poll. There is no `app/admin`
+Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). Tables live under `apps/frontend/src/components/tables/` (`tables-app.tsx`). Graph lives under `apps/frontend/src/components/graph/` (`graph-explorer.tsx`): search hits become chips; Inspect graph POSTs `/graph/inspect`. List is the default accessible view. Canvas is optional `@xyflow/react`. There is no custom SVG neighborhood and no relationship editor. List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations`, `GET /conversations/{id}`, creator-only `GET /conversations/{id}/messages` (newest-first keyset, rendered oldest-first; “Load earlier messages” when `next_before_id` is set), and `POST /conversations/{id}/title` for LLM session titles. Prompt chips fill the composer only; verified `token_delta` arrives after the status line (Preparing/Retrieving/Generating/Verifying); sources open in a drawer. Draft state lives in the composer so typing does not re-render the rail. `/ops/ready` is fetched only for owner/admin; `ReadinessIndicator` owns the 15s poll. There is no `app/admin`
 folder. Team, tools, curation, usage, and profile are packet 4 native
 routes in [ADMINISTRATION.md](./ADMINISTRATION.md). Nav uses Next.js
 `Link`. `aria-current` follows the pathname. Nav is not authorization.

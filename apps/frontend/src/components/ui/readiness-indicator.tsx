@@ -41,13 +41,19 @@ export function ReadinessIndicator() {
     resolved === null || resolved === undefined ? [] : readinessCapabilities(resolved);
 
   return (
-    <span data-action-id="shell.readiness" data-testid="shell-readiness">
+    <span
+      className={styles.readinessControl}
+      data-action-id="shell.readiness"
+      data-testid="shell-readiness"
+    >
       <Popover
         label="Service readiness"
         actionId="shell.readiness"
         trigger={
           <>
-            <StatusPill status={headline} tone={TONE[headline]} />
+            <span className={styles.readinessChip}>
+              <StatusPill status={headline} tone={TONE[headline]} />
+            </span>
             <span className={styles.srOnly}>Service readiness: {headline}</span>
           </>
         }

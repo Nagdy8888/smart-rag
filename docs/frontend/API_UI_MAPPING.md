@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-08-26
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -143,7 +143,7 @@ Production UI shows these codes, never exception text.
 
 ## FastAPI path inventory
 
-Authoritative snapshot: `docs/api/openapi.foundation.json` (44 paths).
+Authoritative snapshot: `docs/api/openapi.foundation.json` (45 paths).
 Roles: `owner` \| `admin` \| `member` \| `viewer` from `GET /me`.
 
 ### Public
@@ -199,6 +199,7 @@ source-preview/download HTTP route.
 | DELETE | `/conversations/{conversation_id}` | **204**; foreign/tombstone **404**; immediate purge |
 | POST | `/conversations/{conversation_id}/messages` | handshake + admit; **requires** Idempotency-Key or body key |
 | GET | `/conversations/{conversation_id}/messages` | creator-only transcript; `limit` 1–100 default 50; `before` keyset; 200 `{items, next_before_id}`; foreign/deleted **404** |
+| POST | `/conversations/{conversation_id}/title` | creator-only LLM session title; 200 same shape as GET conversation; no-op when title is already a summary; foreign/deleted **404** |
 | GET | `/runs/{run_id}` | creator only; IDOR 404 |
 | POST | `/runs/{run_id}/cancel` | creator |
 | GET | `/runs/{run_id}/events` | Bearer SSE resume |
@@ -389,6 +390,7 @@ where listed.
 | F List | conversations | `GET /conversations` | creator | n/a |
 | F Transcript | earlier messages | `GET /conversations/{id}/messages` | creator; 404 otherwise | `limit`/`before` keyset |
 | F New | title optional | `POST /conversations` | creator | COST_MUTATION |
+| F Title | LLM summary | `POST /conversations/{conversation_id}/title` | creator; 404 otherwise | COST_MUTATION; skip when title is already a summary |
 | F Delete | delete | `DELETE /conversations/{id}` | creator or owner/admin; 204/404 | n/a |
 | F Handshake | version | `GET /api/meta` then `X-Client-Version` | public then paid POST | 426 blocks reserve |
 | F Send | message | `POST .../messages` body `message` | creator | `Idempotency-Key` |

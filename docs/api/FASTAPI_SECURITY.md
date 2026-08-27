@@ -70,6 +70,7 @@ keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGA
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
 | DELETE | `/conversations/{id}` | creator or owner/admin | **204**; foreign/tombstoned **404** | Immediate purge; see [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) |
 | GET | `/conversations/{id}/messages` | creator | `app.list_conversation_messages` | `limit` default 50 max 100; `before` UUID keyset. 200 `{items:[{message_id, role, content, created_at}], next_before_id}`. Roles `user`/`assistant` only. Full content, HTML-escaped. Foreign/deleted/missing → generic **404** `not_found`. LOW_RISK_READ. |
+| POST | `/conversations/{id}/title` | creator | `app.get_conversation_title_source` then optional `app.update_conversation_title` | COST_MUTATION. One bounded `conversation_title_v1` call while the stored title is still the first-prompt fallback. Model failure keeps the fallback. Same generic **404** as GET. See [ADR-llm-conversation-titles.md](../adr/ADR-llm-conversation-titles.md). |
 | POST | `/conversations/{id}/messages` | creator | handshake then idempotent Auto admit **composite** | **Requires** `Idempotency-Key` header or body `idempotency_key` (400 if missing). JSON Accept → 202 `{run_id, stream_path}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) |
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
 | POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |

@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { useChatRun } from "./use-chat-run";
 
 /**
@@ -21,12 +21,13 @@ function wrapper({ children }: { children: ReactNode }) {
 
 describe("useChatRun", () => {
   it("resets local run state without inventing a terminal", () => {
+    const onConversationId = vi.fn();
     const { result } = renderHook(
       () =>
         useChatRun({
           auth: { accessToken: "jwt-token" },
           conversationId: "conv-1",
-          onConversationId: () => undefined,
+          onConversationId,
           handshake: {
             allowPaidPost: true,
             kind: "ok",
@@ -49,5 +50,36 @@ describe("useChatRun", () => {
     });
     expect(result.current.chat.terminal).toBeNull();
     expect(result.current.sending).toBe(false);
+    expect(onConversationId).toHaveBeenCalledWith(null);
+  });
+
+  it("keeps the conversation id when selecting another session", () => {
+    const onConversationId = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useChatRun({
+          auth: { accessToken: "jwt-token" },
+          conversationId: "conv-1",
+          onConversationId,
+          handshake: {
+            allowPaidPost: true,
+            kind: "ok",
+            minClientVersion: "0.1.0",
+            sseSchemaVersion: "1",
+          },
+          ready: {
+            status: "ok",
+            query_ready: true,
+            detail: "ready",
+            rate_limit_degraded: false,
+            dependencies: [],
+          },
+        }),
+      { wrapper },
+    );
+    act(() => {
+      result.current.resetRun("select-conversation");
+    });
+    expect(onConversationId).not.toHaveBeenCalled();
   });
 });

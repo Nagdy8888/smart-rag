@@ -11,6 +11,8 @@ from smart_rag_core.gateways.model_types import (
     OPENAI_API_HOST,
     AnswerModelRequest,
     AnswerModelResponse,
+    ConversationTitleModelRequest,
+    ConversationTitleModelResponse,
     EvalJudgeModelRequest,
     EvalJudgeModelResponse,
     GeneralChatModelRequest,
@@ -34,6 +36,9 @@ from smart_rag_core.gateways.openai_answer import (
     execute_openai_eval_judge,
     execute_openai_verifier,
 )
+from smart_rag_core.gateways.openai_conversation_title import (
+    execute_openai_conversation_title,
+)
 from smart_rag_core.gateways.openai_general_chat import execute_openai_general_chat
 from smart_rag_core.gateways.openai_lightrag import execute_openai_lightrag_llm
 from smart_rag_core.gateways.openai_profile import execute_openai_query_profile
@@ -43,6 +48,8 @@ __all__ = [
     "OPENAI_API_HOST",
     "AnswerModelRequest",
     "AnswerModelResponse",
+    "ConversationTitleModelRequest",
+    "ConversationTitleModelResponse",
     "EvalJudgeModelRequest",
     "EvalJudgeModelResponse",
     "GeneralChatModelRequest",
@@ -66,6 +73,7 @@ __all__ = [
     "block_openai_network",
     "create_model_gateway",
     "execute_openai_answer",
+    "execute_openai_conversation_title",
     "execute_openai_eval_judge",
     "execute_openai_general_chat",
     "execute_openai_lightrag_llm",

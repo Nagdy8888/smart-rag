@@ -5,6 +5,8 @@ from __future__ import annotations
 from smart_rag_core.gateways.model_types import (
     AnswerModelRequest,
     AnswerModelResponse,
+    ConversationTitleModelRequest,
+    ConversationTitleModelResponse,
     EvalJudgeModelRequest,
     EvalJudgeModelResponse,
     GeneralChatModelRequest,
@@ -26,6 +28,9 @@ from smart_rag_core.gateways.openai_answer import (
     execute_openai_answer,
     execute_openai_eval_judge,
     execute_openai_verifier,
+)
+from smart_rag_core.gateways.openai_conversation_title import (
+    execute_openai_conversation_title,
 )
 from smart_rag_core.gateways.openai_general_chat import execute_openai_general_chat
 from smart_rag_core.gateways.openai_lightrag import execute_openai_lightrag_llm
@@ -233,6 +238,50 @@ class OpenAIRerankAdapter:
             timeout_seconds=request.remaining_deadline_seconds,
         )
         return GeneralChatModelResponse(
+            mode="openai",
+            payload=payload,
+            request_id=request_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+    async def generate_conversation_title(
+        self, request: ConversationTitleModelRequest
+    ) -> ConversationTitleModelResponse:
+        """Execute one Responses session-title operation.
+
+        Args:
+            request: Bounded title request.
+
+        Returns:
+            Provider JSON payload plus usage.
+
+        Raises:
+            OpenAIAnswerError: Typed provider failure.
+            ValueError: Input bound errors.
+
+        Side Effects:
+            One HTTPS call with ``max_retries=0`` and ``store=False``.
+        """
+
+        joined = request.user_excerpt + request.assistant_excerpt
+        if len(joined) > self._max_input_chars:
+            raise ValueError(
+                f"Model input exceeds configured {self._max_input_chars}-character bound"
+            )
+        payload, request_id, input_tokens, output_tokens = (
+            execute_openai_conversation_title(
+                api_key=self._api_key,
+                prompt_text=request.prompt_text,
+                prompt_sha256=request.prompt_sha256,
+                prompt_version=request.prompt_version,
+                model_id=request.model_id,
+                user_excerpt=request.user_excerpt,
+                assistant_excerpt=request.assistant_excerpt,
+                timeout_seconds=request.remaining_deadline_seconds,
+            )
+        )
+        return ConversationTitleModelResponse(
             mode="openai",
             payload=payload,
             request_id=request_id,

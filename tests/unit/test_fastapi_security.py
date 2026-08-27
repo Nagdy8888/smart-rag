@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 from smart_rag_api.auth_admin.invitations import CreatedInvitation
-from smart_rag_api.dependencies.services import get_postgres_url
+from smart_rag_api.dependencies.services import get_model_gateway, get_postgres_url
 from smart_rag_api.main import create_app
 from smart_rag_api.routers.auth_team import get_auth_team_service
 from smart_rag_api.routers.conversations import (
@@ -218,6 +218,32 @@ class _FakeConversationService:
 
         del caller, conversation_id
 
+    async def generate_title(
+        self,
+        caller: CallerContext,
+        *,
+        conversation_id: UUID,
+        gateway: object,
+    ) -> ConversationRecord:
+        """Return an escaped LLM-style title for HTTP tests.
+
+        Args:
+            caller: Authenticated caller.
+            conversation_id: Conversation id.
+            gateway: Unused gateway stand-in.
+
+        Returns:
+            Record with a compact escaped title.
+        """
+
+        del gateway
+        return ConversationRecord(
+            conversation_id=conversation_id,
+            creator_user_id=UUID(caller.user_id),
+            title=isolate_untrusted_text("Policy summary"),
+            created_at=datetime.now(tz=UTC),
+        )
+
 
 class _FakeQueryRunService:
     """Admission stand-in that never opens Postgres."""
@@ -408,6 +434,36 @@ def test_html_in_conversation_title_is_escaped_json(
     assert "<script>" not in title
     assert "&lt;script&gt;" in title
     assert raw_title not in response.text
+
+
+def test_generate_conversation_title_returns_escaped_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``POST /conversations/{id}/title`` returns the persisted title."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    monkeypatch.setattr(
+        "smart_rag_api.routers.conversations.enforce_rate_limit",
+        _noop_rate_limit,
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_conversation_service] = lambda: (
+        _FakeConversationService()
+    )
+    application.dependency_overrides[get_model_gateway] = lambda: object()
+    conversation_id = uuid4()
+    with TestClient(application) as raw:
+        client = as_openapi_client(raw)
+        response = client.post(
+            f"/conversations/{conversation_id}/title",
+            headers=_identity(_OWNER, "owner"),
+        )
+    assert response.status_code == 200
+    payload = json_object(response.json())
+    assert payload["conversation_id"] == str(conversation_id)
+    assert payload["title"] == "Policy summary"
 
 
 def test_schema_extra_fields_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:

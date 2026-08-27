@@ -96,9 +96,7 @@ export function ChatApp() {
     reducedMotion,
   });
   const resetRun = run.resetRun;
-  const resetSession = useCallback(() => {
-    resetRun("conversation-switch");
-  }, [resetRun]);
+  const resetSession = useCallback(() => resetRun("conversation-switch"), [resetRun]);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const scroll = useConversationScroll({
     conversationId: selection.conversationId,
@@ -111,6 +109,7 @@ export function ChatApp() {
     keys: queries.keys,
     messagesNextBeforeId: liveQueries.messagesNextBeforeId,
     onSelect: selection.setConversationId,
+    onBeginSelect: () => resetRun("select-conversation"),
     onDeletedCurrent: resetSession,
     onFailure: run.setFailure,
     beginPrepend: scroll.beginPrepend,
@@ -235,6 +234,7 @@ export function ChatApp() {
             chat={run.chat}
             run={run}
             historyMessages={historyMessages}
+            messagesPending={liveQueries.messagesPending}
             nextBeforeId={actions.nextBeforeId}
             loadingEarlier={actions.loadingEarlier}
             earlierError={actions.earlierError}

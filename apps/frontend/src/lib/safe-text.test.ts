@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { displayText, formatProvenance, isSafeHttpUrl } from "./safe-text";
+import {
+  decodeHtmlEscapeEntities,
+  displayText,
+  formatProvenance,
+  isSafeHttpUrl,
+} from "./safe-text";
 
 describe("displayText", () => {
   it("strips NUL bytes from XSS payloads", () => {
@@ -8,6 +13,20 @@ describe("displayText", () => {
 
   it("returns empty for non-strings", () => {
     expect(displayText({ html: "<img>" })).toBe("");
+  });
+
+  it("shows API-escaped quotes as real quotation marks", () => {
+    expect(
+      displayText("&quot;Hello from the other side&quot; is a lyric"),
+    ).toBe('"Hello from the other side" is a lyric');
+  });
+});
+
+describe("decodeHtmlEscapeEntities", () => {
+  it("inverts Python html.escape quote=True output", () => {
+    expect(decodeHtmlEscapeEntities("&lt;script&gt;")).toBe("<script>");
+    expect(decodeHtmlEscapeEntities("it&#x27;s")).toBe("it's");
+    expect(decodeHtmlEscapeEntities("&amp;quot;")).toBe("&quot;");
   });
 });
 

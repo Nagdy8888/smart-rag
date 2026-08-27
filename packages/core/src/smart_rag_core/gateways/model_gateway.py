@@ -13,6 +13,8 @@ from smart_rag_core.gateways.model_types import (
     OPENAI_API_HOST,
     AnswerModelRequest,
     AnswerModelResponse,
+    ConversationTitleModelRequest,
+    ConversationTitleModelResponse,
     EvalJudgeModelRequest,
     EvalJudgeModelResponse,
     GeneralChatModelRequest,
@@ -139,6 +141,25 @@ class ModelGateway:
         """
 
         return await self._adapter.generate_general_chat(request)
+
+    @model_call_traceable(name="model.conversation_title")
+    async def generate_conversation_title(
+        self, request: ConversationTitleModelRequest
+    ) -> ConversationTitleModelResponse:
+        """Delegate one session-title request. Never a hidden retry.
+
+        Args:
+            request: Bounded title request.
+
+        Returns:
+            Structured title response plus usage.
+
+        Raises:
+            ModelGatewayUnavailableError: If the adapter is unavailable.
+            ValueError: If a deployable bound is exceeded.
+        """
+
+        return await self._adapter.generate_conversation_title(request)
 
     @model_call_traceable(name="model.verifier")
     async def generate_verifier(

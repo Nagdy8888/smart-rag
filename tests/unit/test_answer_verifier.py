@@ -24,6 +24,7 @@ from smart_rag_core.query_answer.verifier import (
 from smart_rag_core.query_answer.versions import (
     ANSWER_PROMPT_SHA256,
     ANSWER_PROMPT_VERSION,
+    CONVERSATION_TITLE_PROMPT_SHA256,
     GENERAL_CHAT_PROMPT_SHA256,
     GENERAL_CHAT_PROMPT_VERSION,
     MAX_VERIFIER_LINKS,
@@ -56,6 +57,9 @@ def test_answer_and_verifier_prompt_hashes() -> None:
     assert ANSWER_PROMPT_SHA256 == _prompt_digest("answer_v1.md")
     assert VERIFIER_PROMPT_SHA256 == _prompt_digest("verifier_v1.md")
     assert GENERAL_CHAT_PROMPT_SHA256 == _prompt_digest("general_chat_v1.md")
+    assert CONVERSATION_TITLE_PROMPT_SHA256 == _prompt_digest(
+        "conversation_title_v1.md"
+    )
 
 
 def test_unsupported_link_is_removed_not_softened() -> None:

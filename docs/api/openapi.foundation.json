@@ -5109,7 +5109,7 @@
     },
     "/api/meta": {
       "get": {
-        "description": "Publish version handshake fields. Packet 6 owns enforcement.\n\nArgs:\n    request: Request with settings.\n\nReturns:\n    api_version, sse_schema_version, min_client_version.",
+        "description": "Publish version handshake fields. Packet 6 owns enforcement.\n\nThis handler is async so a full sync thread pool cannot stall the\nAsk compatibility handshake.\n\nArgs:\n    request: Request with settings.\n\nReturns:\n    api_version, sse_schema_version, min_client_version.",
         "operationId": "api_meta_api_meta_get",
         "responses": {
           "200": {
@@ -5703,7 +5703,7 @@
     },
     "/conversations/{conversation_id}/messages": {
       "get": {
-        "description": "List creator-owned user and assistant messages, newest first.\n\nAuthorization is creator-only. Missing, deleted, and foreign\nconversations return the same generic 404 as ``GET /conversations/{id}``.\nPagination is a keyset on ``before`` (a previous page's last\n``message_id``). ``limit`` is bounded to 1\u2013100; the SQL RPC also clamps\nto 100. ``next_before_id`` is set only when the page is full.\n\nArgs:\n    request: Active request for rate limits.\n    conversation_id: Conversation the caller must own.\n    caller: Authenticated caller.\n    service: Injected transcript service.\n    limit: Page size, default 50, maximum 100.\n    before: Optional keyset cursor from a prior ``next_before_id``.\n\nReturns:\n    Newest-first page of escaped message records.\n\nRaises:\n    HTTPException: 404 for missing, tombstoned, or foreign conversations.",
+        "description": "List creator-owned user and assistant messages, newest first.\n\nAuthorization is creator-only. Missing, deleted, and foreign\nconversations return the same generic 404 as ``GET /conversations/{id}``.\nPagination is a keyset on ``before`` (a previous page's last\n``message_id``). ``limit`` is bounded to 1-100; the SQL RPC also clamps\nto 100. ``next_before_id`` is set only when the page is full.\n\nArgs:\n    request: Active request for rate limits.\n    conversation_id: Conversation the caller must own.\n    caller: Authenticated caller.\n    service: Injected transcript service.\n    limit: Page size, default 50, maximum 100.\n    before: Optional keyset cursor from a prior ``next_before_id``.\n\nReturns:\n    Newest-first page of escaped message records.\n\nRaises:\n    HTTPException: 404 for missing, tombstoned, or foreign conversations.",
         "operationId": "list_conversation_messages_route_conversations__conversation_id__messages_get",
         "parameters": [
           {
@@ -6079,6 +6079,146 @@
           }
         },
         "summary": "Submit Message Route",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/conversations/{conversation_id}/title": {
+      "post": {
+        "description": "Fill the session title with an LLM summary when it is still a fallback.\n\nCreator-only. Missing, deleted, and foreign conversations return the same\ngeneric 404 as ``GET /conversations/{id}``. When the stored title already\ndiffers from the first-prompt fallback, the existing title is returned\nwithout a model call. Model failures keep the fallback title.\n\nArgs:\n    request: Active request for rate limits.\n    conversation_id: Conversation the caller must own.\n    caller: Authenticated caller.\n    service: Injected conversation service.\n    gateway: Process model gateway.\n\nReturns:\n    Conversation with the persisted title.\n\nRaises:\n    HTTPException: 404 for missing, tombstoned, or foreign conversations.",
+        "operationId": "generate_conversation_title_route_conversations__conversation_id__title_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Conversation Title Route",
         "tags": [
           "chat"
         ]
@@ -7097,7 +7237,7 @@
     },
     "/health/live": {
       "get": {
-        "description": "Process liveness. Does not probe dependencies.\n\nReturns:\n    ``status=live``.",
+        "description": "Process liveness. Does not probe dependencies.\n\nThis handler is async so it stays on the event loop. Sync readiness\nprobes must not fill the default thread pool and hide liveness.\n\nReturns:\n    ``status=live``.",
         "operationId": "live_health_live_get",
         "responses": {
           "200": {

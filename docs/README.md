@@ -24,9 +24,9 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-08-26 | frontend, reviewers |
 | [runbooks/managed-auth-totp-residue.md](./runbooks/managed-auth-totp-residue.md) | engineering-lead | accepted | 2026-08-24 | ops, security |
 | [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-08-26 | eng, frontend, security |
-| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-08-25 | eng, frontend |
+| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-08-26 | eng, frontend |
 | [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-08-24 | eng, frontend, security |
-| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-08-25 | eng, frontend |
+| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-08-26 | eng, frontend |
 | [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_STATES.md](./frontend/STITCH_STATES.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_A11Y_SECURITY.md](./frontend/STITCH_A11Y_SECURITY.md) | engineering-lead | draft | 2026-08-17 | frontend, security |
@@ -117,6 +117,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-ink-indigo-visual-refresh.md](./adr/ADR-ink-indigo-visual-refresh.md) | engineering-lead | accepted | 2026-08-25 | frontend, eng, reviewers |
 | [adr/ADR-general-chat-strict-split.md](./adr/ADR-general-chat-strict-split.md) | engineering-lead | accepted | 2026-08-26 | frontend, eng, security, reviewers |
 | [adr/ADR-local-langsmith-export-io.md](./adr/ADR-local-langsmith-export-io.md) | engineering-lead | accepted | 2026-08-26 | eng, security |
+| [adr/ADR-llm-conversation-titles.md](./adr/ADR-llm-conversation-titles.md) | engineering-lead | accepted | 2026-08-26 | frontend, eng, security |
 | [runbooks/phase10-staging-secrets.md](./runbooks/phase10-staging-secrets.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [adr/ADR-paradedb-edition-availability.md](./adr/ADR-paradedb-edition-availability.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [adr/ADR-private-service-tls.md](./adr/ADR-private-service-tls.md) | engineering-lead | accepted | 2026-08-18 | eng, security |

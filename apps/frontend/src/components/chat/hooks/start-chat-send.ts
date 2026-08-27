@@ -5,6 +5,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createConversation,
+  generateConversationTitle,
   isClassifiedApiError,
   startOrResumeMessageStream,
   type ApiAuth,
@@ -172,9 +173,26 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
           idempotencyKey: deps.idempotencyRef.current as string,
         }));
         if (activeConversationId !== null) {
-          void deps.queryClient.invalidateQueries({
-            queryKey: deps.keys.conversationMessages(activeConversationId),
-          });
+          const titledConversationId = activeConversationId;
+          const titleAuth = deps.auth;
+          void deps.queryClient
+            .invalidateQueries({
+              queryKey: deps.keys.conversationMessages(titledConversationId),
+            })
+            .then(async () => {
+              if (
+                (current.terminal !== "completed" &&
+                  current.terminal !== "partial") ||
+                titleAuth === null
+              ) {
+                return;
+              }
+              await generateConversationTitle(titleAuth, titledConversationId);
+              await deps.queryClient.invalidateQueries({
+                queryKey: deps.keys.conversations,
+              });
+            })
+            .catch(() => undefined);
         }
       } else if (!controller.signal.aborted) {
         deps.setDisconnected(true);

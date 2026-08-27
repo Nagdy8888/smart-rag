@@ -152,6 +152,43 @@ export async function fetchRun(
 }
 
 /**
+ * Ask the API to replace a first-prompt fallback with an LLM session title.
+ *
+ * @param auth - Access token.
+ * @param conversationId - Conversation UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Conversation with the persisted title.
+ * @throws ClassifiedApiError on non-OK responses.
+ */
+export async function generateConversationTitle(
+  auth: ApiAuth,
+  conversationId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ConversationResponse> {
+  const response = await fetchImpl(
+    apiUrl(`/conversations/${conversationId}/title`),
+    {
+      method: "POST",
+      headers: paidMutationHeaders(auth),
+    },
+  );
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  return {
+    conversation_id: String(body.conversation_id ?? ""),
+    creator_user_id: String(body.creator_user_id ?? ""),
+    title:
+      body.title === null || body.title === undefined
+        ? null
+        : String(body.title),
+    created_at:
+      body.created_at === null || body.created_at === undefined
+        ? null
+        : String(body.created_at),
+  };
+}
+
+/**
  * Tombstone and purge one conversation.
  *
  * @param auth - Access token.

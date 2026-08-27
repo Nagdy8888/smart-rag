@@ -87,7 +87,7 @@ where they disagree.
 - At `>=1280px`: 280px Sessions rail and `minmax(0, 1fr)` main workspace. A 28px icon-only “Collapse sessions” control narrows the rail to a 52px strip. The rail width follows that column so “Expand sessions” stays visible inside the strip, not under the answer pane. “Expand sessions” restores the same mounted list. The choice is stored in `localStorage`.
 - At `<1280px`: the desktop Sessions rail is omitted from the workspace grid. Sessions open in a left Sheet. Composer card is full-width with 12px margins; hint text is hidden; transcript uses 16px padding.
 - Transcript column is centered at `max-width: 760px`. Opening a session loads `GET /conversations/{id}/messages` (newest 50, rendered oldest-first). “Load earlier messages” prepends the previous page when `next_before_id` is set.
-- The Message field opts out of the 520px form-field cap. Session titles come from the first question on `POST /conversations`. Null titles render exactly “Untitled chat”. There is no title-update or LLM-title contract.
+- The Message field opts out of the 520px form-field cap. New sessions store a first-question fallback on `POST /conversations`. After the first completed or partial turn, and when the creator re-opens a fallback-titled thread, `POST /conversations/{id}/title` replaces that fallback with an LLM summary. Null titles render exactly “Untitled chat”. See [ADR-llm-conversation-titles.md](../adr/ADR-llm-conversation-titles.md).
 - There is no permanent right sources/diagnostics column and no permanent 4-step stepper.
 
 ```mermaid

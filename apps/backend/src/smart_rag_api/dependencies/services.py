@@ -6,6 +6,7 @@ import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
+from smart_rag_core.gateways.model import ModelGateway
 from smart_rag_core.runtime.valkey import ValkeyClient
 from smart_rag_core.settings import BackendSettings
 from smart_rag_core.sse.catalog import HEARTBEAT_INTERVAL_SECONDS
@@ -62,6 +63,28 @@ def require_postgres_url(settings: BackendSettings) -> str:
             detail="database_unconfigured",
         )
     return settings.supabase_db_url.get_secret_value()
+
+
+def get_model_gateway(request: Request) -> ModelGateway:
+    """Return the lifespan model gateway.
+
+    Args:
+        request: Active request.
+
+    Returns:
+        Process model gateway.
+
+    Raises:
+        HTTPException: 503 when the gateway was not bound.
+    """
+
+    gateway = getattr(request.app.state, "model_gateway", None)
+    if not isinstance(gateway, ModelGateway):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="model_gateway_unconfigured",
+        )
+    return gateway
 
 
 def get_postgres_url(

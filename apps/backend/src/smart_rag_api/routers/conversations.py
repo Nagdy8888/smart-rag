@@ -16,11 +16,13 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse, StreamingResponse
+from smart_rag_core.gateways.model import ModelGateway
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 
 from smart_rag_api.dependencies.identity import CallerContextDep
 from smart_rag_api.dependencies.services import (
     enforce_rate_limit,
+    get_model_gateway,
     get_postgres_url,
     get_sse_stream_service,
     get_valkey_limits_client,
@@ -210,6 +212,60 @@ def get_conversation_route(
     )
     try:
         record = service.get(caller, conversation_id=conversation_id)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    return ConversationResponse(
+        conversation_id=record.conversation_id,
+        creator_user_id=record.creator_user_id,
+        title=record.title,
+        created_at=record.created_at,
+    )
+
+
+@router.post(
+    "/{conversation_id}/title",
+    response_model=ConversationResponse,
+)
+async def generate_conversation_title_route(
+    request: Request,
+    conversation_id: UUID,
+    caller: CallerContextDep,
+    service: Annotated[ConversationService, Depends(get_conversation_service)],
+    gateway: Annotated[ModelGateway, Depends(get_model_gateway)],
+) -> ConversationResponse:
+    """Fill the session title with an LLM summary when it is still a fallback.
+
+    Creator-only. Missing, deleted, and foreign conversations return the same
+    generic 404 as ``GET /conversations/{id}``. When the stored title already
+    differs from the first-prompt fallback, the existing title is returned
+    without a model call. Model failures keep the fallback title.
+
+    Args:
+        request: Active request for rate limits.
+        conversation_id: Conversation the caller must own.
+        caller: Authenticated caller.
+        service: Injected conversation service.
+        gateway: Process model gateway.
+
+    Returns:
+        Conversation with the persisted title.
+
+    Raises:
+        HTTPException: 404 for missing, tombstoned, or foreign conversations.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"chat-start:{caller.user_id}",
+        kind=RateLimitKind.COST_MUTATION,
+        max_attempts=20,
+    )
+    try:
+        record = await service.generate_title(
+            caller,
+            conversation_id=conversation_id,
+            gateway=gateway,
+        )
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
     return ConversationResponse(

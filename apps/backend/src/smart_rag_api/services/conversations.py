@@ -5,12 +5,31 @@ from __future__ import annotations
 from uuid import UUID
 
 import psycopg
+from smart_rag_agents.prompts import conversation_title_prompt_text
 from smart_rag_core.conversations import (
     ConversationRecord,
     create_conversation,
     delete_conversation,
     get_conversation,
+    get_conversation_title_source,
     list_conversations,
+    update_conversation_title,
+)
+from smart_rag_core.conversations.title import (
+    compact_conversation_title,
+    needs_llm_conversation_title,
+    title_generation_excerpt,
+)
+from smart_rag_core.gateways.model import (
+    ConversationTitleModelRequest,
+    ModelGateway,
+    ModelGatewayUnavailableError,
+)
+from smart_rag_core.gateways.openai_answer import OpenAIAnswerError
+from smart_rag_core.query_answer.versions import (
+    CONVERSATION_TITLE_MODEL_ID,
+    CONVERSATION_TITLE_PROMPT_SHA256,
+    CONVERSATION_TITLE_PROMPT_VERSION,
 )
 from smart_rag_core.security.identity import CallerContext
 
@@ -126,3 +145,82 @@ class ConversationService:
                 connection, caller=caller, conversation_id=conversation_id
             )
             connection.commit()
+
+    async def generate_title(
+        self,
+        caller: CallerContext,
+        *,
+        conversation_id: UUID,
+        gateway: ModelGateway,
+    ) -> ConversationRecord:
+        """Fill the session title from a bounded LLM summary when needed.
+
+        Args:
+            caller: Authenticated creator.
+            conversation_id: Conversation id.
+            gateway: Process model gateway.
+
+        Returns:
+            Conversation with the persisted title. On model failure the
+            existing fallback title is kept.
+
+        Raises:
+            QueryAdmissionError: ``not_found`` when missing, deleted, or
+                foreign.
+
+        Side Effects:
+            May call the model gateway once and update
+            ``app.conversations.title``. Failure keeps the prior title.
+        """
+
+        with psycopg.connect(self._postgres_url) as connection:
+            connection.execute("SET ROLE app_api")
+            source = get_conversation_title_source(
+                connection, caller=caller, conversation_id=conversation_id
+            )
+            current = get_conversation(
+                connection, caller=caller, conversation_id=conversation_id
+            )
+        excerpt = title_generation_excerpt(
+            source.current_title, source.user_excerpt
+        )
+        if excerpt == "":
+            return current
+        if not needs_llm_conversation_title(source.current_title, excerpt):
+            return current
+        fallback = compact_conversation_title(excerpt)
+        try:
+            response = await gateway.generate_conversation_title(
+                ConversationTitleModelRequest(
+                    user_excerpt=excerpt[:2000],
+                    assistant_excerpt=source.assistant_excerpt[:2000],
+                    prompt_text=conversation_title_prompt_text(),
+                    prompt_version=CONVERSATION_TITLE_PROMPT_VERSION,
+                    prompt_sha256=CONVERSATION_TITLE_PROMPT_SHA256,
+                    model_id=CONVERSATION_TITLE_MODEL_ID,
+                    remaining_deadline_seconds=8.0,
+                )
+            )
+            raw_title = response.payload.get("title")
+            title = compact_conversation_title(
+                str(raw_title) if isinstance(raw_title, str) else ""
+            )
+            if title == "Chat":
+                title = fallback
+        except (
+            ModelGatewayUnavailableError,
+            OpenAIAnswerError,
+            ValueError,
+            OSError,
+        ):
+            return current
+        with psycopg.connect(self._postgres_url) as connection:
+            connection.execute("SET ROLE app_api")
+            record = update_conversation_title(
+                connection,
+                caller=caller,
+                conversation_id=conversation_id,
+                title=title,
+            )
+            connection.commit()
+        return record

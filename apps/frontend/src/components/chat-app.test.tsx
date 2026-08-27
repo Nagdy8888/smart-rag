@@ -10,6 +10,7 @@ import { ChatApp } from "./chat/chat-app";
 import {
   ClassifiedApiError,
   createConversation,
+  generateConversationTitle,
   fetchMe,
   fetchMeta,
   listCitations,
@@ -104,6 +105,12 @@ vi.mock("../lib/api", async () => {
       title: "Chat",
       created_at: "2026-08-17T00:00:00Z",
     })),
+    generateConversationTitle: vi.fn(async (_auth: unknown, conversationId: string) => ({
+      conversation_id: conversationId,
+      creator_user_id: "u1",
+      title: "Hello summary",
+      created_at: "2026-08-17T00:00:00Z",
+    })),
     fetchUsageMe: vi.fn(async () => ({
       scope: "me",
       cost_usd: "0",
@@ -146,6 +153,7 @@ afterEach(() => {
     next_before_id: null,
   });
   vi.mocked(createConversation).mockClear();
+  vi.mocked(generateConversationTitle).mockClear();
   vi.mocked(fetchConversation).mockClear();
   vi.mocked(fetchConversation).mockImplementation(
     async (_auth: unknown, conversationId: string) => ({
@@ -598,6 +606,12 @@ describe("ChatApp SSE limitation families and reconnect", () => {
       expect(messagePosts).toEqual([
         "http://127.0.0.1:8000/conversations/conv-created/messages",
       ]);
+    });
+    await waitFor(() => {
+      expect(generateConversationTitle).toHaveBeenCalledWith(
+        { accessToken: "jwt-token" },
+        "conv-created",
+      );
     });
   });
 
