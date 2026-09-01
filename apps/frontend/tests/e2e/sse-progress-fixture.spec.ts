@@ -3,15 +3,13 @@
  */
 
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { signInLiveMember } from "./live-auth";
 
-const FIXTURE_DIR = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../fixtures/sse",
-);
+// Playwright 1.62 treats `import.meta.url` as native ESM and then emits
+// `require()`, which throws. Load fixtures from the frontend package cwd.
+const FIXTURE_DIR = join(process.cwd(), "tests", "fixtures", "sse");
 const COMPANY_SSE = readFileSync(join(FIXTURE_DIR, "company-progress.sse"), "utf8");
 const CONVERSATION_ID = "11111111-1111-4111-8111-111111111111";
 const RUN_ID = "22222222-2222-4222-8222-222222222222";
