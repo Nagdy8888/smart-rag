@@ -38,3 +38,22 @@ def test_mermaid_puppeteer_config_is_explicitly_parsed(tmp_path: Path) -> None:
 
     assert runner_options.mermaid_puppeteer_config == config.resolve()
     assert docs_options.puppeteer_config == config.resolve()
+
+
+def test_frontend_production_build_supplies_public_auth_placeholders() -> None:
+    """CI ``next build`` must compile without hosted Auth secrets.
+
+    Production still fails closed when those public values are missing.
+    The quality runner only fills loopback placeholders for the compile.
+    """
+
+    build = next(
+        command
+        for command in CheckRunner(Path(".")).commands_for_tier("frontend")
+        if command.label == "Frontend production build"
+    )
+    values = dict(build.extra_environ)
+    assert values["NEXT_PUBLIC_API_BASE_URL"] == "http://127.0.0.1:8000"
+    assert values["NEXT_PUBLIC_SUPABASE_URL"] == "http://127.0.0.1:54321"
+    assert values["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+    assert "service_role" not in values["NEXT_PUBLIC_SUPABASE_ANON_KEY"]

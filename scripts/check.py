@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
-from smart_rag_core.settings.base import get_process_environ
+from smart_rag_core.settings.base import get_process_environ, snapshot_process_environ
 
 Tier = Literal[
     "format",
@@ -45,6 +45,18 @@ FAST_TIERS: tuple[Tier, ...] = (
     "frontend",
 )
 
+# Published Supabase local demo anon JWT. Same value as Playwright. Not a secret.
+_LOCAL_SUPABASE_ANON_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9."
+    "CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
+)
+_FRONTEND_PUBLIC_BUILD_ENV: tuple[tuple[str, str], ...] = (
+    ("NEXT_PUBLIC_API_BASE_URL", "http://127.0.0.1:8000"),
+    ("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321"),
+    ("NEXT_PUBLIC_SUPABASE_ANON_KEY", _LOCAL_SUPABASE_ANON_KEY),
+)
+
 
 @dataclass(frozen=True)
 class Command:
@@ -53,10 +65,13 @@ class Command:
     Attributes:
         label: User-facing check description.
         arguments: Exact shell-free child argument vector.
+        extra_environ: Public placeholders merged with ``setdefault`` into the
+            child environment. Existing process values win.
     """
 
     label: str
     arguments: tuple[str, ...]
+    extra_environ: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -159,10 +174,16 @@ class CheckRunner:
             print(f"[{tier}] {command.label}", flush=True)
             print(f"$ {' '.join(command.arguments)}", flush=True)
             try:
+                child_env = None
+                if command.extra_environ:
+                    child_env = snapshot_process_environ()
+                    for key, value in command.extra_environ:
+                        child_env.setdefault(key, value)
                 completed = subprocess.run(  # noqa: S603 - fixed repository commands
                     command.arguments,
                     cwd=self._repo_root,
                     check=False,
+                    env=child_env,
                 )
             except FileNotFoundError:
                 print(
@@ -286,6 +307,7 @@ class CheckRunner:
                 Command(
                     "Frontend production build",
                     (self._pnpm, "--filter", "smart-rag-frontend", "build"),
+                    extra_environ=_FRONTEND_PUBLIC_BUILD_ENV,
                 ),
                 Command(
                     "Playwright Chromium install",
