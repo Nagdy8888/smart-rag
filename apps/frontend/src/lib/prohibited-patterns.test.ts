@@ -135,7 +135,9 @@ describe("prohibited production patterns", () => {
   it("ships a DELETE /documents client and keeps citation href null", () => {
     const api = readFileSync(path.join(srcRoot, "lib/api.ts"), "utf8");
     expect(api).toContain("deleteDocument");
-    expect(api).toMatch(/method:\s*"DELETE"/);
+    const documents = readFileSync(path.join(srcRoot, "lib/api/documents.ts"), "utf8");
+    expect(documents).toContain("deleteDocument");
+    expect(documents).toMatch(/method:\s*"DELETE"/);
     const drawer = readFileSync(path.join(srcRoot, "lib/citation-drawer.ts"), "utf8");
     expect(drawer).toContain("return null");
     expect(drawer).not.toContain("DOCUMENT_DELETE_UNAVAILABLE");

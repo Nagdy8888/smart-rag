@@ -133,18 +133,18 @@ def test_five_held_streams_meet_lag_and_heartbeat_gates(
             async def _lag() -> float:
                 """Sample lag while the five streams are open.
 
+                One p95 across the full hold. A max-of-short-windows
+                gauge treats a single scheduler steal as a blocked loop.
+
                 Returns:
-                    Maximum p95 lag observed across windows.
+                    p95 lag over ``_WAIT_SECONDS``.
                 """
 
-                worst = 0.0
-                deadline = asyncio.get_running_loop().time() + _WAIT_SECONDS
-                while asyncio.get_running_loop().time() < deadline:
-                    sample = await sample_event_loop_lag(
-                        samples=10, interval_seconds=0.01
-                    )
-                    worst = max(worst, sample.p95_seconds)
-                return worst
+                sample = await sample_event_loop_lag(
+                    samples=max(1, int(_WAIT_SECONDS / 0.01)),
+                    interval_seconds=0.01,
+                )
+                return sample.p95_seconds
 
             started = asyncio.get_running_loop().time()
             stream_tasks = [

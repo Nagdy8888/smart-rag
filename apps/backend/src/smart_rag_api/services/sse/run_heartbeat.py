@@ -19,11 +19,6 @@ class RunHeartbeatMixin:
 
     if TYPE_CHECKING:
 
-        def _has_terminal(self, caller: CallerContext, run_id: UUID) -> bool:
-            """Return whether a terminal catalog event exists."""
-
-            ...
-
         async def _append_async(
             self,
             caller: CallerContext,
@@ -40,9 +35,9 @@ class RunHeartbeatMixin:
     ) -> None:
         """Persist a heartbeat every interval until the run is terminal.
 
-        Appends run off the event loop. A lock wait cannot freeze
-        ``astream`` or SSE polling. A failed heartbeat degrades to a
-        skipped beat.
+        Appends run off the event loop, including the terminal check
+        inside ``_append``. A store lock wait cannot freeze ``astream``
+        or SSE polling. A failed heartbeat degrades to a skipped beat.
 
         Args:
             caller: Owner.
@@ -54,8 +49,6 @@ class RunHeartbeatMixin:
             while not live.terminal and not live.cancel_event.is_set():
                 await asyncio.sleep(self._heartbeat_interval_seconds)
                 if live.terminal or live.cancel_event.is_set():
-                    break
-                if self._has_terminal(caller, run_id):
                     break
                 await self._append_async(caller, run_id, "heartbeat", {})
         except asyncio.CancelledError:

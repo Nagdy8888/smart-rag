@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from smart_rag_core.gateways.openai_pricing import (
@@ -10,6 +11,7 @@ from smart_rag_core.gateways.openai_pricing import (
     estimate_embedding_cost_usd,
     estimate_usage_cost_usd,
 )
+from smart_rag_core.query_admission.service import ReservationConsumeResult
 from smart_rag_core.query_admission.usage import execute_counted_model_call
 
 
@@ -65,13 +67,29 @@ def test_execute_counted_model_call_records_token_priced_usd(
         recorded.update(kwargs)
         return object()
 
+    def _fake_consume(*args: object, **kwargs: object) -> ReservationConsumeResult:
+        """Return a consume snapshot with remaining budget.
+
+        Args:
+            *args: Unused positional arguments from the patched call.
+            **kwargs: Unused keyword arguments from the patched call.
+
+        Returns:
+            Consume result with remaining USD above the answer cap.
+        """
+
+        del args, kwargs
+        return ReservationConsumeResult(
+            reservation_id=UUID("00000000-0000-0000-0000-000000000001"),
+            optimistic_version=2,
+            remaining_usd=Decimal("1"),
+            remaining_prompt_tokens=10_000,
+            remaining_completion_tokens=10_000,
+        )
+
     monkeypatch.setattr(
         "smart_rag_core.query_admission.usage.consume_query_reservation",
-        lambda *args, **kwargs: type(
-            "Consumed",
-            (),
-            {"optimistic_version": 2, "remaining_usd": Decimal("1")},
-        )(),
+        _fake_consume,
     )
     monkeypatch.setattr(
         "smart_rag_core.query_admission.usage.record_query_llm_usage",
