@@ -6,8 +6,18 @@ test("Tab order on login starts at the skip link and focuses main", async ({
   page,
 }) => {
   await page.goto("/login");
-  await page.keyboard.press("Tab");
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   const skip = page.getByRole("link", { name: "Skip to main content" });
+  await expect(skip).toBeAttached();
+  // Chromium does not treat <body> as a tab stop. Start sequential focus
+  // at the document so the first Tab hits the skip link (Linux CI).
+  await page.evaluate(() => {
+    const root = document.body;
+    root.setAttribute("tabindex", "-1");
+    root.focus();
+    root.removeAttribute("tabindex");
+  });
+  await page.keyboard.press("Tab");
   await expect(skip).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#main")).toBeFocused();

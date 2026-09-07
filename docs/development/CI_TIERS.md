@@ -117,8 +117,10 @@ checkbox or setting the wrapper complete is Failed. See
 [MANAGED_STAGING.md](../deployment/MANAGED_STAGING.md) and
 [phase-10-external-assessment-scope.md](../security/phase-10-external-assessment-scope.md).
 
-Actions are pinned by commit SHA. The caller workflows use
-`permissions: contents: read`; the secret scanner disables PR comments and
+Actions are pinned by commit SHA. Caller workflows and `job-preflight.yml`
+use `permissions: contents: read` plus `pull-requests: read` so Gitleaks
+Action can list PR commits (a `contents`-only token returns 403 on
+`GET .../pulls/{n}/commits`). The secret scanner disables PR comments and
 artifact upload. Nightly `schedule` runs Gitleaks across the full git
 history, while `push` scans only new commits; `.gitleaks.toml` must
 allowlist inert canaries, empty example key names, Action pin SHAs, and

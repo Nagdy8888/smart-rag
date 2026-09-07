@@ -272,6 +272,15 @@ describe("EnvMissingBanner", () => {
       screen.getByText("Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."),
     ).toBeInTheDocument();
   });
+
+  it("does not move keyboard focus on first paint", async () => {
+    envState.present = false;
+    renderAuth(<EnvMissingBanner />);
+    const banner = screen.getByRole("alert");
+    await waitFor(() => {
+      expect(banner).not.toHaveFocus();
+    });
+  });
 });
 
 describe("HandshakeBanner", () => {
