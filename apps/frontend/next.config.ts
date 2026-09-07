@@ -36,8 +36,6 @@ export type ConnectSrcEnv = {
 const DEV_LOOPBACK_ORIGINS = [
   "http://127.0.0.1:8000",
   "http://localhost:8000",
-  "http://127.0.0.1:54321",
-  "http://localhost:54321",
 ] as const;
 
 /**
@@ -66,8 +64,8 @@ export function originFromPublicUrl(value: string | undefined): string | null {
  * Build the CSP `connect-src` directive.
  *
  * Production includes `'self'` plus the exact API and Auth origins when
- * those env vars parse. Development also allows local FastAPI and Auth
- * loopback ports. Missing production env fails closed (no localhost
+ * those env vars parse. Development also allows local FastAPI loopback
+ * ports. Missing production env fails closed (no localhost
  * fallback, no `*.supabase.co` wildcard).
  *
  * @param env - `NODE_ENV` and public API/Auth URLs.

@@ -59,14 +59,14 @@ describe("buildConnectSrcDirective", () => {
     expect(directive).not.toContain("http://127.0.0.1:54321");
   });
 
-  it("adds local FastAPI and Auth loopback only in development", () => {
+  it("adds local FastAPI loopback only in development", () => {
     const directive = buildConnectSrcDirective({
       nodeEnv: "development",
       apiBaseUrl: undefined,
       supabaseUrl: undefined,
     });
     expect(directive).toContain("http://127.0.0.1:8000");
-    expect(directive).toContain("http://localhost:54321");
+    expect(directive).not.toContain("54321");
   });
 });
 
