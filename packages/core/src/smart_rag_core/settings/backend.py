@@ -50,10 +50,9 @@ class BackendSettings(SharedSettings):
             ``8000``.
         supabase_url: Supabase project URL from ``SUPABASE_URL``. Public.
             JWKS fetch uses this origin. Required for ``local``, ``staging``,
-            and ``production``. ``APP_ENV=test`` injects the local fixture
-            origin when unset. Local ``APP_ENV`` may accept the documented
-            ``127.0.0.1`` / ``host.docker.internal`` ``iss`` pair only when
-            that origin is supplied explicitly.
+            and ``production``. ``APP_ENV=test`` injects a synthetic offline
+            origin when unset so unit tests can construct settings without a
+            live Auth/Postgres process.
         supabase_jwt_audience: Required JWT audience from
             ``SUPABASE_JWT_AUDIENCE``. Default ``authenticated``.
         jwks_cache_seconds: JWKS cache TTL from ``JWKS_CACHE_SECONDS``; max
@@ -110,9 +109,9 @@ class BackendSettings(SharedSettings):
         validation_alias="SUPABASE_URL",
         description=(
             "Supabase project URL for JWKS discovery. Required except "
-            "APP_ENV=test, which injects the local fixture origin. When "
-            "APP_ENV=local and the origin is 127.0.0.1:54321 or "
-            "host.docker.internal:54321, iss may use either hostname."
+            "APP_ENV=test, which injects a synthetic offline origin. JWT "
+            "verification accepts exactly one issuer "
+            "``{SUPABASE_URL}/auth/v1``."
         ),
         json_schema_extra={"security": "public"},
     )
@@ -258,11 +257,11 @@ class BackendSettings(SharedSettings):
 
     @model_validator(mode="after")
     def require_supabase_url_for_runtime(self) -> Self:
-        """Require hosted/runtime ``SUPABASE_URL`` except the test fixture.
+        """Require hosted/runtime ``SUPABASE_URL`` except the test origin.
 
-        ``APP_ENV=test`` may omit the variable and receives the local
-        destructive-test fixture origin. Laptop Compose (``local``) and
-        hosted environments fail closed when the origin is missing.
+        ``APP_ENV=test`` may omit the variable and receives a synthetic
+        offline origin used only by unit tests. Laptop Compose (``local``)
+        and hosted environments fail closed when the origin is missing.
 
         Returns:
             This settings instance with ``supabase_url`` populated.

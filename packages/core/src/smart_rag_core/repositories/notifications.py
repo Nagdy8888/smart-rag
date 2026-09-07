@@ -14,8 +14,6 @@ from smart_rag_core.settings.base import get_process_environ
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_ADMIN_ALERT_SMTP_PORT = 54325
-
 
 class AdminNotificationError(Exception):
     """Raised when admin notification persistence fails."""
@@ -29,8 +27,10 @@ def deliver_admin_alert_smtp(
     body: str,
     notification_id: UUID,
 ) -> None:
-    """Best-effort SMTP copy of a durable admin notification (local Inbucket).
+    """Best-effort SMTP copy of a durable admin notification.
 
+    Sends one SMTP message only when both ``ADMIN_ALERT_SMTP_HOST`` and
+    ``ADMIN_ALERT_SMTP_PORT`` are set (operator relay); no loopback default.
     SMTP failure is logged and never raised: the database row remains the
     source of truth.
 
@@ -42,16 +42,13 @@ def deliver_admin_alert_smtp(
         notification_id: Durable ``app.admin_notifications`` row id.
 
     Side Effects:
-        Sends one SMTP message when ``ADMIN_ALERT_SMTP_HOST`` is set. Uses
-        local Inbucket (``127.0.0.1:54325``) in development.
+        Sends one SMTP message when both host and port env vars are set.
     """
 
     host = (get_process_environ("ADMIN_ALERT_SMTP_HOST") or "").strip()
-    if not host:
+    port_raw = (get_process_environ("ADMIN_ALERT_SMTP_PORT") or "").strip()
+    if not host or not port_raw:
         return
-    port_raw = get_process_environ(
-        "ADMIN_ALERT_SMTP_PORT", str(DEFAULT_ADMIN_ALERT_SMTP_PORT)
-    ) or str(DEFAULT_ADMIN_ALERT_SMTP_PORT)
     try:
         port = int(port_raw)
     except ValueError:
@@ -109,7 +106,7 @@ class AdminNotificationRepository:
                 raised.
 
         Side Effects:
-            Inserts ``app.admin_notifications``. Optionally sends Inbucket SMTP.
+            Inserts ``app.admin_notifications``. Optionally sends operator SMTP.
         """
 
         try:

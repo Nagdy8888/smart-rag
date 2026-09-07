@@ -18,16 +18,6 @@ ALLOWED_ALGORITHMS = frozenset({"ES256", "RS256"})
 FORBIDDEN_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
 REQUIRED_JWT_ROLE = "authenticated"
 FORBIDDEN_JWT_ROLES = frozenset({"service_role", "anon"})
-LOCAL_LOOPBACK_JWT_ISSUER = "http://127.0.0.1:54321/auth/v1"
-LOCAL_DOCKER_INTERNAL_JWT_ISSUER = "http://host.docker.internal:54321/auth/v1"
-LOCAL_JWT_ISSUER_ALIASES: frozenset[str] = frozenset(
-    {LOCAL_LOOPBACK_JWT_ISSUER, LOCAL_DOCKER_INTERNAL_JWT_ISSUER}
-)
-_LOCAL_JWT_ISSUER_ALIAS_ORDER: tuple[str, ...] = (
-    LOCAL_DOCKER_INTERNAL_JWT_ISSUER,
-    LOCAL_LOOPBACK_JWT_ISSUER,
-)
-_LOCAL_APP_ENV = "local"
 
 
 class JwksVerificationError(Exception):
@@ -108,36 +98,6 @@ def _jwks_document(value: object) -> dict[str, object]:
     return narrowed
 
 
-def resolved_jwt_issuers(*, supabase_url: str, app_env: str | None) -> tuple[str, ...]:
-    """Return issuers accepted for one JWKS verifier configuration.
-
-    JWKS is always fetched from ``{supabase_url}/auth/v1/.well-known/jwks.json``.
-    When ``app_env`` is ``local`` and that origin is one of the documented
-    Docker loopback aliases, both alias ``iss`` values are accepted. Staging,
-    production, test, and any other ``SUPABASE_URL`` keep a single issuer.
-    ``iss`` checks stay enabled; this never widens algorithms.
-
-    Args:
-        supabase_url: Supabase project URL used for JWKS discovery.
-        app_env: Deployment environment name, or ``None`` for strict mode.
-
-    Returns:
-        Ordered issuers. The first value is always derived from
-        ``supabase_url``.
-    """
-
-    normalized = supabase_url.rstrip("/")
-    primary = f"{normalized}/auth/v1"
-    env_name = "" if app_env is None else str(app_env).strip().casefold()
-    if env_name != _LOCAL_APP_ENV or primary not in LOCAL_JWT_ISSUER_ALIASES:
-        return (primary,)
-    aliases = [primary]
-    for issuer in _LOCAL_JWT_ISSUER_ALIAS_ORDER:
-        if issuer not in aliases:
-            aliases.append(issuer)
-    return tuple(aliases)
-
-
 def _numeric_date(value: object, *, claim: str) -> int:
     """Convert one already-verified JWT NumericDate claim to an integer.
 
@@ -163,9 +123,8 @@ def _numeric_date(value: object, *, claim: str) -> int:
 class JwksVerifier:
     """Fetch and cache Supabase JWKS; verify access tokens fail-closed.
 
-    JWKS discovery always uses ``supabase_url``. Local Docker may accept two
-    documented ``iss`` hostnames when ``app_env`` is ``local``; other
-    environments require an exact issuer match.
+    JWKS discovery always uses ``supabase_url``. Verification accepts exactly
+    one issuer ``{SUPABASE_URL}/auth/v1``; there is no environment aliasing.
     """
 
     def __init__(
@@ -175,20 +134,16 @@ class JwksVerifier:
         audience: str = "authenticated",
         cache_seconds: int = 600,
         http_timeout_seconds: float = 5.0,
-        app_env: str | None = None,
     ) -> None:
         """Initialize verifier endpoints and cache bounds.
 
         Args:
             supabase_url: Supabase project URL used for JWKS fetch. Trailing
-                slashes are stripped.
+                slashes are stripped. The only accepted ``iss`` is
+                ``{supabase_url}/auth/v1``.
             audience: Required JWT ``aud`` claim. Defaults to ``authenticated``.
             cache_seconds: JWKS cache TTL; must not exceed 600 seconds.
             http_timeout_seconds: Network timeout for JWKS fetch.
-            app_env: Deployment environment. ``local`` enables the documented
-                ``127.0.0.1`` / ``host.docker.internal`` ``iss`` pair when
-                ``supabase_url`` is one of those hosts. Other values keep a
-                single issuer. ``None`` is strict (no aliases).
 
         Raises:
             ValueError: When ``cache_seconds`` exceeds 600.
@@ -200,10 +155,7 @@ class JwksVerifier:
         normalized = supabase_url.rstrip("/")
         self._issuer = f"{normalized}/auth/v1"
         self._jwks_url = f"{self._issuer}/.well-known/jwks.json"
-        self._allowed_issuers = resolved_jwt_issuers(
-            supabase_url=normalized,
-            app_env=app_env,
-        )
+        self._allowed_issuers = (self._issuer,)
         self._audience = audience
         self._cache_seconds = cache_seconds
         self._http_timeout_seconds = http_timeout_seconds

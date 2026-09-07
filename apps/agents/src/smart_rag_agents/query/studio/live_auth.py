@@ -127,7 +127,6 @@ def load_production_hooks() -> StudioLiveHooks:
             supabase_url=supabase_url,
             audience=backend.supabase_jwt_audience,
             cache_seconds=backend.jwks_cache_seconds,
-            app_env=backend.app_env.value,
         )
         return verifier.verify_access_token(raw_token)
 

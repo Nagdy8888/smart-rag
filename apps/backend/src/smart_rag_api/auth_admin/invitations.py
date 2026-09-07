@@ -267,7 +267,7 @@ def send_provider_invite_email(
     email: str,
     raw_token: str,
 ) -> None:
-    """Send an Auth Admin invite email; local development uses Inbucket SMTP.
+    """Send an Auth Admin invite email through hosted Supabase Auth.
 
     Args:
         settings: Privileged settings containing Auth Admin secret.
