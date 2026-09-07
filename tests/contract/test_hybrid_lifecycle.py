@@ -16,13 +16,14 @@ from smart_rag_core.retrieval.bm25_indexer import Bm25Indexer
 from tests.contract.integration_support import (
     packet8_paradedb_url,
     paradedb_reachable,
+    require_supabase_db_url,
     resolve_supabase_db_url,
     try_connect,
 )
 
 pytestmark = pytest.mark.skipif(
     try_connect(resolve_supabase_db_url()) is None or not paradedb_reachable(),
-    reason="local Supabase or ParadeDB unavailable",
+    reason="explicit SUPABASE_DB_URL or ParadeDB unavailable",
 )
 
 
@@ -53,7 +54,7 @@ def test_graph_pending_handoff_is_idempotent() -> None:
 
     version_id = uuid4()
     document_id = uuid4()
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         connection.execute("SET ROLE postgres")
         with connection.cursor() as cursor:
             cursor.execute(
@@ -113,7 +114,7 @@ def test_graph_ineligible_replacement_may_flip_current() -> None:
     document_id = uuid4()
     first_id = uuid4()
     second_id = uuid4()
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         connection.execute("SET ROLE postgres")
         with connection.cursor() as cursor:
             cursor.execute(
@@ -166,7 +167,7 @@ def test_graph_eligible_replacement_stays_non_current() -> None:
 
     document_id = uuid4()
     version_id = uuid4()
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         connection.execute("SET ROLE postgres")
         with connection.cursor() as cursor:
             cursor.execute(
@@ -216,7 +217,7 @@ def test_deletion_excludes_retrieval_and_enqueues_bm25_cleanup() -> None:
 
     version_id = uuid4()
     document_id = uuid4()
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         connection.execute("SET ROLE app_worker")
         with connection.cursor() as cursor:
             cursor.execute(
@@ -306,7 +307,7 @@ def test_bm25_delete_job_clears_parade_projection() -> None:
         )
         parade.commit()
     with (
-        psycopg.connect(resolve_supabase_db_url()) as supabase,
+        psycopg.connect(require_supabase_db_url()) as supabase,
         psycopg.connect(parade_url, connect_timeout=5) as parade,
     ):
         supabase.execute("SET ROLE app_worker")
@@ -344,7 +345,7 @@ def test_hybrid_ready_blocked_without_processing_bm25_job() -> None:
 
     version_id = uuid4()
     document_id = uuid4()
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         connection.execute("SET ROLE postgres")
         with connection.cursor() as cursor:
             cursor.execute(
@@ -388,7 +389,7 @@ def test_finalize_hybrid_ready_sets_current_for_graph_ineligible() -> None:
     version_id = uuid4()
     document_id = uuid4()
     job_id = uuid4()
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         connection.execute("SET ROLE postgres")
         with connection.cursor() as cursor:
             cursor.execute(
@@ -450,7 +451,7 @@ def test_finalize_hybrid_ready_keeps_graph_eligible_non_current() -> None:
     old_id = uuid4()
     new_id = uuid4()
     job_id = uuid4()
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         connection.execute("SET ROLE postgres")
         with connection.cursor() as cursor:
             cursor.execute(

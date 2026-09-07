@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Bounded Phase 3 ingestion throughput probe for Packet 8 exit evidence.
 
-Measures parse→chunk→mock-embed locally and, when local Supabase + ParadeDB
-are reachable, drives one synthetic version through BM25 verify + Hybrid Ready.
+Measures parse→chunk→mock-embed locally and, when an explicit
+``SUPABASE_DB_URL`` (required; no local fixture default) plus ParadeDB
+are reachable, drives one synthetic version through BM25 verify + Hybrid
+Ready.
 Mocks are limited to embedding vectors. QT-ING-001/002 are not invented.
 """
 
@@ -225,6 +227,8 @@ def _drive_hybrid_ready(
     """
 
     postgres_url = resolve_supabase_db_url()
+    if postgres_url is None:
+        raise SystemExit("SUPABASE_DB_URL is required (no local fixture default)")
     parade_url = packet8_paradedb_url()
     if (
         try_connect(postgres_url) is None

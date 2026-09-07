@@ -19,7 +19,7 @@ from smart_rag_core.jobs.exceptions import GraphEntityRuleError
 from smart_rag_core.jobs.graph_mapping_persist import load_entity_rules
 from smart_rag_core.retrieval.graph import DEFAULT_GRAPH_WORKSPACE
 
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import require_supabase_db_url, try_connect
 
 
 def _insert_auth_user(cursor: psycopg.Cursor, user_id: object, email: str) -> None:
@@ -58,7 +58,7 @@ def _insert_auth_user(cursor: psycopg.Cursor, user_id: object, email: str) -> No
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")
@@ -90,7 +90,7 @@ def test_approved_rule_invalidates_maps_and_schedules_rebuild(
     """Approved rules bump generation, stamp maps stale, and isolate rebuild."""
 
     owner_id = uuid4()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     with db_connection.cursor() as cursor:
         _insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
         cursor.execute(
@@ -230,7 +230,7 @@ def test_suggestion_stays_inactive_until_explicit_approval(
     """Feedback suggestions do not load until approve; revoke of suggestion skips rebuild."""
 
     owner_id = uuid4()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     with db_connection.cursor() as cursor:
         _insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
         cursor.execute(
@@ -300,7 +300,7 @@ def test_stale_update_and_member_are_rejected(
 
     owner_id = uuid4()
     member_id = uuid4()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     with db_connection.cursor() as cursor:
         _insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
         _insert_auth_user(cursor, member_id, f"{member_id}@example.com")
@@ -376,7 +376,7 @@ def test_approve_then_revoke_reloads_only_approved(
     """Approval loads the rule; revocation removes it from mapping views."""
 
     owner_id = uuid4()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     with db_connection.cursor() as cursor:
         _insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
         cursor.execute(

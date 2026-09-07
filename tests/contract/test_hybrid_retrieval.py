@@ -35,23 +35,23 @@ from tests.contract.hybrid_retrieval_seed import (
 from tests.contract.integration_support import (
     ensure_paradedb_arabic_normalizer,
     ensure_paradedb_bm25_index,
-    local_supabase_status,
     packet8_paradedb_url,
     paradedb_host_reachable,
     paradedb_psql,
-    resolve_supabase_db_url,
+    read_process_env,
+    require_supabase_db_url,
     try_connect,
 )
 
 
 @pytest.fixture
 def db_connection() -> Iterator[psycopg.Connection]:
-    """Yield Postgres or skip when local Supabase is unreachable."""
+    """Yield Postgres or skip when an explicit non-hosted DSN is unavailable."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip(f"Postgres unreachable at {url}")
     connection.autocommit = False
     yield connection
     connection.rollback()
@@ -409,11 +409,12 @@ def test_recheck_drops_stale_and_unauthorized_ids(
 def test_postgrest_cannot_call_dense_rpc() -> None:
     """Anon Data API clients cannot invoke retrieval RPCs."""
 
-    status = local_supabase_status()
-    api_url = status["API_URL"].rstrip("/")
-    anon = status.get("ANON_KEY") or status.get("PUBLISHABLE_KEY")
-    if not anon:
-        pytest.skip("local Supabase anon key unavailable")
+    api_url = (read_process_env("SUPABASE_URL") or "").rstrip("/")
+    anon = read_process_env("SUPABASE_ANON_KEY") or read_process_env(
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    )
+    if not api_url or not anon:
+        pytest.skip("SUPABASE_URL and an anon key are required")
     response = httpx.post(
         f"{api_url}/rest/v1/rpc/retrieve_dense_candidates",
         headers={

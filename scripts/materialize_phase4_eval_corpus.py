@@ -2,8 +2,9 @@
 """Materialize Phase 4 open-split compact sources and a sidecar gold-id map.
 
 Holdout labels are never loaded. Live Hybrid Ready ingest is optional and
-skips nothing in this CLI: when ``--ingest`` is set the Packet 8 ParadeDB
-overlay must already be up.
+skips nothing in this CLI: ``--ingest`` requires an explicit
+``SUPABASE_DB_URL`` (no local fixture default) and a running Packet 8
+ParadeDB overlay.
 """
 
 from __future__ import annotations
@@ -96,7 +97,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--ingest",
         action="store_true",
-        help="Persist compact sources through Hybrid Ready (requires Compose)",
+        help="Persist compact sources through Hybrid Ready (requires SUPABASE_DB_URL)",
     )
     return parser.parse_args(argv)
 
@@ -283,11 +284,14 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         supabase_url = resolve_supabase_db_url()
+        if supabase_url is None:
+            sys.stderr.write("SUPABASE_DB_URL is required (no local fixture default)\n")
+            return 2
         parade_url = packet8_paradedb_url()
         connection = try_connect(supabase_url)
         if connection is None or parade_url is None or not paradedb_host_reachable():
             sys.stderr.write(
-                "Hybrid Ready ingest requires local Supabase and the Packet 8 "
+                "Hybrid Ready ingest requires SUPABASE_DB_URL and the Packet 8 "
                 "ParadeDB overlay (docker compose --env-file .env.compose "
                 "-f docker-compose.yml -f docker-compose.packet8.yml).\n"
             )

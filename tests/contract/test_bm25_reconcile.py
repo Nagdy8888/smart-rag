@@ -13,13 +13,14 @@ from smart_rag_core.schema.enums import JobStatus
 from tests.contract.integration_support import (
     packet8_paradedb_url,
     paradedb_reachable,
+    require_supabase_db_url,
     resolve_supabase_db_url,
     try_connect,
 )
 
 pytestmark = pytest.mark.skipif(
     try_connect(resolve_supabase_db_url()) is None,
-    reason="local Supabase unavailable",
+    reason="SUPABASE_DB_URL unset or Postgres unreachable",
 )
 
 
@@ -94,7 +95,7 @@ def test_claim_reconcile_leases_unowned_processing_job() -> None:
     """Stuck processing rows with a null lease are claimable for reconcile."""
 
     owner = f"reconcile-owner-{uuid4()}"
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         job_id, _version_id = _insert_processing_job(connection)
         connection.execute("SET ROLE app_worker")
         repo = _repository(connection, owner)
@@ -132,7 +133,7 @@ def test_claim_reconcile_does_not_steal_live_lease() -> None:
     owner = f"reconcile-live-{uuid4()}"
     future = datetime.now(tz=UTC) + timedelta(minutes=10)
     live_lease = f"live-{uuid4()}"
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         job_id, _version_id = _insert_processing_job(
             connection,
             lease_expires_at=future,
@@ -161,7 +162,7 @@ def test_claim_reconcile_does_not_steal_live_lease() -> None:
 def test_app_api_cannot_claim_bm25_reconcile_job() -> None:
     """Reconcile claim is worker-role only; API role cannot execute it."""
 
-    with psycopg.connect(resolve_supabase_db_url()) as connection:
+    with psycopg.connect(require_supabase_db_url()) as connection:
         connection.execute("SET ROLE app_api")
         with connection.cursor() as cursor:
             cursor.execute("SAVEPOINT deny_reconcile")
@@ -188,7 +189,7 @@ def test_reconcile_upsert_verify_fail_does_not_complete_outbox() -> None:
     assert parade_url is not None
     owner = f"reconcile-verify-{uuid4()}"
     with (
-        psycopg.connect(resolve_supabase_db_url()) as supabase,
+        psycopg.connect(require_supabase_db_url()) as supabase,
         psycopg.connect(parade_url, connect_timeout=8) as parade,
     ):
         job_id, version_id = _insert_processing_job(supabase)

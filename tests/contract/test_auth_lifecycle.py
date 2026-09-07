@@ -19,7 +19,7 @@ from smart_rag_api.services.profile_loader import (
     load_profile_snapshot,
 )
 
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import require_supabase_db_url, try_connect
 from tests.unit.typed_attrs import ignore_args
 
 
@@ -27,7 +27,7 @@ from tests.unit.typed_attrs import ignore_args
 def postgres_url() -> Iterator[str]:
     """Yield the local Supabase URL or skip when the mandatory stack is absent."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")

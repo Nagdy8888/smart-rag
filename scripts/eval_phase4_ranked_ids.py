@@ -114,7 +114,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--live",
         action="store_true",
-        help="Run HybridRetriever against local Supabase and Packet 8 ParadeDB",
+        help="Run HybridRetriever against SUPABASE_DB_URL and Packet 8 ParadeDB",
     )
     parser.add_argument(
         "--case-id",
@@ -367,6 +367,8 @@ def _live_outcomes(
     )
 
     supabase_url = resolve_supabase_db_url()
+    if supabase_url is None:
+        raise SystemExit("SUPABASE_DB_URL is required (no local fixture default)")
     parade_url = packet8_paradedb_url()
     probe = try_connect(supabase_url)
     if probe is None or parade_url is None or not paradedb_host_reachable():

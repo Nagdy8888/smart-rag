@@ -26,7 +26,7 @@ from smart_rag_core.schema.enums import (
 
 from tests.contract.integration_support import (
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 from tests.unit.typed_attrs import typed_attr
@@ -35,7 +35,7 @@ from tests.unit.typed_attrs import typed_attr
 def _require_postgres() -> psycopg.Connection:
     """Open Postgres or fail closed when integration gate requires it."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":
@@ -162,7 +162,7 @@ def test_skip_locked_claim_is_exclusive(worker_connection: psycopg.Connection) -
     barrier = threading.Barrier(2)
     claims: list[str | None] = []
     lock = threading.Lock()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
 
     def claim(owner: str) -> None:
         """Claim one job from a dedicated connection as ``owner``.

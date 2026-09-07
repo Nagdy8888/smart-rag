@@ -16,51 +16,25 @@ from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.security.identity import CallerContext, UserRole
 
 from tests.contract.integration_support import (
-    REPO_ROOT,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
 
 def ensure_local_postgres() -> str:
-    """Return a reachable local Supabase URL, starting the CLI stack if needed.
+    """Return the explicit ``SUPABASE_DB_URL`` when reachable, else skip.
 
     Returns:
-        Postgres URL on port 54322 when reachable.
+        Postgres URL from ``SUPABASE_DB_URL``.
 
     Raises:
-        pytest.skip: When the stack cannot be started in this environment.
+        pytest.skip: When the DSN is unset, hosted, or unreachable.
     """
 
-    url = resolve_supabase_db_url()
-    connection = try_connect(url)
-    if connection is not None:
-        connection.close()
-        return url
-
-    import shutil
-    import subprocess
-
-    pnpm = shutil.which("pnpm")
-    if pnpm is None:
-        pytest.skip("pnpm is unavailable; local Supabase contract not run")
-    started = subprocess.run(  # noqa: S603 - pinned pnpm starts local CLI stack
-        [pnpm, "exec", "supabase", "start"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=180,
-        check=False,
-    )
-    if started.returncode != 0:
-        pytest.skip(
-            "local Supabase start failed: " + (started.stderr or started.stdout)[-500:]
-        )
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip(f"Postgres unreachable at {url}")
     connection.close()
     return url
 
@@ -230,7 +204,7 @@ def admit(
 
 @pytest.fixture
 def db_url() -> str:
-    """Yield the local Supabase URL or skip."""
+    """Yield the explicit ``SUPABASE_DB_URL`` or skip."""
 
     return ensure_local_postgres()
 

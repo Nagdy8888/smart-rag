@@ -28,7 +28,7 @@ from smart_rag_core.schema.enums import JobStatus
 
 from tests.contract.integration_support import (
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 from tests.contract.test_upload_finalize import (
@@ -40,7 +40,7 @@ from tests.contract.test_upload_finalize import (
 def _require_postgres() -> psycopg.Connection:
     """Open Postgres or skip unless the job integration gate is required."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":
@@ -146,7 +146,7 @@ def test_promote_object_enqueues_hybrid_index_after_scan(
 
     document_id = uuid4()
     version_id = uuid4()
-    postgres_url = resolve_supabase_db_url()
+    postgres_url = require_supabase_db_url()
     worker_connection.execute("SET ROLE postgres")
     with worker_connection.cursor() as cursor:
         cursor.execute(
@@ -221,7 +221,7 @@ def test_crawl_complete_enqueues_hybrid_index(
     """Successful crawl completion enqueues one ``hybrid_index`` with crawl refs."""
 
     owner_id = uuid4()
-    postgres_url = resolve_supabase_db_url()
+    postgres_url = require_supabase_db_url()
     worker_connection.execute("SET ROLE postgres")
     with worker_connection.cursor() as cursor:
         insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
@@ -351,7 +351,7 @@ def test_crawl_dirty_scan_does_not_enqueue_hybrid_index(
     """Missing/dirty snapshot scan fails the crawl job without hybrid_index."""
 
     owner_id = uuid4()
-    postgres_url = resolve_supabase_db_url()
+    postgres_url = require_supabase_db_url()
     worker_connection.execute("SET ROLE postgres")
     with worker_connection.cursor() as cursor:
         insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")

@@ -6,9 +6,8 @@ import psycopg
 import pytest
 
 from tests.contract.integration_support import (
-    DEFAULT_SUPABASE_DB_URL,
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -89,10 +88,10 @@ def _hnsw_selective_filter_smoke(connection: psycopg.Connection) -> None:
 def test_local_pgvector_capabilities_and_selective_filter() -> None:
     """Local vector/search contracts pass capability, filter, and path checks."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip(f"Postgres unreachable at {url}")
 
     with connection:
         version = _assert_pgvector_capabilities(connection)
@@ -126,10 +125,10 @@ def test_managed_pgvector_capabilities_when_configured() -> None:
 def test_unsupported_pgvector_version_pattern_is_fail_closed() -> None:
     """Simulated sub-0.8 version parsing raises the same failure pattern as the gate."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip(f"Postgres unreachable at {url}")
 
     with connection:
         with connection.cursor() as cursor:
@@ -154,9 +153,3 @@ def test_unsupported_pgvector_version_pattern_is_fail_closed() -> None:
                     $gate$;
                     """
                 )
-
-
-def test_default_local_url_constant_matches_documented_supabase_cli_port() -> None:
-    """Document the default qualification URL used when ``SUPABASE_DB_URL`` is unset."""
-
-    assert DEFAULT_SUPABASE_DB_URL.endswith(":54322/postgres")

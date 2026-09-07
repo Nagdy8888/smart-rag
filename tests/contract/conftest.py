@@ -1,4 +1,4 @@
-"""Shared local-Supabase fixtures for contract tests that need Postgres."""
+"""Shared Postgres fixtures for opt-in DB-backed contract tests."""
 
 from __future__ import annotations
 
@@ -8,28 +8,26 @@ import psycopg
 import pytest
 
 from tests.contract.integration_support import (
-    refuse_hosted_destructive_dsn,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
 
 @pytest.fixture
 def db_url() -> str:
-    """Return the local Supabase URL or skip when the stack is down.
+    """Return an explicit non-hosted Postgres DSN or skip.
 
     Returns:
-        Postgres DSN for the local fixture database.
+        Postgres DSN from ``SUPABASE_DB_URL``.
 
     Raises:
-        pytest.skip: When the local stack is unreachable.
+        pytest.skip: When the DSN is unset or the database is unreachable.
     """
 
-    url = resolve_supabase_db_url()
-    refuse_hosted_destructive_dsn(url)
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip(f"Postgres unreachable at {url}")
     connection.close()
     return url
 
@@ -39,7 +37,7 @@ def db_connection(db_url: str) -> Iterator[psycopg.Connection]:
     """Yield one rollback Postgres connection for a contract test.
 
     Args:
-        db_url: Local Supabase DSN from ``db_url``.
+        db_url: Explicit DSN from ``db_url``.
 
     Yields:
         Open ``postgres``-role connection. Callers ``SET ROLE`` as needed.

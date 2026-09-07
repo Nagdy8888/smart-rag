@@ -15,14 +15,14 @@ from tests.contract.hybrid_retrieval_seed import (
     HybridRetrievalSeed,
     seed_hybrid_retrieval_fixture,
 )
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import require_supabase_db_url, try_connect
 
 
 @pytest.fixture
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield Postgres or skip when local Supabase is unreachable."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")
