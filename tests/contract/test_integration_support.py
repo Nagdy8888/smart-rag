@@ -8,7 +8,7 @@ import pytest
 from tests.contract.integration_support import (
     local_supabase_runtime_ready,
     refuse_hosted_destructive_dsn,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -19,7 +19,7 @@ def test_try_connect_treats_incomplete_postgres_as_unreachable() -> None:
     CPU/local contract runs must skip instead of erroring on ``SET ROLE``.
     """
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     try:
         raw = psycopg.connect(url, connect_timeout=3)
     except psycopg.Error:
@@ -49,5 +49,5 @@ def test_refuse_hosted_destructive_dsn_rejects_supabase_hosts() -> None:
             "postgresql://app_runtime:secret@aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
         )
     refuse_hosted_destructive_dsn(
-        "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+        "postgresql://postgres:postgres@127.0.0.1:5432/postgres"
     )

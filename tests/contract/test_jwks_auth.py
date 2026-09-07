@@ -17,7 +17,6 @@ from smart_rag_core.settings.base import load_settings
 
 LOCAL_SUPABASE_URL = "http://127.0.0.1:54321"
 LOCAL_ISSUER = f"{LOCAL_SUPABASE_URL}/auth/v1"
-DEFAULT_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 
 def _supabase_reachable() -> bool:

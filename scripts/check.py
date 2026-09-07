@@ -53,7 +53,7 @@ _LOCAL_SUPABASE_ANON_KEY = (
 )
 _FRONTEND_PUBLIC_BUILD_ENV: tuple[tuple[str, str], ...] = (
     ("NEXT_PUBLIC_API_BASE_URL", "http://127.0.0.1:8000"),
-    ("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321"),
+    ("NEXT_PUBLIC_SUPABASE_URL", "https://placeholder.supabase.co"),
     ("NEXT_PUBLIC_SUPABASE_ANON_KEY", _LOCAL_SUPABASE_ANON_KEY),
 )
 

@@ -68,7 +68,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--admin-dsn",
         default="",
-        help="Optional admin DSN. Never printed. Defaults to local 54322 when restoring.",
+        help="Admin DSN. Never printed. Required when restoring a dump.",
     )
     return parser.parse_args(argv)
 
@@ -184,9 +184,10 @@ def main(argv: list[str] | None = None) -> int:
             f"{args.runtime_database}.{args.runtime_schema})"
         )
         return 0
-    admin_dsn = str(args.admin_dsn).strip() or (
-        "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-    )
+    admin_dsn = str(args.admin_dsn).strip()
+    if not admin_dsn:
+        print("--admin-dsn is required (no local fixture default)")
+        return EXIT_REFUSED
     try:
         restore_dump_into_disposable_database(
             admin_dsn=admin_dsn,

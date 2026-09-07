@@ -6,8 +6,8 @@ Greenfield monorepo for an authorized company RAG system: Hybrid retrieval (Supa
 
 - Windows 10/11 with Docker Desktop (WSL2 backend recommended): 16 GB RAM / 4 cores / 40 GB free minimum
 - [uv](https://docs.astral.sh/uv/) 0.11+, Node.js 20+, pnpm 9.15+
-- Hosted Supabase project `smart-rag` for runtime Auth/Postgres/Storage
-- The workspace-pinned [Supabase CLI](https://supabase.com/docs/guides/local-development), installed by pnpm (destructive-test fixture only)
+- Hosted Supabase project for runtime Auth/Postgres/Storage (see
+  [ADR-cloud-only-supabase-no-local-fixture.md](docs/adr/ADR-cloud-only-supabase-no-local-fixture.md))
 - OpenAI key only for real-model evaluation; mock-model mode needs none
 
 ## Quick start
@@ -27,9 +27,7 @@ Developer endpoints (when healthy):
 - API docs: http://localhost:8000/docs
 - API live: http://localhost:8000/health/live
 
-Stop Compose (preserve volumes): `.\scripts\stop.ps1`  
-Local destructive-test fixture: `.\scripts\ci\start_local_supabase_fixture.ps1`  
-Destructive fixture reset: `.\scripts\reset.ps1 -ConfirmReset`
+Stop Compose (preserve volumes): `.\scripts\stop.ps1`
 
 ## Common commands
 

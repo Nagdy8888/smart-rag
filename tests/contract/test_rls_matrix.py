@@ -10,7 +10,7 @@ import pytest
 
 from tests.contract.integration_support import (
     refuse_hosted_destructive_dsn,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -240,7 +240,7 @@ def _set_document_acl(
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     refuse_hosted_destructive_dsn(url)
     connection = try_connect(url)
     if connection is None:
@@ -916,7 +916,7 @@ def test_graph_downgrade_and_current_version_matrix(
 def test_reused_connection_identity_is_bound_to_rpc_arguments() -> None:
     """Prove a stale session GUC cannot leak identity across transactions."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     refuse_hosted_destructive_dsn(url)
     connection = try_connect(url)
     if connection is None:

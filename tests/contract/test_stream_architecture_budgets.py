@@ -11,7 +11,6 @@ MAPPING_OWNER_LIMIT = 250
 
 STREAM_FACADES: tuple[str, ...] = (
     "apps/backend/src/smart_rag_api/services/sse/executors.py",
-    "apps/backend/src/smart_rag_api/services/sse/executor_support.py",
     "apps/backend/src/smart_rag_api/services/query_sse_mapping.py",
     "apps/backend/src/smart_rag_api/services/sse/service_persist.py",
 )

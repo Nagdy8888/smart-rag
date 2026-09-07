@@ -2,7 +2,7 @@
 title: Database connections and pool budgets
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-07
 audience: engineering, ops
 phase_packet: Phase 2 Packet 6
 ---
@@ -11,7 +11,8 @@ phase_packet: Phase 2 Packet 6
 
 Packet 6 proves worst-case Supabase connections stay below **70%** of the selected
 tier hard limit using the **actual** Compose process inventory (not planned
-replicas).
+replicas). Canonical Auth/Postgres is the cloud project; see
+[ADR-cloud-only-supabase-no-local-fixture.md](../adr/ADR-cloud-only-supabase-no-local-fixture.md).
 
 ## Selected tier (managed smart-rag Free/Nano-class)
 
@@ -119,7 +120,6 @@ Does **not** consume Supabase connections. See [07-bm25-projection.md](./07-bm25
 
 ```powershell
 uv run python scripts/ci/check_migrations.py
-npx supabase db reset --yes
 uv run pytest tests/contract/test_connection_budgets.py -q
 ```
 

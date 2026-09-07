@@ -32,9 +32,9 @@ def test_documentation_flag_blocks_hosted_throttle_claim(flag_name: str) -> None
 def test_postgres_degraded_bucket_enforces_limit() -> None:
     """FastAPI Postgres path exhausts invitation-accept bucket."""
 
-    from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+    from tests.contract.integration_support import require_supabase_db_url, try_connect
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     if try_connect(url) is None:
         pytest.skip(f"Postgres unreachable at {url}")
 

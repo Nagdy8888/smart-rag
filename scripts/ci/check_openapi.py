@@ -25,7 +25,7 @@ def main() -> int:
 
     # CI has no developer `.env`. App construction at import requires an
     # explicit Auth origin when ``APP_ENV`` is not ``test``.
-    setdefault_process_environ("SUPABASE_URL", "http://127.0.0.1:54321")
+    setdefault_process_environ("SUPABASE_URL", "https://placeholder.supabase.co")
     sys.path.insert(0, str(ROOT / "apps" / "backend" / "src"))
     from smart_rag_api.main import app
 

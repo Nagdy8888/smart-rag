@@ -1,6 +1,6 @@
 /**
- * Google OAuth is Auth-direct. Local `supabase/config.toml` has
- * `[auth.external.google] enabled=false` (GAP-07-04).
+ * Google OAuth is Auth-direct. Hosted Auth keeps Google disabled
+ * (GAP-07-04) until the dashboard provider is enabled.
  */
 
 /** Local and v1 default: do not call `signInWithOAuth`. */

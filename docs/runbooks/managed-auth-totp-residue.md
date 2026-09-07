@@ -2,17 +2,17 @@
 title: Managed Auth TOTP residue
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-24
+last-reviewed: 2026-09-07
 audience: operations, security
 packet: P08-12
 ---
 
 # Managed Auth TOTP residue
 
-Application authorization is single-factor after P08-11 and P08-12. Local Auth
-disables new TOTP enrollment/verification through documented CLI keys
-`auth.mfa.totp.enroll_enabled` and `auth.mfa.totp.verify_enabled`. This runbook
-covers hosted Supabase projects that may still hold dormant factors.
+Application authorization is single-factor after P08-11 and P08-12. Hosted
+Auth should keep new TOTP enrollment/verification off in the Auth dashboard.
+This runbook covers hosted Supabase projects that may still hold dormant
+factors.
 
 Never `DELETE FROM auth.mfa_factors` (or any other `auth` schema SQL). Mutating
 GoTrue internals that way is unsupported and can strand sessions.
@@ -24,16 +24,10 @@ GoTrue internals that way is unsupported and can strand sessions.
   browser or frontend env.
 - A change window. Deleting a **verified** factor signs the user out of every
   active session ([Auth Admin deleteFactor](https://supabase.com/docs/reference/javascript/auth-admin-mfa-deletefactor)).
-- Local `supabase/config.toml` already has:
+- Hosted Auth MFA TOTP already disabled in the dashboard.
 
-```toml
-[auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
-```
-
-Restart Auth after changing local config (`npx supabase stop && npx supabase start`).
-Do not `db reset`.
+Restart Auth from the hosted dashboard after changing MFA settings.
+Do not reset the database.
 
 ## Dry run (required first)
 

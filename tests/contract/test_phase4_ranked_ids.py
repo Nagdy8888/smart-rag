@@ -35,7 +35,7 @@ from tests.contract.integration_support import (
     packet8_paradedb_url,
     paradedb_host_reachable,
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -68,7 +68,7 @@ def _require_stack_and_mapped_sidecar() -> tuple[str, str]:
         ``(supabase_url, parade_url)``.
     """
 
-    supabase_url = resolve_supabase_db_url()
+    supabase_url = require_supabase_db_url()
     parade_url = packet8_paradedb_url()
     connection = try_connect(supabase_url)
     if connection is None or parade_url is None or not paradedb_host_reachable():

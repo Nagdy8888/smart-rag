@@ -31,7 +31,7 @@ from tests.contract.integration_support import (
     packet8_paradedb_url,
     paradedb_host_reachable,
     paradedb_reachable,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -40,7 +40,7 @@ from tests.contract.integration_support import (
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield Postgres or skip when local Supabase is unreachable."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")

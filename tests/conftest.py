@@ -32,16 +32,68 @@ def default_mock_model_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def explicit_supabase_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Supply an explicit fixture Auth origin for settings loads.
+def explicit_supabase_url(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Supply an explicit synthetic Auth origin for unit settings loads.
+
+    Args:
+        request: Current pytest item; path is used to detect ``tests/unit``.
+        monkeypatch: Pytest monkeypatch fixture.
+
+    Side Effects:
+        For unit tests only, sets ``SUPABASE_URL`` to the offline synthetic
+        origin so ``APP_ENV=local`` constructors do not depend on a silent
+        settings default. Contract tests keep the process origin (hosted
+        operator URL or the collection-time default). Individual tests may
+        override or delete the variable. The synthetic origin is never
+        contacted.
+    """
+
+    if "/tests/unit/" not in request.path.as_posix():
+        return
+    monkeypatch.setenv("SUPABASE_URL", _TEST_SUPABASE_FIXTURE_URL)
+
+
+@pytest.fixture(autouse=True)
+def isolate_host_langsmith_flags(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep constructors on fail-closed LangSmith defaults.
 
     Args:
         monkeypatch: Pytest monkeypatch fixture.
 
     Side Effects:
-        Sets ``SUPABASE_URL`` to the local test-fixture origin so
-        ``APP_ENV=local`` constructors do not depend on a silent settings
-        default. Individual tests may override or delete the variable.
+        Forces ``LANGSMITH_TRACING=false`` and ``LANGSMITH_EXPORT_IO=false``.
+        Leftover operator flags from ``.env.compose`` otherwise make
+        ``APP_ENV=test`` and hosted settings invalid. Tests that need
+        tracing or I/O export set the variables themselves.
     """
 
-    monkeypatch.setenv("SUPABASE_URL", _TEST_SUPABASE_FIXTURE_URL)
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    monkeypatch.setenv("LANGSMITH_EXPORT_IO", "false")
+
+
+@pytest.fixture(autouse=True)
+def isolate_unit_session_dsns(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Drop hosted session DSNs for unit tests so they cannot open Postgres.
+
+    Args:
+        request: Current pytest item; path is used to detect ``tests/unit``.
+        monkeypatch: Pytest monkeypatch fixture.
+
+    Side Effects:
+        For unit tests only, deletes ``LANGGRAPH_CHECKPOINT_URL``,
+        ``LIGHTRAG_DB_URL``, and ``SUPABASE_DB_URL`` when present. Contract
+        tests keep an explicit operator ``SUPABASE_DB_URL``. Individual unit
+        tests may set fake DSNs.
+    """
+
+    if "/tests/unit/" not in request.path.as_posix():
+        return
+    monkeypatch.delenv("LANGGRAPH_CHECKPOINT_URL", raising=False)
+    monkeypatch.delenv("LIGHTRAG_DB_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_DB_URL", raising=False)

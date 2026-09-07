@@ -19,7 +19,7 @@ from tests.contract.integration_support import (
     packet8_paradedb_url,
     paradedb_host_reachable,
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 from tests.fixtures.parser import build_html_fixture, build_pdf_text_fixture
@@ -28,7 +28,7 @@ from tests.fixtures.parser import build_html_fixture, build_pdf_text_fixture
 def _require_postgres() -> psycopg.Connection:
     """Open Postgres or fail when the job integration gate is required."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":
@@ -127,7 +127,7 @@ def test_synthetic_file_reaches_verified_hybrid_ready() -> None:
     payload, _digest = build_pdf_text_fixture()
     parsed = parse_local_bytes(payload, filename="policy.pdf", format_key="pdf")
     result = drive_hybrid_ready(
-        supabase_url=resolve_supabase_db_url(),
+        supabase_url=require_supabase_db_url(),
         parade_url=parade_url,
         parse_result=parsed,
         title=f"hybrid-file-{uuid4()}",
@@ -136,7 +136,7 @@ def test_synthetic_file_reaches_verified_hybrid_ready() -> None:
     assert result.hybrid_ready is True
     assert result.status in {"hybrid_ready", "graph_ineligible"}
     assert result.bm25_job_id is not None
-    with psycopg.connect(resolve_supabase_db_url()) as supabase:
+    with psycopg.connect(require_supabase_db_url()) as supabase:
         supabase.execute("SET ROLE postgres")
         with supabase.cursor() as cursor:
             cursor.execute(
@@ -164,7 +164,7 @@ def test_synthetic_website_reaches_verified_hybrid_ready() -> None:
     parsed = parse_local_bytes(payload, filename="site.html", format_key="html")
     merged = merge_website_parse_results((parsed,), combined_hash=digest)
     result = drive_hybrid_ready(
-        supabase_url=resolve_supabase_db_url(),
+        supabase_url=require_supabase_db_url(),
         parade_url=parade_url,
         parse_result=merged,
         title=f"hybrid-site-{uuid4()}",

@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import require_supabase_db_url, try_connect
 from tests.contract.test_rls_matrix import rls_auth_version, rls_insert_profile
 
 
@@ -17,7 +17,7 @@ from tests.contract.test_rls_matrix import rls_auth_version, rls_insert_profile
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield a rollback Postgres connection or skip when local Supabase is down."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")

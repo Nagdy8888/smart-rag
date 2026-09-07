@@ -44,7 +44,7 @@ def test_frontend_production_build_supplies_public_auth_placeholders() -> None:
     """CI ``next build`` must compile without hosted Auth secrets.
 
     Production still fails closed when those public values are missing.
-    The quality runner only fills loopback placeholders for the compile.
+    The quality runner only fills hosted placeholders for the compile.
     """
 
     build = next(
@@ -54,6 +54,6 @@ def test_frontend_production_build_supplies_public_auth_placeholders() -> None:
     )
     values = dict(build.extra_environ)
     assert values["NEXT_PUBLIC_API_BASE_URL"] == "http://127.0.0.1:8000"
-    assert values["NEXT_PUBLIC_SUPABASE_URL"] == "http://127.0.0.1:54321"
+    assert values["NEXT_PUBLIC_SUPABASE_URL"] == "https://placeholder.supabase.co"
     assert values["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
     assert "service_role" not in values["NEXT_PUBLIC_SUPABASE_ANON_KEY"]

@@ -26,7 +26,7 @@ from smart_rag_core.retrieval.graph import (
 
 from tests.contract.integration_support import (
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
     typed_module_attr,
 )
@@ -65,7 +65,7 @@ _StubWriter = typed_module_attr(
 def _require_postgres() -> psycopg.Connection:
     """Open Postgres or skip when local Supabase is unreachable."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":

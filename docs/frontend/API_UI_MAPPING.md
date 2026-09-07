@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-07
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -51,7 +51,7 @@ flowchart TD
 | Email/password, password reset, session | Supabase Auth (`@supabase/ssr` 0.7.0, JS 2.57.4). Google omitted while disabled. MFA UI removed P08-12. | **No** |
 | Invitation create/accept, offboarding, chat, upload, crawl, admin mutations | FastAPI | Yes (`AUTH_ADJACENT` / `COST_MUTATION`) |
 | Authenticated reads | FastAPI | Yes (`LOW_RISK_READ`) |
-| Anonymous sign-in | Disabled in `supabase/config.toml` | N/A |
+| Anonymous sign-in | Disabled in hosted Auth | N/A |
 
 Privileged credentials, ParadeDB, Valkey, OpenAI, and service-role keys never
 appear in `NEXT_PUBLIC_*`. UI role hiding is convenience only.
@@ -365,7 +365,7 @@ where listed.
 | A Sign in | email, password, Sign in | `signInWithPassword` | Auth | generic fail; FastAPI does not throttle |
 | A Sign in | ready pills | public `GET /health/ready` (`query_ready` only) | public | informational; no named probes |
 | B Sign up | email, password | `signUp` | Auth | membership still needs invite/profile |
-| C Forgot | email | `resetPasswordForEmail` | Auth | Inbucket locally |
+| C Forgot | email | `resetPasswordForEmail` | Auth | hosted Auth mail |
 | C Reset | new password | Auth update | Auth | |
 | C Callback | waiting | `exchangeCodeForSession` | Auth | |
 | D MFA enroll | QR + code | `mfa.enroll` / `verify` | Auth TOTP | |

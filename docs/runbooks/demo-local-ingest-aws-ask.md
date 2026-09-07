@@ -2,7 +2,7 @@
 title: Demo local ingest and AWS ask later
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-09-07
 audience: engineering, ops
 ---
 
@@ -13,7 +13,9 @@ operator says the instance is up. This is a demo procedure, not a
 production-ready claim.
 
 Canonical decision:
-[ADR-demo-local-ingest-aws-ask.md](../adr/ADR-demo-local-ingest-aws-ask.md).
+[ADR-demo-local-ingest-aws-ask.md](../adr/ADR-demo-local-ingest-aws-ask.md)
+and
+[ADR-cloud-only-supabase-no-local-fixture.md](../adr/ADR-cloud-only-supabase-no-local-fixture.md).
 Related: [LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md) ·
 [ADR-lightrag-async-embed-batched-sources.md](../adr/ADR-lightrag-async-embed-batched-sources.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·

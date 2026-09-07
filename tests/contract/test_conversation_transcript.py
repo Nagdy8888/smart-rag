@@ -23,7 +23,7 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.security.identity import CallerContext, UserRole
 
 from tests.contract.integration_support import (
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 from tests.unit.typed_openapi import (
@@ -313,26 +313,26 @@ def test_deleted_conversation_receives_404(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def _ensure_local_postgres() -> str:
-    """Return a reachable local Supabase URL or skip.
+    """Return the explicit ``SUPABASE_DB_URL`` when reachable, else skip.
 
     Returns:
-        Local Postgres URL.
+        Postgres URL from ``SUPABASE_DB_URL``.
 
     Raises:
-        pytest.skip: When the stack is unreachable.
+        pytest.skip: When the DSN is unset, hosted, or unreachable.
     """
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
-        pytest.skip(f"Local Supabase Postgres unreachable at {url}")
+        pytest.skip(f"Postgres unreachable at {url}")
     connection.close()
     return url
 
 
 @pytest.fixture
 def db_url() -> str:
-    """Yield the local Supabase URL or skip."""
+    """Yield the explicit ``SUPABASE_DB_URL`` or skip."""
 
     return _ensure_local_postgres()
 

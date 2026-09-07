@@ -1,4 +1,4 @@
-"""Privileged Auth Admin services (invitations, MFA recovery, bootstrap helpers)."""
+"""Privileged Auth Admin services (invitations and MFA recovery)."""
 
 from smart_rag_api.auth_admin.settings import (
     PrivilegedAuthSettings,

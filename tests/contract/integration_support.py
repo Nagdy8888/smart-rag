@@ -6,8 +6,6 @@ contract tests remain compliant with the centralized environment-access rule.
 
 from __future__ import annotations
 
-import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +16,6 @@ import psycopg
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SUPABASE_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 ARABIC_NORM_SQL = REPO_ROOT / "infra" / "paradedb" / "sql" / "arabic_norm_v1.sql"
 COMPOSE_ENV_FILE = REPO_ROOT / ".env.compose"
 _T = TypeVar("_T")
@@ -69,14 +66,36 @@ def read_process_env(name: str) -> str | None:
     return value or None
 
 
-def resolve_supabase_db_url() -> str:
-    """Resolve the Supabase Postgres URL for qualification tests.
+def resolve_supabase_db_url() -> str | None:
+    """Return the explicit ``SUPABASE_DB_URL`` for DB-backed contract tests.
 
     Returns:
-        ``SUPABASE_DB_URL`` when set, otherwise the local Supabase CLI default.
+        The trimmed DSN, or ``None`` when the variable is unset or blank.
+        There is no loopback default: the local Supabase CLI fixture was
+        retired (see ``docs/adr/ADR-cloud-only-supabase-no-local-fixture.md``).
+        Callers decide whether ``None`` means skip (tests) or exit (scripts).
     """
 
-    return read_process_env("SUPABASE_DB_URL") or DEFAULT_SUPABASE_DB_URL
+    raw = (read_process_env("SUPABASE_DB_URL") or "").strip()
+    return raw or None
+
+
+def require_supabase_db_url() -> str:
+    """Return ``SUPABASE_DB_URL`` or skip the current test.
+
+    Returns:
+        Explicit non-hosted DSN.
+
+    Raises:
+        pytest.skip: When the variable is unset or blank.
+        RuntimeError: When the DSN targets hosted Supabase.
+    """
+
+    url = resolve_supabase_db_url()
+    if url is None:
+        pytest.skip("SUPABASE_DB_URL not set; DB-backed contract tests are opt-in")
+    refuse_hosted_destructive_dsn(url)
+    return url
 
 
 def refuse_hosted_destructive_dsn(url: str) -> None:
@@ -95,57 +114,11 @@ def refuse_hosted_destructive_dsn(url: str) -> None:
         raise RuntimeError("destructive_tests_refuse_hosted_supabase")
 
 
-def local_supabase_status() -> dict[str, str]:
-    """Return local Supabase status or skip when the live stack is unavailable.
-
-    Returns:
-        String-keyed URLs and ephemeral local credentials reported by the pinned
-        CLI. Callers must never print or persist the returned credential values.
-
-    Raises:
-        RuntimeError: If the available CLI returns malformed status data.
-
-    Side Effects:
-        Executes the workspace-pinned Supabase CLI without mutating the stack.
-        Skips the current test when ``pnpm`` or local Supabase is unavailable;
-        the dedicated integration gate rejects such mandatory skips.
-    """
-
-    pnpm = shutil.which("pnpm")
-    if pnpm is None:
-        pytest.skip("pnpm is unavailable; local Supabase contract not run")
-    completed = subprocess.run(
-        [pnpm, "exec", "supabase", "status", "-o", "json"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=30,
-        check=False,
-    )
-    if completed.returncode != 0:
-        pytest.skip("local Supabase stack is unavailable")
-    try:
-        payload: object = json.loads(completed.stdout)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("local Supabase status returned invalid JSON") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError("local Supabase status returned an invalid object")
-    untyped = cast(dict[object, object], payload)
-    if not all(
-        isinstance(key, str) and isinstance(value, str)
-        for key, value in untyped.items()
-    ):
-        raise RuntimeError("local Supabase status values are invalid")
-    return cast(dict[str, str], untyped)
-
-
 def local_supabase_runtime_ready(connection: psycopg.Connection) -> bool:
     """Return whether a ``postgres`` database has the Smart RAG runtime.
 
     A reachable TCP port is not enough for contract isolation. Vanilla or
-    unrestored local Postgres on ``:54322`` accepts connections but lacks
+    unrestored Postgres on a loopback DSN accepts connections but lacks
     ``app`` / ``app_worker``. ParadeDB and other databases are unchanged.
 
     Args:
@@ -173,20 +146,24 @@ def local_supabase_runtime_ready(connection: psycopg.Connection) -> bool:
     return role is not None
 
 
-def try_connect(url: str, *, connect_timeout: int = 3) -> psycopg.Connection | None:
+def try_connect(
+    url: str | None, *, connect_timeout: int = 3
+) -> psycopg.Connection | None:
     """Open one Postgres connection when the target is a usable stack.
 
     Args:
-        url: PostgreSQL connection URL.
+        url: PostgreSQL connection URL, or ``None`` when unset.
         connect_timeout: Seconds to wait for TCP/auth completion.
 
     Returns:
-        An open connection, or ``None`` when the server is unreachable or
-        the local ``postgres`` database lacks ``app`` / ``app_worker``.
-        Incomplete local Postgres is treated as unavailable so CPU/local
+        An open connection, or ``None`` when the URL is unset, the server
+        is unreachable, or the ``postgres`` database lacks ``app`` /
+        ``app_worker``. Incomplete Postgres is treated as unavailable so
         contract runs skip live integration instead of erroring.
     """
 
+    if not url:
+        return None
     try:
         connection = psycopg.connect(url, connect_timeout=connect_timeout)
     except psycopg.Error:

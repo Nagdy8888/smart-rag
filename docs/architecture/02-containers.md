@@ -2,7 +2,7 @@
 title: C4 — Containers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-07
 audience: engineering
 ---
 
@@ -30,10 +30,10 @@ flowchart TB
   api --> vc
   workerPriv --> pdb
   workerPriv --> cp
-  workerEdge --> hostDb["host.docker.internal Supabase"]
+  workerEdge --> cloudDb["CloudSupabase Auth and Postgres"]
 ```
 
-Published developer ports only: frontend and API. ParadeDB, both Valkey instances, ClamAV, crawl-proxy, and the worker have **no host ports** in `docker-compose.yml`. The worker also joins `edge` so `host.docker.internal:54322` is reachable; Compose `private` is `internal: true` and cannot route to the Docker host gateway. See [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
+Published developer ports only: frontend and API. ParadeDB, both Valkey instances, ClamAV, crawl-proxy, and the worker have **no host ports** in `docker-compose.yml`. Auth/Postgres/Storage are the cloud project; Compose `private` is `internal: true` and cannot route to the Docker host gateway.
 
 Application images use a split base: CPython services build on official
 `python:3.11-slim-trixie` and copy onto `gcr.io/distroless/cc-debian13:nonroot`

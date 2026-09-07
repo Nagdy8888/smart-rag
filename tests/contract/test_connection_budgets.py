@@ -9,7 +9,7 @@ import psycopg
 import pytest
 import yaml
 
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import require_supabase_db_url, try_connect
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_PATH = REPO_ROOT / "docker-compose.yml"
@@ -83,7 +83,7 @@ def _parse_rolconfig(raw: list[str] | None) -> dict[str, str]:
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")

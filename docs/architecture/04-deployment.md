@@ -2,7 +2,7 @@
 title: C4 — Deployment views
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-07
 audience: engineering, operations
 ---
 
@@ -14,13 +14,12 @@ audience: engineering, operations
 | --- | --- | --- |
 | Next.js | host 3000 | scaffold |
 | FastAPI | host 8000 | live + unconfigured ready |
-| Worker | private + edge, no host port | local candidate; `host.docker.internal` for Supabase |
+| Worker | private + edge, no host port | talks to cloud Supabase |
 | ParadeDB | private only | pg_search health |
 | Valkey limits/cache | private only | auth + distinct policies |
 | Crawl proxy | private only | deny-by-default |
-| Supabase CLI | 54321+ when installed | stock Phase 1 config |
 
-Start: `.\scripts\dev.ps1` · Stop: `.\scripts\stop.ps1` · Reset: `.\scripts\reset.ps1 -ConfirmReset` · Candidate freeze: [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md)
+Start: `.\scripts\dev.ps1` · Stop: `.\scripts\stop.ps1`
 
 ## Staging (Packet 1 IaC; live apply Blocked)
 

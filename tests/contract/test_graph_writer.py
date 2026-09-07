@@ -26,7 +26,7 @@ from smart_rag_core.schema.enums import GraphWorkspaceState, JobErrorCategory
 
 from tests.contract.integration_support import (
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -34,7 +34,7 @@ from tests.contract.integration_support import (
 def _require_postgres() -> psycopg.Connection:
     """Open Postgres or fail closed when integration gate requires it."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":
@@ -121,7 +121,7 @@ def test_two_workers_cannot_occupy_writer_lease(
     first.occupy(job_id=job_id, job_lease_token=token)
     worker_connection.commit()
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     second_conn = psycopg.connect(url)
     try:
         second_conn.execute("SET ROLE app_worker")
@@ -143,7 +143,7 @@ def test_advisory_lock_excludes_second_session(
 ) -> None:
     """Session advisory lock, not the vendor schema lock, serializes writers."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     keys = graph_advisory_lock_keys("company_default")
     first = psycopg.connect(url)
     second = psycopg.connect(url)
@@ -178,7 +178,7 @@ def test_session_holds_advisory_lock_after_try_lock(
     job with ``advisory_lock_lost``.
     """
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     lock_conn = psycopg.connect(url)
     try:
         lock_conn.autocommit = True

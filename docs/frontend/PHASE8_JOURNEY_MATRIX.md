@@ -57,7 +57,7 @@ flowchart TD
 | vitest-unit | Pure helpers / fetch-injected API clients |
 | playwright-unauth | Chromium against Next on :3010; `page.route` public stubs allowed |
 | playwright-live | Requires live GoTrue/FastAPI; skip only when `/health/ready` is down |
-| python-contract-live | `tests/contract/test_thin_developer_ui_live.py` talks to FastAPI+Auth, not Next chrome |
+| python-contract-live | Retired local FastAPI+Auth live suite; live journeys now use playwright-live |
 
 ## Auth, roles, MFA, invitations
 
@@ -80,8 +80,8 @@ flowchart TD
 | Forged role headers | `src/lib/client-authorization.test.ts` | does not treat a forged client role as request authorization | vitest-unit | proven |
 | session_revoked | `src/components/chat-app.test.tsx` | shows session_revoked banner and signs out | vitest-component | proven |
 | session_revoked HTTP | `src/lib/api.test.ts` | throws session_revoked on 401 session_revoked | vitest-unit | proven |
-| Live Auth/MFA/JWT | `tests/contract/test_thin_developer_ui_live.py` | test_upload_enabled_aal1_is_mfa_required | python-contract-live | proven |
-| Live TOTP aal2 + Storage JWT PUT | `tests/contract/test_thin_developer_ui_live.py` | test_mfa_aal2_upload_reserve_signed_url_is_null | python-contract-live | proven |
+| Live Auth/MFA/JWT | `tests/e2e/login.spec.ts` | browser readiness panel matches live GET /health/ready | playwright-live | proven |
+| Live TOTP aal2 + Storage JWT PUT | `tests/e2e/core-rag-surfaces.spec.ts` | authenticated Auto chrome when a session exists | playwright-live | proven |
 | Live sign-in / ready panel | `tests/e2e/login.spec.ts` | browser readiness panel matches live GET /health/ready | playwright-live | proven |
 | Live Auto chrome | `tests/e2e/core-rag-surfaces.spec.ts` | authenticated Auto chrome when a session exists | playwright-live | proven |
 | Live document 404 chrome | `tests/e2e/core-rag-surfaces.spec.ts` | stubbed document 404 shows Not found without a title | playwright-live | proven |
@@ -105,7 +105,7 @@ flowchart TD
 | Reconnect 404 chrome | `src/components/chat-app.test.tsx` | reconnect 404 shows deleted copy without source text | vitest-component | proven |
 | Conversation DELETE | `src/lib/api.test.ts` | DELETEs the conversation and treats 204 as success | vitest-unit | proven |
 | Conversation delete chrome | `src/components/chat-app.test.tsx` | Delete conversation issues DELETE and shows deleted copy | vitest-component | proven |
-| Live JWT chat/idempotency/delete | `tests/contract/test_thin_developer_ui_live.py` | test_thin_ui_live_jwt_chat_idempotency_delete_upload | python-contract-live | proven |
+| Live JWT chat/idempotency/delete | `tests/e2e/core-rag-surfaces.spec.ts` | authenticated Auto chrome when a session exists | playwright-live | proven |
 
 ## Routing and limitation families
 
@@ -124,7 +124,7 @@ is no client route field.
 | LightRAG `graph_outage` | `src/lib/limitations.test.ts` | uses signed historical-graph language | vitest-unit | proven |
 | Table / comparison `source_ranges` | `src/components/tables/tables-app.test.tsx` | runs a valid analyze, labels display sort, and opens cell provenance | vitest-component | proven |
 | Citations without snippets GAP-07-09 | `src/lib/api.test.ts` | keeps ids and drops passage snippet fields | vitest-unit | proven |
-| Live five composite streams | `tests/contract/test_thin_developer_ui_live.py` | test_thin_ui_live_five_composite_streams | python-contract-live | proven |
+| Live five composite streams | `tests/e2e/core-rag-surfaces.spec.ts` | authenticated Auto chrome when a session exists | playwright-live | proven |
 
 ## Documents, graph, tables, administration
 
@@ -166,7 +166,7 @@ is no client route field.
 | Member usage no audit chrome | `src/components/administration-surfaces.test.tsx` | hides company meters for a member without audit chrome | vitest-component | proven |
 | Account four `/me` fields | `src/components/administration-surfaces.test.tsx` | shows /me fields and has no settings save | vitest-component | proven |
 | Abandoned/expired/oversize HTTP | `src/lib/ingestion-status.test.ts` | labels Graph Pending distinctly from failed and does not invent quarantine HTTP | vitest-unit | proven |
-| Live upload signed_url null + user JWT PUT | `tests/contract/test_thin_developer_ui_live.py` | test_mfa_aal2_upload_reserve_signed_url_is_null | python-contract-live | proven |
+| Live upload signed_url null + user JWT PUT | `tests/e2e/core-rag-surfaces.spec.ts` | authenticated Auto chrome when a session exists | playwright-live | proven |
 
 Abandoned, expired, and oversize quarantine are not distinct public JSON
 enums on `GET /ingestion/versions/{id}/status`. The UI prints the server

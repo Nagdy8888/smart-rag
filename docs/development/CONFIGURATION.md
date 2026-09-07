@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-08-26
+last-reviewed: 2026-09-07
 audience: developers, operators
 ---
 
@@ -18,7 +18,7 @@ Validation errors list field paths and categories but omit source values.
 
 | Variable | Type / default | Security | Contract |
 | --- | --- | --- | --- |
-| `APP_ENV` | `local`, `test`, `staging`, or `production`; `local` | public | Deployment label added to every structured log. `local` also enables the documented JWT `iss` hostname pair under backend `SUPABASE_URL` |
+| `APP_ENV` | `local`, `test`, `staging`, or `production`; `local` | public | Deployment label added to every structured log. JWT verification always uses a single issuer `{SUPABASE_URL}/auth/v1` |
 | `ALLOW_TEST_IDENTITY` | boolean; `false` | public | `X-Test-*` headers mint a caller only together with `APP_ENV=test`. Staging and production reject the flag at settings load |
 | `MOCK_MODEL_MODE` | boolean; `true` | public | Secure default; selects frozen fixtures and denies DNS access to `api.openai.com`. Local live OpenAI is opt-in via gitignored env (`false` plus `OPENAI_API_KEY`). Real company content stays prohibited until the OpenAI org matrix is `verified` |
 | `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; `INFO` | public | Root JSON log threshold |
@@ -43,10 +43,10 @@ Validation errors list field paths and categories but omit source values.
 | `SMART_RAG_HOLDOUT_ACCESS` | boolean; `false` | public | Default denies sealed holdout labels. Packet 8 freeze refuses to run when true. Enable only for an independently SME-sealed holdout or dataset seal verify |
 | `SMART_RAG_HOLDOUT_ACCESS_PURPOSE` | `packet8_immutable_holdout` or `dataset_seal_verify` | internal | Required when holdout access is enabled |
 | `SMART_RAG_HOLDOUT_ACCESS_ACTOR` | safe identifier | internal | Auditable actor required when holdout access is enabled |
-| `ADMIN_ALERT_SMTP_HOST` | optional hostname; empty skips SMTP | internal | Local Inbucket/Mailpit host. Unset skips mail; set `127.0.0.1` for Packet 8 proof |
-| `ADMIN_ALERT_SMTP_PORT` | integer; `54325` | public | Exposed local SMTP port from `supabase/config.toml` `local_smtp.smtp_port` |
-| `ADMIN_ALERT_SMTP_FROM` | email; `alerts@localhost` | public | Envelope from for metadata-only admin alerts |
-| `ADMIN_ALERT_SMTP_TO` | email; `owner@localhost` | public | Owner/admin mailbox captured by Inbucket |
+| `ADMIN_ALERT_SMTP_HOST` | optional hostname; empty skips SMTP | internal | Operator SMTP relay. Unset skips mail |
+| `ADMIN_ALERT_SMTP_PORT` | integer; required with host | public | Operator SMTP port. Unset skips mail |
+| `ADMIN_ALERT_SMTP_FROM` | email | public | Envelope from for metadata-only admin alerts |
+| `ADMIN_ALERT_SMTP_TO` | email | public | Owner/admin mailbox |
 
 ## Agent-only variables
 
@@ -95,7 +95,7 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | --- | --- | --- | --- |
 | `API_BIND_HOST` | non-empty string; `0.0.0.0` | public | Uvicorn bind address used only by the console entrypoint |
 | `API_BIND_PORT` | integer 1–65,535; `8000` | public | Uvicorn container port |
-| `SUPABASE_URL` | HTTP origin; required except `APP_ENV=test` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Runtime Compose requires a hosted origin. `APP_ENV=test` injects the local fixture origin when unset. See local `iss` aliases below. |
+| `SUPABASE_URL` | HTTP origin; required except `APP_ENV=test` | public | JWKS fetch origin. Tokens verify against `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Runtime Compose requires a hosted origin. `APP_ENV=test` injects a synthetic offline origin when unset. Single issuer only. |
 | `SUPABASE_JWT_AUDIENCE` | non-empty string; `authenticated` | public | Required JWT `aud` claim |
 | `JWKS_CACHE_SECONDS` | integer 1–600; `600` | public | JWKS cache TTL |
 | `SUPABASE_DB_URL` | optional secret URL | secret | Server-side profile reads as `app_api`. Compose API/worker must not use the postgres superuser DSN; see `APP_RUNTIME_DB_PASSWORD`. May be a transaction pooler for short API work. |
@@ -121,24 +121,18 @@ Tracked [`.env.example`](../../.env.example) includes non-secret
 succeeds in CI. Hosted secrets belong in gitignored `.env.compose`.
 
 Runtime Compose interpolates `${SUPABASE_URL:?set hosted SUPABASE_URL}`.
-There is no `host.docker.internal:54321` fallback. Wire hosted Auth with
+There is no Docker-host Auth fallback. Wire hosted Auth with
 [`scripts/ops/wire_hosted_ingest_env.py`](../../scripts/ops/wire_hosted_ingest_env.py).
-The default project `.env` is also used for that interpolation. A fixture
-`SUPABASE_URL=http://127.0.0.1:54321` there overrides `.env.compose` and the
-service `env_file`, so the API rejects hosted browser JWTs with 401
-`unauthorized`. Start with [`scripts/dev.ps1`](../../scripts/dev.ps1) (loads
-`.env.compose` into the process and refuses a loopback API Auth host) and
-keep the fixture origin out of `.env` while Compose is running.
-`APP_ENV=test` may omit `SUPABASE_URL` and receives the local fixture
-origin. When `APP_ENV=local` and `SUPABASE_URL` is one of the two local
-fixture origins, FastAPI accepts `iss`
-`http://127.0.0.1:54321/auth/v1` or
-`http://host.docker.internal:54321/auth/v1`. Signature, `kid`, and `alg`
-still verify against the configured JWKS URL. Hosted laptop runtime uses
-the hosted origin (no local `iss` alias). Staging and production never
-expand aliases. Do not mutate `GOTRUE_JWT_ISSUER` to paper over this split.
+The default project `.env` is also used for that interpolation. A loopback
+`SUPABASE_URL` there overrides `.env.compose` and the service `env_file`,
+so the API rejects hosted browser JWTs with 401 `unauthorized`. Start with
+[`scripts/dev.ps1`](../../scripts/dev.ps1) (loads `.env.compose` into the
+process and refuses a loopback API Auth host).
+`APP_ENV=test` may omit `SUPABASE_URL` and receives a synthetic offline
+origin used only by unit tests. JWT verification accepts exactly one
+issuer `{SUPABASE_URL}/auth/v1`. Do not mutate `GOTRUE_JWT_ISSUER`.
 See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md),
-[ADR-hosted-runtime-local-test-fixture.md](../adr/ADR-hosted-runtime-local-test-fixture.md),
+[ADR-cloud-only-supabase-no-local-fixture.md](../adr/ADR-cloud-only-supabase-no-local-fixture.md),
 and [demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md).
 
 `X-Client-Version` is a request header, not an environment variable. New paid
@@ -166,7 +160,7 @@ enroll_enabled = true
 verify_enabled = true
 ```
 
-Restart Auth after changing that file: `npx supabase stop && npx supabase start`.
+Restart Auth from the hosted dashboard after changing MFA settings.
 Do not `db reset`. Playwright uses origin `http://127.0.0.1:3010`, which is
 listed in `additional_redirect_urls`. Local upload reserve still returns
 `signed_url=null` (CloudFront is Phase 10).

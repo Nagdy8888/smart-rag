@@ -13,7 +13,7 @@ from tests.contract.integration_support import (
     ensure_paradedb_arabic_normalizer,
     paradedb_psql,
     paradedb_reachable,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -60,7 +60,7 @@ def test_python_normalization_matches_fixture(case: _ArabicNormCase) -> None:
 def test_sql_normalization_matches_fixture_when_db_reachable() -> None:
     """Supabase ``search.normalize_arabic_v1`` matches Python for every fixture case."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Supabase Postgres unreachable at {url}")

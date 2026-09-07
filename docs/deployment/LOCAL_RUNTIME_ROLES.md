@@ -2,7 +2,7 @@
 title: Local runtime database roles
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-09-07
 audience: engineering, ops
 ---
 
@@ -10,8 +10,7 @@ audience: engineering, ops
 
 Local Compose API and worker must not connect as the Postgres superuser.
 Migration `app_api` / `app_worker` / `app_checkpointer` / `app_lightrag`
-remain **NOLOGIN** so `npx supabase db reset` and GRANT tests stay
-unchanged. Runtime containers use a dedicated **LOGIN** wrapper that can
+remain **NOLOGIN**. Runtime containers use a dedicated **LOGIN** wrapper that can
 `SET ROLE` those NOLOGIN roles.
 
 Related: [AUTHORIZATION_MODEL.md](../security/AUTHORIZATION_MODEL.md) ·
@@ -19,7 +18,6 @@ Related: [AUTHORIZATION_MODEL.md](../security/AUTHORIZATION_MODEL.md) ·
 [PROTECTED_MIGRATION_CREDENTIALS.md](../security/PROTECTED_MIGRATION_CREDENTIALS.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·
 [LOCAL_SETUP.md](../development/LOCAL_SETUP.md) ·
-[LOCAL_RELEASE_CANDIDATE.md](./LOCAL_RELEASE_CANDIDATE.md) ·
 [docs index](../README.md)
 
 ## Connect and SET ROLE
@@ -44,13 +42,11 @@ least-privilege story. The wrapper is a member of those roles so
 
 ## Create the LOGIN wrapper (operator SQL, not a migration)
 
-Run after `npx supabase db reset`. Do not commit the password. This is
-**not** a `supabase/migrations/` file so the CLI GRANT/NOLOGIN contract
-stays intact.
+Run against the cloud project with `OPERATOR_SUPABASE_DB_URL`. Do not commit
+the password. This is **not** a `supabase/migrations/` file so GRANT/NOLOGIN
+contracts stay intact.
 
-`.\scripts\ci\start_local_supabase_fixture.ps1` and
-`.\scripts\reset.ps1 -ConfirmReset` run this script after the local
-fixture is up. Daily `.\scripts\dev.ps1` does not start local Supabase.
+Daily `.\scripts\dev.ps1` does not create the wrapper.
 
 ```powershell
 uv run python scripts/ops/ensure_app_runtime_role.py
@@ -82,9 +78,10 @@ Reset drops this role. Re-run the script after every reset.
 | `LIGHTRAG_DB_URL` | api, worker | Optional hosted session/direct DSN; unset keeps LightRAG idle |
 
 Compose fails closed if those required names are missing. Do **not** set
-them to `postgresql://postgres:postgres@…` or `host.docker.internal:54322`.
-Host pytest may still use the local fixture superuser DSN; that DSN is
-for destructive reset/RLS tests, not Compose runtime.
+them to `postgresql://postgres:` DSNs. Host pytest may still use an
+explicit non-hosted operator DSN for opt-in destructive suites; that DSN
+is not Compose runtime. See
+[ADR-cloud-only-supabase-no-local-fixture.md](../adr/ADR-cloud-only-supabase-no-local-fixture.md).
 
 ## Storage Admin is not on the worker PID
 

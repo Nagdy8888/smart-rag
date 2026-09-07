@@ -57,21 +57,7 @@ As of 2026-08-16 the local full-repo Pyright count is **0** errors, so
 [PYRIGHT_BASELINE.md](./PYRIGHT_BASELINE.md). A workflow file is not remote
 execution evidence.
 
-**Future (not fake-green):** Supabase reset/RLS, LightRAG, retrieval evals, load, restore — Phases 2–10.
-
-Phase 9 Packet 1 candidate freeze/seed
-(`scripts/phase09_candidate.py`, `scripts/ci/check_phase09_packet1.py`),
-Packet 2 local CI/security gates (`scripts/ci/check_phase09_packet2.py`),
-Packet 3 quality/latency/BM25/graph measurement
-(`scripts/ci/check_phase09_packet3.py`), Packet 4
-foreground-plus-maintenance load (`scripts/ci/check_phase09_packet4.py`),
-Packet 5 worker/ParadeDB/Valkey fault recovery
-(`scripts/ci/check_phase09_packet5.py`), Packet 6 egress/tar-Trivy/
-disposable restore/ParadeDB rebuild
-(`scripts/ci/check_phase09_packet6.py`), and Packet 7 blocker/handoff
-classification (`scripts/ci/check_phase09_packet7.py`)
-are local gates. They are not added to the GitHub PR job graph. See
-[LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
+**Future (not fake-green):** LightRAG, retrieval evals, load, restore — Phases 3–10.
 
 Phase 10 Packet 1 managed-staging IaC/policy
 (`scripts/phase10_staging.py`, `scripts/ci/check_phase10_packet1.py`)

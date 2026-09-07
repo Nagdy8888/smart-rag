@@ -17,7 +17,7 @@ from smart_rag_core.query_answer.citations import (
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
 from smart_rag_core.query_fusion.models import PassageOrigin, ScoredPassage
 
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import require_supabase_db_url, try_connect
 from tests.support.answer_verifier import verifier_fusion, verifier_passage
 from tests.support.query_postgres import (
     admit,
@@ -110,7 +110,7 @@ def test_ensure_fusion_source_citations_backfills_model_gap() -> None:
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield a rollback Postgres connection or skip when local Supabase is down."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")

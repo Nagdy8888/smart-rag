@@ -24,7 +24,7 @@ from smart_rag_core.jobs.ledger import JobOperationLedger
 
 from tests.contract.integration_support import (
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
     typed_module_attr,
 )
@@ -50,7 +50,7 @@ CHECKPOINTER_MODULE = (
 def _require_postgres() -> psycopg.Connection:
     """Open Postgres or skip unless the job integration gate is required."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":
@@ -65,7 +65,7 @@ def postgres_url() -> Iterator[str]:
 
     connection = _require_postgres()
     connection.close()
-    yield resolve_supabase_db_url()
+    yield require_supabase_db_url()
 
 
 def test_langgraph_checkpoint_postgres_pin_matches_library() -> None:

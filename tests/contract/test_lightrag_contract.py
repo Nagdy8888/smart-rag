@@ -55,7 +55,7 @@ from smart_rag_core.settings import SharedSettings
 
 from tests.contract.integration_support import (
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -77,7 +77,7 @@ def _require_postgres() -> tuple[str, LightRagPostgresParams]:
         pytest.fail: When the integration gate is required and Postgres is down.
     """
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":
@@ -239,7 +239,7 @@ async def _bootstrap_fingerprint_second_init_and_no_age(
     """
 
     schema_name = _schema_name()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = psycopg.connect(url)
     embedding_gateway, model_gateway = _gateways()
     session = None
@@ -324,7 +324,7 @@ async def _workspace_isolation_and_postgres_workspace_override(
     """
 
     schema_name = _schema_name()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = psycopg.connect(url)
     embedding_gateway, model_gateway = _gateways()
     session_a = None
@@ -432,7 +432,7 @@ async def _ids_sources_duplicates_and_identical_content_gate(
     """
 
     schema_name = _schema_name()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = psycopg.connect(url)
     embedding_gateway, model_gateway = _gateways()
     session = None
@@ -548,7 +548,7 @@ async def _query_callbacks_bounds_delete_status_and_cancel(
     """
 
     schema_name = _schema_name()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = psycopg.connect(url)
     embedding_gateway, model_gateway = _gateways()
     session = None
@@ -680,7 +680,7 @@ async def _batch_ainsert_ids_delete_independently(
         "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:cccccccc-cccc-cccc-cccc-cccccccccccc"
     )
     schema_name = _schema_name()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = psycopg.connect(url)
     embedding_gateway, model_gateway = _gateways()
     session = None

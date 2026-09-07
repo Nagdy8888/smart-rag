@@ -23,7 +23,7 @@ from smart_rag_core.tables.resolver import PostgresTableResolver, TableResolveEr
 from smart_rag_core.tables.service import structured_table_query
 
 from tests.contract.hybrid_retrieval_seed import seed_hybrid_retrieval_fixture
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import require_supabase_db_url, try_connect
 
 
 def _arrow_type(name: str) -> object:
@@ -68,7 +68,7 @@ def db_connection() -> Iterator[psycopg.Connection]:
         Superuser connection.
     """
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")

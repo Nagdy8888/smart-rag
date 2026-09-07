@@ -49,7 +49,6 @@ REQUIRED_JOURNEY_MARKERS = (
     "session_revoked",
     "rate_limited",
     "budget_exhausted",
-    "test_thin_developer_ui_live.py",
     "phase08-journeys.spec.ts",
     "unverified-live",
     "proven",

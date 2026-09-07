@@ -49,7 +49,7 @@ from smart_rag_core.settings.base import (
 
 from tests.contract.integration_support import (
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -79,7 +79,7 @@ def _require_postgres() -> tuple[str, LightRagPostgresParams]:
         pytest.fail: When the integration gate is required and Postgres is down.
     """
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":

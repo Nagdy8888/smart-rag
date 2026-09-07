@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-20
+last-reviewed: 2026-09-07
 audience: engineering, ops
 ---
 
@@ -63,7 +63,7 @@ ClamAV engine image pin (local Compose): `clamav/clamav:stable@sha256:78810772a9
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Promotion saga idempotency | key | `{operation_key}:promotion` | — | Plan Packet 3 | worker | resume from ledger step | Duplicate destination objects |
 | Authoritative object reference | policy | one destination path post-DB-switch | — | Plan Packet 3 | worker | reconciler; no parse success | Orphan accepted object detected |
-| Admin notification kinds | policy | byte_spike, quarantine_accumulation, repeated_scan_failure | — | Phase 2 seeds | worker/api | durable row + Inbucket locally | Missing alert on anomaly fixture |
+| Admin notification kinds | policy | byte_spike, quarantine_accumulation, repeated_scan_failure | — | Phase 2 seeds | worker/api | durable row + optional operator SMTP | Missing alert on anomaly fixture |
 | Metadata governance policy version | text | `2026-08-13` | — | Packet 1 sign-off | worker | deny promotion | Policy drift without sign-off |
 
 ## Priority ordering
@@ -299,10 +299,9 @@ uv run pytest tests/unit/test_embedding_service.py tests/unit/test_phase3_graph_
 docker compose --profile parser-build build parser-sandbox
 ```
 
-When local Supabase and ParadeDB are running, apply migrations and run integration contracts:
+When ParadeDB sidecars are running, apply cloud migrations and run integration contracts:
 
 ```bash
-pnpm exec supabase db reset --yes
 docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --wait clamav paradedb crawl-proxy
 docker compose --env-file .env.compose --profile parser-build build parser-sandbox
 uv run pytest tests/contract/test_job_leases.py tests/contract/test_hybrid_lifecycle.py tests/contract/test_hybrid_ready_e2e.py tests/contract/test_crawl_proxy_live.py tests/contract/test_clamav_scan.py -q

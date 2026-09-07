@@ -1,9 +1,8 @@
-"""Create or rotate the local LOGIN wrapper ``app_runtime``.
+"""Create or rotate the LOGIN wrapper ``app_runtime``.
 
 ``app_api`` / ``app_worker`` stay NOLOGIN. Compose connects as this wrapper
-then ``SET ROLE``. This is operator SQL, not a migration, so
-``npx supabase db reset`` GRANT tests stay unchanged. Re-run after every
-reset.
+then ``SET ROLE``. This is operator SQL against the cloud project, not a
+migration. Re-run after rotating the wrapper password.
 """
 
 from __future__ import annotations
@@ -16,9 +15,9 @@ import psycopg
 from psycopg import sql
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ADMIN_DSN = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 RUNTIME_WRAPPER_ENV = "APP_RUNTIME_DB_PASSWORD"
 GRANTED_ROLES = ("app_api", "app_worker", "app_checkpointer", "app_lightrag")
+OPERATOR_DSN_ENV = "OPERATOR_SUPABASE_DB_URL"
 
 
 def parse_env(path: Path) -> dict[str, str]:
@@ -72,6 +71,32 @@ def upsert_env(path: Path, key: str, value: str) -> None:
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
+def resolve_admin_dsn() -> str:
+    """Return the operator DSN for creating or rotating ``app_runtime``.
+
+    Reads ``OPERATOR_SUPABASE_DB_URL`` from the process environment first,
+    then from gitignored ``.env.compose``. There is no local fixture default.
+
+    Returns:
+        Non-empty operator Postgres DSN. Never logged.
+
+    Raises:
+        RuntimeError: When the variable is unset in both sources.
+    """
+
+    process_value = os.environ.get(OPERATOR_DSN_ENV, "").strip()
+    if process_value:
+        return process_value
+    compose_value = (
+        parse_env(REPO_ROOT / ".env.compose").get(OPERATOR_DSN_ENV, "").strip()
+    )
+    if compose_value:
+        return compose_value
+    raise RuntimeError(
+        "OPERATOR_SUPABASE_DB_URL is required; the local fixture default was removed"
+    )
+
+
 def resolve_runtime_password() -> str:
     """Return ``APP_RUNTIME_DB_PASSWORD`` from env files, generating if needed.
 
@@ -102,11 +127,11 @@ def ensure_role(*, admin_dsn: str, password: str) -> None:
     """Create ``app_runtime`` and grant NOLOGIN application roles.
 
     Args:
-        admin_dsn: Local superuser DSN used only for this operator script.
+        admin_dsn: Operator Postgres DSN used only for this script.
         password: LOGIN password for ``app_runtime``.
 
     Raises:
-        psycopg.Error: When local Postgres is unreachable or GRANT fails.
+        psycopg.Error: When Postgres is unreachable or GRANT fails.
     """
 
     with psycopg.connect(admin_dsn, connect_timeout=10) as connection:
@@ -144,23 +169,21 @@ def main() -> int:
     """Ensure the Compose LOGIN wrapper exists and env files carry its password.
 
     Returns:
-        ``0`` on success, ``1`` when local Postgres is down or roles missing.
+        ``0`` on success, ``1`` when the operator DSN is missing, Postgres
+        is unreachable, or required roles are missing.
 
     Side Effects:
-        Connects as local ``postgres``. Writes gitignored env files. Prints
+        Connects as the operator role. Writes gitignored env files. Prints
         role name and password length only.
     """
 
     password = resolve_runtime_password()
     print(f"{RUNTIME_WRAPPER_ENV}_len={len(password)}")
     try:
-        ensure_role(admin_dsn=ADMIN_DSN, password=password)
+        ensure_role(admin_dsn=resolve_admin_dsn(), password=password)
     except psycopg.Error as exc:
-        print(f"local Postgres unavailable: {type(exc).__name__}")
-        print(
-            "Re-run after supabase is up: uv run python "
-            "scripts/ops/ensure_app_runtime_role.py"
-        )
+        print(f"Postgres unavailable: {type(exc).__name__}")
+        print("Check OPERATOR_SUPABASE_DB_URL and network access to the cloud pooler")
         return 1
     except RuntimeError as exc:
         print(str(exc))

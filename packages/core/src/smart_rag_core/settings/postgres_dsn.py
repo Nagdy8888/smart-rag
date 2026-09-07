@@ -2,8 +2,8 @@
 
 Transaction-pooler URLs (Supavisor/PgBouncer transaction mode) are rejected
 using documented signals only: TCP port ``6543`` and ``pgbouncer=true``.
-Session-mode pooler URLs on port ``5432`` and local direct ports such as
-``54322`` remain accepted. Error messages never echo the DSN.
+Session-mode pooler URLs on port ``5432`` and other direct ports remain
+accepted. Error messages never echo the DSN.
 """
 
 from __future__ import annotations

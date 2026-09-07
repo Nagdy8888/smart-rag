@@ -132,7 +132,6 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         supabase_url=str(settings.supabase_url),
         audience=settings.supabase_jwt_audience,
         cache_seconds=settings.jwks_cache_seconds,
-        app_env=settings.app_env.value,
     )
     application.state.query_run_registry = QueryRunRegistry()
     adapter = await bind_process_runtime_adapter(

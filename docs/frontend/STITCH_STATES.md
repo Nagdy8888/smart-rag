@@ -2,7 +2,7 @@
 title: Visible UI state matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-09-07
 audience: design, frontend, reviewers
 packet: P07-03
 ---
@@ -65,7 +65,7 @@ challenge. Those failures are Auth-provider generic copy only.
 | Env missing | no `NEXT_PUBLIC_SUPABASE_*` | Public Auth configuration is missing | set env |
 | Google omitted | `enabled=false` | No Google button is rendered | GAP-07-04 |
 | Sign-up | Auth `signUp` | invitation may still be required | accept invite |
-| Reset sent | Auth reset | Check your email (Inbucket locally) | none |
+| Reset sent | Auth reset | Check your email | none |
 | Callback loading | `/auth/callback` | Completing sign-in | none |
 | Callback failed | exchange error | Sign-in could not be completed | sign-in |
 | MFA enroll empty | aal1, not enrolled | Enroll authenticator | Auth TOTP |

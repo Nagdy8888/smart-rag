@@ -2,7 +2,7 @@
 title: Protected migration and privileged credentials
 owner: engineering-lead
 status: proven-local / iac-reviewed-managed / unverified-live
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-07
 audience: engineering, security, ops
 phase_packet: Phase 10 Packet 2
 ---
@@ -14,7 +14,7 @@ phase_packet: Phase 10 Packet 2
 | Item | Local practice |
 | --- | --- |
 | Bootstrap / migration DB password | Developer `.env` / `.env.compose` (**gitignored**) |
-| Supabase CLI | `npx supabase db reset` / `migration up` using local stack credentials |
+| Schema apply | Supabase MCP `apply_migration` or the SSM `psql` job against the cloud project |
 | Runtime containers | `api` / `worker` / `frontend` receive only least-privilege URLs (`app_api`, BM25 reader/writer, Valkey) |
 | Auth Admin secret | Isolated boundary module only (`apps/backend/.../auth_admin/`); absent from `SharedSettings` / `BackendSettings` |
 | Storage Admin secret | Isolated boundary modules only (`apps/backend/.../storage_admin/` and worker `privileged_storage`); absent from `SharedSettings` / `BackendSettings` / `WorkerSettings` / `AgentSettings` |

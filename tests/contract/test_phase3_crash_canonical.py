@@ -10,7 +10,7 @@ import pytest
 
 from tests.contract.integration_support import (
     read_process_env,
-    resolve_supabase_db_url,
+    require_supabase_db_url,
     try_connect,
 )
 
@@ -19,7 +19,7 @@ from tests.contract.integration_support import (
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield Postgres or skip unless the job integration gate is required."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         if read_process_env("SMART_RAG_REQUIRE_JOB_INTEGRATION") == "1":

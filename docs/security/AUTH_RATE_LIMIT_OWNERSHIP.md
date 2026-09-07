@@ -19,7 +19,7 @@ claim to protect browser-direct Supabase Auth traffic.
 | Invitation create/accept, offboarding (FastAPI-mediated) | FastAPI Valkey limits then Postgres `private.consume_auth_rate_limit` | Postgres when Valkey unset; dual failure 503 + Retry-After | `test_auth_rate_limits.py` |
 | Query admission / chat starts / uploads / crawls / admin mutations | FastAPI COST_MUTATION or AUTH_ADJACENT | Same fail-closed path | Packet 1 + packet 5 tests |
 | Authenticated low-risk reads | FastAPI Valkey; on Valkey loss per-process emergency limiter | Emits `rate_limit_degraded`; readiness degraded until Valkey recovers | `test_low_risk_read_emergency_limiter_is_audited`, `test_valkey_success_emits_recovered_after_emergency` |
-| Anonymous sign-in | Disabled (`enable_anonymous_sign_ins = false`) | N/A | `supabase/config.toml` |
+| Anonymous sign-in | Disabled (`enable_anonymous_sign_ins = false`) | N/A | Hosted Auth dashboard |
 
 FastAPI never throttles browser-direct Auth. The FastAPI limiter is a
 different owner from hosted Auth.

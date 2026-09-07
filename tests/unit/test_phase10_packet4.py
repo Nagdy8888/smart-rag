@@ -159,7 +159,6 @@ def test_hs256_is_rejected_without_auth_outage(
         supabase_url="http://127.0.0.1:54321",
         audience="authenticated",
         cache_seconds=600,
-        app_env="local",
     )
     valid = _sign_es256(private_key, kid=_KID_ACTIVE)
     assert verifier.verify_access_token(valid).algorithm == "ES256"
@@ -210,7 +209,6 @@ def test_jwks_rollover_keeps_valid_and_rejects_unknown(
         supabase_url="http://127.0.0.1:54321",
         audience="authenticated",
         cache_seconds=600,
-        app_env="local",
     )
     old_token = _sign_es256(active, kid=_KID_ACTIVE)
     new_token = _sign_es256(standby, kid=_KID_STANDBY)
@@ -221,7 +219,6 @@ def test_jwks_rollover_keeps_valid_and_rejects_unknown(
         supabase_url="http://127.0.0.1:54321",
         audience="authenticated",
         cache_seconds=600,
-        app_env="local",
     )
     with pytest.raises(JwksVerificationError, match="unknown kid"):
         verifier_retired.verify_access_token(old_token)

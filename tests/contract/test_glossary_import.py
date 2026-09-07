@@ -25,7 +25,7 @@ from smart_rag_core.glossary.models import (
 from smart_rag_core.glossary.validation import GlossaryValidationError
 from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
-from tests.contract.integration_support import resolve_supabase_db_url, try_connect
+from tests.contract.integration_support import require_supabase_db_url, try_connect
 
 
 def _insert_auth_user(cursor: psycopg.Cursor, user_id: object, email: str) -> None:
@@ -64,7 +64,7 @@ def _insert_auth_user(cursor: psycopg.Cursor, user_id: object, email: str) -> No
 def db_connection() -> Iterator[psycopg.Connection]:
     """Yield one Postgres connection or skip when Supabase is unreachable."""
 
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     connection = try_connect(url)
     if connection is None:
         pytest.skip(f"Local Supabase Postgres unreachable at {url}")
@@ -129,7 +129,7 @@ def test_owner_import_approve_projects_aliases_and_rollback_removes_them(
 
     owner_id = uuid4()
     member_id = uuid4()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     with db_connection.cursor() as cursor:
         _insert_auth_user(cursor, owner_id, f"{owner_id}@example.com")
         _insert_auth_user(cursor, member_id, f"{member_id}@example.com")
@@ -218,7 +218,7 @@ def test_member_glossary_import_is_forbidden(db_connection: psycopg.Connection) 
     """Members cannot import glossary rows through the RPC."""
 
     member_id = uuid4()
-    url = resolve_supabase_db_url()
+    url = require_supabase_db_url()
     with db_connection.cursor() as cursor:
         _insert_auth_user(cursor, member_id, f"{member_id}@example.com")
         cursor.execute(
