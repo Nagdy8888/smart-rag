@@ -46,5 +46,5 @@ if [[ "$auth_host" == "127.0.0.1" || "$auth_host" == "localhost" || "$auth_host"
   exit 1
 fi
 echo "API Auth JWKS host: $auth_host"
-echo "Canonical data: hosted Supabase (not local :54322)"
+echo "Canonical data: hosted Supabase"
 echo "Stop with: ./scripts/stop.sh"
