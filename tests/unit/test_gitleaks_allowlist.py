@@ -4,9 +4,47 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from typing import cast
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GITLEAKS_TOML = REPO_ROOT / ".gitleaks.toml"
+
+
+def _toml_object(value: object, *, label: str) -> dict[str, object]:
+    """Return a string-keyed object from parsed TOML.
+
+    Args:
+        value: Candidate mapping from ``tomllib``.
+        label: Field name used in the assertion message.
+
+    Returns:
+        The same mapping with a ``dict[str, object]`` type.
+
+    Raises:
+        AssertionError: If ``value`` is not a mapping.
+    """
+
+    assert isinstance(value, dict), f"{label} must be a TOML table"
+    return cast(dict[str, object], value)
+
+
+def _string_values(value: object) -> list[str]:
+    """Return TOML array values as strings.
+
+    Args:
+        value: Candidate array from an allowlist table.
+
+    Returns:
+        Each array element, which must already be a string.
+    """
+
+    if not isinstance(value, list):
+        return []
+    items: list[str] = []
+    for raw_item in cast(list[object], value):
+        assert isinstance(raw_item, str)
+        items.append(raw_item)
+    return items
 
 
 def _allowlists() -> list[dict[str, object]]:
@@ -16,10 +54,17 @@ def _allowlists() -> list[dict[str, object]]:
         Allowlist objects from ``.gitleaks.toml``.
     """
 
-    parsed = tomllib.loads(GITLEAKS_TOML.read_text(encoding="utf-8"))
+    parsed = _toml_object(
+        tomllib.loads(GITLEAKS_TOML.read_text(encoding="utf-8")),
+        label="gitleaks root",
+    )
     tables = parsed.get("allowlists")
-    assert isinstance(tables, list)
-    return [item for item in tables if isinstance(item, dict)]
+    if not isinstance(tables, list):
+        return []
+    loaded: list[dict[str, object]] = []
+    for raw_table in cast(list[object], tables):
+        loaded.append(_toml_object(raw_table, label="allowlist"))
+    return loaded
 
 
 def _joined_paths() -> str:
@@ -31,9 +76,7 @@ def _joined_paths() -> str:
 
     chunks: list[str] = []
     for table in _allowlists():
-        paths = table.get("paths")
-        if isinstance(paths, list):
-            chunks.extend(str(item) for item in paths)
+        chunks.extend(_string_values(table.get("paths")))
     return "\n".join(chunks)
 
 
@@ -46,9 +89,7 @@ def _joined_regexes() -> str:
 
     chunks: list[str] = []
     for table in _allowlists():
-        regexes = table.get("regexes")
-        if isinstance(regexes, list):
-            chunks.extend(str(item) for item in regexes)
+        chunks.extend(_string_values(table.get("regexes")))
     return "\n".join(chunks)
 
 
