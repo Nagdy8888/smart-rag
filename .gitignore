@@ -88,6 +88,9 @@ tfplan.*
 supabase/.temp/
 supabase/.branches/
 
+# Local Codex CLI state
+.codex/
+
 # OS / editor backups
 *~
 
