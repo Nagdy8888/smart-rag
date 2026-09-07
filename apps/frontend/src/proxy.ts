@@ -4,14 +4,18 @@
  * Optimistic redirects are convenience only. FastAPI still authorizes every
  * Bearer call. Missing cookies are not the security boundary.
  *
+ * Missing ``NEXT_PUBLIC_SUPABASE_URL`` or ``NEXT_PUBLIC_SUPABASE_ANON_KEY``
+ * is treated as signed-out so unauthenticated document routes still redirect
+ * to ``/login`` (CI Playwright has no hosted Auth env).
+ *
  * Do not add `middleware.ts` beside this file.
  */
 
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
-import { isPublicAuthPath } from "./lib/auth/paths";
-import { isRetiredProductPath } from "./lib/shell-navigation";
 import { AUTH_CLAIMS_TIMEOUT_MS, raceTimeout } from "./lib/auth/timeout";
+import { hasPublicSupabaseConfig, isPublicAuthPath } from "./lib/auth/paths";
+import { isRetiredProductPath } from "./lib/shell-navigation";
 
 /**
  * Copy refreshed Auth cookies onto a redirect so PKCE/session is not dropped.
@@ -37,42 +41,41 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   let supabaseResponse = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    return supabaseResponse;
-  }
-
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => {
-          request.cookies.set(name, value);
-        });
-        supabaseResponse = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) => {
-          supabaseResponse.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
-
-  let signedIn = false;
-  try {
-    const { data } = await raceTimeout(
-      supabase.auth.getClaims(),
-      AUTH_CLAIMS_TIMEOUT_MS,
-      "auth_claims_timeout",
-    );
-    signedIn = Boolean(data?.claims);
-  } catch {
-    signedIn = false;
-  }
   const { pathname } = request.nextUrl;
 
   if (isRetiredProductPath(pathname)) {
     return supabaseResponse;
+  }
+
+  let signedIn = false;
+  if (hasPublicSupabaseConfig(url, anonKey) && url && anonKey) {
+    const supabase = createServerClient(url, anonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    });
+
+    try {
+      const { data } = await raceTimeout(
+        supabase.auth.getClaims(),
+        AUTH_CLAIMS_TIMEOUT_MS,
+        "auth_claims_timeout",
+      );
+      signedIn = Boolean(data?.claims);
+    } catch {
+      signedIn = false;
+    }
   }
 
   if (!signedIn && !isPublicAuthPath(pathname)) {

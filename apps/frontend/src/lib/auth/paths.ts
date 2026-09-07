@@ -31,3 +31,21 @@ export function isPublicAuthPath(pathname: string): boolean {
     (prefix) => prefix.endsWith("/") && pathname.startsWith(prefix),
   );
 }
+
+/**
+ * Return whether missing public Auth env is treated as signed-out.
+ *
+ * The Next proxy must not skip login redirects when
+ * ``NEXT_PUBLIC_SUPABASE_URL`` or the anon key is unset. FastAPI remains
+ * the security boundary.
+ *
+ * @param url - ``NEXT_PUBLIC_SUPABASE_URL``, possibly empty.
+ * @param anonKey - ``NEXT_PUBLIC_SUPABASE_ANON_KEY``, possibly empty.
+ * @returns True when both values are non-empty.
+ */
+export function hasPublicSupabaseConfig(
+  url: string | undefined,
+  anonKey: string | undefined,
+): boolean {
+  return Boolean(url && anonKey);
+}
