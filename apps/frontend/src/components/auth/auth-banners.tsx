@@ -14,6 +14,10 @@ import { publicQueryKeys } from "../../lib/query-keys";
 /**
  * Env-missing banner for Auth screens.
  *
+ * First-paint configuration copy stays an alert for AT, but does not
+ * `focus()` so the skip link remains the first Tab stop (CI Playwright
+ * and WCAG 2.4.1). Dynamic 426/402 banners still auto-focus.
+ *
  * @returns Banner, or null when public config is present.
  */
 export function EnvMissingBanner() {
@@ -21,7 +25,7 @@ export function EnvMissingBanner() {
     return null;
   }
   return (
-    <StatusBanner kind="error" role="alert">
+    <StatusBanner kind="error" role="alert" autoFocus={false}>
       Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
     </StatusBanner>
   );
