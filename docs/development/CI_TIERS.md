@@ -2,7 +2,7 @@
 title: CI tiers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-07
 audience: engineering
 ---
 
@@ -133,8 +133,12 @@ checkbox or setting the wrapper complete is Failed. See
 
 Actions are pinned by commit SHA. The caller workflows use
 `permissions: contents: read`; the secret scanner disables PR comments and
-artifact upload. A local workflow definition is not remote execution
-evidence, so a GitHub run URL and conclusion must be recorded separately.
+artifact upload. Nightly `schedule` runs Gitleaks across the full git
+history, while `push` scans only new commits; `.gitleaks.toml` must
+allowlist inert canaries, empty example key names, Action pin SHAs, and
+Phase 9 image digests or Nightly preflight stays red. A local workflow
+definition is not remote execution evidence, so a GitHub run URL and
+conclusion must be recorded separately.
 
 GitHub-hosted Ubuntu runners block the Chromium sandbox required by Mermaid
 CLI. After the locked Node install, PR and nightly jobs use the pinned Puppeteer

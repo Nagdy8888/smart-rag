@@ -28,11 +28,12 @@ regexes = [
 ]
 
 [[allowlists]]
-description = "Published local Supabase demo anon JWT for Playwright against GoTrue"
+description = "Published local Supabase demo anon JWT for Playwright and CI frontend build"
 condition = "AND"
 regexTarget = "line"
 paths = [
   '''(?:^|/)apps/frontend/playwright\.config\.ts$''',
+  '''(?:^|/)scripts/check\.py$''',
 ]
 regexes = [
   '''eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24i''',
@@ -43,12 +44,45 @@ description = "Inert LangSmith leak canary, not a live provider key"
 condition = "AND"
 regexTarget = "line"
 paths = [
-  '''(?:^|/)tests/unit/test_langsmith_tracing\.py$''',
-  '''(?:^|/)tests/unit/test_query_agent_eval_trace\.py$''',
-  '''(?:^|/)tests/unit/test_ingest_trace\.py$''',
+  '''(?:^|/)tests/.+$''',
 ]
 regexes = [
   '''sk-canarysecretFORBID''',
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.canarypayload\.signature''',
+]
+
+[[allowlists]]
+description = "Empty hosted-ingest example key names with no values"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)\.env\.hosted-ingest\.example$''',
+]
+regexes = [
+  '''OPENAI_API_KEY=''',
+  '''LANGSMITH_API_KEY=''',
+]
+
+[[allowlists]]
+description = "Pinned GitHub Action commit SHA, not a credential"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)packages/core/src/smart_rag_core/release/phase10_constants\.py$''',
+]
+regexes = [
+  '''CONFIGURE_AWS_CREDENTIALS_SHA = "[0-9a-f]{40}"''',
+]
+
+[[allowlists]]
+description = "Phase 9 evidence image digests and rebuild SHA-256 values"
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''(?:^|/)docs/deployment/phase-09/.+\.json$''',
+]
+regexes = [
+  '''sha256:[0-9a-f]{64}''',
 ]
 
 [[allowlists]]
