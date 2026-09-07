@@ -44,8 +44,7 @@ Related: [infra/ec2](../../infra/ec2/README.md) ·
 [packet1-live-supabase.json](./phase-10/packet1-live-supabase.json) ·
 [packet1-live-vercel.json](./phase-10/packet1-live-vercel.json) ·
 [staging secrets runbook](../runbooks/phase10-staging-secrets.md) ·
-[demo local ingest / AWS ask](../runbooks/demo-local-ingest-aws-ask.md) ·
-[LOCAL_RELEASE_CANDIDATE.md](./LOCAL_RELEASE_CANDIDATE.md)
+[demo local ingest / AWS ask](../runbooks/demo-local-ingest-aws-ask.md)
 
 ## Intended plan, features, and regions
 

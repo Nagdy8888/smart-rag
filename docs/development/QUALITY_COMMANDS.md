@@ -19,14 +19,6 @@ uv run python scripts/check.py --tier frontend
 uv run python scripts/check.py --tier fast
 uv run python scripts/ci/check_openapi.py
 uv run python scripts/ci/check_migrations.py
-uv run python scripts/phase09_candidate.py all
-uv run python scripts/ci/check_phase09_packet1.py
-uv run python scripts/ci/check_phase09_packet2.py --mode candidate
-uv run python scripts/ci/check_phase09_packet3.py --mode candidate
-uv run python scripts/ci/check_phase09_packet4.py
-uv run python scripts/ci/check_phase09_packet5.py
-uv run python scripts/ci/check_phase09_packet6.py
-uv run python scripts/ci/check_phase09_packet7.py
 uv run python scripts/phase10_staging.py assert-iac
 uv run python scripts/ci/check_phase10_packet1.py
 uv run python scripts/ci/check_phase10_packet2.py
@@ -52,147 +44,9 @@ hosted or ParadeDB prerequisites are unavailable, which keeps dependency-only
 CI deterministic. DB-backed schema/RLS suites are opt-in via explicit
 `SUPABASE_DB_URL` (they refuse hosted `*.supabase.co`).
 
-The Phase 9 Packet 1 candidate gate freezes digest-bound images, unpublished
-private ports, and the approved open-split corpus. It is local-only and is
-not a GitHub PR job. Zero collected Packet 1 tests fail the gate. Live
-Compose/Supabase artifact checks skip unless
-`SMART_RAG_REQUIRE_PHASE09_CANDIDATE=1`. See
-[LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
-
-Do not retry Packet 1 Trivy via `docker run aquasec/trivy` mounting
-`docker.sock` on this Windows host: the 2026-08-17 attempt hung Docker
-Desktop (HTTP 500), left WSL `vmmemWSL` StopPending, and filled the disk
-with a Docker Desktop updater download. Packet 6 scans exact images with
-`docker save` plus `trivy image --input` tar only. Compact Packet 1 scan
-status remains Blocked in
+Phase 9 local release-candidate CLI was retired. Compact Packet 1 scan
+status remains historical in
 `docs/deployment/phase-09/candidate-scan-summary.json`.
-
-```powershell
-uv run python scripts/phase09_candidate.py all
-uv run python scripts/ci/check_phase09_packet1.py
-```
-
-The Phase 9 Packet 2 gate is also local-only and is not a GitHub PR job. It
-fail-closes on zero collection, failures, errors, or skipped mandatory local
-tests. `--mode candidate` uses unpublished ParadeDB via `docker compose exec`.
-`--mode overlay` requires `docker-compose.packet8.yml` already attached for
-ClamAV, crawl-proxy, and host-side BM25 tests; detach the overlay afterward
-and re-prove unpublished ports. Overlay merge must use `--merge-artifact` so
-candidate suite rows are not clobbered. Do not set
-`SMART_RAG_HOLDOUT_ACCESS=true`. Old-API/new-schema authenticated smoke is
-`scripts/ci/check_old_api_new_schema_smoke.py` plus
-`smart_rag_core.release.old_api_smoke`. Unset or missing
-`SMART_RAG_OLD_API_IMAGE` classifies Blocked (not a pytest skip and not
-zero-collection success). The env must not equal the Packet 1 freeze API
-Id. Packet 2/7 consume that classification. Managed
-JWKS/CDN/KMS/OIDC/restore/assessment stay Phase 10 handoffs. Do not retry
-Trivy via docker.sock.
-
-```powershell
-uv run python scripts/ci/check_phase09_packet2.py --mode candidate
-uv run python scripts/ci/check_openapi.py
-uv run python scripts/ci/check_migrations.py
-uv run python scripts/phase09_candidate.py seed
-uv run python scripts/phase09_candidate.py sizing
-docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --no-build --wait clamav paradedb crawl-proxy
-$env:SMART_RAG_REQUIRE_CLAMAV = "1"
-$env:SMART_RAG_REQUIRE_CRAWL_PROXY = "1"
-uv run python scripts/ci/check_phase09_packet2.py --mode overlay --merge-artifact
-Remove-Item Env:SMART_RAG_REQUIRE_CLAMAV
-Remove-Item Env:SMART_RAG_REQUIRE_CRAWL_PROXY
-docker compose --env-file .env.compose -f docker-compose.yml up -d --no-build --wait --remove-orphans
-uv run python scripts/phase09_candidate.py ports-static
-uv run python scripts/phase09_candidate.py health
-```
-
-The Phase 9 Packet 3 gate is local-only and is not a GitHub PR job. It
-fail-closes on zero collection, failures, errors, skipped mandatory local
-tests, Packet 2 corpus-identity drift, unmapped gold UUIDs, or mock embeddings
-labeled `qt_eval_006_live=true`. `--mode candidate` uses unpublished ParadeDB
-via compose exec plus in-memory profile/coverage scoring. `--mode overlay`
-requires `docker-compose.packet8.yml` already attached for host BM25 typed
-query/injection/delete/reconcile and `eval_phase4_ranked_ids.py --live` on
-the Packet 2 7-case sidecar (`docs/deployment/phase-09/candidate-gold-id-map.json`).
-Detach the overlay afterward and re-prove unpublished ports. Overlay merge
-must use `--merge-artifact`. Do not set `SMART_RAG_HOLDOUT_ACCESS=true`. Do
-not label mock Recall@K as live QT-EVAL-006. Do not rewrite Phase 4/5 freeze
-markdown from this gate. Overlay recreate empties ParadeDB; Packet 4 must
-re-project through existing `Bm25ProjectionService` without changing Packet 2
-document ids.
-
-```powershell
-uv run python scripts/ci/check_phase09_packet3.py --mode candidate
-docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --no-build --wait paradedb
-uv run python scripts/ci/check_phase09_packet3.py --mode overlay --merge-artifact
-docker compose --env-file .env.compose -f docker-compose.yml up -d --no-build --wait --remove-orphans
-uv run python scripts/phase09_candidate.py health
-```
-
-The Phase 9 Packet 4 gate is local-only and is not a GitHub PR job. It
-fail-closes on zero collection, failures, errors, skipped mandatory local
-tests, Packet 2 corpus-identity drift, Packet 1 image-Id drift, or an empty
-required BM25 re-projection. Candidate compose is `docker-compose.yml` only.
-If overlay host ports are published, the runner detaches with
-`--no-build --wait --remove-orphans` and re-proves unpublished ports.
-BM25 is re-projected through existing `Bm25ProjectionService` inside the
-frozen worker (stdin corpus JSON onto `/tmp`; no image rebuild, no
-SQL-stamped Hybrid/Graph Ready). Load stays on the labeled 8-doc subset.
-Do not claim QT-CAP-001/002/003. Do not kill worker/ParadeDB/Valkey (Packet
-5). Managed pooling/EC2/CDN stay Phase 10 Not Run. Do not set
-`SMART_RAG_HOLDOUT_ACCESS=true`. Do not retry Trivy via docker.sock.
-
-```powershell
-uv run python scripts/ci/check_phase09_packet4.py
-uv run python scripts/phase09_candidate.py health
-```
-
-The Phase 9 Packet 5 gate is local-only and is not a GitHub PR job. It
-fail-closes on zero collection, failures, errors, skipped mandatory local
-tests, Packet 2 corpus-identity drift, or Packet 1 image-Id drift. Candidate
-compose is `docker-compose.yml` only. It kills, denies, fills, and restarts
-worker/ParadeDB/Valkey, then restores them. It does not destroy the ParadeDB
-volume (Packet 6), rebuild images, or set `SMART_RAG_HOLDOUT_ACCESS=true`.
-Named Valkey ACL users and managed CDN SSE faults stay Phase 10. Packet 5
-ASGI resume/heartbeat is the local Packet 5 proof. Live docker EventSource
-JWT iss split was repaired in Packet 7 (`APP_ENV=local` hostname pair).
-
-```powershell
-uv run python scripts/ci/check_phase09_packet5.py
-uv run python scripts/phase09_candidate.py health
-```
-
-The Phase 9 Packet 6 gate is local-only. It fail-closes on zero collection,
-Failed egress tests, unresolved Critical Trivy findings, live-database
-overwrite, or ParadeDB-as-canonical backup. Trivy uses ``docker save`` plus
-``trivy image --input`` tar only. Do not remount docker.sock. Restore uses a
-disposable database, then drops it. ParadeDB volume destroy happens only after
-that inventory. Do not set `SMART_RAG_HOLDOUT_ACCESS=true`.
-
-```powershell
-uv run python scripts/ci/check_phase09_packet6.py
-uv run python scripts/phase09_candidate.py health
-```
-
-The Phase 9 Packet 7 gate is local-only. It classifies remaining local
-blockers and the Phase 10 managed handoff. It does not rebuild images, open
-holdout, check the Packet 7 checkbox, or set the Phase 9 wrapper complete.
-After Phase 9 close, re-running this script fails P09-07-E because the
-wrapper is complete; that is expected. Unresolved Critical Trivy findings
-keep P09-07-A Failed (no-go). The distroless/Alpine freeze reports
-Critical=0. Old-API smoke uses the running Compose ``api`` image as the
-current slot. Set `SMART_RAG_OLD_API_IMAGE` to a prior digest that is not
-that running Id. The advertised envelope is QT-CAP-001-P9 / QT-CAP-002-P9.
-Live 70% pause is measured with:
-
-```powershell
-uv run python scripts/ci/check_phase09_seventy_live.py
-```
-
-```powershell
-uv run python scripts/ci/check_old_api_new_schema_smoke.py
-uv run python scripts/ci/check_phase09_packet7.py
-uv run python scripts/phase09_candidate.py health
-```
 
 Tiers hard-fail (no `|| true`). Zero collected tests fail the unit/contract tiers.
 The `lint` tier runs Ruff with pydocstyle (D) enabled; missing Google-style
@@ -297,4 +151,4 @@ uv run python scripts/ci/check_phase10_packet6.py
 uv run python scripts/ci/check_phase10_packet7.py
 ```
 
-[docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Local release candidate](../deployment/LOCAL_RELEASE_CANDIDATE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)
+[docs index](../README.md) · [CI tiers](./CI_TIERS.md) · [Pyright baseline](./PYRIGHT_BASELINE.md) · [Managed staging](../deployment/MANAGED_STAGING.md)

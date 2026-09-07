@@ -44,11 +44,7 @@ flowchart LR
    when both Valkey probes are `ok`.
 6. Destructive RLS/schema suites are opt-in against an explicit non-hosted
    `SUPABASE_DB_URL`. They refuse `*.supabase.co`.
-7. For the Phase 9 local release candidate, freeze, build, and seed with
-   `uv run python scripts/phase09_candidate.py all`. Candidate identity is
-   `docker-compose.yml` only; do not use `docker-compose.packet8.yml` for
-   that proof. See [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md).
-8. To inspect the query graph in LangGraph Studio (unbound, no FastAPI
+7. To inspect the query graph in LangGraph Studio (unbound, no FastAPI
    admit), run `.\scripts\langgraph-studio.ps1` and open the printed Studio
    URL. Select `query_studio`. See [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md).
 

@@ -13,7 +13,6 @@ default. `QueryRunRegistry` is process-local; two colors at once split
 in-memory runs and double checkpointer/Valkey pools.
 
 Related: [STREAMING_TIMEOUTS.md](./STREAMING_TIMEOUTS.md) ·
-[LOCAL_RELEASE_CANDIDATE.md](./LOCAL_RELEASE_CANDIDATE.md) ·
 [instance rebuild](../runbooks/instance-rebuild.md) ·
 [demo local ingest / AWS ask](../runbooks/demo-local-ingest-aws-ask.md) ·
 [docs index](../README.md)

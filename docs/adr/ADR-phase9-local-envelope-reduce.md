@@ -69,7 +69,6 @@ flowchart TD
 ## Related
 
 - [QUALITY_TARGETS.md](../QUALITY_TARGETS.md)
-- [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md)
 - [phase-09 evidence](../development/phase-09-local-release-candidate-evidence.md)
 - [sizing envelope](../../.cursor/plans/hybrid-graph-rag/shared/release/05-sizing-envelope.md)
 

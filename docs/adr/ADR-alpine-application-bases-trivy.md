@@ -74,7 +74,6 @@ flowchart TD
 
 - [IMAGE_DIGESTS.md](../../infra/paradedb/IMAGE_DIGESTS.md)
 - [02-containers.md](../architecture/02-containers.md)
-- [LOCAL_RELEASE_CANDIDATE.md](../deployment/LOCAL_RELEASE_CANDIDATE.md)
 - [ADR-cve-pin-patch-2026-08.md](./ADR-cve-pin-patch-2026-08.md)
 
 ## Approval

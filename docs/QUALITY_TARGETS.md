@@ -252,8 +252,7 @@ the aspiration to raise toward after measured load. Phase 9 Packet 4 proved
 foreground-plus-maintenance behavior only on the Packet 2 labeled 8-version
 / 16-chunk subset. Live 70% CPU/IO pause did not fire. On 2026-08-18 the
 user signed the reduce so Phase 9 can close and Phase 10 can start. Details:
-[ADR-phase9-local-envelope-reduce.md](./adr/ADR-phase9-local-envelope-reduce.md)
-· [LOCAL_RELEASE_CANDIDATE.md](./deployment/LOCAL_RELEASE_CANDIDATE.md).
+[ADR-phase9-local-envelope-reduce.md](./adr/ADR-phase9-local-envelope-reduce.md).
 
 | ID | Target | Unit | Provenance | Approval | Approver | Approval date | Measure in | On failure |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -288,4 +287,3 @@ Graph stays [QT-CAP-005-P8](#14-packet-8-supported-graph-envelope-reduced)
 - [Graph scaling options](./graph/SCALING_OPTIONS.md)
 - [Phase 6 graph handoff](./graph/PHASE6_HANDOFF.md)
 - [Phase 9 local envelope reduce ADR](./adr/ADR-phase9-local-envelope-reduce.md)
-- [Local release candidate](./deployment/LOCAL_RELEASE_CANDIDATE.md)

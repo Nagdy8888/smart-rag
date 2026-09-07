@@ -1,11 +1,9 @@
 """Phase 9 Packet 2 local CI/security gate matrix.
 
-Packet 2 maps P09-02-A through P09-02-E onto existing repository tests and
-CI scripts. It does not rebuild candidate images, open holdout, or publish
-private ports. Old-API/new-schema smoke is classified by
-``smart_rag_core.release.old_api_smoke``: missing
-``SMART_RAG_OLD_API_IMAGE`` is Blocked, never a pytest skip or freeze-image
-pass.
+Packet 2 maps P09-02-A through P09-02-E onto existing repository tests.
+It does not rebuild candidate images, open holdout, or publish private
+ports. Old-API/new-schema smoke evidence is consumed by Phase 10 Packet 6
+from committed JSON artifacts.
 """
 
 from __future__ import annotations
