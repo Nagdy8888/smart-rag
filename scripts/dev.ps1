@@ -5,7 +5,7 @@
 .DESCRIPTION
   Requires a pre-wired ignored Compose env with hosted Auth and separate
   transaction/session DSNs. Starts ParadeDB, Valkey, crawl-proxy, api, worker,
-  and frontend. Local Supabase remains a destructive-test fixture only.
+  and frontend against the cloud Supabase project.
 #>
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -39,9 +39,8 @@ if ($missing.Count -gt 0) {
   throw ("Hosted Compose env is incomplete. Missing names: {0}" -f ($missing -join ", "))
 }
 
-# Process env wins Compose interpolation. Project `.env` often keeps the
-# local fixture SUPABASE_URL; without this export the API verifies hosted
-# browser JWTs against local GoTrue and Ask returns 401 unauthorized.
+# Process env wins Compose interpolation. Export .env.compose into this
+# process so a stale project `.env` cannot override SUPABASE_URL.
 Get-Content $EnvFile | ForEach-Object {
   $line = $_.Trim()
   if (-not $line -or $line.StartsWith("#")) {
@@ -76,7 +75,5 @@ Write-Host "  Frontend:  http://localhost:$fePort"
 Write-Host "  API docs:  http://localhost:$apiPort/docs"
 Write-Host "  API live:  http://localhost:$apiPort/health/live"
 Write-Host "Private (no host ports): paradedb, valkey-limits, valkey-cache, crawl-proxy"
-Write-Host "Canonical data: hosted Supabase (not local :54322)"
+Write-Host "Canonical data: hosted Supabase"
 Write-Host "Stop with:  .\scripts\stop.ps1"
-Write-Host "Local fixture only: .\scripts\ci\start_local_supabase_fixture.ps1"
-Write-Host "Destructive fixture reset: .\scripts\reset.ps1 -ConfirmReset"
