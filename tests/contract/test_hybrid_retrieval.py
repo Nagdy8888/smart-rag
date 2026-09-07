@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from urllib.parse import urlparse
 from uuid import uuid4
 
 import httpx
@@ -415,16 +416,22 @@ def test_postgrest_cannot_call_dense_rpc() -> None:
     )
     if not api_url or not anon:
         pytest.skip("SUPABASE_URL and an anon key are required")
-    response = httpx.post(
-        f"{api_url}/rest/v1/rpc/retrieve_dense_candidates",
-        headers={
-            "apikey": anon,
-            "Authorization": f"Bearer {anon}",
-            "Content-Type": "application/json",
-        },
-        json={},
-        timeout=10.0,
-    )
+    host = (urlparse(api_url).hostname or "").casefold()
+    if host in {"127.0.0.1", "localhost", "host.docker.internal"}:
+        pytest.skip("hosted SUPABASE_URL required; local Auth fixture retired")
+    try:
+        response = httpx.post(
+            f"{api_url}/rest/v1/rpc/retrieve_dense_candidates",
+            headers={
+                "apikey": anon,
+                "Authorization": f"Bearer {anon}",
+                "Content-Type": "application/json",
+            },
+            json={},
+            timeout=10.0,
+        )
+    except (httpx.ConnectError, httpx.TimeoutException):
+        pytest.skip("Supabase Data API unreachable")
     assert response.status_code in {401, 403, 404}
 
 

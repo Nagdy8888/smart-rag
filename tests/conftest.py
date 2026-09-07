@@ -32,19 +32,27 @@ def default_mock_model_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def explicit_supabase_url(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Supply an explicit synthetic Auth origin for settings loads.
+def explicit_supabase_url(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Supply an explicit synthetic Auth origin for unit settings loads.
 
     Args:
+        request: Current pytest item; path is used to detect ``tests/unit``.
         monkeypatch: Pytest monkeypatch fixture.
 
     Side Effects:
-        Sets ``SUPABASE_URL`` to the offline synthetic origin so
-        ``APP_ENV=local`` constructors do not depend on a silent settings
-        default. Individual tests may override or delete the variable.
-        The origin is never contacted.
+        For unit tests only, sets ``SUPABASE_URL`` to the offline synthetic
+        origin so ``APP_ENV=local`` constructors do not depend on a silent
+        settings default. Contract tests keep the process origin (hosted
+        operator URL or the collection-time default). Individual tests may
+        override or delete the variable. The synthetic origin is never
+        contacted.
     """
 
+    if "/tests/unit/" not in request.path.as_posix():
+        return
     monkeypatch.setenv("SUPABASE_URL", _TEST_SUPABASE_FIXTURE_URL)
 
 
