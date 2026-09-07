@@ -2,7 +2,7 @@
 title: LightRAG private-schema bootstrap runbook
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-09-07
 audience: engineering, operations
 phase_packet: Phase 5 Packet 2
 ---
@@ -51,7 +51,8 @@ sequenceDiagram
   Core->>Pg: persist schema_capture_status captured
 ```
 
-1. Confirm local Postgres is reachable (default `127.0.0.1:54322`). Do not log the DSN.
+1. Confirm operator Postgres is reachable (`OPERATOR_SUPABASE_DB_URL` or
+   the schema-admin DSN). Do not log the DSN.
 2. Apply reviewed migrations as the migration role if objects are missing. Expand-only: no DROP TABLE/COLUMN/TYPE.
 3. Export `LIGHTRAG_SCHEMA_ADMIN_DSN` in the ops shell only. Do not put it in Backend/Worker/Agent settings.
 4. Run:

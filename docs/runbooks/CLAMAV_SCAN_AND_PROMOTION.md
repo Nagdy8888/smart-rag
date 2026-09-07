@@ -2,7 +2,7 @@
 title: ClamAV scan and Storage promotion runbook
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-07
 audience: engineering, operations
 ---
 

@@ -2,17 +2,17 @@
 title: Managed Auth TOTP residue
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-24
+last-reviewed: 2026-09-07
 audience: operations, security
 packet: P08-12
 ---
 
 # Managed Auth TOTP residue
 
-Application authorization is single-factor after P08-11 and P08-12. Local Auth
-disables new TOTP enrollment/verification through documented CLI keys
-`auth.mfa.totp.enroll_enabled` and `auth.mfa.totp.verify_enabled`. This runbook
-covers hosted Supabase projects that may still hold dormant factors.
+Application authorization is single-factor after P08-11 and P08-12. Hosted
+Auth should keep new TOTP enrollment/verification off in the Auth dashboard.
+This runbook covers hosted Supabase projects that may still hold dormant
+factors.
 
 Never `DELETE FROM auth.mfa_factors` (or any other `auth` schema SQL). Mutating
 GoTrue internals that way is unsupported and can strand sessions.

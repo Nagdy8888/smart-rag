@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-07
 audience: engineering, security
 ---
 
@@ -43,11 +43,8 @@ JWKS-verified `CallerContext`. `X-Test-*` bypass requires `APP_ENV=test` and
 `ALLOW_TEST_IDENTITY=true`. Staging and production reject that flag and
 return HTTP 400 when those headers are present. JWKS requires JWT
 `role=authenticated` and rejects `service_role` / `anon`.
-Local Docker (`APP_ENV=local`) accepts the documented GoTrue `iss` pair
-`http://127.0.0.1:54321/auth/v1` and
-`http://host.docker.internal:54321/auth/v1` when `SUPABASE_URL` is one of
-those origins; JWKS fetch stays on `SUPABASE_URL`. Staging and production
-keep a single issuer. See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
+Verification accepts exactly one issuer `{SUPABASE_URL}/auth/v1`.
+See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 
 ## Endpoint authorization matrix
 

@@ -2,7 +2,7 @@
 title: Local runtime database roles
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-09-07
 audience: engineering, ops
 ---
 
@@ -78,9 +78,10 @@ Reset drops this role. Re-run the script after every reset.
 | `LIGHTRAG_DB_URL` | api, worker | Optional hosted session/direct DSN; unset keeps LightRAG idle |
 
 Compose fails closed if those required names are missing. Do **not** set
-them to `postgresql://postgres:postgres@…` or `host.docker.internal:54322`.
-Host pytest may still use the local fixture superuser DSN; that DSN is
-for destructive reset/RLS tests, not Compose runtime.
+them to `postgresql://postgres:` DSNs. Host pytest may still use an
+explicit non-hosted operator DSN for opt-in destructive suites; that DSN
+is not Compose runtime. See
+[ADR-cloud-only-supabase-no-local-fixture.md](../adr/ADR-cloud-only-supabase-no-local-fixture.md).
 
 ## Storage Admin is not on the worker PID
 

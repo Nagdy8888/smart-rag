@@ -2,7 +2,7 @@
 title: Quality commands
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-09-07
 audience: engineering
 ---
 

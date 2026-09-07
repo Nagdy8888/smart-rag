@@ -11,4 +11,5 @@ audience: engineering, ops
 The Phase-9 local release-candidate runbook was removed with the local
 Supabase CLI fixture. Runtime, E2E, and operator scripts target the cloud
 project only. Destructive schema suites stay opt-in via an explicit
-non-hosted `SUPABASE_DB_URL`.
+non-hosted `SUPABASE_DB_URL`. See
+[ADR-cloud-only-supabase-no-local-fixture.md](../adr/ADR-cloud-only-supabase-no-local-fixture.md).

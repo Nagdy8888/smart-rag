@@ -2,7 +2,7 @@
 title: Thin authenticated developer UI
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-07
 audience: engineering, frontend
 ---
 
@@ -107,7 +107,7 @@ returns `signed_url=null`.
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | FastAPI origin; default `http://127.0.0.1:8000` |
-| `NEXT_PUBLIC_SUPABASE_URL` | Browser Auth project URL. Packet 8 Playwright forces `http://127.0.0.1:54321` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Browser Auth project URL (hosted `https://<project-ref>.supabase.co`) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser anon key only |
 
 Privileged service-role keys, database URLs, and OpenAI keys must never appear
@@ -133,7 +133,8 @@ tier installs Chromium and runs those tests; it no longer stops at
 `playwright --version`. Live JWT chat,
 aal2 upload `signed_url=null`, lingering-ID search after DELETE, five Composite
 EventSource connections, and public ready omitting named probes are
-Playwright live specs against hosted Auth plus FastAPI.
+Playwright live specs against hosted Auth plus FastAPI. Live signed-in
+specs require `E2E_LIVE_EMAIL` and `E2E_LIVE_PASSWORD` (skip when unset).
 Five-run heartbeat/lag remains
 `tests/contract/test_sse_heartbeat.py` because live mock Composite often
 finishes before the 15s heartbeat interval.

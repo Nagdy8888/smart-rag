@@ -2,7 +2,7 @@
 title: Supabase JWKS signing-key rollover
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-07
 audience: engineering, ops, security
 ---
 
@@ -40,14 +40,6 @@ retain_old_key_seconds >= jwt_expiry
 
 Hosted `jwt_expiry` is configured in the cloud Auth dashboard.
 
-## Local vs managed
-
-| Environment | Rollover API | Packet 4 gate |
-| --- | --- | --- |
-| Local CLI (`127.0.0.1:54321`) | Env `GOTRUE_JWT_KEYS` only | Application ES256 JWKS, unknown `kid`, HS256 reject |
-| Phase 2 project `qsjivtwtmlmtksufqjik` | `POST/PATCH …/config/auth/signing-keys` with `SUPABASE_ACCESS_TOKEN` | **Not Phase 10 staging proof** — isolated staging has no project yet |
-| Isolated Phase 10 managed staging | Dashboard after Packet 1 apply | **Not Run** — no managed project; do not invent JWKS kids |
-
 Phase 10 Packet 4 classifies **application JWKS Passed** (no HS256, unknown
 `kid`, standby→active→retired fixtures) and records **managed Supabase
 dashboard rollover Not Run**. Do not treat the Phase 2 project as Packet 4
@@ -68,15 +60,12 @@ managed staging evidence.
 | --- | --- |
 | Unknown `kid` spike after refresh | Check Supabase Auth status; verify JWKS URL reachable |
 | JWKS fetch errors | Fail closed (401/503); do not fall back to JWT secret |
-| All tokens fail after rollover | Confirm issuer URL matches `SUPABASE_URL/auth/v1`. Local Docker may use the documented `127.0.0.1` / `host.docker.internal` `iss` pair only when `APP_ENV=local`. |
+| All tokens fail after rollover | Confirm issuer URL matches `SUPABASE_URL/auth/v1`. Verification accepts exactly one issuer. |
 
 ## Verification commands
 
-```bash
-# Local JWKS (expect ES256 key with kid)
-Invoke-RestMethod http://127.0.0.1:54321/auth/v1/.well-known/jwks.json
-
-# Managed JWKS probe (read-only)
+```powershell
+# Hosted JWKS probe (read-only)
 Invoke-RestMethod https://qsjivtwtmlmtksufqjik.supabase.co/auth/v1/.well-known/jwks.json
 ```
 

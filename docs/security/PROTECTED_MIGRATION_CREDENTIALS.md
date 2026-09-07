@@ -2,7 +2,7 @@
 title: Protected migration and privileged credentials
 owner: engineering-lead
 status: proven-local / iac-reviewed-managed / unverified-live
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-07
 audience: engineering, security, ops
 phase_packet: Phase 10 Packet 2
 ---

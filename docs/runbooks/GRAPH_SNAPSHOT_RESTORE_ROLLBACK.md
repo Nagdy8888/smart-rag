@@ -2,7 +2,7 @@
 title: LightRAG snapshot restore and graph pointer rollback
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-09-07
 audience: engineering, operations
 phase_packet: Phase 5 Packet 7
 ---
@@ -57,8 +57,8 @@ flowchart TD
 1. Take a production-sized dump of the vendor schema (and required
    extensions) using the reviewed backup tool. Do not log connection
    strings.
-2. Confirm local or staging Postgres can create a disposable database.
-   Default local admin is `127.0.0.1:54322`.
+2. Confirm operator Postgres can create a disposable database.
+   `--admin-dsn` is required when restoring a dump (no local fixture default).
 3. Qualify isolation (must exit 0):
 
    `uv run python scripts/ops/restore_lightrag_upgrade_copy.py --candidate-database lightrag_upgrade_copy --runtime-database postgres --runtime-schema lightrag`

@@ -109,7 +109,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-phase10-hosted-supabase-reuse.md](./adr/ADR-phase10-hosted-supabase-reuse.md) | product-owner | accepted | 2026-08-18 | client, engineering, ops |
 | [adr/ADR-phase10-free-tier-ec2.md](./adr/ADR-phase10-free-tier-ec2.md) | engineering-lead | accepted | 2026-08-19 | engineering, ops |
 | [adr/ADR-demo-local-ingest-aws-ask.md](./adr/ADR-demo-local-ingest-aws-ask.md) | product-owner / engineering-lead | accepted | 2026-08-20 | client, engineering, ops |
-| [adr/ADR-hosted-runtime-local-test-fixture.md](./adr/ADR-hosted-runtime-local-test-fixture.md) | engineering-lead | accepted | 2026-08-25 | client, engineering, ops |
+| [adr/ADR-hosted-runtime-local-test-fixture.md](./adr/ADR-hosted-runtime-local-test-fixture.md) | engineering-lead | superseded | 2026-09-07 | client, engineering, ops |
+| [adr/ADR-cloud-only-supabase-no-local-fixture.md](./adr/ADR-cloud-only-supabase-no-local-fixture.md) | engineering-lead | accepted | 2026-09-07 | client, engineering, ops |
 | [adr/ADR-stitch-first-ux.md](./adr/ADR-stitch-first-ux.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, reviewers |
 | [adr/ADR-frontend-functional-overhaul.md](./adr/ADR-frontend-functional-overhaul.md) | engineering-lead | accepted | 2026-08-24 | frontend, eng, security, reviewers |
 | [adr/ADR-workspace-member-list.md](./adr/ADR-workspace-member-list.md) | engineering-lead | accepted | 2026-08-27 | frontend, eng, security, reviewers |
