@@ -133,7 +133,7 @@ tier installs Chromium and runs those tests; it no longer stops at
 `playwright --version`. Live JWT chat,
 aal2 upload `signed_url=null`, lingering-ID search after DELETE, five Composite
 EventSource connections, and public ready omitting named probes are
-`tests/contract/test_thin_developer_ui_live.py` against local FastAPI + Auth.
+Playwright live specs against hosted Auth plus FastAPI.
 Five-run heartbeat/lag remains
 `tests/contract/test_sse_heartbeat.py` because live mock Composite often
 finishes before the 15s heartbeat interval.

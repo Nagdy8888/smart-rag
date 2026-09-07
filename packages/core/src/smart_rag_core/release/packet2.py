@@ -108,7 +108,7 @@ class JUnitCounts:
     skipped: int
 
 
-# Contract extras beyond ``scripts/ci/check_phase2_integration.py``. Unit files
+# Contract extras beyond the unit tier. Unit files
 # stay in ``scripts/check.py --tier unit`` so Packet 2 does not double-run them.
 PYTEST_SUITES: tuple[Packet2Suite, ...] = (
     Packet2Suite(
@@ -307,7 +307,7 @@ HANDOFFS: tuple[Packet2Handoff, ...] = (
         classification="Passed",
         owner="Phase 9 Packet 2",
         reason=(
-            "Two local supabase db reset --yes passes matched schema SHA-256 "
+            "Two schema-reset passes matched schema SHA-256 "
             "0921806d9fb378393c2dd313bbaf52953d1636af96f311a59ad4f63f57fee76d "
             "and types SHA-256 "
             "8aafd3c2871be7199707d36429ec57b782b77f91b2f4526eed5df6bc383a42c8. "

@@ -119,10 +119,8 @@ LOCAL_GOTRUE_JWT_ISSUER = "http://127.0.0.1:54321/auth/v1"
 LOCAL_JWT_ISSUER_PAIR: frozenset[str] = frozenset(
     {API_EXPECTED_JWT_ISSUER, LOCAL_GOTRUE_JWT_ISSUER}
 )
-CONSUMED_LIVE_NODEIDS: tuple[str, ...] = (
-    "tests/contract/test_thin_developer_ui_live.py"
-    "::test_thin_ui_live_five_composite_streams",
-)
+# Live five-stream nodeids were retired with the local FastAPI+Auth suite.
+CONSUMED_LIVE_NODEIDS: tuple[str, ...] = ()
 
 
 class Phase09Packet4GateError(RuntimeError):

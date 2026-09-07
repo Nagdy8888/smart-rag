@@ -10,8 +10,7 @@ audience: engineering, ops
 
 Local Compose API and worker must not connect as the Postgres superuser.
 Migration `app_api` / `app_worker` / `app_checkpointer` / `app_lightrag`
-remain **NOLOGIN** so `npx supabase db reset` and GRANT tests stay
-unchanged. Runtime containers use a dedicated **LOGIN** wrapper that can
+remain **NOLOGIN**. Runtime containers use a dedicated **LOGIN** wrapper that can
 `SET ROLE` those NOLOGIN roles.
 
 Related: [AUTHORIZATION_MODEL.md](../security/AUTHORIZATION_MODEL.md) ·
@@ -44,13 +43,11 @@ least-privilege story. The wrapper is a member of those roles so
 
 ## Create the LOGIN wrapper (operator SQL, not a migration)
 
-Run after `npx supabase db reset`. Do not commit the password. This is
-**not** a `supabase/migrations/` file so the CLI GRANT/NOLOGIN contract
-stays intact.
+Run against the cloud project with `OPERATOR_SUPABASE_DB_URL`. Do not commit
+the password. This is **not** a `supabase/migrations/` file so GRANT/NOLOGIN
+contracts stay intact.
 
-`.\scripts\ci\start_local_supabase_fixture.ps1` and
-`.\scripts\reset.ps1 -ConfirmReset` run this script after the local
-fixture is up. Daily `.\scripts\dev.ps1` does not start local Supabase.
+Daily `.\scripts\dev.ps1` does not create the wrapper.
 
 ```powershell
 uv run python scripts/ops/ensure_app_runtime_role.py

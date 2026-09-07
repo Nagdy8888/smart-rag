@@ -38,7 +38,7 @@ retain_old_key_seconds >= jwt_expiry
                         + supabase_edge_cache_margin (managed: assume 600)
 ```
 
-Local `jwt_expiry = 3600` in `supabase/config.toml`.
+Hosted `jwt_expiry` is configured in the cloud Auth dashboard.
 
 ## Local vs managed
 

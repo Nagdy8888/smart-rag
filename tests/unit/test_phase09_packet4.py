@@ -114,7 +114,7 @@ def test_overlay_is_not_candidate_identity() -> None:
     assert not any(
         "test_thin_ui_live_five_composite_streams" in item for item in five.pytest_args
     )
-    assert CONSUMED_LIVE_NODEIDS[0].endswith("test_thin_ui_live_five_composite_streams")
+    assert CONSUMED_LIVE_NODEIDS == ()
 
 
 def test_packet1_image_ids_stay_frozen() -> None:

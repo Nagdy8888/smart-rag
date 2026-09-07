@@ -66,7 +66,6 @@ Investigate admin notifications `quarantine_accumulation` and `repeated_scan_fai
 ## Orphan cleanup
 
 ```bash
-pnpm exec supabase db reset --yes
 uv run pytest tests/contract/test_quarantine_cleanup.py -q
 ```
 
@@ -76,7 +75,6 @@ Cleanup uses `list_quarantine_cleanup_candidates` → Storage HTTP DELETE → `m
 
 ```bash
 docker compose --env-file .env.compose up -d clamav
-pnpm exec supabase db reset --yes
 uv run pytest tests/unit/test_clamav_client.py tests/contract/test_clamav_scan.py tests/contract/test_promotion_saga.py tests/contract/test_upload_finalize.py -q
 ```
 

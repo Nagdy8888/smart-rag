@@ -24,16 +24,10 @@ GoTrue internals that way is unsupported and can strand sessions.
   browser or frontend env.
 - A change window. Deleting a **verified** factor signs the user out of every
   active session ([Auth Admin deleteFactor](https://supabase.com/docs/reference/javascript/auth-admin-mfa-deletefactor)).
-- Local `supabase/config.toml` already has:
+- Hosted Auth MFA TOTP already disabled in the dashboard.
 
-```toml
-[auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
-```
-
-Restart Auth after changing local config (`npx supabase stop && npx supabase start`).
-Do not `db reset`.
+Restart Auth from the hosted dashboard after changing MFA settings.
+Do not reset the database.
 
 ## Dry run (required first)
 

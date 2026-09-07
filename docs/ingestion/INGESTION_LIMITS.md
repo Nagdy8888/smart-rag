@@ -299,10 +299,9 @@ uv run pytest tests/unit/test_embedding_service.py tests/unit/test_phase3_graph_
 docker compose --profile parser-build build parser-sandbox
 ```
 
-When local Supabase and ParadeDB are running, apply migrations and run integration contracts:
+When ParadeDB sidecars are running, apply cloud migrations and run integration contracts:
 
 ```bash
-pnpm exec supabase db reset --yes
 docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --wait clamav paradedb crawl-proxy
 docker compose --env-file .env.compose --profile parser-build build parser-sandbox
 uv run pytest tests/contract/test_job_leases.py tests/contract/test_hybrid_lifecycle.py tests/contract/test_hybrid_ready_e2e.py tests/contract/test_crawl_proxy_live.py tests/contract/test_clamav_scan.py -q

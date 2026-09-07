@@ -19,7 +19,6 @@ uv run python scripts/check.py --tier frontend
 uv run python scripts/check.py --tier fast
 uv run python scripts/ci/check_openapi.py
 uv run python scripts/ci/check_migrations.py
-uv run python scripts/ci/check_phase2_integration.py
 uv run python scripts/phase09_candidate.py all
 uv run python scripts/ci/check_phase09_packet1.py
 uv run python scripts/ci/check_phase09_packet2.py --mode candidate
@@ -48,28 +47,10 @@ When `CI=true`, `check.py` appends `--tb=short -ra` to the unit and
 contract pytest invocations. Local runs without that environment variable
 keep pytest’s default traceback style.
 
-The schema determinism gate is intentionally destructive and local-only. With
-the pinned Supabase stack running, it resets the local database exactly twice,
-runs the authoritative schema contract after each reset, and compares roles,
-extensions, tables, columns, constraints, private-schema exposure, and generated
-types. Type generation uses `--db-url` against host `127.0.0.1:54322`. The gate
-wipes any Phase 9 seed; reseed immediately on candidate compose only.
-
-```powershell
-uv run python scripts/ci/check_schema_determinism.py
-```
-
-The ordinary contract and fast tiers may skip live integration checks when their
-local Supabase or ParadeDB prerequisites are unavailable, which keeps
-dependency-only CI deterministic. The Phase 2 integration gate requires or
-starts the local Supabase destructive-test fixture and the private ParadeDB service, then runs the mandatory
-schema/RLS/Auth/Storage/audit/BM25 suite. Any skipped mandatory test fails the
-gate. Managed pgvector and JWKS rollover checks are deliberately reported as
-separate, not silently skipped as local proof:
-
-```powershell
-uv run python scripts/ci/check_phase2_integration.py
-```
+The ordinary contract and fast tiers may skip live integration checks when
+hosted or ParadeDB prerequisites are unavailable, which keeps dependency-only
+CI deterministic. DB-backed schema/RLS suites are opt-in via explicit
+`SUPABASE_DB_URL` (they refuse hosted `*.supabase.co`).
 
 The Phase 9 Packet 1 candidate gate freezes digest-bound images, unpublished
 private ports, and the approved open-split corpus. It is local-only and is
@@ -98,10 +79,7 @@ tests. `--mode candidate` uses unpublished ParadeDB via `docker compose exec`.
 ClamAV, crawl-proxy, and host-side BM25 tests; detach the overlay afterward
 and re-prove unpublished ports. Overlay merge must use `--merge-artifact` so
 candidate suite rows are not clobbered. Do not set
-`SMART_RAG_HOLDOUT_ACCESS=true`. `check_schema_determinism.py` wipes Packet 1
-seed; reseed immediately with `phase09_candidate.py seed` on candidate compose
-only (worker `exec` copies artifacts; `compose cp` cannot see worker `/tmp`
-tmpfs). Old-API/new-schema authenticated smoke is
+`SMART_RAG_HOLDOUT_ACCESS=true`. Old-API/new-schema authenticated smoke is
 `scripts/ci/check_old_api_new_schema_smoke.py` plus
 `smart_rag_core.release.old_api_smoke`. Unset or missing
 `SMART_RAG_OLD_API_IMAGE` classifies Blocked (not a pytest skip and not
@@ -112,10 +90,8 @@ Trivy via docker.sock.
 
 ```powershell
 uv run python scripts/ci/check_phase09_packet2.py --mode candidate
-uv run python scripts/ci/check_phase2_integration.py
 uv run python scripts/ci/check_openapi.py
 uv run python scripts/ci/check_migrations.py
-uv run python scripts/ci/check_schema_determinism.py
 uv run python scripts/phase09_candidate.py seed
 uv run python scripts/phase09_candidate.py sizing
 docker compose --env-file .env.compose -f docker-compose.yml -f docker-compose.packet8.yml up -d --no-build --wait clamav paradedb crawl-proxy

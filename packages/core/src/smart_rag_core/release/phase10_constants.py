@@ -349,12 +349,8 @@ PACKET5_BUDGET_TEST_FILES: tuple[str, ...] = (
         "::test_worst_case_connection_budget_under_seventy_percent"
     ),
 )
-PACKET5_OAUTH_TEST_FILES: tuple[str, ...] = (
-    (
-        "tests/contract/test_local_auth_mail.py"
-        "::test_auth_oauth_and_local_smtp_configuration_is_explicit"
-    ),
-)
+# Hosted Auth OAuth is dashboard-configured; the local CLI config suite was retired.
+PACKET5_OAUTH_TEST_FILES: tuple[str, ...] = ()
 PACKET5_CORS_TEST_FILES: tuple[str, ...] = (
     "tests/unit/test_fastapi_security.py::test_cors_reflects_exact_origin_not_wildcard",
     "tests/unit/test_fastapi_security.py::test_wildcard_cors_settings_fail_closed",
@@ -432,7 +428,7 @@ PACKET6_RESTORE_INCOMPLETE_TEST_FILES: tuple[str, ...] = (
     ),
     "tests/unit/test_phase10_packet6.py::test_object_orphan_quarantines_and_alerts",
 )
-PACKET4_JWKS_TEST_FILES: tuple[str, ...] = ("tests/unit/test_jwks_local_issuers.py",)
+PACKET4_JWKS_TEST_FILES: tuple[str, ...] = ("tests/contract/test_jwks_auth.py",)
 PACKET4_PARADEDB_TEST_FILES: tuple[str, ...] = (
     "tests/unit/test_hybrid_run.py::test_bm25_degradation_continues_dense_and_term",
     (

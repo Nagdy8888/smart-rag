@@ -119,7 +119,6 @@ Does **not** consume Supabase connections. See [07-bm25-projection.md](./07-bm25
 
 ```powershell
 uv run python scripts/ci/check_migrations.py
-npx supabase db reset --yes
 uv run pytest tests/contract/test_connection_budgets.py -q
 ```
 

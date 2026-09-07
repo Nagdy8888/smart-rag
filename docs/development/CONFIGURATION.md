@@ -43,10 +43,10 @@ Validation errors list field paths and categories but omit source values.
 | `SMART_RAG_HOLDOUT_ACCESS` | boolean; `false` | public | Default denies sealed holdout labels. Packet 8 freeze refuses to run when true. Enable only for an independently SME-sealed holdout or dataset seal verify |
 | `SMART_RAG_HOLDOUT_ACCESS_PURPOSE` | `packet8_immutable_holdout` or `dataset_seal_verify` | internal | Required when holdout access is enabled |
 | `SMART_RAG_HOLDOUT_ACCESS_ACTOR` | safe identifier | internal | Auditable actor required when holdout access is enabled |
-| `ADMIN_ALERT_SMTP_HOST` | optional hostname; empty skips SMTP | internal | Local Inbucket/Mailpit host. Unset skips mail; set `127.0.0.1` for Packet 8 proof |
-| `ADMIN_ALERT_SMTP_PORT` | integer; `54325` | public | Exposed local SMTP port from `supabase/config.toml` `local_smtp.smtp_port` |
-| `ADMIN_ALERT_SMTP_FROM` | email; `alerts@localhost` | public | Envelope from for metadata-only admin alerts |
-| `ADMIN_ALERT_SMTP_TO` | email; `owner@localhost` | public | Owner/admin mailbox captured by Inbucket |
+| `ADMIN_ALERT_SMTP_HOST` | optional hostname; empty skips SMTP | internal | Operator SMTP relay. Unset skips mail |
+| `ADMIN_ALERT_SMTP_PORT` | integer; required with host | public | Operator SMTP port. Unset skips mail |
+| `ADMIN_ALERT_SMTP_FROM` | email | public | Envelope from for metadata-only admin alerts |
+| `ADMIN_ALERT_SMTP_TO` | email | public | Owner/admin mailbox |
 
 ## Agent-only variables
 
@@ -166,7 +166,7 @@ enroll_enabled = true
 verify_enabled = true
 ```
 
-Restart Auth after changing that file: `npx supabase stop && npx supabase start`.
+Restart Auth from the hosted dashboard after changing MFA settings.
 Do not `db reset`. Playwright uses origin `http://127.0.0.1:3010`, which is
 listed in `additional_redirect_urls`. Local upload reserve still returns
 `signed_url=null` (CloudFront is Phase 10).

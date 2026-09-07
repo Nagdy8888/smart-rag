@@ -1,9 +1,8 @@
 """Create or rotate the local LOGIN wrapper ``app_runtime``.
 
 ``app_api`` / ``app_worker`` stay NOLOGIN. Compose connects as this wrapper
-then ``SET ROLE``. This is operator SQL, not a migration, so
-``npx supabase db reset`` GRANT tests stay unchanged. Re-run after every
-reset.
+then ``SET ROLE``. This is operator SQL, not a migration. Re-run after
+rotating the wrapper password.
 """
 
 from __future__ import annotations

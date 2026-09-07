@@ -8,8 +8,7 @@ audience: engineering
 
 # Local setup
 
-Daily laptop runtime uses hosted Supabase plus Compose sidecars. Local
-Docker Supabase is a destructive-test fixture only. See
+Daily laptop runtime uses hosted Supabase plus Compose sidecars. See
 [ADR-hosted-runtime-local-test-fixture.md](../adr/ADR-hosted-runtime-local-test-fixture.md).
 
 ```mermaid
@@ -27,7 +26,7 @@ flowchart LR
 
 1. Install Docker Desktop (WSL2), uv, Node 20+, and pnpm 9.15+.
 2. Run `uv sync --all-packages --group dev --python 3.11 --frozen`.
-3. Run `pnpm install --frozen-lockfile`; this installs the workspace-pinned Supabase CLI for fixture/CI use.
+3. Run `pnpm install --frozen-lockfile`.
 4. Put hosted session/transaction URLs in ignored `.env`, then run
    `uv run python scripts/ops/wire_hosted_ingest_env.py`. That writes
    `SUPABASE_URL`, `API_SUPABASE_DB_URL`, `WORKER_SUPABASE_DB_URL`,
@@ -43,9 +42,8 @@ flowchart LR
    limits timeout latched `rate_limit_degraded`. Restart the API to clear
    it immediately. After this change, `/health/ready` clears the latch
    when both Valkey probes are `ok`.
-6. For destructive reset/RLS/schema gates, start the fixture with
-   `.\scripts\ci\start_local_supabase_fixture.ps1`. Those suites refuse
-   `*.supabase.co`.
+6. Destructive RLS/schema suites are opt-in against an explicit non-hosted
+   `SUPABASE_DB_URL`. They refuse `*.supabase.co`.
 7. For the Phase 9 local release candidate, freeze, build, and seed with
    `uv run python scripts/phase09_candidate.py all`. Candidate identity is
    `docker-compose.yml` only; do not use `docker-compose.packet8.yml` for
@@ -55,8 +53,7 @@ flowchart LR
    URL. Select `query_studio`. See [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md).
 
 `dev.ps1` fails closed without hosted `.env.compose`. `stop.ps1` stops
-Compose only. `reset.ps1 -ConfirmReset` remains the explicit destructive
-fixture route.
+Compose only.
 
 See [CONFIGURATION.md](./CONFIGURATION.md), [TOOL_VERSIONS.md](./TOOL_VERSIONS.md),
 [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md),
