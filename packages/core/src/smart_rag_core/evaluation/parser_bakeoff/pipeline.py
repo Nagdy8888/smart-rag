@@ -19,10 +19,10 @@ from smart_rag_core.evaluation.parser_bakeoff.constants import (
     CURRENT_LANE,
     GOLD_MAP_NAME,
     INGEST_IDS_NAME,
-    LaneId,
     MAPPING_REVIEW_NAME,
     PARSE_RESULT_NAME,
     RETRIEVAL_REPORT_NAME,
+    LaneId,
 )
 from smart_rag_core.evaluation.parser_bakeoff.indexing import lane_document_title
 from smart_rag_core.evaluation.parser_bakeoff.lanes import (
@@ -51,7 +51,11 @@ from smart_rag_core.evaluation.parser_bakeoff.summaries import (
     summarize_parse_chunk,
 )
 from smart_rag_core.ingestion.chunking.service import chunk_parse_result
-from smart_rag_core.ingestion.parser.types import ParseDisposition, ParseResult, PdfLocator
+from smart_rag_core.ingestion.parser.types import (
+    ParseDisposition,
+    ParseResult,
+    PdfLocator,
+)
 
 
 def parse_result_path(repo: Path, run_id: str, lane_id: LaneId) -> Path:
@@ -126,7 +130,9 @@ def load_chunk_summary(repo: Path, run_id: str, lane_id: LaneId) -> ChunkSummary
         Count-only summary.
     """
 
-    return read_model(lane_dir(repo, run_id, lane_id) / CHUNK_SUMMARY_NAME, ChunkSummary)
+    return read_model(
+        lane_dir(repo, run_id, lane_id) / CHUNK_SUMMARY_NAME, ChunkSummary
+    )
 
 
 def parse_lane_artifacts(
@@ -161,7 +167,9 @@ def parse_lane_artifacts(
     if resume and existing.is_file():
         result = load_parse_result(repo, manifest.run_id, lane_id)
         if result.content_hash != manifest.source_sha256:
-            raise BakeoffError("hash_mismatch", "resume parse hash does not match the manifest")
+            raise BakeoffError(
+                "hash_mismatch", "resume parse hash does not match the manifest"
+            )
         return (
             result,
             load_chunk_summary(repo, manifest.run_id, lane_id),
@@ -208,8 +216,12 @@ def parse_lane_artifacts(
         chunk_count=summary.chunk_count,
     )
     write_json_atomic(existing, first)
-    write_json_atomic(lane_dir(repo, manifest.run_id, lane_id) / CHUNK_SUMMARY_NAME, summary)
-    write_json_atomic(lane_dir(repo, manifest.run_id, lane_id) / INGEST_IDS_NAME, ingest)
+    write_json_atomic(
+        lane_dir(repo, manifest.run_id, lane_id) / CHUNK_SUMMARY_NAME, summary
+    )
+    write_json_atomic(
+        lane_dir(repo, manifest.run_id, lane_id) / INGEST_IDS_NAME, ingest
+    )
     return first, summary, ingest
 
 

@@ -112,7 +112,9 @@ def assert_version_scoped(
         if unit.chunk_id in foreign_chunk_ids:
             raise BakeoffError("cross_lane_id", "evidence id escaped version scope")
         if allowed_chunk_ids and unit.chunk_id not in allowed_chunk_ids:
-            raise BakeoffError("version_scope", "evidence id is not in the lane version")
+            raise BakeoffError(
+                "version_scope", "evidence id is not in the lane version"
+            )
     return 0
 
 
@@ -160,7 +162,9 @@ def score_retrieve(
             if unit.locator.page_number is not None
         )
         if case.page_numbers and evidence_pages:
-            locator_ok = locator_ok and bool(set(case.page_numbers) & set(evidence_pages))
+            locator_ok = locator_ok and bool(
+                set(case.page_numbers) & set(evidence_pages)
+            )
     return LaneRetrieveScore(
         case_id=case.case_id,
         recall_hit_at_10=recall,

@@ -25,7 +25,9 @@ from smart_rag_core.evaluation.ranked_ids import recall_hit_at_k
 Winner = Literal["current", "anydoc_local", "tie", "unavailable"]
 
 
-def reciprocal_rank(ranked_ids: Sequence[UUID], gold_ids: Sequence[UUID]) -> float | None:
+def reciprocal_rank(
+    ranked_ids: Sequence[UUID], gold_ids: Sequence[UUID]
+) -> float | None:
     """Return the reciprocal rank of the first gold chunk.
 
     Args:
@@ -112,7 +114,7 @@ def bootstrap_mean_ci(
 
     if not paired:
         return None, None
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311 — deterministic bootstrap, not crypto
     deltas = [right - left for left, right in paired]
     samples: list[float] = []
     count = len(deltas)
@@ -280,7 +282,9 @@ def compare_reports(
         Frozen comparison report.
     """
 
-    current_recall = mean_bools(tuple(item.recall_hit_at_10 for item in current_retrieve))
+    current_recall = mean_bools(
+        tuple(item.recall_hit_at_10 for item in current_retrieve)
+    )
     anydoc_recall = mean_bools(tuple(item.recall_hit_at_10 for item in anydoc_retrieve))
     recall_pairs = tuple(
         (1.0 if left.recall_hit_at_10 else 0.0, 1.0 if right.recall_hit_at_10 else 0.0)
@@ -290,8 +294,12 @@ def compare_reports(
     recall_metric = build_paired_metric(
         "hybrid_recall_at_10", current_recall, anydoc_recall, paired=recall_pairs
     )
-    current_cit = mean_optional(tuple(item.citation_correctness for item in current_agent))
-    anydoc_cit = mean_optional(tuple(item.citation_correctness for item in anydoc_agent))
+    current_cit = mean_optional(
+        tuple(item.citation_correctness for item in current_agent)
+    )
+    anydoc_cit = mean_optional(
+        tuple(item.citation_correctness for item in anydoc_agent)
+    )
     citation_metric = build_paired_metric(
         "citation_correctness", current_cit, anydoc_cit
     )
@@ -330,7 +338,9 @@ def compare_reports(
         item.cross_lane_leaks + int(item.acl_leak)
         for item in (*current_retrieve, *anydoc_retrieve)
     )
-    unscored = sum(1 for item in (*current_agent, *anydoc_agent) if item.judge_status != "complete")
+    unscored = sum(
+        1 for item in (*current_agent, *anydoc_agent) if item.judge_status != "complete"
+    )
     classification, reasons = classify(
         recall=recall_metric,
         faithfulness=faith_metric,

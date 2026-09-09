@@ -9,19 +9,22 @@ from pathlib import Path
 
 sys.path.insert(0, "/app")
 
-from smart_rag_core.evaluation.parser_bakeoff.anydoc import (  # noqa: E402
+from smart_rag_core.evaluation.parser_bakeoff.anydoc import (
     anydoc_config_extra,
     convert_with_anydoc,
     failed_lane_result,
     map_anydoc_exception,
     parse_anydoc_markdown_bytes,
 )
-from smart_rag_core.evaluation.parser_bakeoff.constants import (  # noqa: E402
+from smart_rag_core.evaluation.parser_bakeoff.constants import (
     ANYDOC_CLEANING_VERSION,
     ANYDOC_PARSER_VERSION,
 )
-from smart_rag_core.evaluation.parser_bakeoff.models import BakeoffError  # noqa: E402
-from smart_rag_core.ingestion.parser.types import ParseDisposition, ParseResult  # noqa: E402
+from smart_rag_core.evaluation.parser_bakeoff.models import BakeoffError
+from smart_rag_core.ingestion.parser.types import (
+    ParseDisposition,
+    ParseResult,
+)
 
 
 def _failed(content_hash: str, code: str) -> ParseResult:

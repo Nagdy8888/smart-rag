@@ -7,7 +7,10 @@ from uuid import UUID, uuid4
 
 import psycopg
 
-from smart_rag_core.evaluation.parser_bakeoff.constants import DOCUMENT_TITLE_PREFIX, LaneId
+from smart_rag_core.evaluation.parser_bakeoff.constants import (
+    DOCUMENT_TITLE_PREFIX,
+    LaneId,
+)
 from smart_rag_core.evaluation.parser_bakeoff.models import (
     BakeoffError,
     BakeoffScanEvidence,
@@ -63,7 +66,9 @@ def assert_title_owned(*, title: str, run_id: str, lane_id: LaneId) -> None:
 
     expected = lane_document_title(run_id, lane_id)
     if title != expected:
-        raise BakeoffError("cleanup_title_mismatch", "document title is not owned by this run")
+        raise BakeoffError(
+            "cleanup_title_mismatch", "document title is not owned by this run"
+        )
 
 
 def _scan_from_evidence(
@@ -267,7 +272,9 @@ def persist_lane_index(
     status = str(status_row[0]) if status_row is not None else "missing"
     graph_eligible = bool(status_row[1]) if status_row is not None else True
     if graph_eligible:
-        raise BakeoffError("graph_eligible", "bake-off versions must stay graph-ineligible")
+        raise BakeoffError(
+            "graph_eligible", "bake-off versions must stay graph-ineligible"
+        )
     chunk_count = int(count_row[0]) if count_row is not None else 0
     ready_states = {"hybrid_ready", "graph_ineligible", "graph_pending"}
     hybrid_ready = passed and status in ready_states

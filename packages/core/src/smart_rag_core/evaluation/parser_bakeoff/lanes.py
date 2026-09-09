@@ -375,7 +375,9 @@ def parse_anydoc_docker(request: LaneParseRequest) -> ParseResult:
                 code="missing_output",
                 extra=extra,
             )
-        result = ParseResult.model_validate_json(output_path.read_text(encoding="utf-8"))
+        result = ParseResult.model_validate_json(
+            output_path.read_text(encoding="utf-8")
+        )
         metrics = result.resource_metrics.model_copy(
             update={"wall_seconds": time.monotonic() - started}
         )
