@@ -193,8 +193,7 @@ def test_same_scope_reconnects_and_different_scope_collides(
     assert second.reconnect is True
     assert second.context.run_id == first.context.run_id
     assert (
-        second.context.requested_search_scope
-        is RequestedSearchScope.COMPANY_DOCUMENTS
+        second.context.requested_search_scope is RequestedSearchScope.COMPANY_DOCUMENTS
     )
     _admit_error(
         db_connection,
@@ -267,13 +266,9 @@ def test_invalid_search_scope_rejected_and_foreign_get_is_not_found(
     finally:
         db_connection.execute("ROLLBACK TO SAVEPOINT invalid_scope_rpc")
         db_connection.execute("RELEASE SAVEPOINT invalid_scope_rpc")
-    owned = get_query_run(
-        db_connection, caller=caller, run_id=admitted.context.run_id
-    )
+    owned = get_query_run(db_connection, caller=caller, run_id=admitted.context.run_id)
     assert owned.requested_search_scope is RequestedSearchScope.COMPANY_DOCUMENTS
     stranger = _caller(stranger_id, "member", version)
     with pytest.raises(QueryAdmissionError, match="not_found"):
-        get_query_run(
-            db_connection, caller=stranger, run_id=admitted.context.run_id
-        )
+        get_query_run(db_connection, caller=stranger, run_id=admitted.context.run_id)
     db_connection.execute("RESET ROLE")

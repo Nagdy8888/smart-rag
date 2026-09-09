@@ -16,6 +16,7 @@ from smart_rag_core.evaluation.parser_bakeoff.artifacts import (
     sha256_text,
 )
 from smart_rag_core.evaluation.parser_bakeoff.constants import (
+    ANYDOC_CLEANING_VERSION,
     ANYDOC_LANE,
     ANYDOC_PARSER_VERSION,
     COMMAND_VERSION,
@@ -85,7 +86,9 @@ def resolve_selected_pdf(repo: Path, pdf: Path) -> Path:
     except ValueError as exc:
         raise BakeoffError("selected_pdf_required", "path outside repository") from exc
     if resolved != selected:
-        raise BakeoffError("selected_pdf_required", "only the sealed book PDF is allowed")
+        raise BakeoffError(
+            "selected_pdf_required", "only the sealed book PDF is allowed"
+        )
     if not resolved.is_file():
         raise BakeoffError("pdf_missing", "selected PDF is not a regular file")
     if resolved.suffix.lower() != ".pdf":
@@ -130,7 +133,7 @@ def pdf_page_count(path: Path) -> int:
 
     try:
         document = fitz.open(path)
-    except Exception as exc:  # noqa: BLE001 — vendor open failures are fail-closed
+    except Exception as exc:
         raise BakeoffError("pdf_unreadable", "PDF page count unavailable") from exc
     try:
         return as_int(vendor_attr(document, "page_count"))
@@ -177,7 +180,9 @@ def clamav_scanner_from_env() -> Scanner:
         except ClamAvError as exc:
             raise BakeoffError("scan_unavailable", "ClamAV scan failed") from exc
         if result.disposition is not ScanDisposition.CLEAN:
-            raise BakeoffError("scan_not_clean", f"scan disposition {result.disposition}")
+            raise BakeoffError(
+                "scan_not_clean", f"scan disposition {result.disposition}"
+            )
         signature = "unknown"
         if result.signature_db_ids:
             signature = "|".join(sorted(result.signature_db_ids.values()))
@@ -222,7 +227,9 @@ def prepare_run(
     source = resolve_selected_pdf(root, pdf)
     digest, size = stream_sha256(source)
     if size > PARSER_SANDBOX_MAX_INPUT_BYTES:
-        raise BakeoffError("limit_exceeded:input_bytes", f"input bytes {size} exceed max")
+        raise BakeoffError(
+            "limit_exceeded:input_bytes", f"input bytes {size} exceed max"
+        )
     pages = pdf_page_count(source)
     if pages > PARSER_SANDBOX_MAX_PAGES:
         raise BakeoffError("limit_exceeded:pages", f"page count {pages}")

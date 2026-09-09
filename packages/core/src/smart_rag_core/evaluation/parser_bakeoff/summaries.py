@@ -12,7 +12,11 @@ from smart_rag_core.ingestion.chunking.service import (
     stable_chunking_config_hash,
 )
 from smart_rag_core.ingestion.chunking.types import ChunkKind
-from smart_rag_core.ingestion.parser.types import ParseDisposition, ParseResult, PdfLocator
+from smart_rag_core.ingestion.parser.types import (
+    ParseDisposition,
+    ParseResult,
+    PdfLocator,
+)
 
 
 def element_text_hash(result: ParseResult) -> str:

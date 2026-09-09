@@ -42,9 +42,7 @@ def _visit_nodes(
     deps = QueryGraphDeps(hybrid_retriever=hybrid)
     compiled = compile_state_graph(build_query_graph(deps))
     state = pending_query_state(
-        _runtime(requested_search_scope=requested_search_scope).model_dump(
-            mode="json"
-        ),
+        _runtime(requested_search_scope=requested_search_scope).model_dump(mode="json"),
         user_query=query,
     )
     visited: list[str] = []

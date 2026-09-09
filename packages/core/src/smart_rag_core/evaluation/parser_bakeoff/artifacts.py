@@ -10,7 +10,10 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from smart_rag_core.evaluation.parser_bakeoff.constants import PRIVATE_ROOT, LaneId
-from smart_rag_core.evaluation.parser_bakeoff.models import BakeoffError, BakeoffManifest
+from smart_rag_core.evaluation.parser_bakeoff.models import (
+    BakeoffError,
+    BakeoffManifest,
+)
 
 TModel = TypeVar("TModel", bound=BaseModel)
 

@@ -127,7 +127,9 @@ def convert_with_anydoc(path: Path) -> str:
     try:
         import anydoc
     except ImportError as exc:
-        raise BakeoffError("anydoc_missing", "firecrawl-anydoc is not installed") from exc
+        raise BakeoffError(
+            "anydoc_missing", "firecrawl-anydoc is not installed"
+        ) from exc
     return str(anydoc.to_markdown(str(path), ocr=ANYDOC_OCR_MODE))
 
 

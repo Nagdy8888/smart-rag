@@ -5,7 +5,10 @@ from __future__ import annotations
 import unicodedata
 from uuid import UUID
 
-from smart_rag_core.evaluation.parser_bakeoff.artifacts import canonical_json, sha256_text
+from smart_rag_core.evaluation.parser_bakeoff.artifacts import (
+    canonical_json,
+    sha256_text,
+)
 from smart_rag_core.evaluation.parser_bakeoff.constants import (
     ALLOWED_SPLITS,
     FORBIDDEN_SPLIT,
@@ -254,7 +257,9 @@ def apply_review(
             )
         )
     if pending:
-        raise BakeoffError("gold_review_incomplete", f"unresolved review items {pending}")
+        raise BakeoffError(
+            "gold_review_incomplete", f"unresolved review items {pending}"
+        )
     approved = mapping.model_copy(
         update={"items": tuple(resolved), "reviewer": reviewer, "approved": True}
     )

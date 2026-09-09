@@ -76,6 +76,7 @@ select = [
 "tests/contract/integration_support.py" = ["S603", "S607"]
 "tests/contract/test_parser_sandbox.py" = ["S607"]
 "packages/core/src/smart_rag_core/ingestion/parser/sandbox/launcher.py" = ["S108", "S603", "S607"]
+"packages/core/src/smart_rag_core/evaluation/parser_bakeoff/lanes.py" = ["S108", "S603", "S607"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

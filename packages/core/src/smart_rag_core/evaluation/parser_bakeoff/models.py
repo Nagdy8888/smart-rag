@@ -271,9 +271,9 @@ class LaneRetrieveScore(BaseModel):
     refusal_ok: bool
     first_evidence_ms: float | None = None
     bm25_fallback: str = "none"
-    rerank_call_count: int = Field(ge=0)
-    ranked_id_count: int = Field(ge=0)
-    cross_lane_leaks: int = Field(ge=0)
+    rerank_call_count: int = Field(default=0, ge=0)
+    ranked_id_count: int = Field(default=0, ge=0)
+    cross_lane_leaks: int = Field(default=0, ge=0)
     acl_leak: bool = False
 
 
@@ -289,11 +289,11 @@ class LaneAgentScore(BaseModel):
     faithfulness: float | None
     judge_status: str
     refusal_ok: bool
-    invented_or_forbidden: int = Field(ge=0)
-    answer_calls: int = Field(ge=0)
-    judge_calls: int = Field(ge=0)
-    input_tokens: int = Field(ge=0)
-    output_tokens: int = Field(ge=0)
+    invented_or_forbidden: int = Field(default=0, ge=0)
+    answer_calls: int = Field(default=0, ge=0)
+    judge_calls: int = Field(default=0, ge=0)
+    input_tokens: int = Field(default=0, ge=0)
+    output_tokens: int = Field(default=0, ge=0)
     cost_usd: float | None = None
     budget_or_deadline_failed: bool = False
 

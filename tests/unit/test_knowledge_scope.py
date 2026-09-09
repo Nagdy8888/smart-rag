@@ -659,7 +659,9 @@ def test_requested_company_keeps_greeting_and_user_text() -> None:
     assert hello.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
     assert hello.confidence == 1.0
     assert hello.scope_degradation_reason is None
-    hello_plan = _plan("Hello", requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS)
+    hello_plan = _plan(
+        "Hello", requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS
+    )
     assert hello_plan.effective_route is Phase6RouteFamily.NO_RETRIEVAL
     assert hello_plan.company_claim_forbidden is True
 
@@ -678,7 +680,9 @@ def test_requested_company_keeps_greeting_and_user_text() -> None:
     )
     assert user_text.knowledge_scope is KnowledgeScope.USER_SUPPLIED_TEXT
     assert user_text.confidence == 1.0
-    user_plan = _plan(rewrite, requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS)
+    user_plan = _plan(
+        rewrite, requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS
+    )
     assert user_plan.no_retrieval_answer_mode is NoRetrievalAnswerMode.USER_TEXT_MODEL
 
 
