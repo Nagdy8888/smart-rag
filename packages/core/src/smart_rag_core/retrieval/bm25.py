@@ -16,6 +16,7 @@ from smart_rag_core.retrieval.bm25_indexer import Bm25Indexer
 from smart_rag_core.retrieval.bm25_query import (
     Bm25QueryError,
     Bm25StructuredQuery,
+    bm25_key_scope_sql,
     bm25_match_clause,
     build_bm25_query,
 )
@@ -31,7 +32,7 @@ from smart_rag_core.retrieval.profiles import (
     RetrievalFallbackReason,
 )
 from smart_rag_core.retrieval.recheck import recheck_retrieval_candidates
-from smart_rag_core.retrieval.types import Bm25RetrievalResult
+from smart_rag_core.retrieval.types import Bm25RetrievalResult, RetrievalCandidate
 from smart_rag_core.security.identity import CallerContext
 
 _FIELD_TIER = {
@@ -153,6 +154,7 @@ class Bm25Retriever:
             if len(ordered_ids) >= BM25_SCAN_ID_CAP:
                 break
 
+        scanned_ids = tuple(ordered_ids)
         survivors = recheck_retrieval_candidates(
             supabase,
             caller=caller,
@@ -161,10 +163,269 @@ class Bm25Retriever:
         )
         capped = survivors[:BM25_AUTHORIZED_SURVIVOR_CAP]
         return Bm25RetrievalResult(
-            scanned_ids=tuple(ordered_ids),
+            scanned_ids=scanned_ids,
             candidates=capped,
             fallback_reason=RetrievalFallbackReason.NONE,
+            variant_count=1,
+            variant_ranks=(len(capped),),
+            rechecked_count=len(ordered_ids),
+            survivor_count=len(capped),
+            index_schema_version=BM25_INDEX_SCHEMA_VERSION,
+            normalizer_version=NORMALIZATION_VERSION,
+            variant_lists=(capped,) if capped else (),
         )
+
+    def retrieve_variants(
+        self,
+        *,
+        supabase: psycopg.Connection,
+        caller: CallerContext,
+        texts: tuple[str, ...],
+        operator: Bm25Operator = Bm25Operator.MATCH_DISJUNCTION,
+        language: str | None = None,
+        acl_scope_id: str | None = None,
+        version_id: UUID | None = None,
+        fields: tuple[Bm25Field, ...] = BM25_FIELD_PRIORITY,
+    ) -> Bm25RetrievalResult:
+        """Scan original plus at most three variants in one top-300 statement.
+
+        Args:
+            supabase: Canonical Postgres for the recheck RPC.
+            caller: Server-derived identity used only on recheck.
+            texts: Original query first, then at most three variants.
+            operator: Allow-listed ParadeDB operator.
+            language: Optional language filter pushed into ranking.
+            acl_scope_id: Optional opaque scope prefilter.
+            version_id: Optional current version. Applied as a btree lookup
+                of ``chunk_id`` values, then ``chunk_id = ANY(...)`` on the
+                BM25 key field. ``version_id`` is not a ``pg_search`` filter
+                column; mixing it with ``pdb.score`` is an unsupported query
+                shape on the pinned image.
+            fields: Allow-listed fields.
+
+        Returns:
+            Combined scanned IDs, per-variant authorized lists, and
+            globally capped unique survivors. Never returns snippets.
+
+        Side Effects:
+            One btree id lookup when ``version_id`` is set. One ParadeDB
+            BM25 statement. One canonical recheck of the union.
+        """
+
+        meta = self._indexer.fetch_meta()
+        if meta.get("normalization_version") != NORMALIZATION_VERSION:
+            return Bm25RetrievalResult(
+                scanned_ids=(),
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.BM25_VERSION_MISMATCH,
+                index_schema_version=str(meta.get("index_schema_version") or ""),
+                normalizer_version=str(meta.get("normalization_version") or ""),
+            )
+        if meta.get("index_schema_version") != BM25_INDEX_SCHEMA_VERSION:
+            return Bm25RetrievalResult(
+                scanned_ids=(),
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.BM25_VERSION_MISMATCH,
+                index_schema_version=str(meta.get("index_schema_version") or ""),
+                normalizer_version=NORMALIZATION_VERSION,
+            )
+        if not self._indexer.search_index_exists():
+            return Bm25RetrievalResult(
+                scanned_ids=(),
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.BM25_UNAVAILABLE,
+            )
+
+        unique_texts: list[str] = []
+        seen_text: set[str] = set()
+        for text in texts[:4]:
+            normalized = text.strip()
+            if not normalized or normalized in seen_text:
+                continue
+            seen_text.add(normalized)
+            unique_texts.append(text)
+        if not unique_texts:
+            return Bm25RetrievalResult(
+                scanned_ids=(),
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.NONE,
+            )
+
+        branches: list[sql.Composed] = []
+        params: list[object] = []
+        try:
+            scope_ids: tuple[UUID, ...] | None = None
+            if version_id is not None:
+                scope_ids = self._current_chunk_ids_for_version(version_id)
+                if not scope_ids:
+                    return Bm25RetrievalResult(
+                        scanned_ids=(),
+                        candidates=(),
+                        fallback_reason=RetrievalFallbackReason.NONE,
+                    )
+            scope_sql, scope_params = bm25_key_scope_sql(scope_ids)
+            for ordinal, text in enumerate(unique_texts):
+                for field in fields:
+                    structured = build_bm25_query(
+                        query_text=text,
+                        operator=operator,
+                        field=field,
+                    )
+                    branches.append(
+                        sql.SQL(
+                            """
+                            SELECT {ordinal}::integer AS variant_ordinal,
+                                   {tier}::integer AS field_tier,
+                                   chunk_id,
+                                   pdb.score(chunk_id) AS score
+                            FROM bm25_chunks
+                            WHERE {match}
+                              AND is_current = true
+                              AND (%s::text IS NULL OR language IS NOT DISTINCT FROM %s)
+                              AND (%s::text IS NULL OR acl_scope_id = %s)
+                              {scope}
+                            """
+                        ).format(
+                            ordinal=sql.Literal(ordinal),
+                            tier=sql.Literal(_FIELD_TIER[field]),
+                            match=bm25_match_clause(structured),
+                            scope=scope_sql,
+                        )
+                    )
+                    params.extend(
+                        [
+                            structured.query_normalized,
+                            language,
+                            language,
+                            acl_scope_id,
+                            acl_scope_id,
+                            *scope_params,
+                        ]
+                    )
+            statement = sql.SQL(
+                """
+                SELECT variant_ordinal, field_tier, chunk_id, score
+                FROM ({union}) AS unioned
+                ORDER BY field_tier ASC, score DESC, chunk_id ASC
+                LIMIT %s
+                """
+            ).format(union=sql.SQL(" UNION ALL ").join(branches))
+            params.append(BM25_SCAN_ID_CAP)
+            with self._connection.transaction():
+                with self._connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT set_config(%s, %s, true)",
+                        ("statement_timeout", str(RETRIEVAL_STATEMENT_TIMEOUT_MS)),
+                    )
+                    cursor.execute(statement, params)
+                    rows = cursor.fetchall()
+        except (psycopg.Error, Bm25QueryError):
+            return Bm25RetrievalResult(
+                scanned_ids=(),
+                candidates=(),
+                fallback_reason=RetrievalFallbackReason.BM25_UNAVAILABLE,
+            )
+
+        scanned: list[UUID] = []
+        scores: dict[UUID, float] = {}
+        seen_ids: set[UUID] = set()
+        per_variant_ids: list[list[UUID]] = [[] for _ in unique_texts]
+        per_variant_scores: list[dict[UUID, float]] = [
+            {} for _ in unique_texts
+        ]
+        for row in rows:
+            ordinal = int(row[0])
+            score = float(row[3])
+            chunk_id = UUID(str(row[2]))
+            if 0 <= ordinal < len(per_variant_ids) and chunk_id not in per_variant_scores[ordinal]:
+                per_variant_ids[ordinal].append(chunk_id)
+                per_variant_scores[ordinal][chunk_id] = score
+            if chunk_id in seen_ids:
+                continue
+            seen_ids.add(chunk_id)
+            scanned.append(chunk_id)
+            scores[chunk_id] = score
+            if len(scanned) >= BM25_SCAN_ID_CAP:
+                break
+
+        survivors = recheck_retrieval_candidates(
+            supabase,
+            caller=caller,
+            chunk_ids=tuple(scanned),
+            scores_by_id=scores,
+        )
+        survivor_by_id = {item.chunk_id: item for item in survivors}
+        variant_lists: list[tuple[RetrievalCandidate, ...]] = []
+        for ordinal, ids in enumerate(per_variant_ids):
+            kept: list[RetrievalCandidate] = []
+            for chunk_id in ids:
+                item = survivor_by_id.get(chunk_id)
+                if item is None:
+                    continue
+                kept.append(
+                    RetrievalCandidate(
+                        chunk_id=item.chunk_id,
+                        document_id=item.document_id,
+                        version_id=item.version_id,
+                        channel_rank=len(kept) + 1,
+                        channel_score=per_variant_scores[ordinal].get(
+                            chunk_id, item.channel_score
+                        ),
+                    )
+                )
+            variant_lists.append(tuple(kept))
+        from smart_rag_core.retrieval.hybrid_run.channels import (
+            cap_unique_across_variants,
+        )
+
+        capped_lists = cap_unique_across_variants(
+            tuple(variant_lists), BM25_AUTHORIZED_SURVIVOR_CAP
+        )
+        combined: list[RetrievalCandidate] = []
+        seen_final: set[UUID] = set()
+        for variant in capped_lists:
+            for item in variant:
+                if item.chunk_id in seen_final:
+                    continue
+                seen_final.add(item.chunk_id)
+                combined.append(item)
+        return Bm25RetrievalResult(
+            scanned_ids=tuple(scanned),
+            candidates=tuple(combined),
+            fallback_reason=RetrievalFallbackReason.NONE,
+            variant_count=len(unique_texts),
+            variant_ranks=tuple(len(item) for item in capped_lists),
+            rechecked_count=len(scanned),
+            survivor_count=len(combined),
+            index_schema_version=BM25_INDEX_SCHEMA_VERSION,
+            normalizer_version=NORMALIZATION_VERSION,
+            variant_lists=capped_lists,
+        )
+
+    def _current_chunk_ids_for_version(self, version_id: UUID) -> tuple[UUID, ...]:
+        """Load current projection ids for one version via btree, not BM25.
+
+        Args:
+            version_id: Canonical document version.
+
+        Returns:
+            Chunk ids currently projected for that version.
+
+        Side Effects:
+            One ParadeDB ``SELECT`` on ``bm25_chunks_version_id_idx``.
+        """
+
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT chunk_id
+                FROM bm25_chunks
+                WHERE version_id = %s
+                  AND is_current = true
+                """,
+                (version_id,),
+            )
+            return tuple(UUID(str(row[0])) for row in cursor.fetchall())
 
     def _scan_field(
         self,

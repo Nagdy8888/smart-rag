@@ -12,6 +12,10 @@ import {
   type ApiFailure,
 } from "../../../lib/api";
 import {
+  snapshotSettledTurn,
+  type SettledChatTurn,
+} from "../../../lib/chat-history";
+import {
   addChatTokens,
   applyAdmission,
   startNextChatRun,
@@ -39,6 +43,10 @@ export type StartChatSendDeps = {
   abortRef: { current: AbortController | null };
   idempotencyRef: { current: string | null };
   liveRunIdsRef: { current: Set<string> };
+  /** Previous live question; snapshotted before the next send overwrites it. */
+  lastUserMessageRef: { current: string };
+  /** Fold a finished live answer into the transcript overlay. */
+  settleCompletedTurn: (turn: SettledChatTurn) => void;
   /** Mark the admitted run as created in this mounted session. */
   setLiveRunCreated: (value: boolean) => void;
   autoResumeRef: {
@@ -152,6 +160,14 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
     }
     deps.sendLockRef.current = true;
     deps.setSending(true);
+    const settled = snapshotSettledTurn(
+      deps.lastUserMessageRef.current,
+      deps.chatRef.current,
+      new Date().toISOString(),
+    );
+    if (settled !== null) {
+      deps.settleCompletedTurn(settled);
+    }
     deps.setLastUserMessage(text.trim());
     let streamHandedOff = false;
     let activeConversationId = deps.conversationId;

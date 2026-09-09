@@ -66,3 +66,4 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | Cleanup packet 9 — Tests, docs, and dead-code closure (2026-08-26) | [phase-06/cleanup-packet-9-tests-docs-dead-code-2026-08-26.md](./phase-06/cleanup-packet-9-tests-docs-dead-code-2026-08-26.md) | 52 |
 | Cleanup final-gates — Architecture, work counts, and repository gates (2026-08-26) | [phase-06/cleanup-final-gates-2026-08-26.md](./phase-06/cleanup-final-gates-2026-08-26.md) | 88 |
 | P06-16 — Custom SSE progress and paced-reveal contract (2026-08-26) | [phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md](./phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md) | 32 |
+| Overlay PDF Hybrid P13/P15/P16 (2026-09-09, blocked live gates) | [phase-06/overlay-pdf-hybrid-packets.md](./phase-06/overlay-pdf-hybrid-packets.md) | 86 |

@@ -56,6 +56,7 @@ def main() -> int:
         "/ingestion/crawls",
         "/ingestion/jobs/{job_id}/retry",
         "/ingestion/versions/{version_id}/status",
+        "/ingestion/detector-findings/reviews",
         "/admin/glossary/imports",
         "/admin/glossary/imports/{import_id}/approve",
         "/admin/glossary/imports/{import_id}/rollback",

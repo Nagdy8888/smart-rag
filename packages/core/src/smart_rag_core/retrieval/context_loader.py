@@ -305,3 +305,66 @@ def _optional_str(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def fetch_authorized_heading_inventory(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    version_id: UUID,
+) -> tuple[str, ...]:
+    """Return authorized major section paths for one current version.
+
+    Args:
+        connection: Idle login connection.
+        caller: Server-derived identity.
+        version_id: Current document version.
+
+    Returns:
+        Distinct joined section paths in first-seen order. Missing,
+        unauthorized, stale, or deleted versions return empty.
+    """
+
+    with retrieval_transaction(
+        connection,
+        caller=caller,
+        profile="low",
+        apply_hnsw=False,
+    ):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT section_path, page_start, page_end
+                FROM app.retrieve_heading_inventory(
+                  %s::uuid,
+                  %s::text,
+                  %s::bigint,
+                  %s::uuid
+                )
+                """,
+                (
+                    caller.rpc_user_id(),
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    version_id,
+                ),
+            )
+            rows = cursor.fetchall()
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for raw_row in rows:
+        row = cast(Sequence[object], raw_row)
+        section = row[0]
+        path = (
+            tuple(str(item) for item in cast(Sequence[object], section))
+            if section
+            else ()
+        )
+        if not path:
+            continue
+        label = "/".join(path)
+        if label in seen:
+            continue
+        seen.add(label)
+        ordered.append(label)
+    return tuple(ordered)

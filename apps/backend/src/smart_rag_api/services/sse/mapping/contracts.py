@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from smart_rag_core.sse.catalog import ALLOWED_SSE_EVENT_TYPES
+from smart_rag_core.sse.catalog import ALLOWED_SSE_EVENT_TYPES, PAYLOAD_MODELS
 
 GENERATE_ANSWER_NODE: Final[str] = "generate_answer"
 GENERAL_SCOPE_NODE: Final[str] = "general_scope"
@@ -14,26 +14,9 @@ DRAFT_ANSWER_NODES: Final[frozenset[str]] = frozenset(
 )
 VERIFY_ANSWER_NODE: Final[str] = "verify_answer"
 TOKEN_DELTA_LIMIT: Final[int] = 4096
+# Catalog payload keys. Derived from extra=forbid ``PAYLOAD_MODELS``.
 ALLOWED_SSE_FIELDS: Final[frozenset[str]] = frozenset(
-    {
-        "stage",
-        "status",
-        "code",
-        "reason",
-        "route_family",
-        "from_route",
-        "to_route",
-        "delta",
-        "citation_ids",
-        "ranks",
-        "origin",
-        "prompt_tokens",
-        "completion_tokens",
-        "tool_keys",
-        "tool_key",
-        "phase",
-        "sse_schema_version",
-    }
+    name for model in PAYLOAD_MODELS.values() for name in model.model_fields
 )
 PARTIAL_STATUSES: Final[frozenset[str]] = frozenset(
     {
@@ -48,6 +31,7 @@ REJECT_STATUSES: Final[frozenset[str]] = frozenset(
         "routing_rejected",
     }
 )
+DEADLINE_EXHAUSTED_DETAIL: Final[str] = "deadline_exhausted"
 
 
 def assert_catalog_event(event_type: str, payload: dict[str, object]) -> None:

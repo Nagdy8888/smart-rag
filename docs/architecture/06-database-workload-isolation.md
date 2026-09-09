@@ -2,7 +2,7 @@
 title: Database workload isolation
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-09
 audience: engineering, ops
 phase_packet: Phase 2 Packet 6 / Phase 9 Packet 7
 ---
@@ -21,7 +21,7 @@ introspection SQL live in [05-database-connections.md](./05-database-connections
 
 | Control | API txn (`app_api`) | Worker txn (`app_worker`) | Session (`app_checkpointer` / `app_lightrag`) | Maintenance |
 | --- | --- | --- | --- | --- |
-| `statement_timeout` | 15s | 60s | 30s / 120s | window-approved window |
+| `statement_timeout` | 15s | 60s (300s SET LOCAL on long-document canonical/ledger txn) | 30s / 120s | window-approved window |
 | `lock_timeout` | 2s | 5s | 3s / 5s | 10s |
 | `idle_in_transaction_session_timeout` | 5s | 15s | 10s / 30s | 60s |
 | `work_mem` cap | 8MB | 16MB | 16MB | 64MB (ops role) |

@@ -38,9 +38,12 @@ def configure_hosted_backend_env(
     monkeypatch.setenv("ALLOW_TEST_IDENTITY", "false")
 
 
-def test_deployable_settings_are_typed_and_share_secure_defaults() -> None:
+def test_deployable_settings_are_typed_and_share_secure_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """All deployable settings inherit deterministic mock-mode defaults."""
 
+    monkeypatch.delenv("APP_ENV", raising=False)
     backend = BackendSettings()
     worker = WorkerSettings()
     agents = AgentSettings()

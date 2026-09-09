@@ -9,6 +9,7 @@ from smart_rag_core.ingestion.governance import (
     ExtractionGovernanceInput,
     evaluate_extraction_governance,
 )
+from smart_rag_core.ingestion.detectors import DetectorFamilyOutcome
 from smart_rag_core.ingestion.parser.sandbox.launcher import (
     ParserSandboxLauncher,
     SandboxLaunchConfig,
@@ -36,6 +37,7 @@ class ParserServiceResult:
     promotion_allowed: bool
     external_processing_allowed: bool
     governance_detail: str
+    detector_outcomes: tuple[DetectorFamilyOutcome, ...] = ()
 
 
 class ParserService:
@@ -120,6 +122,7 @@ class ParserService:
             promotion_allowed=governance_result.promotion_allowed,
             external_processing_allowed=governance_result.external_processing.allowed,
             governance_detail=governance_result.detail,
+            detector_outcomes=governance_result.detector_outcomes,
         )
 
 

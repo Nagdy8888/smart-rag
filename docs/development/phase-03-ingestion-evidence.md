@@ -2,7 +2,7 @@
 title: Phase 3 ingestion evidence
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-15
+last-reviewed: 2026-09-09
 audience: engineering, reviewers
 phase: 3
 ---
@@ -11,7 +11,7 @@ phase: 3
 
 Canonical packet evidence and exit record for [Phase 3](../../.cursor/plans/hybrid-graph-rag/03-phase-ingestion.md). Packet 1 creates this file; later packets append. Phase status remains `pending` until Packet 8 and explicit user acceptance.
 
-Related: [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) · [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) · [2026-08-16 Phases 1–5 implementation review](../reviews/2026-08-16-phases-01-05-implementation-review.md) · [close-out](../reviews/2026-08-16-phases-01-05-closeout.md) · [docs index](../README.md)
+Related: [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) · [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) · [hybrid-pdf-accuracy-remediation.md](./hybrid-pdf-accuracy-remediation.md) · [ADR-detector-finding-reviews.md](../adr/ADR-detector-finding-reviews.md) · [2026-08-16 Phases 1–5 implementation review](../reviews/2026-08-16-phases-01-05-implementation-review.md) · [close-out](../reviews/2026-08-16-phases-01-05-closeout.md) · [docs index](../README.md)
 
 ## Prerequisites
 
@@ -703,3 +703,258 @@ QT-BM25-003 p95 lag &lt;5 minutes: this synthetic drive measured 1.005s projecti
 ### Explicit acceptance
 
 User request: implement Phase 4 (`.cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md`). That request is recorded as Phase 3 acceptance to start Phase 4 Packet 1.
+
+## Overlay Packet 9 — 2026-09-09 provider matrix named approval
+
+Quoted requirement: re-verify OpenAI and LangSmith processing matrices before any live document call.
+
+### Proven
+
+- OpenAI `GET /v1/models` HTTP 200. Org console endpoints 404/403.
+- LangSmith `/api/v1/info` and `/api/v1/workspaces` HTTP 200. Workspace
+  `02a8641a-ecd6-462c-b80c-13beca9ebd90` has no retention-day field.
+- Product owner (Cursor chat, 2026-09-09) accepted public no-training default,
+  residual 30-day abuse monitoring, ZDR off, and hide-I/O traces.
+- Ignored env: `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true`,
+  `LANGSMITH_EXPORT_IO=false`, `WORKER_GRAPH_ENABLED=false`.
+
+### Not claimed
+
+- ZDR/MAM. DPA in-repo. Staging/production real-company traffic.
+
+### Rollback
+
+- Unset `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED`. Restore 2026-08-13
+  framework wording if this overlay approval is withdrawn.
+
+## Overlay Packet 10 — detector findings and hash-bound reviews
+
+Quoted requirement: persist append-only findings/reviews; ignore `payload_ref.review_approved`.
+
+### Proven
+
+- Additive migration `supabase/migrations/20260909120000_detector_findings_reviews_v1.sql`.
+- `GovernanceReviewRepository.resolve_review_approved` is the parse/embed gate.
+- Local env does not reclassify `real_company` jobs (`test_ingest_trace.py`).
+- ADR: [ADR-detector-finding-reviews.md](../adr/ADR-detector-finding-reviews.md).
+
+### Rollback
+
+- Reverse the additive findings/reviews migration. Keep historical Packet 1 complete.
+
+## Overlay Packet 11 — review lifecycle transport
+
+Quoted requirement: owner/admin review API, nested diagnostics, IDOR-safe 404.
+
+### Proven
+
+- `POST /ingestion/detector-findings/reviews` in OpenAPI allowed set and
+  `docs/api/openapi.foundation.json`.
+- Members and viewers receive the same `not_found` as a missing finding,
+  including on the HTTP path before Valkey rate limiting.
+- Status schema includes `finding_count` and `findings`.
+
+### Commands (2026-09-09)
+
+| Command | Exit |
+| --- | --- |
+| `uv run pytest tests/unit/test_ingestion_status_openapi.py tests/unit/test_pdf_overlay_governance.py -q` | 0 |
+| `uv run python scripts/ci/check_openapi.py` | 0 after snapshot update |
+
+## Overlay Packet 12 — hybrid-only worker mode
+
+Quoted requirement: `WORKER_GRAPH_ENABLED=false` skips LightRAG bind and graph claims.
+
+### Proven
+
+- Default remains true. False skips adapter bind. BM25 loop still runs.
+- Laptop runner prints `worker_graph_enabled=false`.
+
+## Overlay Packet 13 — chunking_v2
+
+Quoted requirement: 401–600 ordinary prose splits toward 200–400.
+
+### Proven
+
+- Policy pin `chunking_v2`. Unit test builds a tokenizer-true 401-600
+  fixture and splits it toward 200-400.
+- Analyzer `scripts/ops/analyze_pdf_chunks.py` is count-only.
+
+### Measured stop (this PDF, 2026-09-09)
+
+Count-only analyzer on SHA-256
+`72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1`
+(12,990,407 bytes, 355 pages):
+
+| Metric | Value |
+| --- | --- |
+| `chunking_version` | `chunking_v2` |
+| ordinary prose passages | 640 |
+| 200–400 band | 495 (0.7734) |
+| under 200 | 134 |
+| 401–600 | 11 |
+| over 600 | 0 |
+| parents over 1500 | 0 |
+| parser element kinds | `page_break` 355, `paragraph` 3250, `figure` 7, heading 0 |
+
+The ≥90% ordinary-prose gate is **not met**. The parser emitted no heading
+elements, so one parent covers the file and short paragraphs cannot merge
+inside heading ancestry. Packet 5 stop: do not merge across unproven page
+boundaries to force the percentage. Bounded follow-up is PDF heading
+recovery in the parser, not a chunker target change.
+
+## Overlay Packet 14 — one-file ingest
+
+Quoted requirement: ingest the private PDF to public `graph_ineligible`
+with redacted traces and no graph work.
+
+### Acceptance checks restated
+
+- Public status `graph_ineligible`; no `ingestion.graph` or
+  `model.lightrag_llm` for this version; traces redacted.
+- Successful ingest is not an accuracy pass.
+- Job class stays `real_company`. Graph eligibility stays false.
+
+### Captured IDs (no source text)
+
+| Field | Value |
+| --- | --- |
+| `document_id` | `9c9fcbfe-d86b-4850-bc7f-94f0fcd8ccb2` |
+| `version_id` | `4324c385-80fd-4464-9c97-a7568bf364db` |
+| `scan_promote` job | `029848c0-bc3b-4dbe-b7a8-195b97c699ec` completed |
+| `hybrid_index` job | `0998baed-df79-4538-8467-d55c60527b3e` completed |
+| `bm25` upsert job | `77c26568-6504-420b-bc66-ea15589a2107` completed |
+| content SHA-256 | `72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1` |
+| `content_class` | `real_company` |
+| document / version `graph_eligible` | `false` / `false` |
+| public version status | `graph_ineligible` |
+| `lightrag_index_jobs` for this version | `0` |
+
+Ids also written gitignored at `.private-eval/ingest-ids.json`.
+
+### Operator-visible re-ingest (2026-09-09T11:23Z)
+
+A second Hybrid ingest of the same SHA-256 ran with the Packet 7
+`[hybrid]` follow window open. Persist-timeout repair held: one embedding
+pass, then BM25, public `graph_ineligible`. Job never marked synthetic.
+
+| Field | Value |
+| --- | --- |
+| `document_id` | `a0ede339-e41f-47cc-b364-051176219ad4` |
+| `version_id` | `d16b0fe2-7335-4cf2-aab1-04c1b2bb2c78` |
+| `scan_promote` job | `f7fec6b5-acf5-4a95-b1c2-a15a733870ae` completed |
+| `hybrid_index` job | `d4a96df1-1bc9-49aa-abca-47e943fe8ca8` completed |
+| `bm25` upsert job | `56d7c377-ed05-49f1-9466-3ff902b2e4aa` completed |
+| `content_class` | `real_company` |
+| document / version `graph_eligible` | `false` / `false` |
+| public version status | `graph_ineligible` |
+| `lightrag_index_jobs` | `0` |
+| ledger `actual_usd` | `0.024930` (one 640-input pass) |
+
+Visible `[hybrid]` stages: `scan` → `scan_promote_done` → `parse` →
+`governance_review_required` (credentials 1 + health 14, owner
+`false_positive`) → `parse` → `chunked chunks=641` → 10× `embed_batch`
+(64 chunks) → `hybrid_index_done` → `bm25` → `hybrid_ready`. No `[graph]`
+lines. `.private-eval/ingest-ids.json` now points at this version.
+
+### Stage transcript (TTY, no source text)
+
+Host worker `LANGSMITH_EXPORT_IO=false`, `WORKER_GRAPH_ENABLED=false`,
+`SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true`. Visible `[hybrid]` stages:
+
+`scan` → `scan_promote_done` → `parse` → `governance_review_required`
+(credentials + health; owner `false_positive` reviews) → retry `parse` →
+`chunked chunks=641` → `embed_batch` (10×64) → `hybrid_index_done` →
+`bm25` → `hybrid_ready`.
+
+No `[graph]` lines. `lightrag_db_url_set=false`.
+
+### Detector reviews
+
+| Family | Bounded count | Decision | Notes |
+| --- | --- | --- | --- |
+| `credentials` | 1 | `false_positive` | Technical-book example vocabulary |
+| `health` | 14 | `false_positive` | Health-check wording, not medical records |
+
+HTTP `POST /ingestion/detector-findings/reviews` as a newly created owner
+returned 404 (that principal could not `caller_can_read_document`). Reviews
+were recorded through `app.review_detector_finding` as the document
+`created_by` owner (role `owner`, `authorization_version=3`). Coverage is
+per family. `national_id` was not present and stays fail-closed.
+
+### Canonical write repair (measured)
+
+Two live persist attempts after embedding failed with
+`canceling statement due to statement timeout` (~135s after the last
+OpenAI embeddings batch). Cause: `app_worker` 60s `statement_timeout` plus
+a completed-ledger JSONB payload of 640×1024-d vectors.
+
+Repair (role defaults unchanged):
+
+- `SET LOCAL statement_timeout = '300s'` and idle-in-txn `180s` on the
+  embed-ledger and canonical-write transactions.
+- Ledger omits inline vectors when `input_count > 64`; vectors persist on
+  `app.document_chunks` only.
+
+Third attempt after worker restart: `hybrid_index` completed,
+`chunk_set_hash` set, BM25 upsert completed, public `graph_ineligible`.
+
+### Counts (no text)
+
+| Metric | Value |
+| --- | --- |
+| Chunks | 641 (640 search representatives + 1 parent) |
+| Embedded rows | 640 |
+| Ordinary-prose token bands | under 200: 134; 200–400: 495; 401–600: 11; over 600: 1 (parent) |
+| Embedding model | `text-embedding-3-large` |
+| Ledger `actual_usd` (last completed row only) | `0.024930` (one 640-input pass) |
+| LangSmith `openai.embeddings` / `embedding.embed` | 30 spans, **USD 0.07479** (three provider passes after persist timeouts; list price `$0.13` / 1M tokens) |
+
+Successful ingest is **not** Recall@10 or answer-faithfulness evidence.
+
+### LangSmith (I/O hidden)
+
+Project `smart-rag-demo-3` (`74ffccd3-c739-42e9-8a12-4a052c663d82`).
+UI: <https://smith.langchain.com/o/02a8641a-ecd6-462c-b80c-13beca9ebd90/projects/p/74ffccd3-c739-42e9-8a12-4a052c663d82>
+Filter `ingestion.scan`, `ingestion.parse`, `ingestion.index`, `embedding.embed`.
+`LANGSMITH_EXPORT_IO=false` so Inputs/Outputs panels are empty by design; usage/cost still attach.
+`document_id` prefix `08954b22399c1d21`, `version_id` prefix
+`c4d88206276d4f13`. Runs since 2026-09-09 10:20 UTC (names/ids only):
+
+| Name | Count | Sample run id |
+| --- | --- | --- |
+| `ingestion.scan` | 1 | `01a085b0-fa8e-7cf2-b1b5-1ebb9256eebe` |
+| `ingestion.parse` | 6 | `01a085cf-f30d-7111-ba56-8cf60eb8c01f` |
+| `ingestion.index` | 6 | `01a085cf-6642-7a33-9fbb-96d21c83e207` |
+| `embedding.embed` | 30 | `01a085c7-dc57-76a0-9daa-d01858b0fd38` |
+| `ingestion.graph` | 0 | — |
+| `model.lightrag_llm` | 0 | — |
+
+### Negative checks
+
+- Job was never patched to `synthetic`.
+- Graph handoff/job absent for this version.
+- Accuracy is not claimed from `hybrid_ready` / `graph_ineligible`.
+
+### Commands
+
+```text
+uv run python scripts/ops/ingest_private_pdf.py
+uv run python scripts/ops/ingest_private_pdf.py --requeue-hybrid-index 0998baed-df79-4538-8467-d55c60527b3e
+uv run python scripts/ops/report_pdf_ingest_evidence.py
+```
+
+Poller exit 0 at 2026-09-09T11:05:14Z (`terminal_status=graph_ineligible`).
+
+### Rollback
+
+Normal version/deletion lifecycle: delete or supersede version
+`4324c385-80fd-4464-9c97-a7568bf364db`. Do not commit the PDF. Detector
+reviews remain hash-bound; a new hash requires new findings/reviews.
+
+### Unverified / next
+
+- Packet 8 (Phase 4 Packet 11) still requires a **named human** seal of
+  private Q/A with current chunk UUIDs. The coding model is not a reviewer.
+- Overlay Packets 14–16 (tune / agent eval / holdout) stay blocked until
+  that seal.

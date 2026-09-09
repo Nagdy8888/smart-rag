@@ -19,9 +19,28 @@ from smart_rag_api.services.sse.langgraph_stream_consume import (
     MappedStreamResult,
     iter_mapped_langgraph_updates,
 )
+from smart_rag_api.services.sse.mapping.contracts import DEADLINE_EXHAUSTED_DETAIL
 from smart_rag_api.services.sse.stream_lifecycle import StreamLifecycleMixin
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _deadline_partial_events(
+    context: AuthorizedRuntimeContext,
+) -> list[tuple[str, dict[str, object]]]:
+    """Return the catalog deadline diagnostic plus partial terminal.
+
+    Args:
+        context: Run whose family is copied onto the diagnostic event.
+
+    Returns:
+        ``deadline`` then ``partial`` with ``reason=deadline_exhausted``.
+    """
+
+    return [
+        ("deadline", {"route_family": context.route_family.value}),
+        ("partial", {"reason": DEADLINE_EXHAUSTED_DETAIL}),
+    ]
 
 
 class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
@@ -111,6 +130,32 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
         self.compile_count = self._factory.compile_count
         return compiled
 
+    async def warmup(self, settings: object) -> None:
+        """Open process Hybrid, store, checkpointer, and compiled graph.
+
+        Args:
+            settings: Backend settings with checkpoint DSN and adapters.
+
+        Side Effects:
+            Caches factory bindings so the first Ask run does not open
+            hosted Postgres pools under the Composite deadline.
+            ``setup()`` is never called.
+        """
+
+        self._process_bindings(settings)
+        self._bind_memory_store(settings)
+        checkpointer = await self._ensure_async_checkpointer(settings)
+        self._compiled_query_graph(checkpointer)
+
+    async def aclose(self) -> None:
+        """Close cached checkpointer and memory-store pools.
+
+        Side Effects:
+            Drops factory caches so a later ``execute`` reopens them.
+        """
+
+        await self._factory.aclose()
+
     async def execute(
         self,
         *,
@@ -128,7 +173,9 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
         Yields:
             Status events and at most one terminal. Retrieved source text is
             never copied into payloads. Summary or assistant persist after
-            ``completed``/``partial`` cannot replace that terminal.
+            ``completed``/``partial`` cannot replace that terminal. Verified
+            assistant text is still persisted when a later catalog assertion
+            fails so the next question cannot drop the live answer.
 
         Raises:
             asyncio.CancelledError: When the wrapping task is cancelled.
@@ -163,11 +210,12 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
         )
         if datetime.now(tz=UTC) >= context.deadline_at:
             self._set_termination(reason="deadline", terminal_event_type="partial")
-            yield ("deadline", {"route_family": context.route_family.value})
-            yield ("partial", {"reason": "deadline_exhausted"})
+            for event in _deadline_partial_events(context):
+                yield event
             return
 
         from smart_rag_api.services.query_graph_runtime import QueryGraphRuntimeError
+        from smart_rag_api.services.query_sse_mapping import QuerySseMapper
 
         connection = None
         connection_closed = False
@@ -176,6 +224,7 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
         stream_aclose_called = False
         last_prompt_tokens: int | None = None
         last_completion_tokens: int | None = None
+        mapper: QuerySseMapper | None = None
 
         def _close_connection() -> None:
             """Close the app_api connection exactly once."""
@@ -197,8 +246,11 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
                 ensure_async_checkpointer=self._ensure_async_checkpointer,
                 compiled_query_graph=self._compiled_query_graph,
             )
-            from smart_rag_api.services.query_sse_mapping import QuerySseMapper
-
+            if datetime.now(tz=UTC) >= context.deadline_at:
+                self._set_termination(reason="deadline", terminal_event_type="partial")
+                for event in _deadline_partial_events(context):
+                    yield event
+                return
             mapper = QuerySseMapper()
             LOGGER.info(
                 "query sse stream started",
@@ -259,6 +311,8 @@ class LangGraphQueryRunExecutor(StreamLifecycleMixin, AnswerPersistenceMixin):
             raise
         except Exception:
             self._set_termination(reason="error", terminal_event_type="error")
+            if mapper is not None and mapper.verified_text:
+                self._persist_assistant_answer(context, mapper, settings)
             raise
         finally:
             self._record_stream_usage(

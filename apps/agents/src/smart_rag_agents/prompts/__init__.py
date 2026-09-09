@@ -24,6 +24,8 @@ CONVERSATION_TITLE_PROMPT_VERSION = "conversation_title_v1"
 CONVERSATION_TITLE_PROMPT_PATH = (
     Path(__file__).resolve().parent / "conversation_title_v1.md"
 )
+EVAL_PDF_JUDGE_PROMPT_VERSION = "eval_pdf_judge_v1"
+EVAL_PDF_JUDGE_PROMPT_PATH = Path(__file__).resolve().parent / "eval_pdf_judge_v1.md"
 
 
 def query_profile_prompt_text() -> str:
@@ -128,3 +130,16 @@ def conversation_title_prompt_text() -> str:
     """
 
     return CONVERSATION_TITLE_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def eval_pdf_judge_prompt_text() -> str:
+    """Return the private-PDF judge prompt. Never reuse ``eval_judge_v1``.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return EVAL_PDF_JUDGE_PROMPT_PATH.read_text(encoding="utf-8")

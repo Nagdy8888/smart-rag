@@ -2,7 +2,7 @@
 title: BM25 projection contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-09-09
 audience: engineering
 ---
 
@@ -24,6 +24,15 @@ ParadeDB failure → Hybrid visibly degrades to dense + exact/trigram term searc
 (`bm25_unavailable`). See [HYBRID_RETRIEVAL_CONTRACT.md](./HYBRID_RETRIEVAL_CONTRACT.md).
 
 Packet 2 creates `bm25_chunks_search_idx` with `pdb.unicode_words` over
-title/heading/alias/body plus filter fields. Queries return `chunk_id` only.
+title/heading/alias/body plus filter fields `language`, `acl_scope_id`,
+`is_current`, and `visibility_generation`. Queries return `chunk_id` only.
+
+`version_id` is stored on the projection and indexed with a btree
+(`bm25_chunks_version_id_idx`) but is **not** a `pg_search` filter column.
+On the pinned ParadeDB image, mixing `version_id` with `pdb.score` in the
+same `WHERE` raises `XX000` unsupported query shape. Variant BM25 therefore
+loads current-version ids with that btree, then scopes the scored scan with
+`chunk_id = ANY(...)` on the BM25 key field. Hybrid still rechecks every id
+on canonical Supabase.
 
 [docs index](../README.md)

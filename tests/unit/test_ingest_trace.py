@@ -12,6 +12,7 @@ import langsmith
 from smart_rag_core.observability.ingest_trace import (
     INGEST_RUN_GRAPH,
     INGEST_RUN_INDEX,
+    ingest_content_class_for_job,
     ingest_run_name_for_job_kind,
     ingest_run_trace_metadata,
     invoke_traced_ingestion,
@@ -20,7 +21,8 @@ from smart_rag_core.observability.langsmith_tracing import (
     payload_contains_forbidden_text,
     short_content_hash,
 )
-from smart_rag_core.settings import AgentSettings
+from smart_rag_core.security.external_processing import ContentClass
+from smart_rag_core.settings import AgentSettings, SharedSettings
 
 from tests.support.langsmith import RecordingLangSmithClient
 from tests.unit.typed_attrs import module_attr
@@ -120,3 +122,13 @@ def test_ingest_metadata_hashes_ids_only() -> None:
     assert payload["graph_name"] == INGEST_RUN_GRAPH
     assert str(document_id) not in rendered
     assert CANARY_PASSAGE not in rendered
+
+
+def test_real_company_job_is_not_synthetic_under_local_settings() -> None:
+    """Local env never reclassifies an authoritative real-company job."""
+
+    settings = SharedSettings()
+    assert (
+        ingest_content_class_for_job(ContentClass.REAL_COMPANY, settings=settings)
+        is ContentClass.REAL_COMPANY
+    )

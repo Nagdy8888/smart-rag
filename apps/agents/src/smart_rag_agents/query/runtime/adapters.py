@@ -13,6 +13,7 @@ import psycopg
 from smart_rag_core.evaluation.schema import ExpectedProfile
 from smart_rag_core.gateways.embedding import EmbeddingGateway
 from smart_rag_core.gateways.model import (
+    ModelGateway,
     ModelGatewayUnavailableError,
     QueryProfileModelRequest,
 )
@@ -31,12 +32,20 @@ from smart_rag_core.query_routing.models import (
     PreparationModelPayload,
 )
 from smart_rag_core.query_routing.preparation import PrepModelCaller
+from smart_rag_core.query_routing.profile_fields import profile_strings
 from smart_rag_core.retrieval.bm25 import Bm25Retriever
 from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     fetch_authorized_chunk_context,
 )
+from smart_rag_core.retrieval.frozen_profile import load_frozen_profile
 from smart_rag_core.retrieval.hybrid_run import HybridRetriever
+from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
+from smart_rag_core.retrieval.reranker import rerank_pool
+from smart_rag_core.retrieval.source_scope import (
+    ResolvedRetrievalScope,
+    resolve_retrieval_scope,
+)
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.tables.executor import TableSandboxError
 from smart_rag_core.tables.refusals import TableQueryRefusal
@@ -122,11 +131,41 @@ class DsnBm25Retriever:
             Opens and closes one ParadeDB connection.
         """
 
+        return self.retrieve_variants(
+            supabase=supabase,
+            caller=caller,
+            texts=(query_text,),
+        )
+
+    def retrieve_variants(
+        self,
+        *,
+        supabase: psycopg.Connection,
+        caller: CallerContext,
+        texts: tuple[str, ...],
+        version_id: UUID | None = None,
+    ) -> object:
+        """Scan original plus bounded variants on a fresh ParadeDB connection.
+
+        Args:
+            supabase: Canonical connection used only for ACL recheck.
+            caller: Server-derived caller.
+            texts: Original query first, then at most three variants.
+            version_id: Optional current-version filter inside ranking.
+
+        Returns:
+            ``Bm25RetrievalResult`` with per-variant lists. Never snippets.
+
+        Side Effects:
+            Opens and closes one ParadeDB connection.
+        """
+
         with psycopg.connect(self._parade_dsn, connect_timeout=8) as parade:
-            return Bm25Retriever(parade).retrieve(
+            return Bm25Retriever(parade).retrieve_variants(
                 supabase=supabase,
                 caller=caller,
-                query_text=query_text,
+                texts=texts,
+                version_id=version_id,
             )
 
 
@@ -144,6 +183,8 @@ class ProcessHybridRetriever:
         embedding_gateway: EmbeddingGateway,
         supabase_dsn: str,
         bm25: DsnBm25Retriever | None,
+        model_gateway: ModelGateway | None = None,
+        rerank_prompt_text: str | None = None,
     ) -> None:
         """Bind the process embedding gateway and DSNs.
 
@@ -152,11 +193,16 @@ class ProcessHybridRetriever:
             supabase_dsn: Full canonical Postgres URL including password.
             bm25: Optional per-retrieve ParadeDB adapter. ``None`` degrades
                 BM25 (approved dense+term Hybrid).
+            model_gateway: Shared model gateway for the one-shot reranker.
+            rerank_prompt_text: Pinned ``rerank_v1`` body. Missing prompt
+                leaves identity fallback.
         """
 
         self._embedding_gateway = embedding_gateway
         self._supabase_dsn = supabase_dsn
         self._bm25 = bm25
+        self._model_gateway = model_gateway
+        self._rerank_prompt = rerank_prompt_text
         self.query_budget: object | None = None
 
     def retrieve(
@@ -187,6 +233,42 @@ class ProcessHybridRetriever:
         """
 
         typed_profile = profile if isinstance(profile, ExpectedProfile) else None
+        scope = self._resolve_scope(caller, typed_profile)
+        restrict_version_id = scope.version_id if scope is not None else None
+        profile_id = HYBRID_DEFAULT_PROFILE_ID
+        if scope is not None:
+            profile_id = scope.candidate_profile_id
+        retrieval_profile = load_frozen_profile(profile_id)
+        gateway = self._model_gateway
+        prompt = self._rerank_prompt
+        rerank_fn = None
+        if gateway is not None and prompt:
+
+            def _rerank(
+                query_text: str,
+                pool: object,
+                remaining: float,
+            ) -> object:
+                """Run one process-local rerank closure.
+
+                Args:
+                    query_text: User query.
+                    pool: Authorized rerank pool.
+                    remaining: Remaining deadline seconds.
+
+                Returns:
+                    Rankings, usage, and fallback from ``rerank_pool``.
+                """
+
+                return rerank_pool(
+                    query_text,
+                    pool,  # type: ignore[arg-type]
+                    remaining,
+                    gateway=gateway,
+                    prompt_text=prompt,
+                )
+
+            rerank_fn = _rerank
         inner = HybridRetriever(
             embedding_gateway=self._embedding_gateway,
             supabase=None,
@@ -196,6 +278,8 @@ class ProcessHybridRetriever:
             bm25=self._bm25,
             term=_DsnChannelMarker(),
             load_context=context_loader(self._supabase_dsn, caller),
+            rerank=rerank_fn,  # type: ignore[arg-type]
+            retrieval_profile=retrieval_profile,
         )
         budget = query_budget if query_budget is not None else self.query_budget
         inner.query_budget = budget  # type: ignore[assignment]
@@ -204,7 +288,82 @@ class ProcessHybridRetriever:
             caller=caller,
             profile=typed_profile,
             deadline_seconds=deadline_seconds,
+            restrict_version_id=restrict_version_id,
         )
+
+    def _resolve_version_id(
+        self,
+        caller: CallerContext,
+        profile: ExpectedProfile | None,
+    ) -> UUID | None:
+        """Resolve textual requested sources to at most one authorized version.
+
+        Low-confidence names stay unscoped. UUID-shaped strings are treated as
+        text. Missing or unauthorized titles are indistinguishable.
+
+        Args:
+            caller: Server-derived identity.
+            profile: Typed query profile.
+
+        Returns:
+            One current version id, or ``None`` when unscoped or ambiguous.
+        """
+
+        scope = self._resolve_scope(caller, profile)
+        return None if scope is None else scope.version_id
+
+    def _resolve_scope(
+        self,
+        caller: CallerContext,
+        profile: ExpectedProfile | None,
+    ) -> ResolvedRetrievalScope | None:
+        """Resolve source scope and the frozen Hybrid profile.
+
+        Args:
+            caller: Server-derived identity.
+            profile: Typed query profile.
+
+        Returns:
+            Resolved scope, or None when names are absent/low-confidence.
+        """
+
+        if profile is None:
+            return None
+        if profile.requested_sources.confidence < 0.80:
+            return None
+        names = tuple(
+            item.strip()[:256]
+            for item in profile_strings(profile.requested_sources)
+            if item.strip()
+        )[:8]
+        if not names:
+            return None
+        raw_class = profile.query_type.value
+        query_class = raw_class if isinstance(raw_class, str) else None
+        try:
+            with psycopg.connect(self._supabase_dsn) as connection:
+                connection.execute("SET ROLE app_api")
+                return resolve_retrieval_scope(
+                    caller=caller,
+                    requested_sources=names,
+                    whole_document=False,
+                    query_class=query_class,
+                    connection=connection,
+                )
+        except psycopg.Error:
+            return None
+
+    def authorized_chunk_loader(self, caller: CallerContext) -> object:
+        """Return the ACL-rechecking canonical context loader.
+
+        Args:
+            caller: Server-derived identity.
+
+        Returns:
+            Loader used by citations and parent expansion.
+        """
+
+        return context_loader(self._supabase_dsn, caller)
 
 
 @dataclass(slots=True)
@@ -246,6 +405,18 @@ class RunScopedHybrid:
             deadline_seconds=deadline_seconds,
             query_budget=self.query_budget,
         )
+
+    def authorized_chunk_loader(self, caller: CallerContext) -> object:
+        """Forward the process Hybrid canonical context loader.
+
+        Args:
+            caller: Server-derived identity.
+
+        Returns:
+            ACL-rechecking context loader.
+        """
+
+        return self.inner.authorized_chunk_loader(caller)
 
 
 class RunScopedGraph:

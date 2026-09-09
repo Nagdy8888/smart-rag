@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {
+      "case_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+      "split": "development",
+      "source_family_id": "cccccccccccccccccccccccc",
+      "query_class": "factual_definition",
+      "chunk_ids": ["00000000-0000-0000-0000-000000000001"],
+      "human_approved": false,
+      "generated_only": true
+    }
+  ]
+}

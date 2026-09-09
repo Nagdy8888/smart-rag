@@ -23,12 +23,16 @@ from smart_rag_core.query_admission.exceptions import (
     QueryCeilingError,
 )
 from smart_rag_core.query_admission.retrieve_budget import QueryRetrieveBudget
+from smart_rag_core.query_profile.extract import extract_deterministic
 from smart_rag_core.retrieval.context import ContextFn, RerankFn, select_hybrid_context
 from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     fetch_authorized_chunk_context,
+    fetch_authorized_heading_inventory,
     heading_inventory_from_contexts,
 )
+from smart_rag_core.retrieval.coverage_score import attach_numeric_coverage
+from smart_rag_core.retrieval.frozen_profile import FrozenHybridProfile
 from smart_rag_core.retrieval.hybrid import run_channels_parallel
 from smart_rag_core.retrieval.hybrid_run.assemble import (
     call_assemble_hybrid,
@@ -54,7 +58,6 @@ from smart_rag_core.retrieval.hybrid_run.channels import (
 )
 from smart_rag_core.retrieval.hybrid_run.evidence import (
     evidence_units,
-    evidence_units_from_context,
 )
 from smart_rag_core.retrieval.hybrid_run.jobs import HybridChannelJobsMixin
 from smart_rag_core.retrieval.hybrid_run.profile_fields import (
@@ -73,10 +76,14 @@ from smart_rag_core.retrieval.hybrid_run.types import (
 )
 from smart_rag_core.retrieval.profiles import (
     FINAL_EVIDENCE_MAX,
+    HYBRID_DEFAULT_PROFILE_ID,
     MAX_NORMALIZED_QUERY_CHARS,
+    RERANK_MAX_PER_DOCUMENT,
+    RERANK_POOL_SIZE,
     RETRIEVAL_SLICE_SECONDS,
     RetrievalFallbackReason,
 )
+from smart_rag_core.retrieval.rerank import RerankFallbackReason, rerank_preload_ids
 from smart_rag_core.retrieval.types import Bm25RetrievalResult
 from smart_rag_core.runtime.async_bridge import run_coro_blocking
 from smart_rag_core.security.identity import CallerContext
@@ -118,6 +125,7 @@ class HybridRetriever(HybridChannelJobsMixin):
         rerank: RerankFn | None = None,
         channel_jobs: dict[str, ChannelJob] | None = None,
         supabase_dsn: str | None = None,
+        retrieval_profile: FrozenHybridProfile | None = None,
     ) -> None:
         """Bind gateways, optional retrievers, and test doubles.
 
@@ -136,6 +144,10 @@ class HybridRetriever(HybridChannelJobsMixin):
                 their own transaction; ``psycopg`` connections are not safe to
                 share across those threads. ``Connection.info.dsn`` omits the
                 password, so callers must pass the complete URL.
+            retrieval_profile: Optional selection bounds. Runtime uses the
+                frozen default; evaluation may inject the long-document
+                candidate. Unfrozen ids stay rejected by
+                ``load_frozen_profile``.
         """
 
         self._embedding_gateway = embedding_gateway
@@ -148,6 +160,7 @@ class HybridRetriever(HybridChannelJobsMixin):
         self._load_context = load_context
         self._rerank = rerank
         self._channel_jobs = channel_jobs
+        self._retrieval_profile = retrieval_profile
         self.query_budget: QueryRetrieveBudget | None = None
 
     def retrieve(
@@ -221,6 +234,7 @@ class HybridRetriever(HybridChannelJobsMixin):
                 query=query,
                 texts=texts[:FUSION_LIST_CAP],
                 vectors=vectors[:FUSION_LIST_CAP],
+                version_id=restrict_version_id,
             )
         completed, timed_out, exhausted = run_channels_parallel(
             jobs,
@@ -260,19 +274,41 @@ class HybridRetriever(HybridChannelJobsMixin):
         media_dependence = bool_field(profile, "media_dependence")
         historical = bool_field(profile, "historical_relationship")
         negation_scope = str_field(profile, "negation_scope") or "none"
-        want_full_summary = False
         query_type = query_type_field(profile)
+        # Imported here so HybridRetriever load cannot cycle through query_routing.
+        from smart_rag_core.query_routing.signals import is_whole_document_summary
+
+        extract = extract_deterministic(query)
+        scope_raw = str_field(profile, "document_scope") or extract.document_scope
+        want_full_summary = is_whole_document_summary(
+            query, extract
+        ) and scope_raw not in {
+            "section",
+            "page",
+            "range",
+            "sheet",
+        }
         temporal_intent = temporal_intent_field(profile)
         target = target_date_field(profile)
-        required_terms = str_list_field(profile, "codes") + str_list_field(
-            profile, "exact_terms"
+        required_terms = (
+            str_list_field(profile, "codes")
+            + str_list_field(profile, "exact_terms")
+            + str_list_field(profile, "quoted_phrases")
+            + str_list_field(profile, "entities")
+            + str_list_field(profile, "approved_aliases")
         )
+        subquestions = str_list_field(profile, "subquestions")[:3]
+        subquestion_count = len(subquestions)
         temporal_records = self._load_temporal_records(
             flatten_channel_candidates(dense_lists, bm25_result.candidates, term_lists)
         )
         assemble_kwargs = hybrid_assemble_kwargs(
             dense_variants=dense_lists,
-            bm25_variants=(bm25_result.candidates,) if bm25_result.candidates else (),
+            bm25_variants=(
+                bm25_result.variant_lists
+                if bm25_result.variant_lists
+                else ((bm25_result.candidates,) if bm25_result.candidates else ())
+            ),
             term_variants=term_lists,
             bm25_fallback=bm25_fallback,
             temporal_intent=temporal_intent,
@@ -289,6 +325,7 @@ class HybridRetriever(HybridChannelJobsMixin):
             query_type=query_type,
             required_terms=required_terms,
             matched_terms=(),
+            subquestion_count=subquestion_count,
             deadline_exhausted=exhausted,
         )
         assembled = call_assemble_hybrid(
@@ -301,17 +338,19 @@ class HybridRetriever(HybridChannelJobsMixin):
         fused_ids = tuple(item.chunk_id for item in assembled.fused)
         context_cache: dict[UUID, ChunkContext] = {}
         loader = self._bound_loader(caller, context_cache)
-        contexts = loader(fused_ids) if fused_ids else ()
-        inventory = heading_inventory_from_contexts(contexts)
-        covered = heading_inventory_from_contexts(
-            tuple(item for item in contexts if item.chunk_id in set(fused_ids))
-        )
-        assembled = call_assemble_hybrid(
-            heading_inventory=inventory,
-            covered_headings=covered,
-            kwargs=assemble_kwargs,
-        )
         remaining = max(0.0, slice_seconds - (time.perf_counter() - started))
+        if self._retrieval_profile is not None:
+            pool_size = self._retrieval_profile.rerank_pool_size
+            max_per_document = self._retrieval_profile.rerank_max_per_document
+        else:
+            pool_size = RERANK_POOL_SIZE
+            max_per_document = RERANK_MAX_PER_DOCUMENT
+        preload_ids = rerank_preload_ids(
+            assembled.fused,
+            pool_size=pool_size,
+            max_per_document=max_per_document,
+        )
+        contexts = loader(preload_ids) if preload_ids else ()
         rerank_fn: RerankFn = counted_rerank(
             self._rerank or identity_rerank,
             self.query_budget,
@@ -319,7 +358,16 @@ class HybridRetriever(HybridChannelJobsMixin):
         )
         rerank_calls = 0
         evidence: tuple[EvidenceUnit, ...] = ()
-        if assembled.fused and resolved_profile is not None:
+        selected_ids: tuple[UUID, ...] = ()
+        rerank_order: tuple[UUID, ...] = fused_ids
+        rerank_fallback = ""
+        rerank_top_support: float | None = None
+        profile_id = HYBRID_DEFAULT_PROFILE_ID
+        if self._retrieval_profile is not None:
+            profile_id = self._retrieval_profile.profile_id
+        selection_profile = self._retrieval_profile
+        coverage = assembled.coverage
+        if assembled.fused:
             selection = select_hybrid_context(
                 query=query,
                 profile=resolved_profile,
@@ -329,29 +377,77 @@ class HybridRetriever(HybridChannelJobsMixin):
                 rerank=rerank_fn,
                 load_context=loader,
                 remaining_deadline_seconds=remaining,
+                retrieval_profile=selection_profile,
             )
             if selection.usage is not None:
                 rerank_calls = selection.usage.model_calls
             selected_ids = tuple(item.candidate.chunk_id for item in selection.passages)
+            rerank_order = selection.rerank_order
+            rerank_fallback = selection.fallback_reason.value
             locator_rows = loader(selected_ids) if selected_ids else ()
             evidence = evidence_units(selection.passages, locator_rows)
-        elif assembled.fused:
-            evidence = evidence_units_from_context(
-                assembled.fused[:FINAL_EVIDENCE_MAX],
-                contexts,
+            unique_docs = {item.candidate.document_id for item in selection.passages}
+            unique_versions = {item.candidate.version_id for item in selection.passages}
+            if want_full_summary and len(unique_docs) != 1:
+                want_full_summary = False
+            inventory_version = restrict_version_id
+            if inventory_version is None and len(unique_versions) == 1:
+                inventory_version = next(iter(unique_versions))
+            rpc_inventory = self._heading_inventory(caller, inventory_version)
+            covered = heading_inventory_from_contexts(locator_rows)
+            inventory = rpc_inventory or covered
+            matched_terms = _matched_terms_from_units(required_terms, evidence)
+            real_rerank = (
+                selection.fallback_reason is RerankFallbackReason.NONE
+                and rerank_calls == 1
+            )
+            rerank_top_support = selection.rerank_top_support if real_rerank else None
+            supported = _supported_subquestion_count(
+                subquestions=subquestions,
+                evidence=evidence,
+                matched_terms=matched_terms,
+                rerank_indices=(
+                    selection.supported_subquestion_indices if real_rerank else ()
+                ),
+            )
+            assemble_kwargs["matched_terms"] = matched_terms
+            assemble_kwargs["want_full_summary"] = want_full_summary
+            assembled = call_assemble_hybrid(
+                heading_inventory=inventory,
+                covered_headings=covered,
+                kwargs=assemble_kwargs,
+            )
+            selected_cands = tuple(item.candidate for item in selection.passages)
+            coverage = attach_numeric_coverage(
+                assembled.coverage,
+                fused=selected_cands,
+                channel_hits=assembled.channel_hits or {},
+                query_type=query_type,
+                required_terms=required_terms,
+                matched_terms=matched_terms,
+                subquestion_count=subquestion_count,
+                supported_subquestions=supported,
+                rerank_top_support=rerank_top_support,
             )
         if fallback is RetrievalFallbackReason.NONE:
             fallback = assembled.fallback_reason
+        ranked = selected_ids or fused_ids
         return HybridRunResult(
-            ranked_ids=tuple(item.chunk_id for item in assembled.fused),
+            ranked_ids=ranked,
             evidence=evidence[:FINAL_EVIDENCE_MAX],
-            coverage=assembled.coverage,
+            coverage=coverage,
             fallback_reason=fallback,
             deadline_exhausted=assembled.deadline_exhausted,
             first_evidence_ms=elapsed_ms(started),
             embedding_call_count=1,
             rerank_call_count=rerank_calls,
             cache_key=assembled.cache_key,
+            fused_ids=fused_ids,
+            selected_ids=selected_ids,
+            rerank_order=rerank_order,
+            retrieval_profile_id=profile_id,
+            rerank_fallback=rerank_fallback,
+            rerank_top_support=rerank_top_support,
         )
 
     def authorized_chunk_loader(self, caller: CallerContext) -> ContextFn:
@@ -487,3 +583,104 @@ class HybridRetriever(HybridChannelJobsMixin):
             caller=caller,
             chunk_ids=chunk_ids,
         )
+
+    def _heading_inventory(
+        self,
+        caller: CallerContext,
+        version_id: UUID | None,
+    ) -> tuple[str, ...]:
+        """Load authorized major headings for one current version.
+
+        Args:
+            caller: Server-derived identity.
+            version_id: Resolved current version, when known.
+
+        Returns:
+            Stable section paths. Empty when the version is missing, the
+            loader is injected, or the caller is unauthorized.
+        """
+
+        if version_id is None or self._load_context is not None:
+            return ()
+        if self._supabase is None:
+            return ()
+        return fetch_authorized_heading_inventory(
+            self._supabase,
+            caller=caller,
+            version_id=version_id,
+        )
+
+
+def _matched_terms_from_units(
+    required: tuple[str, ...],
+    evidence: tuple[EvidenceUnit, ...],
+) -> tuple[str, ...]:
+    """Return required terms found in canonical citation text and headings.
+
+    Args:
+        required: Profile exact terms, codes, phrases, entities, aliases.
+        evidence: Final selected citation units.
+
+    Returns:
+        Required terms whose normalized form appears in raw text or headings.
+        BM25 snippets are never consulted.
+    """
+
+    haystack = " ".join(
+        normalize_arabic_v1(item.citation_text)
+        + " "
+        + " ".join(normalize_arabic_v1(part) for part in item.locator.section_path)
+        for item in evidence
+    )
+    matched: list[str] = []
+    seen: set[str] = set()
+    for term in required:
+        normalized = normalize_arabic_v1(term)
+        key = normalized.casefold()
+        if not normalized or key in seen:
+            continue
+        if normalized in haystack or key in haystack.casefold():
+            seen.add(key)
+            matched.append(term)
+    return tuple(matched)
+
+
+def _supported_subquestion_count(
+    *,
+    subquestions: tuple[str, ...],
+    evidence: tuple[EvidenceUnit, ...],
+    matched_terms: tuple[str, ...],
+    rerank_indices: tuple[int, ...],
+) -> int:
+    """Count subquestions proven by rerank indices or canonical evidence.
+
+    Args:
+        subquestions: At most three profile subquestions.
+        evidence: Final selected units.
+        matched_terms: Required terms found in those units.
+        rerank_indices: Validated indices from a completed rerank, else empty.
+
+    Returns:
+        Supported subquestion count. Identity/failure fallback is
+        conservative and never invents model support.
+    """
+
+    bound = tuple(subquestions[:3])
+    if rerank_indices:
+        allowed = set(range(len(bound) or 1))
+        return len({index for index in rerank_indices if index in allowed})
+    haystack = " ".join(normalize_arabic_v1(item.citation_text) for item in evidence)
+    if not bound:
+        return 1 if haystack and matched_terms else 0
+    matched_fold = {item.casefold() for item in matched_terms}
+    supported = 0
+    for sub in bound:
+        tokens = [
+            token for token in normalize_arabic_v1(sub).split() if len(token) >= 3
+        ]
+        if tokens and all(token in haystack for token in tokens):
+            supported += 1
+            continue
+        if any(term in sub.casefold() for term in matched_fold):
+            supported += 1
+    return supported

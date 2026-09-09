@@ -28,6 +28,7 @@ from smart_rag_core.ingestion.embeddings.policy import (
 from smart_rag_core.ingestion.limits import (
     DEFAULT_EMBEDDING_BATCH_SIZE,
     DEFAULT_EMBEDDING_MAX_INPUTS,
+    LEDGER_INLINE_VECTOR_MAX,
 )
 from smart_rag_core.jobs.admission import JobAdmissionService
 from smart_rag_core.security.external_processing import (
@@ -246,12 +247,12 @@ class EmbeddingService:
             provider_request_id=response.provider_request_id,
             reserved_usd=batch.estimated_cost_usd,
             actual_usd=response.estimated_cost_usd,
-            result_ref={
-                "mode": response.mode,
-                "fixture_provenance": response.fixture_provenance,
-                "chunk_set_hash": chunk_set_hash,
-                "vectors": [list(vector) for vector in response.vectors],
-            },
+            result_ref=_completed_ledger_result_ref(
+                chunk_set_hash=chunk_set_hash,
+                mode=response.mode,
+                fixture_provenance=response.fixture_provenance,
+                vectors=response.vectors,
+            ),
         )
 
         attempt_count = self._ledger_attempt_count(
@@ -403,6 +404,8 @@ class EmbeddingService:
             }
         stored_hash = result_ref.get("chunk_set_hash")
         if status != "completed" or stored_hash != chunk_set_hash:
+            return None
+        if result_ref.get("vectors_inline") is False:
             return None
         raw_vectors_obj = result_ref.get("vectors")
         if not isinstance(raw_vectors_obj, list) or not raw_vectors_obj:
@@ -579,6 +582,40 @@ def _embedded_from_stored_vectors(
             )
         )
     return embedded
+
+
+def _completed_ledger_result_ref(
+    *,
+    chunk_set_hash: str,
+    mode: str,
+    fixture_provenance: str,
+    vectors: tuple[tuple[float, ...], ...] | list[tuple[float, ...]],
+) -> dict[str, object]:
+    """Build a ledger result_ref that stays under the worker statement timeout.
+
+    Args:
+        chunk_set_hash: Hash of the representative set.
+        mode: Gateway mode token.
+        fixture_provenance: Optional fixture pin.
+        vectors: Provider vectors aligned with representatives.
+
+    Returns:
+        JSON-ready mapping. Inline vectors only when the count is at most
+        ``LEDGER_INLINE_VECTOR_MAX``; otherwise persist on chunks only.
+    """
+
+    payload: dict[str, object] = {
+        "mode": mode,
+        "fixture_provenance": fixture_provenance,
+        "chunk_set_hash": chunk_set_hash,
+        "vector_count": len(vectors),
+    }
+    if len(vectors) <= LEDGER_INLINE_VECTOR_MAX:
+        payload["vectors_inline"] = True
+        payload["vectors"] = [list(vector) for vector in vectors]
+    else:
+        payload["vectors_inline"] = False
+    return payload
 
 
 def _chunk_set_hash(chunks: tuple[CanonicalChunk, ...]) -> str:

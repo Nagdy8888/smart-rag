@@ -41,12 +41,20 @@ class DenseRetrievalResult:
         candidates: Ordered authorized candidates.
         authorized_count: Admission count used for exact fallback.
         fallback_reason: Weak-evidence or none.
+        hnsw_profile: Allow-listed HNSW profile used for the last attempt.
+        attempts: ANN/HIGH/exact attempts in this retrieve (1–3).
+        underfill: True when unique survivors are below the candidate floor.
+        exact_admitted: True when the exact scan ran.
     """
 
     mode: DenseMode
     candidates: tuple[RetrievalCandidate, ...]
     authorized_count: int
     fallback_reason: RetrievalFallbackReason = RetrievalFallbackReason.NONE
+    hnsw_profile: str = "low"
+    attempts: int = 1
+    underfill: bool = False
+    exact_admitted: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,8 +80,22 @@ class Bm25RetrievalResult:
         scanned_ids: Canonical IDs scanned before recheck (≤ 300).
         candidates: Authorized survivors after recheck (≤ 75).
         fallback_reason: Outage, version mismatch, timeout, or none.
+        variant_count: Normalized original plus faithful variants scanned.
+        variant_ranks: Per-variant survivor counts after recheck.
+        rechecked_count: Unique IDs sent to canonical recheck.
+        survivor_count: Unique authorized survivors.
+        index_schema_version: Projection schema pin.
+        normalizer_version: Normalization pin.
+        variant_lists: Per-variant authorized lists after global unique cap.
     """
 
     scanned_ids: tuple[UUID, ...]
     candidates: tuple[RetrievalCandidate, ...]
     fallback_reason: RetrievalFallbackReason = RetrievalFallbackReason.NONE
+    variant_count: int = 1
+    variant_ranks: tuple[int, ...] = ()
+    rechecked_count: int = 0
+    survivor_count: int = 0
+    index_schema_version: str = ""
+    normalizer_version: str = ""
+    variant_lists: tuple[tuple[RetrievalCandidate, ...], ...] = ()

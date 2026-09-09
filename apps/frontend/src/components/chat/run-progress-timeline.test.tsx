@@ -4,6 +4,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { createChatViewState } from "../../lib/chat-view";
+import { EMPTY_DEADLINE_PARTIAL_COPY } from "../../lib/run-details";
 import type { RunProgressItem } from "../../lib/run-progress";
 import {
   progressSummary,
@@ -175,6 +177,16 @@ describe("progressSummary", () => {
     expect(
       progressSummary({ ...base, terminal: "error", answerAvailable: true }),
     ).toBe("Error");
+    const deadlineChat = createChatViewState("k");
+    deadlineChat.status = "deadline_exhausted";
+    expect(
+      progressSummary({
+        ...base,
+        terminal: "partial",
+        answerAvailable: false,
+        chat: deadlineChat,
+      }),
+    ).toBe(EMPTY_DEADLINE_PARTIAL_COPY);
     expect(screen.queryByText("%")).toBeNull();
   });
 });

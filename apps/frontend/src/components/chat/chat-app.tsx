@@ -13,6 +13,7 @@ import {
 import { HandshakeBanner } from "../auth/auth-screens";
 import { useSession } from "../../lib/auth/session-provider";
 import { citationChipHref } from "../../lib/citation-drawer";
+import { overlaySettledTurns } from "../../lib/chat-history";
 import { evaluatePaidHandshake } from "../../lib/handshake";
 import { shouldShowCitations } from "../../lib/answer-origin";
 import { FEEDBACK_TAGS_UP, type CitationResponse, type FeedbackTag } from "../../lib/types";
@@ -142,8 +143,12 @@ export function ChatApp() {
     }
   }, [session, sessionRevokedNow]);
   const historyMessages = useMemo(
-    () => [...actions.olderMessages, ...[...liveQueries.messages].reverse()],
-    [actions.olderMessages, liveQueries.messages],
+    () =>
+      overlaySettledTurns(
+        [...actions.olderMessages, ...[...liveQueries.messages].reverse()],
+        run.settledTurns,
+      ),
+    [actions.olderMessages, liveQueries.messages, run.settledTurns],
   );
   const visibleCitations = shouldShowCitations(run.chat.answerOrigin)
     ? [...liveQueries.citations]

@@ -86,7 +86,7 @@ def assemble_hybrid(
     query_class: QueryClass | None = None,
     required_terms: tuple[str, ...] = (),
     matched_terms: tuple[str, ...] = (),
-    subquestion_count: int = 1,
+    subquestion_count: int = 0,
     supported_subquestions: int | None = None,
     rerank_top_support: float | None = None,
     exact_phrase_or_code: bool = False,
@@ -123,8 +123,9 @@ def assemble_hybrid(
         query_class: Evaluation class for the frozen threshold.
         required_terms: Required codes/entities/terms.
         matched_terms: Required terms found in authorized evidence.
-        subquestion_count: Decomposition size.
-        supported_subquestions: Supported subquestions.
+        subquestion_count: Decomposition size. ``0`` means no subquestions.
+        supported_subquestions: Supported subquestions. Omitted values stay
+            ``0`` so fused occupancy is never guessed as support.
         rerank_top_support: Optional rerank support feature.
         exact_phrase_or_code: Exact lookup winner.
         profile_ok: Query profile succeeded.

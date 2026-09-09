@@ -7,6 +7,7 @@ and ``version`` match the environment; sockets stay in lifespan.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -88,9 +89,11 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         ``application.state.offload_executor`` and shuts it down on exit.
         Closes a lazily created run-event database store and finalizes the
         adapter on shutdown, then gives the process-cached LangSmith client at
-        most two seconds to drain. Gateway and retrieval adapters are imported
-        here so constructing ``create_app`` cannot form a retrieval import
-        cycle.
+        most two seconds to drain. Outside ``test``, binds one query executor
+        and warms Hybrid/checkpointer/graph compile so the first Ask run does
+        not open hosted pools under the Composite deadline. Gateway and
+        retrieval adapters are imported here so constructing ``create_app``
+        cannot form a retrieval import cycle.
     """
 
     from smart_rag_core.gateways import block_openai_network, create_model_gateway
@@ -98,7 +101,10 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
     from smart_rag_core.retrieval.lightrag_adapter import bind_process_runtime_adapter
     from smart_rag_core.security.jwks import JwksVerifier
 
-    from smart_rag_api.services.sse_stream import QueryRunRegistry
+    from smart_rag_api.services.sse_stream import (
+        LangGraphQueryRunExecutor,
+        QueryRunRegistry,
+    )
 
     settings = load_backend_settings()
     configure_json_logging(
@@ -134,6 +140,8 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
         cache_seconds=settings.jwks_cache_seconds,
     )
     application.state.query_run_registry = QueryRunRegistry()
+    query_executor: LangGraphQueryRunExecutor | None = None
+    warmup_task: asyncio.Task[None] | None = None
     adapter = await bind_process_runtime_adapter(
         dsn=settings.lightrag_db_url,
         settings=settings,
@@ -142,6 +150,36 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
     try:
         async with block_openai_network(settings.mock_model_mode):
             application.state.model_gateway = create_model_gateway(settings)
+            if settings.app_env is not Environment.TEST:
+                query_executor = LangGraphQueryRunExecutor()
+                application.state.query_run_executor = query_executor
+                warmed_executor = query_executor
+
+                async def _warmup_query_runtime() -> None:
+                    """Open process query pools without blocking ``/health/live``.
+
+                    Side Effects:
+                        Caches Hybrid, memory store, checkpointer, and the
+                        compiled graph on ``warmed_executor``. Failures are
+                        logged by type only so DSN text cannot leak.
+                    """
+
+                    try:
+                        await warmed_executor.warmup(settings)
+                        LOGGER.info(
+                            "query runtime warmed",
+                            extra={"event": "backend.query_runtime.warmed"},
+                        )
+                    except Exception as exc:
+                        LOGGER.warning(
+                            "query runtime warmup failed; first Ask run opens lazily",
+                            extra={
+                                "event": "backend.query_runtime.warmup_failed",
+                                "error_type": type(exc).__name__,
+                            },
+                        )
+
+                warmup_task = asyncio.create_task(_warmup_query_runtime())
             LOGGER.info(
                 "Backend foundation startup",
                 extra={"event": "backend.startup"},
@@ -152,6 +190,15 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
                 extra={"event": "backend.shutdown"},
             )
     finally:
+        if warmup_task is not None:
+            warmup_task.cancel()
+            try:
+                await warmup_task
+            except asyncio.CancelledError:
+                pass
+        if query_executor is not None:
+            await query_executor.aclose()
+            application.state.query_run_executor = None
         run_event_store = getattr(application.state, "run_event_store", None)
         close_run_event_store = getattr(run_event_store, "close", None)
         if callable(close_run_event_store):
@@ -259,6 +306,9 @@ def create_app() -> FastAPI:
     from smart_rag_api.routers.documents import router as documents_router
     from smart_rag_api.routers.entity_rules import router as entity_rules_router
     from smart_rag_api.routers.glossary import router as glossary_router
+    from smart_rag_api.routers.governance_reviews import (
+        router as governance_reviews_router,
+    )
     from smart_rag_api.routers.graph_inspect import router as graph_inspect_router
     from smart_rag_api.routers.ingestion_crawl import router as ingestion_crawl_router
     from smart_rag_api.routers.ingestion_status import router as ingestion_status_router
@@ -277,6 +327,7 @@ def create_app() -> FastAPI:
     application.include_router(ingestion_status_router)
     application.include_router(ingestion_crawl_router)
     application.include_router(glossary_router)
+    application.include_router(governance_reviews_router)
     application.include_router(graph_inspect_router)
     application.include_router(entity_rules_router)
     application.include_router(tables_router)

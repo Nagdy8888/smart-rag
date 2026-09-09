@@ -35,6 +35,23 @@ const TERMINAL_LABELS: Readonly<Record<string, string>> = {
   deadline: "Deadline reached",
 };
 
+/**
+ * Answer-column copy when Composite (or any family) exhausted the run
+ * deadline before verified tokens. Catalog terminal is still `partial`.
+ */
+export const EMPTY_DEADLINE_PARTIAL_COPY =
+  "This run reached its time limit before an answer was ready. Send the question again.";
+
+/**
+ * Return whether a chat-view status is a retrieve-time deadline partial.
+ *
+ * @param status - SSE `partial.reason` stored on the view, or null.
+ * @returns True for `deadline_exhausted` and the shorter `deadline` alias.
+ */
+export function isDeadlinePartialStatus(status: string | null | undefined): boolean {
+  return status === "deadline_exhausted" || status === "deadline";
+}
+
 const CORRECTION_REASONS: Readonly<Record<string, string>> = {
   relationship: "The question needed relationship search.",
 };

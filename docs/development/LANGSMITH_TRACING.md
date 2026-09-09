@@ -2,7 +2,7 @@
 title: LangSmith tracing for model and embedding calls
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-09
 audience: engineering, operators, security
 ---
 
@@ -167,10 +167,13 @@ sequenceDiagram
 5. Org rows in
    [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) and
    [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) stay
-   `unverified` until a console/DPA review. Do not set
-   `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true` to fake that review.
-   Staging/production still require it. Do not ingest real company files into
-   a hosted environment on this waiver.
+   prohibited for staging/production until a console/DPA review. On
+   2026-09-09 the product owner named this Cursor session as approver for
+   **laptop ingest of one private PDF**, accepting public OpenAI no-training
+   defaults, residual 30-day abuse monitoring, ZDR off, and LangSmith traces
+   with `LANGSMITH_EXPORT_IO=false`. Ignored local env may then set
+   `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true`. That flag must not be used
+   to claim ZDR or to authorize staging/production.
 6. Laptop **ingest** demo (Phase A): set `LANGSMITH_TRACING=true` on the
    **worker** (not the EC2 API). After a plot-slice upload, open project
    `LANGSMITH_PROJECT` and filter `ingestion.index` / `embedding.embed`.

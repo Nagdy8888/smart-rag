@@ -153,6 +153,26 @@ def test_weak_single_channel_factual_refuses_at_baseline() -> None:
     assert result.coverage.first_failing_stage is FailureStage.COVERAGE
 
 
+def test_omitted_supported_subquestions_are_not_guessed_from_fused() -> None:
+    """Fused occupancy never counts as subquestion support."""
+
+    item = _candidate()
+    result = assemble_hybrid(
+        dense_variants=((item,),),
+        bm25_variants=(),
+        term_variants=(),
+        principal_scope_hash="abc",
+        query_normalized="compare retention and leave",
+        visibility_generation=1,
+        query_type=QueryType.MULTI_PART,
+        query_class=QueryClass.MULTI_PART,
+        subquestion_count=3,
+    )
+    assert result.coverage.subquestion_coverage == pytest.approx(0.0)
+    assert result.coverage.coverage_score == pytest.approx(0.0)
+    assert result.coverage.decision is CoverageDecision.REFUSE
+
+
 def test_two_channel_exact_supports_answer() -> None:
     """Exact two-channel winners reach support 1.0 and may answer."""
 

@@ -200,3 +200,124 @@ def test_production_executor_keeps_partial_when_summary_fails(
         event_type == "token_delta" and payload.get("delta") == "Hello there."
         for event_type, payload in events
     )
+
+
+def test_executor_persists_verified_text_when_later_sse_event_fails(
+    monkeypatch: Any,
+) -> None:
+    """Token deltas already shown stay in the transcript if catalog assert fails."""
+
+    final = AnswerPayload(answer_text="KEEP_LIVE_ANSWER", status="complete")
+    compiled = FakeCompiled(
+        (
+            {
+                "verify_answer": {
+                    "status": "verified",
+                    "answer": final.model_dump(mode="json"),
+                    "prompt_tokens": 4,
+                    "completion_tokens": 2,
+                }
+            },
+        )
+    )
+    executor = LangGraphQueryRunExecutor()
+    _commits, settlements = patch_recording_executor(monkeypatch, executor, compiled)
+
+    def _reject_usage(event_type: str, _payload: dict[str, object]) -> None:
+        """Fail closed only on the usage event after token_delta.
+
+        Args:
+            event_type: Catalog event name.
+            _payload: Draft payload.
+
+        Raises:
+            ValueError: When the event is ``usage``.
+        """
+
+        if event_type == "usage":
+            raise ValueError("sse_payload_field_not_allowlisted")
+
+    monkeypatch.setattr(
+        "smart_rag_api.services.query_sse_mapping.assert_catalog_event",
+        _reject_usage,
+    )
+
+    async def _drain() -> None:
+        """Drain until the catalog assertion aborts the stream."""
+
+        async for _event in executor.execute(
+            context=runtime(),
+            message="hello",
+            cancel_event=asyncio.Event(),
+        ):
+            pass
+
+    with pytest.raises(ValueError, match="sse_payload_field_not_allowlisted"):
+        asyncio.run(_drain())
+    assert settlements == ["persist"]
+
+
+def test_executor_emits_partial_when_deadline_elapses_while_opening_stream(
+    monkeypatch: Any,
+) -> None:
+    """Opening astream after admit must not continue nodes past the envelope."""
+
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    compiled = FakeCompiled(
+        (
+            {
+                "company_scope": {
+                    "status": "branches_executed",
+                }
+            },
+        )
+    )
+    executor = LangGraphQueryRunExecutor()
+    patch_recording_executor(monkeypatch, executor, compiled)
+    ctx = runtime()
+    ticks = {"n": 0}
+
+    def _now(*, tz: object = None) -> object:
+        """Return a pre-deadline clock once, then a post-deadline clock.
+
+        Args:
+            tz: Ignored timezone (UTC is used).
+
+        Returns:
+            Aware datetime.
+        """
+
+        del tz
+        ticks["n"] += 1
+        if ticks["n"] == 1:
+            return ctx.deadline_at - timedelta(seconds=10)
+        return ctx.deadline_at + timedelta(seconds=1)
+
+    monkeypatch.setattr(
+        "smart_rag_api.services.sse.langgraph_executor.datetime",
+        SimpleNamespace(now=_now),
+    )
+
+    async def _collect() -> list[tuple[str, dict[str, object]]]:
+        """Drain deadline-after-open events.
+
+        Returns:
+            SSE event name and payload pairs.
+        """
+
+        events: list[tuple[str, dict[str, object]]] = []
+        async for event in executor.execute(
+            context=ctx,
+            message="what is Our First Agent System?",
+            cancel_event=asyncio.Event(),
+        ):
+            events.append(event)
+        return events
+
+    events = asyncio.run(_collect())
+    types = [item[0] for item in events]
+    assert types == ["deadline", "partial"]
+    assert events[1][1] == {"reason": "deadline_exhausted"}
+    assert "company_scope" not in str(events)

@@ -213,6 +213,20 @@ describe("chat view", () => {
     expect(shouldShowChatFailureBanner(state)).toBe(false);
   });
 
+  it("treats deadline_exhausted partial as a non-failure terminal", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(state, parseSseBlock("event: deadline\nid: 1\ndata: {}"));
+    state = applySseFrame(
+      state,
+      parseSseBlock('event: partial\nid: 2\ndata: {"reason":"deadline_exhausted"}'),
+    );
+    expect(state.stage).toBe("deadline");
+    expect(state.terminal).toBe("partial");
+    expect(state.status).toBe("deadline_exhausted");
+    expect(state.failure).toBeNull();
+    expect(shouldShowChatFailureBanner(state)).toBe(false);
+  });
+
   it("keeps the first terminal when a later error arrives", () => {
     let state = createChatViewState("k");
     state = applySseFrame(state, verifyFrame(1));

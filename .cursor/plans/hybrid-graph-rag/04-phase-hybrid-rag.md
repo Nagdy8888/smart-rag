@@ -59,9 +59,19 @@ Complete these in order. A checked box requires committed implementation evidenc
 
 Packet 9 is engineering-close per [`docs/adr/ADR-phase4-engineering-close.md`](../../../docs/adr/ADR-phase4-engineering-close.md). Phase 4 is **engineering-complete** (holdout sealed; not production v1). The independently SME-sealed v1 holdout remains a launch blocker.
 
+Additive 2026-09-09 Hybrid PDF accuracy packets. Do not uncheck packets 1–9 or open the synthetic holdout. Overlay index: [`docs/development/hybrid-pdf-accuracy-remediation.md`](../../../docs/development/hybrid-pdf-accuracy-remediation.md). Do not edit `apps/agents/` in packets 10–16.
+
+10. [ ] Generate a private book glossary draft and import only after owner/admin approval.
+11. [ ] Build and human-seal a private PDF evaluation dataset with hidden holdout.
+12. [ ] Make rerank/context selection profile-driven for one long document without freezing the candidate.
+13. [ ] Compute coverage after final evidence selection and enforce full-summary truth.
+14. [ ] Add bounded BM25 variants and channel-global caps without multiplying work.
+15. [ ] Implement selectivity-aware dense escalation and bounded exact fallback.
+16. [ ] Tune on PDF development only, freeze `hybrid_long_document_v1`, and confirm qualification once.
+
 ## Cheap-model execution protocol
 
-The nine checkboxes above are separate work packets. One model run may execute only one packet, in order. Packet 9 may follow a Packet 8 no-go; it does not reopen holdout labels. Before editing, the model must quote the active packet, state its positive and negative acceptance checks, inspect every target path plus the Phase 1–3 accepted exit records, and prove all prerequisites. This expanded plan does not satisfy any prerequisite or sign-off.
+The nine historical checkboxes above plus additive packets 10–16 are separate work packets. One model run may execute only one packet, in order. Packet 9 may follow a Packet 8 no-go; it does not reopen holdout labels. Overlay packets 10–16 also leave the synthetic holdout sealed. Before editing, the model must quote the active packet, state its positive and negative acceptance checks, inspect every target path plus the Phase 1–3 accepted exit records, and prove all prerequisites. This expanded plan does not satisfy any prerequisite or sign-off.
 
 Use [`docs/development/phase-04-hybrid-rag-evidence.md`](../../../docs/development/phase-04-hybrid-rag-evidence.md) as the canonical packet evidence and exit record. Packet 1 creates it and links it from `docs/README.md`. Every packet appends inspected migrations/schema/pins, dated primary-documentation links, exact commands and exit codes, dataset/config hashes, authorization and failure fixtures, measured quality/latency/cost/resources, unresolved assumptions, rollback, and next-packet handoff.
 
@@ -559,6 +569,278 @@ Every inferred/normalized field carries typed value, confidence in `[0,1]`, and 
 #### Packet 9 required evidence
 
 - Retrieve module paths, embedding adapter pin, materializer sidecar hashes, ranked-ID reports, locator/ACL/p95/cost traces, exact commands and exit codes, ADR links, residual launch blockers, and a request for user acceptance before `status: complete`.
+
+### Packet 10 — private book glossary draft and approved import
+
+Skills: [`implement-hybrid-retrieval`](../../../.cursor/skills/implement-hybrid-retrieval/SKILL.md), [`implement-observability-evals`](../../../.cursor/skills/implement-observability-evals/SKILL.md). Use existing `/admin/glossary/imports`. Overlay index: [`hybrid-pdf-accuracy-remediation.md`](../../../docs/development/hybrid-pdf-accuracy-remediation.md).
+
+#### Packet 10 preconditions
+
+- Existing glossary import service and conflict/cycle checks are inspectable. Phase 3 Packet 9 live-call gate applies if the draft command would call OpenAI; default is deterministic-only.
+
+#### Packet 10 allowed outputs
+
+- [`scripts/ops/draft_pdf_glossary.py`](../../../scripts/ops/draft_pdf_glossary.py); gitignored `.private-eval/` drafts; synthetic tests; docs. Import through the existing owner/admin API.
+
+#### Packet 10 forbidden outputs
+
+- A second glossary store. Auto-approve. Model-generated guesses as canonical terms. Private values in Git, logs, HTTP errors, or LangSmith. Editing `apps/agents/`.
+
+#### Packet 10 ordered actions
+
+1. Draft candidates only from headings, repeated capitalized technical names, parenthetical first-use acronyms, code-style identifiers, and explicit aliases. Each row has locators and a normalized hash.
+2. Human owner/admin reviews and imports via the existing flow. Trigger versioned term/BM25 reprojection as implemented.
+3. Verify exact/alias lookup against canonical Supabase IDs.
+
+#### Packet 10 acceptance checks
+
+- Named source/version/approver and audit ID; term-channel and BM25 alias projections non-empty for the approved private sample; rollback removes only that import; no private value in Git/logs.
+
+#### Packet 10 negative tests
+
+- Ambiguous alias auto-approved, member/viewer import, or printed glossary values fail.
+
+#### Packet 10 stop routes
+
+- Stop and leave unapproved when an alias is ambiguous, unsupported by a locator, or needs an unsupported scope. Operator may stop after tooling if human approve has not occurred.
+
+#### Packet 10 required evidence
+
+- Import IDs/counts/hashes only; tests; rollback procedure.
+
+### Packet 11 — private PDF evaluation dataset and human seal
+
+Skill: [`implement-observability-evals`](../../../.cursor/skills/implement-observability-evals/SKILL.md). Separate identity from the synthetic Phase 4 corpus.
+
+#### Packet 11 preconditions
+
+- Synthetic holdout remains sealed. Packet 10 glossary may be empty if ingest is blocked; sealing still requires current chunk/locator resolution after ingest.
+
+#### Packet 11 allowed outputs
+
+- [`packages/core/src/smart_rag_core/evaluation/private_pdf/`](../../../packages/core/src/smart_rag_core/evaluation/private_pdf/); [`scripts/draft_pdf_eval_dataset.py`](../../../scripts/draft_pdf_eval_dataset.py); [`scripts/seal_pdf_eval_dataset.py`](../../../scripts/seal_pdf_eval_dataset.py); synthetic fixtures under `tests/fixtures/evaluation/private_pdf/`; gitignore for `.private-eval/`.
+
+#### Packet 11 forbidden outputs
+
+- Generated-only gold. Implementation loaders reading holdout. Source-family split leakage. Private text in Git/logs. Reusing `eval_judge_v1.md`.
+
+#### Packet 11 ordered actions
+
+1. Draft 50–60 source-grounded cases with class, atomic facts, locators, expected profile/scope, source-family ID. Treat source text as untrusted.
+2. Named human reviewer inspects the PDF and approves every row. Sealer rejects unresolved/duplicate/stale/unauthorized rows.
+3. Split 50/25/remainder by `document hash + major chapter/section + semantic family`. Hide holdout from normal loaders.
+
+#### Packet 11 acceptance checks
+
+- Deterministic IDs/splits; pairwise disjoint families; human-seal required; holdout hidden; manifest reproducible. Operator may stop after tooling if seal has not occurred.
+
+#### Packet 11 negative tests
+
+- Self-seal, holdout path in calibration commands, family crossing splits, or LangSmith split label treated as immutability fail.
+
+#### Packet 11 stop routes
+
+- Do not substitute the coding model as reviewer. Do not start Packet 16 tuning from generated-only labels.
+
+#### Packet 11 required evidence
+
+- Ordered case-ID hashes, family hashes, counts; `holdout_opened=false`.
+
+### Packet 12 — profile-driven rerank and long-document candidate
+
+Skill: [`implement-hybrid-retrieval`](../../../.cursor/skills/implement-hybrid-retrieval/SKILL.md). No production runtime binding.
+
+#### Packet 12 preconditions
+
+- `hybrid_default_v1` hash pin remains `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c`. [`ADR-hybrid-long-document-profile.md`](../../../docs/adr/ADR-hybrid-long-document-profile.md) is proposed.
+
+#### Packet 12 allowed outputs
+
+- Profile-object-driven pool/quota/excerpt/MMR in frozen_profile/profiles/rerank/context; injectable evaluation candidate `hybrid_long_document_v1` **rejected** by `load_frozen_profile()` until Packet 16; unit tests.
+
+#### Packet 12 forbidden outputs
+
+- Changing `hybrid_default_v1` bytes. Global constant enlargement. PDF title/hash hardcoded in retrieval. Editing `apps/agents/`. Map-reduce/RAPTOR/local rerankers.
+
+#### Packet 12 ordered actions
+
+1. Drive pool size, per-doc cap, quotas, excerpt policy, MMR, evidence cap, and token budget from the immutable profile object.
+2. Long-document candidate: per-doc rerank cap 20; final document quota 12; section quota 2 (evaluated); global 20/12/3500 unchanged.
+3. Rank-based MMR relevance; Jaccard duplicate penalty only.
+4. Query-aware excerpt builder; evaluate 400 prefix, 800 prefix, 800 query-aware window; do not freeze a winner.
+
+#### Packet 12 acceptance checks
+
+- One-document input can fill top-20 and contribute more than two diverse final children under the candidate. Default behavior unchanged. Rank relevance survives zero lexical overlap. Section quota independent. Phrase after char 400 appears in query-aware excerpt. Hard quotas remain.
+
+#### Packet 12 negative tests
+
+- Unfrozen candidate executable at runtime, default hash change, or citation text replaced by excerpts fail.
+
+#### Packet 12 stop routes
+
+- Stop if configurability would bypass the frozen hash/allow-list.
+
+#### Packet 12 required evidence
+
+- Tests, unchanged default digest, candidate file not on runtime allow-list.
+
+### Packet 13 — post-selection coverage and heading inventory
+
+Skills: [`implement-hybrid-retrieval`](../../../.cursor/skills/implement-hybrid-retrieval/SKILL.md), [`implement-supabase-security`](../../../.cursor/skills/implement-supabase-security/SKILL.md).
+
+#### Packet 13 preconditions
+
+- Packet 12 profile object exists. Phase 6 `is_whole_document_summary` remains the summary signal; do not add a competing classifier.
+
+#### Packet 13 allowed outputs
+
+- Coverage finalized after rerank/MMR/parents/recheck/trim; required/matched terms from canonical evidence; additive security-invoker heading-inventory RPC; diagnostic orders on `HybridRunResult`.
+
+#### Packet 13 forbidden outputs
+
+- Pre-rerank fused occupancy as final recall. Identity rerank labelled model support. BM25 snippets as term matches. Map-reduce summaries. Unauthorized heading disclosure. Editing `apps/agents/`.
+
+#### Packet 13 ordered actions
+
+1. Finalize coverage once on selected evidence. Carry rerank support only when a real rerank completed.
+2. Build `required_terms` from profile exact terms/codes/phrases/entities/aliases; `matched_terms` from normalized final canonical text and headings.
+3. Replace guessed `min(subquestions, fused_count)` with validated subquestion support (≤3) or conservative fallback.
+4. Heading inventory RPC for one resolved version after ACL/current/deletion checks.
+5. `want_full_summary` only from the Phase 6 signal and exactly one whole current document. Incomplete inventory → `scoped_summary`.
+
+#### Packet 13 acceptance checks
+
+- Selected-versus-fused distinction; exact term found/not found; complete summary only at ratio 1.0; >12-section scoped refusal; authorized inventory.
+
+#### Packet 13 negative tests
+
+- Empty matched_terms by construction, pre-selection headings counted, arbitrary broad query as whole-document, or parent expansion exceeding budgets fail.
+
+#### Packet 13 stop routes
+
+- Stop if inventory RPC cannot remain security-invoker without leaking unauthorized headings.
+
+#### Packet 13 required evidence
+
+- Migration, tests, rollback, coverage diagnostics documented.
+
+### Packet 14 — bounded BM25 variants and global caps
+
+Skills: [`implement-hybrid-retrieval`](../../../.cursor/skills/implement-hybrid-retrieval/SKILL.md), [`implement-api-security`](../../../.cursor/skills/implement-api-security/SKILL.md). Verify the pinned ParadeDB/`pg_search` contract before SQL.
+
+#### Packet 14 preconditions
+
+- Packet 13 diagnostics exist. Phase 6 Packet 10 (not this packet) updates `DsnBm25Retriever`.
+
+#### Packet 14 allowed outputs
+
+- `Bm25Retriever.retrieve_variants(...)`; one bounded top-300 statement; global caps 100/75/30; document-version filters inside ranking; contract tests. No `apps/agents/` edits.
+
+#### Packet 14 forbidden outputs
+
+- Unbounded per-variant queries. Snippets as evidence. Silent dense+term labelled full Hybrid.
+
+#### Packet 14 ordered actions
+
+1. Typed variants over original plus at most three faithful variants.
+2. One parameterized top-300 across variants; if the pin cannot prove ranking in one statement, stop.
+3. Recheck union through canonical Supabase; reconstruct per-variant lists from survivors. At most 75 unique authorized BM25 IDs.
+4. Apply reusable post-variant caps before fusion; preserve max-not-sum RRF and 205 pre-fusion ceiling.
+5. Push resolved version/metadata/language filters inside BM25 and term ranking before `LIMIT`.
+
+#### Packet 14 acceptance checks
+
+- Duplicate/reordered variants, global caps, injection, timeout/version mismatch, and `bm25_unavailable` (never full-Hybrid pass) are proven. PDF development candidate recall vs original-only is measured later in Packet 16.
+
+#### Packet 14 negative tests
+
+- Cap multiplication, stale/unauthorized IDs fused, or snippet citations fail.
+
+#### Packet 14 stop routes
+
+- Stop and record the contract gap rather than multiplying unbounded queries.
+
+#### Packet 14 required evidence
+
+- Primary-docs URL, pin, tests, rollback to original-only retrieve.
+
+### Packet 15 — dense escalation and bounded exact fallback
+
+Skills: [`implement-hybrid-retrieval`](../../../.cursor/skills/implement-hybrid-retrieval/SKILL.md), [`implement-supabase-security`](../../../.cursor/skills/implement-supabase-security/SKILL.md).
+
+#### Packet 15 preconditions
+
+- Packet 14 global dense cap exists. Verify pgvector pin and iterative-scan semantics from current docs.
+
+#### Packet 15 allowed outputs
+
+- Additive v2 dense RPC with filters inside count and ranking; typed dense channel result; ANN → one HIGH escalation → exact only if filtered authorized_count × vectors ≤ 10,000.
+
+#### Packet 15 forbidden outputs
+
+- Caller-supplied identity. Outer-filter top-K. LOW→MEDIUM→HIGH retries. Unbounded exact. Leaked `SET LOCAL`. Editing `apps/agents/`.
+
+#### Packet 15 ordered actions
+
+1. Filters (current, deletion, ACL, resolved version, language, allow-listed metadata) inside authorized-count and vector ranking.
+2. Replace information-losing dense collect with typed result retaining authorized_count, HNSW profile/mode, attempts, underfill, exact admission.
+3. Exact search only under the 10k work ceiling and remaining deadline; otherwise `weak_evidence`.
+4. Apply 100-unique dense cap across variants; cancel must close connections.
+
+#### Packet 15 acceptance checks
+
+- Underfilled selective queries recover to the candidate floor or return typed weak evidence; exact IDs match the authorized oracle; no multi-document ACL/latency regression.
+
+#### Packet 15 negative tests
+
+- Forged caller, filter after limit, work product >10k, planner estimate as hard bound, cancelled work continuing, or weak labelled successful ANN fail.
+
+#### Packet 15 stop routes
+
+- Stop if iterative scans cannot be proven on the pinned pgvector.
+
+#### Packet 15 required evidence
+
+- Migration, live/contract comparison to exact oracle, rollback.
+
+### Packet 16 — development tune, freeze, one qualification
+
+Skill: [`implement-observability-evals`](../../../.cursor/skills/implement-observability-evals/SKILL.md). Do not open the private holdout.
+
+#### Packet 16 preconditions
+
+- Packets 12–15 implemented. Packet 11 human seal exists for development/qualification splits. Phase 6 Packet 10 has bound the live reranker (or this packet records blocked live-rerank and must not freeze a full-Hybrid claim). Phase 3 Packet 9 approval required for live OpenAI.
+
+#### Packet 16 allowed outputs
+
+- [`scripts/eval_pdf_hybrid.py`](../../../scripts/eval_pdf_hybrid.py); frozen [`hybrid_long_document_v1.json`](../../../packages/core/src/smart_rag_core/retrieval/frozen/hybrid_long_document_v1.json); allow-list update only after qualification; rejected-candidate hashes; synthetic open-split regression proof.
+
+#### Packet 16 forbidden outputs
+
+- Holdout access. Tuning from anecdotes/qualification/synthetic holdout. Editing a failed hash. Merging dense+term outage into full-Hybrid metrics. Editing `apps/agents/` except if Packet 10 already bound rerank.
+
+#### Packet 16 ordered actions
+
+1. Compare declared candidates on development only (chunking v1/v2, BM25 variants, dense escalation, live rerank vs identity, quotas, excerpts, MMR, selector classes).
+2. Require live full Hybrid for the main result: `bm25_fallback=none`, real embeddings, real rerank on eligible non-trivial cases.
+3. Separate ParadeDB fault matrix. Select only from declared ranges. Freeze digest/selector. Re-run synthetic open-split. Qualification once.
+
+#### Packet 16 acceptance checks
+
+- Zero ACL leaks; Recall@10 ≥85%; exact-code@5 ≥98% and alias@10 ≥95% when denominators meet minima else `not_applicable`; locator ≥98%; first-evidence p95 ≤2s; eligible non-trivial cases request exactly one rerank; `holdout_opened=false`.
+
+#### Packet 16 negative tests
+
+- Failed hash edited, holdout opened, occupancy Recall, or identity labelled live rerank fail.
+
+#### Packet 16 stop routes
+
+- Failed qualification returns to development with a new versioned candidate.
+
+#### Packet 16 required evidence
+
+- Commands, per-case artifact hashes (no private text), qualification run ID, rollback profile, `holdout_opened=false`.
 
 ## Cross-packet invariants and ownership
 

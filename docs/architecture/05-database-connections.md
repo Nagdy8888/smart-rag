@@ -2,7 +2,7 @@
 title: Database connections and pool budgets
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-09-07
+last-reviewed: 2026-09-09
 audience: engineering, ops
 phase_packet: Phase 2 Packet 6
 ---
@@ -100,6 +100,13 @@ Applied in `20260813150000_audit_chain_role_timeouts_v1.sql` and introspected vi
 | `app_checkpointer` | 30s | 3s | 10s | 16MB | `smart-rag-checkpointer` |
 | `app_lightrag` | 120s | 5s | 30s | 16MB | `smart-rag-lightrag` |
 | `app_audit_writer` | 15s | 2s | 5s | 8MB | `smart-rag-audit` |
+
+Long-document Hybrid ingest (Phase 3 overlay Packet 14) does **not** change
+those role defaults. `apply_long_document_write_timeouts` issues
+`SET LOCAL statement_timeout = '300s'` and
+`SET LOCAL idle_in_transaction_session_timeout = '180s'` inside the
+embedding-ledger and canonical-write transactions only. See
+[INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md).
 
 ### Verification SQL
 

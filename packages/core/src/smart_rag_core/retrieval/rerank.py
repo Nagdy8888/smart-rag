@@ -79,11 +79,13 @@ class RerankRanking:
         chunk_id: Supplied candidate ID.
         rank: 1-based order.
         support: Bounded ranking feature in ``[0, 1]``.
+        supported_subquestion_indices: Optional 0-based subquestion indices.
     """
 
     chunk_id: UUID
     rank: int
     support: float
+    supported_subquestion_indices: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +119,10 @@ class ContextSelection:
         expanded_parent_ids: Parent IDs added after recheck.
         usage: Gateway usage for the one rerank call, if any.
         skipped_counterfactual: True when a skip trigger fired.
+        rerank_top_support: Support of the top selected child after a real
+            rerank. None on identity/skip/failure.
+        supported_subquestion_indices: Validated 0-based subquestion indices
+            from a completed rerank payload. Empty on fallback.
     """
 
     passages: tuple[RerankPassage, ...]
@@ -126,6 +132,8 @@ class ContextSelection:
     expanded_parent_ids: tuple[UUID, ...]
     usage: RerankUsage | None
     skipped_counterfactual: bool
+    rerank_top_support: float | None = None
+    supported_subquestion_indices: tuple[int, ...] = ()
 
 
 def rerank_input_hash(
@@ -157,30 +165,122 @@ def rerank_input_hash(
     return hashlib.sha256(encoded).hexdigest()
 
 
-def excerpt_text(raw_text: str, *, limit: int = RERANK_EXCERPT_CHARS) -> str:
+def excerpt_text(
+    raw_text: str,
+    *,
+    limit: int = RERANK_EXCERPT_CHARS,
+    query: str | None = None,
+    strategy: str = "prefix",
+) -> str:
     """Clamp canonical text for the rerank request.
 
     Args:
-        raw_text: Canonical passage.
+        raw_text: Canonical passage. Citation text is not replaced.
         limit: Maximum characters.
+        query: Original query used only for ``query_aware`` windows.
+        strategy: ``prefix`` or ``query_aware``.
 
     Returns:
-        Bounded excerpt. Empty input stays empty.
+        Bounded excerpt. Empty input stays empty. Citation ``raw_text`` is
+        unchanged on the passage object.
     """
 
     stripped = raw_text.strip()
     if len(stripped) <= limit:
         return stripped
+    if strategy == "query_aware" and query and query.strip():
+        window = _query_aware_window(stripped, query=query, limit=limit)
+        if window:
+            return window
     return stripped[:limit]
+
+
+def _query_aware_window(raw_text: str, *, query: str, limit: int) -> str:
+    """Return a character window around the first query-token hit.
+
+    Args:
+        raw_text: Canonical passage.
+        query: Original query.
+        limit: Window size.
+
+    Returns:
+        Windowed excerpt, or empty when no query token of length ≥3 is found.
+    """
+
+    lowered = raw_text.lower()
+    tokens = [token for token in query.lower().split() if len(token) >= 3]
+    hit = -1
+    for token in tokens:
+        hit = lowered.find(token)
+        if hit >= 0:
+            break
+    if hit < 0:
+        return ""
+    start = max(0, hit - max(0, (limit - len(tokens[0])) // 2))
+    end = start + limit
+    if end > len(raw_text):
+        start = max(0, len(raw_text) - limit)
+        end = len(raw_text)
+    return raw_text[start:end]
+
+
+def rerank_preload_ids(
+    fused: tuple[RetrievalCandidate, ...],
+    *,
+    pool_size: int = RERANK_POOL_SIZE,
+    max_per_document: int = RERANK_MAX_PER_DOCUMENT,
+) -> tuple[UUID, ...]:
+    """Return fused IDs that occupy the one-shot rerank pool.
+
+    Coverage is computed after final evidence selection. Loading the full
+    prefusion union (up to 205 IDs, two 75-ID context RPCs) before rerank
+    burns ``RETRIEVAL_SLICE_SECONDS`` and starves the live reranker.
+
+    Args:
+        fused: Authorized fused candidates in rank order.
+        pool_size: Global rerank pool cap.
+        max_per_document: Per-document cap inside the pool.
+
+    Returns:
+        Distinct chunk IDs, at most ``pool_size``, matching
+        ``build_rerank_pool`` membership.
+    """
+
+    seen: set[UUID] = set()
+    per_document: dict[UUID, int] = {}
+    selected: list[UUID] = []
+    for item in fused:
+        if item.chunk_id in seen:
+            continue
+        seen.add(item.chunk_id)
+        used = per_document.get(item.document_id, 0)
+        if used >= max_per_document:
+            continue
+        per_document[item.document_id] = used + 1
+        selected.append(item.chunk_id)
+        if len(selected) >= pool_size:
+            break
+    return tuple(selected)
 
 
 def build_rerank_pool(
     passages: tuple[RerankPassage, ...],
+    *,
+    pool_size: int = RERANK_POOL_SIZE,
+    max_per_document: int = RERANK_MAX_PER_DOCUMENT,
+    excerpt_chars: int = RERANK_EXCERPT_CHARS,
+    query: str | None = None,
+    excerpt_strategy: str = "prefix",
 ) -> tuple[RerankPassage, ...]:
-    """Collapse duplicates and cap the pool at 20 with five per document.
+    """Collapse duplicates and cap the pool with per-document limits.
 
     Args:
         passages: Fused-order authorized passages with canonical text.
+        pool_size: Global pool cap. Default matches ``hybrid_default_v1``.
+        max_per_document: Per-document cap inside the pool.
+        excerpt_chars: Excerpt character budget.
+        query: Original query for query-aware excerpts.
+        excerpt_strategy: ``prefix`` or ``query_aware``.
 
     Returns:
         Pool in fused order after per-document and global caps.
@@ -196,7 +296,7 @@ def build_rerank_pool(
         seen.add(chunk_id)
         document_id = item.candidate.document_id
         used = per_document.get(document_id, 0)
-        if used >= RERANK_MAX_PER_DOCUMENT:
+        if used >= max_per_document:
             continue
         per_document[document_id] = used + 1
         selected.append(
@@ -209,10 +309,15 @@ def build_rerank_pool(
                 chunk_index=item.chunk_index,
                 token_count=item.token_count or max(1, len(item.raw_text.split())),
                 channels=item.channels,
-                excerpt=excerpt_text(item.raw_text),
+                excerpt=excerpt_text(
+                    item.raw_text,
+                    limit=excerpt_chars,
+                    query=query,
+                    strategy=excerpt_strategy,
+                ),
             )
         )
-        if len(selected) >= RERANK_POOL_SIZE:
+        if len(selected) >= pool_size:
             break
     return tuple(selected)
 
@@ -326,6 +431,7 @@ class RerankRowModel(BaseModel):
     chunk_id: str
     rank: int = Field(ge=1)
     support: float
+    supported_subquestion_indices: list[int] = Field(default_factory=list)
 
     @field_validator("rank", mode="before")
     @classmethod
@@ -442,12 +548,39 @@ def validate_rerank_payload(
                 chunk_id=UUID(row.chunk_id),
                 rank=row.rank,
                 support=float(row.support),
+                supported_subquestion_indices=_validated_subquestion_indices(
+                    row.supported_subquestion_indices
+                ),
             )
         )
     if seen_ids != expected:
         raise ValueError("rerank_id_set_mismatch")
     parsed.sort(key=lambda item: item.rank)
     return tuple(parsed)
+
+
+def _validated_subquestion_indices(raw: list[int]) -> tuple[int, ...]:
+    """Keep at most three unique 0-based subquestion indices.
+
+    Args:
+        raw: Model-supplied indices.
+
+    Returns:
+        Unique indices in ``{0, 1, 2}`` order of first appearance.
+    """
+
+    unique: list[int] = []
+    seen: set[int] = set()
+    for index in raw:
+        if isinstance(index, bool) or not isinstance(index, int):
+            continue
+        if index < 0 or index > 2 or index in seen:
+            continue
+        seen.add(index)
+        unique.append(index)
+        if len(unique) >= 3:
+            break
+    return tuple(unique)
 
 
 def _jaccard(left: str, right: str) -> float:
@@ -476,29 +609,36 @@ def apply_mmr(
     document_quota: int = DOCUMENT_QUOTA,
     section_quota: int = SECTION_QUOTA,
     limit: int = FINAL_EVIDENCE_MAX,
+    candidate_depth: int = MMR_CANDIDATE_DEPTH,
 ) -> tuple[tuple[RerankPassage, ...], tuple[UUID, ...]]:
     """Select diverse evidence with per-document and per-section quotas.
 
-    Similarity source is token Jaccard on ``arabic_norm_v1`` excerpts.
-    Tie-break is canonical chunk ID ascending.
+    Relevance is rank order (or RRF fallback order). Token Jaccard is a
+    duplicate penalty only. UUID is the exact-tie break. Rank relevance
+    survives zero lexical overlap with the query.
 
     Args:
         ordered: Post-rerank (or RRF fallback) pool.
-        query: Original query.
+        query: Original query. Unused for relevance; kept for call sites.
         lambda_mult: Relevance versus diversity mix.
         document_quota: Max selected passages per document.
         section_quota: Max selected passages per first heading.
         limit: Final evidence cap.
+        candidate_depth: MMR candidate prefix.
 
     Returns:
         Selected passages and dropped IDs.
     """
 
-    depth = ordered[:MMR_CANDIDATE_DEPTH]
+    del query
+    depth = ordered[:candidate_depth]
     remaining = list(depth)
     selected: list[RerankPassage] = []
     doc_counts: dict[UUID, int] = {}
     section_counts: dict[str, int] = {}
+    rank_by_id = {
+        item.candidate.chunk_id: index for index, item in enumerate(depth)
+    }
     while remaining and len(selected) < limit:
 
         def score(item: RerankPassage) -> tuple[float, str]:
@@ -511,7 +651,8 @@ def apply_mmr(
                 Sort key: higher MMR first, then canonical ID.
             """
 
-            relevance = _jaccard(query, item.excerpt or item.raw_text)
+            rank = rank_by_id.get(item.candidate.chunk_id, len(depth))
+            relevance = 1.0 / (rank + 1)
             diversity = 0.0
             if selected:
                 diversity = max(

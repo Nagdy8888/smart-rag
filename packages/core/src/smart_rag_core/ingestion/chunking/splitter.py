@@ -56,14 +56,10 @@ def split_prose_segments(
                 locators=merged_locators,
             )
         ]
-    if token_count <= PASSAGE_HARD_MAX_TOKENS:
-        return [
-            ProseSegment(
-                text=merged_text,
-                element_ids=merged_ids,
-                locators=merged_locators,
-            )
-        ]
+
+    expanded: list[ProseSegment] = []
+    for segment in segments:
+        expanded.extend(_expand_to_target(segment))
 
     passages: list[ProseSegment] = []
     current_parts: list[str] = []
@@ -83,7 +79,7 @@ def split_prose_segments(
             )
         )
 
-    for segment in segments:
+    for segment in expanded:
         candidate_parts = [*current_parts, segment.text]
         candidate_text = "\n\n".join(candidate_parts)
         if (
@@ -124,6 +120,108 @@ def split_prose_segments(
         )
         previous_text = passage.text
     return overlapped
+
+
+def _expand_to_target(segment: ProseSegment) -> list[ProseSegment]:
+    """Split one prose segment toward the 200–400 token target.
+
+    Args:
+        segment: Unsplit paragraph or heading fragment.
+
+    Returns:
+        One or more segments that each stay at or under the target when
+        sentence boundaries allow. Fragments keep the source locators.
+    """
+
+    if tokenizer.count_tokens(segment.text) <= PASSAGE_TARGET_MAX_TOKENS:
+        return [segment]
+    pieces = _split_prose_text(segment.text, PASSAGE_TARGET_MAX_TOKENS)
+    return [
+        ProseSegment(
+            text=piece,
+            element_ids=segment.element_ids,
+            locators=segment.locators,
+        )
+        for piece in pieces
+        if piece.strip()
+    ]
+
+
+def _split_prose_text(text: str, target_max: int) -> list[str]:
+    """Prefer paragraph then sentence splits before token windows.
+
+    Args:
+        text: Prose text.
+        target_max: Soft token ceiling.
+
+    Returns:
+        Ordered fragments.
+    """
+
+    if tokenizer.count_tokens(text) <= target_max:
+        return [text]
+    paragraphs = [part for part in text.split("\n\n") if part.strip()]
+    if len(paragraphs) > 1:
+        packed = _pack_parts(paragraphs, target_max, joiner="\n\n")
+        if all(tokenizer.count_tokens(part) <= target_max for part in packed):
+            return packed
+        expanded: list[str] = []
+        for part in packed:
+            expanded.extend(_split_prose_text(part, target_max))
+        return expanded
+    sentences = _sentence_parts(text)
+    if len(sentences) > 1:
+        return _pack_parts(sentences, target_max, joiner=" ")
+    return _split_by_tokens(text, target_max)
+
+
+def _sentence_parts(text: str) -> list[str]:
+    """Split on sentence-ending punctuation followed by whitespace.
+
+    Args:
+        text: Prose text.
+
+    Returns:
+        Sentence-sized parts. A single item when no boundary is found.
+    """
+
+    parts: list[str] = []
+    current: list[str] = []
+    for token in text.split(" "):
+        current.append(token)
+        if token.endswith((".", "?", "!")) and current:
+            parts.append(" ".join(current))
+            current = []
+    if current:
+        parts.append(" ".join(current))
+    return parts or [text]
+
+
+def _pack_parts(parts: list[str], target_max: int, *, joiner: str) -> list[str]:
+    """Pack ordered parts until the next one would exceed the target.
+
+    Args:
+        parts: Ordered fragments.
+        target_max: Soft token ceiling.
+        joiner: Join string between packed parts.
+
+    Returns:
+        Packed fragments. A single oversized part is left intact for a later
+        token window split.
+    """
+
+    packed: list[str] = []
+    current: list[str] = []
+    for part in parts:
+        candidate = joiner.join([*current, part]) if current else part
+        if current and tokenizer.count_tokens(candidate) > target_max:
+            packed.append(joiner.join(current))
+            current = [part]
+        else:
+            current.append(part)
+    if current:
+        packed.append(joiner.join(current))
+    return packed
 
 
 def split_oversized_atomic(

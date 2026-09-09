@@ -4,8 +4,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { MIXED_SCOPE_CLARIFICATION } from "../../lib/answer-origin";
+import { EMPTY_DEADLINE_PARTIAL_COPY } from "../../lib/run-details";
 import type { CitationResponse } from "../../lib/types";
-import { AnswerSurface, transcriptTextMatches } from "./answer-surface";
+import { AnswerSurface, answerTerminalNote, transcriptTextMatches } from "./answer-surface";
 
 const CITATION: CitationResponse = {
   citation_id: "cite-1",
@@ -291,6 +292,20 @@ describe("AnswerSurface origin chrome", () => {
         "Ask your company knowledge",
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe("answerTerminalNote", () => {
+  it("explains an empty deadline partial instead of kept-token copy", () => {
+    expect(answerTerminalNote("partial", "", "deadline_exhausted")).toBe(
+      EMPTY_DEADLINE_PARTIAL_COPY,
+    );
+    expect(answerTerminalNote("partial", "Hello.", "deadline_exhausted")).toBe(
+      "Partial answer. Verified tokens are kept.",
+    );
+    expect(answerTerminalNote("partial", "")).toBe(
+      "Partial answer. Verified tokens are kept.",
+    );
   });
 });
 

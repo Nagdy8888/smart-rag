@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-09-09
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -217,11 +217,15 @@ Counterfactuals: [RERANK_COUNTERFACTUAL.md](../evaluation/RERANK_COUNTERFACTUAL.
 | Skip policy | rule | Plan | trivial exact only | **two-channel exact/quote** | counterfactual script | No score-gap skip; Packet 6 did not retune | retrieval | same | Live always-rerank |
 
 `app.fetch_authorized_chunk_context` still raises `context_batch_exceeds_limit`
-above 75 IDs **per RPC**. The Python loader batches fused Hybrid IDs
-(dense 100 + BM25 75 + term 30) into sequential 75-ID calls. Parallel
+above 75 IDs **per RPC**. The retrieve path loads only the rerank-pool IDs
+before the one-shot reranker (`rerank_preload_ids`), then batches any larger
+parent/selected fetches. Coverage is recomputed after final selection. Parallel
 dense, term, and BM25-recheck channels each open a dedicated Supabase
 connection from the full Postgres URL; they must not share one `psycopg`
-connection (`Connection.info.dsn` omits the password).
+connection (`Connection.info.dsn` omits the password). Variant BM25 must not
+put `version_id` in the same `WHERE` as `pdb.score` on pg_search 0.25.2;
+scope by `chunk_id = ANY(...)` after a btree lookup. See
+[BM25_PROJECTION_CONTRACT.md](./BM25_PROJECTION_CONTRACT.md).
 
 ## Frozen Packet 6 values
 

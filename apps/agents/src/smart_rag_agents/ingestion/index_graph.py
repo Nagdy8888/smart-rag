@@ -17,8 +17,15 @@ from langgraph.graph.state import CompiledStateGraph
 from smart_rag_core.gateways.embedding import create_embedding_gateway
 from smart_rag_core.gateways.storage import StorageGateway
 from smart_rag_core.ingestion.canonical.repository import CanonicalRepository
+from smart_rag_core.ingestion.canonical.timeouts import (
+    apply_long_document_write_timeouts,
+)
 from smart_rag_core.ingestion.chunking.service import chunk_parse_result
 from smart_rag_core.ingestion.chunking.types import ChunkingResult
+from smart_rag_core.ingestion.detectors import (
+    DETECTOR_POLICY_VERSION,
+    DetectorFamilyOutcome,
+)
 from smart_rag_core.ingestion.embeddings.policy import embedding_policy_hash
 from smart_rag_core.ingestion.embeddings.service import (
     EmbeddingBatchInput,
@@ -43,6 +50,10 @@ from smart_rag_core.observability.ingest_progress import log_ingest_progress
 from smart_rag_core.observability.ingest_trace import (
     INGEST_RUN_PARSE,
     nest_traced_ingestion,
+)
+from smart_rag_core.repositories.governance_reviews import (
+    GovernanceReviewRepository,
+    GovernanceReviewRepositoryError,
 )
 from smart_rag_core.repositories.scan_events import ScanEventRepository
 from smart_rag_core.security.external_processing import (
@@ -80,6 +91,7 @@ class IngestionIndexState(TypedDict):
         "index_pending",
         "parsing",
         "index_failed",
+        "governance_review_required",
         "indexed",
         "lease_invalid",
     ]
@@ -367,25 +379,27 @@ def index_hybrid_content(
         declared_category=state["declared_category"],
         attestation_present=state["attestation_policy_version"] is not None,
         attestation_policy_version=state["attestation_policy_version"],
-        review_approved=state["review_approved"],
+        review_approved=False,
         filename=state["filename"],
         content_class=content_class,
     )
     if isinstance(crawl_run_id, str) and crawl_run_id:
         try:
-            parse_result, governance_detail, promotion_allowed = nest_traced_ingestion(
-                lambda: _parse_website_snapshots(
-                    postgres_url=postgres_url,
-                    storage=storage,
-                    parser=parser,
-                    crawl_run_id=UUID(crawl_run_id),
-                    governance=governance,
-                    scan_evidence_current=scan_current,
-                ),
-                job_id=state["job_id"],
-                run_name=INGEST_RUN_PARSE,
-                document_id=state["document_id"],
-                version_id=state["version_id"],
+            parse_result, governance_detail, promotion_allowed, detector_outcomes = (
+                nest_traced_ingestion(
+                    lambda: _parse_website_snapshots(
+                        postgres_url=postgres_url,
+                        storage=storage,
+                        parser=parser,
+                        crawl_run_id=UUID(crawl_run_id),
+                        governance=governance,
+                        scan_evidence_current=scan_current,
+                    ),
+                    job_id=state["job_id"],
+                    run_name=INGEST_RUN_PARSE,
+                    document_id=state["document_id"],
+                    version_id=state["version_id"],
+                )
             )
         except ParserSandboxError as exc:
             return {
@@ -394,6 +408,22 @@ def index_hybrid_content(
                 "detail": f"parser_sandbox:{exc.detail}"[:500],
             }
         if parse_result is None:
+            resolve_extraction_review(
+                postgres_url,
+                state=state,
+                outcomes=detector_outcomes,
+            )
+            if detector_outcomes:
+                log_ingest_progress(
+                    "hybrid",
+                    "governance_review_required",
+                    UUID(str(state["job_id"])),
+                )
+                return {
+                    **state,
+                    "status": "governance_review_required",
+                    "detail": governance_detail,
+                }
             return {
                 **state,
                 "status": "index_failed",
@@ -403,6 +433,7 @@ def index_hybrid_content(
         promotion_ok = promotion_allowed
         parse_detail = parse_result.detail
         governed_parse = parse_result
+        extraction_outcomes = detector_outcomes
     else:
         payload = storage.download_object(
             bucket=str(state["storage_bucket"]),
@@ -441,11 +472,30 @@ def index_hybrid_content(
         outcome_disposition = outcome.parse_result.disposition.value
         promotion_ok = outcome.promotion_allowed
         parse_detail = outcome.governance_detail or outcome.parse_result.detail
+        extraction_outcomes = outcome.detector_outcomes
 
-    if outcome_disposition == "failed" or not promotion_ok:
+    review_approved = resolve_extraction_review(
+        postgres_url,
+        state=state,
+        outcomes=extraction_outcomes,
+    )
+    if review_approved:
+        promotion_ok = True
+    if outcome_disposition == "failed":
         return {
             **state,
             "status": "index_failed",
+            "detail": parse_detail,
+        }
+    if not promotion_ok:
+        log_ingest_progress(
+            "hybrid",
+            "governance_review_required",
+            UUID(str(state["job_id"])),
+        )
+        return {
+            **state,
+            "status": "governance_review_required",
             "detail": parse_detail,
         }
 
@@ -475,6 +525,7 @@ def index_hybrid_content(
         scan_evidence_current=scan_current,
         configurable=configurable,
         content_class=content_class,
+        review_approved=review_approved,
     )
     embed_operation_key = f"{state['operation_key']}:embed"
 
@@ -523,6 +574,7 @@ def index_hybrid_content(
 
     with psycopg.connect(postgres_url) as connection:
         connection.execute("SET ROLE app_worker")
+        apply_long_document_write_timeouts(connection)
         ledger = JobOperationLedger(connection)
         existing = ledger.fetch_result(
             job_table="ingestion_jobs",
@@ -570,6 +622,7 @@ def index_hybrid_content(
 
     with psycopg.connect(postgres_url) as connection:
         connection.execute("SET ROLE app_worker")
+        apply_long_document_write_timeouts(connection)
         ledger = JobOperationLedger(connection)
         existing = ledger.fetch_result(
             job_table="ingestion_jobs",
@@ -699,7 +752,7 @@ def _parse_website_snapshots(
     crawl_run_id: UUID,
     governance: ExtractionGovernanceInput,
     scan_evidence_current: bool,
-) -> tuple[ParseResult | None, str, bool]:
+) -> tuple[ParseResult | None, str, bool, tuple[DetectorFamilyOutcome, ...]]:
     """Parse every snapshot for one crawl run into a single element tree.
 
     Args:
@@ -712,8 +765,8 @@ def _parse_website_snapshots(
             version. Never defaulted to ``True``.
 
     Returns:
-        Tuple of merged parse result (or ``None``), diagnostic detail, and
-        whether promotion/indexing is allowed.
+        Tuple of merged parse result (or ``None``), diagnostic detail,
+        whether promotion/indexing is allowed, and detector outcomes.
     """
 
     with psycopg.connect(postgres_url) as connection:
@@ -732,7 +785,7 @@ def _parse_website_snapshots(
             rows = cursor.fetchall()
         connection.rollback()
     if not rows:
-        return None, "no snapshots for crawl run", False
+        return None, "no snapshots for crawl run", False, ()
     pages: list[ParseResult] = []
     hashes: list[str] = []
     for row in rows:
@@ -740,7 +793,7 @@ def _parse_website_snapshots(
         payload = storage.download_object(bucket=str(bucket), object_path=str(path))
         digest = hashlib.sha256(payload).hexdigest()
         if digest != str(content_hash):
-            return None, "snapshot content hash mismatch after download", False
+            return None, "snapshot content hash mismatch after download", False, ()
         hashes.append(digest)
         filename = str(canonical_url).rsplit("/", 1)[-1] or "index.html"
         if "." not in filename:
@@ -763,13 +816,14 @@ def _parse_website_snapshots(
                 None,
                 outcome.governance_detail or outcome.parse_result.detail,
                 False,
+                outcome.detector_outcomes,
             )
         pages.append(outcome.parse_result)
     combined = hashlib.sha256("".join(hashes).encode("utf-8")).hexdigest()
     merged = merge_website_parse_results(tuple(pages), combined_hash=combined)
     if merged.disposition is ParseDisposition.FAILED:
-        return None, merged.detail, False
-    return merged, merged.detail, True
+        return None, merged.detail, False, ()
+    return merged, merged.detail, True, ()
 
 
 def route_after_index_lease(state: IngestionIndexState) -> str:
@@ -937,12 +991,61 @@ def index_scan_gate_allows(
     return repo.has_current_clean_evidence(version_id)
 
 
+def resolve_extraction_review(
+    postgres_url: str,
+    *,
+    state: IngestionIndexState,
+    outcomes: tuple[DetectorFamilyOutcome, ...],
+) -> bool:
+    """Persist extraction findings and return hash-bound review coverage.
+
+    Args:
+        postgres_url: Worker-role database URL.
+        state: Index graph state with version and hash.
+        outcomes: Detector family outcomes from parse.
+
+    Returns:
+        True when every positive family is covered. Fail-closed on SQL
+        errors, missing ids, or missing scan evidence.
+    """
+
+    document_raw = state["document_id"]
+    version_raw = state["version_id"]
+    content_hash = state.get("content_hash")
+    if document_raw is None or version_raw is None or not isinstance(content_hash, str):
+        return False
+    attestation = state["attestation_policy_version"] or ""
+    try:
+        with psycopg.connect(postgres_url) as connection:
+            connection.execute("SET ROLE app_worker")
+            reviews = GovernanceReviewRepository(connection)
+            scan_id = reviews.latest_scan_evidence_id(UUID(str(version_raw)))
+            if scan_id is None:
+                connection.rollback()
+                return False
+            covered = reviews.resolve_review_approved(
+                document_id=UUID(str(document_raw)),
+                version_id=UUID(str(version_raw)),
+                content_hash=content_hash,
+                scan_evidence_id=scan_id,
+                attestation_policy_version=attestation,
+                detector_policy_version=DETECTOR_POLICY_VERSION,
+                finding_scope="extraction",
+                outcomes=outcomes,
+            )
+            connection.commit()
+    except (GovernanceReviewRepositoryError, psycopg.Error):
+        return False
+    return covered
+
+
 def load_external_processing_input(
     *,
     state: IngestionIndexState,
     scan_evidence_current: bool,
     configurable: dict[str, object],
     content_class: ContentClass,
+    review_approved: bool,
 ) -> ExternalProcessingDecisionInput:
     """Build embedding governance from DB-backed scan/attestation/provider flags.
 
@@ -951,6 +1054,8 @@ def load_external_processing_input(
         scan_evidence_current: Result of ``index_scan_gate_allows``.
         configurable: Worker settings including subprocessor matrix.
         content_class: Payload class; never inferred as synthetic.
+        review_approved: Hash-bound repository decision. Payload flags are
+            ignored.
 
     Returns:
         Decision input. Real company content requires a verified matrix.
@@ -960,7 +1065,7 @@ def load_external_processing_input(
     return ExternalProcessingDecisionInput(
         attestation_present=attestation is not None,
         category=declared_category_disposition(state["declared_category"]),
-        review_approved=state["review_approved"],
+        review_approved=review_approved,
         scan_evidence_current=scan_evidence_current,
         provider_settings_verified=provider_matrix_verified(configurable),
         policy_version_matches=(attestation == EXTERNAL_PROCESSING_POLICY_VERSION),

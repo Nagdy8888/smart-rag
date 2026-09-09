@@ -183,3 +183,30 @@ def eval_judge_json_schema() -> dict[str, object]:
             "rationale": {"type": "string", "maxLength": 240},
         },
     }
+
+
+def pdf_eval_judge_json_schema() -> dict[str, object]:
+    """Return the strict private-PDF judge schema.
+
+    Returns:
+        OpenAI ``json_schema`` document. Distinct from the synthetic judge.
+    """
+
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["status", "faithfulness", "claim_support"],
+        "properties": {
+            "status": {"type": "string", "enum": ["complete", "unscored"]},
+            "faithfulness": {"type": "number", "minimum": 0, "maximum": 1},
+            "claim_support": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["supported"],
+                    "properties": {"supported": {"type": "boolean"}},
+                },
+            },
+        },
+    }

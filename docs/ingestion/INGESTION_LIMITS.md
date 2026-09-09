@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-07
+last-reviewed: 2026-09-09
 audience: engineering, ops
 ---
 
@@ -209,7 +209,9 @@ Primary references: [tiktoken](https://github.com/openai/tiktoken), [Apache Arro
 | LightRAG embedding watchdog | seconds | 30 | 30 | Vendor `default_embedding_timeout`; do not raise | adapter | vendor force-kill | Health-check 75s misses |
 | Gateway retries | count | 2 | 2 | Packet 7 bounded repair | gateway | fail batch | Retry storm |
 | Gateway concurrency | workers | 1 | 2 | Worker concurrency /2 | gateway | queue | Provider 429 sustained |
-| Ledger idempotency | key | `(version_id, operation_key)` UNIQUE | — | Packet 7 | worker | replay no-op | Duplicate canonical rows |
+| Ledger inline vector cap | vectors | 64 | 64 | Hosted `app_worker` 60s statement_timeout; JSONB of hundreds of 1024-d vectors timed out | worker | omit vectors; persist on `document_chunks`; re-embed if persist failed | Change requires overlay evidence |
+| Long-document write `SET LOCAL statement_timeout` | seconds | 300 | 300 | Overlay PDF canonical/ledger txn only; role default stays 60s | worker | job retry / dead-letter | p95 persist > timeout |
+| Long-document idle-in-txn `SET LOCAL` | seconds | 180 | 180 | Overlay embed txn holds connection across OpenAI batches | worker | idle-in-transaction disconnect | Provider batch p95 > 15s role default |
 | Budget reservation | USD/job | 0.05 | 1.00 | QT-COST-002 provisional | admission | `JobAdmissionError` | Budget leak >0.1%/day |
 
 Primary references: [OpenAI embeddings](https://platform.openai.com/docs/guides/embeddings), [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md).

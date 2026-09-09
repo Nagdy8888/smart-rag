@@ -26,6 +26,8 @@ Related: [DATASET_SPEC.md](../evaluation/DATASET_SPEC.md) ·
 [PHASE4_ABLATIONS.md](../evaluation/PHASE4_ABLATIONS.md) ·
 [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md) ·
 [HYBRID_TUNING.md](../retrieval/HYBRID_TUNING.md) ·
+[PDF_HYBRID_EVALUATION.md](../evaluation/PDF_HYBRID_EVALUATION.md) ·
+[hybrid-pdf-accuracy-remediation.md](./hybrid-pdf-accuracy-remediation.md) ·
 [2026-08-16 Phases 1–5 implementation review](../reviews/2026-08-16-phases-01-05-implementation-review.md) ·
 [close-out](../reviews/2026-08-16-phases-01-05-closeout.md) ·
 [docs index](../README.md)
@@ -1294,3 +1296,110 @@ Related: [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.m
 The Phase 4 wrapper may therefore be `status: complete` with Packet 9
 checked. Canonical plan-index todos for Phases 1–5 may be `completed`.
 Phase 6 was not started in this change.
+
+## Overlay Packet 10 — private glossary draft
+
+Quoted requirement: hash-only deterministic glossary draft; human import/approve.
+
+### Proven
+
+- `scripts/ops/draft_pdf_glossary.py` writes under gitignored `.private-eval/`.
+- Terminal output is counts only. Rows store hashes and locators.
+- Command never auto-approves.
+- Live draft on this PDF: `row_count=50`, `auto_approved=false`, kinds
+  acronym 26 / identifier 24 / heading 0. Keys are
+  `kind,locator,normalized_hash` only. Path is gitignored.
+- Owner/admin import 2026-09-09: `import_id=abd34a10-1a78-41f8-aa48-38ec0b9abb17`,
+  `entry_count=14`, `alias_count=14`, `projected_alias_count=14`,
+  `audit_id=aa4341c5-c8ea-4cee-bc9a-35521cd4101d`, `status=approved`.
+  Approver: user (Cursor chat). No private values in Git.
+
+### Rollback
+
+- `POST /admin/glossary/imports/{import_id}/rollback` removes only that
+  import’s `search_aliases` projection.
+
+## Overlay Packet 11 — private PDF eval seal tooling
+
+Quoted requirement: separate dataset identity; generated labels cannot self-seal;
+operator may stop after tooling if the human seal has not occurred.
+
+### Proven
+
+- `smart_rag_core.evaluation.private_pdf` rejects generated-only rows, family
+  leakage, missing ACL actor/reviewer, and missing live current chunk ids.
+- Holdout path under `.private-eval/holdout` is hidden from normal loaders.
+- LangSmith split labels are not treated as immutability.
+- Synthetic fixtures under `tests/fixtures/evaluation/private_pdf/`.
+- `scripts/draft_pdf_eval_dataset.py` writes gitignored generated-only rows
+  (counts/hashes only in stdout). `scripts/seal_pdf_eval_dataset.py` rejects
+  that draft with `generated_labels_cannot_self_seal`.
+- Live draft 2026-09-09 against version in `.private-eval/ingest-ids.json`:
+  `locator_count=640`, `draft_count=60`,
+  `split_counts={"development": 28, "qualification": 12, "holdout": 20}`,
+  `openai_calls=0`, `human_sealed=false`, `holdout_opened=false`,
+  `manifest_sha256=7fee5d7a9b17d25dca07d8bbc73ad11c5a4ca8e0d6b8d00dd34c8746bfd9f8d9`.
+  Review status: `generated_only=60`, `human_approved=0`.
+
+### Proven after tooling (2026-09-09)
+
+- Locator-bound owner seal (`reviewer=Nagdy`); coding model is not the
+  reviewer. `human_sealed=true`; `holdout_opened=false`.
+
+### Still closed
+
+- Overlay Packet 16 freeze: development Hybrid `gates_pass=false`.
+- Phase 6 Packets 17–18 stay closed until a frozen long-document pin.
+
+## Overlay Packets 12–15 — Hybrid long-document, coverage, BM25 variants, dense v2
+
+Quoted requirement: profile-driven quotas, post-selection coverage, one-statement BM25 variants, dense escalation.
+
+### Proven
+
+- `hybrid_default_v1` digest unchanged.
+- `load_frozen_profile("hybrid_long_document_v1")` still rejected.
+- `ranked_ids` is post-MMR/rerank/parent/trim even when no query profile is
+  injected; `fused_ids` preserves fused occupancy.
+- Query-aware excerpts and rank-based MMR.
+- Omitted `supported_subquestions` stays `0`. No-subquestion profiles use
+  `subquestion_count=0` so that component is `1.0`.
+- Additive RPCs: heading inventory, dense candidates v2.
+
+### Unverified
+
+- Live pgvector LOW→HIGH/exact vs authorized oracle on this PDF slice.
+  Hosted dense ANN plus `count_authorized` is ~2.5s on 640 authorized rows.
+
+## Overlay Packet 16 — development tune / qualification
+
+Quoted requirement: live full Hybrid; holdout sealed.
+
+### Proven
+
+- Locator-bound owner seal 2026-09-09 (`reviewer=Nagdy`); holdout JSON
+  lives outside the git worktree.
+- BM25 variant scan no longer puts `version_id` in the `pg_search` `WHERE`
+  with `pdb.score` (that shape is `XX000` on the pinned image).
+- `uv run python scripts/eval_pdf_hybrid.py --split development --live`
+  completed with `fallback_histogram={none: 28}` and
+  `dense_term_degraded_count=0`. Candidate digest
+  `ac42dec12e79681badcc382b16312108d6a265d35b1d5b1f962d4ec5e3930109`.
+  Default profile digest unchanged
+  `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c`.
+
+### No-go (do not freeze)
+
+- `gates_pass=false`: Recall@10 0.0417; locator 0.0357;
+  first-evidence p95 10545 ms; eligible rerank 0/24.
+- Dummy retrieve: `rerank_fallback=rerank_timeout` inside the signed 8s
+  slice (not raised). Hosted dense count+ANN ≈ 2.5s on 640 authorized rows.
+- Qualification not run. `--freeze` remains denied.
+- `holdout_opened=false`. Identity rerank is not a live-rerank gate.
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run python scripts/eval_pdf_hybrid.py --split development --live` | 0 (report written) | `gates_pass=false`; `holdout_opened=false`; `human_sealed=true` |
+| `uv run python scripts/eval_pdf_hybrid.py --split holdout` | 2 | `blocked=holdout_sealed`; `holdout_opened=false` |
+| `uv run python scripts/eval_pdf_agent.py --split development` | 2 | freeze still denied |
+| `uv run python scripts/eval_pdf_holdout.py` | 2 | `blocked=holdout_sealed`; `holdout_opened=false` |

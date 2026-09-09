@@ -53,6 +53,8 @@ class PreparationModelPayload(BaseModel):
             ignored by ``classify_knowledge_scope``.
         knowledge_scope_confidence: Optional scope confidence from the same
             call. Values below 0.80 degrade to general knowledge.
+        requested_sources: Bounded textual titles or filenames. Never a
+            document UUID used as a SQL predicate.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -69,6 +71,7 @@ class PreparationModelPayload(BaseModel):
     relationship_intent: bool | None = None
     knowledge_scope: str | None = Field(default=None, max_length=64)
     knowledge_scope_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    requested_sources: tuple[str, ...] = Field(default_factory=tuple, max_length=8)
 
     @model_validator(mode="after")
     def _bound_lists(self) -> PreparationModelPayload:

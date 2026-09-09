@@ -2,6 +2,7 @@
 
 from smart_rag_api.services.sse.mapping.contracts import (
     ALLOWED_SSE_FIELDS,
+    DEADLINE_EXHAUSTED_DETAIL,
     DRAFT_ANSWER_NODES,
     GENERAL_SCOPE_NODE,
     GENERATE_ANSWER_NODE,
@@ -17,6 +18,7 @@ from smart_rag_api.services.sse.mapping.verified import chunk_answer_text
 
 __all__ = [
     "ALLOWED_SSE_FIELDS",
+    "DEADLINE_EXHAUSTED_DETAIL",
     "DRAFT_ANSWER_NODES",
     "GENERAL_SCOPE_NODE",
     "GENERATE_ANSWER_NODE",

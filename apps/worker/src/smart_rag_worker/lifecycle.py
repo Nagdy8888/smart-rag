@@ -117,7 +117,8 @@ class WorkerLifecycle:
             saver = self._checkpointer.saver
         self._lightrag_loop: asyncio.AbstractEventLoop | None = None
         try:
-            if settings.lightrag_db_url is not None:
+            graph_enabled = settings.worker_graph_enabled
+            if graph_enabled and settings.lightrag_db_url is not None:
                 self._lightrag_loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(self._lightrag_loop)
                 self._lightrag_adapter = self._lightrag_loop.run_until_complete(
@@ -166,7 +167,8 @@ class WorkerLifecycle:
                             exc_info=exc,
                         )
                 in_flight = still_running
-                self._graph_loop.process_once()
+                if self._settings.worker_graph_enabled:
+                    self._graph_loop.process_once()
                 if len(in_flight) >= self._settings.worker_concurrency:
                     time.sleep(1)
                     continue
@@ -363,6 +365,8 @@ class WorkerLifecycle:
 
         run_name = ingest_run_name_for_job_kind(job.job_kind) or "ingestion.probe"
         log_ingest_progress("hybrid", job.job_kind, job.id)
+        payload_class = job.payload_ref.get("content_class")
+        content_class = payload_class if isinstance(payload_class, str) else None
         return invoke_traced_ingestion(
             lambda: self._invoke_graph(
                 graph,
@@ -375,6 +379,7 @@ class WorkerLifecycle:
             run_name=run_name,
             document_id=job.document_id,
             version_id=job.version_id,
+            content_class=content_class,
         )
 
     def _claim_one(self) -> IngestionJobRecord | None:
@@ -435,6 +440,7 @@ class WorkerLifecycle:
             config = self._run_config(job)
             configurable = cast(dict[str, object], config["configurable"])
             configurable["lease_lost"] = lease_lost
+            status = ""
             if job.job_kind == "scan_promote":
                 graph_input = _scan_graph_input_from_job(job)
                 result = self._invoke_traced_graph(
@@ -442,10 +448,17 @@ class WorkerLifecycle:
                     self._scan_graph,
                     graph_input,
                     config,
-                    success_statuses=("promoted",),
+                    success_statuses=("promoted", "governance_review_required"),
                 )
-                success = result.get("status") == "promoted"
+                status = str(result.get("status", ""))
+                success = status in {"promoted", "governance_review_required"}
                 detail = str(result.get("detail", "scan_promote_failed"))
+                if status == "governance_review_required":
+                    log_ingest_progress(
+                        "hybrid",
+                        "governance_review_required",
+                        job.id,
+                    )
             elif job.job_kind == "website_crawl":
                 graph_input = _crawl_graph_input_from_job(job)
                 result = self._invoke_traced_graph(
@@ -464,10 +477,17 @@ class WorkerLifecycle:
                     self._index_graph,
                     graph_input,
                     config,
-                    success_statuses=("indexed",),
+                    success_statuses=("indexed", "governance_review_required"),
                 )
-                success = result.get("status") == "indexed"
+                status = str(result.get("status", ""))
+                success = status in {"indexed", "governance_review_required"}
                 detail = str(result.get("detail", "hybrid_index_failed"))
+                if status == "governance_review_required":
+                    log_ingest_progress(
+                        "hybrid",
+                        "governance_review_required",
+                        job.id,
+                    )
             elif job.job_kind in {
                 "query_memory_reaper",
                 "langsmith_trace_deletion",
@@ -513,11 +533,15 @@ class WorkerLifecycle:
                 elif success:
                     completed = repository.complete(job.id, lease_token)
                     _log_hybrid_job_outcome(job, reason_code=None)
-                    if job.job_kind not in {
-                        "query_memory_reaper",
-                        "langsmith_trace_deletion",
-                        "query_reservation_true_up",
-                    }:
+                    skip_true_up = status == "governance_review_required" or (
+                        job.job_kind
+                        in {
+                            "query_memory_reaper",
+                            "langsmith_trace_deletion",
+                            "query_reservation_true_up",
+                        }
+                    )
+                    if not skip_true_up:
                         self._true_up_budget(connection, completed)
                 else:
                     _log_hybrid_job_outcome(job, reason_code="job_failed")
@@ -858,7 +882,6 @@ def _scan_graph_input_from_job(job: IngestionJobRecord) -> IngestionScanState:
 
     payload: dict[str, Any] = job.payload_ref
     content_class = str(payload.get("content_class", "real_company"))
-    review_approved = bool(payload.get("review_approved", False))
     return {
         "job_id": str(job.id),
         "lease_token": job.lease_token or "",
@@ -920,7 +943,7 @@ def _scan_graph_input_from_job(job: IngestionJobRecord) -> IngestionScanState:
             if isinstance(payload.get("uploader_user_id"), str)
             else None
         ),
-        "review_approved": review_approved,
+        "review_approved": False,
         "content_class": content_class,
         "crash_after": (
             str(payload["crash_after"])
@@ -1016,7 +1039,7 @@ def _index_graph_input_from_job(job: IngestionJobRecord) -> IngestionIndexState:
             if isinstance(payload.get("attestation_policy_version"), str)
             else None
         ),
-        "review_approved": bool(payload.get("review_approved", False)),
+        "review_approved": False,
         "content_class": str(payload.get("content_class", "real_company")),
         "graph_eligible": bool(payload.get("graph_eligible", False)),
         "crawl_run_id": (

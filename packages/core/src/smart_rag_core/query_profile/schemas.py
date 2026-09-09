@@ -40,6 +40,7 @@ def query_profile_json_schema() -> dict[str, object]:
             "relationship_intent",
             "knowledge_scope",
             "knowledge_scope_confidence",
+            "requested_sources",
         ],
         "properties": {
             "rewrite": {"type": ["string", "null"]},
@@ -64,5 +65,6 @@ def query_profile_json_schema() -> dict[str, object]:
                     {"type": "null"},
                 ]
             },
+            "requested_sources": {**string_list, "maxItems": 8},
         },
     }

@@ -59,12 +59,39 @@ class IngestionStatusRepository:
                 ),
             )
             row = cursor.fetchone()
-        if row is None:
-            return None
-        payload: object = row.get("status_payload")
-        if not isinstance(payload, dict):
-            return None
-        result = cast(dict[str, Any], payload)
-        jobs: object = row.get("recent_jobs") or []
-        result["recent_jobs"] = jobs if isinstance(jobs, list) else []
-        return result
+            if row is None:
+                return None
+            payload: object = row.get("status_payload")
+            if not isinstance(payload, dict):
+                return None
+            result = cast(dict[str, Any], payload)
+            jobs: object = row.get("recent_jobs") or []
+            result["recent_jobs"] = jobs if isinstance(jobs, list) else []
+            review = result.get("review")
+            if not isinstance(review, dict):
+                return result
+            try:
+                cursor.execute(
+                    """
+                    SELECT app.version_governance_review_diagnostics(
+                      %s::uuid, %s::text, %s::bigint, %s::uuid
+                    ) AS diagnostics
+                    """,
+                    (
+                        caller_user_id,
+                        caller_role,
+                        caller_authorization_version,
+                        version_id,
+                    ),
+                )
+                diagnostics = cursor.fetchone()
+            except psycopg.Error:
+                return result
+            extra: object = None if diagnostics is None else diagnostics.get(
+                "diagnostics"
+            )
+            if isinstance(extra, dict):
+                merged = dict(review)
+                merged.update(cast(dict[str, Any], extra))
+                result["review"] = merged
+            return result

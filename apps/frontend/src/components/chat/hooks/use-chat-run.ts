@@ -12,6 +12,7 @@ import {
   type ApiAuth,
   type ApiFailure,
 } from "../../../lib/api";
+import type { SettledChatTurn } from "../../../lib/chat-history";
 import { createChatViewState, type ChatViewState } from "../../../lib/chat-view";
 import { clearChatRunPointer } from "../../../lib/chat-pointer";
 import { newIdempotencyKey } from "../../../lib/idempotency";
@@ -40,6 +41,8 @@ export type UseChatRunResult = {
   nextRetryMs: number | null;
   failure: ApiFailure | null;
   lastUserMessage: string;
+  /** Finished live answers not yet present in GET /messages. */
+  settledTurns: readonly SettledChatTurn[];
   liveRunCreated: boolean;
   send(text: string): Promise<boolean>;
   reconnect(): Promise<void>;
@@ -65,6 +68,8 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState("");
+  const [settledTurns, setSettledTurns] = useState<SettledChatTurn[]>([]);
+  const lastUserMessageRef = useRef("");
   const [disconnected, setDisconnected] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectExhausted, setReconnectExhausted] = useState(false);
@@ -87,7 +92,11 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
     chatRef.current = chat;
     sequenceRef.current = chat.lastSequence;
     failureRef.current = failure;
-  }, [chat, failure]);
+    lastUserMessageRef.current = lastUserMessage;
+  }, [chat, failure, lastUserMessage]);
+  const settleCompletedTurn = useCallback((turn: SettledChatTurn) => {
+    setSettledTurns((previous) => [...previous, turn]);
+  }, []);
   const keys = sessionQueryKeys(auth?.accessToken ?? null);
 
   usePaidRunPointer({
@@ -112,6 +121,7 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
       idempotencyRef.current = newIdempotencyKey();
       liveRunIdsRef.current.clear();
       setLiveRunCreated(false);
+      setSettledTurns([]);
       if (reason !== "new-send" && reason !== "select-conversation") {
         onConversationId(null);
         setLastUserMessage("");
@@ -190,8 +200,10 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
       abortRef,
       idempotencyRef,
       liveRunIdsRef,
+      lastUserMessageRef,
       autoResumeRef,
       setLiveRunCreated,
+      settleCompletedTurn,
       setChat,
       setFailure,
       setSending,
@@ -201,7 +213,16 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
       setReconnectExhausted,
       setNextRetryMs,
     };
-  }, [auth, conversationId, handshake, keys, onConversationId, queryClient, ready]);
+  }, [
+    auth,
+    conversationId,
+    handshake,
+    keys,
+    onConversationId,
+    queryClient,
+    ready,
+    settleCompletedTurn,
+  ]);
   const send = useCallback(async (text: string) => {
     const deps = sendDepsRef.current;
     if (deps === null) {
@@ -271,6 +292,7 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
     nextRetryMs,
     failure,
     lastUserMessage,
+    settledTurns,
     liveRunCreated,
     send,
     reconnect,

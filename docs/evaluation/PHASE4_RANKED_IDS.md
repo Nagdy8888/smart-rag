@@ -2,7 +2,7 @@
 title: Phase 4 ranked-ID evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-16
+last-reviewed: 2026-09-09
 audience: engineering, reviewers
 ---
 
@@ -23,7 +23,7 @@ quote these percents as launch Hybrid quality, Combined gain, or live
 OpenAI rerank evidence. Frozen `hybrid_default_v1` was not retuned. See
 [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md).
 
-Related: [DATASET_SPEC.md](./DATASET_SPEC.md) · [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md) · [runtime sidecar README](../../tests/fixtures/evaluation/phase4/runtime/README.md)
+Related: [DATASET_SPEC.md](./DATASET_SPEC.md) · [QUALITY_TARGETS.md](../QUALITY_TARGETS.md) · [ADR-phase4-engineering-close.md](../adr/ADR-phase4-engineering-close.md) · [PHASE4_HOLDOUT.md](./PHASE4_HOLDOUT.md) · [HYBRID_RETRIEVAL_CONTRACT.md](../retrieval/HYBRID_RETRIEVAL_CONTRACT.md) · [PDF_HYBRID_EVALUATION.md](./PDF_HYBRID_EVALUATION.md) · [runtime sidecar README](../../tests/fixtures/evaluation/phase4/runtime/README.md)
 
 ## Metric formulas
 
@@ -35,7 +35,7 @@ If any sidecar row has a synthetic chunk id and `chunk_id=null` (dry run),
 
 | Metric | Formula | Gate |
 | --- | --- | --- |
-| Recall@10 | Mean over recall-lane cases of: every mapped gold chunk UUID ∈ top-10 `HybridRunResult.ranked_ids` (final order after rerank/MMR when rerank ran) | QT-EVAL-006 ≥85% |
+| Recall@10 | Mean over recall-lane cases of: every mapped gold chunk UUID ∈ top-10 `HybridRunResult.ranked_ids` (final order after rerank/MMR/parent/trim). Overlay retrieval keeps fused occupancy on `fused_ids`; do not score fused occupancy as final evidence recall. | QT-EVAL-006 ≥85% |
 | Exact-code Recall@5 | Same @5 on `QueryClass.EXACT_CODE` | QT-EVAL-007 ≥98% |
 | Alias Recall@10 | Same @10 on `QueryClass.ALIAS` | QT-EVAL-008 ≥95% |
 | Locator correctness | Fraction of returned `EvidenceUnit`s whose page/section/sheet/range/URL match `ChunkContext` and gold locator; `citation_text` is canonical `raw_text`, never BM25 text | QT-EVAL-002 ≥98% (locators) |

@@ -2,14 +2,14 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-18
+last-reviewed: 2026-09-09
 owning_phase: 3
 audience: engineering
 ---
 
 # Chunking contract
 
-**Owning phase:** 3 (ingestion). **Policy version:** `chunking_v1`. **Tokenizer:** `cl100k_base_v1` (OpenAI `text-embedding-3-large` sizing).
+**Owning phase:** 3 (ingestion). **Policy version:** `chunking_v2` (new ingest). Historical rows may still carry `chunking_v1`; readers must remain compatible. **Tokenizer:** `cl100k_base_v1` (OpenAI `text-embedding-3-large` sizing).
 
 ## Hierarchy
 
@@ -23,6 +23,15 @@ Typed parser elements become **document → section (parent) → passage** chunk
 | Adjacent prose-sibling overlap | **40–60 tokens** |
 | Normal hard cap | **600 tokens** |
 | Parent section cap | **1,500 tokens** |
+
+`chunking_v1` kept 401–600 token ordinary prose unsplit. `chunking_v2` splits that band toward 200–400 using paragraph then sentence boundaries, then token windows. Page-break elements still flush the prose buffer; page-boundary merge is allowed only when the parser proves continuous reading order and the same heading ancestry. Cross-heading merge is forbidden. Parents are not counted as ordinary prose.
+
+Count-only analysis of private PDF SHA-256
+`72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1`
+on 2026-09-09: 640 ordinary passages, 495 in 200–400 (**0.7734**), 134
+under 200, 11 in 401–600, 0 over 600. Parser kinds were paragraph/page_break/figure
+only (zero headings). The 90% gate is a Packet 5 stop, not a reason to
+relax merge rules.
 
 ## Atomicity
 

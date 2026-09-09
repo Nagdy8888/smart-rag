@@ -1,0 +1,18 @@
+{
+  "schema_version": "private-pdf-eval-v1",
+  "dataset_id": "private_pdf_book_v1",
+  "note": "Synthetic fixture only. No private questions, answers, or excerpts.",
+  "case_count": 2,
+  "case_ids": [
+    "aaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbb"
+  ],
+  "source_family_ids": [
+    "cccccccccccccccccccccccc"
+  ],
+  "split_counts": {
+    "development": 2,
+    "qualification": 0,
+    "holdout": 0
+  }
+}

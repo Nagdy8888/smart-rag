@@ -30,7 +30,9 @@ from smart_rag_core.ingestion.embeddings.service import (
     EmbeddingBatchInput,
     EmbeddingGateError,
     EmbeddingService,
+    _completed_ledger_result_ref,
 )
+from smart_rag_core.ingestion.limits import LEDGER_INLINE_VECTOR_MAX
 from smart_rag_core.security.external_processing import (
     CategoryDisposition,
     ContentClass,
@@ -993,3 +995,154 @@ def test_openai_adapter_maps_http_429_to_rate_limited() -> None:
             )
     assert captured["timeout"] == 20.0
     assert captured["max_retries"] == 0
+
+
+def test_completed_ledger_omits_vectors_above_inline_cap() -> None:
+    """Large batches must not persist vectors inside ledger JSONB."""
+
+    over_cap = LEDGER_INLINE_VECTOR_MAX + 1
+    vectors = tuple((0.0, 1.0) for _ in range(over_cap))
+    payload = _completed_ledger_result_ref(
+        chunk_set_hash="hash",
+        mode="mock",
+        fixture_provenance="test",
+        vectors=vectors,
+    )
+    assert payload["vectors_inline"] is False
+    assert "vectors" not in payload
+    assert payload["vector_count"] == over_cap
+
+
+def test_completed_ledger_inlines_small_batches() -> None:
+    """Batches at the inline cap keep vectors for ledger replay."""
+
+    vectors = ((0.1, 0.2),)
+    payload = _completed_ledger_result_ref(
+        chunk_set_hash="hash",
+        mode="mock",
+        fixture_provenance="test",
+        vectors=vectors,
+    )
+    assert payload["vectors_inline"] is True
+    assert payload["vectors"] == [[0.1, 0.2]]
+
+
+def test_embedding_service_reembeds_when_vectors_not_inlined() -> None:
+    """Completed ledger rows with ``vectors_inline=false`` re-call the provider."""
+
+    chunk = _chunk("annual leave policy")
+    chunk_set_hash = typed_attr(embedding_service_mod, "_chunk_set_hash")((chunk,))
+    called = {"embed": 0}
+
+    class _Adapter:
+        """Count provider calls for the canonical-only ledger path."""
+
+        async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+            """Return one mock vector and count the call.
+
+            Args:
+                request: Embedding request.
+
+            Returns:
+                One-vector mock response.
+            """
+
+            called["embed"] += 1
+            vector = mock_embedding_vector(request.inputs[0])
+            return EmbeddingResponse(
+                mode="mock",
+                vectors=(vector,),
+                provider_request_id="reembed",
+                fixture_provenance="test",
+            )
+
+    class _Cursor:
+        """Cursor that reports canonical-only completed ledger then inserts."""
+
+        def __init__(self) -> None:
+            """Start with an empty statement log."""
+
+            self.statements: list[str] = []
+
+        def __enter__(self) -> _Cursor:
+            """Return this cursor.
+
+            Returns:
+                The same cursor instance.
+            """
+
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            """Leave the context without suppressing exceptions."""
+
+            return None
+
+        def execute(self, sql: str, _params: object = None) -> None:
+            """Append one SQL string.
+
+            Args:
+                sql: Statement text.
+                _params: Unused bind parameters.
+            """
+
+            self.statements.append(sql)
+
+        def fetchone(self) -> tuple[object, ...]:
+            """Return completed canonical-only ledger, insert id, or attempts.
+
+            Returns:
+                Stub row matching the last statement.
+            """
+
+            latest = self.statements[-1]
+            if "FROM app.embedding_operation_ledger" in latest and "status" in latest:
+                return (
+                    uuid4(),
+                    "completed",
+                    {
+                        "chunk_set_hash": chunk_set_hash,
+                        "vectors_inline": False,
+                        "vector_count": 1,
+                    },
+                )
+            if "record_embedding_ledger" in latest:
+                return (uuid4(),)
+            if "attempt_count" in latest:
+                return (2,)
+            return (None,)
+
+    class _Connection:
+        """Connection double that reuses one in-memory cursor."""
+
+        def __init__(self) -> None:
+            """Create the shared cursor."""
+
+            self.cursor_obj = _Cursor()
+
+        def cursor(self) -> _Cursor:
+            """Return the shared cursor.
+
+            Returns:
+                The in-memory cursor.
+            """
+
+            return self.cursor_obj
+
+    service = EmbeddingService(
+        _Connection(),
+        gateway=EmbeddingGateway(_Adapter()),
+    )  # type: ignore[arg-type]
+    service._admission.assert_can_enqueue_ingestion = lambda **_kwargs: None  # type: ignore[method-assign]
+    result = service.embed_version(
+        EmbeddingBatchInput(
+            version_id=uuid4(),
+            document_title="Policy",
+            chunks=(chunk,),
+            chunking_config_hash="cfg",
+            operation_key="embed:canonical-only",
+            governance=_governance(),
+        )
+    )
+    assert called["embed"] == 1
+    assert len(result.embedded) == 1

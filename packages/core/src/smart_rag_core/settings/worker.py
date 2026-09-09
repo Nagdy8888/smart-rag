@@ -37,6 +37,8 @@ class WorkerSettings(SharedSettings):
         allow_inprocess_parser: Test-only flag from ``ALLOW_INPROCESS_PARSER``.
             Valid solely when ``APP_ENV=test``. Production workers must keep
             the default ``false`` and require Docker/gVisor.
+        worker_graph_enabled: When false, skip LightRAG adapter bind and
+            graph-job claims. Hybrid ingestion and BM25 stay enabled.
     """
 
     service_name: ClassVar[Literal["worker"]] = "worker"
@@ -137,6 +139,15 @@ class WorkerSettings(SharedSettings):
         description=(
             "Permit in-process parsing only when APP_ENV=test. Default false; "
             "worker jobs require Docker/gVisor."
+        ),
+        json_schema_extra={"security": "public"},
+    )
+    worker_graph_enabled: bool = Field(
+        default=True,
+        validation_alias="WORKER_GRAPH_ENABLED",
+        description=(
+            "When false, skip LightRAG bind and graph-job claims. Hybrid, "
+            "BM25, embeddings, and checkpoints stay enabled."
         ),
         json_schema_extra={"security": "public"},
     )

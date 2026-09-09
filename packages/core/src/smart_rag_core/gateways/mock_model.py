@@ -140,6 +140,7 @@ class MockModelAdapter:
             "relationship_intent": None,
             "knowledge_scope": scope.value,
             "knowledge_scope_confidence": confidence,
+            "requested_sources": [],
         }
         return QueryProfileModelResponse(
             mode="mock",

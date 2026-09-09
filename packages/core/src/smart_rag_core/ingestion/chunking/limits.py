@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-CHUNKING_POLICY_VERSION = "chunking_v1"
+CHUNKING_POLICY_VERSION_V1 = "chunking_v1"
+CHUNKING_POLICY_VERSION = "chunking_v2"
 TOKENIZER_VERSION = "cl100k_base_v1"
 DEDUP_POLICY_VERSION = "dedup_v1"
 

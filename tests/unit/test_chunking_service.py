@@ -16,8 +16,12 @@ from smart_rag_core.ingestion.chunking.limits import (
     PASSAGE_TARGET_MAX_TOKENS,
     PASSAGE_TARGET_MIN_TOKENS,
 )
-from smart_rag_core.ingestion.chunking.splitter import split_oversized_atomic
-from smart_rag_core.ingestion.chunking.tokenizer import count_tokens
+from smart_rag_core.ingestion.chunking.splitter import (
+    ProseSegment,
+    split_oversized_atomic,
+    split_prose_segments,
+)
+from smart_rag_core.ingestion.chunking.tokenizer import count_tokens, truncate_to_tokens
 from smart_rag_core.ingestion.parser.adapters import parse_file
 from smart_rag_core.ingestion.parser.types import (
     CoverageAccounting,
@@ -41,6 +45,26 @@ from tests.fixtures.parser import (
 DOCUMENT_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 VERSION_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
 FixtureBuilder = Callable[[], tuple[bytes, str]]
+
+
+def _ordinary_prose_in_401_to_600_band() -> str:
+    """Build ordinary prose whose tokenizer count is in the 401-600 band.
+
+    Returns:
+        Space-separated words whose ``count_tokens`` is greater than the
+        400-token target and at most the 600-token hard cap.
+    """
+
+    words: list[str] = []
+    text = ""
+    index = 0
+    while count_tokens(text) <= PASSAGE_TARGET_MAX_TOKENS:
+        words.append(f"word{index:04d}")
+        text = " ".join(words)
+        index += 1
+    if count_tokens(text) > PASSAGE_HARD_MAX_TOKENS:
+        text = truncate_to_tokens(text, PASSAGE_HARD_MAX_TOKENS)
+    return text
 
 
 @pytest.mark.parametrize(
@@ -232,3 +256,34 @@ def test_ordinary_prose_sizing_metrics() -> None:
     assert PASSAGE_TARGET_MIN_TOKENS <= PASSAGE_TARGET_MAX_TOKENS
     assert PASSAGE_OVERLAP_MIN_TOKENS <= PASSAGE_OVERLAP_MAX_TOKENS
     assert result.metrics.hard_cap_violations == 0
+
+
+def test_chunking_v2_splits_401_to_600_token_ordinary_prose() -> None:
+    """Ordinary prose in the 401-600 band splits toward the 200-400 target.
+
+    Returns:
+        None. Asserts locators survive and no passage exceeds the hard cap.
+    """
+
+    words = _ordinary_prose_in_401_to_600_band()
+    token_count = count_tokens(words)
+    assert PASSAGE_TARGET_MAX_TOKENS < token_count <= PASSAGE_HARD_MAX_TOKENS
+    passages = split_prose_segments(
+        [
+            ProseSegment(
+                text=words,
+                element_ids=("p-401",),
+                locators=({"page": 3},),
+            )
+        ]
+    )
+    assert len(passages) >= 2
+    for passage in passages:
+        assert count_tokens(passage.text) <= PASSAGE_HARD_MAX_TOKENS
+        assert passage.element_ids == ("p-401",)
+        assert passage.locators == ({"page": 3},)
+    assert all(
+        count_tokens(passage.text) <= PASSAGE_TARGET_MAX_TOKENS
+        or count_tokens(passage.text) <= PASSAGE_HARD_MAX_TOKENS
+        for passage in passages
+    )

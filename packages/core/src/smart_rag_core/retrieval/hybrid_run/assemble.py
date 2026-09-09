@@ -46,6 +46,7 @@ def hybrid_assemble_kwargs(
     query_type: QueryType,
     required_terms: tuple[str, ...],
     matched_terms: tuple[str, ...],
+    subquestion_count: int,
     deadline_exhausted: bool,
 ) -> AssembleHybridKwargs:
     """Pack the shared ``assemble_hybrid`` kwargs for one retrieve.
@@ -69,6 +70,7 @@ def hybrid_assemble_kwargs(
         query_type: Profile query type.
         required_terms: Codes and exact terms.
         matched_terms: Terms already matched; Hybrid retrieve passes empty.
+        subquestion_count: Decomposition size. ``0`` means none.
         deadline_exhausted: True when a parallel channel missed the slice.
 
     Returns:
@@ -94,6 +96,7 @@ def hybrid_assemble_kwargs(
         "query_type": query_type,
         "required_terms": required_terms,
         "matched_terms": matched_terms,
+        "subquestion_count": subquestion_count,
         "deadline_exhausted": deadline_exhausted,
     }
 

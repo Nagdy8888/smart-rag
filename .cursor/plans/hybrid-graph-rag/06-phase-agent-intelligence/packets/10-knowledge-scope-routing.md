@@ -44,6 +44,15 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
   and graph state. The reason is server-derived and never model-supplied.
 - Later explicit graph topology/node files required to execute the compiled
   company/general/mixed/fail-closed paths; route-family semantics stay here.
+- 2026-09-09 Hybrid PDF overlay (markdown-authorized here; implement in this
+  packet after Packet 9 acceptance, not as an out-of-order Phase 6 code run):
+  bounded `requested_sources` on the single preparation call; server-side
+  authorized title/filename/alias resolver; `ResolvedRetrievalScope`; production
+  `rerank_pool` binding on `ProcessHybridRetriever`; Packet 11/12 core
+  protocol forwarding (variants + scope) in `DsnBm25Retriever` /
+  `ProcessHybridRetriever`; `authorized_chunk_loader` forwarded through
+  `RunScopedHybrid`. Until Phase 4 Packet 16 freeze, runtime must fail closed
+  to `hybrid_default_v1`. Do not edit `eval_judge_v1.md`.
 
 ## Forbidden outputs
 
@@ -54,6 +63,7 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
 - A second preparation model call.
 - Treating the isolated word `policy` as a company signal.
 - Changing `StudioQueryState.messages`.
+- Editing `eval_judge_v1.md` or executing unfrozen `hybrid_long_document_v1`.
 
 ## Ordered actions
 
@@ -157,6 +167,29 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
    stays unbound. Malformed payload raises so preparation records
    `profile_malformed`; no fabricated profile is allowed.
 10. Write the required unit and contract tests listed in Acceptance checks.
+11. Hybrid PDF overlay after Packet 9 acceptance: extend the single
+    preparation/profile operation with bounded textual `requested_sources`
+    and source-span/confidence/provenance. The model may name text but never a
+    document UUID, retrieval limit, SQL predicate, or profile number.
+12. Add a server-side resolver over current authorized title/filename/approved
+    aliases. Resolve to a hard version filter only when exactly one current
+    authorized version matches. Zero matches stay unscoped; multiple matches
+    return clarification. Missing and unauthorized IDs remain indistinguishable.
+13. Produce `ResolvedRetrievalScope` (version, whole-document/section/page,
+    representative-passage count, query class, eligibility, candidate profile
+    id). Long profile is eligible only when exactly one version resolves,
+    passage count > 5, and the frozen selector allow-lists the class. Until
+    Phase 4 Packet 16 freeze, fail closed to `hybrid_default_v1`.
+14. In `deps_factory.py`, load `model_gateway` and `rerank_v1` and pass them to
+    `ProcessHybridRetriever`. Build a run-local closure around
+    `rerank_pool`. Do not store per-run budget on process-global state.
+15. Update `DsnBm25Retriever` and `ProcessHybridRetriever` to pass bounded
+    query variants and server-resolved scope through Phase 4 Packet 11/12
+    core protocols. Forward `authorized_chunk_loader(caller)` through
+    `RunScopedHybrid`. Do not reimplement ranking in `apps/agents/`.
+16. Expose safe diagnostics: profile id/hash, source-resolution, rerank
+    model/prompt hash, requested/called/skipped/fallback, usage/cost.
+    Keep `LANGSMITH_EXPORT_IO=false`. Do not edit `eval_judge_v1.md`.
 
 ## Acceptance checks
 
@@ -178,6 +211,12 @@ Do not load frontend, Studio-live, SSE-lifecycle, or answer-generation skills.
   storage/network/redaction controls and record the actual model ID.
 - A genuine mixed decision has no degradation reason; degraded scope has one
   and keeps `company_claim_forbidden=True`.
+- Hybrid PDF overlay: a non-trivial two-candidate production Hybrid query calls
+  the model gateway exactly once and returns `rerank_call_count=1`; trivial
+  exact lookup may skip with the named reason; timeout/refusal/malformed IDs/
+  budget denial preserve deterministic RRF; source ambiguity never hard-filters
+  or leaks IDs; concurrent runs isolate budgets; mock/identity cannot satisfy
+  the live-rerank gate. Unfrozen `hybrid_long_document_v1` remains runtime-denied.
 
 Run at minimum:
 
@@ -196,6 +235,9 @@ Also run every existing routing/profile contract suite named by inspection.
   `AMBIGUOUS`, model-supplied degradation reason, NoRetrieval without
   `company_claim_forbidden`, a new route family, or mutation of
   `StudioQueryState.messages` fails the packet.
+- Hybrid PDF overlay: process-global rerank budget, client-supplied document
+  UUIDs/SQL predicates, unfrozen long-document profile execution, or identity
+  rerank labelled as a live OpenAI call fails the packet.
 
 ## Stop routes
 
@@ -206,6 +248,10 @@ Also run every existing routing/profile contract suite named by inspection.
 - Stop if the profile gateway cannot remain one counted call under existing
   `usage_kind="profile"` caps, strict schema, zero hidden retry, `store=False`,
   and redacted tracing.
+- Stop the Hybrid PDF overlay if the provider matrix is unsigned or the current
+  OpenAI SDK cannot prove zero hidden retries and strict set equality. Bind and
+  verify reranking under `hybrid_default_v1` until Phase 4 Packet 16 freezes
+  the long-document selector.
 
 ## Required evidence
 

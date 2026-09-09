@@ -2,23 +2,23 @@
 title: OpenAI data governance
 owner: product-owner
 status: accepted
-last-reviewed: 2026-08-13
+last-reviewed: 2026-09-09
 audience: client-approver, security
 approver: "user (Cursor chat; Phase 1–5 mandate; no legal name provided)"
 approval_date: 2026-08-13
 policy_version: openai-gov-v1
-real_company_content_external_processing: prohibited
+real_company_content_external_processing: laptop-pdf-overlay-accepted
 ---
 
 # OpenAI data governance
 
-**Status: accepted (framework).** Org-contracted OpenAI settings remain
-`unverified`. Staging and production still must not send **real company**
-corpus until those rows are `verified`. **Local unsigned live keys**
-(`APP_ENV=local` and `MOCK_MODEL_MODE=false`) are an operator waiver so the
-gitignored OpenAI key can run against synthetic fixtures and local chat.
-That waiver does **not** flip this matrix to `verified` and does **not**
-authorize production traffic.
+**Status: accepted for this laptop PDF overlay (2026-09-09).** Framework
+from 2026-08-13 remains. The product owner named this Cursor session as
+approver for sending **this one** `real_company` PDF through the laptop
+Hybrid path. Org console Data Retention / ZDR tabs were **not** readable
+via the API key (HTTP 404/403). Rows below record public API defaults the
+owner accepted, plus residual 30-day abuse monitoring. **ZDR is not
+claimed.**
 
 Related: [SUBPROCESSOR_GOVERNANCE.md](./SUBPROCESSOR_GOVERNANCE.md) · [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [docs index](../README.md)
 
@@ -36,21 +36,29 @@ No undocumented company-content path to OpenAI is authorized. Direct SDK use out
 
 ## 2. Provider settings matrix (do not invent org commitments)
 
-Public defaults below are from OpenAI primary docs as of 2026-08-13. **Org-contracted rows stay `unverified` until the verification owner confirms the live org/project console or signed DPA.**
+Public defaults below are from OpenAI primary docs as of 2026-09-09
+([Your data](https://developers.openai.com/api/docs/guides/your-data)).
+Live org/project console Data Retention and ZDR tabs were not readable with
+the configured API key (`/v1/organization` 404, `/v1/organization/projects`
+403). The product owner accepted these recorded values for **laptop ingest
+of this one PDF** on 2026-09-09. Staging and production remain prohibited
+until a console/DPA review.
 
 | Setting | Public / documented default | Org/project value | Verification status | Source | Verification owner |
 | --- | --- | --- | --- | --- | --- |
-| Training on API customer content | Not used for training by default | unverified for this org | unverified | [Data controls](https://developers.openai.com/api/docs/guides/your-data), [Business data](https://openai.com/business-data/) | product-owner |
-| Abuse-monitoring retention | Up to 30 days unless ZDR/MAM approved | unverified | unverified | Same | product-owner |
-| Zero Data Retention (ZDR) | Opt-in; prior OpenAI approval; endpoint-limited | not confirmed enabled | unverified | Same | product-owner |
-| Data residency / region | Eligible customers may pin residency; creation-time constraints apply | unverified | unverified | Same | product-owner |
-| Encryption in transit/at rest | TLS + provider-controlled at-rest controls (public claims) | unverified for contract | unverified | OpenAI trust/security pages | product-owner |
-| DPA / enterprise MSA | Available to qualifying customers | not attached in-repo | unverified | OpenAI legal / sales | product-owner |
-| Incident contact | Provider status + account team | unverified local contact | unverified | — | product-owner |
-| Deletion / export | Account deletion and ZDR endpoint rules | unverified | unverified | Data controls | product-owner |
-| Subprocessors | OpenAI published subprocessors | unverified acceptance | unverified | OpenAI trust portal | product-owner |
+| Training on API customer content | Not used for training by default (since 2023-03-01) | accepted public default; no training opt-in claimed | verified-accepted 2026-09-09 | [Data controls](https://developers.openai.com/api/docs/guides/your-data) | product-owner (Cursor chat) |
+| Abuse-monitoring retention | Up to 30 days unless ZDR/MAM approved | accepted residual 30-day window | verified-accepted 2026-09-09 | Same | product-owner (Cursor chat) |
+| Zero Data Retention (ZDR) | Opt-in; prior OpenAI approval; endpoint-limited | not enabled; not claimed | verified-accepted as off 2026-09-09 | Same | product-owner (Cursor chat) |
+| Data residency / region | Eligible customers may pin residency | default API region; no pin claimed | verified-accepted default 2026-09-09 | Same | product-owner (Cursor chat) |
+| Encryption in transit/at rest | TLS + provider-controlled at-rest controls (public claims) | accepted public claims | verified-accepted 2026-09-09 | OpenAI trust/security pages | product-owner (Cursor chat) |
+| DPA / enterprise MSA | Available to qualifying customers | not attached in-repo; owner accepted residual | verified-accepted without DPA-in-repo 2026-09-09 | OpenAI legal / sales | product-owner (Cursor chat) |
+| Incident contact | Provider status + account team | product-owner | verified-accepted 2026-09-09 | — | product-owner (Cursor chat) |
+| Deletion / export | Account deletion and ZDR endpoint rules | residual 30-day abuse logs; ZDR off | verified-accepted 2026-09-09 | Data controls | product-owner (Cursor chat) |
+| Subprocessors | OpenAI published subprocessors | accepted published list | verified-accepted 2026-09-09 | OpenAI trust portal | product-owner (Cursor chat) |
 
-**Rule:** Unavailable or unverified provider settings cannot produce `external_processing_allowed=true` for real company content.
+**Rule:** Staging and production still cannot send real company content until a
+console/DPA review. This laptop overlay is a named/date acceptance of the
+public defaults above, not a ZDR claim.
 
 ## 3. Data categories
 
@@ -118,17 +126,30 @@ Default for missing evidence: **deny**. Never default `external_processing_allow
 | Approver | user (Cursor chat; Phase 1–5 mandate; no legal name provided) |
 | Date | 2026-08-13 |
 | Decision | Accept framework, categories, detectors, and deny-by-default decision |
-| Real company content to OpenAI | **prohibited** until provider matrix rows required for the flow are `verified` |
+| Real company content to OpenAI | **prohibited** in staging/production until console/DPA review |
 | Approved exceptions | none |
-| Next review | 2026-11-11 or earlier on provider change |
-
-## 8. Negative decision fixtures (normative)
-
-| Fixture | Expected |
-| --- | --- |
-| Missing attestation | deny |
-| Expired approval | deny |
-| Contradictory category vs detectors | deny |
-| Positive sensitive detector | deny |
-| Unverified OpenAI retention for real content | deny |
 | Synthetic fixture + mock gateway | allow for tests only (not real content) |
+
+## 9. 2026-09-09 Hybrid PDF overlay named approval
+
+Phase 3 Packet 9 obtained named/date owner approval in this Cursor session
+after OpenAI `GET /v1/models` succeeded (200) and org console endpoints
+returned 404/403. Public data-control defaults were re-fetched from
+[Your data](https://developers.openai.com/api/docs/guides/your-data).
+
+| Control | Overlay record |
+| --- | --- |
+| Approver | user (Cursor chat; product-owner; no legal name provided) |
+| Date | 2026-09-09 |
+| Decision | Accept residual 30-day abuse monitoring, no-training API default, ZDR off, laptop Hybrid embeddings/rerank/chat for this PDF only |
+| `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED` | set `true` in ignored `.env` / `.env.compose` after this record |
+| `LANGSMITH_EXPORT_IO` | forced `false` |
+| `WORKER_GRAPH_ENABLED` | forced `false` |
+| ZDR | **not** enabled; not claimed |
+| Staging / production | still prohibited |
+
+Detector false-positive reviews for this PDF use hash-bound finding IDs
+([ADR-detector-finding-reviews.md](../adr/ADR-detector-finding-reviews.md)).
+`payload_ref.review_approved` is not an authoritative override.
+
+Related: [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy-remediation.md)

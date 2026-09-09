@@ -55,7 +55,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 7. [x] [Implement Supabase checkpoints/store memory, idempotency/run-event GC, full governance enforcement, trace redaction, prompt versions, usage accounting, feedback, and immediate conversation deletion.](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md)
 8. [x] [Ship the thin authenticated developer UI and prove route, fallback, injection, idempotency, budget, outage, event-loop, and privacy gates.](./06-phase-agent-intelligence/packets/08-thin-developer-ui.md)
 
-Packets P06-09 through P06-16 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract.
+Packets P06-09 through P06-18 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract. P06-17 and P06-18 are the 2026-09-09 private-PDF agent evaluation and holdout overlay; they do not start until Packet 9 is accepted and Packet 10 includes the production rerank/scope contract.
 
 9. [ ] [Canonical amendment for general-chat strict-split, ADR, and packets P06-10 through P06-15.](./06-phase-agent-intelligence/packets/09-canonical-general-chat-amendment.md)
 10. [ ] [Implement typed knowledge-scope classification, the live profile gateway, and deterministic route compilation.](./06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md)
@@ -65,6 +65,8 @@ Packets P06-09 through P06-16 are additive after the completed historical packet
 14. [ ] [Add answer-origin, clarification, and citation-safe behavior to the main chat UI.](./06-phase-agent-intelligence/packets/14-chat-origin-ux.md)
 15. [ ] [Run all deterministic and live gates, inspect LangSmith traces, and update evidence and runbooks.](./06-phase-agent-intelligence/packets/15-integrated-verification.md)
 16. [ ] [Add LangGraph custom SSE progress and paced verified-answer presentation contract.](./06-phase-agent-intelligence/packets/16-sse-custom-progress.md)
+17. [ ] [Qualify PDF Hybrid agent answers on development and qualification without reusing the synthetic judge.](./06-phase-agent-intelligence/packets/17-pdf-agent-evaluation.md)
+18. [ ] [Execute one immutable private-PDF holdout and close with redacted evidence.](./06-phase-agent-intelligence/packets/18-pdf-holdout-close.md)
 
 ## Approved planned deviation: general-chat strict split
 

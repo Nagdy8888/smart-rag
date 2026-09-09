@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
+from psycopg import sql as pg_sql
 from smart_rag_core.ingestion.chunking.types import (
     CanonicalChunk,
     ChunkKind,
@@ -13,7 +14,11 @@ from smart_rag_core.ingestion.chunking.types import (
 from smart_rag_core.ingestion.embeddings.contextual import (
     extract_deterministic_search_terms,
 )
-from smart_rag_core.retrieval.bm25_query import Bm25QueryError, build_bm25_query
+from smart_rag_core.retrieval.bm25_query import (
+    Bm25QueryError,
+    bm25_key_scope_sql,
+    build_bm25_query,
+)
 from smart_rag_core.retrieval.profiles import (
     EXACT_FALLBACK_AUTHORIZED_ROW_CAP,
     Bm25Field,
@@ -92,6 +97,23 @@ def test_bm25_query_normalizes_but_does_not_parse_operators() -> None:
     assert "|||" not in query.field.value
     assert query.operator is Bm25Operator.MATCH_DISJUNCTION
     assert "pdb.parse" in query.query_normalized or "pdb" in query.query_normalized
+
+
+def test_bm25_key_scope_uses_chunk_id_any_not_version_column() -> None:
+    """Version scope is a key-field ANY list, never a version_id predicate."""
+
+    chunk_id = uuid4()
+    fragment, params = bm25_key_scope_sql((chunk_id,))
+    assert params == ([chunk_id],)
+    assert isinstance(fragment, pg_sql.SQL)
+    assert "chunk_id = ANY" in fragment.as_string()
+    assert "version_id" not in fragment.as_string()
+    empty_fragment, empty_params = bm25_key_scope_sql(None)
+    assert isinstance(empty_fragment, pg_sql.SQL)
+    assert empty_fragment.as_string() == ""
+    assert empty_params == ()
+    with pytest.raises(Bm25QueryError, match="empty_bm25_key_scope"):
+        bm25_key_scope_sql(())
 
 
 def test_phase4_identifier_patterns_populate_terms() -> None:

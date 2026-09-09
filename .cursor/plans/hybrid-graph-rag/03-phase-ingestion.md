@@ -55,9 +55,18 @@ Complete these in order. A checked box requires committed implementation evidenc
 7. [x] Implement governed embeddings, durable idempotent ParadeDB BM25 projection, verified `Hybrid Ready`, graph eligibility plus idempotent `Graph Pending` handoff, canonical/Hybrid version transitions, immediate deletion exclusion, and status APIs.
 8. [x] Exercise positive, failure, authorization, idempotency, crash-recovery, resource-limit, malware, sensitive-data, and SSRF fixtures.
 
+Additive 2026-09-09 Hybrid PDF accuracy packets. Do not uncheck packets 1–8. Historical Phase 3 `status: complete` is unchanged. Overlay packets do not reopen Packet 1 sign-off as a substitute for live matrix verification.
+
+9. [ ] Re-verify the actual OpenAI and LangSmith processing matrices before any live document call.
+10. [ ] Persist versioned detector findings and hash-bound owner/admin false-positive reviews.
+11. [ ] Expose hold/review/retry diagnostics and authorized retry without treating payload overrides as approval.
+12. [ ] Add `WORKER_GRAPH_ENABLED=false` without disrupting Hybrid ingestion or BM25.
+13. [ ] Version and prove `chunking_v2` for the measured long-PDF token-band gap.
+14. [ ] Ingest the private PDF to public `graph_ineligible` with redacted traces and no graph work.
+
 ## Cheap-model execution protocol
 
-The eight checkboxes above are separate work packets. One model run may execute only one packet, in order. Before editing, the model must quote the active packet, restate its positive and negative acceptance tests, inspect every target path plus the Phase 1/2 exit records, and verify that both prerequisite phases are complete and user-accepted. This plan expansion does not satisfy those prerequisites.
+The eight historical checkboxes above plus additive packets 9–14 are separate work packets. One model run may execute only one packet, in order. Before editing, the model must quote the active packet, restate its positive and negative acceptance tests, inspect every target path plus the Phase 1/2 exit records, and verify that both prerequisite phases are complete and user-accepted. This plan expansion does not satisfy those prerequisites.
 
 Use [`docs/development/phase-03-ingestion-evidence.md`](../../../docs/development/phase-03-ingestion-evidence.md) as the canonical packet evidence and exit record. Packet 1 creates it and links it from `docs/README.md`. Every packet appends inspected files/schema/pins, primary-documentation links, exact commands and exit codes, fixtures, measured limits, authorization/idempotency/failure/crash tests, external calls and cost, unverified assumptions, rollback, and next-packet handoff.
 
@@ -496,6 +505,235 @@ At most two bounded repair attempts may be made for the same external/integratio
 #### Packet 8 required evidence
 
 - The immutable fixture manifest, complete command log with exit codes, real-boundary service/version report, crash matrix, authorization/failure/idempotency/resource results, throughput/lag/resource/cost report, every `Done when` mapping, managed-only gaps, deviations/rollback, and explicit user acceptance.
+
+### Packet 9 — re-verify external-processing matrices for the private PDF
+
+Index: [`docs/development/hybrid-pdf-accuracy-remediation.md`](../../../docs/development/hybrid-pdf-accuracy-remediation.md). Skill: [`implement-ingestion-pipeline`](../../../.cursor/skills/implement-ingestion-pipeline/SKILL.md).
+
+#### Packet 9 preconditions
+
+- Historical Packet 1 framework remains accepted. Org-contracted OpenAI and LangSmith rows are still `unverified` unless this packet records named verification.
+- No live document bytes, embeddings, rerank, or LangSmith I/O for this PDF until named/date approval exists.
+
+#### Packet 9 allowed outputs
+
+- Updated verification rows in [`OPENAI_DATA_GOVERNANCE.md`](../../../docs/security/OPENAI_DATA_GOVERNANCE.md) and [`SUBPROCESSOR_GOVERNANCE.md`](../../../docs/security/SUBPROCESSOR_GOVERNANCE.md); tracing notes in [`LANGSMITH_TRACING.md`](../../../docs/development/LANGSMITH_TRACING.md); Phase 3 evidence append.
+- After named approval only, `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true` in ignored local configuration.
+
+#### Packet 9 forbidden outputs
+
+- Runtime ingest/query code. Setting the verified flag without named/date matrix rows. Claiming ZDR from an unverified console. Uploading the PDF.
+
+#### Packet 9 ordered actions
+
+1. Inspect the live OpenAI project and LangSmith workspace for training, abuse retention, ZDR/MAM, region, DPA, deletion, subprocessors, trace retention, and hidden I/O. Record the real setting; “verified” does not imply ZDR.
+2. Obtain named/date approval in both governance documents.
+3. Only then set the ignored verified flag. If settings cannot be verified or accepted, stop and leave the flag false.
+
+#### Packet 9 acceptance checks
+
+- Every required matrix cell is `verified` with named approver/date, or the packet records an explicit blocker and the verified flag stays false.
+- No live PDF call occurred in this packet.
+
+#### Packet 9 negative tests
+
+- Invented org commitments, unsigned `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true`, or a live embedding/trace of this PDF fail the packet.
+
+#### Packet 9 stop routes
+
+- Stop without uploading when required settings cannot be verified or accepted.
+
+#### Packet 9 required evidence
+
+- Matrix rows, approver/date or blocker, commands (none required beyond docs), rollback (unset the flag; restore docs).
+
+### Packet 10 — detector findings and audited false-positive reviews
+
+#### Packet 10 preconditions
+
+- Packet 9 recorded approval or an explicit live-call blocker. Historical detectors in [`governance.py`](../../../packages/core/src/smart_rag_core/ingestion/governance.py) are inspectable.
+
+#### Packet 10 allowed outputs
+
+- Additive migration for append-only findings/reviews; [`governance_reviews.py`](../../../packages/core/src/smart_rag_core/repositories/governance_reviews.py); Luhn/issuer-aware card detection; ingest-trace content-class gate; focused ADR; tests.
+
+#### Packet 10 forbidden outputs
+
+- Treating `payload_ref.review_approved` as authoritative. Logging raw matched secrets. Reclassifying a real job as synthetic because `APP_ENV=local`. Graph/LightRAG changes.
+
+#### Packet 10 ordered actions
+
+1. Align `detectors-v1` with Luhn/issuer validation; export stable family and policy identifiers.
+2. Persist worker-authored findings (version, hash, scan evidence, attestation/policy versions, family, bounded count, safe locator/fingerprint).
+3. Reviews reference finding IDs; approval is active only when hash/scan/attestation/policy/complete positive-family set still match.
+4. Feed persisted detector result plus active review into parse governance and the embedding gate.
+5. Pass authoritative job content class into [`ingest_trace.py`](../../../packages/core/src/smart_rag_core/observability/ingest_trace.py).
+
+#### Packet 10 acceptance checks
+
+- False-positive ISBN-like numbers without Luhn/issuer do not classify as payment cards.
+- Stale scan, policy/hash drift, incomplete-family approval, or upheld finding fail closed.
+- Local env waiver never flips `real_company` traces to synthetic.
+
+#### Packet 10 negative tests
+
+- Payload override, duplicate approval without supersession, raw secret in logs/traces, or local-env synthetic reclassification fail.
+
+#### Packet 10 stop routes
+
+- Stop if RLS cannot keep findings worker-authored and owner/admin-reviewed without leaking matched values.
+
+#### Packet 10 required evidence
+
+- Migration name, ADR, tests/commands, rollback SQL, Phase 3 evidence append.
+
+### Packet 11 — hold/review/retry lifecycle
+
+#### Packet 11 preconditions
+
+- Packet 10 findings/reviews exist. Existing quarantine promotion saga and retry RPC remain inspectable.
+
+#### Packet 11 allowed outputs
+
+- Owner/admin-only review transport under `apps/backend/src/smart_rag_api`; status schema/RPC/OpenAPI diagnostics; count-only `[hybrid]` hold/retry events.
+
+#### Packet 11 forbidden outputs
+
+- Client-submitted detector outcomes. Model calls before full extraction governance. Raw bytes in LangGraph checkpoints.
+
+#### Packet 11 ordered actions
+
+1. Keep scan and sandbox parse on quarantine; promotion and embeddings only after governance success.
+2. Add rate-limited review API reusing `validate_caller_context` and IDOR-safe 404.
+3. Extend ingestion status with role-safe finding/review diagnostics and existing retry action.
+4. Emit `governance_review_required` then authorized retry progress without source text.
+
+#### Packet 11 acceptance checks
+
+- Member/viewer denial, cross-document denial, hash/policy drift, incomplete-family approval, duplicate, rejection, stale scan, and replay are proven.
+- No external call before approval.
+
+#### Packet 11 negative tests
+
+- Member review, payload_ref override, or promotion before parse governance fail.
+
+#### Packet 11 stop routes
+
+- Stop if retry cannot reparse the same hash deterministically without checkpointing full parse output.
+
+#### Packet 11 required evidence
+
+- OpenAPI diff, ACL tests, terminal event contract, rollback (drop review routes; keep Packet 10 tables).
+
+### Packet 12 — hybrid-only worker mode
+
+#### Packet 12 preconditions
+
+- Worker settings and lifecycle modules are inspectable. Default remains graph-enabled for other deployments.
+
+#### Packet 12 allowed outputs
+
+- `WORKER_GRAPH_ENABLED` on [`worker.py`](../../../packages/core/src/smart_rag_core/settings/worker.py); lifecycle skip of LightRAG/graph loop; laptop runner startup evidence; compose/env/docs.
+
+#### Packet 12 forbidden outputs
+
+- Disabling Hybrid, BM25, embeddings, or checkpoints. Copying `SUPABASE_DB_URL` into `LIGHTRAG_DB_URL` when graph is disabled.
+
+#### Packet 12 ordered actions
+
+1. Add the bool defaulting true. When false, do not initialize LightRAG or claim graph jobs.
+2. Update [`run_laptop_ingest_worker.py`](../../../scripts/ops/run_laptop_ingest_worker.py) to print `worker_graph_enabled=false` and `lightrag_db_url_set=false`.
+3. Document the setting in compose, hosted-ingest example, CONFIGURATION, and the demo runbook.
+
+#### Packet 12 acceptance checks
+
+- Disabled mode: no adapter bind, graph queue claim, `[graph]` line, `ingestion.graph` trace, or graph OpenAI call. Hybrid `[hybrid]` progress still completes in tests/fakes.
+
+#### Packet 12 negative tests
+
+- Default-true regression, silent LightRAG bind, or BM25 skip when graph is false fail.
+
+#### Packet 12 stop routes
+
+- Stop if graph disable cannot be proven without skipping Hybrid index jobs.
+
+#### Packet 12 required evidence
+
+- Settings tests, lifecycle tests, docs, rollback (remove flag; default bind restored).
+
+### Packet 13 — chunking_v2 for long prose PDFs
+
+#### Packet 13 preconditions
+
+- Packets 9–12 contracts exist. Do not change retrieval ranking. Skill: [`implement-ingestion-pipeline`](../../../.cursor/skills/implement-ingestion-pipeline/SKILL.md).
+
+#### Packet 13 allowed outputs
+
+- `chunking_v2` in [`limits.py`](../../../packages/core/src/smart_rag_core/ingestion/chunking/limits.py); splitter/builder/pdf_adapter changes; [`scripts/ops/analyze_pdf_chunks.py`](../../../scripts/ops/analyze_pdf_chunks.py); CHUNKING_CONTRACT; unit tests with synthetic book-like fixtures.
+
+#### Packet 13 forbidden outputs
+
+- Printing extracted text. Committing derived PDF fixtures. Counting parents as prose. Changing the 200–400 target after seeing live counts.
+
+#### Packet 13 ordered actions
+
+1. Add a count-only analyzer over the real parser/chunker; report versions, kind, token-band counts, overlap, parents, locators, hashes.
+2. Fail then fix: 401–600 token prose must split toward 200–400; merge only same heading ancestry; page-boundary merge only when continuous reading order is proven; prefer sentence/paragraph; keep list/table/code atomic; overlap 40–60 between genuine siblings.
+3. Version v2 in stable IDs and embedding/index metadata; keep v1 readable.
+
+#### Packet 13 acceptance checks
+
+- ≥90% eligible ordinary prose in 200–400 after declared exceptions, or a recorded parser-boundary stop with by-kind counts.
+- No normal passage >600; parents ≤1500; identical inputs → identical IDs/hashes.
+
+#### Packet 13 negative tests
+
+- Parent counted as prose, cross-heading merge, unproven page merge, table split, source text in logs, or v1 data unreadable fail.
+
+#### Packet 13 stop routes
+
+- Stop if parser element boundaries make the 90% gate impossible without semantic/provenance loss; record follow-up rather than forcing the number.
+
+#### Packet 13 required evidence
+
+- Analyzer command on synthetic fixtures; private PDF counts only as hashes/bands; rollback to `chunking_v1` for new ingest.
+
+### Packet 14 — one-file Hybrid ingest with graph disabled
+
+#### Packet 14 preconditions
+
+- Packet 9 named approval; Packet 12 disabled graph; `LANGSMITH_EXPORT_IO=false`; `chunking_v2` accepted; reviewed glossary import from Phase 4 Packet 10; ClamAV and ParadeDB healthy; no older current version of this PDF.
+
+#### Packet 14 allowed outputs
+
+- Authenticated upload/ingest of the untracked PDF; captured IDs; redacted terminal/LangSmith evidence in Phase 3 evidence (no source text).
+
+#### Packet 14 forbidden outputs
+
+- Graph handoff/job. Patching the job to synthetic. Committing the PDF. Reporting Hybrid quality from a smoke query.
+
+#### Packet 14 ordered actions
+
+1. Upload reserve → Storage → finalize. Keep graph eligibility false.
+2. One unbuffered host worker; follow `[hybrid]` stages. Review server-authored findings if held; retry exact hash.
+3. Require scan → parse → chunk/embed → BM25 → internal `hybrid_ready`, public `graph_ineligible`.
+4. Correlate LangSmith `ingestion.scan`/`parse`/`index`/`embedding.embed` to captured IDs with hidden I/O.
+
+#### Packet 14 acceptance checks
+
+- Public status `graph_ineligible`; no `ingestion.graph` or `model.lightrag_llm` for the version; traces redacted; successful ingest is not an accuracy pass.
+
+#### Packet 14 negative tests
+
+- Synthetic job class, graph trace, or accuracy claim from `hybrid_ready` fail.
+
+#### Packet 14 stop routes
+
+- Stop and record blocker when Packet 9 is unsigned, ClamAV/ParadeDB/parser image missing, or two live repairs fail.
+
+#### Packet 14 required evidence
+
+- IDs, stage transcript without text, LangSmith run IDs, chunk-band counts, cost, rollback via normal version/deletion lifecycle.
 
 ## Authoritative lifecycle and transition ownership
 

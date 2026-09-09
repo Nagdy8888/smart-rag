@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
 from psycopg import sql
 
@@ -92,3 +93,32 @@ def bm25_match_clause(query: Bm25StructuredQuery) -> sql.Composed:
         field=sql.Identifier(query.field.value),
         operator=operator_sql,
     )
+
+
+def bm25_key_scope_sql(
+    chunk_ids: tuple[UUID, ...] | None,
+) -> tuple[sql.Composed, tuple[object, ...]]:
+    """Return a key-field scope fragment for one BM25 scored statement.
+
+    ``pg_search`` 0.25.2 raises ``XX000`` (unsupported query shape) when
+    ``version_id`` appears in the same ``WHERE`` as ``pdb.score``. The BM25
+    index key is ``chunk_id``, so version scope is applied as
+    ``chunk_id = ANY(%s::uuid[])`` after a btree lookup of current-version ids.
+
+    Args:
+        chunk_ids: Current-version chunk ids, or ``None`` to leave the
+            scan unscoped.
+
+    Returns:
+        Composed SQL (possibly empty) and bound parameters.
+
+    Raises:
+        Bm25QueryError: Empty tuple would match nothing. Callers must
+            return an empty ``Bm25RetrievalResult`` instead of querying.
+    """
+
+    if chunk_ids is None:
+        return sql.SQL(""), ()
+    if not chunk_ids:
+        raise Bm25QueryError("empty_bm25_key_scope")
+    return sql.SQL("AND chunk_id = ANY(%s::uuid[])"), (list(chunk_ids),)

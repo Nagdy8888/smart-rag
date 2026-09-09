@@ -2,7 +2,7 @@
 title: Coverage and refusal calibration
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-14
+last-reviewed: 2026-09-09
 audience: engineering, reviewers
 ---
 
@@ -31,7 +31,10 @@ coverage_score = min(
 Development baseline `0.65`. False-supported
 answers carry loss weight 2; unnecessary refusals carry weight 1.
 Unequal RRF channel weights were **not selected** (no ranked-ID
-evidence to retune `rrf_k=60` or equal weights).
+evidence to retune `rrf_k=60` or equal weights). When the profile has
+no subquestions, `subquestion_count` is `0` and that component is
+`1.0`. Omitted `supported_subquestions` stays `0` so fused occupancy
+is never guessed as support.
 
 ## Frozen artifact
 

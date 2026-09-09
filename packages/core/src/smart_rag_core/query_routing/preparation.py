@@ -309,6 +309,16 @@ def prepare_query(
         original, rewrite_candidate, extract
     )
     profile = result.profile
+    if payload is not None and payload.requested_sources:
+        profile = profile.model_copy(
+            update={
+                "requested_sources": ProfileField(
+                    value=[item[:256] for item in payload.requested_sources[:8]],
+                    confidence=payload.confidence,
+                    provenance=FieldProvenance.MODEL_INFERRED,
+                )
+            }
+        )
     if accepted is not None:
         profile = profile.model_copy(
             update={

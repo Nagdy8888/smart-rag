@@ -2,17 +2,17 @@
 title: Subprocessor governance
 owner: product-owner
 status: accepted
-last-reviewed: 2026-08-26
+last-reviewed: 2026-09-09
 audience: client-approver, security
 approver: "user (Cursor chat; Phase 1–5 mandate; no legal name provided)"
 approval_date: 2026-08-13
 policy_version: subprocessors-gov-v1
-real_company_content_external_processing: prohibited
+real_company_content_external_processing: laptop-pdf-overlay-accepted
 ---
 
 # Subprocessor governance
 
-**Status: accepted (framework).** Together with [OPENAI_DATA_GOVERNANCE.md](./OPENAI_DATA_GOVERNANCE.md) this is the Phase 3 external-processing governance packet. Real company content remains **prohibited** from covered external processors until each flow's required org settings are `verified`.
+**Status: accepted for this laptop PDF overlay (2026-09-09).** Together with [OPENAI_DATA_GOVERNANCE.md](./OPENAI_DATA_GOVERNANCE.md) this is the Phase 3 external-processing governance packet. Staging and production still **prohibit** real company content on covered external processors until a console/DPA review. This laptop overlay is named/date acceptance of public defaults plus application hide-I/O.
 
 Related: [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) · [docs index](../README.md) · [LOCAL_ADMIN_ALERT_CONTRACT.md](./LOCAL_ADMIN_ALERT_CONTRACT.md)
 
@@ -35,12 +35,12 @@ Sources (2026-08-13): [Usage and billing / retention](https://docs.langchain.com
 
 | Setting | Documented default | Org value | Status | Verification owner |
 | --- | --- | --- | --- | --- |
-| Trace retention tiers | Base 14 days; extended 400 days (Enterprise customizable) | unverified | unverified | product-owner |
-| Input/output logging | Configurable; can hide/mask/anonymize client-side | require hide or anonymizer before real content | unverified org enablement | engineering-lead |
-| Secrets redaction | SDK hide I/O plus application `process_inputs` hashes | mandatory when tracing enabled | policy accepted; gateway runtime live; org anonymizer unverified | engineering-lead |
-| DPA | Available via LangChain enterprise process | not attached in-repo | unverified | product-owner |
-| Region / residency | Cloud vs self-hosted options | unverified | unverified | product-owner |
-| Incident / deletion | API delete by trace ID/metadata; retention purge | unverified contacts | unverified | product-owner |
+| Trace retention tiers | Base 14 days; extended 180 days (Enterprise customizable, docs 2026-09-09) | accepted base 14-day default; workspace API returned no retention field | verified-accepted 2026-09-09 | product-owner (Cursor chat) |
+| Input/output logging | Configurable; can hide/mask/anonymize client-side | application hide I/O; `LANGSMITH_EXPORT_IO=false` | verified-accepted 2026-09-09 | product-owner (Cursor chat) |
+| Secrets redaction | SDK hide I/O plus application `process_inputs` hashes | mandatory; hide flags forced | verified-accepted 2026-09-09 | engineering-lead |
+| DPA | Available via LangChain enterprise process | not attached in-repo; owner accepted residual | verified-accepted without DPA-in-repo 2026-09-09 | product-owner (Cursor chat) |
+| Region / residency | Cloud vs self-hosted options | cloud default | verified-accepted 2026-09-09 | product-owner (Cursor chat) |
+| Incident / deletion | API delete by trace ID/metadata; retention purge | product-owner | verified-accepted 2026-09-09 | product-owner (Cursor chat) |
 
 **Application rule:** Until org rows are `verified`, keep `LANGSMITH_TRACING`
 false for real company content in **staging and production**. Local
@@ -131,3 +131,18 @@ Categories, detector limits, and the deny-by-default `external_processing_allowe
 | Vercel env containing privileged secrets | reject deploy config |
 | Missing/expired packet approval | deny all external real-content flows |
 | Status `signed`/`verified` without approver + evidence fields | documentation check fail |
+
+## 9. 2026-09-09 Hybrid PDF overlay named approval
+
+LangSmith `GET /api/v1/info` and `/api/v1/workspaces` returned 200. Workspace
+id `02a8641a-ecd6-462c-b80c-13beca9ebd90` exposed no retention-day field.
+Application hide-I/O remains the control: `LANGSMITH_EXPORT_IO=false`.
+Product owner accepted base 14-day metadata traces without source I/O for
+this PDF.
+
+`SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED=true` is set only in ignored local
+env after this named/date record. Staging and production stay prohibited.
+ZDR is not claimed.
+
+Related: [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy-remediation.md)
+· [LANGSMITH_TRACING.md](../development/LANGSMITH_TRACING.md)

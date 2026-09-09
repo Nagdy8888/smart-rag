@@ -22,6 +22,7 @@ from smart_rag_agents.prompts import (
     answer_prompt_text,
     general_chat_prompt_text,
     query_profile_prompt_text,
+    rerank_prompt_text,
     verifier_prompt_text,
 )
 from smart_rag_agents.query.deps import QueryGraphDeps
@@ -119,6 +120,8 @@ def build_query_process_bindings(
         embedding_gateway=embedding,
         supabase_dsn=dsn,
         bm25=bm25,
+        model_gateway=gateway,  # type: ignore[arg-type]
+        rerank_prompt_text=rerank_prompt_text(),
     )
     graph_retriever: GraphRetrieveLike | None = None
     if graph is not None and all(

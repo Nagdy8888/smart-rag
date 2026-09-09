@@ -7,6 +7,7 @@ from uuid import UUID
 
 from smart_rag_core.evaluation.schema import ExpectedProfile
 from smart_rag_core.retrieval.context_loader import ChunkContext
+from smart_rag_core.retrieval.frozen_profile import FrozenHybridProfile
 from smart_rag_core.retrieval.profiles import FINAL_EVIDENCE_MAX, FINAL_TOKEN_BUDGET
 from smart_rag_core.retrieval.rerank import (
     ContextSelection,
@@ -168,25 +169,29 @@ def apply_rankings(
 def select_hybrid_context(
     *,
     query: str,
-    profile: ExpectedProfile,
+    profile: ExpectedProfile | None,
     fused: tuple[RetrievalCandidate, ...],
     contexts: tuple[ChunkContext, ...],
     channel_hits: dict[UUID, frozenset[str]],
     rerank: RerankFn,
     load_context: ContextFn,
     remaining_deadline_seconds: float,
+    retrieval_profile: FrozenHybridProfile | None = None,
 ) -> ContextSelection:
     """Run pool, optional one-shot rerank, MMR, quotas, and parent expansion.
 
     Args:
         query: Original user query.
-        profile: Typed query profile.
+        profile: Typed query profile. ``None`` skips the trivial-exact
+            rerank skip because that path requires profile fields.
         fused: Authorized fused candidates.
         contexts: Context rows for fused IDs.
         channel_hits: Per-ID channel membership.
         rerank: One-operation reranker. Must not retry locally.
         load_context: Rechecking context loader for parents.
         remaining_deadline_seconds: Remaining Hybrid deadline share.
+        retrieval_profile: Optional frozen/candidate bounds. ``None`` uses
+            ``hybrid_default_v1`` constants.
 
     Returns:
         Final evidence plus decision metadata. No answer text.
@@ -195,14 +200,53 @@ def select_hybrid_context(
         At most one model call through ``rerank``. Parents are rechecked.
     """
 
+    if retrieval_profile is not None:
+        pool_size = retrieval_profile.rerank_pool_size
+        max_per_document = retrieval_profile.rerank_max_per_document
+        excerpt_chars = retrieval_profile.excerpt_chars
+        excerpt_strategy = retrieval_profile.excerpt_strategy
+        document_quota = retrieval_profile.document_quota
+        section_quota = retrieval_profile.section_quota
+        evidence_max = retrieval_profile.final_evidence_max
+        token_budget = retrieval_profile.final_token_budget
+        mmr_lambda = retrieval_profile.mmr_lambda
+        mmr_depth = retrieval_profile.mmr_candidate_depth
+    else:
+        from smart_rag_core.retrieval.profiles import (
+            DOCUMENT_QUOTA,
+            MMR_CANDIDATE_DEPTH,
+            MMR_LAMBDA,
+            RERANK_EXCERPT_CHARS,
+            RERANK_MAX_PER_DOCUMENT,
+            RERANK_POOL_SIZE,
+            SECTION_QUOTA,
+        )
+
+        pool_size = RERANK_POOL_SIZE
+        max_per_document = RERANK_MAX_PER_DOCUMENT
+        excerpt_chars = RERANK_EXCERPT_CHARS
+        excerpt_strategy = "prefix"
+        document_quota = DOCUMENT_QUOTA
+        section_quota = SECTION_QUOTA
+        evidence_max = FINAL_EVIDENCE_MAX
+        token_budget = FINAL_TOKEN_BUDGET
+        mmr_lambda = MMR_LAMBDA
+        mmr_depth = MMR_CANDIDATE_DEPTH
     passages = passages_from_context(fused, contexts, channel_hits)
-    pool = build_rerank_pool(passages)
+    pool = build_rerank_pool(
+        passages,
+        pool_size=pool_size,
+        max_per_document=max_per_document,
+        excerpt_chars=excerpt_chars,
+        query=query,
+        excerpt_strategy=excerpt_strategy,
+    )
     if len(pool) < 2:
         expanded, parent_ids = expand_parents(pool, load_context, pool=pool)
         trimmed = trim_token_budget(
             expanded,
-            budget=FINAL_TOKEN_BUDGET,
-            limit=FINAL_EVIDENCE_MAX,
+            budget=token_budget,
+            limit=evidence_max,
         )
         return ContextSelection(
             passages=trimmed,
@@ -213,10 +257,18 @@ def select_hybrid_context(
             usage=None,
             skipped_counterfactual=False,
         )
-    if should_skip_trivial_exact(profile, pool):
-        mmr_selected, dropped = apply_mmr(pool, query=query)
+    if profile is not None and should_skip_trivial_exact(profile, pool):
+        mmr_selected, dropped = apply_mmr(
+            pool,
+            query=query,
+            lambda_mult=mmr_lambda,
+            document_quota=document_quota,
+            section_quota=section_quota,
+            limit=evidence_max,
+            candidate_depth=mmr_depth,
+        )
         expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
-        trimmed = trim_token_budget(expanded)
+        trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
         return ContextSelection(
             passages=trimmed,
             rerank_order=tuple(item.candidate.chunk_id for item in pool),
@@ -231,9 +283,37 @@ def select_hybrid_context(
     fallback = reason
     if reason is RerankFallbackReason.NONE:
         ordered = apply_rankings(pool, rankings)
-    mmr_selected, dropped = apply_mmr(ordered, query=query)
+    mmr_selected, dropped = apply_mmr(
+        ordered,
+        query=query,
+        lambda_mult=mmr_lambda,
+        document_quota=document_quota,
+        section_quota=section_quota,
+        limit=evidence_max,
+        candidate_depth=mmr_depth,
+    )
     expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
-    trimmed = trim_token_budget(expanded)
+    trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
+    top_support: float | None = None
+    indices: tuple[int, ...] = ()
+    if fallback is RerankFallbackReason.NONE and rankings:
+        by_id = {item.chunk_id: item for item in rankings}
+        if trimmed:
+            winner = by_id.get(trimmed[0].candidate.chunk_id)
+            if winner is not None:
+                top_support = winner.support
+        collected: list[int] = []
+        seen_indices: set[int] = set()
+        for passage in trimmed:
+            row = by_id.get(passage.candidate.chunk_id)
+            if row is None:
+                continue
+            for index in row.supported_subquestion_indices:
+                if index in seen_indices:
+                    continue
+                seen_indices.add(index)
+                collected.append(index)
+        indices = tuple(collected)
     return ContextSelection(
         passages=trimmed,
         rerank_order=tuple(item.candidate.chunk_id for item in ordered),
@@ -242,4 +322,6 @@ def select_hybrid_context(
         expanded_parent_ids=parent_ids,
         usage=usage,
         skipped_counterfactual=False,
+        rerank_top_support=top_support,
+        supported_subquestion_indices=indices,
     )

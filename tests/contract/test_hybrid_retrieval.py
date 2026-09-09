@@ -516,6 +516,14 @@ def test_bm25_typed_query_and_injection(
     assert seed.code_chunk_id in matched_ids
     assert seed.code_chunk_id not in injected_ids
     assert "body_search" not in injection
+    variants = retriever.retrieve_variants(
+        supabase=db_connection,
+        caller=seed.member,
+        texts=(f"{seed.code_term} delivery",),
+        version_id=seed.visible_version_id,
+    )
+    assert variants.fallback_reason is RetrievalFallbackReason.NONE
+    assert seed.code_chunk_id in {item.chunk_id for item in variants.candidates}
 
 
 def _paradedb_exec_ok() -> bool:

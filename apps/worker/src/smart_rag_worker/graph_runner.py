@@ -359,6 +359,11 @@ class GraphWorkerLoop:
                     run_name=INGEST_RUN_GRAPH,
                     document_id=str(document_id_raw) if document_id_raw else None,
                     version_id=str(version_id_raw) if version_id_raw else None,
+                    content_class=(
+                        str(payload.get("content_class"))
+                        if isinstance(payload.get("content_class"), str)
+                        else None
+                    ),
                 )
             self._finish_job(
                 postgres_url,

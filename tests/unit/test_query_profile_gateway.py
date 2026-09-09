@@ -129,6 +129,10 @@ def test_query_profile_schema_forbids_extra_fields_and_over_bound_lists() -> Non
     assert isinstance(properties_raw, dict)
     properties = cast(dict[str, object], properties_raw)
     assert "scope_degradation_reason" not in properties
+    assert "requested_sources" in properties
+    sources = properties["requested_sources"]
+    assert isinstance(sources, dict)
+    assert sources["maxItems"] == 8
     subquestions = properties["subquestions"]
     assert isinstance(subquestions, dict)
     assert subquestions["maxItems"] == 3
@@ -145,6 +149,7 @@ def test_query_profile_schema_forbids_extra_fields_and_over_bound_lists() -> Non
         "relationship_intent": None,
         "knowledge_scope": KnowledgeScope.GENERAL_KNOWLEDGE.value,
         "knowledge_scope_confidence": 0.9,
+        "requested_sources": [],
     }
     payload = PreparationModelPayload.model_validate(valid)
     assert payload.knowledge_scope == KnowledgeScope.GENERAL_KNOWLEDGE.value

@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-09
 audience: engineering, frontend
 ---
 
@@ -83,7 +83,7 @@ tracebacks, secrets, source HTML, or passages.
 | `citation_preview` | Citation IDs and ranks. No passage text. |
 | `answer_origin` | Additive origin (`origin` only). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
 | `token_delta` | Generated token delta. Never retrieved source. |
-| `usage` | Accumulated provider prompt and completion tokens for this query run (profile, search, answer, verifier). Emitted after verify, before the terminal. Counts are 0 when no model ran. Conversation-title generation is not in this event; Ask Run Details adds it under **This chat**. No prompts. |
+| `usage` | Accumulated provider prompt and completion tokens for this query run (profile, search, answer, verifier). Optional billed `cost_usd` when `app.llm_usage` is available. Emitted after verify, before the terminal. Counts are 0 when no model ran. Conversation-title generation is not in this event; Ask Run Details adds it under **This chat**. No prompts. |
 | `completed` | Success terminal. |
 | `cancelled` | Cancel terminal. |
 | `error` | Sanitized `{code}`. |
@@ -96,16 +96,19 @@ Exactly one terminal among `completed`, `cancelled`, `error`, `partial`.
 Conversation summary and assistant-message persist run only after that
 terminal is yielded. Those writes must not emit a second `error`.
 
-Live `LangGraphQueryRunExecutor` compiles **per execute** with
-`build_query_graph_deps`: Hybrid (DSN-based, ParadeDB optional), counted
-`model_gateway` (mock gateway is still a gateway), pinned `answer_v1` /
-`verified_v1` bodies, optional process LightRAG adapter, structured-table
-`structured_table_query`, per-run `app_api` connection, and per-run
-`cancel_check`. Missing Hybrid or gateway fails closed. A failed per-run
-`app_api` connect is `error.code=app_api_connection_unbound`; the executor
-does not continue with `connection=None`. Concurrent Combined retrieves
-serialize `query_budget` onto the shared LightRAG adapter. Studio's
-module-level `graph` stays unbound.
+Live `LangGraphQueryRunExecutor` is **process-cached** on `app.state`
+(checkpointer pool, memory store, compiled graph). Each execute still
+calls `build_query_graph_deps`: Hybrid (DSN-based, ParadeDB optional),
+counted `model_gateway` (mock gateway is still a gateway), pinned
+`answer_v1` / `verified_v1` bodies, optional process LightRAG adapter,
+structured-table `structured_table_query`, per-run `app_api` connection,
+and per-run `cancel_check`. Missing Hybrid or gateway fails closed. A
+failed per-run `app_api` connect is `error.code=app_api_connection_unbound`;
+the executor does not continue with `connection=None`. Concurrent Combined
+retrieves serialize `query_budget` onto the shared LightRAG adapter.
+Studio's module-level `graph` stays unbound. Local Compose warms the
+cached executor after startup so the first Ask run does not open hosted
+pools under the Composite 50s envelope.
 
 ## Progress, verify, then tokens
 
@@ -114,7 +117,9 @@ Custom node-start writer events may arrive before the matching updates
 completion. The mapper emits `status.phase` and optional `tool_progress`.
 `token_delta` is held until `verify_answer` completes. Replay is
 monotonic and first-terminal-wins. `deadline` is diagnostic; `partial`
-is the terminal.
+is the terminal. Node `status=routing_rejected` with
+`detail=deadline_exhausted` maps to that pair. Other routing rejects
+(empty query, invalid plan) stay `error` `{code: routing_rejected}`.
 
 ```mermaid
 sequenceDiagram

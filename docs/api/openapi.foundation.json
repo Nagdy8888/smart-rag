@@ -411,6 +411,72 @@
         "title": "CurrentUserResponse",
         "type": "object"
       },
+      "DetectorFindingReviewRequest": {
+        "description": "Hash-bound false-positive or uphold decision. No detector outcomes.",
+        "properties": {
+          "decision": {
+            "pattern": "^(false_positive|upheld|rejected)$",
+            "title": "Decision",
+            "type": "string"
+          },
+          "finding_id": {
+            "format": "uuid",
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_id",
+          "decision",
+          "reason",
+          "idempotency_key"
+        ],
+        "title": "DetectorFindingReviewRequest",
+        "type": "object"
+      },
+      "DetectorFindingReviewResponse": {
+        "description": "Identifiers after an authorized review write or replay.",
+        "properties": {
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "finding_id": {
+            "format": "uuid",
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "review_id": {
+            "format": "uuid",
+            "title": "Review Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "review_id",
+          "finding_id",
+          "decision"
+        ],
+        "title": "DetectorFindingReviewResponse",
+        "type": "object"
+      },
       "DocumentIngestionStatusResponse": {
         "description": "Document-scoped ingestion status envelope.",
         "properties": {
@@ -2249,7 +2315,7 @@
         "type": "object"
       },
       "ReviewDiagnostics": {
-        "description": "Category attestation and URL-approval diagnostics.",
+        "description": "Category attestation plus detector-finding review diagnostics.",
         "properties": {
           "approval_status": {
             "anyOf": [
@@ -2284,6 +2350,18 @@
             ],
             "title": "Declared Category"
           },
+          "finding_count": {
+            "default": 0,
+            "title": "Finding Count",
+            "type": "integer"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewFindingSummary"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
           "source_type": {
             "anyOf": [
               {
@@ -2294,9 +2372,61 @@
               }
             ],
             "title": "Source Type"
+          },
+          "unresolved_family_count": {
+            "default": 0,
+            "title": "Unresolved Family Count",
+            "type": "integer"
           }
         },
         "title": "ReviewDiagnostics",
+        "type": "object"
+      },
+      "ReviewFindingSummary": {
+        "description": "Role-safe detector finding identity. No matched secrets.",
+        "properties": {
+          "bounded_count": {
+            "default": 0,
+            "title": "Bounded Count",
+            "type": "integer"
+          },
+          "detector_policy_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detector Policy Version"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "finding_id": {
+            "format": "uuid",
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          }
+        },
+        "required": [
+          "finding_id",
+          "family"
+        ],
+        "title": "ReviewFindingSummary",
         "type": "object"
       },
       "RunResponse": {
@@ -7707,6 +7837,146 @@
           }
         },
         "summary": "Enqueue Website Crawl",
+        "tags": [
+          "ingestion"
+        ]
+      }
+    },
+    "/ingestion/detector-findings/reviews": {
+      "post": {
+        "description": "Record an owner/admin hash-bound detector review.\n\nClients cannot submit detector outcomes. Unauthorized callers receive\nthe same 404 as a missing finding.\n\nArgs:\n    request: FastAPI request for rate limiting.\n    body: Finding id, decision, reason, and idempotency key.\n    caller: Authenticated caller.\n    service: Injected review service.\n\nReturns:\n    Review identifiers. Duplicate idempotency keys replay.\n\nRaises:\n    HTTPException: 404 when unauthorized or missing; 429 when limited.",
+        "operationId": "review_detector_finding_ingestion_detector_findings_reviews_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectorFindingReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectorFindingReviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Detector Finding",
         "tags": [
           "ingestion"
         ]

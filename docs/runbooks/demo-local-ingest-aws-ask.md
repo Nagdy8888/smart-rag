@@ -209,10 +209,11 @@ See
    ```
 
    The host worker copies ``WORKER_SUPABASE_DB_URL`` onto ``LIGHTRAG_DB_URL``
-   when that variable is unset, then ``SET ROLE app_lightrag``. Without that,
-   hybrid ingest can reach `hybrid_ready` while the 200-line LightRAG job
-   stays `pending` forever and LangSmith shows no `ingestion.graph` runs.
-   Startup prints `lightrag_db_url_set=true` (never the DSN).
+   when graph is enabled and that variable is unset, then ``SET ROLE
+   app_lightrag``. Set ``WORKER_GRAPH_ENABLED=false`` for Hybrid-only PDF
+   ingest: the runner must print ``worker_graph_enabled=false`` and
+   ``lightrag_db_url_set=false`` and must not copy the worker DSN into
+   LightRAG. Hybrid `[hybrid]` progress still completes.
 
    Daily `.\scripts\dev.ps1` starts hosted-runtime Compose sidecars and does
    not start local Supabase. This demo's host-worker ingest path is still

@@ -43,7 +43,7 @@ def test_extraction_positive_detector_blocks_promotion() -> None:
             declared_category="allowed",
             attestation_present=True,
             attestation_policy_version=EXTERNAL_PROCESSING_POLICY_VERSION,
-            review_approved=True,
+            review_approved=False,
             content_class=ContentClass.SYNTHETIC,
         ),
         extracted_texts=("contact api_key=secret-value",),

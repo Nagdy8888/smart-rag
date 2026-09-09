@@ -160,20 +160,47 @@ def redact_ingest_parent_outputs(outputs: object) -> dict[str, Any]:
     return {"completed": True}
 
 
+def ingest_content_class_for_job(
+    job_content_class: ContentClass | str | None,
+    *,
+    settings: SharedSettings,
+) -> ContentClass:
+    """Return the job's content class. Local env never reclassifies real jobs.
+
+    Args:
+        job_content_class: Authoritative job payload class, when present.
+        settings: Process settings. Mock mode applies only when the job
+            omitted a class.
+
+    Returns:
+        The job class. ``APP_ENV=local`` is an export waiver, not a
+        synthetic reclassification of ``real_company`` work.
+    """
+
+    if isinstance(job_content_class, ContentClass):
+        return job_content_class
+    if isinstance(job_content_class, str) and job_content_class.strip():
+        normalized = job_content_class.strip().lower()
+        if normalized == ContentClass.SYNTHETIC.value:
+            return ContentClass.SYNTHETIC
+        return ContentClass.REAL_COMPANY
+    if settings.mock_model_mode:
+        return ContentClass.SYNTHETIC
+    return ContentClass.REAL_COMPANY
+
+
 def ingest_content_class_for_settings(settings: SharedSettings) -> ContentClass:
-    """Choose the LangSmith content class for one worker process.
+    """Choose a process-default class when a job class is unavailable.
 
     Args:
         settings: Validated worker or shared settings.
 
     Returns:
-        ``SYNTHETIC`` for mock mode or the local unsigned waiver; otherwise
-        ``REAL_COMPANY``.
+        ``SYNTHETIC`` only for mock-model processes. Local unsigned live
+        providers stay ``REAL_COMPANY``.
     """
 
-    if settings.mock_model_mode or settings.allows_unsigned_local_live_providers():
-        return ContentClass.SYNTHETIC
-    return ContentClass.REAL_COMPANY
+    return ingest_content_class_for_job(None, settings=settings)
 
 
 def _ingest_tracing_scope(*, enabled: bool) -> AbstractContextManager[object]:
@@ -196,11 +223,17 @@ def _ingest_tracing_scope(*, enabled: bool) -> AbstractContextManager[object]:
     return factory(enabled=True)
 
 
-def assert_ingest_langsmith_gate(settings: SharedSettings) -> None:
+def assert_ingest_langsmith_gate(
+    settings: SharedSettings,
+    *,
+    content_class: ContentClass | str | None = None,
+) -> None:
     """Fail closed before opening an ingest parent run.
 
     Args:
         settings: Validated process settings.
+        content_class: Authoritative job class. Local env does not flip
+            ``real_company`` to synthetic.
 
     Raises:
         ExternalFlowBlockedError: When real-company export is unverified and
@@ -210,9 +243,10 @@ def assert_ingest_langsmith_gate(settings: SharedSettings) -> None:
         None. Hide I/O remains forced by ``configure_langsmith``.
     """
 
+    resolved = ingest_content_class_for_job(content_class, settings=settings)
     assert_langsmith_export_permitted(
         tracing_enabled=settings.langsmith_tracing,
-        content_class=ingest_content_class_for_settings(settings),
+        content_class=resolved,
         provider_settings_verified=settings.subprocessor_matrix_verified,
         local_unsigned_waiver=settings.allows_unsigned_local_live_providers(),
     )
@@ -226,6 +260,7 @@ def invoke_traced_ingestion(
     run_name: str,
     document_id: UUID | str | None = None,
     version_id: UUID | str | None = None,
+    content_class: ContentClass | str | None = None,
 ) -> T:
     """Bind ``job_id`` and wrap ``thunk`` in a redacted LangSmith parent run.
 
@@ -237,6 +272,8 @@ def invoke_traced_ingestion(
         run_name: Parent name such as ``ingestion.index``.
         document_id: Optional document id hashed into metadata.
         version_id: Optional version id hashed into metadata.
+        content_class: Authoritative job class. Local env never reclassifies
+            a ``real_company`` job as synthetic.
 
     Returns:
         The thunk result.
@@ -249,7 +286,7 @@ def invoke_traced_ingestion(
         is enabled. Child gateway spans nest under this parent.
     """
 
-    assert_ingest_langsmith_gate(settings)
+    assert_ingest_langsmith_gate(settings, content_class=content_class)
     extra = ingest_run_trace_metadata(
         job_id=job_id,
         graph_name=run_name,

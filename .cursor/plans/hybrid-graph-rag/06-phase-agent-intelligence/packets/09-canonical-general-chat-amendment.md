@@ -39,6 +39,11 @@ This packet names no implementation skill. It edits Markdown only.
   [`phase-06-agent-intelligence-evidence.md`](../../../../../docs/development/phase-06-agent-intelligence-evidence.md).
 - Remediation amendments to P06-10 and P06-12 acceptance/negative/rollback
   contracts. This packet still changes no application behavior.
+- 2026-09-09 Hybrid PDF overlay: additive production source-resolution and
+  OpenAI rerank requirements on still-pending P06-10, plus linked packets
+  P06-17 and P06-18. Overlay index:
+  [`hybrid-pdf-accuracy-remediation.md`](../../../../../docs/development/hybrid-pdf-accuracy-remediation.md).
+  This packet still changes no application behavior.
 
 ## Forbidden outputs
 
@@ -80,6 +85,9 @@ This packet names no implementation skill. It edits Markdown only.
     scope receives zero-call clarification.
 11. Authorize deterministic `RetrievalPlan`-based company/general/mixed/
     fail-closed graph nodes while retaining NoRetrieval as the durable family.
+12. Record the 2026-09-09 Hybrid PDF overlay on still-pending P06-10
+    (production source resolver and OpenAI rerank binding) and link P06-17
+    and P06-18. Do not start P06-10 coding in this packet.
 
 ## Acceptance checks
 
@@ -98,6 +106,8 @@ This packet names no implementation skill. It edits Markdown only.
 - A packet file missing required headings, a wrapper/packet title mismatch, a
   broken relative plan link, an extra unlinked packet file, a duplicate
   requirement ID, or a Phase 8 renumber of P08-22/P08-23 fails the amendment.
+- Unchecking historical Phase 3/4 packets or opening the synthetic holdout to
+  “complete” the PDF overlay fails the amendment.
 
 ## Stop routes
 

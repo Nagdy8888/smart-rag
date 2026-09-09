@@ -180,6 +180,7 @@ listed in `additional_redirect_urls`. Local upload reserve still returns
 | `LANGGRAPH_CHECKPOINT_URL` | optional secret URL | secret | Checkpointer/store DSN; defaults to `SUPABASE_DB_URL` only when that URL is session/direct. Role `app_checkpointer`, schema `langgraph`. Transaction pooler DSNs fail closed. Runtime never auto-migrates. |
 | `SMART_RAG_PROMPT_ENV` | `dev`, `staging`, or `prod`; `dev` | public | Prompt registry promotion. Unknown ids fail closed. See [prompts/CHANGELOG.md](../../apps/agents/src/smart_rag_agents/prompts/CHANGELOG.md) |
 | `LIGHTRAG_DB_URL` | optional secret URL | secret | Runtime LightRAG attach. Unset = unconfigured. Never schema-admin. Cap 4. |
+| `WORKER_GRAPH_ENABLED` | boolean; `true` | public | Worker only. Default true. When `false`, skip LightRAG bind and graph-job claims. Hybrid, BM25, embeddings, and checkpoints stay enabled. Laptop ingest must not copy `SUPABASE_DB_URL` into `LIGHTRAG_DB_URL` while this is false. |
 
 Agent settings currently add only a stable, non-environment service name.
 Queue and retrieval settings remain owned by later phases. Graph runtime DSN

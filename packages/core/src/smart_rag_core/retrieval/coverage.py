@@ -97,6 +97,13 @@ def coverage_for_summary(
     missing = tuple(
         heading for heading in heading_inventory if heading not in covered_headings
     )
+    if len(heading_inventory) > 12:
+        overflow = missing or heading_inventory[12:]
+        return HybridCoverage(
+            signal=CoverageSignal.SCOPED_SUMMARY,
+            uncovered_headings=overflow,
+            notes=("inventory_exceeds_evidence_cap",),
+        )
     if missing:
         return HybridCoverage(
             signal=CoverageSignal.SCOPED_SUMMARY,

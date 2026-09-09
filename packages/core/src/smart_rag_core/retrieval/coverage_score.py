@@ -153,8 +153,10 @@ def build_coverage_components(
         term_coverage = len(required_set & matched_set) / len(required_set)
     else:
         term_coverage = 1.0
-    sub_total = max(1, subquestion_count)
-    sub_coverage = min(1.0, max(0, supported_subquestions) / sub_total)
+    if subquestion_count <= 0:
+        sub_coverage = 1.0
+    else:
+        sub_coverage = min(1.0, max(0, supported_subquestions) / subquestion_count)
     evidence_ratio = min(1.0, distinct / minimum) if minimum else 1.0
     support = support_confidence(
         rerank_top_support=rerank_top_support,
@@ -245,7 +247,7 @@ def attach_numeric_coverage(
     query_class: QueryClass | None = None,
     required_terms: tuple[str, ...] = (),
     matched_terms: tuple[str, ...] = (),
-    subquestion_count: int = 1,
+    subquestion_count: int = 0,
     supported_subquestions: int | None = None,
     rerank_top_support: float | None = None,
     exact_phrase_or_code: bool = False,
@@ -269,9 +271,10 @@ def attach_numeric_coverage(
         query_class: Evaluation class for the frozen threshold.
         required_terms: Required codes/entities/terms.
         matched_terms: Required terms found in evidence.
-        subquestion_count: Decomposition size.
-        supported_subquestions: Supported subquestions; defaults to fused count
-            capped by ``subquestion_count``.
+        subquestion_count: Decomposition size. ``0`` means no decomposition
+            and subquestion coverage is ``1.0``.
+        supported_subquestions: Supported subquestions; defaults to ``0``
+            when omitted so fused occupancy is never guessed as support.
         rerank_top_support: Optional rerank support.
         exact_phrase_or_code: Exact lookup winner.
         profile_ok: Profile stage succeeded.
@@ -289,9 +292,7 @@ def attach_numeric_coverage(
     elif fused:
         winner_channels = 1
     supported = (
-        supported_subquestions
-        if supported_subquestions is not None
-        else min(max(1, subquestion_count), max(0, len(fused)))
+        supported_subquestions if supported_subquestions is not None else 0
     )
     components = build_coverage_components(
         fused=fused,

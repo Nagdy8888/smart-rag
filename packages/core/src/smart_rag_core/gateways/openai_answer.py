@@ -11,6 +11,7 @@ from smart_rag_core.observability.langsmith_tracing import traced_openai_client
 from smart_rag_core.query_answer.schemas import (
     answer_json_schema,
     eval_judge_json_schema,
+    pdf_eval_judge_json_schema,
     verifier_json_schema,
 )
 from smart_rag_core.query_answer.versions import (
@@ -23,6 +24,8 @@ from smart_rag_core.query_answer.versions import (
     EVAL_JUDGE_MAX_OUTPUT_TOKENS,
     EVAL_JUDGE_PROMPT_SHA256,
     EVAL_JUDGE_PROMPT_VERSION,
+    EVAL_PDF_JUDGE_PROMPT_SHA256,
+    EVAL_PDF_JUDGE_PROMPT_VERSION,
     VERIFIER_MAX_OUTPUT_TOKENS,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
@@ -257,6 +260,79 @@ def execute_openai_eval_judge(
             raise OpenAIAnswerError("eval_judge_budget_denied") from error
         raise OpenAIAnswerError("eval_judge_provider_error") from error
     return _parse_response(response, kind="eval_judge")
+
+
+def execute_openai_pdf_eval_judge(
+    *,
+    api_key: str,
+    prompt_text: str,
+    prompt_sha256: str,
+    prompt_version: str,
+    model_id: str,
+    user_payload: dict[str, object],
+    timeout_seconds: float,
+) -> tuple[dict[str, object], str, int, int]:
+    """Make exactly one structured private-PDF judge Responses call.
+
+    Args:
+        api_key: Provider credential. Never logged.
+        prompt_text: Pinned ``eval_pdf_judge_v1`` body.
+        prompt_sha256: Expected prompt digest.
+        prompt_version: Expected prompt version.
+        model_id: Allow-listed small model.
+        user_payload: Bounded question, facts, answer, and excerpts.
+        timeout_seconds: Client timeout. SDK retries are disabled.
+
+    Returns:
+        Parsed JSON payload, provider request id, input tokens, output tokens.
+
+    Raises:
+        OpenAIAnswerError: Timeout, auth, HTTP, version, or parse failures.
+
+    Side Effects:
+        One HTTPS Responses request. ``max_retries=0``. No tools.
+        Does not accept the synthetic ``eval_judge_v1`` pin.
+    """
+
+    if (
+        prompt_version != EVAL_PDF_JUDGE_PROMPT_VERSION
+        or prompt_sha256 != EVAL_PDF_JUDGE_PROMPT_SHA256
+        or prompt_version == EVAL_JUDGE_PROMPT_VERSION
+        or prompt_sha256 == EVAL_JUDGE_PROMPT_SHA256
+    ):
+        raise OpenAIAnswerError("eval_pdf_judge_version_mismatch")
+    if model_id not in ALLOWED_EVAL_JUDGE_MODEL_IDS:
+        raise OpenAIAnswerError("eval_pdf_judge_version_mismatch")
+    if timeout_seconds <= 0:
+        raise OpenAIAnswerError("eval_pdf_judge_budget_denied")
+    client = traced_openai_client(
+        api_key=api_key, max_retries=0, timeout=timeout_seconds
+    )
+    try:
+        response = client.responses.create(
+            model=model_id,
+            instructions=prompt_text,
+            input=json.dumps(user_payload, separators=(",", ":")),
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": "pdf_eval_judge",
+                    "strict": True,
+                    "schema": pdf_eval_judge_json_schema(),
+                }
+            },
+            max_output_tokens=EVAL_JUDGE_MAX_OUTPUT_TOKENS,
+            store=False,
+        )
+    except APITimeoutError as error:
+        raise OpenAIAnswerError("eval_pdf_judge_timeout") from error
+    except AuthenticationError as error:
+        raise OpenAIAnswerError("eval_pdf_judge_provider_error") from error
+    except APIStatusError as error:
+        if error.status_code == 429:
+            raise OpenAIAnswerError("eval_pdf_judge_budget_denied") from error
+        raise OpenAIAnswerError("eval_pdf_judge_provider_error") from error
+    return _parse_response(response, kind="eval_pdf_judge")
 
 
 def _parse_response(

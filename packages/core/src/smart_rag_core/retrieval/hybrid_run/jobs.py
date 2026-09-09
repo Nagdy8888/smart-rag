@@ -53,6 +53,7 @@ class HybridChannelJobsMixin:
         query: str,
         texts: tuple[str, ...],
         vectors: tuple[tuple[float, ...], ...],
+        version_id: UUID | None = None,
     ) -> dict[str, ChannelJob]:
         """Build parallel dense/BM25/term jobs from bound retrievers.
 
@@ -61,6 +62,7 @@ class HybridChannelJobsMixin:
             query: Original query used for the single BM25 scan.
             texts: At most three query forms for dense/term lists.
             vectors: Embeddings aligned with ``texts``.
+            version_id: Optional current-version filter pushed inside ranking.
 
         Returns:
             Zero-argument jobs for ``run_channels_parallel``.
@@ -87,12 +89,14 @@ class HybridChannelJobsMixin:
                             caller=caller,
                             texts=texts,
                             vectors=vectors,
+                            version_id=version_id,
                         )
                 return collect_dense_lists(
                     dense_retriever.retrieve,
                     caller=caller,
                     texts=texts,
                     vectors=vectors,
+                    version_id=version_id,
                 )
 
             jobs["dense"] = _dense_job
@@ -101,26 +105,53 @@ class HybridChannelJobsMixin:
             bm25_retriever = cast(Bm25RetrieverLike, bm25)
 
             def _bm25_job() -> Bm25RetrievalResult:
-                """Run one BM25 scan over the original query.
+                """Run one BM25 scan over original plus bounded variants.
 
                 Returns:
                     Authorized BM25 survivors or a named outage fallback.
                 """
 
+                variant_texts = texts if texts else (query,)
                 try:
-                    if self._supabase_dsn:
-                        with self._channel_supabase() as supabase_conn:
-                            result = bm25_retriever.retrieve(
-                                supabase=supabase_conn,
-                                caller=caller,
-                                query_text=query,
-                            )
-                    else:
-                        result = bm25_retriever.retrieve(
-                            supabase=self._supabase,
+                    retrieve_variants = getattr(
+                        bm25_retriever, "retrieve_variants", None
+                    )
+
+                    def _scan(supabase_conn: object) -> object:
+                        """Call variants when present; drop unknown kwargs.
+
+                        Args:
+                            supabase_conn: Canonical recheck connection.
+
+                        Returns:
+                            Channel result from the BM25 adapter.
+                        """
+
+                        if callable(retrieve_variants):
+                            try:
+                                return retrieve_variants(
+                                    supabase=supabase_conn,
+                                    caller=caller,
+                                    texts=variant_texts,
+                                    version_id=version_id,
+                                )
+                            except TypeError:
+                                return retrieve_variants(
+                                    supabase=supabase_conn,
+                                    caller=caller,
+                                    texts=variant_texts,
+                                )
+                        return bm25_retriever.retrieve(
+                            supabase=supabase_conn,
                             caller=caller,
                             query_text=query,
                         )
+
+                    if self._supabase_dsn:
+                        with self._channel_supabase() as supabase_conn:
+                            result = _scan(supabase_conn)
+                    else:
+                        result = _scan(self._supabase)
                 except Exception:
                     return Bm25RetrievalResult(
                         scanned_ids=(),

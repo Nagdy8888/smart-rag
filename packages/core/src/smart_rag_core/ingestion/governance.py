@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
+from smart_rag_core.ingestion.detectors import (
+    DETECTOR_POLICY_VERSION,
+    DetectorFamilyOutcome,
+    detector_results_from_outcomes,
+    run_detectors_v1,
+)
 from smart_rag_core.ingestion.limits import EXTERNAL_PROCESSING_POLICY_VERSION
 from smart_rag_core.security.external_processing import (
     CategoryDisposition,
@@ -14,18 +19,6 @@ from smart_rag_core.security.external_processing import (
     ExternalProcessingDecisionInput,
     decide_external_processing,
 )
-
-_CARD_PATTERN = re.compile(r"\b(?:\d[ -]*?){13,19}\b")
-# Bare "secret"/"password"/"patient" appear in fiction and must not fail-close ingest.
-_SECRET_PATTERN = re.compile(
-    r"(?i)("
-    r"\bapi[_-]?key\b|"
-    r"\bsecret[_-]?key\b|"
-    r"\b(password|secret|token|credential)\s*="
-    r")"
-)
-_NATIONAL_ID_PATTERN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-_HEALTH_MARKER_PATTERN = re.compile(r"(?i)\b(hipaa|phi|medical record)\b")
 
 
 def _provider_settings_verified_for_process() -> bool:
@@ -42,7 +35,11 @@ def _provider_settings_verified_for_process() -> bool:
 
 @dataclass(frozen=True, slots=True)
 class MetadataGovernanceInput:
-    """Uploader attestation and metadata available before parser extraction."""
+    """Uploader attestation and metadata available before parser extraction.
+
+    ``review_approved`` is the hash-bound repository decision, never a
+    ``payload_ref.review_approved`` override.
+    """
 
     declared_category: str | None
     attestation_present: bool
@@ -58,6 +55,8 @@ class MetadataGovernanceResult:
 
     category: CategoryDisposition
     detector_results: tuple[DetectorResult, ...]
+    detector_outcomes: tuple[DetectorFamilyOutcome, ...]
+    detector_policy_version: str
     external_processing: ExternalProcessingDecision
     promotion_allowed: bool
     detail: str
@@ -81,6 +80,8 @@ class ExtractionGovernanceResult:
 
     category: CategoryDisposition
     detector_results: tuple[DetectorResult, ...]
+    detector_outcomes: tuple[DetectorFamilyOutcome, ...]
+    detector_policy_version: str
     external_processing: ExternalProcessingDecision
     promotion_allowed: bool
     detail: str
@@ -93,68 +94,37 @@ def evaluate_metadata_governance(
 ) -> MetadataGovernanceResult:
     """Run metadata-level detectors and external-processing decision.
 
-    Real company content requires explicit reviewer approval and verified provider
-    settings before external processing is allowed.
+    Real company content requires explicit reviewer approval and verified
+    provider settings before external processing is allowed.
 
     Args:
         decision_input: Uploader attestation and filename metadata.
         scan_evidence_current: Whether current scan evidence exists.
 
     Returns:
-        Governance result including promotion allowance for synthetic/reviewer
-        approved content only when scan evidence is current.
+        Governance result including promotion allowance for synthetic or
+        hash-bound reviewed content only when scan evidence is current.
     """
 
     category = _resolve_category(decision_input.declared_category)
-    detectors = _run_metadata_detectors(decision_input.filename)
-    external = decide_external_processing(
-        ExternalProcessingDecisionInput(
-            attestation_present=decision_input.attestation_present,
-            category=category,
-            review_approved=decision_input.review_approved,
-            detector_results=list(detectors),
-            scan_evidence_current=scan_evidence_current,
-            provider_settings_verified=_provider_settings_verified_for_process(),
-            policy_version_matches=(
-                decision_input.attestation_policy_version
-                == EXTERNAL_PROCESSING_POLICY_VERSION
-            ),
-            content_class=decision_input.content_class,
-        )
+    outcomes = run_detectors_v1(decision_input.filename, ())
+    detectors = detector_results_from_outcomes(outcomes)
+    external, promotion_allowed, detail = _decide(
+        decision_input=decision_input,
+        category=category,
+        detectors=detectors,
+        scan_evidence_current=scan_evidence_current,
+        passed_detail="metadata governance passed",
     )
-    promotion_allowed = (
-        scan_evidence_current
-        and category is not CategoryDisposition.PROHIBITED
-        and category is not CategoryDisposition.UNKNOWN
-        and all(result is DetectorResult.CLEAN for result in detectors)
-        and (
-            decision_input.content_class is ContentClass.SYNTHETIC
-            or decision_input.review_approved
-        )
-    )
-    detail = external.detail if not promotion_allowed else "metadata governance passed"
     return MetadataGovernanceResult(
         category=category,
         detector_results=detectors,
+        detector_outcomes=outcomes,
+        detector_policy_version=DETECTOR_POLICY_VERSION,
         external_processing=external,
         promotion_allowed=promotion_allowed,
         detail=detail,
     )
-
-
-def _resolve_category(declared_category: str | None) -> CategoryDisposition:
-    """Map declared category text to disposition."""
-
-    if declared_category is None or not declared_category.strip():
-        return CategoryDisposition.UNKNOWN
-    normalized = declared_category.strip().lower()
-    if normalized in {"allowed", "public", "internal"}:
-        return CategoryDisposition.ALLOWED
-    if normalized in {"prohibited", "restricted", "secret"}:
-        return CategoryDisposition.PROHIBITED
-    if normalized in {"review", "mandatory_review", "regulated"}:
-        return CategoryDisposition.MANDATORY_REVIEW
-    return CategoryDisposition.UNKNOWN
 
 
 def evaluate_extraction_governance(
@@ -166,7 +136,8 @@ def evaluate_extraction_governance(
     """Run metadata plus extracted-text detectors before promotion/external calls.
 
     Args:
-        decision_input: Uploader attestation and filename metadata.
+        decision_input: Uploader attestation and filename metadata. Reviews must
+            already be hash-bound; payload flags are not consulted here.
         extracted_texts: Normalized text fragments from typed parser output.
         scan_evidence_current: Whether current scan evidence exists.
 
@@ -175,13 +146,57 @@ def evaluate_extraction_governance(
     """
 
     category = _resolve_category(decision_input.declared_category)
-    detectors = _run_detectors(decision_input.filename, extracted_texts)
+    outcomes = run_detectors_v1(decision_input.filename, extracted_texts)
+    detectors = detector_results_from_outcomes(outcomes)
+    external, promotion_allowed, detail = _decide(
+        decision_input=decision_input,
+        category=category,
+        detectors=detectors,
+        scan_evidence_current=scan_evidence_current,
+        passed_detail="extraction governance passed",
+    )
+    return ExtractionGovernanceResult(
+        category=category,
+        detector_results=detectors,
+        detector_outcomes=outcomes,
+        detector_policy_version=DETECTOR_POLICY_VERSION,
+        external_processing=external,
+        promotion_allowed=promotion_allowed,
+        detail=detail,
+    )
+
+
+def _decide(
+    *,
+    decision_input: MetadataGovernanceInput | ExtractionGovernanceInput,
+    category: CategoryDisposition,
+    detectors: tuple[DetectorResult, ...],
+    scan_evidence_current: bool,
+    passed_detail: str,
+) -> tuple[ExternalProcessingDecision, bool, str]:
+    """Apply deny-by-default gates with hash-bound false-positive reviews.
+
+    Args:
+        decision_input: Attestation and content class.
+        category: Resolved category disposition.
+        detectors: Raw detector results before review overlay.
+        scan_evidence_current: Fresh scan evidence flag.
+        passed_detail: Detail when promotion is allowed.
+
+    Returns:
+        External decision, promotion flag, and detail.
+    """
+
+    reviewed = decision_input.review_approved
+    effective = (
+        tuple(DetectorResult.CLEAN for _ in detectors) if reviewed else detectors
+    )
     external = decide_external_processing(
         ExternalProcessingDecisionInput(
             attestation_present=decision_input.attestation_present,
             category=category,
-            review_approved=decision_input.review_approved,
-            detector_results=list(detectors),
+            review_approved=reviewed,
+            detector_results=list(effective),
             scan_evidence_current=scan_evidence_current,
             provider_settings_verified=_provider_settings_verified_for_process(),
             policy_version_matches=(
@@ -191,52 +206,34 @@ def evaluate_extraction_governance(
             content_class=decision_input.content_class,
         )
     )
+    detectors_ok = all(result is DetectorResult.CLEAN for result in detectors) or reviewed
     promotion_allowed = (
         scan_evidence_current
         and category is not CategoryDisposition.PROHIBITED
         and category is not CategoryDisposition.UNKNOWN
-        and all(result is DetectorResult.CLEAN for result in detectors)
-        and (
-            decision_input.content_class is ContentClass.SYNTHETIC
-            or decision_input.review_approved
-        )
+        and detectors_ok
     )
-    detail = (
-        external.detail if not promotion_allowed else "extraction governance passed"
-    )
-    return ExtractionGovernanceResult(
-        category=category,
-        detector_results=detectors,
-        external_processing=external,
-        promotion_allowed=promotion_allowed,
-        detail=detail,
-    )
+    detail = external.detail if not promotion_allowed else passed_detail
+    return external, promotion_allowed, detail
 
 
-def _run_metadata_detectors(filename: str | None) -> tuple[DetectorResult, ...]:
-    """Run deterministic filename/metadata pattern detectors."""
+def _resolve_category(declared_category: str | None) -> CategoryDisposition:
+    """Map declared category text to disposition.
 
-    return _run_detectors(filename, ())
+    Args:
+        declared_category: Uploader attestation category.
 
+    Returns:
+        Disposition used by the signed packet.
+    """
 
-def _run_detectors(
-    filename: str | None,
-    extracted_texts: tuple[str, ...],
-) -> tuple[DetectorResult, ...]:
-    """Run deterministic metadata and extracted-text pattern detectors."""
-
-    haystack = "\n".join([filename or "", *extracted_texts])
-    families = (
-        _CARD_PATTERN,
-        _SECRET_PATTERN,
-        _NATIONAL_ID_PATTERN,
-        _HEALTH_MARKER_PATTERN,
-    )
-    results: list[DetectorResult] = []
-    for pattern in families:
-        results.append(
-            DetectorResult.POSITIVE
-            if pattern.search(haystack)
-            else DetectorResult.CLEAN
-        )
-    return tuple(results)
+    if declared_category is None or not declared_category.strip():
+        return CategoryDisposition.UNKNOWN
+    normalized = declared_category.strip().lower()
+    if normalized in {"allowed", "public", "internal"}:
+        return CategoryDisposition.ALLOWED
+    if normalized in {"prohibited", "restricted", "secret"}:
+        return CategoryDisposition.PROHIBITED
+    if normalized in {"review", "mandatory_review", "regulated"}:
+        return CategoryDisposition.MANDATORY_REVIEW
+    return CategoryDisposition.UNKNOWN

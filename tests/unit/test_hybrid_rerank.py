@@ -32,6 +32,7 @@ from smart_rag_core.retrieval.rerank import (
     build_rerank_pool,
     rerank_input_hash,
     rerank_json_schema,
+    rerank_preload_ids,
     should_skip_trivial_exact,
     trim_token_budget,
     validate_rerank_payload,
@@ -147,6 +148,24 @@ def test_pool_caps_and_per_document_quota() -> None:
     assert sum(1 for item in pool if item.candidate.document_id == document) <= (
         RERANK_MAX_PER_DOCUMENT
     )
+
+
+def test_rerank_preload_ids_match_pool_membership() -> None:
+    """Preload IDs follow the same per-document pool cap as the reranker."""
+
+    document = uuid4()
+    overflow = tuple(_candidate(document=document) for _ in range(8))
+    others = tuple(_candidate() for _ in range(20))
+    fused = overflow + others
+    preloaded = rerank_preload_ids(
+        fused,
+        pool_size=RERANK_POOL_SIZE,
+        max_per_document=RERANK_MAX_PER_DOCUMENT,
+    )
+    assert len(preloaded) == RERANK_POOL_SIZE
+    assert len(preloaded) == len(set(preloaded))
+    from_overflow = [item for item in preloaded if item in {row.chunk_id for row in overflow}]
+    assert len(from_overflow) <= RERANK_MAX_PER_DOCUMENT
 
 
 def test_skip_only_trivial_exact_with_two_channels() -> None:

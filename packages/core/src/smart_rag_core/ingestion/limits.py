@@ -31,6 +31,14 @@ DEFAULT_EMBEDDING_MAX_INPUTS = 2048
 DEFAULT_EMBEDDING_REQUEST_TIMEOUT_SECONDS = 120
 DEFAULT_EMBEDDING_MAX_RETRIES = 2
 DEFAULT_EMBEDDING_CONCURRENCY = 1
+# Inline vectors in embedding_operation_ledger.result_ref. Larger batches
+# persist vectors only on app.document_chunks (hosted 60s statement_timeout
+# cannot store hundreds of 1024-d vectors as one JSONB value).
+LEDGER_INLINE_VECTOR_MAX = 64
+# Role default app_worker statement_timeout stays 60s. Long-document
+# canonical/ledger transactions SET LOCAL these values only.
+LONG_DOCUMENT_WRITE_STATEMENT_TIMEOUT = "300s"
+LONG_DOCUMENT_IDLE_IN_TXN_TIMEOUT = "180s"
 
 # BM25 projection bounds (Packet 7)
 DEFAULT_BM25_UPSERT_BATCH_SIZE = 250

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   cacheStatusLabel,
   correctionReasonLabel,
+  isDeadlinePartialStatus,
   isRealDetailValue,
   routeIcon,
   routeLabel,
@@ -81,6 +82,15 @@ describe("runStatusTone and runStatusSummary", () => {
     expect(runStatusSummary("completed", true)).toBe("Verified and ready.");
     expect(runStatusSummary("completed", false)).toBe("The run finished.");
     expect(runStatusSummary(null, false)).toBe("Working on this question.");
+  });
+});
+
+describe("isDeadlinePartialStatus", () => {
+  it("recognizes retrieve-time deadline reasons", () => {
+    expect(isDeadlinePartialStatus("deadline_exhausted")).toBe(true);
+    expect(isDeadlinePartialStatus("deadline")).toBe(true);
+    expect(isDeadlinePartialStatus("verified_partial")).toBe(false);
+    expect(isDeadlinePartialStatus(null)).toBe(false);
   });
 });
 

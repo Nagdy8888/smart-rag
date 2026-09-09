@@ -77,8 +77,13 @@ def apply_laptop_ingest_environ() -> None:
         f"@127.0.0.1:54329/{paradedb_db}"
     )
     worker_dsn = os.environ.get("SUPABASE_DB_URL", "").strip()
-    if worker_dsn and not os.environ.get("LIGHTRAG_DB_URL", "").strip():
+    graph_enabled = os.environ.get("WORKER_GRAPH_ENABLED", "true").strip().lower()
+    graph_on = graph_enabled not in {"0", "false", "no", "off"}
+    if graph_on and worker_dsn and not os.environ.get("LIGHTRAG_DB_URL", "").strip():
         os.environ["LIGHTRAG_DB_URL"] = worker_dsn
+    if not graph_on:
+        os.environ["WORKER_GRAPH_ENABLED"] = "false"
+        os.environ.pop("LIGHTRAG_DB_URL", None)
     os.environ["CLAMAV_HOST"] = "127.0.0.1"
     os.environ["CLAMAV_PORT"] = "13310"
     os.environ["CRAWL_PROXY_URL"] = "http://127.0.0.1:18080"
@@ -103,6 +108,16 @@ def apply_laptop_ingest_environ() -> None:
         flush=True,
     )
     print(f"langsmith_tracing={os.environ.get('LANGSMITH_TRACING', '')}", flush=True)
+    print(
+        "langsmith_export_io="
+        + os.environ.get("LANGSMITH_EXPORT_IO", "false"),
+        flush=True,
+    )
+    print(
+        "subprocessor_matrix_verified="
+        + os.environ.get("SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED", ""),
+        flush=True,
+    )
     print(f"mock_model_mode={os.environ.get('MOCK_MODEL_MODE', '')}", flush=True)
     print(
         "openai_key_present="
@@ -114,6 +129,14 @@ def apply_laptop_ingest_environ() -> None:
     print(
         "lightrag_db_url_set="
         + str(bool(os.environ.get("LIGHTRAG_DB_URL", "").strip())).lower(),
+        flush=True,
+    )
+    print(
+        "worker_graph_enabled="
+        + str(
+            os.environ.get("WORKER_GRAPH_ENABLED", "true").strip().lower()
+            not in {"0", "false", "no", "off"}
+        ).lower(),
         flush=True,
     )
 

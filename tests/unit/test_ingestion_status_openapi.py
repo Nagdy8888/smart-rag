@@ -161,3 +161,86 @@ def test_ingestion_status_unauthorized_is_not_found(
         )
     assert response.status_code == 404
     assert json_object(response.json())["detail"] == "not_found"
+
+
+def test_detector_review_route_is_registered() -> None:
+    """Owner/admin review transport appears in the public OpenAPI surface."""
+
+    with openapi_test_client() as raw_client:
+        client = as_openapi_client(raw_client)
+        schema = json_object(client.get("/openapi.json").json())
+    paths = json_object(schema.get("paths", {}))
+    assert "/ingestion/detector-findings/reviews" in paths
+    review_path = json_object(paths["/ingestion/detector-findings/reviews"])
+    assert "post" in review_path
+    version_schema = json_object(
+        json_object(json_object(schema.get("components", {})).get("schemas", {})).get(
+            "ReviewDiagnostics", {}
+        )
+    )
+    properties = json_object(version_schema.get("properties", {}))
+    assert "finding_count" in properties
+    assert "findings" in properties
+
+
+class _MissingReviewService:
+    """Review service that hides every finding as missing."""
+
+    def review_finding(
+        self,
+        caller: CallerContext,
+        *,
+        finding_id: UUID,
+        decision: str,
+        reason: str,
+        idempotency_key: str,
+    ) -> None:
+        """Always hide existence.
+
+        Args:
+            caller: Authenticated caller.
+            finding_id: Requested finding.
+            decision: Unused decision.
+            reason: Unused reason.
+            idempotency_key: Unused replay key.
+
+        Raises:
+            QueryAdmissionError: Always ``not_found``.
+        """
+
+        del caller, finding_id, decision, reason, idempotency_key
+        raise QueryAdmissionError("not_found")
+
+
+def test_member_detector_review_is_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Members and viewers cannot distinguish missing from unauthorized findings."""
+
+    from smart_rag_api.routers.governance_reviews import get_governance_review_service
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_governance_review_service] = lambda: (
+        _MissingReviewService()
+    )
+    with TestClient(application) as raw_client:
+        client = as_openapi_client(raw_client)
+        response = client.post(
+            "/ingestion/detector-findings/reviews",
+            json={
+                "finding_id": str(uuid4()),
+                "decision": "false_positive",
+                "reason": "not a secret",
+                "idempotency_key": "idem-key-01",
+            },
+            headers={
+                "X-Test-User-Id": "00000000-0000-4000-8000-000000000002",
+                "X-Test-Role": "member",
+                "X-Test-Authorization-Version": "1",
+            },
+        )
+    assert response.status_code == 404
+    assert json_object(response.json())["detail"] == "not_found"

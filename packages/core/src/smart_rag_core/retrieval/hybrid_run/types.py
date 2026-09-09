@@ -77,6 +77,7 @@ class AssembleHybridKwargs(TypedDict):
         query_type: Profile query type.
         required_terms: Codes and exact terms.
         matched_terms: Terms already matched; Hybrid retrieve passes empty.
+        subquestion_count: Decomposition size. ``0`` means none.
         deadline_exhausted: True when a parallel channel missed the slice.
     """
 
@@ -98,6 +99,7 @@ class AssembleHybridKwargs(TypedDict):
     query_type: QueryType
     required_terms: tuple[str, ...]
     matched_terms: tuple[str, ...]
+    subquestion_count: int
     deadline_exhausted: bool
 
 
@@ -144,9 +146,11 @@ class HybridRunResult:
     """Typed Hybrid retrieve outcome. No answer text.
 
     Attributes:
-        ranked_ids: Authorized fused IDs in rank order (Recall@K input).
+        ranked_ids: Final evidence IDs after rerank/MMR/parents/trim.
+            Historical synthetic Recall@10 used fused occupancy; that order
+            is ``fused_ids``.
         evidence: At most 12 citation units with locators.
-        coverage: Coverage/refusal diagnostics.
+        coverage: Coverage/refusal diagnostics from selected evidence.
         fallback_reason: Named retrieve fallback, or ``none``.
         deadline_exhausted: True when a channel missed the retrieval slice.
         first_evidence_ms: Wall milliseconds until evidence or fail-closed
@@ -154,6 +158,12 @@ class HybridRunResult:
         embedding_call_count: ``0`` or ``1``. Variants share one batch.
         rerank_call_count: ``0`` or ``1`` from the one-shot reranker.
         cache_key: Versioned ID-only cache key when assembly ran.
+        fused_ids: Authorized fused IDs before rerank/MMR.
+        selected_ids: Final evidence IDs after rerank/MMR/parents/trim.
+        rerank_order: Pool order after the one-shot reranker or RRF fallback.
+        retrieval_profile_id: Frozen or evaluation profile id used for quotas.
+        rerank_fallback: Named rerank skip/failure reason, or empty.
+        rerank_top_support: Top selected child's model support, else None.
     """
 
     ranked_ids: tuple[UUID, ...]
@@ -165,3 +175,9 @@ class HybridRunResult:
     embedding_call_count: int
     rerank_call_count: int
     cache_key: str = ""
+    fused_ids: tuple[UUID, ...] = ()
+    selected_ids: tuple[UUID, ...] = ()
+    rerank_order: tuple[UUID, ...] = ()
+    retrieval_profile_id: str = ""
+    rerank_fallback: str = ""
+    rerank_top_support: float | None = None

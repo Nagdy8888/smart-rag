@@ -14,7 +14,11 @@ import type { RunProgressItem } from "../../lib/run-progress";
 import type { ChatViewState } from "../../lib/chat-view";
 import type { CitationResponse, ConversationMessage } from "../../lib/types";
 import { formatRunTokenUsage } from "../../lib/format-usage";
-import { routeLabel } from "../../lib/run-details";
+import {
+  EMPTY_DEADLINE_PARTIAL_COPY,
+  isDeadlinePartialStatus,
+  routeLabel,
+} from "../../lib/run-details";
 import { formatRelativeTime } from "../../lib/relative-time";
 import { displayText } from "../../lib/safe-text";
 import { Badge } from "../ui/badge";
@@ -92,12 +96,17 @@ export type AnswerSurfaceProps = {
  *
  * @param terminal - Catalog terminal or null.
  * @param answer - Tokens already shown.
+ * @param status - SSE `partial.reason` or error code stored on the view.
  * @returns One sentence, or null.
  */
 export function answerTerminalNote(
   terminal: string | null,
   answer: string,
+  status: string | null = null,
 ): string | null {
+  if (terminal === "partial" && isDeadlinePartialStatus(status) && answer.trim() === "") {
+    return EMPTY_DEADLINE_PARTIAL_COPY;
+  }
   if (terminal === "partial") {
     return "Partial answer. Verified tokens are kept.";
   }
@@ -224,7 +233,7 @@ export const AnswerSurface = memo(function AnswerSurface({
   promptTokens = 0,
   completionTokens = 0,
 }: AnswerSurfaceProps) {
-  const note = answerTerminalNote(terminal, answer);
+  const note = answerTerminalNote(terminal, answer, chat?.status ?? null);
   const originLabel = answerOriginLabel(answerOrigin);
   const routeName = routeLabel(effectiveRoute);
   const usageLabel = formatRunTokenUsage(promptTokens, completionTokens);

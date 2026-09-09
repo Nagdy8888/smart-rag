@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-09
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -94,10 +94,17 @@ flowchart TD
 - Ask shows exactly one run-failure alert. `partial` stays on the answer
   surface. `error` after tokens keeps the tokens and omits the generic
   banner. `error` with no tokens shows one “Something went wrong”
-  reference and never echoes `run_failed`.
+  reference and never echoes `run_failed`. Retrieve-time
+  `deadline_exhausted` is catalog `deadline` then `partial`, not
+  `error` `routing_rejected`. Empty-answer deadline copy tells the user
+  to send the question again.
 - Ask does not keep a second live question or answer when decoded
   `GET /conversations/{id}/messages` content already matches. API
   `content` is HTML-escaped; SSE `answerText` is not.
+- Sending the next question keeps the previous verified live answer in
+  the transcript until `GET /conversations/{id}/messages` contains that
+  assistant row. The next send must not blank `answerText` without that
+  overlay; otherwise user bubbles remain and prior replies vanish.
 - The composer field clears as soon as Send is accepted. Create or
   admission failure restores the draft. `send()` returns at stream
   handoff and does not wait for the verified answer.

@@ -29,5 +29,11 @@ def test_summary_v1_is_versioned_and_hashed() -> None:
     assert "source" in prompt_text("summary_v1")
     assert "passage" in prompt_text("summary_v1")
     assert frozenset(
-        {"query_profile_v1", "summary_v1", "general_chat_v1", "conversation_title_v1"}
+        {
+            "query_profile_v1",
+            "summary_v1",
+            "general_chat_v1",
+            "conversation_title_v1",
+            "eval_pdf_judge_v1",
+        }
     ) <= frozenset(PROMPT_REGISTRY)

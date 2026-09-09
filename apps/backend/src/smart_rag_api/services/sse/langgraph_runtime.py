@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
+import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Protocol, cast
 
@@ -25,10 +27,11 @@ class StreamCancelFlag(Protocol):
 
 
 class LangGraphRuntimeFactory:
-    """Lazy process-reusable LangGraph bindings for one executor instance.
+    """Process-reusable LangGraph bindings for one executor instance.
 
-    ``PostgresSaver.setup()``, ``AsyncPostgresSaver.setup()``, and
-    ``PostgresStore.setup()`` are never called.
+    Hybrid, memory store, async checkpointer, and compiled graph are opened
+    once per factory. ``PostgresSaver.setup()``, ``AsyncPostgresSaver.setup()``,
+    and ``PostgresStore.setup()`` are never called.
     """
 
     def __init__(self) -> None:
@@ -39,6 +42,8 @@ class LangGraphRuntimeFactory:
         self._bindings: Any = None
         self._compiled: Any = None
         self._compiled_checkpointer_id: int | None = None
+        self._sync_lock = threading.Lock()
+        self._async_lock = asyncio.Lock()
         self.compile_count = 0
 
     @property
@@ -73,10 +78,13 @@ class LangGraphRuntimeFactory:
 
         if self._bindings is not None:
             return self._bindings
-        self._bindings = build_query_process_bindings(
-            settings=cast(SharedSettings | None, settings),
-        )
-        return self._bindings
+        with self._sync_lock:
+            if self._bindings is not None:
+                return self._bindings
+            self._bindings = build_query_process_bindings(
+                settings=cast(SharedSettings | None, settings),
+            )
+            return self._bindings
 
     def bind_memory_store(self, settings: object) -> tuple[Any, Any]:
         """Open the compact memory store and checkpointer once per process.
@@ -97,9 +105,11 @@ class LangGraphRuntimeFactory:
         if not isinstance(dsn, str) or not dsn:
             return None, None
         if self._store is None:
-            from smart_rag_agents.query.store import open_query_memory_store
+            with self._sync_lock:
+                if self._store is None:
+                    from smart_rag_agents.query.store import open_query_memory_store
 
-            self._store = open_query_memory_store(dsn)
+                    self._store = open_query_memory_store(dsn)
         memory_store = self._store
         if memory_store is None:
             return None, None
@@ -138,14 +148,19 @@ class LangGraphRuntimeFactory:
 
         if self._async_holder is not None:
             return self._async_holder.saver
-        resolved = getattr(settings, "resolved_checkpoint_dsn", None)
-        dsn = resolved() if callable(resolved) else None
-        if not isinstance(dsn, str) or not dsn:
-            return None
-        from smart_rag_agents.query.checkpointer import open_query_async_checkpointer
+        async with self._async_lock:
+            if self._async_holder is not None:
+                return self._async_holder.saver
+            resolved = getattr(settings, "resolved_checkpoint_dsn", None)
+            dsn = resolved() if callable(resolved) else None
+            if not isinstance(dsn, str) or not dsn:
+                return None
+            from smart_rag_agents.query.checkpointer import (
+                open_query_async_checkpointer,
+            )
 
-        self._async_holder = await open_query_async_checkpointer(dsn)
-        return self._async_holder.saver
+            self._async_holder = await open_query_async_checkpointer(dsn)
+            return self._async_holder.saver
 
     def compiled_query_graph(self, checkpointer: object) -> object:
         """Compile the static topology once per factory and checkpointer.
@@ -160,14 +175,43 @@ class LangGraphRuntimeFactory:
         marker = id(checkpointer) if checkpointer is not None else None
         if self._compiled is not None and self._compiled_checkpointer_id == marker:
             return self._compiled
-        from smart_rag_agents.query.graph import compile_query_graph
+        with self._sync_lock:
+            if self._compiled is not None and self._compiled_checkpointer_id == marker:
+                return self._compiled
+            from smart_rag_agents.query.graph import compile_query_graph
 
-        self._compiled = compile_query_graph(
-            checkpointer=cast(BaseCheckpointSaver[str] | None, checkpointer),
-        )
-        self._compiled_checkpointer_id = marker
-        self.compile_count += 1
-        return self._compiled
+            self._compiled = compile_query_graph(
+                checkpointer=cast(BaseCheckpointSaver[str] | None, checkpointer),
+            )
+            self._compiled_checkpointer_id = marker
+            self.compile_count += 1
+            return self._compiled
+
+    async def aclose(self) -> None:
+        """Close cached checkpointer and memory-store pools.
+
+        Side Effects:
+            Drops compiled graph and adapter caches. ``setup()`` is never
+            called. Exception text from pool close is not logged here.
+        """
+
+        holder = self._async_holder
+        store = self._store
+        self._async_holder = None
+        self._store = None
+        self._bindings = None
+        self._compiled = None
+        self._compiled_checkpointer_id = None
+        if holder is not None:
+            closer = getattr(holder, "close", None)
+            if callable(closer):
+                closed = closer()
+                if inspect.isawaitable(closed):
+                    await closed
+        if store is not None:
+            closer = getattr(store, "close", None)
+            if callable(closer):
+                closer()
 
 
 async def open_langgraph_astream(

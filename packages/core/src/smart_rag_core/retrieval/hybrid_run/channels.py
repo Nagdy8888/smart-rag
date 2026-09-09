@@ -10,7 +10,15 @@ from smart_rag_core.retrieval.hybrid_run.types import (
     CandidateList,
     VariantLists,
 )
-from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
+from smart_rag_core.retrieval.profiles import (
+    DENSE_CANDIDATE_CAP,
+    DENSE_UNDERFILL_FLOOR,
+    EXACT_FALLBACK_AUTHORIZED_ROW_CAP,
+    TERM_CANDIDATE_CAP,
+    DenseMode,
+    HnswProfileId,
+    RetrievalFallbackReason,
+)
 from smart_rag_core.retrieval.rerank import (
     RerankFallbackReason,
     RerankPassage,
@@ -58,33 +66,119 @@ def _is_variant_tuple(value: object) -> TypeGuard[VariantLists]:
     return isinstance(items[0], tuple)
 
 
+def _invoke_dense(
+    retrieve: Callable[..., object],
+    *,
+    caller: CallerContext,
+    query_embedding: list[float],
+    **extra: object,
+) -> object:
+    """Call a dense retrieve double, dropping unknown kwargs.
+
+    Args:
+        retrieve: Live adapter or test double.
+        caller: Server-derived identity.
+        query_embedding: Query vector.
+        extra: Optional profile/mode/escalate flags.
+
+    Returns:
+        Dense result or candidate tuple.
+    """
+
+    try:
+        return retrieve(
+            caller=caller,
+            query_embedding=query_embedding,
+            **extra,
+        )
+    except TypeError:
+        return retrieve(caller=caller, query_embedding=query_embedding)
+
+
 def collect_dense_lists(
     retrieve: Callable[..., object],
     *,
     caller: CallerContext,
     texts: tuple[str, ...],
     vectors: tuple[tuple[float, ...], ...],
+    version_id: UUID | None = None,
 ) -> VariantLists:
     """Run dense retrieve once per fused query vector.
+
+    Escalation is at most one HIGH ANN per variant, then exact only when
+    ``authorized_count * vector_count`` is at or below 10,000.
 
     Args:
         retrieve: Bound ``DenseRetriever.retrieve`` or a test double.
         caller: Server-derived identity.
         texts: Query forms aligned with ``vectors``.
         vectors: Query embeddings.
+        version_id: Optional current-version filter inside ranking.
 
     Returns:
-        Per-variant dense candidate lists.
+        Per-variant dense candidate lists after the global unique cap.
     """
 
+    extra: dict[str, object] = {}
+    if version_id is not None:
+        extra["version_id"] = version_id
     lists: list[CandidateList] = []
+    authorized_count = 0
     for _text, vector in zip(texts, vectors, strict=False):
-        result = retrieve(caller=caller, query_embedding=list(vector))
+        result = _invoke_dense(
+            retrieve,
+            caller=caller,
+            query_embedding=list(vector),
+            escalate=False,
+            **extra,
+        )
         if isinstance(result, DenseRetrievalResult):
             lists.append(result.candidates)
+            authorized_count = result.authorized_count
         elif isinstance(result, tuple):
             lists.append(cast(CandidateList, result))
-    return tuple(lists)
+    unique = {item.chunk_id for variant in lists for item in variant}
+    if unique and len(unique) < DENSE_UNDERFILL_FLOOR:
+        high: list[CandidateList] = []
+        for _text, vector in zip(texts, vectors, strict=False):
+            result = _invoke_dense(
+                retrieve,
+                caller=caller,
+                query_embedding=list(vector),
+                profile=HnswProfileId.HIGH,
+                escalate=False,
+                **extra,
+            )
+            if isinstance(result, DenseRetrievalResult):
+                high.append(result.candidates)
+                authorized_count = result.authorized_count
+            elif isinstance(result, tuple):
+                high.append(cast(CandidateList, result))
+        if high:
+            lists = high
+        unique = {item.chunk_id for variant in lists for item in variant}
+        work = authorized_count * max(len(vectors), 1)
+        if (
+            len(unique) < DENSE_UNDERFILL_FLOOR
+            and work <= EXACT_FALLBACK_AUTHORIZED_ROW_CAP
+        ):
+            exact: list[CandidateList] = []
+            for _text, vector in zip(texts, vectors, strict=False):
+                result = _invoke_dense(
+                    retrieve,
+                    caller=caller,
+                    query_embedding=list(vector),
+                    mode=DenseMode.EXACT,
+                    escalate=False,
+                    **extra,
+                )
+                if isinstance(result, DenseRetrievalResult):
+                    exact.append(result.candidates)
+                elif isinstance(result, tuple):
+                    exact.append(cast(CandidateList, result))
+            if exact:
+                lists = exact
+    return cap_unique_across_variants(tuple(lists), DENSE_CANDIDATE_CAP)
 
 
 def collect_term_lists(
@@ -111,7 +205,7 @@ def collect_term_lists(
             lists.append(result.candidates)
         elif isinstance(result, tuple):
             lists.append(cast(CandidateList, result))
-    return tuple(lists)
+    return cap_unique_across_variants(tuple(lists), TERM_CANDIDATE_CAP)
 
 
 def restrict_channel_candidates(
@@ -159,9 +253,56 @@ def restrict_channel_candidates(
         scanned_ids=tuple(item.chunk_id for item in filtered_bm25_candidates),
         candidates=filtered_bm25_candidates,
         fallback_reason=bm25_result.fallback_reason,
+        variant_lists=tuple(_keep(variant) for variant in bm25_result.variant_lists),
+        variant_count=bm25_result.variant_count,
+        variant_ranks=tuple(
+            len(_keep(variant)) for variant in bm25_result.variant_lists
+        )
+        if bm25_result.variant_lists
+        else (len(filtered_bm25_candidates),),
+        rechecked_count=bm25_result.rechecked_count,
+        survivor_count=len(filtered_bm25_candidates),
+        index_schema_version=bm25_result.index_schema_version,
+        normalizer_version=bm25_result.normalizer_version,
     )
     filtered_term = tuple(_keep(variant) for variant in term_lists)
     return filtered_dense, filtered_bm25, filtered_term
+
+
+def cap_unique_across_variants(
+    lists: VariantLists,
+    cap: int,
+) -> VariantLists:
+    """Keep at most ``cap`` unique chunk IDs across all variant lists.
+
+    First-seen IDs win. Later duplicates remain only when they already
+    survived the global unique set. Per-list slicing is not sufficient.
+
+    Args:
+        lists: Per-variant candidate lists.
+        cap: Global unique ID ceiling.
+
+    Returns:
+        Variant lists reconstructed from the global survivor set.
+    """
+
+    allowed: list[UUID] = []
+    seen: set[UUID] = set()
+    for variant in lists:
+        for item in variant:
+            if item.chunk_id in seen:
+                continue
+            seen.add(item.chunk_id)
+            allowed.append(item.chunk_id)
+            if len(allowed) >= cap:
+                break
+        if len(allowed) >= cap:
+            break
+    allowed_set = set(allowed)
+    return tuple(
+        tuple(item for item in variant if item.chunk_id in allowed_set)
+        for variant in lists
+    )
 
 
 def flatten_channel_candidates(

@@ -24,13 +24,28 @@ class ScanDiagnostics(BaseModel):
     object_hash: str | None = None
 
 
+class ReviewFindingSummary(BaseModel):
+    """Role-safe detector finding identity. No matched secrets."""
+
+    finding_id: UUID
+    family: str
+    bounded_count: int = 0
+    scope: str | None = None
+    detector_policy_version: str | None = None
+
+
 class ReviewDiagnostics(BaseModel):
-    """Category attestation and URL-approval diagnostics."""
+    """Category attestation plus detector-finding review diagnostics."""
 
     declared_category: str | None = None
     source_type: str | None = None
     approval_status: str | None = None
     attestation_policy_version: str | None = None
+    finding_count: int = 0
+    unresolved_family_count: int = 0
+    findings: list[ReviewFindingSummary] = Field(
+        default_factory=list[ReviewFindingSummary]
+    )
 
 
 class OcrDiagnostics(BaseModel):

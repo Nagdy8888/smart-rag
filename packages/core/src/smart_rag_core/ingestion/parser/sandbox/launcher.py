@@ -327,7 +327,8 @@ def _docker_available() -> bool:
     Contract tests look up this private name via ``typed_module_attr``.
 
     Returns:
-        ``True`` when ``docker`` is on PATH and ``docker info`` exits 0.
+        ``True`` when ``docker`` is on PATH and ``docker info`` exits 0
+        within 20 seconds (Windows Desktop can exceed a 5s probe).
     """
 
     if shutil.which("docker") is None:
@@ -339,7 +340,7 @@ def _docker_available() -> bool:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=5,
+            timeout=20,
             check=False,
         )
     except (subprocess.TimeoutExpired, OSError):

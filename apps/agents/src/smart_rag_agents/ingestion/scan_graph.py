@@ -31,6 +31,10 @@ from smart_rag_core.jobs.ingestion_repository import (
     configurable_lease_lost,
 )
 from smart_rag_core.observability.ingest_progress import log_ingest_progress
+from smart_rag_core.repositories.governance_reviews import (
+    GovernanceReviewRepository,
+    GovernanceReviewRepositoryError,
+)
 from smart_rag_core.repositories.notifications import AdminNotificationRepository
 from smart_rag_core.repositories.scan_events import ScanEventRepository
 from smart_rag_core.schema.enums import ScanResult
@@ -67,6 +71,7 @@ class IngestionScanState(TypedDict):
         "scan_pending",
         "scanning",
         "scan_failed",
+        "governance_review_required",
         "promotion_failed",
         "promoted",
         "lease_invalid",
@@ -293,7 +298,7 @@ def scan_and_govern(
     with psycopg.connect(postgres_url) as connection:
         connection.execute("SET ROLE app_worker")
         scan_repo = ScanEventRepository(connection)
-        scan_repo.insert_scan_event(
+        scan_id = scan_repo.insert_scan_event(
             document_id=UUID(str(state["document_id"])),
             version_id=UUID(str(state["version_id"])),
             uploader_user_id=(
@@ -329,7 +334,7 @@ def scan_and_govern(
                 declared_category=state["declared_category"],
                 attestation_present=state["attestation_policy_version"] is not None,
                 attestation_policy_version=state["attestation_policy_version"],
-                review_approved=state["review_approved"],
+                review_approved=False,
                 filename=str(state["storage_path"]).split("/")[-1],
                 content_class=(
                     GovernanceContentClass.SYNTHETIC
@@ -339,6 +344,39 @@ def scan_and_govern(
             ),
             scan_evidence_current=True,
         )
+        document_id = UUID(str(state["document_id"]))
+        version_id = UUID(str(state["version_id"]))
+        attestation = state["attestation_policy_version"] or ""
+        try:
+            reviews = GovernanceReviewRepository(connection)
+            review_approved = reviews.resolve_review_approved(
+                document_id=document_id,
+                version_id=version_id,
+                content_hash=str(state["content_hash"]),
+                scan_evidence_id=scan_id,
+                attestation_policy_version=attestation,
+                detector_policy_version=governance.detector_policy_version,
+                finding_scope="metadata",
+                outcomes=governance.detector_outcomes,
+            )
+        except GovernanceReviewRepositoryError:
+            review_approved = False
+        if review_approved:
+            governance = evaluate_metadata_governance(
+                MetadataGovernanceInput(
+                    declared_category=state["declared_category"],
+                    attestation_present=state["attestation_policy_version"] is not None,
+                    attestation_policy_version=state["attestation_policy_version"],
+                    review_approved=True,
+                    filename=str(state["storage_path"]).split("/")[-1],
+                    content_class=(
+                        GovernanceContentClass.SYNTHETIC
+                        if state["content_class"] == "synthetic"
+                        else GovernanceContentClass.REAL_COMPANY
+                    ),
+                ),
+                scan_evidence_current=True,
+            )
         if not governance.promotion_allowed:
             notifications = AdminNotificationRepository(connection)
             notifications.emit(
@@ -352,6 +390,19 @@ def scan_and_govern(
                 },
             )
             connection.commit()
+            hold = governance.external_processing.reason_code == "sensitive_detector"
+            if hold:
+                log_ingest_progress(
+                    "hybrid",
+                    "governance_review_required",
+                    UUID(str(state["job_id"])),
+                )
+                return {
+                    **state,
+                    "status": "governance_review_required",
+                    "scan_result": scan.result.value,
+                    "detail": governance.detail,
+                }
             return {
                 **state,
                 "status": "scan_failed",
@@ -520,7 +571,7 @@ def promote_object(
                 "document_title": document_title,
                 "declared_category": state["declared_category"],
                 "attestation_policy_version": state["attestation_policy_version"],
-                "review_approved": state["review_approved"],
+                "review_approved": False,
                 "content_class": state["content_class"],
                 "graph_eligible": graph_eligible,
             },
@@ -538,9 +589,16 @@ def route_after_scan_lease(state: IngestionScanState) -> str:
 
 
 def route_after_scan(state: IngestionScanState) -> str:
-    """Route failed scans to end; clean scans continue to promotion."""
+    """Route failed or held scans to end; clean scans continue to promotion.
 
-    if state["status"] == "scan_failed":
+    Args:
+        state: Scan graph state after malware and metadata governance.
+
+    Returns:
+        Next node name or ``END``.
+    """
+
+    if state["status"] in {"scan_failed", "governance_review_required"}:
         return END
     return "promote_object"
 

@@ -7,6 +7,9 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import psycopg
 
+from smart_rag_core.ingestion.canonical.timeouts import (
+    apply_long_document_write_timeouts,
+)
 from smart_rag_core.ingestion.chunking.types import CanonicalChunk, ChunkingResult
 from smart_rag_core.ingestion.embeddings.contextual import (
     extract_deterministic_search_terms,
@@ -62,8 +65,13 @@ class CanonicalRepository:
 
         Raises:
             CanonicalWriteError: When required RPC writes fail.
+
+        Side Effects:
+            ``SET LOCAL`` statement and idle-in-transaction timeouts for this
+            transaction only (role defaults stay 60s / 15s).
         """
 
+        apply_long_document_write_timeouts(self._connection)
         embedded_by_id = {item.chunk.chunk_id: item for item in embedded}
         search_terms = extract_deterministic_search_terms(
             document_title=document_title,

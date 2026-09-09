@@ -108,6 +108,10 @@ def get_sse_stream_service(
 ) -> SseStreamService:
     """Return the process SSE service. Tests may inject store and executor.
 
+    The production executor is stored on ``app.state.query_run_executor`` so
+    checkpointer and Hybrid bindings are not reopened on every GET
+    ``/events``.
+
     Args:
         request: Active request.
         postgres_url: app_api DSN used when no in-memory store is bound.
@@ -128,6 +132,7 @@ def get_sse_stream_service(
     executor = getattr(request.app.state, "query_run_executor", None)
     if executor is None:
         executor = default_executor_factory()
+        request.app.state.query_run_executor = executor
     return SseStreamService(
         store=store,
         registry=registry,

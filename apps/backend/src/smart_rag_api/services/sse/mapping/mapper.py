@@ -8,12 +8,14 @@ from smart_rag_core.query_answer.models import AnswerPayload
 
 from smart_rag_api.services.sse.mapping.contracts import (
     DRAFT_ANSWER_NODES,
-    REJECT_STATUSES,
     VERIFY_ANSWER_NODE,
 )
 from smart_rag_api.services.sse.mapping.limitations import limitation_from_update
 from smart_rag_api.services.sse.mapping.progress import CustomProgressDecoder
-from smart_rag_api.services.sse.mapping.status import status_event
+from smart_rag_api.services.sse.mapping.status import (
+    reject_terminal_events,
+    status_event,
+)
 from smart_rag_api.services.sse.mapping.verified import (
     emit_verified_events,
     payload_from_update,
@@ -96,15 +98,12 @@ class QuerySseMapper:
                 final = parsed or self._draft
                 events.extend(self._emit_verified(final, update))
                 continue
-            raw_status = update.get("status")
-            if (
-                isinstance(raw_status, str)
-                and raw_status in REJECT_STATUSES
-                and not self.verified
-            ):
-                events.append(("error", {"code": raw_status}))
-                self.terminal_emitted = True
-                return events
+            if not self.verified:
+                reject_events = reject_terminal_events(update)
+                if reject_events:
+                    events.extend(reject_events)
+                    self.terminal_emitted = True
+                    return events
         return events
 
     def finish(self) -> list[tuple[str, dict[str, object]]]:

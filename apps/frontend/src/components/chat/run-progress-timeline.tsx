@@ -5,11 +5,15 @@
 "use client";
 
 import { useState } from "react";
+import type { ChatViewState } from "../../lib/chat-view";
 import type { RunProgressItem } from "../../lib/run-progress";
+import {
+  EMPTY_DEADLINE_PARTIAL_COPY,
+  isDeadlinePartialStatus,
+} from "../../lib/run-details";
 import { LiveRegion } from "../ui/live-region";
 import { Spinner } from "../ui/spinner";
 import { progressLabel, runStatusLine } from "./run-progress";
-import type { ChatViewState } from "../../lib/chat-view";
 import styles from "./run-progress-timeline.module.css";
 
 export type RunProgressTimelineProps = {
@@ -42,9 +46,13 @@ export function progressSummary(props: RunProgressTimelineProps): string {
       : "Something went wrong.";
   }
   if (props.terminal === "partial") {
-    return props.answerAvailable
-      ? "Partial"
-      : "Partial answer. Verified tokens are kept.";
+    if (props.answerAvailable) {
+      return "Partial";
+    }
+    if (isDeadlinePartialStatus(props.chat?.status)) {
+      return EMPTY_DEADLINE_PARTIAL_COPY;
+    }
+    return "Partial answer. Verified tokens are kept.";
   }
   if (props.verificationCompleted && props.answerAvailable && props.collapsed) {
     return "Verified answer";

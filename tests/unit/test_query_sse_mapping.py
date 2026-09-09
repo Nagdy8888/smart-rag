@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 from typing import Literal, TypedDict, cast
 
+import pytest
 from langgraph.graph import END, START, StateGraph
 from smart_rag_agents.query.graph import compile_query_graph
 from smart_rag_agents.query.state import pending_query_state
 from smart_rag_api.services.query_sse_mapping import (
+    ALLOWED_SSE_FIELDS,
     GENERAL_SCOPE_NODE,
     GENERATE_ANSWER_NODE,
     MIXED_SCOPE_NODE,
@@ -19,6 +21,7 @@ from smart_rag_api.services.query_sse_mapping import (
     chunk_answer_text,
 )
 from smart_rag_core.query_answer.models import AnswerPayload
+from smart_rag_core.sse.catalog import PAYLOAD_MODELS
 
 from tests.support.typed_graph import untyped
 
@@ -166,6 +169,61 @@ def test_mapper_emits_billed_cost_with_usage() -> None:
         "completion_tokens": 167,
         "cost_usd": 0.48,
     }
+    for event_type, payload in events:
+        assert_catalog_event(event_type, payload)
+
+
+def test_mapper_maps_deadline_exhausted_reject_to_partial() -> None:
+    """Retrieve-time deadline is catalog deadline then partial, not error."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            "company_scope": {
+                "status": "routing_rejected",
+                "detail": "deadline_exhausted",
+            }
+        }
+    )
+    for event_type, payload in events:
+        assert_catalog_event(event_type, payload)
+    types = [item[0] for item in events]
+    assert "error" not in types
+    assert types.count("deadline") == 1
+    assert types.count("partial") == 1
+    assert events[types.index("partial")][1] == {"reason": "deadline_exhausted"}
+    assert mapper.terminal_emitted is True
+
+
+def test_mapper_keeps_non_deadline_routing_reject_as_error() -> None:
+    """Empty-query and other routing rejects stay error with the status code."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {"prepare_query": {"status": "routing_rejected", "detail": "empty_query"}}
+    )
+    for event_type, payload in events:
+        assert_catalog_event(event_type, payload)
+    types = [item[0] for item in events]
+    assert ("error", {"code": "routing_rejected"}) in events
+    assert "partial" not in types
+    assert mapper.terminal_emitted is True
+
+
+def test_mapper_allowlist_covers_catalog_payload_fields() -> None:
+    """Mapper field allowlist stays identical to extra=forbid catalog models."""
+
+    catalog_fields = {
+        name for model in PAYLOAD_MODELS.values() for name in model.model_fields
+    }
+    assert ALLOWED_SSE_FIELDS == catalog_fields
+    assert_catalog_event(
+        "usage",
+        {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": 0.01},
+    )
+    assert_catalog_event("coverage", {"coverage_score": 0.65})
+    with pytest.raises(ValueError, match="sse_payload_field_not_allowlisted"):
+        assert_catalog_event("usage", {"prompt_tokens": 1, "secret_field": "nope"})
 
 
 def test_mapper_empty_verified_answer_is_error_not_completed() -> None:
