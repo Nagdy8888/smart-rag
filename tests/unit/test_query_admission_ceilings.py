@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from smart_rag_api.services.query_admission import query_admission_bucket_key
@@ -26,12 +27,18 @@ from smart_rag_core.query_admission.ceilings import (
     envelope_for_family,
     usage_kind_caps,
 )
+from smart_rag_core.query_admission.context import (
+    AuthorizedRuntimeContext,
+    requested_search_scope_from_row,
+)
 from smart_rag_core.query_admission.exceptions import (
     QueryBudgetError,
     QueryCeilingError,
 )
 from smart_rag_core.query_admission.payload import hash_query_admission_payload
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.search_scope import RequestedSearchScope
+from smart_rag_core.security.identity import UserRole
 
 
 def test_signed_monthly_and_concurrency_defaults() -> None:
@@ -135,20 +142,86 @@ def test_payload_hash_changes_with_message_not_with_key() -> None:
         conversation_id=conversation_id,
         route_family=Phase6RouteFamily.HYBRID,
         message="hello",
+        requested_search_scope=RequestedSearchScope.AUTO,
     )
     second = hash_query_admission_payload(
         conversation_id=conversation_id,
         route_family=Phase6RouteFamily.HYBRID,
         message="hello",
+        requested_search_scope=RequestedSearchScope.AUTO,
     )
     changed = hash_query_admission_payload(
         conversation_id=conversation_id,
         route_family=Phase6RouteFamily.HYBRID,
         message="hello!",
+        requested_search_scope=RequestedSearchScope.AUTO,
+    )
+    omitted = hash_query_admission_payload(
+        conversation_id=conversation_id,
+        route_family=Phase6RouteFamily.HYBRID,
+        message="hello",
+    )
+    company = hash_query_admission_payload(
+        conversation_id=conversation_id,
+        route_family=Phase6RouteFamily.HYBRID,
+        message="hello",
+        requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS,
+    )
+    general = hash_query_admission_payload(
+        conversation_id=conversation_id,
+        route_family=Phase6RouteFamily.HYBRID,
+        message="hello",
+        requested_search_scope=RequestedSearchScope.GENERAL_KNOWLEDGE,
     )
     assert first == second
+    assert first == omitted
     assert len(first) == 64
     assert first != changed
+    assert first != company
+    assert company != general
+
+
+def test_legacy_runtime_mapping_defaults_requested_scope_auto() -> None:
+    """Old authorized-runtime mappings without scope become Auto."""
+
+    now = datetime.now(UTC)
+    context = AuthorizedRuntimeContext(
+        user_id=UUID("11111111-1111-4111-8111-111111111111"),
+        role=UserRole.MEMBER,
+        authorization_version=1,
+        conversation_id=UUID("22222222-2222-4222-8222-222222222222"),
+        run_id=UUID("33333333-3333-4333-8333-333333333333"),
+        reservation_id=UUID("44444444-4444-4444-8444-444444444444"),
+        reconnect=False,
+        route_family=Phase6RouteFamily.COMPOSITE,
+        requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS,
+        deadline_at=now + timedelta(seconds=50),
+        recursion_limit=8,
+        correction_ceiling=1,
+        subquestion_ceiling=0,
+        model_call_ceiling=8,
+        tool_ceiling=3,
+        discovery_ceiling=0,
+        manifest_ceiling=2,
+        side_effect_ceiling=1,
+        reserved_amount_usd=Decimal("0.50"),
+        remaining_usd=Decimal("0.50"),
+        remaining_prompt_tokens=8000,
+        remaining_completion_tokens=2000,
+        optimistic_version=1,
+        heartbeat_at=now,
+        payload_hash="c" * 64,
+        status="pending",
+    )
+    dumped = context.model_dump(mode="json")
+    dumped.pop("requested_search_scope")
+    restored = AuthorizedRuntimeContext.from_mapping(dumped)
+    assert restored.requested_search_scope is RequestedSearchScope.AUTO
+    round_trip = AuthorizedRuntimeContext.from_mapping(context.model_dump(mode="json"))
+    assert round_trip.requested_search_scope is RequestedSearchScope.COMPANY_DOCUMENTS
+    assert requested_search_scope_from_row(None) is RequestedSearchScope.AUTO
+    with pytest.raises(ValueError):
+        requested_search_scope_from_row("world_knowledge")
 
 
 def test_query_admission_bucket_includes_user_id() -> None:

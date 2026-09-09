@@ -8,7 +8,7 @@ import sys
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
@@ -71,7 +71,11 @@ async def _collect() -> dict[str, object]:
         rec["cost"] += Decimal(str(getattr(run, "total_cost", None) or 0))
         if name in {"openai.embeddings", "embedding.embed"} and len(samples) < 6:
             extras = getattr(run, "extra", None)
-            extra_keys = sorted(extras.keys()) if isinstance(extras, dict) else []
+            extra_keys: list[str]
+            if isinstance(extras, dict):
+                extra_keys = sorted(str(key) for key in cast(dict[str, object], extras))
+            else:
+                extra_keys = []
             samples.append(
                 {
                     "name": name,

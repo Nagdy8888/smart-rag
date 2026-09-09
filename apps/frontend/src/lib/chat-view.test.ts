@@ -40,7 +40,9 @@ describe("chat view", () => {
       reservation_id: "res-1",
       route_family: "composite",
       reconnect: false,
+      requested_search_scope: "company_documents",
     });
+    expect(state.requestedSearchScope).toBe("company_documents");
     state = applySseFrame(state, verifyFrame(3));
     state = applySseFrame(
       state,

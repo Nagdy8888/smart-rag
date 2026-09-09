@@ -71,6 +71,7 @@ def compile_plan_node(state: QueryGraphState) -> QueryGraphState:
         "effective_route": plan.effective_route.value,
         "corrected_route": None,
         "knowledge_scope": plan.knowledge_scope.value,
+        "requested_search_scope": plan.requested_search_scope.value,
         "no_retrieval_answer_mode": (
             None
             if plan.no_retrieval_answer_mode is None

@@ -123,7 +123,7 @@ def split_prose_segments(
 
 
 def _expand_to_target(segment: ProseSegment) -> list[ProseSegment]:
-    """Split one prose segment toward the 200–400 token target.
+    """Split one prose segment toward the 200-400 token target.
 
     Args:
         segment: Unsplit paragraph or heading fragment.

@@ -12,6 +12,7 @@ from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
     NoRetrievalAnswerMode,
     ScopeDegradationReason,
+    apply_requested_search_scope,
     classify_knowledge_scope,
     scope_requires_model,
 )
@@ -29,6 +30,7 @@ from smart_rag_core.query_routing.signals import (
     is_product_help,
     is_small_talk,
 )
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import UserRole
 
 
@@ -69,30 +71,47 @@ def _runtime() -> AuthorizedRuntimeContext:
     )
 
 
-def _prep(query: str) -> QueryPreparation:
+def _prep(
+    query: str,
+    *,
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
+) -> QueryPreparation:
     """Prepare one query on the deterministic zero-call path.
 
     Args:
         query: Original user text.
+        requested_search_scope: Client source preference.
 
     Returns:
         Typed preparation.
     """
 
-    return prepare_query(query, runtime=_runtime())
+    return prepare_query(
+        query,
+        runtime=_runtime(),
+        requested_search_scope=requested_search_scope,
+    )
 
 
-def _plan(query: str) -> RetrievalPlan:
+def _plan(
+    query: str,
+    *,
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
+) -> RetrievalPlan:
     """Compile a retrieval plan for one query.
 
     Args:
         query: Original user text.
+        requested_search_scope: Client source preference.
 
     Returns:
         Frozen retrieval plan.
     """
 
-    return compile_retrieval_plan(_prep(query), _runtime())
+    return compile_retrieval_plan(
+        _prep(query, requested_search_scope=requested_search_scope),
+        _runtime(),
+    )
 
 
 def test_full_greeting_is_general_knowledge() -> None:
@@ -575,3 +594,106 @@ def test_malformed_profile_payload_degrades() -> None:
     assert prep.scope_degradation_reason is ScopeDegradationReason.PROFILE_MALFORMED
     assert prep.fallback_reason == "profile_malformed"
     assert prep.model_calls == 1
+
+
+def test_requested_company_forces_heading_to_company_hybrid() -> None:
+    """A bare PDF heading plus Company files uses company Hybrid retrieval."""
+
+    query = "Parallel Tool Execution"
+    automatic = classify_knowledge_scope(query)
+    assert automatic.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    forced = apply_requested_search_scope(
+        query, automatic, RequestedSearchScope.COMPANY_DOCUMENTS
+    )
+    assert forced.knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
+    assert forced.confidence == 1.0
+    assert forced.scope_degradation_reason is None
+    assert forced.company_signal is automatic.company_signal
+    prep = _prep(query, requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS)
+    assert prep.requested_search_scope is RequestedSearchScope.COMPANY_DOCUMENTS
+    assert prep.knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
+    assert prep.model_calls == 0
+    plan = _plan(query, requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS)
+    assert plan.knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
+    assert plan.requested_search_scope is RequestedSearchScope.COMPANY_DOCUMENTS
+    assert plan.effective_route is Phase6RouteFamily.HYBRID
+    assert plan.company_claim_forbidden is False
+    assert plan.no_retrieval_answer_mode is None
+    assert any(branch.kind is BranchKind.HYBRID for branch in plan.branches)
+
+
+def test_requested_general_forbids_company_retrieval() -> None:
+    """Requested General compiles to NoRetrieval with company claims forbidden."""
+
+    query = "Parallel Tool Execution"
+    prep = _prep(query, requested_search_scope=RequestedSearchScope.GENERAL_KNOWLEDGE)
+    assert prep.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert prep.scope_degradation_reason is None
+    plan = _plan(query, requested_search_scope=RequestedSearchScope.GENERAL_KNOWLEDGE)
+    assert plan.effective_route is Phase6RouteFamily.NO_RETRIEVAL
+    assert plan.company_claim_forbidden is True
+    assert plan.no_retrieval_answer_mode is NoRetrievalAnswerMode.GENERAL_MODEL
+    assert {branch.kind for branch in plan.branches} == {BranchKind.NO_RETRIEVAL}
+
+
+def test_requested_auto_keeps_classifier_degradation() -> None:
+    """Auto returns the automatic decision, including degradation provenance."""
+
+    query = "Parallel Tool Execution"
+    automatic = classify_knowledge_scope(query)
+    applied = apply_requested_search_scope(query, automatic, RequestedSearchScope.AUTO)
+    assert applied is automatic
+    prep = _prep(query, requested_search_scope=RequestedSearchScope.AUTO)
+    assert prep.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert prep.scope_degradation_reason is ScopeDegradationReason.PROFILE_UNAVAILABLE
+
+
+def test_requested_company_keeps_greeting_and_user_text() -> None:
+    """Greetings and user-text transforms ignore explicit Company files."""
+
+    hello = apply_requested_search_scope(
+        "Hello",
+        classify_knowledge_scope("Hello"),
+        RequestedSearchScope.COMPANY_DOCUMENTS,
+    )
+    assert hello.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert hello.confidence == 1.0
+    assert hello.scope_degradation_reason is None
+    hello_plan = _plan("Hello", requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS)
+    assert hello_plan.effective_route is Phase6RouteFamily.NO_RETRIEVAL
+    assert hello_plan.company_claim_forbidden is True
+
+    help_plan = _plan(
+        "How can you help me?",
+        requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS,
+    )
+    assert help_plan.knowledge_scope is KnowledgeScope.GENERAL_KNOWLEDGE
+    assert help_plan.company_claim_forbidden is True
+
+    rewrite = "Rewrite this paragraph: The sky is blue and wide."
+    user_text = apply_requested_search_scope(
+        rewrite,
+        classify_knowledge_scope(rewrite),
+        RequestedSearchScope.COMPANY_DOCUMENTS,
+    )
+    assert user_text.knowledge_scope is KnowledgeScope.USER_SUPPLIED_TEXT
+    assert user_text.confidence == 1.0
+    user_plan = _plan(rewrite, requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS)
+    assert user_plan.no_retrieval_answer_mode is NoRetrievalAnswerMode.USER_TEXT_MODEL
+
+
+def test_requested_company_does_not_invent_company_signal() -> None:
+    """Requested Company never manufactures ``company_signal=True``."""
+
+    query = "What is the capital of France?"
+    automatic = classify_knowledge_scope(query)
+    assert automatic.company_signal is False
+    forced = apply_requested_search_scope(
+        query, automatic, RequestedSearchScope.COMPANY_DOCUMENTS
+    )
+    assert forced.knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
+    assert forced.company_signal is False
+    assert forced.scope_degradation_reason is None
+    plan = _plan(query, requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS)
+    assert plan.knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
+    assert plan.company_claim_forbidden is False

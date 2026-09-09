@@ -207,7 +207,9 @@ def seal_cases(
         raise PrivatePdfSealError("source_family_crosses_splits")
     if any(case.reviewer is None or not case.reviewer.strip() for case in cases):
         raise PrivatePdfSealError("named_reviewer_required")
-    if any(case.acl_actor_id is None or not case.acl_actor_id.strip() for case in cases):
+    if any(
+        case.acl_actor_id is None or not case.acl_actor_id.strip() for case in cases
+    ):
         raise PrivatePdfSealError("acl_actor_required")
     case_ids = tuple(case.case_id for case in cases)
     if len(case_ids) != len(set(case_ids)):

@@ -19,9 +19,10 @@ import { newIdempotencyKey } from "../../../lib/idempotency";
 import type { HandshakeDecision } from "../../../lib/handshake";
 import { sessionCacheScope, sessionQueryKeys } from "../../../lib/query-keys";
 import { isAbortError } from "../../../lib/sse-consume";
-import type { ReadinessResponse } from "../../../lib/types";
+import type { ReadinessResponse, RequestedSearchScope } from "../../../lib/types";
 import { createChatSend } from "./start-chat-send";
 import { useChatResume } from "./use-chat-resume";
+import { useChatScope } from "./use-chat-scope";
 import { usePaidRunPointer } from "./use-paid-run-pointer";
 
 export type UseChatRunInput = {
@@ -44,6 +45,8 @@ export type UseChatRunResult = {
   /** Finished live answers not yet present in GET /messages. */
   settledTurns: readonly SettledChatTurn[];
   liveRunCreated: boolean;
+  searchScope: RequestedSearchScope;
+  setSearchScope: (scope: RequestedSearchScope) => void;
   send(text: string): Promise<boolean>;
   reconnect(): Promise<void>;
   cancel(): Promise<void>;
@@ -81,6 +84,18 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
   const idempotencyRef = useRef<string | null>(chat.idempotencyKey);
   const recoveredRef = useRef(false);
   const liveRunIdsRef = useRef(new Set<string>());
+  const scopeBindingRef = useRef<{
+    idempotencyKey: string;
+    requestedSearchScope: RequestedSearchScope;
+  } | null>(null);
+  const {
+    scope: searchScope,
+    setScope: setSearchScope,
+    bindCreatedConversation,
+    activateConversation,
+    restoreConversationScope,
+    resetForNewChat,
+  } = useChatScope(conversationId);
   const chatRef = useRef(chat);
   const sequenceRef = useRef(chat.lastSequence);
   const failureRef = useRef(failure);
@@ -119,12 +134,14 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
       clearChatRunPointer();
       sendLockRef.current = false;
       idempotencyRef.current = newIdempotencyKey();
+      scopeBindingRef.current = null;
       liveRunIdsRef.current.clear();
       setLiveRunCreated(false);
       setSettledTurns([]);
       if (reason !== "new-send" && reason !== "select-conversation") {
         onConversationId(null);
         setLastUserMessage("");
+        resetForNewChat();
       }
       if (reason === "select-conversation") {
         setLastUserMessage("");
@@ -137,8 +154,15 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
       setReconnectExhausted(false);
       setNextRetryMs(null);
     },
-    [onConversationId],
+    [onConversationId, resetForNewChat],
   );
+
+  useEffect(() => {
+    if (conversationId === null) {
+      return;
+    }
+    activateConversation(conversationId);
+  }, [activateConversation, conversationId]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -180,8 +204,9 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
       setReconnectExhausted,
       setNextRetryMs,
       onConversationId,
+      restoreConversationScope,
     }),
-    [auth, onConversationId],
+    [auth, onConversationId, restoreConversationScope],
   );
   const { resumeOnce } = useChatResume(resumeInput);
 
@@ -212,9 +237,26 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
       setReconnectAttempt,
       setReconnectExhausted,
       setNextRetryMs,
+      requestedSearchScope: searchScope,
+      bindCreatedConversation,
+      bindSearchScope: (key, current) => {
+        if (scopeBindingRef.current?.idempotencyKey === key) {
+          return scopeBindingRef.current.requestedSearchScope;
+        }
+        scopeBindingRef.current = {
+          idempotencyKey: key,
+          requestedSearchScope: current,
+        };
+        return current;
+      },
+      clearSearchScopeBinding: () => {
+        scopeBindingRef.current = null;
+      },
     };
   }, [
     auth,
+    bindCreatedConversation,
+    searchScope,
     conversationId,
     handshake,
     keys,
@@ -294,6 +336,8 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
     lastUserMessage,
     settledTurns,
     liveRunCreated,
+    searchScope,
+    setSearchScope,
     send,
     reconnect,
     cancel,

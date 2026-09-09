@@ -38,6 +38,7 @@ export type SubmitMessageResponse = {
   reservation_id: string;
   route_family: string;
   status: string;
+  requested_search_scope: RequestedSearchScope;
 };
 
 /** `GET /runs/{run_id}` and `POST /runs/{run_id}/cancel` body. */
@@ -48,6 +49,7 @@ export type RunResponse = {
   status: string;
   reservation_id: string | null;
   created_at: string | null;
+  requested_search_scope: RequestedSearchScope;
 };
 
 /** `POST /runs/{run_id}/feedback` 201 body. */
@@ -72,8 +74,18 @@ export const ANSWER_ORIGINS = [
   "ambiguous",
 ] as const;
 
+/** Client source preference. Not authorization and not answer origin. */
+export const REQUESTED_SEARCH_SCOPES = [
+  "company_documents",
+  "auto",
+  "general_knowledge",
+] as const;
+
 /** One catalog answer origin. Unknown values are tolerated at the reducer. */
 export type AnswerOrigin = (typeof ANSWER_ORIGINS)[number];
+
+/** Source preference sent on paid POST and echoed on the admitted run. */
+export type RequestedSearchScope = (typeof REQUESTED_SEARCH_SCOPES)[number];
 
 /** Exact unmerged thumbs-up tags. */
 export const FEEDBACK_TAGS_UP = [
@@ -114,4 +126,37 @@ export type FeedbackTag = (typeof FEEDBACK_TAGS)[number];
  */
 export function feedbackTagsFor(thumbsUp: boolean): readonly FeedbackTag[] {
   return thumbsUp ? FEEDBACK_TAGS_UP : FEEDBACK_TAGS_DOWN;
+}
+
+/**
+ * Return whether a value is a known requested search scope.
+ *
+ * @param value - Untrusted string.
+ * @returns True for the three catalog values.
+ */
+export function isRequestedSearchScope(
+  value: string,
+): value is RequestedSearchScope {
+  return (REQUESTED_SEARCH_SCOPES as readonly string[]).includes(value);
+}
+
+/**
+ * Return the operator-facing requested-source label.
+ *
+ * @param scope - Stored preference, or null before admission.
+ * @returns Visible label, or null when the run has no stored preference.
+ */
+export function requestedSearchScopeLabel(
+  scope: RequestedSearchScope | null,
+): string | null {
+  if (scope === null) {
+    return null;
+  }
+  if (scope === "company_documents") {
+    return "Company files";
+  }
+  if (scope === "auto") {
+    return "Auto";
+  }
+  return "General knowledge";
 }

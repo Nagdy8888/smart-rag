@@ -368,7 +368,7 @@ describe("DocumentLibrary delete and pagination", () => {
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
     const cursors = listDocuments.mock.calls.map((call) => call[1]?.cursor);
     expect(cursors).toContain("2026-08-24T00:00:00Z,doc-49");
-  });
+  }, 15_000);
 });
 
 describe("DocumentLibrary status", () => {

@@ -206,7 +206,9 @@ def _decide(
             content_class=decision_input.content_class,
         )
     )
-    detectors_ok = all(result is DetectorResult.CLEAN for result in detectors) or reviewed
+    detectors_ok = (
+        all(result is DetectorResult.CLEAN for result in detectors) or reviewed
+    )
     promotion_allowed = (
         scan_evidence_current
         and category is not CategoryDisposition.PROHIBITED

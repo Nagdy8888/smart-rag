@@ -20,6 +20,7 @@ from smart_rag_core.query_routing.knowledge_scope import (
     NoRetrievalAnswerMode,
     ScopeDegradationReason,
 )
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.tables.plan import TableQueryPlan
 
 
@@ -144,6 +145,7 @@ class RetrievalPlan(BaseModel):
             document routes.
         scope_degradation_reason: Server-derived failed-inference reason
             copied from preparation. Distinct from ``fallback_reason``.
+        requested_search_scope: Client source preference copied from preparation.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -173,6 +175,7 @@ class RetrievalPlan(BaseModel):
     knowledge_scope: KnowledgeScope
     no_retrieval_answer_mode: NoRetrievalAnswerMode | None = None
     scope_degradation_reason: ScopeDegradationReason | None = None
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO
 
     @model_validator(mode="after")
     def _invariants(self) -> RetrievalPlan:

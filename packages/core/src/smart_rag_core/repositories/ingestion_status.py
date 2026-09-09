@@ -87,11 +87,11 @@ class IngestionStatusRepository:
                 diagnostics = cursor.fetchone()
             except psycopg.Error:
                 return result
-            extra: object = None if diagnostics is None else diagnostics.get(
-                "diagnostics"
+            extra: object = (
+                None if diagnostics is None else diagnostics.get("diagnostics")
             )
             if isinstance(extra, dict):
-                merged = dict(review)
-                merged.update(cast(dict[str, Any], extra))
-                result["review"] = merged
+                review_map = cast(dict[str, object], review)
+                extra_map = cast(dict[str, object], extra)
+                result["review"] = {**review_map, **extra_map}
             return result

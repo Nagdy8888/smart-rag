@@ -3,6 +3,7 @@
  */
 
 import { CLIENT_VERSION } from "../client-version";
+import type { RequestedSearchScope } from "../types";
 
 /** Headers shared by paid POST bodies. Resume GET omits the version. */
 export type ApiAuth = {
@@ -32,18 +33,29 @@ export function paidMutationHeaders(
 }
 
 /**
- * JSON body for `POST /conversations/{id}/messages`. Auto only.
- * There is no client route field (GAP-07-01).
+ * JSON body for `POST /conversations/{id}/messages`. Auto Composite envelope.
+ * There is no client route field (GAP-07-01). `search_scope` is a source
+ * preference only.
  *
  * @param message - Untrusted user text.
  * @param idempotencyKey - Stable UUID.
- * @returns `{ message, idempotency_key }` only.
+ * @param searchScope - Client source preference captured for this key.
+ * @returns `{ message, idempotency_key, search_scope }` only.
  */
 export function submitMessageBody(
   message: string,
   idempotencyKey: string,
-): { message: string; idempotency_key: string } {
-  return { message, idempotency_key: idempotencyKey };
+  searchScope: RequestedSearchScope,
+): {
+  message: string;
+  idempotency_key: string;
+  search_scope: RequestedSearchScope;
+} {
+  return {
+    message,
+    idempotency_key: idempotencyKey,
+    search_scope: searchScope,
+  };
 }
 
 /**

@@ -212,12 +212,14 @@ def main(argv: list[str] | None = None) -> int:
     open_sealed = tuple(case for case in sealed if case.split != "holdout")
     sealed_path = args.sealed_out
     if sealed_path is None and args.ids.is_file():
-        digest = str(json.loads(args.ids.read_text(encoding="utf-8")).get("content_hash", ""))
+        digest = str(
+            json.loads(args.ids.read_text(encoding="utf-8")).get("content_hash", "")
+        )
         if len(digest) >= 12:
             sealed_path = Path(".private-eval") / digest[:12] / "v1" / "sealed.json"
     if sealed_path is None:
         sealed_path = Path(".private-eval/eval-draft/sealed.json")
-    extra = {
+    extra: dict[str, object] = {
         "human_sealed": True,
         "generated_only": False,
         "holdout_opened": False,

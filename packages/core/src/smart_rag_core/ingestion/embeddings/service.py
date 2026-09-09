@@ -618,6 +618,9 @@ def _completed_ledger_result_ref(
     return payload
 
 
+completed_ledger_result_ref = _completed_ledger_result_ref
+
+
 def _chunk_set_hash(chunks: tuple[CanonicalChunk, ...]) -> str:
     """Hash stable chunk IDs and normalized content for cross-system verification."""
 

@@ -193,6 +193,12 @@ class GraphWorkerLoop:
         lease_token = str(job["lease_token"])
         version_id_raw = job.get("version_id")
         document_id_raw = job.get("document_id")
+        payload_raw = job.get("payload_ref")
+        payload: Mapping[str, object]
+        if isinstance(payload_raw, Mapping):
+            payload = cast(Mapping[str, object], payload_raw)
+        else:
+            payload = {}
         writer_token: str | None = None
         occupied_token = ""
         lock_connection: psycopg.Connection | None = None

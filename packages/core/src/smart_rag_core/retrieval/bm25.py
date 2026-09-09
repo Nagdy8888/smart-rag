@@ -330,14 +330,15 @@ class Bm25Retriever:
         scores: dict[UUID, float] = {}
         seen_ids: set[UUID] = set()
         per_variant_ids: list[list[UUID]] = [[] for _ in unique_texts]
-        per_variant_scores: list[dict[UUID, float]] = [
-            {} for _ in unique_texts
-        ]
+        per_variant_scores: list[dict[UUID, float]] = [{} for _ in unique_texts]
         for row in rows:
             ordinal = int(row[0])
             score = float(row[3])
             chunk_id = UUID(str(row[2]))
-            if 0 <= ordinal < len(per_variant_ids) and chunk_id not in per_variant_scores[ordinal]:
+            if (
+                0 <= ordinal < len(per_variant_ids)
+                and chunk_id not in per_variant_scores[ordinal]
+            ):
                 per_variant_ids[ordinal].append(chunk_id)
                 per_variant_scores[ordinal][chunk_id] = score
             if chunk_id in seen_ids:

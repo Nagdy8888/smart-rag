@@ -32,6 +32,7 @@ from smart_rag_core.query_routing.signals import (
     is_user_text_transform,
     is_whole_document_summary,
 )
+from smart_rag_core.search_scope import RequestedSearchScope
 
 SCOPE_CONFIDENCE_THRESHOLD = 0.80
 """Minimum accepted model confidence for a non-degraded scope."""
@@ -471,6 +472,67 @@ def classify_knowledge_scope(
         confidence=confidence,
         company_signal=company,
         general_signal=parsed is KnowledgeScope.GENERAL_KNOWLEDGE or general,
+    )
+
+
+def apply_requested_search_scope(
+    query: str,
+    automatic: KnowledgeScopeDecision,
+    requested: RequestedSearchScope,
+) -> KnowledgeScopeDecision:
+    """Apply a client source preference to an automatic scope decision.
+
+    Greetings, small talk, product help, and user-text transforms keep their
+    current handling. Other substantive prompts honor explicit Company or
+    General. Auto returns the automatic decision unchanged. Requested
+    Company never manufactures ``company_signal=True``.
+
+    Args:
+        query: Original user text. Untrusted.
+        automatic: Decision from ``classify_knowledge_scope``.
+        requested: Client source preference fixed at admission.
+
+    Returns:
+        Effective scope decision used by preparation and the route matrix.
+    """
+
+    if requested is RequestedSearchScope.AUTO:
+        return automatic
+    extract = extract_deterministic(query)
+    query_company = company_intent_signal(query, extract)
+    if is_product_help(query) and not query_company:
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
+            confidence=1.0,
+            company_signal=False,
+            general_signal=True,
+        )
+    if _social_opener(query) and not query_company:
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
+            confidence=1.0,
+            company_signal=False,
+            general_signal=True,
+        )
+    if is_user_text_transform(query):
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.USER_SUPPLIED_TEXT,
+            confidence=1.0,
+            company_signal=automatic.company_signal,
+            general_signal=automatic.general_signal,
+        )
+    if requested is RequestedSearchScope.COMPANY_DOCUMENTS:
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.COMPANY_DOCUMENTS,
+            confidence=1.0,
+            company_signal=automatic.company_signal,
+            general_signal=automatic.general_signal,
+        )
+    return KnowledgeScopeDecision(
+        knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
+        confidence=1.0,
+        company_signal=automatic.company_signal,
+        general_signal=automatic.general_signal,
     )
 
 

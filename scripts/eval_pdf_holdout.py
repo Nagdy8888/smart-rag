@@ -14,6 +14,7 @@ from smart_rag_core.evaluation.private_pdf import (
     load_private_pdf_labeled_holdout,
     retrieve_gates_pass,
 )
+from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.retrieval.frozen_profile import (
     LONG_DOCUMENT_PROFILE_ID,
     UnknownRetrievalProfileError,
@@ -160,8 +161,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     retrieve_report["holdout_opened"] = True
     retrieve_report["holdout_run_id"] = run_id
-    answers = []
-    judges = []
+    answers: list[AnswerPayload] = []
+    judges: list[tuple[str, float | None]] = []
     incomplete = 0
     for row, result in zip(labeled, results, strict=True):
         if str(result.fallback_reason) != "none":

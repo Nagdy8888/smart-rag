@@ -2,7 +2,7 @@
  * Admit and resume EventSource bodies. Does not parse SSE frames.
  */
 
-import type { SubmitMessageResponse } from "../types";
+import type { RequestedSearchScope, SubmitMessageResponse } from "../types";
 import { classifiedOrGenericFailure, type ApiFailure } from "./errors";
 import type { ApiAuth } from "./headers";
 import { paidMutationHeaders, resumeHeaders, submitMessageBody } from "./headers";
@@ -45,6 +45,7 @@ export function shouldResumeExistingRun(state: PaidRunPointer): boolean {
  * @param conversationId - Conversation UUID.
  * @param message - Untrusted user text.
  * @param idempotencyKey - Stable UUID reused on retry.
+ * @param searchScope - Client source preference. Sent on POST only.
  * @param fetchImpl - Injected fetch.
  * @param signal - Abort from Cancel or a replacement send.
  * @returns Streaming GET response plus admission JSON, or a typed failure.
@@ -54,6 +55,7 @@ export async function startMessageStream(
   conversationId: string,
   message: string,
   idempotencyKey: string,
+  searchScope: RequestedSearchScope,
   fetchImpl: typeof fetch = fetch,
   signal?: AbortSignal,
 ): Promise<StreamStart> {
@@ -66,7 +68,7 @@ export async function startMessageStream(
     {
       method: "POST",
       headers: admitHeaders,
-      body: JSON.stringify(submitMessageBody(message, idempotencyKey)),
+      body: JSON.stringify(submitMessageBody(message, idempotencyKey, searchScope)),
       signal,
     },
   );
@@ -114,6 +116,7 @@ export async function startMessageStream(
  * @param conversationId - Conversation UUID.
  * @param message - Untrusted user text. Ignored on resume.
  * @param state - Current run pointer.
+ * @param searchScope - Client source preference. Used only when this helper POSTs.
  * @param fetchImpl - Injected fetch.
  * @param signal - Abort from Cancel or a replacement send.
  * @returns Stream start. `resumed` is true when POST was skipped.
@@ -123,6 +126,7 @@ export async function startOrResumeMessageStream(
   conversationId: string,
   message: string,
   state: PaidRunPointer,
+  searchScope: RequestedSearchScope,
   fetchImpl: typeof fetch = fetch,
   signal?: AbortSignal,
 ): Promise<StreamStart> {
@@ -155,6 +159,7 @@ export async function startOrResumeMessageStream(
     conversationId,
     message,
     state.idempotencyKey,
+    searchScope,
     fetchImpl,
     signal,
   );

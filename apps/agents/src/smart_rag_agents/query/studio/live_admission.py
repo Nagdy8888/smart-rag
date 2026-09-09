@@ -16,6 +16,7 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.payload import hash_query_admission_payload
 from smart_rag_core.query_admission.service import admit_query_run
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.jwks import JwksVerificationError
 from smart_rag_core.security.profile_snapshot import build_caller_context
 
@@ -251,6 +252,7 @@ def run_studio_live_seed(
         conversation_id=conversation_id,
         route_family=LIVE_ROUTE_FAMILY,
         message=query,
+        requested_search_scope=RequestedSearchScope.AUTO,
     )
     idempotency_key = studio_live_idempotency_key(
         thread_id=thread_id,
@@ -401,6 +403,7 @@ def production_admit(
         idempotency_key=idempotency_key,
         payload_hash=payload_hash,
         route_family=LIVE_ROUTE_FAMILY,
+        requested_search_scope=RequestedSearchScope.AUTO,
         token_issued_at=token_issued_at,
     )
     commit = getattr(connection, "commit", None)

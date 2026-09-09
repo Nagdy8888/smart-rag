@@ -88,6 +88,7 @@ def _run_response(record: QueryRunRecord) -> RunResponse:
         status=record.status,
         reservation_id=record.reservation_id,
         created_at=record.created_at,
+        requested_search_scope=record.requested_search_scope,
     )
 
 

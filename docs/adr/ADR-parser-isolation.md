@@ -35,6 +35,7 @@ Phase 3 Packet 5 parses untrusted uploads (PDF, DOCX, PPTX, XLSX/CSV, HTML, Mark
 - [INGESTION_LIMITS.md](../ingestion/INGESTION_LIMITS.md) parser bounds
 - [Phase 3 evidence](../development/phase-03-ingestion-evidence.md) Packet 5
 - Plan Phase 3 Packet 5 acceptance checks
+- [ADR-anydoc-local-parser-bakeoff.md](./ADR-anydoc-local-parser-bakeoff.md) experiment-only AnyDoc image; production parser selection unchanged
 
 ## Approval
 

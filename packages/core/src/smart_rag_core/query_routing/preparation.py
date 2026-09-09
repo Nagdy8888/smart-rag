@@ -27,6 +27,7 @@ from smart_rag_core.query_routing.fidelity import score_rewrite_fidelity
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
     ScopeDegradationReason,
+    apply_requested_search_scope,
     classify_knowledge_scope,
     company_intent_signal,
     scope_requires_model,
@@ -54,6 +55,7 @@ from smart_rag_core.query_routing.signals import (
     is_product_help,
     is_whole_document_summary,
 )
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext
 
 PrepModelCaller = Callable[[str, tuple[MemoryRecord, ...]], PreparationModelPayload]
@@ -90,6 +92,7 @@ def _needs_model(
     *,
     memory: Sequence[MemoryRecord],
     force_model: bool,
+    requested_search_scope: RequestedSearchScope,
 ) -> bool:
     """Return whether rewrite plus profile needs the one structured call.
 
@@ -97,6 +100,8 @@ def _needs_model(
         query: Original query.
         memory: Loaded untrusted messages.
         force_model: Test/diagnostic hook.
+        requested_search_scope: Client source preference. Explicit Company or
+            General skips only the scope-classification reason for a call.
 
     Returns:
         True when a model is required. Simple deterministic profiles are False.
@@ -111,7 +116,9 @@ def _needs_model(
         return True
     if memory and extract.query_type.value == "factual" and len(query.split()) <= 4:
         return True
-    if scope_requires_model(query, memory=memory):
+    if requested_search_scope is RequestedSearchScope.AUTO and scope_requires_model(
+        query, memory=memory
+    ):
         return True
     return False
 
@@ -161,6 +168,7 @@ def prepare_query(
     memory: Sequence[MemoryRecord] = (),
     routing_surface: RoutingSurface = RoutingSurface.PRODUCTION,
     requested_manual_route: str | None = None,
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
     model_caller: PrepModelCaller | None = None,
     force_model: bool = False,
     connection: psycopg.Connection | None = None,
@@ -180,6 +188,7 @@ def prepare_query(
         memory: Bounded untrusted messages. Never source documents.
         routing_surface: Production or diagnostic.
         requested_manual_route: Recorded only on diagnostic surfaces.
+        requested_search_scope: Client source preference from admission.
         model_caller: Optional structured prep adapter.
         force_model: Spend the one call even when deterministic extract exists.
         connection: Required to consume the reservation when a model runs.
@@ -207,7 +216,12 @@ def prepare_query(
 
     original = sanitize_user_text(query)
     extract = extract_deterministic(original)
-    needs_model = _needs_model(original, memory=tuple(memory), force_model=force_model)
+    needs_model = _needs_model(
+        original,
+        memory=tuple(memory),
+        force_model=force_model,
+        requested_search_scope=requested_search_scope,
+    )
     payload: PreparationModelPayload | None = None
     model_calls: int = 0
     fallback = "not_needed"
@@ -343,6 +357,7 @@ def prepare_query(
         model_available=payload is not None,
         forced_degradation=forced_degradation,
     )
+    scope = apply_requested_search_scope(original, scope, requested_search_scope)
     try:
         preparation = QueryPreparation(
             original=original,
@@ -390,6 +405,7 @@ def prepare_query(
             knowledge_scope=scope.knowledge_scope,
             knowledge_scope_confidence=scope.confidence,
             scope_degradation_reason=scope.scope_degradation_reason,
+            requested_search_scope=requested_search_scope,
         )
     except ValueError as exc:
         raise QueryRoutingError(_prep_value_error(exc)) from exc

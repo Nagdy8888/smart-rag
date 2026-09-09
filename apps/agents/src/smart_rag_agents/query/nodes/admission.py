@@ -72,6 +72,7 @@ def enforce_admission(state: QueryGraphState) -> QueryGraphState:
         "authorized_runtime": dumped,
         "route_family": context.route_family.value,
         "requested_route": context.route_family.value,
+        "requested_search_scope": context.requested_search_scope.value,
         "deadline_at": deadline,
         "recursion_limit": context.recursion_limit,
         "remaining_corrections": context.correction_ceiling,

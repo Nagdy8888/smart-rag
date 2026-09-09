@@ -611,6 +611,137 @@ export type Database = {
         }
         Relationships: []
       }
+      detector_finding_reviews: {
+        Row: {
+          actor_role: Database["app"]["Enums"]["user_role"]
+          actor_user_id: string
+          audit_event_id: string | null
+          authorization_version: number | null
+          created_at: string
+          decision: Database["app"]["Enums"]["detector_review_decision"]
+          finding_id: string
+          id: string
+          idempotency_key: string
+          reason: string
+          superseded_by: string | null
+        }
+        Insert: {
+          actor_role: Database["app"]["Enums"]["user_role"]
+          actor_user_id: string
+          audit_event_id?: string | null
+          authorization_version?: number | null
+          created_at?: string
+          decision: Database["app"]["Enums"]["detector_review_decision"]
+          finding_id: string
+          id?: string
+          idempotency_key: string
+          reason: string
+          superseded_by?: string | null
+        }
+        Update: {
+          actor_role?: Database["app"]["Enums"]["user_role"]
+          actor_user_id?: string
+          audit_event_id?: string | null
+          authorization_version?: number | null
+          created_at?: string
+          decision?: Database["app"]["Enums"]["detector_review_decision"]
+          finding_id?: string
+          id?: string
+          idempotency_key?: string
+          reason?: string
+          superseded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detector_finding_reviews_audit_event_id_fkey"
+            columns: ["audit_event_id"]
+            isOneToOne: false
+            referencedRelation: "audit_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detector_finding_reviews_finding_id_fkey"
+            columns: ["finding_id"]
+            isOneToOne: false
+            referencedRelation: "detector_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detector_finding_reviews_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "detector_finding_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      detector_findings: {
+        Row: {
+          attestation_policy_version: string
+          bounded_count: number
+          content_hash: string
+          created_at: string
+          detector_family: string
+          detector_policy_version: string
+          document_id: string
+          finding_scope: string
+          id: string
+          locator_fingerprint: string
+          scan_evidence_id: string
+          version_id: string
+        }
+        Insert: {
+          attestation_policy_version: string
+          bounded_count: number
+          content_hash: string
+          created_at?: string
+          detector_family: string
+          detector_policy_version: string
+          document_id: string
+          finding_scope: string
+          id?: string
+          locator_fingerprint: string
+          scan_evidence_id: string
+          version_id: string
+        }
+        Update: {
+          attestation_policy_version?: string
+          bounded_count?: number
+          content_hash?: string
+          created_at?: string
+          detector_family?: string
+          detector_policy_version?: string
+          document_id?: string
+          finding_scope?: string
+          id?: string
+          locator_fingerprint?: string
+          scan_evidence_id?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detector_findings_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detector_findings_scan_evidence_id_fkey"
+            columns: ["scan_evidence_id"]
+            isOneToOne: false
+            referencedRelation: "document_scan_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detector_findings_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_acl: {
         Row: {
           created_at: string
@@ -2434,6 +2565,7 @@ export type Database = {
           created_at: string
           id: string
           role: string
+          run_id: string | null
         }
         Insert: {
           content: string
@@ -2441,6 +2573,7 @@ export type Database = {
           created_at?: string
           id?: string
           role: string
+          run_id?: string | null
         }
         Update: {
           content?: string
@@ -2448,6 +2581,7 @@ export type Database = {
           created_at?: string
           id?: string
           role?: string
+          run_id?: string | null
         }
         Relationships: [
           {
@@ -2455,6 +2589,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
             referencedColumns: ["id"]
           },
         ]
@@ -2761,6 +2902,7 @@ export type Database = {
           model_call_ceiling: number | null
           recursion_limit: number | null
           request_payload_hash: string | null
+          requested_search_scope: string
           reservation_id: string | null
           route_family: string | null
           side_effect_ceiling: number | null
@@ -2787,6 +2929,7 @@ export type Database = {
           model_call_ceiling?: number | null
           recursion_limit?: number | null
           request_payload_hash?: string | null
+          requested_search_scope?: string
           reservation_id?: string | null
           route_family?: string | null
           side_effect_ceiling?: number | null
@@ -2813,6 +2956,7 @@ export type Database = {
           model_call_ceiling?: number | null
           recursion_limit?: number | null
           request_payload_hash?: string | null
+          requested_search_scope?: string
           reservation_id?: string | null
           route_family?: string | null
           side_effect_ceiling?: number | null
@@ -3593,6 +3737,44 @@ export type Database = {
           tool_ceiling: number
         }[]
       }
+      admit_query_run_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+          p_idempotency_key: string
+          p_payload_hash: string
+          p_requested_search_scope: string
+          p_route_family: string
+          p_session_id?: string
+          p_token_issued_at?: string
+        }
+        Returns: {
+          correction_ceiling: number
+          deadline_at: string
+          discovery_ceiling: number
+          heartbeat_at: string
+          manifest_ceiling: number
+          model_call_ceiling: number
+          optimistic_version: number
+          reconnect: boolean
+          recursion_limit: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          request_payload_hash: string
+          requested_search_scope: string
+          reservation_id: string
+          reserved_amount_usd: number
+          route_family: string
+          run_id: string
+          side_effect_ceiling: number
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number
+          tool_ceiling: number
+        }[]
+      }
       advance_promotion_saga_step: {
         Args: { p_expected_step: string; p_new_step: string; p_saga_id: string }
         Returns: boolean
@@ -3612,6 +3794,20 @@ export type Database = {
           p_target_type: string
         }
         Returns: string
+      }
+      append_query_message: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_content: string
+          p_conversation_id: string
+          p_role: string
+          p_run_id: string
+        }
+        Returns: {
+          message_id: string
+        }[]
       }
       append_run_event: {
         Args: {
@@ -3942,6 +4138,16 @@ export type Database = {
         }
         Returns: number
       }
+      count_authorized_retrievable_chunks_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_language?: string
+          p_version_id?: string
+        }
+        Returns: number
+      }
       create_conversation: {
         Args: {
           caller_authorization_version: number
@@ -3965,6 +4171,17 @@ export type Database = {
           p_conversation_id: string
         }
         Returns: undefined
+      }
+      detector_reviews_cover_version: {
+        Args: {
+          p_attestation_policy_version: string
+          p_content_hash: string
+          p_detector_policy_version: string
+          p_required_families: string[]
+          p_scan_evidence_id: string
+          p_version_id: string
+        }
+        Returns: boolean
       }
       disable_graph_workspace: {
         Args: { p_reason: string; p_workspace_key: string }
@@ -4049,6 +4266,14 @@ export type Database = {
         Args: { p_now?: string }
         Returns: number
       }
+      estimate_llm_usage_cost_usd: {
+        Args: {
+          p_completion_tokens: number
+          p_prompt_tokens: number
+          p_usage_kind: string
+        }
+        Returns: number
+      }
       exclude_version_from_retrieval: {
         Args: { p_reason?: string; p_version_id: string }
         Returns: {
@@ -4095,6 +4320,22 @@ export type Database = {
           p_status: Database["app"]["Enums"]["job_status"]
         }
         Returns: boolean
+      }
+      fail_query_run: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          creator_user_id: string
+          id: string
+          reservation_id: string
+          status: Database["app"]["Enums"]["run_status"]
+        }[]
       }
       fetch_authorized_chunk_context: {
         Args: {
@@ -4213,6 +4454,7 @@ export type Database = {
           model_call_ceiling: number | null
           recursion_limit: number | null
           request_payload_hash: string | null
+          requested_search_scope: string
           reservation_id: string | null
           route_family: string | null
           side_effect_ceiling: number | null
@@ -4243,6 +4485,19 @@ export type Database = {
           title: string
         }[]
       }
+      get_conversation_title_source: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+        }
+        Returns: {
+          assistant_excerpt: string
+          current_title: string
+          user_excerpt: string
+        }[]
+      }
       get_query_run: {
         Args: {
           caller_authorization_version: number
@@ -4259,6 +4514,35 @@ export type Database = {
           status: Database["app"]["Enums"]["run_status"]
         }[]
       }
+      get_query_run_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          creator_user_id: string
+          id: string
+          requested_search_scope: string
+          reservation_id: string
+          status: Database["app"]["Enums"]["run_status"]
+        }[]
+      }
+      get_version_ingestion_status: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_version_id: string
+        }
+        Returns: {
+          recent_jobs: Json
+          status_payload: Json
+        }[]
+      }
       get_visible_document: {
         Args: {
           caller_authorization_version: number
@@ -4267,6 +4551,7 @@ export type Database = {
           p_document_id: string
         }
         Returns: {
+          created_at: string
           current_version_id: string
           id: string
           title: string
@@ -4349,6 +4634,21 @@ export type Database = {
           status: Database["app"]["Enums"]["glossary_import_status"]
         }[]
       }
+      insert_run_citation: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_chunk_id: string
+          p_citation_index: number
+          p_provenance: Json
+          p_run_id: string
+          p_snippet: string
+        }
+        Returns: {
+          citation_id: string
+        }[]
+      }
       inspect_graph_neighborhood: {
         Args: {
           caller_authorization_version: number
@@ -4389,6 +4689,22 @@ export type Database = {
           version_id: string
         }[]
       }
+      list_conversation_messages: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_before_id?: string
+          p_conversation_id: string
+          p_limit?: number
+        }
+        Returns: {
+          content: string
+          created_at: string
+          message_id: string
+          role: string
+        }[]
+      }
       list_graph_entity_rules: {
         Args: {
           caller_authorization_version: number
@@ -4413,6 +4729,21 @@ export type Database = {
           source: Database["app"]["Enums"]["graph_entity_rule_source"]
           status: Database["app"]["Enums"]["graph_entity_rule_status"]
           updated_at: string
+        }[]
+      }
+      list_pending_team_invitations: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: {
+          created_at: string
+          email: string
+          expires_at: string
+          invitation_id: string
+          role: Database["app"]["Enums"]["user_role"]
+          upload_enabled: boolean
         }[]
       }
       list_quarantine_cleanup_candidates: {
@@ -4459,6 +4790,17 @@ export type Database = {
           sequence: number
         }[]
       }
+      list_tool_catalog_seeds: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: {
+          active: boolean
+          tool_key: string
+        }[]
+      }
       list_user_conversations: {
         Args: {
           caller_authorization_version: number
@@ -4466,6 +4808,22 @@ export type Database = {
           caller_user_id: string
         }
         Returns: {
+          creator_user_id: string
+          id: string
+          title: string
+        }[]
+      }
+      list_user_conversations_page: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_cursor_created_at?: string
+          p_cursor_id?: string
+          p_limit?: number
+        }
+        Returns: {
+          created_at: string
           creator_user_id: string
           id: string
           title: string
@@ -4485,6 +4843,40 @@ export type Database = {
           visibility_generation: number
         }[]
       }
+      list_visible_documents_page: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_cursor_created_at?: string
+          p_cursor_id?: string
+          p_limit?: number
+        }
+        Returns: {
+          created_at: string
+          current_version_id: string
+          id: string
+          title: string
+          visibility: Database["app"]["Enums"]["document_visibility"]
+          visibility_generation: number
+        }[]
+      }
+      list_workspace_members: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+        }
+        Returns: {
+          created_at: string
+          disabled_at: string
+          display_name: string
+          email: string
+          role: Database["app"]["Enums"]["user_role"]
+          upload_enabled: boolean
+          user_id: string
+        }[]
+      }
       load_active_crawl_approval: {
         Args: { p_source_id: string }
         Returns: {
@@ -4497,6 +4889,17 @@ export type Database = {
           reviewer_user_id: string
           source_id: string
           start_url: string
+        }[]
+      }
+      load_graph_mapping_caller: {
+        Args: { p_version_id: string }
+        Returns: {
+          authorization_version: number
+          disabled_at: string
+          mfa_enrolled: boolean
+          role: Database["app"]["Enums"]["user_role"]
+          upload_enabled: boolean
+          user_id: string
         }[]
       }
       load_query_memory: {
@@ -4512,6 +4915,82 @@ export type Database = {
           created_at: string
           message_id: string
           role: string
+        }[]
+      }
+      load_query_run_runtime: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          conversation_id: string
+          correction_ceiling: number
+          deadline_at: string
+          discovery_ceiling: number
+          heartbeat_at: string
+          manifest_ceiling: number
+          model_call_ceiling: number
+          optimistic_version: number
+          recursion_limit: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          request_payload_hash: string
+          reservation_id: string
+          reserved_amount_usd: number
+          route_family: string
+          run_id: string
+          side_effect_ceiling: number
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number
+          tool_ceiling: number
+          user_message: string
+        }[]
+      }
+      load_query_run_runtime_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          conversation_id: string
+          correction_ceiling: number
+          deadline_at: string
+          discovery_ceiling: number
+          heartbeat_at: string
+          manifest_ceiling: number
+          model_call_ceiling: number
+          optimistic_version: number
+          recursion_limit: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          request_payload_hash: string
+          requested_search_scope: string
+          reservation_id: string
+          reserved_amount_usd: number
+          route_family: string
+          run_id: string
+          side_effect_ceiling: number
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number
+          tool_ceiling: number
+          user_message: string
+        }[]
+      }
+      load_query_run_user_message: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          content: string
         }[]
       }
       mark_graph_maps_ineligible_for_version: {
@@ -4724,6 +5203,39 @@ export type Database = {
           version_id: string
         }[]
       }
+      retrieve_dense_candidates_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_candidate_limit: number
+          p_language?: string
+          p_mode: string
+          p_profile: string
+          p_query_embedding: string
+          p_version_id?: string
+        }
+        Returns: {
+          chunk_id: string
+          distance: number
+          document_id: string
+          retrieval_mode: string
+          version_id: string
+        }[]
+      }
+      retrieve_heading_inventory: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_version_id: string
+        }
+        Returns: {
+          page_end: number
+          page_start: number
+          section_path: string[]
+        }[]
+      }
       retrieve_term_candidates: {
         Args: {
           caller_authorization_version: number
@@ -4768,6 +5280,23 @@ export type Database = {
           version_id: string
         }[]
       }
+      review_detector_finding: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_decision: string
+          p_finding_id: string
+          p_idempotency_key: string
+          p_reason: string
+        }
+        Returns: {
+          decision: string
+          finding_id: string
+          replayed: boolean
+          review_id: string
+        }[]
+      }
       revoke_graph_entity_rule: {
         Args: {
           caller_authorization_version: number
@@ -4804,6 +5333,10 @@ export type Database = {
           import_id: string
           status: Database["app"]["Enums"]["glossary_import_status"]
         }[]
+      }
+      sanitize_ingestion_last_error: {
+        Args: { p_category: string; p_error: string }
+        Returns: string
       }
       search_conversation_lingering_ids: {
         Args: { p_conversation_id: string }
@@ -4906,6 +5439,20 @@ export type Database = {
           usage_rows: number
         }[]
       }
+      summarize_run_usage: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          completion_tokens: number
+          cost_usd: number
+          prompt_tokens: number
+          usage_rows: number
+        }[]
+      }
       switch_graph_active_workspace: {
         Args: {
           p_expected_generation: number
@@ -4970,6 +5517,21 @@ export type Database = {
           committed_amount_usd: number
           reservation_id: string
           status: Database["app"]["Enums"]["budget_reservation_status"]
+        }[]
+      }
+      update_conversation_title: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+          p_title: string
+        }
+        Returns: {
+          created_at: string
+          creator_user_id: string
+          id: string
+          title: string
         }[]
       }
       upsert_graph_cleanup_tombstone: {
@@ -5047,6 +5609,15 @@ export type Database = {
         Returns: boolean
       }
       verify_audit_chain: { Args: { limit_n?: number }; Returns: string }
+      version_governance_review_diagnostics: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_version_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       approval_status: "pending" | "approved" | "rejected" | "revoked"
@@ -5056,6 +5627,7 @@ export type Database = {
         | "committed"
         | "released"
         | "expired"
+      detector_review_decision: "false_positive" | "upheld" | "rejected"
       document_status:
         | "uploading"
         | "uploaded"
@@ -6276,6 +6848,7 @@ export type Database = {
           public: boolean | null
           type: Database["storage"]["Enums"]["buckettype"]
           updated_at: string | null
+          versioning_status: string
         }
         Insert: {
           allowed_mime_types?: string[] | null
@@ -6289,6 +6862,7 @@ export type Database = {
           public?: boolean | null
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string | null
+          versioning_status?: string
         }
         Update: {
           allowed_mime_types?: string[] | null
@@ -6302,6 +6876,7 @@ export type Database = {
           public?: boolean | null
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string | null
+          versioning_status?: string
         }
         Relationships: []
       }
@@ -6356,101 +6931,6 @@ export type Database = {
         }
         Relationships: []
       }
-      iceberg_namespaces: {
-        Row: {
-          bucket_name: string
-          catalog_id: string
-          created_at: string
-          id: string
-          metadata: Json
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          bucket_name: string
-          catalog_id: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          bucket_name?: string
-          catalog_id?: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "iceberg_namespaces_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "buckets_analytics"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      iceberg_tables: {
-        Row: {
-          bucket_name: string
-          catalog_id: string
-          created_at: string
-          id: string
-          location: string
-          name: string
-          namespace_id: string
-          remote_table_id: string | null
-          shard_id: string | null
-          shard_key: string | null
-          updated_at: string
-        }
-        Insert: {
-          bucket_name: string
-          catalog_id: string
-          created_at?: string
-          id?: string
-          location: string
-          name: string
-          namespace_id: string
-          remote_table_id?: string | null
-          shard_id?: string | null
-          shard_key?: string | null
-          updated_at?: string
-        }
-        Update: {
-          bucket_name?: string
-          catalog_id?: string
-          created_at?: string
-          id?: string
-          location?: string
-          name?: string
-          namespace_id?: string
-          remote_table_id?: string | null
-          shard_id?: string | null
-          shard_key?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "iceberg_tables_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "buckets_analytics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "iceberg_tables_namespace_id_fkey"
-            columns: ["namespace_id"]
-            isOneToOne: false
-            referencedRelation: "iceberg_namespaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       migrations: {
         Row: {
           executed_at: string | null
@@ -6474,9 +6954,12 @@ export type Database = {
       }
       objects: {
         Row: {
+          archived_at: string | null
           bucket_id: string | null
           created_at: string | null
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string | null
           metadata: Json | null
           name: string | null
@@ -6488,9 +6971,12 @@ export type Database = {
           version: string | null
         }
         Insert: {
+          archived_at?: string | null
           bucket_id?: string | null
           created_at?: string | null
           id?: string
+          is_delete_marker?: boolean
+          is_versioned?: boolean
           last_accessed_at?: string | null
           metadata?: Json | null
           name?: string | null
@@ -6502,9 +6988,12 @@ export type Database = {
           version?: string | null
         }
         Update: {
+          archived_at?: string | null
           bucket_id?: string | null
           created_at?: string | null
           id?: string
+          is_delete_marker?: boolean
+          is_versioned?: boolean
           last_accessed_at?: string | null
           metadata?: Json | null
           name?: string | null
@@ -6816,12 +7305,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6845,11 +7334,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6870,11 +7359,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6895,11 +7384,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6912,11 +7401,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6936,6 +7425,7 @@ export const Constants = {
         "released",
         "expired",
       ],
+      detector_review_decision: ["false_positive", "upheld", "rejected"],
       document_status: [
         "uploading",
         "uploaded",
@@ -7047,3 +7537,4 @@ export const Constants = {
     },
   },
 } as const
+

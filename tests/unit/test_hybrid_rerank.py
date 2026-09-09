@@ -164,7 +164,9 @@ def test_rerank_preload_ids_match_pool_membership() -> None:
     )
     assert len(preloaded) == RERANK_POOL_SIZE
     assert len(preloaded) == len(set(preloaded))
-    from_overflow = [item for item in preloaded if item in {row.chunk_id for row in overflow}]
+    from_overflow = [
+        item for item in preloaded if item in {row.chunk_id for row in overflow}
+    ]
     assert len(from_overflow) <= RERANK_MAX_PER_DOCUMENT
 
 

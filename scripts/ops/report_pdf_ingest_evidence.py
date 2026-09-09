@@ -6,6 +6,7 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import cast
 
 import psycopg
 
@@ -14,8 +15,8 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from scripts.ops.ingest_demo_plot_slices import (  # noqa: E402
-    _merged_env,
-    _require,
+    merged_env,
+    require_env,
 )
 
 VERSION_ID = "4324c385-80fd-4464-9c97-a7568bf364db"
@@ -50,8 +51,8 @@ def main() -> int:
         Process exit code.
     """
 
-    env = _merged_env()
-    url = _require(env, "OPERATOR_SUPABASE_DB_URL")
+    env = merged_env()
+    url = require_env(env, "OPERATOR_SUPABASE_DB_URL")
     with psycopg.connect(url, connect_timeout=20) as connection:
         connection.execute("SET ROLE postgres")
         version = connection.execute(
@@ -122,18 +123,19 @@ def main() -> int:
     representatives = sum(1 for row in chunk_rows if row[1] is True)
     ledger_payload: list[dict[str, object]] = []
     for row in ledger:
-        result_ref = row[3] if isinstance(row[3], dict) else {}
+        raw_ref = row[3]
+        result_ref: dict[str, object]
+        if isinstance(raw_ref, dict):
+            result_ref = cast(dict[str, object], raw_ref)
+        else:
+            result_ref = {}
         ledger_payload.append(
             {
                 "status": row[0],
                 "input_count": row[1],
                 "actual_usd": str(row[2]) if row[2] is not None else None,
-                "vectors_inline": result_ref.get("vectors_inline")
-                if isinstance(result_ref, dict)
-                else None,
-                "vector_count": result_ref.get("vector_count")
-                if isinstance(result_ref, dict)
-                else None,
+                "vectors_inline": result_ref.get("vectors_inline"),
+                "vector_count": result_ref.get("vector_count"),
             }
         )
     print(

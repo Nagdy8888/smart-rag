@@ -40,6 +40,7 @@ from smart_rag_core.release.packet4 import (
     percentile,
 )
 from smart_rag_core.retrieval.graph import DEFAULT_GRAPH_WORKSPACE
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext, UserRole
 
 _HNSW_INDEX = "app.document_chunks_embedding_hnsw_idx"
@@ -339,6 +340,7 @@ def measure_budget_lock_contention(db_url: str) -> dict[str, object]:
             conversation_id=conversation_id,
             route_family=Phase6RouteFamily.HYBRID,
             message=message,
+            requested_search_scope=RequestedSearchScope.AUTO,
         )
         with psycopg.connect(db_url) as connection:
             connection.execute("SET ROLE app_api")
@@ -352,6 +354,7 @@ def measure_budget_lock_contention(db_url: str) -> dict[str, object]:
                     idempotency_key=uuid4(),
                     payload_hash=payload_hash,
                     route_family=Phase6RouteFamily.HYBRID,
+                    requested_search_scope=RequestedSearchScope.AUTO,
                 )
                 connection.commit()
                 elapsed_ms = (time.monotonic() - started) * 1000.0

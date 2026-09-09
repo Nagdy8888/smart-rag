@@ -27,7 +27,7 @@ import { newIdempotencyKey } from "../../../lib/idempotency";
 import { paidSendBlockReason, type HandshakeDecision } from "../../../lib/handshake";
 import { sessionQueryKeys } from "../../../lib/query-keys";
 import { consumeSse, isAbortError } from "../../../lib/sse-consume";
-import type { ReadinessResponse } from "../../../lib/types";
+import type { ReadinessResponse, RequestedSearchScope } from "../../../lib/types";
 
 export type StartChatSendDeps = {
   auth: ApiAuth | null;
@@ -60,6 +60,13 @@ export type StartChatSendDeps = {
   setReconnectAttempt: (value: number) => void;
   setReconnectExhausted: (value: boolean) => void;
   setNextRetryMs: (value: number | null) => void;
+  requestedSearchScope: RequestedSearchScope;
+  bindCreatedConversation: (conversationId: string) => void;
+  bindSearchScope: (
+    idempotencyKey: string,
+    current: RequestedSearchScope,
+  ) => RequestedSearchScope;
+  clearSearchScopeBinding: () => void;
 };
 
 /**
@@ -96,6 +103,7 @@ async function finishAdmittedStream(
     deps.setChat(next);
     deps.sequenceRef.current = next.lastSequence;
     if (next.terminal !== null) {
+      deps.clearSearchScopeBinding();
       deps.idempotencyRef.current = newIdempotencyKey();
       deps.setChat((prev) => ({
         ...prev,
@@ -160,6 +168,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
     }
     deps.sendLockRef.current = true;
     deps.setSending(true);
+    const capturedScope = deps.requestedSearchScope;
     const settled = snapshotSettledTurn(
       deps.lastUserMessageRef.current,
       deps.chatRef.current,
@@ -185,6 +194,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
           deps.setSending(false);
           return false;
         }
+        deps.bindCreatedConversation(created.conversation_id);
         deps.onConversationId(created.conversation_id);
         void deps.queryClient.invalidateQueries({ queryKey: deps.keys.conversations });
       } catch (error) {
@@ -220,6 +230,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
       deps.setChat(current);
       deps.setFailure(null);
     }
+    const searchScope = deps.bindSearchScope(current.idempotencyKey, capturedScope);
     try {
       const started = await startOrResumeMessageStream(
         deps.auth,
@@ -231,6 +242,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
           lastSequence: current.lastSequence,
           idempotencyKey: current.idempotencyKey,
         },
+        searchScope,
         fetch,
         controller.signal,
       );
@@ -251,6 +263,7 @@ export function createChatSend(deps: StartChatSendDeps): (text: string) => Promi
           reservation_id: started.admission.reservation_id,
           route_family: started.admission.route_family,
           reconnect: started.admission.reconnect,
+          requested_search_scope: started.admission.requested_search_scope,
         });
         deps.setChat(current);
         deps.setSending(false);

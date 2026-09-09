@@ -5,11 +5,11 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
+from smart_rag_core.ingestion.detectors import DetectorFamilyOutcome
 from smart_rag_core.ingestion.governance import (
     ExtractionGovernanceInput,
     evaluate_extraction_governance,
 )
-from smart_rag_core.ingestion.detectors import DetectorFamilyOutcome
 from smart_rag_core.ingestion.parser.sandbox.launcher import (
     ParserSandboxLauncher,
     SandboxLaunchConfig,

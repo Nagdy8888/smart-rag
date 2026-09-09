@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-07
+last-reviewed: 2026-09-09
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -72,10 +72,11 @@ appear in `NEXT_PUBLIC_*`. UI role hiding is convenience only.
 | One terminal | `completed` \| `cancelled` \| `error` \| `partial` | `TERMINAL_SSE_EVENT_TYPES` |
 | Unknown SSE | Ignore additive types; do not break the stream | `SSE.md` |
 
-`SubmitMessageRequest` fields are `message` and optional `idempotency_key`
-only. There is **no** client route override. Admission is Auto Composite
-(`route_family` is server-derived). Manual Hybrid/Combined/table/inspection
-controls are [GAP-07-01](#gap-register).
+`SubmitMessageRequest` fields are `message`, optional `idempotency_key`,
+and optional `search_scope` (`auto` | `company_documents` |
+`general_knowledge`). There is **no** client route override. Admission is
+Auto Composite (`route_family` is server-derived). Manual
+Hybrid/Combined/table/inspection controls are [GAP-07-01](#gap-register).
 
 ## SSE catalog
 
@@ -182,6 +183,7 @@ No HTTP for owner bootstrap (`bootstrap_owner` service), MFA recovery
 | GET | `/ingestion/versions/{version_id}/status` | lifecycle `status` plus nested `scan`, `review`, `ocr`, `chunks_tables`, `embedding`, `bm25`, `queue_age`, `graph_handoff`, `retry_allowed` | authenticated; unauthorized **404**; `retry_allowed` owner/admin only |
 | POST | `/ingestion/jobs/{job_id}/retry` | `job_id`, `status`, `detail` | owner/admin |
 | POST | `/ingestion/crawls` | req `start_url`, `approved_domain`, `idempotency_key`, optional title/depth/pages/class/graph/attestation; resp ids | owner/admin |
+| POST | `/ingestion/detector-findings/reviews` | req `finding_id`, `decision`, `reason`, `idempotency_key`; resp review ids; unauthorized **404** | owner/admin |
 
 Version `status` enum: `uploading`, `uploaded`, `scanning`, `parsing`,
 `hybrid_ready`, `graph_pending`, `graph_ready`, `graph_ineligible`,
@@ -324,7 +326,7 @@ mocks. Stitch may show an honest unavailable/blocked state.
 
 | ID | Missing contract | Owner | Disposition |
 | --- | --- | --- | --- |
-| GAP-07-01 | Manual route on `SubmitMessageRequest` (`Hybrid`/`Combined`/`Structured table`/`Graph inspection`) | Phase 6 | Advanced panel is display-only of server `route_family` + `route_correction` until admit grows a typed override |
+| GAP-07-01 | Manual route on `SubmitMessageRequest` (`Hybrid`/`Combined`/`Structured table`/`Graph inspection`) | Phase 6 | Advanced panel is display-only of server `route_family` + `route_correction`. `search_scope` is a source preference, not a route |
 | GAP-07-02 | SSE profile, rewrite, candidate counts, BM25 index bytes, rerank, uncovered ranges, inference objects, latency | Phase 6 | Render only catalog events; do not invent static diagnostics |
 | GAP-07-03 | Sign-up UI (Auth `signUp` exists) | Phase 7/8 UI | Specify Auth-direct sign-up; FastAPI still does not create profiles |
 | GAP-07-04 | Google OAuth enabled locally | Phase 2/10 | Specify OAuth screens; local `enabled=false` until configured |
@@ -396,8 +398,8 @@ where listed.
 | F Title | LLM summary | `POST /conversations/{conversation_id}/title` | creator; 404 otherwise | COST_MUTATION; skip when title is already a summary |
 | F Delete | delete | `DELETE /conversations/{id}` | creator or owner/admin; 204/404 | n/a |
 | F Handshake | version | `GET /api/meta` then `X-Client-Version` | public then paid POST | 426 blocks reserve |
-| F Send | message | `POST .../messages` body `message` | creator | `Idempotency-Key` |
-| F Route | Auto label | 202 `route_family` | server-derived | no client override GAP-07-01 |
+| F Send | message | `POST .../messages` body `message` + `search_scope` | creator | `Idempotency-Key` |
+| F Route | Answer source | POST `search_scope`; 202 `requested_search_scope` | source preference | no client route override GAP-07-01 |
 | F Advanced Hybrid/Combined/Table/Inspect buttons | — | GAP-07-01 | — | display-only of events |
 | F Stream | EventSource | `GET /runs/{id}/events?after=` | creator Bearer | Last-Event-ID; no version header |
 | F Cancel | cancel | `POST /runs/{id}/cancel` | creator | 409 if terminal |
@@ -429,6 +431,7 @@ Unknown additive SSE types: log and ignore. One terminal among
 | H signed_url | display | response `signed_url` | local **null** | Phase 10 |
 | H Finalize | hash, bytes, category, policy | `POST /documents/uploads/finalize` | same | `idempotency_key` |
 | H Crawl | url, domain | `POST /ingestion/crawls` | owner/admin | `idempotency_key` |
+| H Detector review | hash-bound decision | `POST /ingestion/detector-findings/reviews` | owner/admin; unauthorized **404** | `idempotency_key` |
 | H Status | pills + BM25 + handoff | `GET /ingestion/versions/{id}/status` | authenticated | n/a |
 | H Retry | retry | `POST /ingestion/jobs/{id}/retry` | owner/admin when `retry_allowed` | n/a |
 | H Graph not-ready copy | sentence | `graphNotReadyCopy(n)` from authorized counts only | never restricted | n/a |

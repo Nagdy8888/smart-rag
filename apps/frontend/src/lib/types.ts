@@ -8,8 +8,8 @@
 export type { AcceptInvitationResponse, CreateInvitationRequest, CreateInvitationResponse, CurrentUserResponse, InviteRole, MetaResponse, OffboardResponse, PendingInvitation, WorkspaceDirectoryResponse, WorkspaceMember } from "./types/auth";
 export { INVITE_ROLES } from "./types/auth";
 export type { DependencyStatus, ReadinessResponse } from "./types/readiness";
-export type { AnswerOrigin, CitationResponse, ConversationMessage, ConversationMessagesResponse, ConversationResponse, FeedbackResponse, FeedbackTag, RunResponse, SubmitMessageResponse } from "./types/chat";
-export { ANSWER_ORIGINS, FEEDBACK_TAGS, FEEDBACK_TAGS_DOWN, FEEDBACK_TAGS_UP, feedbackTagsFor } from "./types/chat";
+export type { AnswerOrigin, CitationResponse, ConversationMessage, ConversationMessagesResponse, ConversationResponse, FeedbackResponse, FeedbackTag, RequestedSearchScope, RunResponse, SubmitMessageResponse } from "./types/chat";
+export { ANSWER_ORIGINS, FEEDBACK_TAGS, FEEDBACK_TAGS_DOWN, FEEDBACK_TAGS_UP, REQUESTED_SEARCH_SCOPES, feedbackTagsFor, isRequestedSearchScope, requestedSearchScopeLabel } from "./types/chat";
 export type { Bm25Diagnostics, DocumentIngestionStatusResponse, DocumentResponse, EnqueueWebsiteCrawlRequest, EnqueueWebsiteCrawlResponse, FinalizeUploadHttpRequest, FinalizeUploadHttpResponse, GraphHandoffDiagnostics, IngestionJobSummary, IngestionLifecycleStatus, IngestionStatusVersion, OcrDiagnostics, RetryIngestionJobResponse, ReviewDiagnostics, ScanDiagnostics, SignedUploadResponse } from "./types/documents";
 export { INGESTION_LIFECYCLE_STATUSES } from "./types/documents";
 export type { GraphEntityResponse, GraphInspectLimitation, GraphInspectLocator, GraphInspectNodeResponse, GraphInspectRequest, GraphInspectResponse } from "./types/graph";

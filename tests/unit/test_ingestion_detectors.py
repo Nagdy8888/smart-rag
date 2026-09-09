@@ -25,7 +25,9 @@ def test_isbn_like_number_is_not_a_payment_card() -> None:
     """
 
     outcomes = run_detectors_v1(None, ("See identifier 9780262048224 in the index.",))
-    payment = next(item for item in outcomes if item.family == DETECTOR_FAMILY_PAYMENT_CARD)
+    payment = next(
+        item for item in outcomes if item.family == DETECTOR_FAMILY_PAYMENT_CARD
+    )
     assert payment.result is DetectorResult.CLEAN
     assert DETECTOR_POLICY_VERSION == "detectors-v1"
 
@@ -38,7 +40,9 @@ def test_luhn_valid_visa_test_number_is_positive() -> None:
     """
 
     outcomes = run_detectors_v1(None, ("card 4111111111111111",))
-    payment = next(item for item in outcomes if item.family == DETECTOR_FAMILY_PAYMENT_CARD)
+    payment = next(
+        item for item in outcomes if item.family == DETECTOR_FAMILY_PAYMENT_CARD
+    )
     assert payment.result is DetectorResult.POSITIVE
     assert payment.bounded_count == 1
     assert "4111" not in payment.locator_fingerprint

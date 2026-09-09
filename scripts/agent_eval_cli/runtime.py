@@ -33,6 +33,7 @@ from smart_rag_core.query_answer.versions import (
     EVAL_JUDGE_USD_PER_1K_INPUT,
     EVAL_JUDGE_USD_PER_1K_OUTPUT,
 )
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.settings import SharedSettings
 
@@ -279,6 +280,7 @@ def live_lifecycle(
             conversation_id=conversation.conversation_id,
             idempotency_key=idempotency,
             message=query,
+            requested_search_scope=RequestedSearchScope.AUTO,
         )
         return AdmittedEvalRun(
             case_id=case_id,

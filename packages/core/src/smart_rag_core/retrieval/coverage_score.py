@@ -291,9 +291,7 @@ def attach_numeric_coverage(
         winner_channels = len(channel_hits.get(fused[0].chunk_id, frozenset()))
     elif fused:
         winner_channels = 1
-    supported = (
-        supported_subquestions if supported_subquestions is not None else 0
-    )
+    supported = supported_subquestions if supported_subquestions is not None else 0
     components = build_coverage_components(
         fused=fused,
         query_type=query_type,

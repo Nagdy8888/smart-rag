@@ -98,6 +98,7 @@ def test_load_external_processing_uses_db_backed_flags() -> None:
         scan_evidence_current=False,
         configurable={},
         content_class=ContentClass.REAL_COMPANY,
+        review_approved=False,
     )
     assert denied.scan_evidence_current is False
     assert denied.policy_version_matches is True
@@ -109,6 +110,7 @@ def test_load_external_processing_uses_db_backed_flags() -> None:
         scan_evidence_current=True,
         configurable={"subprocessor_matrix_verified": True},
         content_class=ContentClass.REAL_COMPANY,
+        review_approved=True,
     )
     assert allowed.scan_evidence_current is True
     assert allowed.provider_settings_verified is True

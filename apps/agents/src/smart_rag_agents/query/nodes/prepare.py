@@ -27,7 +27,9 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
 
     State inputs:
         ``user_query``, ``memory_records``, ``authorized_runtime``,
-        ``routing_surface``, ``requested_manual_route``.
+        ``routing_surface``, ``requested_manual_route``. Requested search
+        scope is read from the authorized runtime, never from untrusted
+        graph fields.
 
     State outputs:
         ``preparation`` mapping, decremented ``remaining_model_calls``
@@ -79,6 +81,7 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             memory=memory,
             routing_surface=surface,
             requested_manual_route=state.get("requested_manual_route"),
+            requested_search_scope=context.requested_search_scope,
             model_caller=deps.model_caller,
             force_model=deps.force_model,
             connection=deps.connection,
@@ -117,6 +120,7 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "keyword_extract_count": 0,
             "catalog_llm_call_count": 0,
             "knowledge_scope": preparation.knowledge_scope.value,
+            "requested_search_scope": preparation.requested_search_scope.value,
             "no_retrieval_answer_mode": None,
             "scope_degradation_reason": (
                 None

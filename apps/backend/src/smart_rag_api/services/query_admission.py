@@ -19,6 +19,7 @@ from smart_rag_core.query_admission.service import (
 )
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.runtime.valkey import ValkeyClient
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext
 
 from smart_rag_api.services.auth_rate_limits import (
@@ -56,6 +57,7 @@ def admit_query_run_for_caller(
     idempotency_key: UUID,
     message: str,
     route_family: Phase6RouteFamily,
+    requested_search_scope: RequestedSearchScope,
     token_issued_at: datetime | None = None,
     postgres_rate_limit_url: SecretStr | None = None,
     valkey_limits_url: SecretStr | None = None,
@@ -74,6 +76,7 @@ def admit_query_run_for_caller(
         idempotency_key: Client-generated UUID message key.
         message: User message text hashed into the payload.
         route_family: Server-selected family for the ceiling table.
+        requested_search_scope: Client source preference hashed and stored.
         token_issued_at: JWT ``iat`` for profile-wide revocation.
         postgres_rate_limit_url: Degraded limiter URL. Defaults to
             ``postgres_url``. Missing backends fail closed.
@@ -114,6 +117,7 @@ def admit_query_run_for_caller(
         conversation_id=conversation_id,
         route_family=route_family,
         message=message,
+        requested_search_scope=requested_search_scope,
     )
     try:
         with psycopg.connect(postgres_url) as connection:
@@ -125,6 +129,7 @@ def admit_query_run_for_caller(
                 idempotency_key=idempotency_key,
                 payload_hash=payload_hash,
                 route_family=route_family,
+                requested_search_scope=requested_search_scope,
                 token_issued_at=token_issued_at,
             )
             connection.commit()

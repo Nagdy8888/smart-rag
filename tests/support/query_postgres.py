@@ -13,6 +13,7 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.payload import hash_query_admission_payload
 from smart_rag_core.query_admission.service import QueryAdmissionResult, admit_query_run
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext, UserRole
 
 from tests.contract.integration_support import (
@@ -164,6 +165,7 @@ def admit(
     conversation_id: UUID,
     message: str = "what is the policy",
     route_family: Phase6RouteFamily = Phase6RouteFamily.HYBRID,
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
     idempotency_key: UUID | None = None,
     token_issued_at: datetime | None = None,
 ) -> tuple[QueryAdmissionResult, UUID]:
@@ -175,6 +177,7 @@ def admit(
         conversation_id: Conversation id.
         message: User text hashed into the payload.
         route_family: Reserved envelope.
+        requested_search_scope: Source preference. ``AUTO`` keeps the legacy hash.
         idempotency_key: Optional stable key.
         token_issued_at: Optional issued-at stamp.
 
@@ -187,6 +190,7 @@ def admit(
         conversation_id=conversation_id,
         route_family=route_family,
         message=message,
+        requested_search_scope=requested_search_scope,
     )
     connection.execute("SET ROLE app_api")
     result = admit_query_run(
@@ -196,6 +200,7 @@ def admit(
         idempotency_key=key,
         payload_hash=payload_hash,
         route_family=route_family,
+        requested_search_scope=requested_search_scope,
         token_issued_at=token_issued_at,
     )
     connection.execute("RESET ROLE")

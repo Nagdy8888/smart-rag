@@ -15,18 +15,25 @@ from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.preparation import prepare_query
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import UserRole
 
 from tests.support.scope_graph import COMPANY_ONLY_NODES, SpyHybrid
 from tests.support.typed_graph import compile_state_graph
 
 
-def _visit_nodes(query: str, *, hybrid: SpyHybrid | None = None) -> list[str]:
+def _visit_nodes(
+    query: str,
+    *,
+    hybrid: SpyHybrid | None = None,
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
+) -> list[str]:
     """Compile and stream one admitted run, returning visited node names.
 
     Args:
         query: Original user text.
         hybrid: Optional Hybrid spy. ``None`` proves the path never needs it.
+        requested_search_scope: Client source preference on the runtime.
 
     Returns:
         Node names emitted by LangGraph ``updates`` stream mode.
@@ -34,7 +41,12 @@ def _visit_nodes(query: str, *, hybrid: SpyHybrid | None = None) -> list[str]:
 
     deps = QueryGraphDeps(hybrid_retriever=hybrid)
     compiled = compile_state_graph(build_query_graph(deps))
-    state = pending_query_state(_runtime().model_dump(mode="json"), user_query=query)
+    state = pending_query_state(
+        _runtime(requested_search_scope=requested_search_scope).model_dump(
+            mode="json"
+        ),
+        user_query=query,
+    )
     visited: list[str] = []
     for chunk in compiled.stream(state, stream_mode="updates"):
         if isinstance(chunk, dict):
@@ -42,8 +54,14 @@ def _visit_nodes(query: str, *, hybrid: SpyHybrid | None = None) -> list[str]:
     return visited
 
 
-def _runtime() -> AuthorizedRuntimeContext:
+def _runtime(
+    *,
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
+) -> AuthorizedRuntimeContext:
     """Return a Composite admission envelope for routing tests.
+
+    Args:
+        requested_search_scope: Client source preference copied into runtime.
 
     Returns:
         Frozen authorized runtime context.
@@ -59,6 +77,7 @@ def _runtime() -> AuthorizedRuntimeContext:
         reservation_id=uuid4(),
         reconnect=False,
         route_family=Phase6RouteFamily.COMPOSITE,
+        requested_search_scope=requested_search_scope,
         deadline_at=now + timedelta(seconds=50),
         recursion_limit=24,
         correction_ceiling=1,
@@ -220,6 +239,34 @@ def test_company_path_visits_retrieve_then_verify() -> None:
     assert "company_scope" in nodes
     assert "apply_correction" in nodes
     assert "verify_answer" in nodes
+
+
+def test_pdf_heading_company_visits_company_scope() -> None:
+    """Requested Company files sends a bare heading through company retrieval."""
+
+    hybrid = SpyHybrid()
+    nodes = _visit_nodes(
+        "Parallel Tool Execution",
+        hybrid=hybrid,
+        requested_search_scope=RequestedSearchScope.COMPANY_DOCUMENTS,
+    )
+    assert hybrid.calls >= 1
+    assert "company_scope" in nodes
+    assert "general_scope" not in nodes
+
+
+def test_pdf_heading_general_visits_general_scope() -> None:
+    """Requested General knowledge never opens company retrieval for a heading."""
+
+    hybrid = SpyHybrid()
+    nodes = _visit_nodes(
+        "Parallel Tool Execution",
+        hybrid=hybrid,
+        requested_search_scope=RequestedSearchScope.GENERAL_KNOWLEDGE,
+    )
+    assert hybrid.calls == 0
+    assert "general_scope" in nodes
+    assert "company_scope" not in nodes
 
 
 def test_studio_graphs_use_the_same_post_plan_router() -> None:

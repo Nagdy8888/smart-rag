@@ -17,6 +17,7 @@ import {
   emptyRunProgress,
   type RunProgressState,
 } from "./run-progress";
+import type { RequestedSearchScope } from "./types";
 
 /** Developer-visible diagnostics collected from catalog events. */
 export type ChatDiagnostics = {
@@ -54,6 +55,8 @@ export type ChatViewState = {
   answerOrigin: string | null;
   clarificationRequired: boolean;
   progress: RunProgressState;
+  /** Client source preference echoed from admission or run fetch. */
+  requestedSearchScope: RequestedSearchScope | null;
   /** Completed prior runs and title tokens in this live conversation. */
   chatPromptTokens: number;
   /** Completed prior runs and title tokens in this live conversation. */
@@ -109,6 +112,7 @@ export function createChatViewState(idempotencyKey: string): ChatViewState {
     answerOrigin: null,
     clarificationRequired: false,
     progress: emptyRunProgress(),
+    requestedSearchScope: null,
     chatPromptTokens: 0,
     chatCompletionTokens: 0,
     chatCostUsd: 0,
@@ -209,6 +213,7 @@ export function applyAdmission(
     reservation_id: string;
     route_family: string;
     reconnect: boolean;
+    requested_search_scope?: RequestedSearchScope;
   },
 ): ChatViewState {
   return {
@@ -216,6 +221,7 @@ export function applyAdmission(
     runId: admission.run_id,
     reservationId: admission.reservation_id,
     routeFamily: admission.route_family,
+    requestedSearchScope: admission.requested_search_scope ?? state.requestedSearchScope,
     diagnostics: {
       ...state.diagnostics,
       requestedRoute: admission.route_family,

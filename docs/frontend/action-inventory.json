@@ -678,6 +678,20 @@
       "test_id": "src/components/chat-app.test.tsx"
     },
     {
+      "action_id": "ask.scope",
+      "route": "/",
+      "label": "Answer source",
+      "control_kind": "select",
+      "contract_owner": "fastapi-sse",
+      "contract": "POST /conversations/{id}/messages search_scope",
+      "role": "authenticated",
+      "success_state": "company files, auto, or general knowledge",
+      "failure_state": "422 validation_failed",
+      "idempotency": "bound to Idempotency-Key",
+      "disposition": "keep",
+      "test_id": "src/components/chat-app.test.tsx"
+    },
+    {
       "action_id": "ask.prompt_fill",
       "route": "/",
       "label": "Prompt chip",

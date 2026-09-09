@@ -227,7 +227,9 @@ def build_draft_rows(
             chapter=chapter,
             semantic_family=query_class.value,
         )
-        heading = " / ".join(part for part in left.section_path if part) or "unsectioned"
+        heading = (
+            " / ".join(part for part in left.section_path if part) or "unsectioned"
+        )
         term = aliases[ordinal % len(aliases)] if aliases else _term_from_locator(left)
         fact = first_sentence(left.raw_text)
         second = first_sentence(right.raw_text)
@@ -244,7 +246,9 @@ def build_draft_rows(
             question = f"According to {heading}, what is stated about {term}?"
             answer = fact
         elif query_class is PrivatePdfQueryClass.EXACT_ACRONYM:
-            question = f"What does the term or abbreviation {term} refer to in this book?"
+            question = (
+                f"What does the term or abbreviation {term} refer to in this book?"
+            )
             answer = fact
         elif query_class is PrivatePdfQueryClass.SEMANTIC_PARAPHRASE:
             question = f"In other words, how does the book describe {term}?"
