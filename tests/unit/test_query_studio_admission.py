@@ -16,6 +16,7 @@ from smart_rag_agents.query.studio_live import (
 )
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.payload import hash_query_admission_payload
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import UserRole
 from smart_rag_core.security.profile_snapshot import ProfileSnapshot
 
@@ -94,6 +95,7 @@ def test_same_human_message_reuses_idempotency_key() -> None:
             conversation_id=studio_live_conversation_id("thread-retry"),
             route_family=LIVE_ROUTE_FAMILY,
             message="same question",
+            requested_search_scope=RequestedSearchScope.AUTO,
         ),
     )
     assert keys[0] == expected

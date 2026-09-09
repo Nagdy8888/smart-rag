@@ -101,11 +101,16 @@ def _locator_bound(case: dict[str, object], chunks: dict[str, tuple[int, str]]) 
     raw_ids = case.get("chunk_ids", ())
     if not isinstance(raw_ids, (list, tuple)) or not raw_ids:
         return False
-    ids = tuple(str(item) for item in raw_ids)
+    ids: tuple[str, ...] = tuple(
+        str(item) for item in cast(list[object] | tuple[object, ...], raw_ids)
+    )
     pages_raw = case.get("page_numbers", ())
     pages: tuple[int, ...]
     if isinstance(pages_raw, (list, tuple)):
-        pages = tuple(int(str(item)) for item in pages_raw)
+        pages = tuple(
+            int(str(item))
+            for item in cast(list[object] | tuple[object, ...], pages_raw)
+        )
     else:
         pages = ()
     question = str(case.get("question", "")).strip()
@@ -129,7 +134,9 @@ def _locator_bound(case: dict[str, object], chunks: dict[str, tuple[int, str]]) 
             return True
     headings = case.get("heading_paths", ())
     if isinstance(headings, (list, tuple)):
-        heading = " ".join(str(item) for item in headings).lower()
+        heading = " ".join(
+            str(item) for item in cast(list[object] | tuple[object, ...], headings)
+        ).lower()
         if q_tokens & set(_TOKEN.findall(heading)):
             return True
     return False
@@ -223,7 +230,9 @@ def main(argv: list[str] | None = None) -> int:
         description="Private PDF draft status or locator-bound review."
     )
     parser.add_argument("--input", type=Path, required=True)
-    parser.add_argument("--ids", type=Path, default=Path(".private-eval/ingest-ids.json"))
+    parser.add_argument(
+        "--ids", type=Path, default=Path(".private-eval/ingest-ids.json")
+    )
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--reviewer", default="")
     parser.add_argument(

@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 import { INFERENCE_LINKS_UNAVAILABLE } from "../../lib/citation-drawer";
 import { chatCostTotal, chatTokenTotals, type ChatViewState } from "../../lib/chat-view";
 import { formatRunTokenUsage, formatUsd } from "../../lib/format-usage";
+import { answerOriginLabel } from "../../lib/answer-origin";
+import { requestedSearchScopeLabel } from "../../lib/types";
 import {
   cacheStatusLabel,
   correctionReasonLabel,
@@ -259,6 +261,28 @@ export function RunDetailsSheet({
           ) : null}
           {changeReason ? <UserText value={changeReason} /> : null}
         </p>
+      ) : null}
+      {requestedSearchScopeLabel(chat.requestedSearchScope) ? (
+        <section className={styles.card} aria-label="Requested source">
+          <div>
+            <p className={styles.kicker}>Requested source</p>
+            <h3 className={styles.title}>
+              <UserText
+                value={requestedSearchScopeLabel(chat.requestedSearchScope) ?? ""}
+              />
+            </h3>
+          </div>
+        </section>
+      ) : null}
+      {answerOriginLabel(chat.answerOrigin) ? (
+        <section className={styles.card} aria-label="Answer origin">
+          <div>
+            <p className={styles.kicker}>Answer origin</p>
+            <h3 className={styles.title}>
+              <UserText value={answerOriginLabel(chat.answerOrigin) ?? ""} />
+            </h3>
+          </div>
+        </section>
       ) : null}
       <TokenMetricsSection
         label="This run"

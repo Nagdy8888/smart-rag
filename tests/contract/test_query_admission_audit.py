@@ -16,6 +16,7 @@ from smart_rag_core.query_admission.service import (
     record_run_restricted_evidence,
 )
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import UserRole
 
 from tests.support.query_postgres import (
@@ -242,6 +243,7 @@ def test_fastapi_rate_limit_reject_creates_no_reservation(
             idempotency_key=uuid4(),
             message="limited",
             route_family=Phase6RouteFamily.HYBRID,
+            requested_search_scope=RequestedSearchScope.AUTO,
             postgres_rate_limit_url=SecretStr("postgresql://x:y@127.0.0.1:1/none"),
         )
     with db_connection.cursor() as cursor:
@@ -275,6 +277,7 @@ def test_fastapi_rate_limit_reject_creates_no_reservation(
             idempotency_key=uuid4(),
             message="limited",
             route_family=Phase6RouteFamily.HYBRID,
+            requested_search_scope=RequestedSearchScope.AUTO,
         )
     with db_connection.cursor() as cursor:
         after = cursor.execute(
@@ -301,6 +304,7 @@ def test_fastapi_rate_limit_reject_creates_no_reservation(
         idempotency_key=uuid4(),
         message="ok-after-new-bucket-user",
         route_family=Phase6RouteFamily.HYBRID,
+        requested_search_scope=RequestedSearchScope.AUTO,
         postgres_rate_limit_url=SecretStr(db_url),
         valkey_limits_url=SecretStr("redis://valkey-is-not-authority"),
     )

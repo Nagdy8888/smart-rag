@@ -97,6 +97,9 @@ supabase/.branches/
 # Private PDF evaluation drafts, labels, and holdout custody copies
 .private-eval/
 
+# Operator laptop PDF corpus (never commit book bytes)
+dataset/*.pdf
+
 # Phase 4 Packet 9 generated Hybrid Ready eval corpus (schema/README stay tracked)
 tests/fixtures/evaluation/phase4/runtime/sources/
 tests/fixtures/evaluation/phase4/runtime/gold_id_map.json

@@ -12,7 +12,7 @@ Untrusted parse/OCR runs in a no-network Docker (gVisor-capable) sandbox.
 Missing Docker does **not** fall back to in-process parsing next to worker
 secrets.
 
-Related: [SCAN_BEFORE_INDEX.md](./SCAN_BEFORE_INDEX.md) · [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [ADR-parser-isolation.md](../adr/ADR-parser-isolation.md)
+Related: [SCAN_BEFORE_INDEX.md](./SCAN_BEFORE_INDEX.md) · [INGESTION_LIMITS.md](./INGESTION_LIMITS.md) · [ADR-parser-isolation.md](../adr/ADR-parser-isolation.md) · [PARSER_BAKEOFF.md](../evaluation/PARSER_BAKEOFF.md) · [ADR-anydoc-local-parser-bakeoff.md](../adr/ADR-anydoc-local-parser-bakeoff.md)
 
 ## Launch policy
 

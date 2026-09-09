@@ -14,6 +14,7 @@ other documents, graph questions, or unrestricted full-book summaries.
 Related: [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy-remediation.md) ·
 [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md) ·
 [ADR-hybrid-long-document-profile.md](../adr/ADR-hybrid-long-document-profile.md) ·
+[PARSER_BAKEOFF.md](./PARSER_BAKEOFF.md) ·
 [docs index](../README.md)
 
 ```mermaid

@@ -196,10 +196,14 @@ function renderChat(ui: ReactElement) {
 }
 
 describe("ChatApp Auto chrome", () => {
-  it("shows Auto, blocks Send on handshake, and has no route send buttons", async () => {
+  it("shows Answer source, blocks Send on handshake, and has no route send buttons", async () => {
     renderChat(<ChatApp />);
     const send = await screen.findByRole("button", { name: "Send" });
-    expect(screen.getByTestId("auto-label")).toBeInTheDocument();
+    const source = screen.getByLabelText("Answer source") as HTMLSelectElement;
+    expect(source).toHaveValue("company_documents");
+    expect(screen.getByRole("option", { name: "Company files" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Auto" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "General knowledge" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Inspect" })).toBeNull();
@@ -274,12 +278,14 @@ function stubChatFetch(options: {
   cancelCalls?: string[];
   deleteCalls?: string[];
   messagePosts?: string[];
+  messageBodies?: string[];
 }): typeof fetch {
   return async (input, init) => {
     const url = String(input);
     const method = (init?.method ?? "GET").toUpperCase();
     if (method === "POST" && url.includes("/messages")) {
       options.messagePosts?.push(url);
+      options.messageBodies?.push(String(init?.body ?? ""));
       const headers = init?.headers as Record<string, string>;
       expect(headers["X-Test-Role"]).toBeUndefined();
       expect(JSON.parse(String(init?.body ?? "{}")).route).toBeUndefined();
@@ -291,6 +297,7 @@ function stubChatFetch(options: {
           reservation_id: "res-1",
           route_family: "composite",
           status: "pending",
+          requested_search_scope: "company_documents",
         }),
         { status: 202, headers: { "Content-Type": "application/json" } },
       );
@@ -616,6 +623,40 @@ describe("ChatApp SSE limitation families and reconnect", () => {
         { accessToken: "jwt-token" },
         "conv-created",
       );
+    });
+  });
+
+  it("posts the selected Answer source and disables it during a live run", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([]);
+    const messageBodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events:
+          'event: status\nid: 1\ndata: {"stage":"retrieve","status":"running","phase":"started"}\n\n',
+        messagePosts: [],
+        messageBodies,
+      }),
+    );
+    renderChat(<ChatApp />);
+    const source = await screen.findByLabelText("Answer source");
+    expect(source).toHaveValue("company_documents");
+    expect(source).toBeEnabled();
+    await user.selectOptions(source, "general_knowledge");
+    expect(source).toHaveValue("general_knowledge");
+    await user.type(screen.getByLabelText("Message"), "Parallel Tool Execution");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => {
+      expect(messageBodies).toHaveLength(1);
+    });
+    expect(JSON.parse(messageBodies[0] ?? "{}")).toMatchObject({
+      message: "Parallel Tool Execution",
+      search_scope: "general_knowledge",
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText("Answer source")).toBeDisabled();
     });
   });
 

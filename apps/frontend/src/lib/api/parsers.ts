@@ -2,7 +2,8 @@
  * Shared JSON parsers for run, feedback, and document rows.
  */
 
-import type { ConversationResponse, DocumentResponse, FeedbackResponse, RunResponse } from "../types";
+import type { ConversationResponse, DocumentResponse, FeedbackResponse, RequestedSearchScope, RunResponse } from "../types";
+import { isRequestedSearchScope } from "../types";
 
 import { DOCUMENT_LIST_PAGE_SIZE } from "./documents-constants";
 
@@ -43,10 +44,23 @@ export function parseConversationResponse(
 }
 
 /**
+ * Parse a requested search scope from JSON.
+ *
+ * @param value - Unknown JSON field.
+ * @returns Catalog value, or `auto` when omitted or unknown.
+ */
+export function parseRequestedSearchScope(value: unknown): RequestedSearchScope {
+  if (typeof value === "string" && isRequestedSearchScope(value)) {
+    return value;
+  }
+  return "auto";
+}
+
+/**
  * Parse an owned run JSON body.
  *
  * @param body - FastAPI object.
- * @returns Run identifiers only. No transcript fields.
+ * @returns Run identifiers and stored source preference. No transcript fields.
  */
 export function parseRunResponse(body: Record<string, unknown>): RunResponse {
   return {
@@ -62,6 +76,7 @@ export function parseRunResponse(body: Record<string, unknown>): RunResponse {
       body.created_at === null || body.created_at === undefined
         ? null
         : String(body.created_at),
+    requested_search_scope: parseRequestedSearchScope(body.requested_search_scope),
   };
 }
 

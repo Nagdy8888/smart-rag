@@ -19,6 +19,7 @@ from smart_rag_core.query_admission.service import (
 )
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.runtime.valkey import ValkeyClient
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.security.untrusted import isolate_untrusted_text
 
@@ -53,6 +54,7 @@ class QueryRunService:
         conversation_id: UUID,
         idempotency_key: UUID,
         message: str,
+        requested_search_scope: RequestedSearchScope,
     ) -> tuple[AuthorizedRuntimeContext, str]:
         """Admit a Composite envelope for Auto chat. Does not start SSE.
 
@@ -61,6 +63,7 @@ class QueryRunService:
             conversation_id: Conversation the caller must own.
             idempotency_key: Client UUID key.
             message: Untrusted user text (hashed for admission).
+            requested_search_scope: Client source preference. Not authorization.
 
         Returns:
             Authorized context and the packet 6 stream path.
@@ -76,6 +79,7 @@ class QueryRunService:
             idempotency_key=idempotency_key,
             message=message,
             route_family=Phase6RouteFamily.COMPOSITE,
+            requested_search_scope=requested_search_scope,
             postgres_rate_limit_url=SecretStr(self._postgres_url),
             valkey_client=self._valkey_client,
         )

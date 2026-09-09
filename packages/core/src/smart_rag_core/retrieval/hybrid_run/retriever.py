@@ -3,25 +3,12 @@
 from __future__ import annotations
 
 import time
-from typing import cast
 from uuid import UUID
 
 import psycopg
 
 from smart_rag_core.evaluation.schema import ExpectedProfile
-from smart_rag_core.gateways.embedding import (
-    EmbeddingGateway,
-    EmbeddingRequest,
-    EmbeddingResponse,
-)
-from smart_rag_core.ingestion.embeddings.policy import (
-    EMBEDDING_DIMENSIONS,
-    EMBEDDING_MODEL,
-)
-from smart_rag_core.query_admission.exceptions import (
-    QueryBudgetError,
-    QueryCeilingError,
-)
+from smart_rag_core.gateways.embedding import EmbeddingGateway
 from smart_rag_core.query_admission.retrieve_budget import QueryRetrieveBudget
 from smart_rag_core.query_profile.extract import extract_deterministic
 from smart_rag_core.retrieval.context import ContextFn, RerankFn, select_hybrid_context
@@ -45,7 +32,6 @@ from smart_rag_core.retrieval.hybrid_run.assemble import (
 )
 from smart_rag_core.retrieval.hybrid_run.budget import (
     counted_rerank,
-    counted_retrieve_send,
 )
 from smart_rag_core.retrieval.hybrid_run.channels import (
     compose_fallback,
@@ -56,6 +42,7 @@ from smart_rag_core.retrieval.hybrid_run.channels import (
     unpack_dense,
     unpack_term,
 )
+from smart_rag_core.retrieval.hybrid_run.embed import embed_query_texts
 from smart_rag_core.retrieval.hybrid_run.evidence import (
     evidence_units,
 )
@@ -67,6 +54,10 @@ from smart_rag_core.retrieval.hybrid_run.profile_fields import (
     str_list_field,
     target_date_field,
     temporal_intent_field,
+)
+from smart_rag_core.retrieval.hybrid_run.terms import (
+    matched_terms_from_units,
+    supported_subquestion_count,
 )
 from smart_rag_core.retrieval.hybrid_run.types import (
     FUSION_LIST_CAP,
@@ -85,7 +76,6 @@ from smart_rag_core.retrieval.profiles import (
 )
 from smart_rag_core.retrieval.rerank import RerankFallbackReason, rerank_preload_ids
 from smart_rag_core.retrieval.types import Bm25RetrievalResult
-from smart_rag_core.runtime.async_bridge import run_coro_blocking
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
@@ -215,8 +205,8 @@ class HybridRetriever(HybridChannelJobsMixin):
             return closed_result(query_check, started=started)
 
         texts = query_texts(query, profile)
-        embed_response, embed_error = self._embed_query_texts(
-            texts, budget=self.query_budget
+        embed_response, embed_error = embed_query_texts(
+            self._embedding_gateway, texts, budget=self.query_budget
         )
         if embed_error is not None or embed_response is None:
             return closed_result(
@@ -396,13 +386,13 @@ class HybridRetriever(HybridChannelJobsMixin):
             rpc_inventory = self._heading_inventory(caller, inventory_version)
             covered = heading_inventory_from_contexts(locator_rows)
             inventory = rpc_inventory or covered
-            matched_terms = _matched_terms_from_units(required_terms, evidence)
+            matched_terms = matched_terms_from_units(required_terms, evidence)
             real_rerank = (
                 selection.fallback_reason is RerankFallbackReason.NONE
                 and rerank_calls == 1
             )
             rerank_top_support = selection.rerank_top_support if real_rerank else None
-            supported = _supported_subquestion_count(
+            supported = supported_subquestion_count(
                 subquestions=subquestions,
                 evidence=evidence,
                 matched_terms=matched_terms,
@@ -468,62 +458,6 @@ class HybridRetriever(HybridChannelJobsMixin):
 
         cache: dict[UUID, ChunkContext] = {}
         return self._bound_loader(caller, cache)
-
-    def _embed_query_texts(
-        self,
-        texts: tuple[str, ...],
-        budget: QueryRetrieveBudget | None = None,
-    ) -> tuple[EmbeddingResponse | None, RetrievalFallbackReason | None]:
-        """Issue one batched gateway embedding call.
-
-        Args:
-            texts: Unique original plus variants, already bounded.
-            budget: Optional retrieve ledger. When set, the batch consumes
-                the run-local reservation before the provider call.
-
-        Returns:
-            Response and optional fallback when the gateway fails or
-            remaining cannot cover the embedding kind cap.
-        """
-
-        request = EmbeddingRequest(
-            operation_key="hybrid.query_embed",
-            inputs=texts,
-            model=EMBEDDING_MODEL,
-            dimensions=EMBEDDING_DIMENSIONS,
-        )
-
-        def _send() -> EmbeddingResponse:
-            """Await the embedding gateway from this sync retrieve.
-
-            Returns:
-                Embedding response.
-
-            Raises:
-                Exception: Provider or loop failures. Mapped to dense
-                    unavailable by the caller.
-            """
-
-            result = run_coro_blocking(self._embedding_gateway.embed(request))
-            return cast(EmbeddingResponse, result)
-
-        try:
-            response = cast(
-                EmbeddingResponse,
-                counted_retrieve_send(
-                    budget,
-                    usage_kind="embedding",
-                    model_id=EMBEDDING_MODEL,
-                    send=_send,
-                ),
-            )
-        except (QueryBudgetError, QueryCeilingError):
-            return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
-        except Exception:
-            return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
-        if len(response.vectors) != len(texts):
-            return None, RetrievalFallbackReason.DENSE_UNAVAILABLE
-        return response, None
 
     def _bound_loader(
         self,
@@ -609,78 +543,3 @@ class HybridRetriever(HybridChannelJobsMixin):
             caller=caller,
             version_id=version_id,
         )
-
-
-def _matched_terms_from_units(
-    required: tuple[str, ...],
-    evidence: tuple[EvidenceUnit, ...],
-) -> tuple[str, ...]:
-    """Return required terms found in canonical citation text and headings.
-
-    Args:
-        required: Profile exact terms, codes, phrases, entities, aliases.
-        evidence: Final selected citation units.
-
-    Returns:
-        Required terms whose normalized form appears in raw text or headings.
-        BM25 snippets are never consulted.
-    """
-
-    haystack = " ".join(
-        normalize_arabic_v1(item.citation_text)
-        + " "
-        + " ".join(normalize_arabic_v1(part) for part in item.locator.section_path)
-        for item in evidence
-    )
-    matched: list[str] = []
-    seen: set[str] = set()
-    for term in required:
-        normalized = normalize_arabic_v1(term)
-        key = normalized.casefold()
-        if not normalized or key in seen:
-            continue
-        if normalized in haystack or key in haystack.casefold():
-            seen.add(key)
-            matched.append(term)
-    return tuple(matched)
-
-
-def _supported_subquestion_count(
-    *,
-    subquestions: tuple[str, ...],
-    evidence: tuple[EvidenceUnit, ...],
-    matched_terms: tuple[str, ...],
-    rerank_indices: tuple[int, ...],
-) -> int:
-    """Count subquestions proven by rerank indices or canonical evidence.
-
-    Args:
-        subquestions: At most three profile subquestions.
-        evidence: Final selected units.
-        matched_terms: Required terms found in those units.
-        rerank_indices: Validated indices from a completed rerank, else empty.
-
-    Returns:
-        Supported subquestion count. Identity/failure fallback is
-        conservative and never invents model support.
-    """
-
-    bound = tuple(subquestions[:3])
-    if rerank_indices:
-        allowed = set(range(len(bound) or 1))
-        return len({index for index in rerank_indices if index in allowed})
-    haystack = " ".join(normalize_arabic_v1(item.citation_text) for item in evidence)
-    if not bound:
-        return 1 if haystack and matched_terms else 0
-    matched_fold = {item.casefold() for item in matched_terms}
-    supported = 0
-    for sub in bound:
-        tokens = [
-            token for token in normalize_arabic_v1(sub).split() if len(token) >= 3
-        ]
-        if tokens and all(token in haystack for token in tokens):
-            supported += 1
-            continue
-        if any(term in sub.casefold() for term in matched_fold):
-            supported += 1
-    return supported

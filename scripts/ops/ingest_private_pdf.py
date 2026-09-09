@@ -26,12 +26,12 @@ from smart_rag_core.ingestion.limits import (  # noqa: E402
     EXTERNAL_PROCESSING_POLICY_VERSION,
 )
 
-from scripts.ops.import_approved_pdf_glossary import _create_owner  # noqa: E402
+from scripts.ops.import_approved_pdf_glossary import create_owner  # noqa: E402
 from scripts.ops.ingest_demo_plot_slices import (  # noqa: E402
-    _json_object,
-    _merged_env,
-    _require,
-    _version_jobs,
+    json_object,
+    merged_env,
+    require_env,
+    version_jobs,
 )
 
 API_URL = "http://127.0.0.1:8000"
@@ -91,7 +91,7 @@ def _upload_pdf(
         print(f"reserve_failed status={reserved.status_code}", flush=True)
         print(reserved.text[:500], flush=True)
     reserved.raise_for_status()
-    body = _json_object(reserved.json(), "reserve")
+    body = json_object(reserved.json(), "reserve")
     reservation_id = str(body["reservation_id"])
     bucket = str(body["storage_bucket"])
     prefix = str(body["storage_path"]).rstrip("/")
@@ -129,7 +129,7 @@ def _upload_pdf(
         print(f"finalize_failed status={finalized.status_code}", flush=True)
         print(finalized.text[:800], flush=True)
     finalized.raise_for_status()
-    fin = _json_object(finalized.json(), "finalize")
+    fin = json_object(finalized.json(), "finalize")
     return (
         str(fin["document_id"]),
         str(fin["version_id"]),
@@ -138,7 +138,9 @@ def _upload_pdf(
     )
 
 
-def requeue_hybrid_index_keep_class(*, operator_url: str, job_id: str) -> dict[str, object]:
+def requeue_hybrid_index_keep_class(
+    *, operator_url: str, job_id: str
+) -> dict[str, object]:
     """Clear checkpoints and requeue one hybrid_index job without recasting class.
 
     Args:
@@ -271,8 +273,9 @@ def _review_findings(
     review = status_payload.get("review")
     if not isinstance(review, dict):
         return 0
-    findings = review.get("findings")
-    if not isinstance(findings, list) or not findings:
+    review_map = cast(dict[str, object], review)
+    findings_raw = review_map.get("findings")
+    if not isinstance(findings_raw, list) or not findings_raw:
         return 0
     submitted = 0
     headers = {
@@ -281,17 +284,18 @@ def _review_findings(
         "Accept": "application/json",
         "X-Client-Version": "0.1.0",
     }
-    for item in findings:
+    for item in cast(list[object], findings_raw):
         if not isinstance(item, dict):
             continue
-        family = str(item.get("family", ""))
-        finding_id = str(item.get("finding_id", ""))
+        finding = cast(dict[str, object], item)
+        family = str(finding.get("family", ""))
+        finding_id = str(finding.get("finding_id", ""))
         print(
             json.dumps(
                 {
                     "finding_id": finding_id,
                     "family": family,
-                    "bounded_count": item.get("bounded_count"),
+                    "bounded_count": finding.get("bounded_count"),
                 }
             ),
             flush=True,
@@ -386,22 +390,28 @@ def _poll_until_terminal(
         )
         jobs_payload: list[dict[str, object]] = []
         if response.status_code < 400:
-            envelope = _json_object(response.json(), "status")
+            envelope = json_object(response.json(), "status")
             version = payload_version(envelope)
             public_status = str(version.get("status", ""))
             recent = envelope.get("recent_jobs")
             if isinstance(recent, list):
-                jobs_payload = [item for item in recent if isinstance(item, dict)]
+                jobs_payload = [
+                    cast(dict[str, object], item)
+                    for item in cast(list[object], recent)
+                    if isinstance(item, dict)
+                ]
             unresolved = 0
             review = version.get("review")
             if isinstance(review, dict):
-                unresolved = int(review.get("unresolved_family_count") or 0)
+                review_map = cast(dict[str, object], review)
+                unresolved_raw = review_map.get("unresolved_family_count") or 0
+                unresolved = int(str(unresolved_raw))
             if unresolved and not reviewed:
                 print("governance_review_required", flush=True)
                 _review_findings(client, token=token, status_payload=version)
                 _retry_jobs(client, token=token, jobs=jobs_payload)
                 reviewed = True
-        jobs = _version_jobs(operator_url=operator_url, version_id=version_id)
+        jobs = version_jobs(operator_url=operator_url, version_id=version_id)
         snapshot = json.dumps(
             {"status": public_status, "jobs": jobs},
             sort_keys=True,
@@ -457,9 +467,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Requeue one hybrid_index job as real_company and exit.",
     )
     args = parser.parse_args(argv)
-    env = _merged_env()
+    env = merged_env()
     if args.requeue_hybrid_index:
-        operator_url = _require(env, "OPERATOR_SUPABASE_DB_URL")
+        operator_url = require_env(env, "OPERATOR_SUPABASE_DB_URL")
         snapshot = requeue_hybrid_index_keep_class(
             operator_url=operator_url,
             job_id=args.requeue_hybrid_index,
@@ -494,11 +504,11 @@ def main(argv: list[str] | None = None) -> int:
     if graph_flag not in {"0", "false", "no", "off"}:
         print("blocked=worker_graph_must_be_false")
         return 2
-    auth_url = _require(env, "SUPABASE_URL", "SUPABASE_MANAGED_URL").rstrip("/")
-    anon = _require(env, "SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY")
-    operator_url = _require(env, "OPERATOR_SUPABASE_DB_URL")
+    auth_url = require_env(env, "SUPABASE_URL", "SUPABASE_MANAGED_URL").rstrip("/")
+    anon = require_env(env, "SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    operator_url = require_env(env, "OPERATOR_SUPABASE_DB_URL")
     with httpx.Client(timeout=300.0) as client:
-        token = _create_owner(
+        token = create_owner(
             client,
             auth_url=auth_url,
             anon=anon,

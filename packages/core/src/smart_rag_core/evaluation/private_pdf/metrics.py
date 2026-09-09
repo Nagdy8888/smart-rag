@@ -96,7 +96,9 @@ def score_retrieve_case(
         Per-case score without source text.
     """
 
-    locator_ok = bool(gold_ids) and all(item in set(ranked_ids[:12]) for item in gold_ids)
+    locator_ok = bool(gold_ids) and all(
+        item in set(ranked_ids[:12]) for item in gold_ids
+    )
     if gold_pages and evidence_pages:
         locator_ok = locator_ok and bool(set(gold_pages) & set(evidence_pages))
     if expected_refusal:
@@ -120,9 +122,7 @@ def score_retrieve_case(
         if query_class == PrivatePdfQueryClass.EXACT_ACRONYM.value
         else None
     )
-    alias10 = (
-        recall_hit_at_k(ranked_ids, gold_ids, 10) if required_terms else None
-    )
+    alias10 = recall_hit_at_k(ranked_ids, gold_ids, 10) if required_terms else None
     return PrivatePdfRetrieveScore(
         case_id=case_id,
         query_class=query_class,
@@ -176,9 +176,7 @@ def aggregate_retrieve_gates(
         if item.recall_hit_at_10 is not None
     )
     exact_flags = tuple(
-        bool(item.exact_hit_at_5)
-        for item in scores
-        if item.exact_hit_at_5 is not None
+        bool(item.exact_hit_at_5) for item in scores if item.exact_hit_at_5 is not None
     )
     alias_flags = tuple(
         bool(item.alias_hit_at_10)
@@ -187,9 +185,7 @@ def aggregate_retrieve_gates(
     )
     locator_flags = tuple(item.locator_ok for item in scores)
     latencies = tuple(
-        item.first_evidence_ms
-        for item in scores
-        if item.first_evidence_ms is not None
+        item.first_evidence_ms for item in scores if item.first_evidence_ms is not None
     )
     exact_denom = counts.get(PrivatePdfQueryClass.EXACT_ACRONYM.value, len(exact_flags))
     exact_minimum = PRIVATE_PDF_CLASS_MINIMUMS[PrivatePdfQueryClass.EXACT_ACRONYM]

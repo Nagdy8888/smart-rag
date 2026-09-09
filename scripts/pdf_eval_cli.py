@@ -7,11 +7,10 @@ answers, glossary values, or excerpts.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
-from smart_rag_core.settings import setdefault_process_environ
+from smart_rag_core.settings import set_process_environ, setdefault_process_environ
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -102,10 +101,10 @@ def require_live_models(env: dict[str, str]) -> None:
         RuntimeError: Missing API key.
     """
 
-    key = env.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
+    key = env.get("OPENAI_API_KEY", "")
     if not key.strip():
         raise RuntimeError("openai_api_key_required")
-    os.environ["MOCK_MODEL_MODE"] = "false"
-    os.environ["OPENAI_API_KEY"] = key
+    set_process_environ("MOCK_MODEL_MODE", "false")
+    set_process_environ("OPENAI_API_KEY", key)
     export_io = env.get("LANGSMITH_EXPORT_IO", "false").strip() or "false"
-    os.environ["LANGSMITH_EXPORT_IO"] = export_io
+    set_process_environ("LANGSMITH_EXPORT_IO", export_io)

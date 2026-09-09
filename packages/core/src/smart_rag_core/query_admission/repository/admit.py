@@ -10,10 +10,14 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
-from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.context import (
+    AuthorizedRuntimeContext,
+    requested_search_scope_from_row,
+)
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.repository.errors import raise_admission
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext, UserRole
 
 
@@ -38,9 +42,10 @@ def admit_query_run(
     idempotency_key: UUID,
     payload_hash: str,
     route_family: Phase6RouteFamily,
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
     token_issued_at: datetime | None = None,
 ) -> QueryAdmissionResult:
-    """Admit one query run or reconnect through ``app.admit_query_run``.
+    """Admit one query run or reconnect through ``app.admit_query_run_v2``.
 
     Args:
         connection: Open connection. Caller must ``SET ROLE app_api`` and
@@ -50,6 +55,7 @@ def admit_query_run(
         idempotency_key: Client-generated UUID message key.
         payload_hash: SHA-256 of the canonical payload.
         route_family: Server-selected family used only to look up ceilings.
+        requested_search_scope: Client source preference persisted on the run.
         token_issued_at: JWT ``iat`` used with profile-wide session revocation.
 
     Returns:
@@ -69,8 +75,8 @@ def admit_query_run(
             cursor.execute(
                 """
                 SELECT *
-                FROM app.admit_query_run(
-                  %s, %s, %s, %s, %s, %s, %s, %s, %s
+                FROM app.admit_query_run_v2(
+                  %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
                 """,
                 (
@@ -81,6 +87,7 @@ def admit_query_run(
                     str(idempotency_key),
                     payload_hash,
                     route_family.value,
+                    requested_search_scope.value,
                     caller.session_id,
                     token_issued_at,
                 ),
@@ -100,6 +107,9 @@ def admit_query_run(
         reservation_id=row["reservation_id"],
         reconnect=bool(row["reconnect"]),
         route_family=Phase6RouteFamily(str(row["route_family"])),
+        requested_search_scope=requested_search_scope_from_row(
+            row["requested_search_scope"]
+        ),
         deadline_at=row["deadline_at"],
         recursion_limit=int(row["recursion_limit"]),
         correction_ceiling=int(row["correction_ceiling"]),

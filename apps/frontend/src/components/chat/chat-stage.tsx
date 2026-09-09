@@ -16,6 +16,7 @@ import {
 } from "../../lib/limitations";
 import { MAX_RECONNECT_ATTEMPTS } from "../../lib/stream-reconnect";
 import type { CitationResponse, ConversationMessage, ReadinessResponse } from "../../lib/types";
+import { REQUESTED_SEARCH_SCOPES } from "../../lib/types";
 import { Button } from "../ui/button";
 import { LimitationCallout } from "../ui/limitation-callout";
 import { AnswerSurface } from "./answer-surface";
@@ -142,9 +143,36 @@ export function ChatStage(props: ChatStageProps) {
     <section className={chatStyles.stage} aria-label="Answer">
       <div className={chatStyles.stageHeader}>
         <div className={chatStyles.row}>
-          <span className={chatStyles.autoChip} data-testid="auto-label">
-            Auto
-          </span>
+          <label className={chatStyles.scopeField}>
+            Answer source
+            <select
+              className={chatStyles.autoChip}
+              data-action-id="ask.scope"
+              data-testid="answer-source"
+              value={run.searchScope}
+              disabled={run.sending || (chat.runId !== null && chat.terminal === null)}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (
+                  next === "company_documents" ||
+                  next === "auto" ||
+                  next === "general_knowledge"
+                ) {
+                  run.setSearchScope(next);
+                }
+              }}
+            >
+              {REQUESTED_SEARCH_SCOPES.map((scope) => (
+                <option key={scope} value={scope}>
+                  {scope === "company_documents"
+                    ? "Company files"
+                    : scope === "auto"
+                      ? "Auto"
+                      : "General knowledge"}
+                </option>
+              ))}
+            </select>
+          </label>
           <Button
             type="button"
             variant="ghost"

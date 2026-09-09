@@ -296,7 +296,7 @@ def test_executor_emits_partial_when_deadline_elapses_while_opening_stream(
         return ctx.deadline_at + timedelta(seconds=1)
 
     monkeypatch.setattr(
-        "smart_rag_api.services.sse.langgraph_executor.datetime",
+        "smart_rag_api.services.sse.langgraph_execute.datetime",
         SimpleNamespace(now=_now),
     )
 

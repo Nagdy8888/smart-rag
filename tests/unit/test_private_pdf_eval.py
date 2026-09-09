@@ -489,7 +489,12 @@ def test_review_apply_requires_locator_flag() -> None:
     from scripts.review_pdf_eval_dataset import main as review_main
 
     fixture = (
-        REPO_ROOT / "tests" / "fixtures" / "evaluation" / "private_pdf" / "generated_only.json"
+        REPO_ROOT
+        / "tests"
+        / "fixtures"
+        / "evaluation"
+        / "private_pdf"
+        / "generated_only.json"
     )
     assert review_main(["--input", str(fixture), "--apply", "--reviewer", "Nagdy"]) == 2
 
@@ -500,7 +505,12 @@ def test_seal_rejects_holdout_inside_repository() -> None:
     from scripts.seal_pdf_eval_dataset import main as seal_main
 
     fixture = (
-        REPO_ROOT / "tests" / "fixtures" / "evaluation" / "private_pdf" / "generated_only.json"
+        REPO_ROOT
+        / "tests"
+        / "fixtures"
+        / "evaluation"
+        / "private_pdf"
+        / "generated_only.json"
     )
     inside = (
         REPO_ROOT
@@ -574,7 +584,12 @@ def test_seal_cli_rejects_generated_fixture() -> None:
     from scripts.seal_pdf_eval_dataset import main as seal_main
 
     fixture = (
-        REPO_ROOT / "tests" / "fixtures" / "evaluation" / "private_pdf" / "generated_only.json"
+        REPO_ROOT
+        / "tests"
+        / "fixtures"
+        / "evaluation"
+        / "private_pdf"
+        / "generated_only.json"
     )
     assert seal_main(["--input", str(fixture)]) == 2
 

@@ -555,6 +555,12 @@ def _insert_auth_user(*, operator_url: str, email: str, password: str) -> str:
     return user_id
 
 
+json_object = _json_object
+enroll_totp = _enroll_totp
+insert_auth_user = _insert_auth_user
+version_jobs = _version_jobs
+
+
 def _create_uploader(
     client: httpx.Client,
     *,

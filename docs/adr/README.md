@@ -13,6 +13,7 @@ audience: engineering
 | Hybrid Pilot release cut | accepted | 1 | [ADR-hybrid-pilot-release-cut.md](./ADR-hybrid-pilot-release-cut.md) |
 | Allow-listed long-document Hybrid profile | proposed | 4/6 overlay | [ADR-hybrid-long-document-profile.md](./ADR-hybrid-long-document-profile.md) |
 | Detector findings and hash-bound reviews | accepted | 3 overlay | [ADR-detector-finding-reviews.md](./ADR-detector-finding-reviews.md) |
+| Local AnyDoc parser bake-off (no Firecrawl upload) | accepted | experiment | [ADR-anydoc-local-parser-bakeoff.md](./ADR-anydoc-local-parser-bakeoff.md) |
 | Phase 4 engineering close | accepted | 4 | [ADR-phase4-engineering-close.md](./ADR-phase4-engineering-close.md) |
 | ParadeDB edition/availability | accepted | 1 | [ADR-paradedb-edition-availability.md](./ADR-paradedb-edition-availability.md) |
 | Private service TLS | accepted | 1 | [ADR-private-service-tls.md](./ADR-private-service-tls.md) |

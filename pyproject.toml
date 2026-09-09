@@ -17,6 +17,7 @@ dev = [
     "psycopg[binary]==3.3.3",
     "pip-audit>=2.10.1",
     "duckdb==1.2.1",
+    "firecrawl-anydoc==0.2.4",
 ]
 
 [tool.uv]

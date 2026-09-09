@@ -10,6 +10,7 @@ import hashlib
 import json
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any, cast
 from uuid import UUID
 
 import psycopg
@@ -29,6 +30,7 @@ from smart_rag_core.evaluation.private_pdf import (
 from smart_rag_core.evaluation.private_pdf.agent_scores import (
     FAITHFULNESS_GATE,
     UNSCORED,
+    PrivatePdfAgentScore,
     aggregate_agent_gates,
 )
 from smart_rag_core.evaluation.private_pdf.metrics import PrivatePdfRetrieveScore
@@ -116,7 +118,8 @@ def candidate_digest(profile_id: str) -> str:
     raw: object = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise UnknownRetrievalProfileError(profile_id)
-    return canonical_profile_digest(raw)
+    payload = cast(dict[str, Any], raw)
+    return canonical_profile_digest(payload)
 
 
 def load_profile_for_eval(profile_id: str) -> object:
@@ -333,7 +336,10 @@ def judge_pdf_answer(
     if status != "complete":
         return UNSCORED, None
     try:
-        faith = float(payload.get("faithfulness"))
+        faith_raw = payload.get("faithfulness")
+        if not isinstance(faith_raw, int | float) or isinstance(faith_raw, bool):
+            return UNSCORED, None
+        faith = float(faith_raw)
     except (TypeError, ValueError):
         return UNSCORED, None
     if faith < 0.0 or faith > 1.0:
@@ -427,9 +433,7 @@ class PdfEvalRuntime:
                 authorization_version=int(str(role_row[1])),
             )
             wanted = row.meta.expected_profile_id
-            profile = (
-                default_profile if wanted == default_profile_id else long_profile
-            )
+            profile = default_profile if wanted == default_profile_id else long_profile
             retriever = HybridRetriever(
                 embedding_gateway=self._embedding,
                 supabase=None,
@@ -528,17 +532,22 @@ def score_agent_rows(
         Git-safe agent report. ``holdout_opened`` stays false here.
     """
 
-    scores = []
-    for row, result, answer, judge in zip(labeled, results, answers, judge_pairs, strict=True):
+    scores: list[PrivatePdfAgentScore] = []
+    for row, result, answer, judge in zip(
+        labeled, results, answers, judge_pairs, strict=True
+    ):
         cited: list[UUID] = []
         for citation in answer.citations:
             if citation.chunk_id:
                 cited.append(UUID(str(citation.chunk_id)))
-        fact_ids = tuple((row.meta.chunk_ids,) for _ in row.atomic_facts) or (
-            (row.meta.chunk_ids,)
-            if row.meta.chunk_ids
-            else ()
-        )
+        gold_ids = row.meta.chunk_ids
+        fact_ids: tuple[tuple[UUID, ...], ...]
+        if row.atomic_facts:
+            fact_ids = tuple(gold_ids for _ in row.atomic_facts)
+        elif gold_ids:
+            fact_ids = (gold_ids,)
+        else:
+            fact_ids = ()
         pages = tuple(
             int(unit.locator.page_number)
             for unit in result.evidence

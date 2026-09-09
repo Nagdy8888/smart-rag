@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from decimal import Decimal
+from typing import cast
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+import psycopg
 import pytest
 from smart_rag_core.gateways.embedding import (
     EmbeddingGateway,
@@ -30,7 +32,7 @@ from smart_rag_core.ingestion.embeddings.service import (
     EmbeddingBatchInput,
     EmbeddingGateError,
     EmbeddingService,
-    _completed_ledger_result_ref,
+    completed_ledger_result_ref,
 )
 from smart_rag_core.ingestion.limits import LEDGER_INLINE_VECTOR_MAX
 from smart_rag_core.security.external_processing import (
@@ -1002,7 +1004,7 @@ def test_completed_ledger_omits_vectors_above_inline_cap() -> None:
 
     over_cap = LEDGER_INLINE_VECTOR_MAX + 1
     vectors = tuple((0.0, 1.0) for _ in range(over_cap))
-    payload = _completed_ledger_result_ref(
+    payload = completed_ledger_result_ref(
         chunk_set_hash="hash",
         mode="mock",
         fixture_provenance="test",
@@ -1017,7 +1019,7 @@ def test_completed_ledger_inlines_small_batches() -> None:
     """Batches at the inline cap keep vectors for ledger replay."""
 
     vectors = ((0.1, 0.2),)
-    payload = _completed_ledger_result_ref(
+    payload = completed_ledger_result_ref(
         chunk_set_hash="hash",
         mode="mock",
         fixture_provenance="test",
@@ -1051,7 +1053,7 @@ def test_embedding_service_reembeds_when_vectors_not_inlined() -> None:
             vector = mock_embedding_vector(request.inputs[0])
             return EmbeddingResponse(
                 mode="mock",
-                vectors=(vector,),
+                vectors=(tuple(vector),),
                 provider_request_id="reembed",
                 fixture_provenance="test",
             )
@@ -1130,9 +1132,9 @@ def test_embedding_service_reembeds_when_vectors_not_inlined() -> None:
             return self.cursor_obj
 
     service = EmbeddingService(
-        _Connection(),
+        cast(psycopg.Connection, _Connection()),
         gateway=EmbeddingGateway(_Adapter()),
-    )  # type: ignore[arg-type]
+    )
     service._admission.assert_can_enqueue_ingestion = lambda **_kwargs: None  # type: ignore[method-assign]
     result = service.embed_version(
         EmbeddingBatchInput(

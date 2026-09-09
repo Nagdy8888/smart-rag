@@ -109,8 +109,7 @@ def apply_laptop_ingest_environ() -> None:
     )
     print(f"langsmith_tracing={os.environ.get('LANGSMITH_TRACING', '')}", flush=True)
     print(
-        "langsmith_export_io="
-        + os.environ.get("LANGSMITH_EXPORT_IO", "false"),
+        "langsmith_export_io=" + os.environ.get("LANGSMITH_EXPORT_IO", "false"),
         flush=True,
     )
     print(

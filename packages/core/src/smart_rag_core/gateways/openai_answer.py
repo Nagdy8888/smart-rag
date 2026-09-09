@@ -297,8 +297,6 @@ def execute_openai_pdf_eval_judge(
     if (
         prompt_version != EVAL_PDF_JUDGE_PROMPT_VERSION
         or prompt_sha256 != EVAL_PDF_JUDGE_PROMPT_SHA256
-        or prompt_version == EVAL_JUDGE_PROMPT_VERSION
-        or prompt_sha256 == EVAL_JUDGE_PROMPT_SHA256
     ):
         raise OpenAIAnswerError("eval_pdf_judge_version_mismatch")
     if model_id not in ALLOWED_EVAL_JUDGE_MODEL_IDS:

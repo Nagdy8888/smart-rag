@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 
 def main() -> int:
@@ -23,9 +24,12 @@ def main() -> int:
             continue
         message = raw
         try:
-            payload = json.loads(raw)
-            if isinstance(payload, dict) and isinstance(payload.get("message"), str):
-                message = str(payload["message"])
+            decoded: object = json.loads(raw)
+            if isinstance(decoded, dict):
+                mapped = cast(dict[str, object], decoded)
+                message_raw = mapped.get("message")
+                if isinstance(message_raw, str):
+                    message = message_raw
         except json.JSONDecodeError:
             message = raw
         if "[hybrid]" in message:

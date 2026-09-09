@@ -11,10 +11,14 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 
-from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
+from smart_rag_core.query_admission.context import (
+    AuthorizedRuntimeContext,
+    requested_search_scope_from_row,
+)
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.repository.errors import raise_admission
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext, UserRole
 
 
@@ -28,6 +32,7 @@ class QueryRunRecord:
         creator_user_id: Run owner.
         status: Durable ``app.run_status`` text.
         reservation_id: Run-local reservation when present.
+        requested_search_scope: Source preference stored at admit.
         created_at: Insert timestamp when returned.
     """
 
@@ -36,6 +41,7 @@ class QueryRunRecord:
     creator_user_id: UUID
     status: str
     reservation_id: UUID | None
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO
     created_at: datetime | None = None
 
 
@@ -100,7 +106,7 @@ def get_query_run(
             cursor.execute(
                 """
                 SELECT *
-                FROM app.get_query_run(%s, %s, %s, %s)
+                FROM app.get_query_run_v2(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,
@@ -121,6 +127,9 @@ def get_query_run(
         creator_user_id=row["creator_user_id"],
         status=str(row["status"]),
         reservation_id=reservation,
+        requested_search_scope=requested_search_scope_from_row(
+            row.get("requested_search_scope")
+        ),
         created_at=row.get("created_at"),
     )
 
@@ -150,7 +159,7 @@ def load_query_run_runtime(
             cursor.execute(
                 """
                 SELECT *
-                FROM app.load_query_run_runtime(%s, %s, %s, %s)
+                FROM app.load_query_run_runtime_v2(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,
@@ -177,6 +186,9 @@ def load_query_run_runtime(
         reservation_id=row["reservation_id"],
         reconnect=True,
         route_family=Phase6RouteFamily(str(row["route_family"])),
+        requested_search_scope=requested_search_scope_from_row(
+            row.get("requested_search_scope")
+        ),
         deadline_at=row["deadline_at"],
         recursion_limit=int(row["recursion_limit"]),
         correction_ceiling=int(row["correction_ceiling"]),

@@ -46,6 +46,7 @@ from smart_rag_core.runtime.offload import (
     cpu_slice_over_budget,
     sample_event_loop_lag,
 )
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.audit_chain import (
     AUDIT_CHAIN_GENESIS_HASH,
     canonical_audit_material,
@@ -281,6 +282,7 @@ class _FakeQueryRunService:
         conversation_id: UUID,
         idempotency_key: UUID,
         message: str,
+        requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
     ) -> tuple[AuthorizedRuntimeContext, str]:
         """Return the canned Composite admit.
 
@@ -289,13 +291,19 @@ class _FakeQueryRunService:
             conversation_id: Conversation id.
             idempotency_key: Client key.
             message: User text.
+            requested_search_scope: Client source preference.
 
         Returns:
             Context and stream path.
         """
 
         del caller, conversation_id, idempotency_key, message
-        return self._context, self._stream_path
+        return (
+            self._context.model_copy(
+                update={"requested_search_scope": requested_search_scope}
+            ),
+            self._stream_path,
+        )
 
     def get(self, caller: CallerContext, *, run_id: UUID) -> QueryRunRecord:
         """Reject foreign runs.

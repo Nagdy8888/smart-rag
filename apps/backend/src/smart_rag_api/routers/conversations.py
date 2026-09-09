@@ -480,6 +480,7 @@ def submit_message_route(
             conversation_id=conversation_id,
             idempotency_key=key,
             message=body.message,
+            requested_search_scope=body.search_scope,
         )
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
@@ -502,5 +503,6 @@ def submit_message_route(
             reservation_id=context.reservation_id,
             route_family=context.route_family.value,
             status=context.status,
+            requested_search_scope=context.requested_search_scope,
         ).model_dump(mode="json"),
     )

@@ -10,7 +10,26 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import UserRole
+
+
+def requested_search_scope_from_row(value: object) -> RequestedSearchScope:
+    """Parse a stored or RPC search-scope value.
+
+    Args:
+        value: Database text, enum, or null for pre-migration rows.
+
+    Returns:
+        Typed requested scope. Null becomes ``AUTO``.
+
+    Raises:
+        ValueError: When a non-null value is not a known enum member.
+    """
+
+    if value is None:
+        return RequestedSearchScope.AUTO
+    return RequestedSearchScope(str(value))
 
 
 class AuthorizedRuntimeContext(BaseModel):
@@ -29,6 +48,7 @@ class AuthorizedRuntimeContext(BaseModel):
         reservation_id: Run-local ``query_run`` reservation.
         reconnect: True when this admit reused an existing paid run.
         route_family: Server-selected envelope family.
+        requested_search_scope: Client source preference fixed at admit.
         deadline_at: Absolute UTC deadline for the run.
         recursion_limit: LangGraph superstep cap.
         correction_ceiling: Maximum corrections.
@@ -59,6 +79,7 @@ class AuthorizedRuntimeContext(BaseModel):
     reservation_id: UUID
     reconnect: bool
     route_family: Phase6RouteFamily
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO
     deadline_at: datetime
     recursion_limit: int = Field(ge=1)
     correction_ceiling: int = Field(ge=0)

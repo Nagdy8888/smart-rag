@@ -97,7 +97,7 @@ def bm25_match_clause(query: Bm25StructuredQuery) -> sql.Composed:
 
 def bm25_key_scope_sql(
     chunk_ids: tuple[UUID, ...] | None,
-) -> tuple[sql.Composed, tuple[object, ...]]:
+) -> tuple[sql.Composable, tuple[object, ...]]:
     """Return a key-field scope fragment for one BM25 scored statement.
 
     ``pg_search`` 0.25.2 raises ``XX000`` (unsupported query shape) when

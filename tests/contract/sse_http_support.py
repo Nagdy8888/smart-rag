@@ -22,6 +22,7 @@ from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.settings import BackendSettings, load_backend_settings
 from smart_rag_core.sse.store import MemoryRunEventStore
@@ -189,6 +190,7 @@ class RecordingAdmitService:
         conversation_id: UUID,
         idempotency_key: UUID,
         message: str,
+        requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
     ) -> tuple[AuthorizedRuntimeContext, str]:
         """Admit or reconnect one Composite run.
 
@@ -197,6 +199,7 @@ class RecordingAdmitService:
             conversation_id: Conversation.
             idempotency_key: Client key.
             message: User text.
+            requested_search_scope: Client source preference stored on the run.
 
         Returns:
             Context and stream path.
@@ -211,7 +214,7 @@ class RecordingAdmitService:
         context = composite_context(
             conversation_id=conversation_id,
             user_id=caller.user_id,
-        )
+        ).model_copy(update={"requested_search_scope": requested_search_scope})
         self._by_key[idempotency_key] = context
         return context, f"/runs/{context.run_id}/events"
 
@@ -239,6 +242,7 @@ class RecordingAdmitService:
                     creator_user_id=context.user_id,
                     status=context.status,
                     reservation_id=context.reservation_id,
+                    requested_search_scope=context.requested_search_scope,
                     created_at=None,
                 )
         raise QueryAdmissionError("not_found")

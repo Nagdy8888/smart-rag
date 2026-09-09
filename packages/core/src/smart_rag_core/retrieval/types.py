@@ -42,7 +42,7 @@ class DenseRetrievalResult:
         authorized_count: Admission count used for exact fallback.
         fallback_reason: Weak-evidence or none.
         hnsw_profile: Allow-listed HNSW profile used for the last attempt.
-        attempts: ANN/HIGH/exact attempts in this retrieve (1–3).
+        attempts: ANN/HIGH/exact attempts in this retrieve (1-3).
         underfill: True when unique survivors are below the candidate floor.
         exact_admitted: True when the exact scan ran.
     """

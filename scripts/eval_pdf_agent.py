@@ -16,6 +16,7 @@ from smart_rag_core.evaluation.private_pdf import (
     load_private_pdf_labeled_tuning,
     load_private_pdf_tuning_cases,
 )
+from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.retrieval.frozen_profile import (
     LONG_DOCUMENT_PROFILE_ID,
     UnknownRetrievalProfileError,
@@ -107,8 +108,8 @@ def _run_split(split: str, labels: Path, ingest_ids: Path) -> int:
         default_profile_id=HYBRID_DEFAULT_PROFILE_ID,
         long_profile_id=LONG_DOCUMENT_PROFILE_ID,
     )
-    answers = []
-    judges = []
+    answers: list[AnswerPayload] = []
+    judges: list[tuple[str, float | None]] = []
     for row, result in zip(labeled, results, strict=True):
         answer = generate_live_answer(
             settings=settings,

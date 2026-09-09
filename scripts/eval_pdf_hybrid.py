@@ -142,7 +142,11 @@ def _run_split(
     )
     report["split"] = split
     report["default_profile_digest"] = FROZEN_HYBRID_PROFILE_SHA256
-    out_name = "hybrid-dev-report.json" if split == "development" else "hybrid-qual-report.json"
+    out_name = (
+        "hybrid-dev-report.json"
+        if split == "development"
+        else "hybrid-qual-report.json"
+    )
     write_report(Path(".private-eval") / out_name, report)
     print_retrieve_stdout(report)
     print(f"gates_pass={retrieve_gates_pass(report)}")
@@ -177,10 +181,13 @@ def _freeze_if_ready() -> int:
             "blocked=qualification_gates_failed",
             "runtime_allow_listed=false",
         )
-    if development.get("live_rerank") is not True or qualification.get("live_rerank") is not True:
+    if (
+        development.get("live_rerank") is not True
+        or qualification.get("live_rerank") is not True
+    ):
         return _print_block("blocked=identity_cannot_freeze_live_hybrid")
     digest = candidate_digest(LONG_DOCUMENT_PROFILE_ID)
-    decision = {
+    decision: dict[str, object] = {
         "freeze_ready": True,
         "candidate_profile_id": LONG_DOCUMENT_PROFILE_ID,
         "candidate_digest": digest,

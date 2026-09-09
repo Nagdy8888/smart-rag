@@ -162,7 +162,9 @@ class DenseRetriever:
                     attempts = 3
                 elif len(unique) < DENSE_UNDERFILL_FLOOR:
                     fallback = RetrievalFallbackReason.WEAK_EVIDENCE
-            underfill = len({item.chunk_id for item in candidates}) < DENSE_UNDERFILL_FLOOR
+            underfill = (
+                len({item.chunk_id for item in candidates}) < DENSE_UNDERFILL_FLOOR
+            )
         return DenseRetrievalResult(
             mode=selected_mode,
             candidates=candidates,

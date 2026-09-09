@@ -2,7 +2,7 @@
 title: Query run admission
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-25
+last-reviewed: 2026-09-09
 audience: engineering, security
 phase_packet: Phase 6 Packet 1
 ---
@@ -95,13 +95,21 @@ not throttle hosted Supabase Auth.
 
 `POST /conversations/{id}/messages` admits Auto chat as
 `Phase6RouteFamily.COMPOSITE` after the `X-Client-Version` handshake.
-JSON Accept returns `{run_id, stream_path}` where `stream_path` is
-`/runs/{run_id}/events`. `Accept: text/event-stream` streams immediately.
-See [SSE.md](../api/SSE.md). Public `GET /health/ready` never sets
-`query_ready` in mock mode. A stale `rate_limit_degraded` latch also
-clears `query_ready` until Valkey recovers; readiness probes and a later
+JSON Accept returns `{run_id, stream_path, requested_search_scope}` where
+`stream_path` is `/runs/{run_id}/events`. `Accept: text/event-stream`
+streams immediately. See [SSE.md](../api/SSE.md). Public `GET /health/ready`
+never sets `query_ready` in mock mode. A stale `rate_limit_degraded` latch
+also clears `query_ready` until Valkey recovers; readiness probes and a later
 successful limits `INCR` clear that latch. Named ParadeDB/Valkey/LightRAG
 probes stay on authenticated `GET /ops/ready`.
+
+The request body may include `search_scope` (`auto` default). Responses and
+durable run rows echo `requested_search_scope`. Scope is hashed into the
+idempotency payload unless it is `auto`, so an old Auto retry keeps the
+legacy hash. Same key plus a different scope is `key_collision`. Reconnect
+and `GET /runs/{run_id}` reload the stored value and never mutate it.
+`app.admit_query_run_v2`, `app.load_query_run_runtime_v2`, and
+`app.get_query_run_v2` wrap the previous RPCs. Old signatures stay callable.
 
 See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 

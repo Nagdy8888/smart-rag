@@ -168,6 +168,42 @@ def test_resume_after_boundary_and_last_event_id(
     assert executor.start_count == 1
 
 
+def test_resume_reloads_requested_search_scope_without_second_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GET run and resume reuse the stored scope and do not admit again."""
+
+    monkeypatch.setenv("APP_ENV", "test")
+    patch_sse_rate_limits(monkeypatch)
+    store = MemoryRunEventStore()
+    executor = FixtureQueryRunExecutor()
+    admit = RecordingAdmitService()
+    conversation_id = uuid4()
+    with sse_openapi_client(store=store, executor=executor, admit=admit) as client:
+        submitted = client.post(
+            f"/conversations/{conversation_id}/messages",
+            json={
+                "message": "Parallel Tool Execution",
+                "idempotency_key": str(uuid4()),
+                "search_scope": "company_documents",
+            },
+            headers=client_headers(),
+        )
+        payload = json_object(submitted.json())
+        run_id = require_str(payload["run_id"])
+        fetched = client.get(f"/runs/{run_id}", headers=client_headers())
+        resumed = client.get(f"/runs/{run_id}/events?after=0", headers=sse_headers())
+    assert submitted.status_code == 202
+    assert payload["requested_search_scope"] == "company_documents"
+    assert fetched.status_code == 200
+    assert json_object(fetched.json())["requested_search_scope"] == (
+        "company_documents"
+    )
+    assert resumed.status_code == 200
+    assert admit.calls == 1
+    assert executor.start_count == 1
+
+
 def test_foreign_missing_and_tombstoned_resume_are_404(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

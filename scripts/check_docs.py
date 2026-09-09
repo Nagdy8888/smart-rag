@@ -176,7 +176,8 @@ def check_governance_signoff() -> list[str]:
 
     Returns:
         Human-readable error strings. Empty when both governance documents carry
-        approver, approval date, policy version, and real-content posture.
+        approver, approval date, policy version, and a real-content posture of
+        ``prohibited``, ``allowed``, or ``laptop-pdf-overlay-accepted``.
 
     Side Effects:
         None.
@@ -208,10 +209,14 @@ def check_governance_signoff() -> list[str]:
                     f"frontmatter field {key!r}"
                 )
         posture = fields.get("real_company_content_external_processing", "").lower()
-        if posture not in {"prohibited", "allowed"}:
+        if posture not in {
+            "prohibited",
+            "allowed",
+            "laptop-pdf-overlay-accepted",
+        }:
             errors.append(
                 f"{relative} must set real_company_content_external_processing "
-                "to prohibited or allowed"
+                "to prohibited, allowed, or laptop-pdf-overlay-accepted"
             )
     return errors
 

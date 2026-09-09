@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -431,7 +432,7 @@ class RerankRowModel(BaseModel):
     chunk_id: str
     rank: int = Field(ge=1)
     support: float
-    supported_subquestion_indices: list[int] = Field(default_factory=list)
+    supported_subquestion_indices: list[int] = Field(default_factory=list[int])
 
     @field_validator("rank", mode="before")
     @classmethod
@@ -559,7 +560,7 @@ def validate_rerank_payload(
     return tuple(parsed)
 
 
-def _validated_subquestion_indices(raw: list[int]) -> tuple[int, ...]:
+def _validated_subquestion_indices(raw: Sequence[object]) -> tuple[int, ...]:
     """Keep at most three unique 0-based subquestion indices.
 
     Args:
@@ -636,9 +637,7 @@ def apply_mmr(
     selected: list[RerankPassage] = []
     doc_counts: dict[UUID, int] = {}
     section_counts: dict[str, int] = {}
-    rank_by_id = {
-        item.candidate.chunk_id: index for index, item in enumerate(depth)
-    }
+    rank_by_id = {item.candidate.chunk_id: index for index, item in enumerate(depth)}
     while remaining and len(selected) < limit:
 
         def score(item: RerankPassage) -> tuple[float, str]:

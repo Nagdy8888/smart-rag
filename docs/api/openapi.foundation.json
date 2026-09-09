@@ -2289,6 +2289,16 @@
         "title": "QueueAgeDiagnostics",
         "type": "object"
       },
+      "RequestedSearchScope": {
+        "description": "Client source preference fixed at admission.\n\nValues:\n    AUTO: Existing server classifier decides company versus general.\n    COMPANY_DOCUMENTS: Force company retrieval for substantive prompts.\n    GENERAL_KNOWLEDGE: Forbid company retrieval and company claims.",
+        "enum": [
+          "auto",
+          "company_documents",
+          "general_knowledge"
+        ],
+        "title": "RequestedSearchScope",
+        "type": "string"
+      },
       "RetryIngestionJobResponse": {
         "description": "Result of a role-scoped dead-letter or failed-job retry.",
         "properties": {
@@ -2453,6 +2463,10 @@
             "format": "uuid",
             "title": "Creator User Id",
             "type": "string"
+          },
+          "requested_search_scope": {
+            "$ref": "#/components/schemas/RequestedSearchScope",
+            "default": "auto"
           },
           "reservation_id": {
             "anyOf": [
@@ -2664,6 +2678,11 @@
             "minLength": 1,
             "title": "Message",
             "type": "string"
+          },
+          "search_scope": {
+            "$ref": "#/components/schemas/RequestedSearchScope",
+            "default": "auto",
+            "description": "Answer-source preference. Not a route, document, or ACL selector."
           }
         },
         "required": [
@@ -2678,6 +2697,10 @@
           "reconnect": {
             "title": "Reconnect",
             "type": "boolean"
+          },
+          "requested_search_scope": {
+            "$ref": "#/components/schemas/RequestedSearchScope",
+            "default": "auto"
           },
           "reservation_id": {
             "format": "uuid",

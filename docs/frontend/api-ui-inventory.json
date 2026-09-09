@@ -37,6 +37,7 @@
     "/health/live",
     "/health/ready",
     "/ingestion/crawls",
+    "/ingestion/detector-findings/reviews",
     "/ingestion/jobs/{job_id}/retry",
     "/ingestion/versions/{version_id}/status",
     "/invitations/accept",

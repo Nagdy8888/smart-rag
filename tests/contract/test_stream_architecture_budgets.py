@@ -24,6 +24,8 @@ STREAM_OWNERS: tuple[str, ...] = (
     "apps/backend/src/smart_rag_api/services/sse/stream_lifecycle.py",
     "apps/backend/src/smart_rag_api/services/sse/answer_persistence.py",
     "apps/backend/src/smart_rag_api/services/sse/langgraph_executor.py",
+    "apps/backend/src/smart_rag_api/services/sse/langgraph_execute.py",
+    "apps/backend/src/smart_rag_api/services/sse/langgraph_bindings.py",
     "apps/backend/src/smart_rag_api/services/sse/langgraph_stream_consume.py",
     "apps/backend/src/smart_rag_api/services/sse/stream_dispatch.py",
     "apps/backend/src/smart_rag_api/services/sse/stream_parts.py",

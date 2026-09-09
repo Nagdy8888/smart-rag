@@ -57,6 +57,31 @@ def explicit_supabase_url(
 
 
 @pytest.fixture(autouse=True)
+def isolate_unit_app_env(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep unit constructors on local defaults unless a test overrides.
+
+    Args:
+        request: Current pytest item; path is used to detect ``tests/unit``.
+        monkeypatch: Pytest monkeypatch fixture.
+
+    Side Effects:
+        For unit tests only, sets ``APP_ENV=local`` and drops
+        ``WORKER_GRAPH_ENABLED`` plus ``ALLOW_TEST_IDENTITY``. Developer
+        ``.env`` / ``.env.compose`` otherwise leak laptop overlay flags into
+        CORS, LangSmith I/O, and worker-graph default tests.
+    """
+
+    if "/tests/unit/" not in request.path.as_posix():
+        return
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.delenv("WORKER_GRAPH_ENABLED", raising=False)
+    monkeypatch.delenv("ALLOW_TEST_IDENTITY", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def isolate_host_langsmith_flags(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep constructors on fail-closed LangSmith defaults.
 

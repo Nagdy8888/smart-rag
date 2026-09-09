@@ -13,6 +13,7 @@ from smart_rag_core.query_routing.knowledge_scope import (
     ScopeDegradationReason,
 )
 from smart_rag_core.query_routing.models.plan import Phase6Extension, RoutingSurface
+from smart_rag_core.search_scope import RequestedSearchScope
 
 
 class MemoryRecord(BaseModel):
@@ -136,6 +137,7 @@ class QueryPreparation(BaseModel):
         knowledge_scope: Strict-split answer origin.
         knowledge_scope_confidence: Confidence for ``knowledge_scope``.
         scope_degradation_reason: Server-derived failed-inference reason.
+        requested_search_scope: Client source preference copied from admission.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -181,6 +183,7 @@ class QueryPreparation(BaseModel):
     knowledge_scope: KnowledgeScope
     knowledge_scope_confidence: float = Field(ge=0.0, le=1.0)
     scope_degradation_reason: ScopeDegradationReason | None = None
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO
 
     @model_validator(mode="after")
     def _original_preserved(self) -> QueryPreparation:

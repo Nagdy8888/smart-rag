@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 from smart_rag_core.feedback.tags import FeedbackTag
+from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.tables.plan import TableQueryPlan
 
 
@@ -129,6 +130,10 @@ class SubmitMessageRequest(BaseModel):
         default=None,
         description="Required on paid POST unless Idempotency-Key header is set.",
     )
+    search_scope: RequestedSearchScope = Field(
+        default=RequestedSearchScope.AUTO,
+        description="Answer-source preference. Not a route, document, or ACL selector.",
+    )
 
 
 class SubmitMessageResponse(BaseModel):
@@ -142,6 +147,7 @@ class SubmitMessageResponse(BaseModel):
     reservation_id: UUID
     route_family: str
     status: str
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO
 
 
 class RunResponse(BaseModel):
@@ -155,6 +161,7 @@ class RunResponse(BaseModel):
     status: str
     reservation_id: UUID | None = None
     created_at: datetime | None = None
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO
 
 
 class CitationResponse(BaseModel):

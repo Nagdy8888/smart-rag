@@ -25,6 +25,8 @@ function completedComposite(): ChatViewState {
     terminal: "completed",
     stage: "verify_answer",
     status: "verified",
+    requestedSearchScope: "company_documents",
+    answerOrigin: "company_documents",
     diagnostics: {
       ...admitted.diagnostics,
       promptTokens: 258,
@@ -86,6 +88,10 @@ describe("RunDetailsSheet", () => {
     expect(details).toHaveTextContent("Completed");
     expect(details).toHaveTextContent("Verified and ready.");
     expect(details).toHaveTextContent("Composite");
+    expect(details).toHaveTextContent("Requested source");
+    expect(details).toHaveTextContent("Company files");
+    expect(details).toHaveTextContent("Answer origin");
+    expect(details).toHaveTextContent("Company documents");
     expect(details).toHaveTextContent("Searches documents, tables, and relationships.");
     expect(details).toHaveTextContent("258 prompt · 32 completion");
     expect(details).toHaveTextContent("290");

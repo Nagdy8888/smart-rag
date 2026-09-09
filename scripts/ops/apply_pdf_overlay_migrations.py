@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import LiteralString, cast
 
 import psycopg
 
 REPO = Path(__file__).resolve().parents[2]
 MIGRATIONS = (
-    REPO / "supabase" / "migrations" / "20260909120000_detector_findings_reviews_v1.sql",
+    REPO
+    / "supabase"
+    / "migrations"
+    / "20260909120000_detector_findings_reviews_v1.sql",
     REPO / "supabase" / "migrations" / "20260909130000_heading_inventory_v1.sql",
     REPO / "supabase" / "migrations" / "20260909140000_dense_candidates_v2.sql",
 )
@@ -59,7 +63,7 @@ def main() -> int:
             return 0
         for path in MIGRATIONS:
             print(f"applying={path.name}")
-            connection.execute(path.read_text(encoding="utf-8"))
+            connection.execute(cast(LiteralString, path.read_text(encoding="utf-8")))
             connection.execute(
                 """
                 INSERT INTO supabase_migrations.schema_migrations (version, name)

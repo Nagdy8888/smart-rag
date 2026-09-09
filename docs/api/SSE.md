@@ -54,8 +54,11 @@ resume with 404. Reconnect never starts a second paid graph.
 
 - `POST /conversations/{conversation_id}/messages` with `Accept: text/event-stream`
   admits (after handshake) then streams. JSON Accept keeps HTTP 202
-  `{run_id, stream_path}` where `stream_path=/runs/{run_id}/events`.
-- Duplicate idempotency keys return the existing run stream.
+  `{run_id, stream_path, requested_search_scope}` where
+  `stream_path=/runs/{run_id}/events`. Optional POST body `search_scope` is
+  `auto` when omitted. Resume is GET-only and never sends `search_scope`.
+- Duplicate idempotency keys return the existing run stream. A different
+  `search_scope` on the same key is a key collision.
 - `GET /runs/{run_id}/events?after={sequence}` also honors `Last-Event-ID`.
   Replay is strictly `sequence > after`. `after=0` or omitted means from start.
 - Headers on SSE responses: `Content-Type: text/event-stream`,

@@ -175,6 +175,16 @@ def test_sse_execute_does_not_continue_without_app_api_connection() -> None:
         / "sse"
         / "langgraph_runtime.py"
     ).read_text(encoding="utf-8")
+    execute_source = (
+        Path(__file__).resolve().parents[2]
+        / "apps"
+        / "backend"
+        / "src"
+        / "smart_rag_api"
+        / "services"
+        / "sse"
+        / "langgraph_execute.py"
+    ).read_text(encoding="utf-8")
     executor_source = (
         Path(__file__).resolve().parents[2]
         / "apps"
@@ -190,10 +200,13 @@ def test_sse_execute_does_not_continue_without_app_api_connection() -> None:
         not in runtime_source
     )
     assert "except QueryGraphRuntimeError:\n                connection = None" not in (
+        execute_source
+    )
+    assert "except QueryGraphRuntimeError:\n                connection = None" not in (
         executor_source
     )
     assert "open_run_app_api_connection(bindings.supabase_dsn)" in runtime_source
-    assert 'yield ("error", {"code": exc.reason})' in executor_source
+    assert 'yield ("error", {"code": exc.reason})' in execute_source
 
 
 def test_context_loader_keeps_connection_idle_for_retrieval_transaction(
@@ -264,11 +277,11 @@ def test_context_loader_keeps_connection_idle_for_retrieval_transaction(
         return ()
 
     monkeypatch.setattr(
-        "smart_rag_agents.query.runtime.adapters.psycopg.connect",
+        "smart_rag_agents.query.runtime.adapters_hybrid.psycopg.connect",
         _connect,
     )
     monkeypatch.setattr(
-        "smart_rag_agents.query.runtime.adapters.fetch_authorized_chunk_context",
+        "smart_rag_agents.query.runtime.adapters_hybrid.fetch_authorized_chunk_context",
         _fetch,
     )
     loader = context_loader(

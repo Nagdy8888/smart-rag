@@ -207,6 +207,7 @@ describe("startMessageStream", () => {
       "66666666-6666-4666-8666-666666666666",
       "<script>alert(1)</script>",
       "33333333-3333-4333-8333-333333333333",
+      "company_documents",
       fetchImpl,
     );
     expect(started.failure).toBeNull();
@@ -247,6 +248,7 @@ describe("startMessageStream", () => {
       "66666666-6666-4666-8666-666666666666",
       "hello",
       "33333333-3333-4333-8333-333333333333",
+      "company_documents",
       fetchImpl,
       controller.signal,
     );
@@ -281,6 +283,7 @@ describe("startOrResumeMessageStream", () => {
         lastSequence: 4,
         idempotencyKey: "33333333-3333-4333-8333-333333333333",
       },
+      "company_documents",
       fetchImpl,
     );
     expect(started.resumed).toBe(true);
@@ -309,6 +312,7 @@ describe("startOrResumeMessageStream", () => {
         lastSequence: 4,
         idempotencyKey: "33333333-3333-4333-8333-333333333333",
       },
+      "company_documents",
       fetchImpl,
       controller.signal,
     );
@@ -354,6 +358,7 @@ describe("startOrResumeMessageStream", () => {
         lastSequence: 0,
         idempotencyKey: "33333333-3333-4333-8333-333333333333",
       },
+      "company_documents",
       fetchImpl,
     );
     expect(started.resumed).toBe(false);
@@ -385,7 +390,7 @@ describe("acceptInvitation", () => {
 });
 
 describe("submitMessageBody Auto contract", () => {
-  it("posts message and idempotency_key only, with no route field", async () => {
+  it("posts message, idempotency_key, and search_scope with no route field", async () => {
     let body = "";
     const fetchImpl: typeof fetch = async (input, init) => {
       const url = String(input);
@@ -402,6 +407,7 @@ describe("submitMessageBody Auto contract", () => {
             reservation_id: "res-auto",
             route_family: "composite",
             status: "pending",
+            requested_search_scope: "company_documents",
           }),
           { status: 202, headers: { "Content-Type": "application/json" } },
         );
@@ -416,15 +422,51 @@ describe("submitMessageBody Auto contract", () => {
       "conv-1",
       "hello",
       "33333333-3333-4333-8333-333333333333",
+      "company_documents",
       fetchImpl,
     );
     const parsed = JSON.parse(body) as Record<string, unknown>;
     expect(parsed).toEqual({
       message: "hello",
       idempotency_key: "33333333-3333-4333-8333-333333333333",
+      search_scope: "company_documents",
     });
     expect(parsed.route).toBeUndefined();
     expect(parsed.route_family).toBeUndefined();
+  });
+
+  it("omits search_scope from resume GET", async () => {
+    let resumeUrl = "";
+    let resumeBody: string | undefined;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes("/events")) {
+        resumeUrl = url;
+        resumeBody = init?.body === undefined ? undefined : String(init.body);
+        const headers = init?.headers as Record<string, string>;
+        expect(headers["X-Client-Version"]).toBeUndefined();
+        return new Response("event: heartbeat\ndata: {}\n\n", {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
+      return new Response("{}", { status: 500 });
+    };
+    await startOrResumeMessageStream(
+      { accessToken: "jwt-token" },
+      "conv-1",
+      "retry",
+      {
+        runId: "run-1",
+        terminal: null,
+        lastSequence: 4,
+        idempotencyKey: "33333333-3333-4333-8333-333333333333",
+      },
+      "general_knowledge",
+      fetchImpl,
+    );
+    expect(resumeUrl).toContain("/runs/run-1/events?after=4");
+    expect(resumeBody).toBeUndefined();
   });
 });
 
@@ -1349,6 +1391,7 @@ describe("paid POST handshake 426", () => {
       "conv-1",
       "hello",
       "33333333-3333-4333-8333-333333333333",
+      "company_documents",
       fetchImpl,
     );
     expect(started.failure).toEqual({
@@ -1386,6 +1429,7 @@ describe("private-run resume 404", () => {
         lastSequence: 3,
         idempotencyKey: "33333333-3333-4333-8333-333333333333",
       },
+      "company_documents",
       fetchImpl,
     );
     expect(started.resumed).toBe(true);
@@ -1427,6 +1471,7 @@ describe("cancelRun", () => {
       status: "cancelled",
       reservation_id: null,
       created_at: null,
+      requested_search_scope: "auto",
     });
   });
 });
@@ -1593,6 +1638,7 @@ describe("fetchRun and fetchConversation", () => {
       status: "running",
       reservation_id: "res-1",
       created_at: "2026-08-17T00:00:00Z",
+      requested_search_scope: "auto",
     });
     expect(JSON.stringify(run)).not.toContain("SECRET");
   });

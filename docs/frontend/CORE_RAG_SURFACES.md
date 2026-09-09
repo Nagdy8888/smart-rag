@@ -52,7 +52,7 @@ routes in [ADMINISTRATION.md](./ADMINISTRATION.md). Nav uses Next.js
 flowchart TD
   browser[Browser]
   browser -->|GET /api/meta handshake| meta[FastAPI meta]
-  browser -->|POST messages message plus idempotency_key only| admit[Admit Auto]
+  browser -->|POST messages message plus search_scope| admit[Admit Auto]
   admit -->|202 run_id| resume[GET events after]
   resume --> catalog[SSE catalog]
   catalog --> chips[Citation chips]
@@ -69,7 +69,7 @@ flowchart TD
 
 | ID | UI |
 | --- | --- |
-| GAP-07-01 | Auto only. Advanced panel is display-only of `route_family` and `route_correction`. No Hybrid/Combined/Table/Inspect send buttons |
+| GAP-07-01 | Auto envelope only. Advanced panel is display-only of `route_family` and `route_correction`. No Hybrid/Combined/Table/Inspect send buttons. `search_scope` is allowed |
 | GAP-07-02 | SSE catalog only. Inference-chain objects are absent; citation chips only |
 | GAP-07-09 | Source drawer: ids + provenance text. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
 | GAP-07-10 | No rolling ETA/cost. Authorized `graph_handoff` counts + `graphNotReadyCopy(n)` only |
@@ -78,7 +78,12 @@ flowchart TD
 
 ## Honest contracts
 
-- `SubmitMessageRequest` is `{ message, idempotency_key? }` only.
+- `SubmitMessageRequest` is `{ message, idempotency_key?, search_scope? }`.
+  Omitted `search_scope` is `auto`. There is still **no** client
+  `route_family` (GAP-07-01). New chats default the Answer source selector
+  to Company files. The selector is disabled while sending or while a
+  run is admitted and non-terminal. Run Details show **Requested source**
+  separately from SSE **Answer origin**.
 - Local `signed_url` is **null**. `upload_method` is `supabase_storage_jwt`.
 - Reserve is never Hybrid Ready.
 - Graph Pending is warning, distinct from ACL blindness. ACL copy is

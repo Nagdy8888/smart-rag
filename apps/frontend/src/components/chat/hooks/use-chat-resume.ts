@@ -29,6 +29,7 @@ import {
   shouldStopReconnect,
   waitForReconnectDelay,
 } from "../../../lib/stream-reconnect";
+import type { RequestedSearchScope } from "../../../lib/types";
 
 export type ResumeOutcome = ChatViewState | "deleted" | "unauthorized" | null;
 
@@ -51,6 +52,10 @@ export type UseChatResumeInput = {
   setReconnectExhausted: Dispatch<SetStateAction<boolean>>;
   setNextRetryMs: Dispatch<SetStateAction<number | null>>;
   onConversationId: (id: string | null) => void;
+  restoreConversationScope: (
+    conversationId: string,
+    scope: RequestedSearchScope,
+  ) => void;
 };
 
 /**
@@ -82,6 +87,7 @@ export function useChatResume(input: UseChatResumeInput): {
     setReconnectExhausted,
     setNextRetryMs,
     onConversationId,
+    restoreConversationScope,
   } = input;
   const resumeOnce = useCallback(
     async (currentChat: ChatViewState, controller: AbortController) => {
@@ -227,11 +233,16 @@ export function useChatResume(input: UseChatResumeInput): {
           return;
         }
         onConversationId(pointer.conversationId);
+        restoreConversationScope(
+          pointer.conversationId,
+          fetched.requested_search_scope,
+        );
         const recovered = {
           ...createChatViewState(idempotencyRef.current ?? newIdempotencyKey()),
           runId: fetched.run_id,
           lastSequence: pointer.lastSequence,
           reservationId: fetched.reservation_id,
+          requestedSearchScope: fetched.requested_search_scope,
         };
         sequenceRef.current = pointer.lastSequence;
         setChat(recovered);
@@ -263,6 +274,7 @@ export function useChatResume(input: UseChatResumeInput): {
     idempotencyRef,
     onConversationId,
     recoveredRef,
+    restoreConversationScope,
     resumeOnce,
     sequenceRef,
     setChat,

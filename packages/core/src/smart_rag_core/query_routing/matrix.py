@@ -160,4 +160,5 @@ def compile_retrieval_plan(
         knowledge_scope=prep.knowledge_scope,
         no_retrieval_answer_mode=no_retrieval_mode_for_scope(prep.knowledge_scope),
         scope_degradation_reason=prep.scope_degradation_reason,
+        requested_search_scope=prep.requested_search_scope,
     )

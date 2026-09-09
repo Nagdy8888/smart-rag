@@ -162,7 +162,9 @@ def main(argv: list[str] | None = None) -> int:
         description="Draft private PDF eval cases. Does not self-seal."
     )
     parser.add_argument("--pdf-sha256", default="")
-    parser.add_argument("--ids", type=Path, default=Path(".private-eval/ingest-ids.json"))
+    parser.add_argument(
+        "--ids", type=Path, default=Path(".private-eval/ingest-ids.json")
+    )
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
     env = merged_env()

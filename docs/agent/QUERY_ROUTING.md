@@ -2,7 +2,7 @@
 title: Query routing matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-09-09
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 2
 ---
@@ -54,6 +54,41 @@ world knowledge when evidence is missing; they refuse.
 | `user_supplied_text` | `NoRetrieval` / `user_text_model` | one `usage_kind=answer` | none / `user_supplied_text` |
 | `ambiguous` | `NoRetrieval` / `clarification` | 0 | none / `ambiguous` |
 | `company_documents` | Hybrid / Combined / table / inspection as before | existing RAG | cited or refusal / `company_documents` |
+
+### Requested search scope
+
+`requested_search_scope` is a client **source preference** fixed at admission.
+It is not authorization, not `route_family`, and not effective
+`knowledge_scope`. Values: `auto`, `company_documents`, `general_knowledge`.
+
+```mermaid
+flowchart TD
+  requested["requested_search_scope"]
+  requested --> greeting["Greeting, small talk, product help, or user text"]
+  requested --> autoNode["auto: existing classifier"]
+  requested --> companyNode["company_documents: force company_documents"]
+  requested --> generalNode["general_knowledge: NoRetrieval plus company_claim_forbidden"]
+  greeting --> keep["Keep current handling"]
+  autoNode --> origin["Effective knowledge_scope"]
+  companyNode --> origin
+  generalNode --> origin
+```
+
+Precedence after classification:
+
+1. Pure greetings, small talk, product-help, and user-text transforms keep
+   their current handling even when Company files is selected.
+2. Other substantive prompts with `company_documents` force
+   `KnowledgeScope.COMPANY_DOCUMENTS` and the existing company matrix.
+3. Other substantive prompts with `general_knowledge` force
+   `KnowledgeScope.GENERAL_KNOWLEDGE`, one NoRetrieval branch, and
+   `company_claim_forbidden=True`.
+4. `auto` keeps the classifier, including degradation reasons.
+
+Requested Company never manufactures `company_signal=True`. Explicit Company
+or General does not spend the profile model merely to decide company versus
+general. Answer origin remains effective `knowledge_scope`. Company mode
+never falls back to world knowledge.
 
 Standalone greetings such as “Hi”, “Hello”, and “hi friend” are
 `general_knowledge`. They use the one structured profile call plus one
