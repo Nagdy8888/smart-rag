@@ -54,6 +54,8 @@ class FrozenHybridProfile(BaseModel):
         final_evidence_max: Packet 5 evidence unit cap.
         final_token_budget: Packet 5 token cap.
         coverage_thresholds: Per-class coverage_score refuse thresholds.
+        dense_mode_when_version_scoped: ``exact`` for a resolved version on
+            the long-document candidate; default profile stays ``ann``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -78,6 +80,7 @@ class FrozenHybridProfile(BaseModel):
     excerpt_chars: int = Field(default=400, ge=1)
     mmr_candidate_depth: int = Field(default=20, ge=1)
     excerpt_strategy: Literal["prefix", "query_aware"] = "prefix"
+    dense_mode_when_version_scoped: Literal["ann", "exact"] = "ann"
 
 
 def canonical_profile_digest(payload: dict[str, Any]) -> str:

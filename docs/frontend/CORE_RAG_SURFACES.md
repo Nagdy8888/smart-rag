@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -71,7 +71,7 @@ flowchart TD
 | --- | --- |
 | GAP-07-01 | Auto envelope only. Advanced panel is display-only of `route_family` and `route_correction`. No Hybrid/Combined/Table/Inspect send buttons. `search_scope` is allowed |
 | GAP-07-02 | SSE catalog only. Inference-chain objects are absent; citation chips only |
-| GAP-07-09 | Source drawer: ids + provenance text. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
+| GAP-07-09 | Source drawer: page/title/section locators plus technical ids. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
 | GAP-07-10 | No rolling ETA/cost. Authorized `graph_handoff` counts + `graphNotReadyCopy(n)` only |
 | GAP-07-12 | No anomaly toast counts or audit tabs |
 | GAP-07-14 | `DELETE /documents/{id}` is wired for owner/admin with confirmation. Members still 403. No source preview/download |

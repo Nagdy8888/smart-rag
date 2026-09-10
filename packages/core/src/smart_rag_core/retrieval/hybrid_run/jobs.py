@@ -10,9 +10,11 @@ from uuid import UUID
 
 import psycopg
 
+from smart_rag_core.retrieval.frozen_profile import FrozenHybridProfile
 from smart_rag_core.retrieval.hybrid_run.channels import (
     collect_dense_lists,
     collect_term_lists,
+    dense_retrieve_mode,
 )
 from smart_rag_core.retrieval.hybrid_run.types import (
     Bm25RetrieverLike,
@@ -37,6 +39,8 @@ class HybridChannelJobsMixin:
         _paradedb: Optional ParadeDB connection used as a BM25 presence signal.
         _supabase: Bound canonical connection used when no DSN is provided.
         _supabase_dsn: Full Postgres URL for one idle connection per thread.
+        _retrieval_profile: Optional frozen or evaluation profile. Version
+            scoped exact dense is read from this object.
     """
 
     _dense: object | None
@@ -45,6 +49,7 @@ class HybridChannelJobsMixin:
     _paradedb: object | None
     _supabase: psycopg.Connection | None
     _supabase_dsn: str | None
+    _retrieval_profile: FrozenHybridProfile | None
 
     def _build_channel_jobs(
         self,
@@ -70,6 +75,10 @@ class HybridChannelJobsMixin:
 
         jobs: dict[str, ChannelJob] = {}
         dense = self._dense
+        dense_mode = dense_retrieve_mode(
+            version_id=version_id,
+            profile=getattr(self, "_retrieval_profile", None),
+        )
         if dense is not None:
             dense_retriever = cast(DenseRetrieverLike, dense)
 
@@ -90,6 +99,7 @@ class HybridChannelJobsMixin:
                             texts=texts,
                             vectors=vectors,
                             version_id=version_id,
+                            dense_mode=dense_mode,
                         )
                 return collect_dense_lists(
                     dense_retriever.retrieve,
@@ -97,6 +107,7 @@ class HybridChannelJobsMixin:
                     texts=texts,
                     vectors=vectors,
                     version_id=version_id,
+                    dense_mode=dense_mode,
                 )
 
             jobs["dense"] = _dense_job

@@ -10,6 +10,10 @@ import {
   answerOriginLabel,
   shouldShowCitations,
 } from "../../lib/answer-origin";
+import {
+  citationChipName,
+  citationSourceLabel,
+} from "../../lib/citation-label";
 import type { RunProgressItem } from "../../lib/run-progress";
 import type { ChatViewState } from "../../lib/chat-view";
 import type { CitationResponse, ConversationMessage } from "../../lib/types";
@@ -181,7 +185,8 @@ function CitationRow({
         <li key={citation.citation_id}>
           <CitationChip
             index={citation.citation_index}
-            citationId={citation.citation_id}
+            label={citationSourceLabel(citation)}
+            name={citationChipName(citation)}
             unavailable={citation.source_unavailable}
             href={hrefForCitation(citation)}
             onSelect={(trigger) => {

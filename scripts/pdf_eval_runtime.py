@@ -34,6 +34,7 @@ from smart_rag_core.evaluation.private_pdf.agent_scores import (
     aggregate_agent_gates,
 )
 from smart_rag_core.evaluation.private_pdf.metrics import PrivatePdfRetrieveScore
+from smart_rag_core.evaluation.schema import ExpectedProfile
 from smart_rag_core.gateways.embedding import create_embedding_gateway
 from smart_rag_core.gateways.model import (
     AnswerModelRequest,
@@ -61,6 +62,7 @@ from smart_rag_core.query_fusion.models import (
     PassageOrigin,
     ScoredPassage,
 )
+from smart_rag_core.query_profile.profiler import profile_query_sync
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.retrieval.coverage import CoverageDecision
 from smart_rag_core.retrieval.frozen_profile import (
@@ -82,6 +84,26 @@ from tests.contract.integration_support import (
 )
 
 EXACT_DEFAULT = PrivatePdfQueryClass.EXACT_ACRONYM.value
+
+
+def query_profile_for_retrieve(query: str) -> ExpectedProfile:
+    """Build the production deterministic ``ExpectedProfile`` for one query.
+
+    Packet 14 measures the same profile fields the retrieve path uses:
+    variants, exact terms, aliases, and temporal intent. Gold labels are
+    not copied onto the profile.
+
+    Args:
+        query: User question. Never logged.
+
+    Returns:
+        Frozen ``ExpectedProfile`` from ``profile_query_sync``.
+
+    Raises:
+        ValueError: Query exceeds profile bounds.
+    """
+
+    return profile_query_sync(query).profile
 
 
 class _DsnChannelMarker:
@@ -434,6 +456,7 @@ class PdfEvalRuntime:
             )
             wanted = row.meta.expected_profile_id
             profile = default_profile if wanted == default_profile_id else long_profile
+            typed_profile = query_profile_for_retrieve(row.question)
             retriever = HybridRetriever(
                 embedding_gateway=self._embedding,
                 supabase=None,
@@ -449,6 +472,7 @@ class PdfEvalRuntime:
             result = retriever.retrieve(
                 query=row.question,
                 caller=caller,
+                profile=typed_profile,
                 restrict_version_id=self.version_id,
             )
             results.append(result)
@@ -475,6 +499,8 @@ class PdfEvalRuntime:
                     first_evidence_ms=result.first_evidence_ms,
                     rerank_call_count=result.rerank_call_count,
                     bm25_fallback=str(result.fallback_reason),
+                    fused_ids=result.fused_ids,
+                    rerank_fallback=str(result.rerank_fallback or "none"),
                 )
             )
         return scores, results
@@ -639,6 +665,98 @@ def load_current_chunk_ids(supabase_url: str, version_id: UUID) -> frozenset[UUI
     return frozenset(UUID(str(row[0])) for row in rows)
 
 
+def load_version_chunk_sets(
+    supabase_url: str,
+    version_id: UUID,
+) -> tuple[frozenset[UUID], frozenset[UUID]]:
+    """Load all current chunk IDs and the representative subset.
+
+    Args:
+        supabase_url: Operator DSN.
+        version_id: Ingested version.
+
+    Returns:
+        ``(all_current_ids, representative_ids)``.
+    """
+
+    with psycopg.connect(supabase_url, connect_timeout=20) as connection:
+        connection.execute("SET ROLE postgres")
+        rows = connection.execute(
+            """
+            SELECT id, is_search_representative
+            FROM app.document_chunks
+            WHERE version_id = %s::uuid
+              AND deleted_at IS NULL
+            """,
+            (version_id,),
+        ).fetchall()
+    all_ids = frozenset(UUID(str(row[0])) for row in rows)
+    representatives = frozenset(UUID(str(row[0])) for row in rows if bool(row[1]))
+    return all_ids, representatives
+
+
+def _rejected_candidate_rows(payload: object) -> list[dict[str, object]]:
+    """Parse previously recorded rejected-candidate rows.
+
+    Args:
+        payload: JSON object or list.
+
+    Returns:
+        Typed rows. Unknown shapes are dropped.
+    """
+
+    rows: list[dict[str, object]] = []
+    candidates: object
+    if isinstance(payload, dict):
+        mapping = cast(dict[str, object], payload)
+        candidates = mapping.get("rejected")
+    elif isinstance(payload, list):
+        candidates = cast(object, payload)
+    else:
+        return rows
+    if not isinstance(candidates, list):
+        return rows
+    for item in cast(list[object], candidates):
+        if not isinstance(item, dict):
+            continue
+        typed = cast(dict[str, object], item)
+        row: dict[str, object] = {}
+        for key, value in typed.items():
+            row[str(key)] = value
+        rows.append(row)
+    return rows
+
+
+def record_rejected_candidate(report: dict[str, object]) -> None:
+    """Append a failed candidate digest to the gitignored reject log.
+
+    Args:
+        report: Retrieve aggregates. No private text.
+
+    Side Effects:
+        Writes ``.private-eval/rejected-candidates.json``.
+    """
+
+    path = Path(".private-eval/rejected-candidates.json")
+    existing: list[dict[str, object]] = []
+    if path.is_file():
+        loaded: object = json.loads(path.read_text(encoding="utf-8"))
+        existing.extend(_rejected_candidate_rows(loaded))
+    existing.append(
+        {
+            "candidate_digest": report.get("candidate_digest"),
+            "candidate_profile_id": report.get("candidate_profile_id"),
+            "gates_pass": False,
+            "hybrid_recall_at_10": report.get("hybrid_recall_at_10"),
+            "locator_correctness": report.get("locator_correctness"),
+            "first_evidence_p95_ms": report.get("first_evidence_p95_ms"),
+            "eligible_rerank_ones": report.get("eligible_rerank_ones"),
+            "holdout_opened": False,
+        }
+    )
+    write_report(path, {"rejected": existing})
+
+
 def write_report(path: Path, report: dict[str, object]) -> None:
     """Write a gitignored JSON report.
 
@@ -667,6 +785,10 @@ def print_retrieve_stdout(report: dict[str, object]) -> None:
     print(f"acl_leaks={report['acl_leaks']}")
     print(f"eligible_rerank_ones={report.get('eligible_rerank_ones')}")
     print(f"fallback_histogram={report.get('fallback_histogram')}")
+    print(f"rerank_fallback_histogram={report.get('rerank_fallback_histogram')}")
+    print(f"fused_occupancy_at_10={report.get('fused_occupancy_at_10')}")
+    print(f"gold_in_fused_any={report.get('gold_in_fused_any')}")
+    print(f"fused_gold_rank_p50={report.get('fused_gold_rank_p50')}")
     print(f"live_rerank={report.get('live_rerank')}")
     print(f"candidate_profile_id={report.get('candidate_profile_id')}")
     print(f"candidate_digest={report.get('candidate_digest')}")

@@ -224,3 +224,39 @@ def elapsed_ms(started: float) -> float:
     """
 
     return max(0.0, (time.perf_counter() - started) * 1000.0)
+
+
+def remaining_slice_seconds(*, slice_seconds: float, slice_started: float) -> float:
+    """Return unused seconds in the channel-plus-rerank slice.
+
+    Embedding runs before ``slice_started`` and is not subtracted from the
+    8s bound. The 8s value itself is not raised.
+
+    Args:
+        slice_seconds: Channel-plus-rerank bound.
+        slice_started: ``perf_counter`` when parallel channels started.
+
+    Returns:
+        Remaining seconds, never negative.
+    """
+
+    return max(0.0, slice_seconds - (time.perf_counter() - slice_started))
+
+
+def fused_first_evidence_ms(*, started: float, fused_at: float | None) -> float:
+    """Return milliseconds until fused IDs exist, else until fail-closed.
+
+    Rerank, MMR, parent expansion, and context preload after fusion are
+    excluded so first-evidence is not the end-to-end retrieve wall time.
+
+    Args:
+        started: Retrieve start ``perf_counter``.
+        fused_at: ``perf_counter`` when fused candidate IDs first exist.
+
+    Returns:
+        Non-negative milliseconds.
+    """
+
+    if fused_at is None:
+        return elapsed_ms(started)
+    return max(0.0, (fused_at - started) * 1000.0)

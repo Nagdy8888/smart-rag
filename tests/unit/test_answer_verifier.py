@@ -324,7 +324,14 @@ def test_empty_graph_citation_text_cannot_pass_complete() -> None:
 def test_citation_provenance_uses_existing_jsonb() -> None:
     """Fusion scores land in ``app.citations.provenance`` without a new table."""
 
-    fusion = verifier_fusion(verifier_passage(1, text="The refund period is 30 days."))
+    fusion = verifier_fusion(
+        verifier_passage(1, text="The refund period is 30 days.").model_copy(
+            update={
+                "page_number": 129,
+                "section_path": ("Tools", "Parallel Tool Execution"),
+            }
+        )
+    )
     answer = mock_answer_payload(fusion, (), user_query="refund")
     payload = citation_provenance_payload(
         fusion=fusion,
@@ -338,3 +345,8 @@ def test_citation_provenance_uses_existing_jsonb() -> None:
     assert payload["config_hash"] == fusion.config_hash
     assert payload["keyword_extract_count"] == 0
     assert payload["lightrag_answer_generate_count"] == 0
+    assert payload["page_number"] == 129
+    assert payload["section_path"] == ["Tools", "Parallel Tool Execution"]
+    assert payload["document_id"] == verifier_uid(10_001)
+    assert "citation_text" not in payload
+    assert "snippet" not in payload

@@ -89,6 +89,31 @@
   padding: 0;
 }
 
+.citationList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sourceDl {
+  margin: 0;
+}
+
+.sourceDl dt {
+  margin: calc(var(--space) * 2) 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sourceDl dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .answerFooter {
   display: flex;
   flex-wrap: wrap;

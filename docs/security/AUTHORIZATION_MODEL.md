@@ -2,7 +2,7 @@
 title: Authorization model
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-09-10
 audience: engineering, security, reviewers
 ---
 
@@ -97,6 +97,7 @@ Packet 3 **revokes** all `app`/`private`/`langgraph`/`lightrag` grants from `ano
 | `app.get_version_ingestion_status` | caller context, version_id | DEFINER ACL status. Empty set when unauthorized (HTTP 404) |
 | `app.delete_visible_document` | caller context, document_id | Owner/admin tombstone wrapping `exclude_version_from_retrieval`. Unreadable ids return NULL |
 | `app.list_run_citations` | caller context, run_id | Creator-only. ACL + current-version recheck nulls `chunk_id` when unavailable |
+| `app.list_run_citations_v2` | caller context, run_id | Creator-only. Same recheck as v1; overlays authorized page/title/section onto provenance; omits passage text |
 | `app.accept_invitation` | token_hash, user_id, email, assurance_level | Refuses demotion; privileged/upload upgrades revoke sessions. `assurance_level` is ignored |
 | `app.validate_caller_context` | caller_user_id, caller_role, authorization_version | Boolean membership + snapshot check |
 | `private.set_document_acl` | caller context, document, grantee, grant/revoke | Idempotent owner/admin-only ACL mutation with audit |

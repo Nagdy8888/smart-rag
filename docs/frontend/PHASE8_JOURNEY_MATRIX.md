@@ -123,7 +123,7 @@ is no client route field.
 | BM25 `bm25_unavailable` | `src/lib/limitations.test.ts` | uses signed historical-graph language | vitest-unit | proven |
 | LightRAG `graph_outage` | `src/lib/limitations.test.ts` | uses signed historical-graph language | vitest-unit | proven |
 | Table / comparison `source_ranges` | `src/components/tables/tables-app.test.tsx` | runs a valid analyze, labels display sort, and opens cell provenance | vitest-component | proven |
-| Citations without snippets GAP-07-09 | `src/lib/api.test.ts` | keeps ids and drops passage snippet fields | vitest-unit | proven |
+| Citations without snippets GAP-07-09 | `src/lib/api.test.ts` | keeps ids/locators and drops passage snippet fields | vitest-unit | proven |
 | Live five composite streams | `tests/e2e/core-rag-surfaces.spec.ts` | authenticated Auto chrome when a session exists | playwright-live | proven |
 
 ## Documents, graph, tables, administration

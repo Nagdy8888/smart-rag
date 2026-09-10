@@ -106,7 +106,10 @@ def test_citation_get_marks_unavailable_after_acl_revoke(
             INSERT INTO app.citations (
               run_id, citation_index, chunk_id, snippet, provenance
             )
-            VALUES (%s, 0, %s, 'must not leak', '{}'::jsonb)
+            VALUES (
+              %s, 0, %s, 'must not leak',
+              '{"page_number": 7, "document_title": "SECRET TITLE"}'::jsonb
+            )
             """,
             (admitted.context.run_id, chunk_id),
         )
@@ -143,3 +146,6 @@ def test_citation_get_marks_unavailable_after_acl_revoke(
     assert records[0].source_unavailable is True
     assert records[0].chunk_id is None
     assert UUID(str(records[0].citation_id))
+    assert records[0].provenance.get("document_title") is None
+    assert records[0].provenance.get("page_number") is None
+    assert "SECRET TITLE" not in str(records[0].provenance)

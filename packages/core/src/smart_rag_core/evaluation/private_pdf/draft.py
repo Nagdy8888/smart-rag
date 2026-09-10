@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -161,6 +162,112 @@ def _term_from_locator(locator: ChunkLocator) -> str:
     return "passage"
 
 
+def _locator_haystack(locator: ChunkLocator) -> str:
+    """Normalize heading plus passage for alias grounding.
+
+    Args:
+        locator: Passage locator.
+
+    Returns:
+        Normalized haystack. Callers must not print it.
+    """
+
+    return normalize_question(" ".join((*locator.section_path, locator.raw_text)))
+
+
+def aliases_supported_by_locator(
+    locator: ChunkLocator, aliases: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Return glossary aliases that actually appear in the locator.
+
+    Cycling an approved alias onto an unrelated passage makes Recall@10
+    measure the wrong chunk. Unsupported aliases stay unused.
+
+    Args:
+        locator: Gold passage.
+        aliases: Approved glossary aliases. Never logged.
+
+    Returns:
+        Aliases whose normalized form is a substring of the locator.
+    """
+
+    haystack = _locator_haystack(locator)
+    found: list[str] = []
+    seen: set[str] = set()
+    for alias in aliases:
+        token = normalize_question(alias)
+        if not token or token in seen or token not in haystack:
+            continue
+        seen.add(token)
+        found.append(alias)
+    return tuple(found)
+
+
+def required_term_for_locator(
+    locator: ChunkLocator, aliases: tuple[str, ...], ordinal: int
+) -> str:
+    """Choose a required term the gold passage can actually support.
+
+    Args:
+        locator: Gold passage.
+        aliases: Approved glossary aliases.
+        ordinal: Draft row index used to pick among supported aliases.
+
+    Returns:
+        A supported alias, or a heading/passage token.
+    """
+
+    supported = aliases_supported_by_locator(locator, aliases)
+    if supported:
+        return supported[ordinal % len(supported)]
+    return _term_from_locator(locator)
+
+
+def case_is_locator_grounded(
+    *,
+    question: str,
+    required_terms: Sequence[str],
+    expected_refusal: bool,
+    gold_texts: Sequence[str],
+    gold_headings: Sequence[str],
+) -> bool:
+    """Return whether a non-refusal question is about the gold passage.
+
+    Heading-boilerplate overlap (``according``, ``what``, ``stated``) is
+    not enough. Each required term must appear in the question and in gold
+    text or heading.
+
+    Args:
+        question: Draft question. Never logged.
+        required_terms: Exact terms or aliases.
+        expected_refusal: Summary or injection gold.
+        gold_texts: Canonical passage texts. Never logged.
+        gold_headings: Heading locators. Never logged.
+
+    Returns:
+        True when refusal questions are long enough, or every required
+        term is grounded.
+    """
+
+    if len(question.strip()) < 8:
+        return False
+    if expected_refusal:
+        return True
+    if not required_terms:
+        return False
+    q_norm = normalize_question(question)
+    haystacks = tuple(
+        normalize_question(item) for item in (*gold_texts, *gold_headings)
+    )
+    for term in required_terms:
+        token = normalize_question(term)
+        if not token or token not in q_norm:
+            return False
+        if not any(token in haystack for haystack in haystacks if haystack):
+            return False
+    return True
+
+
 def _quota_plan(*, locator_count: int) -> tuple[PrivatePdfQueryClass, ...]:
     """Return the ordered class mix for 50-60 cases.
 
@@ -230,7 +337,7 @@ def build_draft_rows(
         heading = (
             " / ".join(part for part in left.section_path if part) or "unsectioned"
         )
-        term = aliases[ordinal % len(aliases)] if aliases else _term_from_locator(left)
+        term = required_term_for_locator(left, aliases, ordinal)
         fact = first_sentence(left.raw_text)
         second = first_sentence(right.raw_text)
         refusal = query_class in {

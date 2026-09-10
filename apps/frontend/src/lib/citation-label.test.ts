@@ -1,0 +1,85 @@
+import { describe, expect, it } from "vitest";
+import {
+  citationChipName,
+  citationLocatorFields,
+  citationSourceLabel,
+} from "./citation-label";
+import type { CitationResponse } from "./types";
+
+function citation(
+  overrides: Partial<CitationResponse> = {},
+): CitationResponse {
+  return {
+    citation_id: "cite-1",
+    citation_index: 0,
+    chunk_id: "chunk-1",
+    provenance: {},
+    source_unavailable: false,
+    ...overrides,
+  };
+}
+
+describe("citationSourceLabel", () => {
+  it("uses page, title, and heading instead of UUIDs", () => {
+    expect(
+      citationSourceLabel(
+        citation({
+          provenance: {
+            document_title: "Building applications with AI agents",
+            page_number: 129,
+            section_path: ["Chapter 6", "Parallel Tool Execution"],
+          },
+        }),
+      ),
+    ).toBe(
+      "Building applications with AI agents · p. 129 · Parallel Tool Execution",
+    );
+    expect(
+      citationChipName(
+        citation({
+          citation_index: 1,
+          provenance: { page_number: 3 },
+        }),
+      ),
+    ).toBe("Citation 1, p. 3");
+  });
+
+  it("falls back to Evidence instead of a citation UUID", () => {
+    expect(citationSourceLabel(citation())).toBe("Evidence");
+    expect(citationChipName(citation({ citation_index: 2 }))).toBe("Citation 2");
+  });
+
+  it("labels unavailable sources without leaking stored titles", () => {
+    expect(
+      citationSourceLabel(
+        citation({
+          source_unavailable: true,
+          provenance: { document_title: "SECRET TITLE", page_number: 7 },
+        }),
+      ),
+    ).toBe("Source unavailable");
+  });
+});
+
+describe("citationLocatorFields", () => {
+  it("lists locators then technical ids", () => {
+    const fields = citationLocatorFields(
+      citation({
+        provenance: {
+          document_title: "Policy",
+          page_number: 12,
+          section_path: ["Refunds"],
+        },
+      }),
+    );
+    expect(fields.locators).toEqual([
+      { key: "document_title", label: "Document", value: "Policy" },
+      { key: "page_number", label: "Page", value: "12" },
+      { key: "section_path", label: "Section", value: "Refunds" },
+    ]);
+    expect(fields.technical.map((item) => item.key)).toEqual([
+      "citation_id",
+      "chunk_id",
+    ]);
+  });
+});

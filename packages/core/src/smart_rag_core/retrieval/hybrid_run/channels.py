@@ -95,6 +95,33 @@ def _invoke_dense(
         return retrieve(caller=caller, query_embedding=query_embedding)
 
 
+def dense_retrieve_mode(
+    *,
+    version_id: UUID | None,
+    profile: object | None,
+) -> DenseMode:
+    """Select ANN or exact dense for one Hybrid channel job.
+
+    Version-scoped exact is a long-document evaluation candidate. The
+    default profile stays on ANN. Exact still honors the 10,000-row
+    admission ceiling inside ``DenseRetriever``.
+
+    Args:
+        version_id: Resolved current version, or ``None`` when unscoped.
+        profile: Frozen or evaluation Hybrid profile, or ``None``.
+
+    Returns:
+        ``exact`` only when the profile asks for it and a version is set.
+    """
+
+    if version_id is None or profile is None:
+        return DenseMode.ANN
+    mode = getattr(profile, "dense_mode_when_version_scoped", "ann")
+    if mode == "exact":
+        return DenseMode.EXACT
+    return DenseMode.ANN
+
+
 def collect_dense_lists(
     retrieve: Callable[..., object],
     *,
@@ -102,11 +129,13 @@ def collect_dense_lists(
     texts: tuple[str, ...],
     vectors: tuple[tuple[float, ...], ...],
     version_id: UUID | None = None,
+    dense_mode: DenseMode = DenseMode.ANN,
 ) -> VariantLists:
     """Run dense retrieve once per fused query vector.
 
     Escalation is at most one HIGH ANN per variant, then exact only when
-    ``authorized_count * vector_count`` is at or below 10,000.
+    ``authorized_count * vector_count`` is at or below 10,000. When
+    ``dense_mode`` is already exact, ANN/HIGH retries are skipped.
 
     Args:
         retrieve: Bound ``DenseRetriever.retrieve`` or a test double.
@@ -114,6 +143,7 @@ def collect_dense_lists(
         texts: Query forms aligned with ``vectors``.
         vectors: Query embeddings.
         version_id: Optional current-version filter inside ranking.
+        dense_mode: Initial dense execution mode.
 
     Returns:
         Per-variant dense candidate lists after the global unique cap.
@@ -122,6 +152,8 @@ def collect_dense_lists(
     extra: dict[str, object] = {}
     if version_id is not None:
         extra["version_id"] = version_id
+    if dense_mode is DenseMode.EXACT:
+        extra["mode"] = DenseMode.EXACT
     lists: list[CandidateList] = []
     authorized_count = 0
     for _text, vector in zip(texts, vectors, strict=False):
@@ -137,6 +169,8 @@ def collect_dense_lists(
             authorized_count = result.authorized_count
         elif isinstance(result, tuple):
             lists.append(cast(CandidateList, result))
+    if dense_mode is DenseMode.EXACT:
+        return cap_unique_across_variants(tuple(lists), DENSE_CANDIDATE_CAP)
     unique = {item.chunk_id for variant in lists for item in variant}
     if unique and len(unique) < DENSE_UNDERFILL_FLOOR:
         high: list[CandidateList] = []

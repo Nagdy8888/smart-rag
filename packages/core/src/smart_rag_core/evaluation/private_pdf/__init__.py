@@ -6,10 +6,13 @@ from smart_rag_core.evaluation.private_pdf.agent_scores import (
 )
 from smart_rag_core.evaluation.private_pdf.draft import (
     ChunkLocator,
+    aliases_supported_by_locator,
     build_draft_rows,
+    case_is_locator_grounded,
     near_duplicate_pairs,
     normalize_question,
     question_hash,
+    required_term_for_locator,
 )
 from smart_rag_core.evaluation.private_pdf.loader import (
     development_labels_are_sealed,
@@ -27,6 +30,7 @@ from smart_rag_core.evaluation.private_pdf.loader import (
 from smart_rag_core.evaluation.private_pdf.metrics import (
     NOT_APPLICABLE,
     aggregate_retrieve_gates,
+    gold_id_overlap_counts,
     retrieve_gates_pass,
     score_retrieve_case,
 )
@@ -71,14 +75,17 @@ __all__ = [
     "SealStatus",
     "aggregate_agent_gates",
     "aggregate_retrieve_gates",
+    "aliases_supported_by_locator",
     "assert_current_chunk_ids",
     "assert_holdout_outside_repository",
     "assert_holdout_path_hidden",
     "assign_splits",
     "build_draft_rows",
     "case_id_for",
+    "case_is_locator_grounded",
     "development_labels_are_sealed",
     "families_are_disjoint",
+    "gold_id_overlap_counts",
     "load_private_pdf_holdout",
     "load_private_pdf_labeled_holdout",
     "load_private_pdf_labeled_open_splits",
@@ -93,6 +100,7 @@ __all__ = [
     "question_hash",
     "read_private_pdf_labeled",
     "read_private_pdf_payload",
+    "required_term_for_locator",
     "retrieve_gates_pass",
     "score_agent_case",
     "score_retrieve_case",

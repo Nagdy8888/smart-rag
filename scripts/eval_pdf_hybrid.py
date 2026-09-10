@@ -8,10 +8,13 @@ import sys
 from pathlib import Path
 from uuid import UUID
 
+import psycopg
 from smart_rag_core.evaluation.holdout import HoldoutSealedError
 from smart_rag_core.evaluation.private_pdf import (
     assert_holdout_path_hidden,
+    case_is_locator_grounded,
     development_labels_are_sealed,
+    gold_id_overlap_counts,
     load_private_pdf_labeled_qualification,
     load_private_pdf_labeled_tuning,
     load_private_pdf_tuning_cases,
@@ -44,8 +47,10 @@ from scripts.pdf_eval_runtime import (  # noqa: E402
     build_retrieve_report,
     candidate_digest,
     load_current_chunk_ids,
+    load_version_chunk_sets,
     print_retrieve_stdout,
     probe_infra,
+    record_rejected_candidate,
     write_report,
 )
 
@@ -142,14 +147,21 @@ def _run_split(
     )
     report["split"] = split
     report["default_profile_digest"] = FROZEN_HYBRID_PROFILE_SHA256
-    out_name = (
-        "hybrid-dev-report.json"
-        if split == "development"
-        else "hybrid-qual-report.json"
-    )
+    if split == "development":
+        out_name = (
+            "hybrid-dev-report.json"
+            if live_rerank
+            else "hybrid-dev-identity-report.json"
+        )
+    else:
+        out_name = "hybrid-qual-report.json"
     write_report(Path(".private-eval") / out_name, report)
     print_retrieve_stdout(report)
-    print(f"gates_pass={retrieve_gates_pass(report)}")
+    passed = retrieve_gates_pass(report)
+    print(f"gates_pass={passed}")
+    if live_rerank and split == "development" and not passed:
+        record_rejected_candidate(report)
+        print("rejected_candidate_recorded=true")
     default = load_frozen_profile(HYBRID_DEFAULT_PROFILE_ID)
     print(f"default_profile_id={default.profile_id}")
     if long_document_runtime_enabled():
@@ -205,6 +217,175 @@ def _freeze_if_ready() -> int:
     return 0
 
 
+def _probe_gold(*, labels: Path, ingest_ids: Path) -> int:
+    """Print count-only gold-ID overlap with the ingested version.
+
+    Args:
+        labels: Human-sealed gitignored JSON.
+        ingest_ids: Captured ingest identity.
+
+    Returns:
+        ``0`` when counts were printed; ``2`` on missing infrastructure.
+        Does not print questions, excerpts, or chunk UUID values.
+    """
+
+    ids = json.loads(ingest_ids.read_text(encoding="utf-8"))
+    version_id = UUID(str(ids["version_id"]))
+    env = apply_merged_env()
+    supabase_url = operator_url(env)
+    try:
+        all_ids, representatives = load_version_chunk_sets(supabase_url, version_id)
+    except (OSError, ValueError, psycopg.Error):
+        return _print_block("blocked=supabase_or_paradedb_unavailable")
+    cases = load_private_pdf_tuning_cases(labels)
+    development = tuple(case for case in cases if case.split == "development")
+    gold_groups = tuple(case.chunk_ids for case in development)
+    all_overlap = gold_id_overlap_counts(
+        gold_id_groups=gold_groups,
+        current_ids=all_ids,
+    )
+    rep_overlap = gold_id_overlap_counts(
+        gold_id_groups=gold_groups,
+        current_ids=representatives,
+    )
+    print(f"probe_gold_cases={all_overlap['cases']}")
+    print(f"gold_unique={all_overlap['gold_unique']}")
+    print(f"current_all={all_overlap['current']}")
+    print(f"current_representatives={rep_overlap['current']}")
+    print(f"intersection_all={all_overlap['intersection']}")
+    print(f"intersection_representatives={rep_overlap['intersection']}")
+    print(f"cases_missing_all_current={all_overlap['cases_missing_all']}")
+    print(f"cases_missing_all_representatives={rep_overlap['cases_missing_all']}")
+    print(f"gold_ids_per_case_min={all_overlap['gold_ids_per_case_min']}")
+    print(f"gold_ids_per_case_max={all_overlap['gold_ids_per_case_max']}")
+    print("holdout_opened=false")
+    return 0
+
+
+def _probe_grounding(*, labels: Path, ingest_ids: Path) -> int:
+    """Count development cases whose required terms appear in gold text.
+
+    Args:
+        labels: Human-sealed gitignored JSON.
+        ingest_ids: Captured ingest identity.
+
+    Returns:
+        ``0`` when counts were printed; ``2`` on missing infrastructure.
+        Does not print questions, terms, excerpts, or chunk UUID values.
+    """
+
+    ids = json.loads(ingest_ids.read_text(encoding="utf-8"))
+    version_id = UUID(str(ids["version_id"]))
+    env = apply_merged_env()
+    supabase_url = operator_url(env)
+    try:
+        with psycopg.connect(supabase_url, connect_timeout=20) as connection:
+            connection.execute("SET ROLE postgres")
+            rows = connection.execute(
+                """
+                SELECT id, coalesce(raw_text, '')
+                FROM app.document_chunks
+                WHERE version_id = %s::uuid
+                  AND deleted_at IS NULL
+                """,
+                (version_id,),
+            ).fetchall()
+    except (OSError, ValueError, psycopg.Error):
+        return _print_block("blocked=supabase_or_paradedb_unavailable")
+    texts = {UUID(str(row[0])): str(row[1] or "") for row in rows}
+    labeled = load_private_pdf_labeled_tuning(labels)
+    scored = 0
+    grounded = 0
+    refusals = 0
+    missing_text = 0
+    for row in labeled:
+        if row.meta.expected_refusal:
+            refusals += 1
+            continue
+        scored += 1
+        gold_texts: list[str] = []
+        for chunk_id in row.meta.chunk_ids:
+            text = texts.get(chunk_id)
+            if text is None:
+                missing_text += 1
+                gold_texts = []
+                break
+            gold_texts.append(text)
+        if not gold_texts:
+            continue
+        if case_is_locator_grounded(
+            question=row.question,
+            required_terms=row.meta.required_terms,
+            expected_refusal=False,
+            gold_texts=gold_texts,
+            gold_headings=row.meta.heading_paths,
+        ):
+            grounded += 1
+    print(f"probe_grounding_scored={scored}")
+    print(f"probe_grounding_grounded={grounded}")
+    print(f"probe_grounding_refusals={refusals}")
+    print(f"probe_grounding_missing_text={missing_text}")
+    print("holdout_opened=false")
+    return 0
+
+
+def _run_paradedb_fault(*, labels: Path, ingest_ids: Path) -> int:
+    """Run one labeled retrieve against an unreachable ParadeDB URL.
+
+    Args:
+        labels: Human-sealed gitignored JSON.
+        ingest_ids: Captured ingest identity.
+
+    Returns:
+        ``0`` when the named BM25 degradation is observed; ``2`` otherwise.
+        The result is never merged into full-Hybrid metrics.
+    """
+
+    ids = json.loads(ingest_ids.read_text(encoding="utf-8"))
+    version_id = UUID(str(ids["version_id"]))
+    labeled = load_private_pdf_labeled_tuning(labels)
+    sample = tuple(row for row in labeled if not row.meta.expected_refusal)[:1]
+    if not sample:
+        return _print_block("blocked=no_scored_cases")
+    settings = SharedSettings()
+    env = apply_merged_env()
+    supabase_url = operator_url(env)
+    try:
+        runtime = PdfEvalRuntime(
+            supabase_url=supabase_url,
+            parade_url="postgresql://invalid:invalid@127.0.0.1:1/paradedb",
+            settings=settings,
+            version_id=version_id,
+            current_chunk_ids=load_current_chunk_ids(supabase_url, version_id),
+            live_rerank=False,
+        )
+        scores, _results = runtime.retrieve_labeled(
+            sample,
+            default_profile_id=HYBRID_DEFAULT_PROFILE_ID,
+            long_profile_id=LONG_DOCUMENT_PROFILE_ID,
+        )
+    except RuntimeError as error:
+        return _print_block(f"blocked={error}")
+    if not scores:
+        return _print_block("blocked=no_scored_cases")
+    fallback = scores[0].bm25_fallback
+    degraded = fallback != "none"
+    write_report(
+        Path(".private-eval/paradedb-fault-report.json"),
+        {
+            "bm25_fallback": fallback,
+            "dense_term_degraded": degraded,
+            "full_hybrid": False,
+            "holdout_opened": False,
+        },
+    )
+    print(f"bm25_fallback={fallback}")
+    print(f"dense_term_degraded={degraded}")
+    print("full_hybrid=false")
+    print("holdout_opened=false")
+    return 0 if degraded else 2
+
+
 def main(argv: list[str] | None = None) -> int:
     """Refuse to tune or open holdout when live gates are missing.
 
@@ -242,6 +423,22 @@ def main(argv: list[str] | None = None) -> int:
         default="live",
         help="Main result requires live. Identity is a declared comparison.",
     )
+    parser.add_argument(
+        "--probe-gold",
+        action="store_true",
+        help="Count-only gold-ID overlap with the ingested version.",
+    )
+    parser.add_argument(
+        "--probe-grounding",
+        action="store_true",
+        help="Count-only required-term grounding against gold passages.",
+    )
+    parser.add_argument(
+        "--fault",
+        choices=("none", "paradedb"),
+        default="none",
+        help="Separate ParadeDB fault matrix. Never a full-Hybrid pass.",
+    )
     args = parser.parse_args(argv)
     env = apply_merged_env()
     if args.split == "holdout":
@@ -254,12 +451,6 @@ def main(argv: list[str] | None = None) -> int:
         return _print_block("blocked=provider_matrix_unverified")
     if args.freeze:
         return _freeze_if_ready()
-    if not args.live:
-        return _print_block("blocked=live_full_hybrid_required")
-    try:
-        require_live_models(env)
-    except RuntimeError as error:
-        return _print_block(f"blocked={error}")
     if not args.ids.is_file():
         return _print_block("blocked=ingest_and_human_seal_required")
     labels = resolve_labels_path(args.labels, args.ids)
@@ -274,6 +465,22 @@ def main(argv: list[str] | None = None) -> int:
             "blocked=ingest_and_human_seal_required",
             "human_sealed=false",
         )
+    if args.probe_gold:
+        return _probe_gold(labels=labels, ingest_ids=args.ids)
+    if args.probe_grounding:
+        return _probe_grounding(labels=labels, ingest_ids=args.ids)
+    if args.fault == "paradedb":
+        try:
+            require_live_models(env)
+        except RuntimeError as error:
+            return _print_block(f"blocked={error}")
+        return _run_paradedb_fault(labels=labels, ingest_ids=args.ids)
+    if not args.live:
+        return _print_block("blocked=live_full_hybrid_required")
+    try:
+        require_live_models(env)
+    except RuntimeError as error:
+        return _print_block(f"blocked={error}")
     if args.split not in {"development", "qualification"}:
         return _print_block("blocked=unknown_split")
     live_rerank = args.rerank == "live"

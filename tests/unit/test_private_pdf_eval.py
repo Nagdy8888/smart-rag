@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 from uuid import UUID
 
 import pytest
@@ -20,6 +22,7 @@ from smart_rag_core.evaluation.private_pdf import (
     assert_current_chunk_ids,
     assert_holdout_path_hidden,
     build_draft_rows,
+    case_is_locator_grounded,
     families_are_disjoint,
     load_private_pdf_labeled_open_splits,
     load_private_pdf_tuning_cases,
@@ -178,6 +181,9 @@ def test_eval_scripts_cannot_open_holdout() -> None:
         assert "load_private_pdf_holdout" not in source
         assert "holdout_sealed" in source
         assert "prompts/eval_judge_v1.md" not in source
+    hybrid_source = EVAL_HYBRID.read_text(encoding="utf-8")
+    assert "probe-grounding" in hybrid_source
+    assert "case_is_locator_grounded" in hybrid_source
 
 
 def test_draft_builder_meets_class_mix_and_is_deterministic() -> None:
@@ -229,6 +235,92 @@ def test_draft_builder_meets_class_mix_and_is_deterministic() -> None:
     ]
     assert refusal
     assert all(row["expected_refusal"] is True for row in refusal)
+
+
+def test_draft_does_not_cycle_unsupported_aliases() -> None:
+    """Glossary aliases unused by a passage do not become gold required terms."""
+
+    locators = tuple(
+        ChunkLocator(
+            chunk_id=UUID(f"00000000-0000-0000-0000-{index:012d}"),
+            page_number=index + 1,
+            section_path=("Chapter 1", f"Alpha {index}"),
+            raw_text=f"Alpha protocol {index} uses widgets in this passage.",
+        )
+        for index in range(8)
+    )
+    rows = build_draft_rows(
+        locators,
+        document_hash="bb" * 32,
+        aliases=("Unrelated Glossary Token XYZ",),
+        acl_actor_id="actor-1",
+    )
+    unsupported = "unrelated glossary token xyz"
+    for row in rows:
+        if bool(row["expected_refusal"]):
+            continue
+        raw_terms = row["required_terms"]
+        assert isinstance(raw_terms, (list, tuple))
+        term_items = cast(Sequence[object], raw_terms)
+        terms = tuple(str(item) for item in term_items)
+        assert unsupported not in {item.lower() for item in terms}
+        question = str(row["question"])
+        raw_ids = row["chunk_ids"]
+        assert isinstance(raw_ids, (list, tuple))
+        id_items = cast(Sequence[object], raw_ids)
+        gold_ids = {UUID(str(item)) for item in id_items}
+        grounded = False
+        for locator in locators:
+            if locator.chunk_id not in gold_ids:
+                continue
+            if case_is_locator_grounded(
+                question=question,
+                required_terms=terms,
+                expected_refusal=False,
+                gold_texts=(locator.raw_text,),
+                gold_headings=(" / ".join(locator.section_path),),
+            ):
+                grounded = True
+                break
+        assert grounded is True
+
+
+def test_case_is_locator_grounded_rejects_heading_boilerplate() -> None:
+    """Boilerplate overlap with a heading is not gold grounding."""
+
+    question = "According to Chapter 1 / Intro, what is stated about SecretAlias?"
+    assert (
+        case_is_locator_grounded(
+            question=question,
+            required_terms=("SecretAlias",),
+            expected_refusal=False,
+            gold_texts=("The passage never names that alias.",),
+            gold_headings=("Chapter 1 / Intro",),
+        )
+        is False
+    )
+    assert (
+        case_is_locator_grounded(
+            question=question,
+            required_terms=("SecretAlias",),
+            expected_refusal=False,
+            gold_texts=("SecretAlias is defined in this passage.",),
+            gold_headings=("Chapter 1 / Intro",),
+        )
+        is True
+    )
+
+
+def test_eval_runtime_binds_query_profile() -> None:
+    """Live PDF eval uses production profile_query_sync, not gold labels."""
+
+    source = (REPO_ROOT / "scripts" / "pdf_eval_runtime.py").read_text(encoding="utf-8")
+    assert "profile_query_sync" in source
+    assert "profile=typed_profile" in source
+    from scripts.pdf_eval_runtime import query_profile_for_retrieve
+
+    profile = query_profile_for_retrieve("What is the Hybrid retrieval path?")
+    assert profile.original_query.startswith("What is")
 
 
 def test_long_document_profile_rejected_at_runtime() -> None:
@@ -462,6 +554,93 @@ def test_retrieve_gates_pass_requires_rerank_ones() -> None:
         (score,),
         class_counts={PrivatePdfQueryClass.FACTUAL_DEFINITION.value: 1},
     )
+    assert retrieve_gates_pass(report) is False
+
+
+def test_gold_id_overlap_counts_are_count_only() -> None:
+    """Gold overlap reports counts, not identifiers."""
+
+    from smart_rag_core.evaluation.private_pdf import gold_id_overlap_counts
+
+    gold = UUID("00000000-0000-0000-0000-000000000001")
+    other = UUID("00000000-0000-0000-0000-000000000002")
+    counts = gold_id_overlap_counts(
+        gold_id_groups=((gold,), (gold, other)),
+        current_ids=frozenset({gold}),
+    )
+    assert counts["gold_unique"] == 2
+    assert counts["intersection"] == 1
+    assert counts["cases_missing_all"] == 0
+    assert counts["gold_ids_per_case_min"] == 1
+    assert counts["gold_ids_per_case_max"] == 2
+
+
+def test_fused_occupancy_is_not_recall_gate() -> None:
+    """Fused occupancy cannot pass retrieval gates when ranked recall fails."""
+
+    from smart_rag_core.evaluation.private_pdf import retrieve_gates_pass
+
+    miss = UUID("00000000-0000-0000-0000-000000000099")
+    score = score_retrieve_case(
+        case_id="aaaaaaaaaaaaaaaaaaaaaaaa",
+        query_class=PrivatePdfQueryClass.FACTUAL_DEFINITION.value,
+        ranked_ids=(miss,),
+        gold_ids=(_CHUNK,),
+        gold_pages=(1,),
+        evidence_pages=(1,),
+        expected_refusal=False,
+        refused=False,
+        acl_leak=False,
+        first_evidence_ms=100.0,
+        rerank_call_count=1,
+        bm25_fallback="none",
+        fused_ids=(_CHUNK,),
+    )
+    report = aggregate_retrieve_gates(
+        (score,),
+        class_counts={PrivatePdfQueryClass.FACTUAL_DEFINITION.value: 1},
+    )
+    assert score.fused_hit_at_10 is True
+    assert score.fused_hit_any is True
+    assert score.recall_hit_at_10 is False
+    assert report["fused_occupancy_at_10"] == 1.0
+    assert report["gold_in_fused_any"] == 1.0
+    assert retrieve_gates_pass(report) is False
+
+
+def test_gold_in_fused_any_is_not_recall_gate() -> None:
+    """Gold present past fused top-10 is not Recall@10."""
+
+    from smart_rag_core.evaluation.private_pdf import retrieve_gates_pass
+
+    miss = UUID("00000000-0000-0000-0000-000000000099")
+    filler = tuple(
+        UUID(f"00000000-0000-0000-0000-{index:012d}") for index in range(2, 12)
+    )
+    score = score_retrieve_case(
+        case_id="aaaaaaaaaaaaaaaaaaaaaaaa",
+        query_class=PrivatePdfQueryClass.FACTUAL_DEFINITION.value,
+        ranked_ids=(miss,),
+        gold_ids=(_CHUNK,),
+        gold_pages=(1,),
+        evidence_pages=(1,),
+        expected_refusal=False,
+        refused=False,
+        acl_leak=False,
+        first_evidence_ms=100.0,
+        rerank_call_count=1,
+        bm25_fallback="none",
+        fused_ids=(*filler, _CHUNK),
+    )
+    report = aggregate_retrieve_gates(
+        (score,),
+        class_counts={PrivatePdfQueryClass.FACTUAL_DEFINITION.value: 1},
+    )
+    assert score.fused_hit_at_10 is False
+    assert score.fused_hit_any is True
+    assert score.fused_gold_rank == 11
+    assert report["gold_in_fused_any"] == 1.0
+    assert report["fused_gold_rank_p50"] == 11
     assert retrieve_gates_pass(report) is False
 
 

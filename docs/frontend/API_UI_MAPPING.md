@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -334,7 +334,7 @@ mocks. Stitch may show an honest unavailable/blocked state.
 | GAP-07-06 | MFA enroll/challenge UI | Phase 7/8 UI | Auth-direct TOTP; thin UI only shows 403 banner |
 | GAP-07-07 | MFA recovery HTTP | Phase 2/6 | Service only; recovery UI blocked until a router exists |
 | GAP-07-08 | Owner bootstrap HTTP | Phase 2 | SQL/service only; first-owner UI blocked |
-| GAP-07-09 | Signed source preview/download + restricted-read audit HTTP | Phase 6 | Citations are IDs only; no drawer fetch; do not embed Storage privileged URLs |
+| GAP-07-09 | Signed source preview/download + restricted-read audit HTTP | Phase 6 | Locator provenance (page/title/section) plus technical IDs; no drawer fetch; do not embed Storage privileged URLs |
 | GAP-07-10 | Graph backlog rolling ETA/cost HTTP | Phase 5/6 | Show `graph_handoff` counts + `graphNotReadyCopy(n)` only; never unauthorized counts |
 | GAP-07-11 | Budget policy read/write HTTP | Phase 6 | Show 402 `budget_exhausted`; no budget editor |
 | GAP-07-12 | Audit list/export HTTP | Phase 2/6 | Chain exists; no viewer API; do not mock events |
@@ -410,8 +410,8 @@ where listed.
 | F Coverage | score | `coverage.coverage_score` | creator | null hidden |
 | F Tools | chips | `optional_tool_disclosure.tool_keys` | creator | n/a |
 | F Heartbeat | count | `heartbeat` 15s | creator | not assertive |
-| F Citations | chips | `citation_preview` then `GET /runs/{id}/citations` | creator | no snippets |
-| F Source drawer | preview/download | GAP-07-09 | — | IDs/provenance only |
+| F Citations | chips | `citation_preview` then `GET /runs/{id}/citations` | creator | locators; no snippets |
+| F Source drawer | preview/download | GAP-07-09 | — | page/title/section plus technical IDs |
 | F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | polarity catalogs, unmerged |
 | F Usage strip | account totals | `GET /usage/me` | caller | no prompt text |
 | F Run tokens | this run / this chat | SSE `usage`; title POST tokens on this chat | creator | this chat includes later questions in the live session |

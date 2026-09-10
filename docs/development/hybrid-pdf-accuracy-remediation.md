@@ -2,7 +2,7 @@
 title: Hybrid PDF accuracy remediation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: engineering, reviewers, security
 ---
 
@@ -115,10 +115,10 @@ Production retrieve path inspected: `build_query_process_bindings` →
 | P5 `chunking_v2` | 401–600 splits toward 200–400 | this PDF ordinary 200–400 **0.7734**; parser heading follow-up |
 | P6 glossary draft | hash-only CLI plus private import payload | owner/admin import |
 | P7 ingest | `scripts/ops/ingest_private_pdf.py` | **live `graph_ineligible` 2026-09-09**; `real_company`; no graph |
-| P8 private eval seal | schema + draft/seal CLIs | **locator-bound owner seal 2026-09-09**; `holdout_opened=false` |
+| P8 private eval seal | schema + draft/seal CLIs | **locator-bound owner seal 2026-09-09**; grounding 2/24; `holdout_opened=false` |
 | P9–P12 Hybrid | profile-driven quotas, post-selection coverage, BM25 key-field version scope, dense v2 | BM25 variants live; dense ANN ~2.5s on hosted 640-row slice |
-| P13 production rerank/scope | `ProcessHybridRetriever` binds `rerank_v1`; unfrozen long-doc denied | live eligible rerank timed out on this PDF |
-| P14–P16 tune/qualify/holdout | live development Hybrid `gates_pass=false`; freeze denied | `holdout_opened=false` |
+| P13 production rerank/scope | `ProcessHybridRetriever` binds `rerank_v1`; unfrozen long-doc denied | live eligible rerank 7/24 on this PDF (18 timeout) |
+| P14–P16 tune/qualify/holdout | two retrieve repairs; `gates_pass=false`; freeze denied | `holdout_opened=false` |
 
 Successful ingest is not an accuracy pass. No full-Hybrid Recall@10 for this PDF is claimed.
 
@@ -157,12 +157,13 @@ python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py
 uv run python scripts/check.py --tier docs
 ```
 
-Recorded 2026-09-09 (implementation overlay; live ingest still blocked):
+Recorded 2026-09-10 (overlay Packet 16 development no_go after two retrieve repairs; ingest already accepted):
 
 | Command | Exit |
 | --- | --- |
 | Overlay unit suite (`test_pdf_overlay_governance`, `test_private_pdf_eval`, `test_pdf_hybrid_overlay`, `test_chunking_service`, `test_ingest_trace`, `test_ingestion_status_openapi`, `test_query_profile_gateway`, `test_prompt_registry`, `test_hybrid_run`, `test_hybrid_rerank`, `test_hybrid_coverage`, `test_parser_governance`, `test_settings`, `test_hybrid_fusion`, `test_external_processing_governance`) | 0 |
 | Packet-scoped Pyright on touched retrieval/review/eval paths | 0 |
+| `uv run python scripts/eval_pdf_hybrid.py --probe-grounding` | 0; 2/24 scored grounded |
 | `uv run python scripts/ci/check_openapi.py` | 0 |
 | `uv run python scripts/check.py --tier docs --mermaid-puppeteer-config scripts/ci/puppeteer-no-sandbox.json` | 0 |
 | PDF eval/draft CLIs without operator gates | 2; `holdout_opened=false` |

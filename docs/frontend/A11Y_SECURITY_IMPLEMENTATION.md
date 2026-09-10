@@ -2,7 +2,7 @@
 title: Accessibility and security implementation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-24
+last-reviewed: 2026-09-10
 audience: frontend, security, reviewers
 packet: P08-20
 ---
@@ -25,7 +25,8 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 ## Logical citation offsets
 
 `GET /runs/{id}/citations` has no offset fields (GAP-07-09). The production
-citation drawer shows ids and provenance only. `highlightLogicalRange`
+citation drawer shows page, title, and section locators when present, then
+technical ids. `highlightLogicalRange`
 slices with `Array.from` / codepoint indexes. The reviewed fixture is
 canonical text `الشركة ACME وقعت العقد.` with offsets **7–11** selecting
 `ACME`, rendered in `ReviewedContentFixtures`, not in `CitationDrawer`.

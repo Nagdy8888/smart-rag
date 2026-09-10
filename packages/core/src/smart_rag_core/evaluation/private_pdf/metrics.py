@@ -43,6 +43,10 @@ class PrivatePdfRetrieveScore:
         first_evidence_ms: First evidence latency, when measured.
         rerank_call_count: Counted rerank calls.
         bm25_fallback: Named BM25 fallback, or ``none``.
+        fused_hit_at_10: Occupancy hit on fused IDs. Not Recall@10.
+        fused_hit_any: Gold present anywhere in fused IDs. Not a pass gate.
+        fused_gold_rank: One-based rank of the first gold ID in fused IDs.
+        rerank_fallback: Named rerank fallback token.
     """
 
     case_id: str
@@ -57,6 +61,10 @@ class PrivatePdfRetrieveScore:
     first_evidence_ms: float | None = None
     rerank_call_count: int = 0
     bm25_fallback: str = "none"
+    fused_hit_at_10: bool | None = None
+    fused_hit_any: bool | None = None
+    fused_gold_rank: int | None = None
+    rerank_fallback: str = ""
 
 
 def score_retrieve_case(
@@ -74,6 +82,8 @@ def score_retrieve_case(
     first_evidence_ms: float | None = None,
     rerank_call_count: int = 0,
     bm25_fallback: str = "none",
+    fused_ids: Sequence[UUID] = (),
+    rerank_fallback: str = "",
 ) -> PrivatePdfRetrieveScore:
     """Score one Hybrid retrieve against sealed gold chunk ids.
 
@@ -91,6 +101,9 @@ def score_retrieve_case(
         first_evidence_ms: Observed first-evidence latency.
         rerank_call_count: Counted rerank calls.
         bm25_fallback: Named BM25 fallback token.
+        fused_ids: Fused occupancy IDs. Occupancy is never the Recall@10
+            gate.
+        rerank_fallback: Named rerank fallback token.
 
     Returns:
         Per-case score without source text.
@@ -115,8 +128,19 @@ def score_retrieve_case(
             first_evidence_ms=first_evidence_ms,
             rerank_call_count=rerank_call_count,
             bm25_fallback=bm25_fallback,
+            rerank_fallback=rerank_fallback,
         )
     recall10 = recall_hit_at_k(ranked_ids, gold_ids, 10)
+    fused10 = recall_hit_at_k(fused_ids, gold_ids, 10) if fused_ids else None
+    fused_any = (
+        recall_hit_at_k(fused_ids, gold_ids, len(fused_ids)) if fused_ids else False
+    )
+    gold_set = set(gold_ids)
+    fused_rank: int | None = None
+    for index, chunk_id in enumerate(fused_ids):
+        if chunk_id in gold_set:
+            fused_rank = index + 1
+            break
     exact5 = (
         recall_hit_at_k(ranked_ids, gold_ids, 5)
         if query_class == PrivatePdfQueryClass.EXACT_ACRONYM.value
@@ -136,6 +160,10 @@ def score_retrieve_case(
         first_evidence_ms=first_evidence_ms,
         rerank_call_count=rerank_call_count,
         bm25_fallback=bm25_fallback,
+        fused_hit_at_10=fused10,
+        fused_hit_any=fused_any,
+        fused_gold_rank=fused_rank,
+        rerank_fallback=rerank_fallback,
     )
 
 
@@ -216,9 +244,29 @@ def aggregate_retrieve_gates(
     )
     rerank_ones = sum(1 for item in rerank_eligible if item.rerank_call_count == 1)
     fallback_histogram: dict[str, int] = {}
+    rerank_fallback_histogram: dict[str, int] = {}
     for item in scores:
         token = item.bm25_fallback or "none"
         fallback_histogram[token] = fallback_histogram.get(token, 0) + 1
+        rerank_token = item.rerank_fallback or "none"
+        rerank_fallback_histogram[rerank_token] = (
+            rerank_fallback_histogram.get(rerank_token, 0) + 1
+        )
+    fused_flags = tuple(
+        bool(item.fused_hit_at_10)
+        for item in scores
+        if item.fused_hit_at_10 is not None
+    )
+    fused_any_flags = tuple(
+        bool(item.fused_hit_any) for item in scores if item.fused_hit_any is not None
+    )
+    fused_ranks = tuple(
+        item.fused_gold_rank for item in scores if item.fused_gold_rank is not None
+    )
+    fused_rank_p50: int | None = None
+    if fused_ranks:
+        ordered_ranks = tuple(sorted(fused_ranks))
+        fused_rank_p50 = ordered_ranks[len(ordered_ranks) // 2]
     return {
         "case_count": len(scores),
         "holdout_opened": False,
@@ -233,6 +281,10 @@ def aggregate_retrieve_gates(
         "eligible_rerank_case_count": len(rerank_eligible),
         "eligible_rerank_ones": rerank_ones,
         "fallback_histogram": fallback_histogram,
+        "rerank_fallback_histogram": rerank_fallback_histogram,
+        "fused_occupancy_at_10": _mean(fused_flags),
+        "gold_in_fused_any": _mean(fused_any_flags),
+        "fused_gold_rank_p50": fused_rank_p50,
         "gates": {
             "hybrid_recall_at_10": HYBRID_RECALL_AT_10_GATE,
             "exact_term_recall_at_5": EXACT_RECALL_AT_5_GATE,
@@ -282,3 +334,35 @@ def retrieve_gates_pass(report: dict[str, object]) -> bool:
     if eligible > 0 and ones != eligible:
         return False
     return True
+
+
+def gold_id_overlap_counts(
+    *,
+    gold_id_groups: Sequence[Sequence[UUID]],
+    current_ids: frozenset[UUID],
+) -> dict[str, int]:
+    """Count gold-ID overlap with current version chunk IDs.
+
+    Args:
+        gold_id_groups: Per-case gold UUID tuples. No question text.
+        current_ids: Current version chunk IDs (representatives or all).
+
+    Returns:
+        Count-only overlap. Never includes questions, excerpts, or raw IDs.
+    """
+
+    gold = frozenset(item for group in gold_id_groups for item in group)
+    missing_all = 0
+    for group in gold_id_groups:
+        if group and not any(item in current_ids for item in group):
+            missing_all += 1
+    sizes = tuple(len(group) for group in gold_id_groups)
+    return {
+        "gold_unique": len(gold),
+        "current": len(current_ids),
+        "intersection": len(gold & current_ids),
+        "cases": len(gold_id_groups),
+        "cases_missing_all": missing_all,
+        "gold_ids_per_case_min": min(sizes) if sizes else 0,
+        "gold_ids_per_case_max": max(sizes) if sizes else 0,
+    }

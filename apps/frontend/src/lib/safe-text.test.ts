@@ -45,9 +45,11 @@ describe("isSafeHttpUrl", () => {
 describe("formatProvenance", () => {
   it("renders coordinates as text without HTML", () => {
     const text = formatProvenance({
+      document_title: "Policy",
       page: 3,
       section: "<script>x</script>",
     });
+    expect(text).toContain("document_title=Policy");
     expect(text).toContain("page=3");
     expect(text).toContain("section=<script>x</script>");
   });

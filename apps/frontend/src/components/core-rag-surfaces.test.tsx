@@ -8,6 +8,7 @@ import "@testing-library/jest-dom/vitest";
 import { XSS_ENTITY, XSS_FILENAME } from "../lib/hostile-text-fixtures";
 import { DOCUMENT_NOT_FOUND_COPY, SOURCE_PREVIEW_UNAVAILABLE } from "../lib/citation-drawer";
 import { CitationDrawer } from "./chat/chat-app";
+import { CitationSheet } from "./chat/citation-sheet";
 import { DocumentDetail } from "./documents/document-detail";
 import { DocumentLibrary } from "./documents/document-library";
 import { GraphExplorer } from "./graph/graph-explorer";
@@ -177,6 +178,53 @@ describe("CitationDrawer", () => {
     expect(screen.getByText(SOURCE_PREVIEW_UNAVAILABLE)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /https:\/\// })).toBeNull();
     expect(document.querySelector("script")).toBeNull();
+  });
+
+  it("shows page and title locators instead of a provenance dump", () => {
+    const citation: CitationResponse = {
+      citation_id: "cite-1",
+      citation_index: 0,
+      chunk_id: "chunk-1",
+      provenance: {
+        document_title: "Building applications with AI agents",
+        page_number: 129,
+        section_path: ["Parallel Tool Execution"],
+      },
+      source_unavailable: false,
+    };
+    render(<CitationDrawer citation={citation} onClose={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "Page 129" })).toBeInTheDocument();
+    expect(screen.getByText("Building applications with AI agents")).toBeInTheDocument();
+    expect(screen.getByText("Parallel Tool Execution")).toBeInTheDocument();
+  });
+});
+
+describe("CitationSheet", () => {
+  it("lists page labels and does not repeat citation UUIDs", () => {
+    render(
+      <CitationSheet
+        open
+        onClose={() => undefined}
+        citations={[
+          {
+            citation_id: "a035e243-03dd-4987-b7ed-fe00c0b9336c",
+            citation_index: 0,
+            chunk_id: "a035e243-03dd-4987-b7ed-fe00c0b9336c",
+            provenance: { page_number: 129, document_title: "AI agents" },
+            source_unavailable: false,
+          },
+        ]}
+        hrefForCitation={() => undefined}
+        onSelectCitation={() => undefined}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Citation 0, AI agents · p. 129" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("a035e243-03dd-4987-b7ed-fe00c0b9336c"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(SOURCE_PREVIEW_UNAVAILABLE)).toBeInTheDocument();
   });
 });
 

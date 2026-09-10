@@ -77,6 +77,7 @@ export function isSafeHttpUrl(value: string): boolean {
 export function formatProvenance(provenance: Record<string, unknown>): string {
   const parts: string[] = [];
   const keys = [
+    "document_title",
     "page",
     "page_number",
     "section",

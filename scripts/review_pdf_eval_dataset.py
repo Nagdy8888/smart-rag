@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 from typing import cast
@@ -18,6 +17,7 @@ import psycopg
 from smart_rag_core.evaluation.private_pdf import (
     PrivatePdfQueryClass,
     assert_holdout_path_hidden,
+    case_is_locator_grounded,
     read_private_pdf_payload,
 )
 
@@ -27,7 +27,6 @@ if str(REPO) not in sys.path:
 
 from scripts.pdf_eval_cli import apply_merged_env, operator_url  # noqa: E402
 
-_TOKEN = re.compile(r"[a-z0-9]+")
 _EXACT_DEFAULT = frozenset(
     {
         PrivatePdfQueryClass.EXACT_ACRONYM.value,
@@ -88,14 +87,14 @@ def _load_chunk_pages(
 
 
 def _locator_bound(case: dict[str, object], chunks: dict[str, tuple[int, str]]) -> bool:
-    """Return whether locators and question text are grounded in current chunks.
+    """Return whether locators and required terms are grounded in current chunks.
 
     Args:
         case: Draft mapping including private fields.
         chunks: Live chunk id to page/text.
 
     Returns:
-        True when chunk ids, pages, and a token overlap resolve.
+        True when chunk ids, pages, and required terms resolve.
     """
 
     raw_ids = case.get("chunk_ids", ())
@@ -114,8 +113,7 @@ def _locator_bound(case: dict[str, object], chunks: dict[str, tuple[int, str]]) 
     else:
         pages = ()
     question = str(case.get("question", "")).strip()
-    if len(question) < 8:
-        return False
+    gold_texts: list[str] = []
     for index, chunk_id in enumerate(ids):
         record = chunks.get(chunk_id)
         if record is None:
@@ -123,23 +121,26 @@ def _locator_bound(case: dict[str, object], chunks: dict[str, tuple[int, str]]) 
         if index < len(pages) and record[0] not in {0, pages[index]}:
             if pages[index] != record[0]:
                 return False
-    if bool(case.get("expected_refusal", False)):
-        return True
-    q_tokens = set(_TOKEN.findall(question.lower()))
-    if not q_tokens:
-        return False
-    for chunk_id in ids:
-        text = chunks[chunk_id][1].lower()
-        if q_tokens & set(_TOKEN.findall(text)):
-            return True
-    headings = case.get("heading_paths", ())
-    if isinstance(headings, (list, tuple)):
-        heading = " ".join(
-            str(item) for item in cast(list[object] | tuple[object, ...], headings)
-        ).lower()
-        if q_tokens & set(_TOKEN.findall(heading)):
-            return True
-    return False
+        gold_texts.append(record[1])
+    headings_raw = case.get("heading_paths", ())
+    headings: tuple[str, ...] = ()
+    if isinstance(headings_raw, (list, tuple)):
+        headings = tuple(
+            str(item) for item in cast(list[object] | tuple[object, ...], headings_raw)
+        )
+    terms_raw = case.get("required_terms", ())
+    required: tuple[str, ...] = ()
+    if isinstance(terms_raw, (list, tuple)):
+        required = tuple(
+            str(item) for item in cast(list[object] | tuple[object, ...], terms_raw)
+        )
+    return case_is_locator_grounded(
+        question=question,
+        required_terms=required,
+        expected_refusal=bool(case.get("expected_refusal", False)),
+        gold_texts=gold_texts,
+        gold_headings=headings,
+    )
 
 
 def _apply_review(

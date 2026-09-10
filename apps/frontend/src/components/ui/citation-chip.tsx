@@ -9,8 +9,12 @@ import styles from "./styles/data-display.module.css";
 export type CitationChipProps = {
   /** 1-based or server `citation_index`. */
   index: number;
-  /** Optional citation id, rendered as isolated text. */
+  /** Optional citation id, rendered as isolated text when `label` is omitted. */
   citationId?: unknown;
+  /** Human locator such as title and page. Preferred over `citationId`. */
+  label?: unknown;
+  /** Accessible name. Defaults to `Citation {index}`. */
+  name?: string;
   /** When true, append signed unavailable copy supplied by the caller. */
   unavailable?: boolean;
   /** Optional safe http(s) href. Callers must pass `isSafeHttpUrl` first. */
@@ -23,43 +27,49 @@ export type CitationChipProps = {
 };
 
 /**
- * Render `Citation {index}` as a chip.
+ * Render a citation chip with a locator label when one exists.
  *
- * @param props - Index, optional id/href, unavailable flag.
+ * @param props - Index, optional locator label/id/href, unavailable flag.
  * @returns Anchor when `href` is set, otherwise a button or span.
  * @remarks
  * Security: `href` is not validated here. Do not pass `javascript:` URLs.
- * GAP-07-09 keeps production `href` null.
+ * GAP-07-09 keeps production `href` null. Passage text is never rendered.
  */
 export function CitationChip({
   index,
   citationId,
+  label,
+  name,
   unavailable = false,
   href = null,
   onSelect,
 }: CitationChipProps) {
-  const name = `Citation ${String(index)}`;
+  const fallbackName = `Citation ${String(index)}`;
+  const accessibleName = name ?? fallbackName;
   const className = [
     styles.chip,
     unavailable ? styles.chipUnavailable : undefined,
   ]
     .filter(Boolean)
     .join(" ");
+  const source = label !== undefined && label !== "" ? label : citationId;
   const body = (
     <>
-      {name}
-      {citationId !== undefined && citationId !== "" ? (
+      {`[${String(index)}]`}
+      {source !== undefined && source !== "" ? (
         <>
           {" "}
-          <UserText value={citationId} />
+          <UserText value={source} />
         </>
       ) : null}
-      {unavailable ? ` — ${displayText("unavailable")}` : null}
+      {unavailable && (label === undefined || label === "")
+        ? ` — ${displayText("unavailable")}`
+        : null}
     </>
   );
   if (href) {
     return (
-      <a className={className} href={href} rel="noreferrer" aria-label={name}>
+      <a className={className} href={href} rel="noreferrer" aria-label={accessibleName}>
         {body}
       </a>
     );
@@ -69,7 +79,7 @@ export function CitationChip({
       type="button"
       className={className}
       onClick={(event) => onSelect?.(event.currentTarget)}
-      aria-label={name}
+      aria-label={accessibleName}
     >
       {body}
     </button>

@@ -2,7 +2,7 @@
 title: Phase 4 hybrid RAG evidence
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-08-16
+last-reviewed: 2026-09-10
 audience: engineering, reviewers
 phase: 4
 ---
@@ -1390,16 +1390,32 @@ Quoted requirement: live full Hybrid; holdout sealed.
 
 ### No-go (do not freeze)
 
-- `gates_pass=false`: Recall@10 0.0417; locator 0.0357;
-  first-evidence p95 10545 ms; eligible rerank 0/24.
-- Dummy retrieve: `rerank_fallback=rerank_timeout` inside the signed 8s
-  slice (not raised). Hosted dense count+ANN ≈ 2.5s on 640 authorized rows.
+- 2026-09-09 candidate `ac42dec12e79681badcc382b16312108d6a265d35b1d5b1f962d4ec5e3930109`:
+  Recall@10 0.0417; locator 0.0357; first-evidence p95 10545 ms; eligible
+  rerank 0/24.
+- 2026-09-10 candidate `d9e154747a88a94c0c75e87935a1f977e1c1802e2e80f9e12825bd24e1d15d22`
+  (version-scoped exact dense; 8s slice after embedding, not raised):
+  Recall@10 0.0417; fused occupancy 0.0417; locator 0.0357; p95 3236 ms;
+  eligible rerank 7/24 (`rerank_timeout` 18, `rerank_schema_invalid` 3).
+  Identity comparison matched Recall@10 0.0417. `--probe-gold` showed
+  28/28 gold IDs still present as current representatives (1 ID/case).
+- Repair 2 bound production `profile_query_sync` and measured
+  `gold_in_fused_any`. Identity re-run 2026-09-10: Recall@10 0.0417,
+  `gold_in_fused_any` 0.0417, `fused_gold_rank_p50` 9, p95 3955 ms,
+  `bm25_fallback=none`. `--probe-grounding`: 2/24 scored cases have
+  required terms in gold text/heading. Draft no longer cycles unsupported
+  aliases. Two real-integration repairs exhausted. Do not freeze.
 - Qualification not run. `--freeze` remains denied.
 - `holdout_opened=false`. Identity rerank is not a live-rerank gate.
 
 | Command | Exit | Notes |
 | --- | --- | --- |
-| `uv run python scripts/eval_pdf_hybrid.py --split development --live` | 0 (report written) | `gates_pass=false`; `holdout_opened=false`; `human_sealed=true` |
+| `uv run python scripts/eval_pdf_hybrid.py --probe-gold` | 0 | 28/28 gold IDs in current representatives |
+| `uv run python scripts/eval_pdf_hybrid.py --probe-grounding` | 0 | 2/24 scored grounded; 4 refusals |
+| `uv run python scripts/eval_pdf_hybrid.py --split development --live` | 0 (report written) | `gates_pass=false`; digest `d9e1547…`; `holdout_opened=false` |
+| `uv run python scripts/eval_pdf_hybrid.py --split development --live --rerank identity` | 0 | Recall@10 0.0417; `gold_in_fused_any` 0.0417; `live_rerank=false` |
+| `uv run python scripts/eval_pdf_hybrid.py --fault paradedb` | 0 | `retrieval_timeout`; not full Hybrid |
+| `uv run python scripts/eval_pdf_hybrid.py --freeze` | 2 | `blocked=qualification_and_gates_required_before_freeze` |
 | `uv run python scripts/eval_pdf_hybrid.py --split holdout` | 2 | `blocked=holdout_sealed`; `holdout_opened=false` |
-| `uv run python scripts/eval_pdf_agent.py --split development` | 2 | freeze still denied |
+| `uv run python scripts/eval_pdf_agent.py --split development` | 2 | `blocked=live_agent_eval_required` |
 | `uv run python scripts/eval_pdf_holdout.py` | 2 | `blocked=holdout_sealed`; `holdout_opened=false` |

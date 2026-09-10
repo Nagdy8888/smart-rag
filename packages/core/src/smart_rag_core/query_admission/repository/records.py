@@ -53,7 +53,9 @@ class RunCitationRecord:
         citation_id: Citation row.
         citation_index: Display index.
         chunk_id: Canonical chunk when present.
-        provenance: JSON object without source HTML.
+        provenance: JSON object without source HTML. Locator keys such as
+            page number, heading path, and document title are included when
+            the cited chunk is still authorized.
         source_unavailable: True when the cited source was deleted.
     """
 
@@ -218,6 +220,9 @@ def list_run_citations(
 ) -> tuple[RunCitationRecord, ...]:
     """List citation IDs for an owned run. Passage text is omitted.
 
+    Authorized current chunks overlay page, heading path, and document
+    title onto ``provenance``. Unavailable sources omit those locator keys.
+
     Args:
         connection: Open ``app_api`` connection.
         caller: Server-derived owner.
@@ -236,7 +241,7 @@ def list_run_citations(
                 """
                 SELECT citation_id, citation_index, chunk_id, provenance,
                        source_unavailable
-                FROM app.list_run_citations(%s, %s, %s, %s)
+                FROM app.list_run_citations_v2(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,

@@ -4774,6 +4774,21 @@ export type Database = {
           source_unavailable: boolean
         }[]
       }
+      list_run_citations_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          chunk_id: string
+          citation_id: string
+          citation_index: number
+          provenance: Json
+          source_unavailable: boolean
+        }[]
+      }
       list_run_events_after: {
         Args: {
           caller_authorization_version: number

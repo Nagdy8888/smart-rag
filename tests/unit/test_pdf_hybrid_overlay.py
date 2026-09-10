@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import time
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -11,7 +12,12 @@ from smart_rag_agents.prompts import eval_pdf_judge_prompt_text
 from smart_rag_agents.prompts.registry import prompt_text
 from smart_rag_core.evaluation.classes import QueryClass
 from smart_rag_core.evaluation.loader import load_open_splits
-from smart_rag_core.gateways.embedding import EmbeddingGateway, MockEmbeddingAdapter
+from smart_rag_core.gateways.embedding import (
+    EmbeddingGateway,
+    EmbeddingRequest,
+    EmbeddingResponse,
+    MockEmbeddingAdapter,
+)
 from smart_rag_core.retrieval.context import select_hybrid_context
 from smart_rag_core.retrieval.context_loader import ChunkContext
 from smart_rag_core.retrieval.frozen_profile import (
@@ -23,7 +29,11 @@ from smart_rag_core.retrieval.frozen_profile import (
     load_frozen_profile,
 )
 from smart_rag_core.retrieval.hybrid_run import HybridRetriever
-from smart_rag_core.retrieval.hybrid_run.channels import cap_unique_across_variants
+from smart_rag_core.retrieval.hybrid_run.channels import (
+    cap_unique_across_variants,
+    collect_dense_lists,
+    dense_retrieve_mode,
+)
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.retrieval.rerank import (
     RerankFallbackReason,
@@ -319,6 +329,215 @@ def test_ranked_ids_are_post_selection_not_fused() -> None:
     assert set(result.fused_ids) == fused
     assert len(result.ranked_ids) < len(result.fused_ids)
     assert set(result.ranked_ids).issubset(fused)
+
+
+def _context_for(item: RetrievalCandidate, *, text: str) -> ChunkContext:
+    """Build authorized context for one candidate.
+
+    Args:
+        item: Retrieval candidate.
+        text: Canonical citation text.
+
+    Returns:
+        Chunk context row.
+    """
+
+    return ChunkContext(
+        chunk_id=item.chunk_id,
+        document_id=item.document_id,
+        version_id=item.version_id,
+        parent_chunk_id=None,
+        chunk_index=1,
+        page_number=1,
+        section_path=("Leave",),
+        token_count=6,
+        raw_text=text,
+        is_search_representative=True,
+    )
+
+
+def test_retrieve_slice_excludes_embedding_time() -> None:
+    """The 8s channel-plus-rerank slice starts after the embedding batch."""
+
+    remaining_seen: list[float] = []
+    first = _candidate(document=uuid4(), rank=1)
+    second = _candidate(document=first.document_id, rank=2)
+    contexts = {
+        first.chunk_id: _context_for(first, text="canonical first"),
+        second.chunk_id: _context_for(second, text="canonical second"),
+    }
+
+    class SlowAdapter(MockEmbeddingAdapter):
+        """Adapter that sleeps longer than the injected retrieve slice."""
+
+        async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+            """Sleep then return the mock embedding batch.
+
+            Args:
+                request: Embedding request.
+
+            Returns:
+                Mock embedding response.
+            """
+
+            time.sleep(0.12)
+            return await super().embed(request)
+
+    def rerank(
+        _query: str,
+        pool: tuple[RerankPassage, ...],
+        deadline: float,
+    ) -> tuple[tuple[RerankRanking, ...], RerankUsage | None, RerankFallbackReason]:
+        """Record remaining deadline and keep fused order.
+
+        Args:
+            _query: Unused.
+            pool: Authorized pool.
+            deadline: Remaining slice seconds.
+
+        Returns:
+            Identity rankings with one counted call.
+        """
+
+        remaining_seen.append(deadline)
+        rankings = tuple(
+            RerankRanking(chunk_id=item.candidate.chunk_id, rank=index + 1, support=1.0)
+            for index, item in enumerate(pool)
+        )
+        return (
+            rankings,
+            RerankUsage(
+                request_id="test",
+                model="gpt-4o-mini",
+                input_tokens=1,
+                output_tokens=1,
+                model_calls=1,
+            ),
+            RerankFallbackReason.NONE,
+        )
+
+    retriever = HybridRetriever(
+        embedding_gateway=EmbeddingGateway(SlowAdapter(fixture_id="hybrid-run")),
+        load_context=lambda ids: tuple(
+            contexts[item] for item in ids if item in contexts
+        ),
+        rerank=rerank,
+    )
+    result = retriever.retrieve(
+        query="annual leave policy",
+        caller=_caller(),
+        deadline_seconds=0.05,
+        channel_jobs={"dense": lambda: (first, second)},
+    )
+    assert remaining_seen
+    assert remaining_seen[0] > 0.04
+    assert result.rerank_call_count == 1
+
+
+def test_first_evidence_excludes_rerank_wait() -> None:
+    """First-evidence is stamped when fused IDs exist, before rerank."""
+
+    first = _candidate(document=uuid4(), rank=1)
+    second = _candidate(document=first.document_id, rank=2)
+    contexts = {
+        first.chunk_id: _context_for(first, text="canonical first"),
+        second.chunk_id: _context_for(second, text="canonical second"),
+    }
+
+    def rerank(
+        _query: str,
+        pool: tuple[RerankPassage, ...],
+        _deadline: float,
+    ) -> tuple[tuple[RerankRanking, ...], RerankUsage | None, RerankFallbackReason]:
+        """Sleep then return fused order.
+
+        Args:
+            _query: Unused.
+            pool: Authorized pool.
+            _deadline: Unused.
+
+        Returns:
+            Identity rankings.
+        """
+
+        time.sleep(0.2)
+        rankings = tuple(
+            RerankRanking(chunk_id=item.candidate.chunk_id, rank=index + 1, support=1.0)
+            for index, item in enumerate(pool)
+        )
+        return (
+            rankings,
+            RerankUsage(
+                request_id="test",
+                model="gpt-4o-mini",
+                input_tokens=1,
+                output_tokens=1,
+                model_calls=1,
+            ),
+            RerankFallbackReason.NONE,
+        )
+
+    retriever = HybridRetriever(
+        embedding_gateway=EmbeddingGateway(
+            MockEmbeddingAdapter(fixture_id="hybrid-run")
+        ),
+        load_context=lambda ids: tuple(
+            contexts[item] for item in ids if item in contexts
+        ),
+        rerank=rerank,
+    )
+    result = retriever.retrieve(
+        query="annual leave policy",
+        caller=_caller(),
+        channel_jobs={"dense": lambda: (first, second)},
+    )
+    assert result.first_evidence_ms < 100
+    assert result.rerank_call_count == 1
+
+
+def test_collect_dense_lists_exact_skips_ann_escalation() -> None:
+    """Version-scoped exact mode does not retry LOW/HIGH ANN."""
+
+    modes: list[object] = []
+    hit = _candidate(document=uuid4(), rank=1)
+
+    def retrieve(**kwargs: object) -> DenseRetrievalResult:
+        """Record requested mode and return one underfilled list.
+
+        Returns:
+            Dense result with a single candidate.
+        """
+
+        modes.append(kwargs.get("mode"))
+        return DenseRetrievalResult(
+            mode=DenseMode.EXACT,
+            candidates=(hit,),
+            authorized_count=20,
+        )
+
+    collect_dense_lists(
+        retrieve,
+        caller=_caller(),
+        texts=("annual leave policy",),
+        vectors=((0.1,),),
+        version_id=uuid4(),
+        dense_mode=DenseMode.EXACT,
+    )
+    assert modes == [DenseMode.EXACT]
+
+
+def test_long_document_candidate_prefers_exact_when_version_scoped() -> None:
+    """The evaluation candidate may select exact dense; default stays ANN."""
+
+    long_profile = load_evaluation_profile(LONG_DOCUMENT_PROFILE_ID)
+    assert long_profile.dense_mode_when_version_scoped == "exact"
+    default = load_frozen_profile(HYBRID_DEFAULT_PROFILE_ID)
+    assert default.dense_mode_when_version_scoped == "ann"
+    assert (
+        dense_retrieve_mode(version_id=uuid4(), profile=long_profile) is DenseMode.EXACT
+    )
+    assert dense_retrieve_mode(version_id=None, profile=long_profile) is DenseMode.ANN
+    assert dense_retrieve_mode(version_id=uuid4(), profile=default) is DenseMode.ANN
 
 
 def test_global_unique_cap_does_not_multiply_by_variant_count() -> None:

@@ -2,7 +2,7 @@
 title: PDF Hybrid evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: engineering, reviewers
 ---
 
@@ -25,7 +25,7 @@ flowchart LR
   qualify --> holdout["One immutable holdout"]
 ```
 
-## Current gates (2026-09-09)
+## Current gates (2026-09-10)
 
 | Gate | Status |
 | --- | --- |
@@ -33,15 +33,30 @@ flowchart LR
 | Human glossary approve | hash-only draft then owner/admin import |
 | Live PDF ingest | **accepted 2026-09-09** — `graph_ineligible`; Graph off |
 | Human eval seal | **locator-bound owner seal 2026-09-09**; `holdout_opened=false` |
-| Live full-Hybrid development | **no_go 2026-09-09** — BM25 `none`; gates miss |
+| Live full-Hybrid development | **no_go 2026-09-10** — BM25 `none`; Recall@10 and locator miss |
 | Frozen `hybrid_long_document_v1` runtime allow-list | **denied** — qualification not run |
 | Holdout | sealed outside the worktree; not opened |
 
 Locator-bound owner seal (`reviewer=Nagdy`) split 40 open / 20 holdout.
+Count-only gold overlap on development (`--probe-gold`): 28 cases, 28
+unique gold IDs, 640 representatives, intersection 28, 1 gold ID per
+case, `cases_missing_all_representatives=0`. Stale-ID mismatch is not the
+Recall@10 miss.
+
+`--probe-grounding` on the same development split: 24 scored non-refusal
+cases, **2** whose required terms appear in gold text/heading, 4 refusals,
+0 missing gold text. Heading-boilerplate overlap is not grounding. The
+first failing stage is label/question alignment, not RRF. The draft
+builder now uses only glossary aliases that appear in the gold locator;
+unsupported aliases are not cycled onto unrelated passages. A named human
+must re-seal before another freeze attempt. The coding model is not
+the reviewer.
+
 `scripts/eval_pdf_hybrid.py --split development --live` on candidate
 `hybrid_long_document_v1` digest
-`ac42dec12e79681badcc382b16312108d6a265d35b1d5b1f962d4ec5e3930109`
-(default pin unchanged
+`d9e154747a88a94c0c75e87935a1f977e1c1802e2e80f9e12825bd24e1d15d22`
+(version-scoped exact dense; 8s slice starts after embedding; default pin
+unchanged
 `def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c`):
 
 | Token | Value |
@@ -50,24 +65,48 @@ Locator-bound owner seal (`reviewer=Nagdy`) split 40 open / 20 holdout.
 | `fallback_histogram` | `{none: 28}` |
 | `dense_term_degraded_count` | 0 |
 | `hybrid_recall_at_10` | 0.0417 |
+| `fused_occupancy_at_10` | 0.0417 (not the Recall@10 gate) |
 | `locator_correctness` | 0.0357 |
-| `first_evidence_p95_ms` | 10545 |
-| `eligible_rerank_ones` | 0 / 24 |
+| `first_evidence_p95_ms` | 3236 |
+| `eligible_rerank_ones` | 7 / 24 |
+| `rerank_fallback_histogram` | `{rerank_timeout: 18, none: 7, rerank_schema_invalid: 3}` |
 | `gates_pass` | false |
 | `holdout_opened` | false |
 
-A dummy Hybrid retrieve after the BM25 repair returned `rerank_fallback=rerank_timeout`
-with `deadline_exhausted=false`. Live embedding plus hosted dense (~2.5s for 640
-authorized rows) consume the 8s retrieve slice; the one-shot reranker is
-attempted then times out. First-evidence p95 is above the 2s gate. The 8s
-slice was not raised. `hybrid_long_document_v1` is not frozen.
+Rejected candidate hashes (JSON bytes never rewritten in place after a
+failed development run; a new digest is a new candidate):
 
-ParadeDB `pg_search` 0.25.2 rejects `version_id` in the same `WHERE` as
-`pdb.score` (`XX000` unsupported query shape). Variant BM25 now scopes with a
-btree id list and `chunk_id = ANY(...)` on the BM25 key field.
+- `ac42dec12e79681badcc382b16312108d6a265d35b1d5b1f962d4ec5e3930109`
+  (2026-09-09; ANN; eligible rerank 0/24; p95 10545 ms)
+- `d9e154747a88a94c0c75e87935a1f977e1c1802e2e80f9e12825bd24e1d15d22`
+  (2026-09-10; version-scoped exact; eligible rerank 7/24; p95 3236 ms)
+
+Identity comparison (`--rerank identity`) on the same split: Recall@10
+0.0417, fused occupancy 0.0417, eligible rerank 0/24, `live_rerank=false`.
+Live rerank is not the Recall@10 bottleneck. Identity cannot freeze.
+
+Repair 2 (2026-09-10): eval retrieve binds production
+`profile_query_sync`. Identity re-run: Recall@10 0.0417,
+`gold_in_fused_any` 0.0417, `fused_gold_rank_p50` 9, p95 3955 ms,
+`bm25_fallback=none`. Gold is absent from the fused list, not only
+top-10. Two real-integration repairs are exhausted. Stop. Do not freeze,
+open holdout, or edit the failed digest.
+
+`--fault paradedb` against an unreachable writer URL: `bm25_fallback=retrieval_timeout`,
+`dense_term_degraded=true`, `full_hybrid=false`. Unit tests still prove the
+immediate `bm25_unavailable` path. Degraded rows are not merged into
+full-Hybrid metrics.
+
+The 8s retrieve slice was not raised. First-evidence is stamped when fused
+IDs exist, before rerank. `hybrid_long_document_v1` is not frozen.
+Qualification was not run.
 
 The coding model is not a row-by-row PDF gold adjudicator. Do not claim
 Recall@10 from fused occupancy. Do not open holdout.
+
+ParadeDB `pg_search` 0.25.2 rejects `version_id` in the same `WHERE` as
+`pdb.score` (`XX000` unsupported query shape). Variant BM25 still scopes
+with a btree id list and `chunk_id = ANY(...)` on the BM25 key field.
 
 ## Production rerank
 
@@ -84,12 +123,16 @@ comparisons.
 ```text
 uv run python scripts/draft_pdf_eval_dataset.py
 uv run python scripts/seal_pdf_eval_dataset.py --input .private-eval/<pdf-sha12>/v1/draft.json
+uv run python scripts/eval_pdf_hybrid.py --probe-gold
+uv run python scripts/eval_pdf_hybrid.py --probe-grounding
 uv run python scripts/eval_pdf_hybrid.py --split development --live
+uv run python scripts/eval_pdf_hybrid.py --split development --live --rerank identity
+uv run python scripts/eval_pdf_hybrid.py --fault paradedb
 uv run python scripts/eval_pdf_agent.py --split development
 uv run python scripts/eval_pdf_holdout.py --labels .private-eval/holdout/labels.json
 ```
 
 Draft writes counts and hashes only. Seal of generated-only rows exits `2`.
-Live development Hybrid on 2026-09-09 ran after a named locator-bound seal
-and reported `gates_pass=false`. Qualification, freeze, agent eval, and
-holdout stay closed. They never open holdout.
+Live development Hybrid on 2026-09-10 ran after a named locator-bound seal
+and reported `gates_pass=false` after two retrieve repairs. Qualification,
+freeze, agent eval, and holdout stay closed. They never open holdout.

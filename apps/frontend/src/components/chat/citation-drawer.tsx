@@ -5,11 +5,9 @@
 "use client";
 
 import type { RefObject } from "react";
-import {
-  SOURCE_PREVIEW_UNAVAILABLE,
-} from "../../lib/citation-drawer";
+import { SOURCE_PREVIEW_UNAVAILABLE } from "../../lib/citation-drawer";
+import { citationLocatorFields } from "../../lib/citation-label";
 import { limitationCopy } from "../../lib/limitations";
-import { formatProvenance } from "../../lib/safe-text";
 import type { CitationResponse } from "../../lib/types";
 import { Drawer } from "../ui/drawer";
 import { LimitationCallout } from "../ui/limitation-callout";
@@ -23,7 +21,7 @@ export type CitationDrawerProps = {
 };
 
 /**
- * Render citation ids and provenance. No privileged href and no snippet HTML.
+ * Render citation locators and technical ids. No privileged href and no snippet HTML.
  *
  * @param props - Selected citation or null.
  * @returns Drawer region, or null when closed.
@@ -36,25 +34,31 @@ export function CitationDrawer({
   if (citation === null) {
     return null;
   }
+  const fields = citationLocatorFields(citation);
+  const page = fields.locators.find((item) => item.key === "page_number");
+  const title =
+    page === undefined
+      ? `Citation ${String(citation.citation_index)}`
+      : `Page ${page.value}`;
   return (
-    <Drawer
-      title={`Citation ${String(citation.citation_index)}`}
-      onClose={onClose}
-      returnFocusRef={returnFocusRef}
-    >
-      <dl>
-        <dt>citation_id</dt>
-        <dd>
-          <UserText value={citation.citation_id} />
-        </dd>
-        <dt>chunk_id</dt>
-        <dd>
-          <UserText value={citation.chunk_id ?? "none"} />
-        </dd>
-        <dt>provenance</dt>
-        <dd>
-          <UserText value={formatProvenance(citation.provenance) || "none"} />
-        </dd>
+    <Drawer title={title} onClose={onClose} returnFocusRef={returnFocusRef}>
+      <dl className={chatStyles.sourceDl}>
+        {fields.locators.map((item) => (
+          <div key={item.key}>
+            <dt>{item.label}</dt>
+            <dd>
+              <UserText value={item.value} />
+            </dd>
+          </div>
+        ))}
+        {fields.technical.map((item) => (
+          <div key={item.key}>
+            <dt>{item.label}</dt>
+            <dd>
+              <UserText value={item.value} />
+            </dd>
+          </div>
+        ))}
       </dl>
       {citation.source_unavailable ? (
         <LimitationCallout tone="warning">

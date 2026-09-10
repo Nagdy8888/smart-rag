@@ -81,6 +81,25 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.getByTestId("answer-citations")).toBeInTheDocument();
   });
 
+  it("labels company citations with page numbers instead of UUIDs", () => {
+    renderSurface({
+      answerOrigin: "company_documents",
+      citations: [
+        {
+          citation_id: "cite-1",
+          citation_index: 0,
+          chunk_id: "chunk-1",
+          provenance: { page_number: 129, document_title: "AI agents" },
+          source_unavailable: false,
+        },
+      ],
+    });
+    expect(
+      screen.getByRole("button", { name: "Citation 0, AI agents · p. 129" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("cite-1")).not.toBeInTheDocument();
+  });
+
   it("shows clarification and no citation chips for an ambiguous origin", () => {
     renderSurface({ answerOrigin: "ambiguous" });
     expect(screen.getByText(MIXED_SCOPE_CLARIFICATION)).toBeInTheDocument();

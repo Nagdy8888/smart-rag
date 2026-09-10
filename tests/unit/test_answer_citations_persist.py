@@ -164,9 +164,10 @@ def test_persist_answer_citations_lists_for_owned_run(
         cursor.execute(
             """
             INSERT INTO app.document_chunks (
-              id, document_id, version_id, chunk_index, raw_text
+              id, document_id, version_id, chunk_index, raw_text,
+              page_number, section_path
             )
-            VALUES (%s, %s, %s, 0, 'Refund period is 30 days.')
+            VALUES (%s, %s, %s, 0, 'Refund period is 30 days.', 12, ARRAY['Refunds'])
             """,
             (chunk_id, document_id, version_id),
         )
@@ -188,6 +189,8 @@ def test_persist_answer_citations_lists_for_owned_run(
             combined_score=1.0,
             origin=PassageOrigin.HYBRID,
             graph_discovered_only=False,
+            page_number=12,
+            section_path=("Refunds",),
         )
     )
     answer = AnswerPayload(
@@ -214,3 +217,6 @@ def test_persist_answer_citations_lists_for_owned_run(
     assert len(records) == len(inserted)
     assert records[0].citation_index == 0
     assert records[0].chunk_id == UUID(str(chunk_id))
+    assert records[0].provenance.get("page_number") == 12
+    assert records[0].provenance.get("document_title") == "Citation persist fixture"
+    assert "Refund period" not in str(records[0].provenance)

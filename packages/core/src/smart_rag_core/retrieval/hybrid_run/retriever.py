@@ -25,10 +25,11 @@ from smart_rag_core.retrieval.hybrid_run.assemble import (
     call_assemble_hybrid,
     closed_result,
     compute_principal_scope_hash,
-    elapsed_ms,
     fail_closed_query,
+    fused_first_evidence_ms,
     hybrid_assemble_kwargs,
     query_texts,
+    remaining_slice_seconds,
 )
 from smart_rag_core.retrieval.hybrid_run.budget import (
     counted_rerank,
@@ -93,8 +94,10 @@ class HybridRetriever(HybridChannelJobsMixin):
 
     Deadline:
         ``RETRIEVAL_SLICE_SECONDS`` (8s statement-timeout bound) covers
-        parallel channels plus rerank. The 25s ``HYBRID_DEADLINE_SECONDS``
-        value is the Phase 6 full-run budget and is not used here.
+        parallel channels plus rerank after the embedding batch. Embedding
+        time is not subtracted from that slice. The 25s
+        ``HYBRID_DEADLINE_SECONDS`` value is the Phase 6 full-run budget
+        and is not used here.
 
     Failure/fallback:
         Empty or over-long queries fail closed with ``retrieval_empty``.
@@ -173,7 +176,8 @@ class HybridRetriever(HybridChannelJobsMixin):
             profile: Typed query profile. Optional variants are taken from it.
             principal_scope_hash: Cache principal hash. Derived when omitted.
             visibility_generation: ACL/visibility generation for the cache key.
-            deadline_seconds: Retrieval+rerank slice. Defaults to 8.0 seconds.
+            deadline_seconds: Channel+rerank slice after embedding.
+                Defaults to 8.0 seconds.
             channel_jobs: Per-call job override for tests.
             restrict_version_id: When set, drop authorized candidates whose
                 ``version_id`` does not match. Mapping uses this to keep one
@@ -226,6 +230,7 @@ class HybridRetriever(HybridChannelJobsMixin):
                 vectors=vectors[:FUSION_LIST_CAP],
                 version_id=restrict_version_id,
             )
+        channel_started = time.perf_counter()
         completed, timed_out, exhausted = run_channels_parallel(
             jobs,
             deadline_seconds=slice_seconds,
@@ -326,9 +331,13 @@ class HybridRetriever(HybridChannelJobsMixin):
         if fallback is RetrievalFallbackReason.NONE and not assembled.fused:
             fallback = RetrievalFallbackReason.RETRIEVAL_EMPTY
         fused_ids = tuple(item.chunk_id for item in assembled.fused)
+        fused_at = time.perf_counter() if fused_ids else None
         context_cache: dict[UUID, ChunkContext] = {}
         loader = self._bound_loader(caller, context_cache)
-        remaining = max(0.0, slice_seconds - (time.perf_counter() - started))
+        remaining = remaining_slice_seconds(
+            slice_seconds=slice_seconds,
+            slice_started=channel_started,
+        )
         if self._retrieval_profile is not None:
             pool_size = self._retrieval_profile.rerank_pool_size
             max_per_document = self._retrieval_profile.rerank_max_per_document
@@ -428,7 +437,10 @@ class HybridRetriever(HybridChannelJobsMixin):
             coverage=coverage,
             fallback_reason=fallback,
             deadline_exhausted=assembled.deadline_exhausted,
-            first_evidence_ms=elapsed_ms(started),
+            first_evidence_ms=fused_first_evidence_ms(
+                started=started,
+                fused_at=fused_at,
+            ),
             embedding_call_count=1,
             rerank_call_count=rerank_calls,
             cache_key=assembled.cache_key,

@@ -11,7 +11,7 @@ import psycopg
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import list_run_citations
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
-from smart_rag_core.query_fusion.models import FusionResult
+from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.security.identity import CallerContext
 
@@ -85,6 +85,34 @@ def ensure_fusion_source_citations(
     )
 
 
+def _passage_locator_fields(scored: ScoredPassage | None) -> dict[str, object]:
+    """Copy page/section/sheet/URL locators from fusion evidence.
+
+    Args:
+        scored: Matching fusion passage, or ``None``.
+
+    Returns:
+        Locator mapping without empty values or passage text.
+    """
+
+    if scored is None:
+        return {}
+    payload: dict[str, object] = {
+        "document_id": scored.document_id,
+        "version_id": scored.version_id,
+        "page_number": scored.page_number,
+        "section_path": list(scored.section_path),
+        "sheet_name": scored.sheet_name,
+        "range_ref": scored.range_ref,
+        "source_url": scored.source_url,
+    }
+    return {
+        key: value
+        for key, value in payload.items()
+        if value not in (None, "", (), [])
+    }
+
+
 def citation_provenance_payload(
     *,
     fusion: FusionResult,
@@ -93,11 +121,13 @@ def citation_provenance_payload(
     table_id: str | None,
     atomic_link_id: str | None,
     inference: bool,
+    source_ranges: tuple[str, ...] = (),
 ) -> dict[str, object]:
     """Build expand-only provenance for one ``app.citations`` row.
 
     Fusion scores, algorithm, and config hash live in jsonb so packet 3
-    does not require a new table.
+    does not require a new table. Locator coordinates are stored without
+    passage text.
 
     Args:
         fusion: Combined ranking result.
@@ -106,6 +136,7 @@ def citation_provenance_payload(
         table_id: Canonical table when present.
         atomic_link_id: Owning atomic link.
         inference: True when the citation supports a composed inference.
+        source_ranges: Exact table ranges when this is a table citation.
 
     Returns:
         JSON-serializable provenance mapping.
@@ -115,7 +146,7 @@ def citation_provenance_payload(
         (item for item in fusion.evidence if item.chunk_id == chunk_id),
         None,
     )
-    return {
+    payload: dict[str, object] = {
         "algorithm": fusion.algorithm.value,
         "config_hash": fusion.config_hash,
         "requested_route": fusion.requested_route,
@@ -135,7 +166,11 @@ def citation_provenance_payload(
         "answer_status": answer.status,
         "keyword_extract_count": 0,
         "lightrag_answer_generate_count": 0,
+        **_passage_locator_fields(scored),
     }
+    if source_ranges:
+        payload["source_ranges"] = list(source_ranges)
+    return payload
 
 
 def persist_answer_citations(
@@ -173,6 +208,7 @@ def persist_answer_citations(
                 table_id=citation.table_id,
                 atomic_link_id=citation.atomic_link_id,
                 inference=citation.inference,
+                source_ranges=citation.source_ranges,
             )
             snippet = (citation.span or "")[:500]
             try:

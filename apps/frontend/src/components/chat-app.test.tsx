@@ -420,7 +420,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     expect(await screen.findByText("<script>x</script>")).toBeInTheDocument();
     expect(document.querySelector("script")).toBeNull();
     expect(screen.queryByText("SECRET PASSAGE")).toBeNull();
-    expect(await screen.findByRole("button", { name: "Citation 1" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Citation 1, p. 3" })).toBeInTheDocument();
     const diagnostics = screen.getByTestId("advanced-diagnostics");
     expect(diagnostics).toHaveTextContent("future_metric");
     expect(diagnostics).toHaveTextContent("Combined");

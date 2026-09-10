@@ -2,7 +2,7 @@
 title: Overlay PDF Hybrid packets (P13, P15, P16)
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: engineering, reviewers
 ---
 
@@ -38,9 +38,10 @@ flowchart LR
 
 ### Not proven
 
-- Live OpenAI rerank `rerank_call_count=1` with `store=False` on this PDF.
-  A dummy retrieve after BM25 repair returned `rerank_timeout` inside the
-  8s slice. Mock/identity output cannot satisfy the live-rerank gate.
+- Live OpenAI rerank `rerank_call_count=1` on every eligible PDF case.
+  2026-09-10 live development: 7/24 ones, 18 `rerank_timeout`, 3
+  `rerank_schema_invalid`. Mock/identity output cannot satisfy the
+  live-rerank gate.
 
 ## Packet 15 — PDF agent eval
 
@@ -69,16 +70,23 @@ flowchart LR
 
 ```text
 uv run python scripts/draft_pdf_eval_dataset.py
+uv run python scripts/eval_pdf_hybrid.py --probe-gold
+uv run python scripts/eval_pdf_hybrid.py --probe-grounding
 uv run python scripts/eval_pdf_hybrid.py --split development --live
 uv run python scripts/eval_pdf_agent.py --split development
 uv run python scripts/eval_pdf_holdout.py --labels .private-eval/holdout/labels.json
 ```
 
-Recorded 2026-09-09:
+Recorded 2026-09-10:
 
 | Command | Exit | Output tokens |
 | --- | --- | --- |
-| `eval_pdf_hybrid.py --split development --live` (post-seal) | 0 | `gates_pass=false`; `fallback_histogram={none: 28}`; Recall@10 0.0417; locator 0.0357; p95 10545 ms; eligible rerank 0/24; `holdout_opened=false` |
+| `eval_pdf_hybrid.py --probe-gold` | 0 | 28 cases; gold∩representatives 28/28; 1 ID/case; `holdout_opened=false` |
+| `eval_pdf_hybrid.py --probe-grounding` | 0 | 24 scored; 2 grounded; 4 refusals; `holdout_opened=false` |
+| `eval_pdf_hybrid.py --split development --live` | 0 | `gates_pass=false`; Recall@10 0.0417; fused occupancy 0.0417; locator 0.0357; p95 3236 ms; eligible rerank 7/24; digest `d9e1547…` |
+| `eval_pdf_hybrid.py --split development --live --rerank identity` | 0 | Recall@10 0.0417; `gold_in_fused_any` 0.0417; `live_rerank=false`; cannot freeze |
+| `eval_pdf_hybrid.py --fault paradedb` | 0 | `bm25_fallback=retrieval_timeout`; `dense_term_degraded=true`; `full_hybrid=false` |
+| `eval_pdf_hybrid.py --freeze` | 2 | `blocked=qualification_and_gates_required_before_freeze` |
 | `eval_pdf_hybrid.py --split holdout` | 2 | `blocked=holdout_sealed`; `holdout_opened=false` |
-| `eval_pdf_agent.py --split development` | 2 | freeze denied; `eval_judge_v1_reused=false` |
+| `eval_pdf_agent.py --split development` | 2 | `blocked=live_agent_eval_required`; `eval_judge_v1_reused=false` |
 | `eval_pdf_holdout.py` | 2 | `blocked=holdout_sealed`; `holdout_opened=false` |
