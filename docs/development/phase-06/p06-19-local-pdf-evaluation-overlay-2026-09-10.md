@@ -37,8 +37,8 @@ Proven: Packet 9 is accepted; overlay packets 19–26 are linked; Packet 10
 title and number are unchanged; company insufficient evidence still never
 falls back to world knowledge; holdout remains outside the workspace.
 
-Unverified: live operator reseal, heading reingest, Combined +10pp, and
-holdout remain later overlay/operator gates.
+Unverified: live operator reseal, Combined +10pp, and holdout remain later
+overlay/operator gates. Heading reingest is recorded on P06-23.
 
 Rollback: delete overlay packets 19–26 and the ADR, restore Packet 9-era
 deviation sections, and restore the previous integrity lock.

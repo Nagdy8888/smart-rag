@@ -32,9 +32,15 @@ on 2026-09-09: 640 ordinary passages, 495 in 200–400 (**0.7734**), 134
 under 200, 11 in 401–600, 0 over 600. Parser kinds were paragraph/page_break/figure
 only (zero headings). PDF heading extraction (`parser_v1_pdf_headings_v1`)
 is additive and does not relax the 200–400 token band or 600-token cap.
-Live heading-count metrics for the private PDF remain operator-owned until
-a new Graph-disabled ingest. The 90% gate is a Packet 5 stop, not a reason to
-relax merge rules. `document_chunks.page_number` is the 1-based PDF file
+Live 2026-09-10 parse of that PDF with `parser_v1_pdf_headings_v1` (per-line
+blocks plus same-size bold headings) produced 3555 chunks and failed
+`embedding_batch_over_limit` (2048). `parser_v1_pdf_headings_v2` keeps
+standalone large titles as headings, leaves same-size bold labels as
+paragraphs, and merges consecutive body lines before chunking. Live
+Graph-disabled ingest of that hash with `parser_v1_pdf_headings_v2` produced
+1045 chunks and 274 distinct `section_path` values, all under the 2048
+embedding input cap. The 90% gate
+is a Packet 5 stop, not a reason to relax merge rules. `document_chunks.page_number` is the 1-based PDF file
 page (`page_index + 1`). Printed `/PageLabels` values (roman or arabic) are
 copied onto provenance locators as `page_label` for citation display; they
 do not replace `page_number`.

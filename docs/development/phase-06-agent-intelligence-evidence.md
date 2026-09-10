@@ -48,8 +48,8 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-19 — Local PDF evaluation overlay (2026-09-10) | [phase-06/p06-19-local-pdf-evaluation-overlay-2026-09-10.md](./phase-06/p06-19-local-pdf-evaluation-overlay-2026-09-10.md) | 47 |
 | P06-20 — PDF eval workspace store (2026-09-10) | [phase-06/p06-20-pdf-eval-workspace-store-2026-09-10.md](./phase-06/p06-20-pdf-eval-workspace-store-2026-09-10.md) | 40 |
 | P06-21 — PDF eval workspace API (2026-09-10) | [phase-06/p06-21-pdf-eval-workspace-api-2026-09-10.md](./phase-06/p06-21-pdf-eval-workspace-api-2026-09-10.md) | 40 |
-| P06-22 — PDF eval workspace UI (2026-09-10) | [phase-06/p06-22-pdf-eval-workspace-ui-2026-09-10.md](./phase-06/p06-22-pdf-eval-workspace-ui-2026-09-10.md) | 39 |
-| P06-23 — PDF heading extraction (2026-09-10) | [phase-06/p06-23-pdf-heading-extraction-2026-09-10.md](./phase-06/p06-23-pdf-heading-extraction-2026-09-10.md) | 40 |
+| P06-22 — PDF eval workspace UI (2026-09-10) | [phase-06/p06-22-pdf-eval-workspace-ui-2026-09-10.md](./phase-06/p06-22-pdf-eval-workspace-ui-2026-09-10.md) | 41 |
+| P06-23 — PDF heading extraction (2026-09-10) | [phase-06/p06-23-pdf-heading-extraction-2026-09-10.md](./phase-06/p06-23-pdf-heading-extraction-2026-09-10.md) | 60 |
 | P06-24 — PDF eval channel diagnostics (2026-09-10) | [phase-06/p06-24-pdf-eval-channel-diagnostics-2026-09-10.md](./phase-06/p06-24-pdf-eval-channel-diagnostics-2026-09-10.md) | 38 |
 | P06-25 — PDF eval retrieval repair (2026-09-10) | [phase-06/p06-25-pdf-eval-retrieval-repair-2026-09-10.md](./phase-06/p06-25-pdf-eval-retrieval-repair-2026-09-10.md) | 37 |
 | P06-26 — Retrieval cache and holdout gates (2026-09-10) | [phase-06/p06-26-retrieval-cache-and-holdout-gates-2026-09-10.md](./phase-06/p06-26-retrieval-cache-and-holdout-gates-2026-09-10.md) | 41 |

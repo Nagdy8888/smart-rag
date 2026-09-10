@@ -18,6 +18,7 @@ from smart_rag_core.ingestion.parser.exceptions import (
     ParserLimitExceeded,
 )
 from smart_rag_core.ingestion.parser.helpers import (
+    PdfTextBlock,
     as_float,
     as_int,
     build_coverage,
@@ -25,6 +26,7 @@ from smart_rag_core.ingestion.parser.helpers import (
     element_id,
     extract_pdf_text_blocks,
     median_font_size,
+    merge_consecutive_pdf_paragraphs,
     pdf_page_label,
     vendor_attr,
     vendor_call,
@@ -113,6 +115,7 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
         )
         median_size = median_font_size(sizes)
         if dict_blocks:
+            classified: list[tuple[ElementKind, PdfTextBlock]] = []
             for block in dict_blocks:
                 cleaned = block.text.strip()
                 if not cleaned:
@@ -123,6 +126,9 @@ def parse_pdf(path: Path, content_hash: str, format_key: str) -> ParseResult:
                     median_size=median_size,
                     bold=block.bold,
                 )
+                classified.append((kind, block))
+            for kind, block in merge_consecutive_pdf_paragraphs(tuple(classified)):
+                cleaned = block.text.strip()
                 x0, y0, x1, y1 = block.bbox
                 locator = PdfLocator(
                     page_index=page_index,

@@ -41,6 +41,69 @@ class PdfTextBlock(NamedTuple):
     bold: bool
 
 
+def _union_pdf_bbox(
+    left: tuple[float, float, float, float],
+    right: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    """Return the axis-aligned union of two PDF boxes.
+
+    Args:
+        left: First ``(x0, y0, x1, y1)`` box.
+        right: Second ``(x0, y0, x1, y1)`` box.
+
+    Returns:
+        Combined box.
+    """
+
+    return (
+        min(left[0], right[0]),
+        min(left[1], right[1]),
+        max(left[2], right[2]),
+        max(left[3], right[3]),
+    )
+
+
+def merge_consecutive_pdf_paragraphs(
+    lines: tuple[tuple[ElementKind, PdfTextBlock], ...],
+) -> tuple[tuple[ElementKind, PdfTextBlock], ...]:
+    """Join adjacent paragraph lines so heading lines stay standalone.
+
+    Per-line ``get_text('dict')`` extraction keeps titles from being absorbed
+    into body copy. Consecutive paragraphs are then concatenated so chunking
+    can fill the 200-400 token band instead of emitting one passage per line.
+
+    Args:
+        lines: Classified ``(kind, block)`` pairs in reading order.
+
+    Returns:
+        The same order with consecutive ``PARAGRAPH`` blocks merged.
+    """
+
+    if not lines:
+        return ()
+    merged: list[tuple[ElementKind, PdfTextBlock]] = []
+    pending: PdfTextBlock | None = None
+    for kind, block in lines:
+        if kind is ElementKind.PARAGRAPH:
+            if pending is None:
+                pending = block
+                continue
+            pending = PdfTextBlock(
+                text=f"{pending.text}\n{block.text}",
+                bbox=_union_pdf_bbox(pending.bbox, block.bbox),
+                max_size=max(pending.max_size, block.max_size),
+                bold=pending.bold or block.bold,
+            )
+            continue
+        if pending is not None:
+            merged.append((ElementKind.PARAGRAPH, pending))
+            pending = None
+        merged.append((kind, block))
+    if pending is not None:
+        merged.append((ElementKind.PARAGRAPH, pending))
+    return tuple(merged)
+
+
 def element_id(
     content_hash: str,
     reading_order: int,
@@ -424,14 +487,17 @@ def classify_pdf_text_block(
 ) -> ElementKind:
     """Classify one PDF text block as heading or paragraph.
 
-    Conservative: short standalone large or bold titles become headings.
-    Bold body sentences and uncertain blocks stay paragraphs.
+    Conservative: short standalone large titles become headings. Same-size
+    bold labels and uncertain blocks stay paragraphs so live books do not
+    emit one passage per bold line.
 
     Args:
         text: Block text.
         max_size: Largest span size in the block.
         median_size: Median span size on the page.
-        bold: True when any span is flagged bold.
+        bold: True when any span is flagged bold. Same-size bold is not
+            enough without a size jump; it remains available for callers that
+            still pass the flag for diagnostics.
 
     Returns:
         ``HEADING`` or ``PARAGRAPH``.
@@ -446,6 +512,7 @@ def classify_pdf_text_block(
     large = median_size > 0 and max_size >= max(
         PDF_HEADING_MIN_SIZE, median_size * PDF_HEADING_SIZE_RATIO
     )
-    if large or (bold and len(words) <= 8):
+    if large:
         return ElementKind.HEADING
+    _ = bold
     return ElementKind.PARAGRAPH

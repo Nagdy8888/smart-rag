@@ -126,7 +126,7 @@ count-only tokens. BM25 snippets are never diagnostics.
 
 | Gate | Status |
 | --- | --- |
-| PDF heading extraction | `parser_v1_pdf_headings_v1` unit-proven; live reingest operator-owned |
+| PDF heading extraction | `parser_v1_pdf_headings_v2` live `graph_ineligible` (1045 chunks, 274 distinct `section_path`) |
 | Human reseal | operator-owned; labels remain 2/24 grounded |
 | `FROZEN_LONG_DOCUMENT_PROFILE_SHA256` | empty; `runtime_allow_listed=false` |
 | Invalid JSON rerank | typed `rerank_schema_invalid` → RRF fallback |

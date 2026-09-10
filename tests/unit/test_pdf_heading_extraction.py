@@ -7,7 +7,11 @@ from uuid import UUID
 
 from smart_rag_core.ingestion.chunking import chunk_parse_result
 from smart_rag_core.ingestion.parser.adapters import parse_file
-from smart_rag_core.ingestion.parser.helpers import classify_pdf_text_block
+from smart_rag_core.ingestion.parser.helpers import (
+    PdfTextBlock,
+    classify_pdf_text_block,
+    merge_consecutive_pdf_paragraphs,
+)
 from smart_rag_core.ingestion.parser.limits import PDF_PARSER_VERSION
 from smart_rag_core.ingestion.parser.types import ElementKind
 
@@ -18,7 +22,7 @@ VERSION_ID = UUID("22222222-2222-4222-8222-222222222222")
 
 
 def test_short_large_or_bold_titles_are_headings() -> None:
-    """Short large or bold titles classify as headings."""
+    """Short large titles classify as headings."""
 
     assert (
         classify_pdf_text_block(
@@ -43,6 +47,55 @@ def test_bold_body_sentences_stay_paragraphs() -> None:
         )
         is ElementKind.PARAGRAPH
     )
+
+
+def test_same_size_bold_short_labels_stay_paragraphs() -> None:
+    """Same-size bold labels stay paragraphs without a size jump."""
+
+    assert (
+        classify_pdf_text_block(
+            text="Figure caption label",
+            max_size=11.0,
+            median_size=11.0,
+            bold=True,
+        )
+        is ElementKind.PARAGRAPH
+    )
+
+
+def test_merge_consecutive_paragraphs_keeps_headings_atomic() -> None:
+    """Adjacent body lines merge; heading lines stay their own blocks."""
+
+    heading = PdfTextBlock(
+        text="Chapter One Title",
+        bbox=(0.0, 0.0, 100.0, 20.0),
+        max_size=18.0,
+        bold=True,
+    )
+    first = PdfTextBlock(
+        text="Body line one",
+        bbox=(0.0, 24.0, 100.0, 36.0),
+        max_size=11.0,
+        bold=False,
+    )
+    second = PdfTextBlock(
+        text="Body line two",
+        bbox=(0.0, 36.0, 100.0, 48.0),
+        max_size=11.0,
+        bold=False,
+    )
+    merged = merge_consecutive_pdf_paragraphs(
+        (
+            (ElementKind.HEADING, heading),
+            (ElementKind.PARAGRAPH, first),
+            (ElementKind.PARAGRAPH, second),
+        )
+    )
+    assert len(merged) == 2
+    assert merged[0][0] is ElementKind.HEADING
+    assert merged[0][1].text == "Chapter One Title"
+    assert merged[1][0] is ElementKind.PARAGRAPH
+    assert merged[1][1].text == "Body line one\nBody line two"
 
 
 def test_mixed_script_short_title_is_heading() -> None:

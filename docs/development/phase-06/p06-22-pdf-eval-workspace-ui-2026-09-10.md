@@ -31,8 +31,10 @@ Proven: Evaluation tab hidden without capability; member/admin surfaces omit
 the tab in Vitest; editor remounts on revision instead of setState-in-effect;
 expected answer is not editable into the AI request from local state.
 
-Unverified: Playwright live-member `/admin` run (needs live auth fixture).
-Browser walkthrough of compare-run against a mounted workspace.
+Unverified: Playwright live-member `/admin` run. `E2E_LIVE_EMAIL` /
+`E2E_LIVE_PASSWORD` are unset, so those specs skip. Unauthenticated admin
+routes still redirect to login. Browser walkthrough of compare-run against a
+mounted workspace (`PDF_EVAL_WORKSPACE_ENABLED` remains false).
 
 Rollback: hide the tab by leaving `pdf_eval_workspace` false in `/api/meta`.
 

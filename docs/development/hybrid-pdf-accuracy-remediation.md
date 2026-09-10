@@ -84,7 +84,7 @@ No source text is recorded here.
 | PDF bytes SHA-256 | `72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1` |
 | PDF byte length | 12,990,407 |
 | Content class | `real_company` (enum; not synthetic) |
-| Parser policy | `parser_v1`; PDF `parser_v1_pdf_headings_v1` |
+| Parser policy | `parser_v1`; PDF `parser_v1_pdf_headings_v2` |
 | Chunking policy | `chunking_v1` |
 | Tokenizer | `cl100k_base_v1` |
 | Dedup policy | `dedup_v1` |
