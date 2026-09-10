@@ -107,9 +107,7 @@ def _passage_locator_fields(scored: ScoredPassage | None) -> dict[str, object]:
         "source_url": scored.source_url,
     }
     return {
-        key: value
-        for key, value in payload.items()
-        if value not in (None, "", (), [])
+        key: value for key, value in payload.items() if value not in (None, "", (), [])
     }
 
 

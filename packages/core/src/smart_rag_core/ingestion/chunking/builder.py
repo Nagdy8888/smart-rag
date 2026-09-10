@@ -35,7 +35,7 @@ from smart_rag_core.ingestion.parser.types import (
     ParseResult,
     TypedElement,
 )
-from smart_rag_core.ingestion.provenance import locator_to_dict
+from smart_rag_core.ingestion.provenance import attach_page_label, locator_to_dict
 
 
 @dataclass
@@ -69,7 +69,9 @@ def build_hierarchical_chunks(
         version_id: Immutable version identifier.
 
     Returns:
-        Ordered canonical chunks with stable IDs and provenance.
+        Ordered canonical chunks with stable IDs and provenance. Printed
+        PDF labels from ``parse_result.page_labels`` are copied onto locators
+        as ``page_label`` after element IDs are assigned.
     """
 
     if parse_result.format in {"csv", "xlsx"}:
@@ -247,6 +249,7 @@ def build_hierarchical_chunks(
     flush_prose()
     flush_table()
     flush_list()
+    _attach_pdf_page_labels(drafts, parse_result.page_labels)
 
     passage_chunks = _materialize_passages(
         drafts,
@@ -444,8 +447,38 @@ def _table_row_index(element: TypedElement) -> int:
     return element.reading_order
 
 
+def _attach_pdf_page_labels(
+    drafts: list[_DraftChunk],
+    page_labels: tuple[str, ...],
+) -> None:
+    """Stamp printed PDF labels onto draft locators after element IDs exist.
+
+    Args:
+        drafts: Passage drafts whose locators still lack ``page_label``.
+        page_labels: Labels aligned with zero-based ``page_index``.
+
+    Side Effects:
+        Replaces each draft's ``locators`` tuple in place.
+    """
+
+    if not page_labels:
+        return
+    for draft in drafts:
+        draft.locators = tuple(
+            attach_page_label(locator, page_labels) for locator in draft.locators
+        )
+
+
 def _page_from_locators(locators: tuple[dict[str, Any], ...]) -> int | None:
-    """Return the first page/slide index found in provenance locators."""
+    """Return the first page/slide index found in provenance locators.
+
+    Args:
+        locators: Serialized format locators.
+
+    Returns:
+        1-based file/slide page, or ``None``. Printed PDF labels live on
+        ``page_label`` and are not substituted here.
+    """
 
     for locator in locators:
         if "page_index" in locator:

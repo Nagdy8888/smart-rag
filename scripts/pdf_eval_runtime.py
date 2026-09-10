@@ -501,6 +501,10 @@ class PdfEvalRuntime:
                     bm25_fallback=str(result.fallback_reason),
                     fused_ids=result.fused_ids,
                     rerank_fallback=str(result.rerank_fallback or "none"),
+                    selected_ids=result.selected_ids,
+                    dense_ids=result.dense_ids,
+                    bm25_ids=result.bm25_ids,
+                    term_ids=result.term_ids,
                 )
             )
         return scores, results
@@ -789,6 +793,7 @@ def print_retrieve_stdout(report: dict[str, object]) -> None:
     print(f"fused_occupancy_at_10={report.get('fused_occupancy_at_10')}")
     print(f"gold_in_fused_any={report.get('gold_in_fused_any')}")
     print(f"fused_gold_rank_p50={report.get('fused_gold_rank_p50')}")
+    print(f"gold_loss_histogram={report.get('gold_loss_histogram')}")
     print(f"live_rerank={report.get('live_rerank')}")
     print(f"candidate_profile_id={report.get('candidate_profile_id')}")
     print(f"candidate_digest={report.get('candidate_digest')}")

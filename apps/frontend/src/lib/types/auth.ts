@@ -9,6 +9,8 @@ export type MetaResponse = {
   api_version: string;
   sse_schema_version: string;
   min_client_version: string;
+  /** Local-only Admin Evaluation workspace. Default false. Not authorization. */
+  pdf_eval_workspace?: boolean;
 };
 
 /** `POST /invitations/accept` response. Email is not a request field. */

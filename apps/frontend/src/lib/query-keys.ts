@@ -97,6 +97,11 @@ export function sessionQueryKeys(accessToken: string | null) {
     entityRules: ["entity-rules", scope] as const,
     usageCompany: ["usage-company", scope] as const,
     workspaceUsers: ["workspace-users", scope] as const,
+    pdfEvalStatus: ["pdf-eval-status", scope] as const,
+    pdfEvalCases: ["pdf-eval-cases", scope] as const,
+    pdfEvalCase: (caseId: string | null) =>
+      ["pdf-eval-case", scope, caseId] as const,
+    pdfEvalPassages: ["pdf-eval-passages", scope] as const,
     consoleReady: (role: string | null) =>
       ["console-ready", scope, role ?? "pending"] as const,
   };

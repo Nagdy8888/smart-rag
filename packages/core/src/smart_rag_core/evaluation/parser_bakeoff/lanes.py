@@ -113,7 +113,7 @@ def anydoc_docker_command(
         "none",
         "--read-only",
         "--tmpfs",
-        "/tmp:rw,noexec,nosuid,size=64m",
+        "/tmp:rw,noexec,nosuid,size=256m",
         "--user",
         "10001:10001",
         "--memory",

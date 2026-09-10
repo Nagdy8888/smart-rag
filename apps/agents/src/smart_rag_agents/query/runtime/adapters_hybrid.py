@@ -12,6 +12,7 @@ from smart_rag_core.gateways.embedding import EmbeddingGateway
 from smart_rag_core.gateways.model import ModelGateway
 from smart_rag_core.query_routing.profile_fields import profile_strings
 from smart_rag_core.retrieval.bm25 import Bm25Retriever
+from smart_rag_core.retrieval.cache_store import RetrievalCacheStore
 from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     fetch_authorized_chunk_context,
@@ -129,6 +130,7 @@ class ProcessHybridRetriever:
         bm25: DsnBm25Retriever | None,
         model_gateway: ModelGateway | None = None,
         rerank_prompt_text: str | None = None,
+        retrieval_cache: RetrievalCacheStore | None = None,
     ) -> None:
         """Bind the process embedding gateway and DSNs.
 
@@ -140,6 +142,7 @@ class ProcessHybridRetriever:
             model_gateway: Shared model gateway for the one-shot reranker.
             rerank_prompt_text: Pinned ``rerank_v1`` body. Missing prompt
                 leaves identity fallback.
+            retrieval_cache: Optional ID/rank cache. Hits still recheck ACL.
         """
 
         self._embedding_gateway = embedding_gateway
@@ -147,6 +150,7 @@ class ProcessHybridRetriever:
         self._bm25 = bm25
         self._model_gateway = model_gateway
         self._rerank_prompt = rerank_prompt_text
+        self._retrieval_cache = retrieval_cache
         self.query_budget: object | None = None
 
     def retrieve(
@@ -224,6 +228,7 @@ class ProcessHybridRetriever:
             load_context=context_loader(self._supabase_dsn, caller),
             rerank=rerank_fn,  # type: ignore[arg-type]
             retrieval_profile=retrieval_profile,
+            retrieval_cache=self._retrieval_cache,
         )
         budget = query_budget if query_budget is not None else self.query_budget
         inner.query_budget = budget  # type: ignore[assignment]

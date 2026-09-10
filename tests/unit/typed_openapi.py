@@ -106,12 +106,14 @@ class OpenAPIClient(Protocol):
         url: str,
         *,
         headers: dict[str, str] | None = None,
+        params: dict[str, str] | None = None,
     ) -> JsonResponse:
         """Send one GET request.
 
         Args:
             url: Request path.
             headers: Optional request headers.
+            params: Optional query parameters.
         """
         ...
 
@@ -130,6 +132,22 @@ class OpenAPIClient(Protocol):
             json: Optional JSON body.
             headers: Optional request headers.
             content: Optional raw body.
+        """
+        ...
+
+    def patch(
+        self,
+        url: str,
+        *,
+        json: object | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> JsonResponse:
+        """Send one PATCH request.
+
+        Args:
+            url: Request path.
+            json: Optional JSON body.
+            headers: Optional request headers.
         """
         ...
 

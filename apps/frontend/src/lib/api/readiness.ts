@@ -171,6 +171,7 @@ export async function fetchMeta(
     api_version: String(body.api_version ?? ""),
     sse_schema_version: String(body.sse_schema_version ?? ""),
     min_client_version: minClientVersion,
+    pdf_eval_workspace: body.pdf_eval_workspace === true,
   };
 }
 

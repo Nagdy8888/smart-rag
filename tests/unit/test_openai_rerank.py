@@ -264,3 +264,47 @@ def test_incomplete_status_after_success_falls_back() -> None:
         pytest.raises(OpenAIRerankError, match="rerank_incomplete"),
     ):
         _run(first, second)
+
+
+def test_invalid_json_maps_to_schema_invalid() -> None:
+    """Malformed JSON is ``rerank_schema_invalid``, not an untyped success."""
+
+    first, second = str(uuid4()), str(uuid4())
+
+    class FakeResponses:
+        """Return completed usage with invalid JSON."""
+
+        def create(self, **kwargs: object) -> SimpleNamespace:
+            """Return non-JSON output text.
+
+            Args:
+                **kwargs: Unused.
+
+            Returns:
+                Completed Responses object with invalid JSON.
+            """
+
+            return SimpleNamespace(
+                id="resp_invalid",
+                status="completed",
+                usage=SimpleNamespace(input_tokens=9, output_tokens=4),
+                output_text="{not-json",
+            )
+
+    class FakeOpenAI:
+        """Return the invalid-JSON stub."""
+
+        def __init__(self, **kwargs: object) -> None:
+            """Ignore constructor kwargs.
+
+            Args:
+                **kwargs: Unused.
+            """
+
+            self.responses = FakeResponses()
+
+    with (
+        patch("smart_rag_core.gateways.openai_rerank.traced_openai_client", FakeOpenAI),
+        pytest.raises(OpenAIRerankError, match="rerank_schema_invalid"),
+    ):
+        _run(first, second)

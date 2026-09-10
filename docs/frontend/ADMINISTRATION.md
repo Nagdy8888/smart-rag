@@ -2,7 +2,7 @@
 title: Administration surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-10
 audience: engineering, frontend, security
 packet: P08-19
 ---
@@ -10,7 +10,8 @@ packet: P08-19
 # Administration surfaces (Phase 8 packet 19)
 
 One role-aware `/admin` workspace with tabs Team & access, Tools, Names &
-aliases, and Usage. Account is a separate `/account` page from `GET /me`. Bookmark
+aliases, Usage, and (when `/api/meta` `pdf_eval_workspace` is true) Evaluation.
+Account is a separate `/account` page from `GET /me`. Bookmark
 routes `/team`, `/tools`, `/curation`, `/usage`, and `/profile` redirect.
 Stitch frames 02/08/11/12/13/14 are unused as product routes.
 
@@ -22,6 +23,7 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 [PHASE8_JOURNEY_MATRIX.md](./PHASE8_JOURNEY_MATRIX.md) ·
 [admin-and-auth-screens.md](./admin-and-auth-screens.md) ·
 [OPTIONAL_TOOLS.md](../agent/OPTIONAL_TOOLS.md) ·
+[PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md) ·
 [GLOSSARY_IMPORT.md](../api/GLOSSARY_IMPORT.md) ·
 [ENTITY_RULES.md](../graph/ENTITY_RULES.md) ·
 [phase-08 evidence](../development/phase-08-frontend-integration-evidence.md) ·
@@ -35,6 +37,7 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 | `/admin?tab=tools` | Catalog search, enable/permissions, details drawer. No seed form | `GET /tools?q=`, `POST /admin/tools/{tool_key}/enable`, `POST /admin/tools/{tool_key}/permissions` |
 | `/admin?tab=curation` | Word aliases (glossary import) and people/things (entity rules) | `/admin/glossary/imports*`, `/admin/graph/entity-rules*` |
 | `/admin?tab=usage` | Caller totals; company totals for owner/admin. Rate-degraded banner only when `rate_limit_degraded` | `GET /usage/me`, `GET /usage/company`. Totals only, no prompt text |
+| `/admin?tab=evaluation` | Local PDF evaluation workspace. Hidden unless `/api/meta` `pdf_eval_workspace` is true. Member/viewer still 403. | `/admin/pdf-eval/*`. Question-only Ask comparison. Official Recall@10 stays CLI |
 | `/account` | Read-only four `/me` fields. `/profile` redirects here | `user_id`, `role`, `authorization_version`, `upload_enabled`. Sign out stays in the shell menu |
 
 Nav shows **Admin** for owner/admin convenience and **Account** for every

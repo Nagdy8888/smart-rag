@@ -49,6 +49,13 @@ flowchart LR
 `dev.ps1` fails closed without hosted `.env.compose`. `stop.ps1` stops
 Compose only.
 
+The optional PDF evaluation workspace (`PDF_EVAL_WORKSPACE_ENABLED`,
+default false) bind-mounts gitignored `./.private-eval` on the API only.
+The API container is read-only and runs as uid 10001, so create the
+directory first (`mkdir .private-eval`) and grant that uid write access
+on Linux (`chown 10001:10001 .private-eval`). Staging and production reject
+the flag. See [PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md).
+
 See [CONFIGURATION.md](./CONFIGURATION.md), [TOOL_VERSIONS.md](./TOOL_VERSIONS.md),
 [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md),
 [demo-local-ingest-aws-ask.md](../runbooks/demo-local-ingest-aws-ask.md)

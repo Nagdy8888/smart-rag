@@ -35,7 +35,9 @@ export function CitationDrawer({
     return null;
   }
   const fields = citationLocatorFields(citation);
-  const page = fields.locators.find((item) => item.key === "page_number");
+  const page =
+    fields.locators.find((item) => item.key === "page_label") ??
+    fields.locators.find((item) => item.key === "page_number");
   const title =
     page === undefined
       ? `Citation ${String(citation.citation_index)}`

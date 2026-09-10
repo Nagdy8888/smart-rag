@@ -12,6 +12,7 @@ import {
   readinessCapabilities,
   readinessHeadline,
   showAdminNav,
+  visibleAdminTabs,
 } from "./shell-navigation";
 
 const readyOk: ReadinessResponse = {
@@ -48,6 +49,10 @@ describe("shell navigation", () => {
     expect(isRetiredProductPath("/login")).toBe(false);
     expect(parseAdminTab("usage")).toBe("usage");
     expect(parseAdminTab("nope")).toBe("team");
+    expect(parseAdminTab("evaluation")).toBe("team");
+    expect(parseAdminTab("evaluation", true)).toBe("evaluation");
+    expect(visibleAdminTabs(false)).toEqual(["team", "tools", "curation", "usage"]);
+    expect(visibleAdminTabs(true)).toContain("evaluation");
   });
 
   it("titles pages and builds command destinations without MFA", () => {

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, status
 from smart_rag_core.security.identity import UserRole
-from smart_rag_core.settings import BackendSettings
+from smart_rag_core.settings import BackendSettings, Environment
 
 from smart_rag_api.dependencies.identity import CallerContextDep
 from smart_rag_api.dependencies.services import clear_rate_limit_degraded
@@ -134,7 +134,8 @@ async def api_meta(request: Request) -> MetaResponse:
         request: Request with settings.
 
     Returns:
-        api_version, sse_schema_version, min_client_version.
+        api_version, sse_schema_version, min_client_version,
+        pdf_eval_workspace.
     """
 
     settings: BackendSettings | None = getattr(request.app.state, "settings", None)
@@ -143,9 +144,15 @@ async def api_meta(request: Request) -> MetaResponse:
             api_version="0.1.0",
             sse_schema_version="1",
             min_client_version="0.1.0",
+            pdf_eval_workspace=False,
         )
+    enabled = bool(settings.pdf_eval_workspace_enabled) and settings.app_env in {
+        Environment.LOCAL,
+        Environment.TEST,
+    }
     return MetaResponse(
         api_version=settings.api_version,
         sse_schema_version=settings.sse_schema_version,
         min_client_version=settings.min_client_version,
+        pdf_eval_workspace=enabled,
     )

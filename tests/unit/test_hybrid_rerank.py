@@ -13,6 +13,7 @@ from smart_rag_core.evaluation.classes import QueryClass
 from smart_rag_core.evaluation.loader import load_open_splits
 from smart_rag_core.evaluation.schema import QueryType
 from smart_rag_core.gateways.model import create_model_gateway
+from smart_rag_core.gateways.openai_rerank import OpenAIRerankError
 from smart_rag_core.retrieval.context import (
     expand_parents,
     passages_from_context,
@@ -654,3 +655,37 @@ def test_budget_denied_does_not_call_gateway() -> None:
     assert rankings == ()
     assert usage is None
     assert reason is RerankFallbackReason.BUDGET_DENIED
+
+
+def test_invalid_json_schema_falls_back_to_rrf() -> None:
+    """Invalid JSON from the model is a typed schema fallback, not success."""
+
+    first = _passage(text="alpha unique")
+    second = _passage(text="beta unique")
+
+    class _Gateway:
+        """Raise a typed schema-invalid rerank error."""
+
+        async def generate_rerank(self, request: object) -> object:
+            """Abort with invalid JSON.
+
+            Args:
+                request: Unused.
+
+            Raises:
+                OpenAIRerankError: Always schema invalid.
+            """
+
+            del request
+            raise OpenAIRerankError("rerank_schema_invalid")
+
+    rankings, usage, reason = rerank_pool(
+        "how does retention work",
+        (first, second),
+        8.0,
+        gateway=_Gateway(),  # type: ignore[arg-type]
+        prompt_text=rerank_prompt_text(),
+    )
+    assert rankings == ()
+    assert usage is None
+    assert reason is RerankFallbackReason.SCHEMA_INVALID

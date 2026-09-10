@@ -5,13 +5,40 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Iterable
-from typing import cast
+from typing import NamedTuple, cast
 
 from smart_rag_core.ingestion.parser.types import (
     CoverageAccounting,
+    ElementKind,
     SourceLocator,
     TypedElement,
 )
+
+# PyMuPDF 1.25.5 span ``flags`` bit 4 (``TEXT_FONT_BOLD``).
+PDF_TEXT_FONT_BOLD = 1 << 4
+PDF_HEADING_MAX_WORDS = 12
+PDF_HEADING_MAX_CHARS = 80
+PDF_HEADING_SIZE_RATIO = 1.2
+PDF_HEADING_MIN_SIZE = 11.0
+
+
+class PdfTextBlock(NamedTuple):
+    """One PDF text line from PyMuPDF ``get_text('dict')``.
+
+    Vendor blocks often mix a title with following body copy. Emitting one
+    line keeps short large or bold titles standalone for heading classification.
+
+    Attributes:
+        text: Concatenated span text for one line.
+        bbox: ``(x0, y0, x1, y1)`` from the vendor line, else the parent block.
+        max_size: Largest span size on the line.
+        bold: True when any span has ``TEXT_FONT_BOLD``.
+    """
+
+    text: str
+    bbox: tuple[float, float, float, float]
+    max_size: float
+    bold: bool
 
 
 def element_id(
@@ -150,6 +177,28 @@ def vendor_attr(
     return getattr(owner, name, default)
 
 
+def pdf_page_label(page: object) -> str:
+    """Return the printed PDF page label for one PyMuPDF page.
+
+    Uses ``Page.get_label()``. Empty when the file has no ``/PageLabels``
+    entry for that page. Never used for element identity.
+
+    Args:
+        page: PyMuPDF page handle.
+
+    Returns:
+        Stripped label such as ``vii`` or ``179``, or ``""``.
+    """
+
+    getter = vendor_attr(page, "get_label", None)
+    if not callable(getter):
+        return ""
+    raw = vendor_call(getter)
+    if raw is None:
+        return ""
+    return str(raw).strip()
+
+
 def vendor_call(func: object, /, *args: object) -> object:
     """Invoke one vendor callable with the original positional arguments.
 
@@ -189,3 +238,214 @@ def vendor_items(value: object) -> list[object]:
     if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
         return list(cast(Iterable[object], value))
     raise TypeError(f"vendor collection is not iterable: {type(value).__name__}")
+
+
+def median_font_size(sizes: tuple[float, ...]) -> float:
+    """Return the median font size from collected span sizes.
+
+    Args:
+        sizes: Positive span sizes from one page.
+
+    Returns:
+        Median size, or ``0.0`` when empty.
+    """
+
+    if not sizes:
+        return 0.0
+    ordered = tuple(sorted(sizes))
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def _pdf_block_bbox(raw: object) -> tuple[float, float, float, float] | None:
+    """Return a four-float bbox from a vendor mapping or sequence.
+
+    Args:
+        raw: Vendor ``bbox`` value.
+
+    Returns:
+        ``(x0, y0, x1, y1)`` or ``None`` when the payload is unusable.
+    """
+
+    items: list[object]
+    if isinstance(raw, (list, tuple)):
+        items = list(cast(list[object] | tuple[object, ...], raw))
+    else:
+        return None
+    if len(items) < 4:
+        return None
+    try:
+        return (
+            as_float(items[0]),
+            as_float(items[1]),
+            as_float(items[2]),
+            as_float(items[3]),
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _span_is_bold(flags: object) -> bool:
+    """Return whether a span ``flags`` integer has the bold bit.
+
+    Args:
+        flags: Vendor span flags.
+
+    Returns:
+        True when bit 4 is set.
+    """
+
+    try:
+        return bool(as_int(flags) & PDF_TEXT_FONT_BOLD)
+    except (TypeError, ValueError):
+        return False
+
+
+def extract_pdf_text_blocks(
+    raw: object,
+) -> tuple[tuple[PdfTextBlock, ...], tuple[float, ...]]:
+    """Walk PyMuPDF ``get_text('dict')`` into per-line text blocks and sizes.
+
+    Image blocks (``type == 1``) are skipped. Unknown dict shapes return
+    empty so the adapter can fall back to ``get_text('blocks')``. Lines are
+    emitted separately so a large title is not absorbed into body copy.
+
+    Args:
+        raw: Vendor dictionary from ``page.get_text('dict')``.
+
+    Returns:
+        Text blocks and every numeric span size used for the page median.
+    """
+
+    if not isinstance(raw, dict):
+        return (), ()
+    mapping = cast(dict[object, object], raw)
+    blocks_raw = mapping.get("blocks")
+    if blocks_raw is None:
+        return (), ()
+    try:
+        blocks = vendor_items(blocks_raw)
+    except TypeError:
+        return (), ()
+    collected: list[PdfTextBlock] = []
+    sizes: list[float] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        block_map = cast(dict[object, object], block)
+        kind = block_map.get("type", 0)
+        try:
+            if as_int(kind) == 1:
+                continue
+        except (TypeError, ValueError):
+            continue
+        block_bbox = _pdf_block_bbox(block_map.get("bbox"))
+        if block_bbox is None:
+            continue
+        lines_raw = block_map.get("lines")
+        if lines_raw is None:
+            continue
+        try:
+            lines = vendor_items(lines_raw)
+        except TypeError:
+            continue
+        for line in lines:
+            if not isinstance(line, dict):
+                continue
+            line_map = cast(dict[object, object], line)
+            spans_raw = line_map.get("spans")
+            if spans_raw is None:
+                continue
+            try:
+                spans = vendor_items(spans_raw)
+            except TypeError:
+                continue
+            line_parts: list[str] = []
+            max_size = 0.0
+            bold = False
+            for span in spans:
+                if not isinstance(span, dict):
+                    continue
+                span_map = cast(dict[object, object], span)
+                text = str(span_map.get("text") or "")
+                if text:
+                    line_parts.append(text)
+                size_raw = span_map.get("size")
+                if size_raw is not None:
+                    try:
+                        size = as_float(size_raw)
+                    except (TypeError, ValueError):
+                        size = 0.0
+                    if size > 0:
+                        sizes.append(size)
+                        if size > max_size:
+                            max_size = size
+                if _span_is_bold(span_map.get("flags", 0)):
+                    bold = True
+            cleaned = "".join(line_parts).strip()
+            if not cleaned:
+                continue
+            bbox = _pdf_block_bbox(line_map.get("bbox")) or block_bbox
+            collected.append(
+                PdfTextBlock(text=cleaned, bbox=bbox, max_size=max_size, bold=bold)
+            )
+    return tuple(collected), tuple(sizes)
+
+
+def _sentence_like_pdf_text(text: str) -> bool:
+    """Return whether text looks like a body sentence, not a heading.
+
+    Args:
+        text: Block text.
+
+    Returns:
+        True when the block should stay a paragraph.
+    """
+
+    stripped = text.strip()
+    words = stripped.split()
+    if len(words) >= 10:
+        return True
+    if len(stripped) > 72 and ("." in stripped or "。" in stripped):
+        return True
+    if stripped.endswith((".", "?", "!", "。")) and len(words) >= 6:
+        return True
+    return False
+
+
+def classify_pdf_text_block(
+    *,
+    text: str,
+    max_size: float,
+    median_size: float,
+    bold: bool,
+) -> ElementKind:
+    """Classify one PDF text block as heading or paragraph.
+
+    Conservative: short standalone large or bold titles become headings.
+    Bold body sentences and uncertain blocks stay paragraphs.
+
+    Args:
+        text: Block text.
+        max_size: Largest span size in the block.
+        median_size: Median span size on the page.
+        bold: True when any span is flagged bold.
+
+    Returns:
+        ``HEADING`` or ``PARAGRAPH``.
+    """
+
+    stripped = text.strip()
+    if not stripped or _sentence_like_pdf_text(stripped):
+        return ElementKind.PARAGRAPH
+    words = stripped.split()
+    if len(words) > PDF_HEADING_MAX_WORDS or len(stripped) > PDF_HEADING_MAX_CHARS:
+        return ElementKind.PARAGRAPH
+    large = median_size > 0 and max_size >= max(
+        PDF_HEADING_MIN_SIZE, median_size * PDF_HEADING_SIZE_RATIO
+    )
+    if large or (bold and len(words) <= 8):
+        return ElementKind.HEADING
+    return ElementKind.PARAGRAPH

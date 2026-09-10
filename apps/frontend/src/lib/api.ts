@@ -72,6 +72,15 @@ export { acceptInvitation, createInvitation, listWorkspaceUsers, offboardUser } 
 export { enableTool, listTools, seedTool, setToolPermission } from "./api/tools";
 export { approveGlossaryImport, importGlossary, rollbackGlossaryImport } from "./api/knowledge";
 export {
+  comparePdfEvalRun,
+  fetchPdfEvalCase,
+  fetchPdfEvalStatus,
+  listPdfEvalCases,
+  listPdfEvalPassages,
+  patchPdfEvalCase,
+  setPdfEvalApproval,
+} from "./api/pdf-eval";
+export {
   approveEntityRule,
   listEntityRules,
   patchEntityRule,

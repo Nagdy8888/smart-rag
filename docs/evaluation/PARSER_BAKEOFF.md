@@ -2,7 +2,7 @@
 title: Isolated PDF parser bake-off
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: engineering, reviewers, security
 ---
 
@@ -156,12 +156,12 @@ Do not collapse these into one weighted accuracy score.
 | Wrong PDF path | `blocked=selected_pdf_required` |
 | Size/page overflow | Failed prepare, no run directory mutation beyond the attempt |
 | ClamAV not clean | `blocked=scan_not_clean` |
-| AnyDoc `NeedsOcrError` | Lane failed, `failure_code=needs_ocr`, no Firecrawl |
+| AnyDoc `NeedsOcrError` | Drop named scanned pages and convert the rest locally. If every remaining page still needs OCR, lane failed, `failure_code=needs_ocr`. No Firecrawl |
 | Encrypted / malformed PDF | Lane failed, zero elements |
 | Nondeterministic replay | Stop before index |
 | Unapproved gold map | Stop before live evaluate |
 | Cross-lane chunk ID | Retrieval hard-fail, leak counted |
-| Invalid judge JSON/timeout | `unscored`, never a pass |
+| Invalid judge JSON/timeout or answer input bound | `unscored`, never a pass |
 | Cleanup title mismatch | Refuse delete |
 
 ## Verification
@@ -182,8 +182,13 @@ blocker, not a silent skip in the CLI.
 
 - `docker executable not found`: build/start Docker Desktop; do not set
   `ALLOW_INPROCESS_PARSER` for the live bake-off.
-- `needs_ocr`: the PDF is image-only for AnyDoc; the experiment stops that
-  lane. Do not enable hosted OCR.
+- `sandbox_nonzero` on `anydoc_local`: rebuild
+  `smart-rag-parser-bakeoff:local`. The image must overlay the evaluation and
+  adapter package inits so the runner does not import SharedSettings or
+  PyMuPDF. Do not add Firecrawl or OCR fallback.
+- `needs_ocr`: remaining pages are still image-only after dropping the pages
+  AnyDoc named. Do not enable hosted OCR. The first failure used to abort the
+  whole book; the lane now omits those scanned pages and converts the rest.
 - `provider_matrix_unverified`: set `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED`
   only after the signed matrix exists.
 - Cross-lane hits: confirm `restrict_version_id` and distinct

@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -168,7 +168,7 @@ flowchart TD
 | `recent` window | days | Plan UTC | positive | **90** provisional | QT-TZ-001 | Unknown dates excluded | retrieval | 90 | Packet 6 |
 | Temporal intents | enum | Plan / QT-TZ-001 | `none` `latest` `current` `recent` `as_of` | **UTC only** | temporal unit tests | Naive/Hijri timestamps rejected | retrieval | UTC | Signed company TZ |
 | Coverage signals | enum | Plan Packet 4 | listed enums | **signals plus numeric score** | unit fixtures | Full-summary refused when headings missing | retrieval | same | Live ranked-ID coverage |
-| Cache key | SHA-256 | Plan Packet 4 | versioned material | **IDs/ranks only** | `hybrid_cache_key` | Must recheck before evidence; Valkey TTL not selected | retrieval | same | Valkey store still interface-only |
+| Cache key | SHA-256 | Plan Packet 4 | versioned material | **IDs/ranks only** | `hybrid_cache_key` | Must recheck before evidence; outage is a miss | retrieval | same | Overlay Packet 26 retrieve-path injection |
 | BM25 degradation | reason | Plan | `bm25_unavailable` / version / timeout | **visible dense+term** | assemble tests | Never labeled three-channel Hybrid | retrieval | same | Circuit breaker |
 
 Raw channel scores never mix. Equal fused scores break ties by effective date,
@@ -296,7 +296,7 @@ and [PHASE4_HOLDOUT.md](../evaluation/PHASE4_HOLDOUT.md). Winning profile remain
 
 | Tunable | Owner packet | Status |
 | --- | --- | --- |
-| Cache TTLs / Valkey store | 8 | still interface only; IDs/ranks plus mandatory recheck |
+| Cache TTLs / Valkey store | 8 / overlay 26 | retrieve-path `RetrievalCacheStore`; IDs/ranks plus mandatory recheck; outage is a miss |
 | Unequal RRF channel weights | 8 | not selected; no ranked-ID evidence |
 | Live Hybrid Recall@10 / citation percents | 8 | Packet 8 unverified; Packet 9 measured synthetic open-split Recall@K with **identity rerank** (`rerank_call_count=0`); holdout sealed; locators ≠ citation completeness; table Parquet eval `not_run` |
 

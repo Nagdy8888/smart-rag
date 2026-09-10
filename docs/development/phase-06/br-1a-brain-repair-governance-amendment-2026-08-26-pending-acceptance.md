@@ -58,8 +58,8 @@ Proven: packet titles match the Phase 6 wrapper, plan integrity verifies
 after the approved-structure lock refresh, docs lint/links/Mermaid pass,
 and no application code was changed in this packet.
 
-Unverified: explicit user acceptance of the four decisions.
+Unverified: none. User accepted the four decisions on 2026-09-10.
 
 Rollback: restore the 2026-08-25 deviation/ADR/packet wording and the
-previous integrity lock. Do not start BR-2 or Packet 2 code until the user
-accepts the amendment.
+previous integrity lock. Overlay packets P06-19 through P06-26 now run
+before Packet 10 coding.

@@ -59,9 +59,11 @@ from smart_rag_core.evaluation.parser_bakeoff.models import (
     BakeoffError,
     BakeoffManifest,
     ChunkSummary,
+    GoldMap,
     LaneAgentScore,
     LaneIngestIds,
     LaneRetrieveScore,
+    NeutralCase,
     NeutralCaseSet,
     RunStage,
 )
@@ -92,6 +94,7 @@ from smart_rag_core.evaluation.private_pdf import (
 from smart_rag_core.ingestion.embeddings.policy import EMBEDDING_MODEL
 from smart_rag_core.ingestion.parser.types import ParseDisposition
 from smart_rag_core.retrieval.coverage import CoverageDecision
+from smart_rag_core.retrieval.hybrid_run import HybridRunResult
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.security.external_processing import ContentClass
 from smart_rag_core.settings import SharedSettings, get_process_environ
@@ -295,6 +298,80 @@ def _live_settings() -> tuple[dict[str, str], SharedSettings, str, str]:
     return env, settings, supabase_url, parade_url
 
 
+def _score_live_answer_or_unscored(
+    case: NeutralCase,
+    mapping: GoldMap,
+    *,
+    settings: SharedSettings,
+    question: str,
+    atomic_facts: Sequence[str],
+    result: HybridRunResult,
+) -> LaneAgentScore:
+    """Generate and judge one answer, or record an unscored bound failure.
+
+    Args:
+        case: Neutral case. Question text is not printed.
+        mapping: Approved gold map for this lane.
+        settings: Live model settings.
+        question: Case question. Never logged.
+        atomic_facts: Approved facts. Never logged.
+        result: Version-scoped Hybrid result.
+
+    Returns:
+        Per-case agent score. Gateway input-bound and timeout failures are
+        ``unscored`` and never treated as a pass. The OpenAI 16384-character
+        limit is not raised.
+    """
+
+    try:
+        answer = generate_live_answer(settings=settings, query=question, result=result)
+    except (TimeoutError, ValueError):
+        return score_agent(
+            case,
+            mapping,
+            cited_ids=(),
+            judge_status="unscored",
+            faithfulness=None,
+            refused=False,
+            answer_calls=1,
+            judge_calls=0,
+            input_tokens=0,
+            output_tokens=0,
+            cost_usd=None,
+            budget_failed=True,
+        )
+    excerpts = tuple(unit.citation_text[:500] for unit in result.evidence[:12])
+    excerpt_ids = tuple(str(unit.chunk_id) for unit in result.evidence[:12])
+    judge_status, faith = judge_pdf_answer(
+        query=question,
+        answer_text=answer.answer_text,
+        atomic_facts=atomic_facts,
+        excerpt_ids=excerpt_ids,
+        excerpts=excerpts,
+    )
+    cited: list[UUID] = []
+    for citation in answer.citations:
+        if citation.chunk_id:
+            cited.append(UUID(str(citation.chunk_id)))
+    refused = answer.status == "refused" or (
+        result.coverage.decision is CoverageDecision.REFUSE
+    )
+    return score_agent(
+        case,
+        mapping,
+        cited_ids=cited,
+        judge_status=judge_status,
+        faithfulness=faith,
+        refused=refused,
+        answer_calls=1,
+        judge_calls=1,
+        input_tokens=0,
+        output_tokens=0,
+        cost_usd=None,
+        budget_failed=False,
+    )
+
+
 def _cmd_index(args: argparse.Namespace) -> int:
     """Index successful lanes as restricted graph-ineligible versions.
 
@@ -325,6 +402,27 @@ def _cmd_index(args: argparse.Namespace) -> int:
                 if parse_result.disposition is ParseDisposition.FAILED:
                     print(f"lane={lane_id} skipped=parse_failed")
                     ingest_map[lane_id] = allocated
+                    continue
+                supabase.execute("SET ROLE postgres")
+                existing = supabase.execute(
+                    """
+                    SELECT status::text
+                    FROM app.document_versions
+                    WHERE id = %s
+                      AND deleted_at IS NULL
+                    """,
+                    (allocated.version_id,),
+                ).fetchone()
+                if existing is not None and str(existing[0]) in {
+                    "hybrid_ready",
+                    "graph_ineligible",
+                    "graph_pending",
+                }:
+                    print(f"lane={lane_id} skipped=already_indexed")
+                    ingest_map[lane_id] = allocated
+                    summaries[lane_id] = load_chunk_summary(
+                        repo, manifest.run_id, lane_id
+                    )
                     continue
                 written = persist_lane_index(
                     supabase,
@@ -593,6 +691,10 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
         }
         for index, case in enumerate(cases.cases):
             for lane_id in alternate_lane_order(index):
+                print(
+                    f"case_index={index} lane={lane_id} cases={len(cases.cases)}",
+                    flush=True,
+                )
                 row = labeled[lane_id][index]
                 scores, results = runtimes[lane_id].retrieve_labeled(
                     (row,),
@@ -627,41 +729,14 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
                         acl_leak=acl_leak,
                     )
                 )
-                answer = generate_live_answer(
-                    settings=settings, query=row.question, result=result
-                )
-                excerpts = tuple(
-                    unit.citation_text[:500] for unit in result.evidence[:12]
-                )
-                excerpt_ids = tuple(str(unit.chunk_id) for unit in result.evidence[:12])
-                judge_status, faith = judge_pdf_answer(
-                    query=row.question,
-                    answer_text=answer.answer_text,
-                    atomic_facts=row.atomic_facts,
-                    excerpt_ids=excerpt_ids,
-                    excerpts=excerpts,
-                )
-                cited: list[UUID] = []
-                for citation in answer.citations:
-                    if citation.chunk_id:
-                        cited.append(UUID(str(citation.chunk_id)))
-                refused = answer.status == "refused" or (
-                    result.coverage.decision is CoverageDecision.REFUSE
-                )
                 agent_scores[lane_id].append(
-                    score_agent(
+                    _score_live_answer_or_unscored(
                         case,
                         maps[lane_id],
-                        cited_ids=cited,
-                        judge_status=judge_status,
-                        faithfulness=faith,
-                        refused=refused,
-                        answer_calls=1,
-                        judge_calls=1,
-                        input_tokens=0,
-                        output_tokens=0,
-                        cost_usd=None,
-                        budget_failed=False,
+                        settings=settings,
+                        question=row.question,
+                        atomic_facts=row.atomic_facts,
+                        result=result,
                     )
                 )
         for lane_id in CURRENT_AND_ANYDOC:
@@ -700,8 +775,15 @@ def _cmd_evaluate(args: argparse.Namespace) -> int:
                 }
             ),
         )
+        bound_failures = sum(
+            1
+            for lane_id in CURRENT_AND_ANYDOC
+            for item in agent_scores[lane_id]
+            if item.budget_or_deadline_failed
+        )
         print(f"run_id={manifest.run_id}")
         print(f"cases={len(cases.cases)}")
+        print(f"answer_bound_failures={bound_failures}")
         print("live=true")
         del env
     except BakeoffError as exc:

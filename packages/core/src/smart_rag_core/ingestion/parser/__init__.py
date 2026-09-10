@@ -8,6 +8,7 @@ from ``smart_rag_core.ingestion.parser.service`` in worker/agent code.
 from smart_rag_core.ingestion.parser.limits import (
     CLEANING_POLICY_VERSION,
     PARSER_CONFIG_VERSION,
+    PDF_PARSER_VERSION,
 )
 from smart_rag_core.ingestion.parser.types import (
     CoverageAccounting,
@@ -20,6 +21,7 @@ from smart_rag_core.ingestion.parser.types import (
 __all__ = [
     "CLEANING_POLICY_VERSION",
     "PARSER_CONFIG_VERSION",
+    "PDF_PARSER_VERSION",
     "CoverageAccounting",
     "ElementKind",
     "ParseDisposition",

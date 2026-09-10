@@ -72,8 +72,8 @@ export const ACCOUNT_NAV_ITEM: ShellNavItem = {
   testId: "nav-account",
 };
 
-/** Admin query-tab ids. Bodies stay the existing Team/Tools/Curation/Usage apps. */
-export const ADMIN_TABS = ["team", "tools", "curation", "usage"] as const;
+/** Admin query-tab ids. Evaluation appears only when `/api/meta` allows it. */
+export const ADMIN_TABS = ["team", "tools", "curation", "usage", "evaluation"] as const;
 
 /** Admin tab union. */
 export type AdminTab = (typeof ADMIN_TABS)[number];
@@ -114,14 +114,37 @@ export function showAdminNav(role: string | undefined): boolean {
 }
 
 /**
+ * Return Admin tabs visible for this handshake.
+ *
+ * Hidden Evaluation is convenience only. FastAPI still 403s members.
+ *
+ * @param pdfEvalWorkspace - `/api/meta` capability.
+ * @returns Tabs to render.
+ */
+export function visibleAdminTabs(pdfEvalWorkspace: boolean): readonly AdminTab[] {
+  if (pdfEvalWorkspace) {
+    return ADMIN_TABS;
+  }
+  return ADMIN_TABS.filter((id) => id !== "evaluation");
+}
+
+/**
  * Normalize `?tab=` for `/admin`.
  *
  * @param value - Raw search param.
+ * @param pdfEvalWorkspace - Handshake capability. Unknown or unauthorized
+ *   Evaluation values fall back to Team.
  * @returns Known tab. Unknown values fall back to Team.
  */
-export function parseAdminTab(value: string | undefined): AdminTab {
+export function parseAdminTab(
+  value: string | undefined,
+  pdfEvalWorkspace = false,
+): AdminTab {
   if (value === "tools" || value === "curation" || value === "usage") {
     return value;
+  }
+  if (value === "evaluation" && pdfEvalWorkspace) {
+    return "evaluation";
   }
   return "team";
 }

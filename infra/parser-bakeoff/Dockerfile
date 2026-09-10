@@ -15,6 +15,8 @@ COPY infra/parser-bakeoff/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY infra/parser-bakeoff/runner.py /app/runner.py
 COPY packages/core/src/smart_rag_core /app/smart_rag_core
+COPY infra/parser-bakeoff/sandbox_evaluation_init.py /app/smart_rag_core/evaluation/__init__.py
+COPY infra/parser-bakeoff/sandbox_adapters_init.py /app/smart_rag_core/ingestion/parser/adapters/__init__.py
 
 USER 10001:10001
 ENTRYPOINT []

@@ -7,6 +7,14 @@
 
 export type { AcceptInvitationResponse, CreateInvitationRequest, CreateInvitationResponse, CurrentUserResponse, InviteRole, MetaResponse, OffboardResponse, PendingInvitation, WorkspaceDirectoryResponse, WorkspaceMember } from "./types/auth";
 export { INVITE_ROLES } from "./types/auth";
+export type {
+  PdfEvalCaseDetail,
+  PdfEvalCaseList,
+  PdfEvalCaseSummary,
+  PdfEvalCompareRun,
+  PdfEvalPassage,
+  PdfEvalStatus,
+} from "./types/pdf-eval";
 export type { DependencyStatus, ReadinessResponse } from "./types/readiness";
 export type { AnswerOrigin, CitationResponse, ConversationMessage, ConversationMessagesResponse, ConversationResponse, FeedbackResponse, FeedbackTag, RequestedSearchScope, RunResponse, SubmitMessageResponse } from "./types/chat";
 export { ANSWER_ORIGINS, FEEDBACK_TAGS, FEEDBACK_TAGS_DOWN, FEEDBACK_TAGS_UP, REQUESTED_SEARCH_SCOPES, feedbackTagsFor, isRequestedSearchScope, requestedSearchScopeLabel } from "./types/chat";

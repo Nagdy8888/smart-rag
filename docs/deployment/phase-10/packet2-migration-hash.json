@@ -1,9 +1,9 @@
 {
   "contraction_absent": true,
-  "file_count": 78,
+  "file_count": 79,
   "policy_module": "scripts/ci/check_migrations.py",
   "schema_version": "phase10-packet2-migration-hash-v1",
-  "sha256": "d9340836d88af8c3b4617fcc5e89e17b4692437deff9e8b6da534c3d128cc71a",
+  "sha256": "30ea14263b9d8dd9bd5434e717c6a8174a6a6c61baf6f460e21ea8975f041288",
   "unknown_files": [],
   "violations": []
 }

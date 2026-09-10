@@ -14,6 +14,8 @@ other documents, graph questions, or unrestricted full-book summaries.
 Related: [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy-remediation.md) ·
 [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md) ·
 [ADR-hybrid-long-document-profile.md](../adr/ADR-hybrid-long-document-profile.md) ·
+[ADR-local-pdf-evaluation-workspace.md](../adr/ADR-local-pdf-evaluation-workspace.md) ·
+[PDF_EVAL_WORKSPACE.md](./PDF_EVAL_WORKSPACE.md) ·
 [PARSER_BAKEOFF.md](./PARSER_BAKEOFF.md) ·
 [docs index](../README.md)
 
@@ -116,7 +118,24 @@ Unfrozen `hybrid_long_document_v1` stays rejected by `load_frozen_profile()`.
 
 `HybridRunResult.ranked_ids` is the post-rerank/MMR/parent/trim order.
 `fused_ids` preserves historical fused occupancy for synthetic compact-corpus
-comparisons.
+comparisons. Overlay Packet 24 adds authorized `dense_ids`, `bm25_ids`, and
+`term_ids` after recheck. CLI reports print `gold_loss_histogram` as
+count-only tokens. BM25 snippets are never diagnostics.
+
+## Overlay freeze, Combined, and holdout (2026-09-10)
+
+| Gate | Status |
+| --- | --- |
+| PDF heading extraction | `parser_v1_pdf_headings_v1` unit-proven; live reingest operator-owned |
+| Human reseal | operator-owned; labels remain 2/24 grounded |
+| `FROZEN_LONG_DOCUMENT_PROFILE_SHA256` | empty; `runtime_allow_listed=false` |
+| Invalid JSON rerank | typed `rerank_schema_invalid` → RRF fallback |
+| Retrieval cache | ID/rank only; recheck on hit; outage is a miss |
+| `qt_eval_009_status` | `unverified` (no disjoint graph-eligible live set) |
+| `holdout_opened` | `false` |
+
+Do not retune from the 2026-09-10 2/24 ungrounded baseline. Do not freeze
+`hybrid_long_document_v1` without live development and qualification reports.
 
 ## Verification
 

@@ -1,5 +1,5 @@
 /**
- * Admin workspace: Team, Tools, Names & aliases, and Usage behind `?tab=`.
+ * Admin workspace: Team, Tools, Names & aliases, Usage, and Evaluation.
  * Member/viewer visits confirm denial with an owner/admin GET before chrome.
  */
 
@@ -12,14 +12,20 @@ import { HandshakeBanner } from "../auth/auth-screens";
 import { ErrorState } from "../ui/error-state";
 import { PageHeader } from "../ui/page-header";
 import { Spinner } from "../ui/spinner";
+import { EvaluationPanel } from "../evaluation/evaluation-panel";
 import { CurationPanel } from "./curation-panel";
 import { TeamAccessPanel } from "./team-access-panel";
 import { ToolsPanel } from "./tools-panel";
 import { UsagePanel } from "./usage-panel";
-import { listEntityRules, type ApiAuth } from "../../lib/api";
+import { fetchMeta, listEntityRules, type ApiAuth } from "../../lib/api";
 import { useSession } from "../../lib/auth/session-provider";
-import { sessionQueryKeys } from "../../lib/query-keys";
-import { ADMIN_TABS, parseAdminTab, type AdminTab } from "../../lib/shell-navigation";
+import { pdfEvalCapability } from "../../lib/eval-workspace";
+import { publicQueryKeys, sessionQueryKeys } from "../../lib/query-keys";
+import {
+  parseAdminTab,
+  visibleAdminTabs,
+  type AdminTab,
+} from "../../lib/shell-navigation";
 import styles from "./admin-shell.module.css";
 
 const TAB_LABELS: Record<AdminTab, string> = {
@@ -27,6 +33,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   tools: "Tools",
   curation: "Names & aliases",
   usage: "Usage",
+  evaluation: "Evaluation",
 };
 
 /**
@@ -38,13 +45,20 @@ export function AdminApp() {
   const session = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = parseAdminTab(searchParams.get("tab") ?? undefined);
   const accessToken = session.accessToken;
   const auth = useMemo<ApiAuth | null>(
     () => (accessToken ? { accessToken } : null),
     [accessToken],
   );
   const keys = sessionQueryKeys(accessToken);
+  const metaQuery = useQuery({
+    queryKey: publicQueryKeys.meta,
+    queryFn: () => fetchMeta(),
+    retry: false,
+  });
+  const pdfEval = pdfEvalCapability(metaQuery.data);
+  const tabs = visibleAdminTabs(pdfEval);
+  const tab = parseAdminTab(searchParams.get("tab") ?? undefined, pdfEval);
   const gateQuery = useQuery({
     queryKey: keys.entityRules,
     queryFn: () => listEntityRules(auth as ApiAuth),
@@ -59,7 +73,7 @@ export function AdminApp() {
    * @param index - Focused tab index.
    */
   function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number): void {
-    const last = ADMIN_TABS.length - 1;
+    const last = tabs.length - 1;
     let next = index;
     if (event.key === "ArrowRight" || event.key === "ArrowDown") {
       next = index === last ? 0 : index + 1;
@@ -73,7 +87,7 @@ export function AdminApp() {
       return;
     }
     event.preventDefault();
-    const id = ADMIN_TABS[next];
+    const id = tabs[next];
     if (id) {
       router.replace(`/admin?tab=${id}`);
     }
@@ -125,7 +139,7 @@ export function AdminApp() {
       <PageHeader description="Manage people, tools, search names, and usage." />
       <HandshakeBanner />
       <div role="tablist" aria-label="Admin sections" className={styles.tabList}>
-        {ADMIN_TABS.map((id, index) => {
+        {tabs.map((id, index) => {
           const current = tab === id;
           return (
             <button
@@ -157,6 +171,7 @@ export function AdminApp() {
         {tab === "tools" ? <ToolsPanel /> : null}
         {tab === "curation" ? <CurationPanel /> : null}
         {tab === "usage" ? <UsagePanel /> : null}
+        {tab === "evaluation" ? <EvaluationPanel /> : null}
       </div>
     </div>
   );

@@ -11,6 +11,10 @@ from uuid import UUID
 from smart_rag_core.evaluation.private_pdf.schema import (
     MINIMUM_SEALED_CASES,
     TARGET_SEALED_CASES,
+    WORKSPACE_MAX_ANSWER_CHARS,
+    WORKSPACE_MAX_FACT_CHARS,
+    WORKSPACE_MAX_GOLD_CHUNKS,
+    WORKSPACE_MAX_QUESTION_CHARS,
     PrivatePdfQueryClass,
 )
 from smart_rag_core.evaluation.private_pdf.seal import (
@@ -354,11 +358,12 @@ def build_draft_rows(
             answer = fact
         elif query_class is PrivatePdfQueryClass.EXACT_ACRONYM:
             question = (
-                f"What does the term or abbreviation {term} refer to in this book?"
+                f"According to {heading}, what does the term or abbreviation {term} "
+                "refer to in this book?"
             )
             answer = fact
         elif query_class is PrivatePdfQueryClass.SEMANTIC_PARAPHRASE:
-            question = f"In other words, how does the book describe {term}?"
+            question = f"In other words, how does section {heading} describe {term}?"
             answer = fact
         elif query_class is PrivatePdfQueryClass.MULTI_PART:
             question = (
@@ -387,8 +392,22 @@ def build_draft_rows(
             required = ()
         digest = question_hash(question)
         if digest in seen_hashes:
-            question = f"{question} [p{left.page_number} #{ordinal + 1}]"
-            digest = question_hash(question)
+            continue
+        if len(question) > WORKSPACE_MAX_QUESTION_CHARS:
+            continue
+        answer = answer[:WORKSPACE_MAX_ANSWER_CHARS]
+        bounded_ids = chunk_ids[:WORKSPACE_MAX_GOLD_CHUNKS]
+        facts = ()
+        if fact and not refusal:
+            facts = (fact[:WORKSPACE_MAX_FACT_CHARS],)
+        if not case_is_locator_grounded(
+            question=question,
+            required_terms=required,
+            expected_refusal=refusal,
+            gold_texts=(left.raw_text, right.raw_text),
+            gold_headings=headings,
+        ):
+            continue
         seen_hashes.add(digest)
         rows.append(
             {
@@ -399,9 +418,9 @@ def build_draft_rows(
                 ),
                 "source_family_id": family,
                 "query_class": query_class.value,
-                "chunk_ids": chunk_ids,
-                "page_numbers": pages,
-                "heading_paths": headings,
+                "chunk_ids": bounded_ids,
+                "page_numbers": pages[:WORKSPACE_MAX_GOLD_CHUNKS],
+                "heading_paths": headings[:WORKSPACE_MAX_GOLD_CHUNKS],
                 "required_terms": required,
                 "expected_profile_id": "hybrid_default_v1",
                 "expected_scope": scope,
@@ -412,10 +431,12 @@ def build_draft_rows(
                 "reviewer": None,
                 "question": question,
                 "expected_answer": answer,
-                "atomic_facts": (fact,) if fact and not refusal else (),
+                "atomic_facts": facts,
                 "question_sha256": digest,
             }
         )
+    if len(rows) < MINIMUM_SEALED_CASES:
+        raise ValueError("insufficient_unique_draft_questions")
     families = tuple(str(row["source_family_id"]) for row in rows)
     splits = assign_splits(families)
     for row in rows:

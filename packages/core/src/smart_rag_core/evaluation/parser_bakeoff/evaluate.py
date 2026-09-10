@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from smart_rag_core.evaluation.parser_bakeoff.constants import ANYDOC_LANE, CURRENT_LANE
+from smart_rag_core.evaluation.parser_bakeoff.constants import (
+    ANYDOC_LANE,
+    CURRENT_LANE,
+    LaneId,
+)
 from smart_rag_core.evaluation.parser_bakeoff.mapping import (
     fact_chunk_ids_for_case,
     gold_ids_for_case,
@@ -239,7 +243,7 @@ def score_agent(
     )
 
 
-def alternate_lane_order(index: int) -> tuple[str, str]:
+def alternate_lane_order(index: int) -> tuple[LaneId, LaneId]:
     """Return sequential pair order that alternates starting lane.
 
     Args:

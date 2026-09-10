@@ -262,7 +262,7 @@ User approval on 2026-08-24: remove MFA, TOTP enrollment/challenge/recovery, and
 
 ## Approved planned deviation: general-chat strict split
 
-User approval on 2026-08-25; 2026-08-26 remediation drafted and pending explicit user acceptance: the production Ask surface and a separate live LangSmith Studio graph may answer general questions from OpenAI world knowledge, while company/document questions remain citation-required RAG with no world-knowledge fallback. Only a genuine conflict between company and general signals asks for clarification; unavailable, malformed, or low-confidence profile inference records a typed degradation reason and may produce an honest company-claim-forbidden general answer that explicitly states company documents were not searched.
+User approval on 2026-08-25; 2026-08-26 remediation accepted 2026-09-10: the production Ask surface and a separate live LangSmith Studio graph may answer general questions from OpenAI world knowledge, while company/document questions remain citation-required RAG with no world-knowledge fallback. Only a genuine conflict between company and general signals asks for clarification; unavailable, malformed, or low-confidence profile inference records a typed degradation reason and may produce an honest company-claim-forbidden general answer that explicitly states company documents were not searched.
 
 - Recorded in `docs/adr/ADR-general-chat-strict-split.md`.
 - Implementation is additive Phase 6 packets P06-09 through P06-15. P06-14 is a Phase 6/Phase 8 co-owned UI amendment. Do not uncheck historical completed Phase 6 packets or Phase 8 packets 1–21, and do not renumber active P08-22/P08-23.
@@ -274,6 +274,18 @@ User approval on 2026-08-25; 2026-08-26 remediation drafted and pending explicit
 - Keep the five existing `KnowledgeScope` values and route families. The degradation reason is server-derived, never accepted from model output, and cannot authorize evidence.
 - Validated `RetrievalPlan` selects explicit company, general, mixed, or fail-closed graph paths after plan compilation. Direct paths skip retrieval/correction/fusion/table/tool/verifier-model work but still run deterministic verification.
 - Rollback disables general scope, restores the former post-plan linear edge, and removes the live graph registration without changing document RAG or durable usage history.
+
+## Approved planned deviation: local PDF evaluation workspace
+
+User approval on 2026-09-10: after Phase 6 Packet 9, run a local-only owner/admin PDF evaluation workspace and label-repair overlay before Packet 10 coding. Integrity keeps packet numbers contiguous, so overlay packets are P06-19 through P06-26 and execute immediately after Packet 9.
+
+- Recorded in `docs/adr/ADR-local-pdf-evaluation-workspace.md`.
+- Private questions, answers, facts, and excerpts stay in gitignored `.private-eval/`. No evaluation-label tables and no staging/production UI.
+- FastAPI uses `app_api` plus server-derived owner/admin identity. Operator and service-role DSNs are forbidden on this path.
+- Holdout files remain outside the repository. The workspace never lists, fetches, or opens holdout.
+- Automatic drafts may propose extractive questions. A named human must approve. The answering model receives only the question.
+- Do not freeze `hybrid_long_document_v1`, retune frozen Hybrid weights, or open holdout until grounded labels and open-split gates pass.
+- Rollback disables `PDF_EVAL_WORKSPACE_ENABLED` and removes the local Compose mount without changing document RAG.
 
 ## Approved planned deviation: paced verified-answer reveal and custom progress
 

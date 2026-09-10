@@ -930,12 +930,9 @@ describe("ChatApp Ask workspace", () => {
   it("fills the composer from a prompt chip without sending", async () => {
     const user = userEvent.setup();
     renderChat(<ChatApp />);
-    await user.click(
-      await screen.findByRole("button", { name: "Summarize an uploaded policy" }),
-    );
-    expect(screen.getByLabelText("Message")).toHaveValue(
-      "Summarize an uploaded policy",
-    );
+    const chipLabel = "What is LCEL according to the uploaded PDF?";
+    await user.click(await screen.findByRole("button", { name: chipLabel }));
+    expect(screen.getByLabelText("Message")).toHaveValue(chipLabel);
     expect(createConversation).not.toHaveBeenCalled();
   });
 

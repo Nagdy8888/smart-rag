@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from uuid import UUID
 
 from smart_rag_core.evaluation.private_pdf.schema import (
@@ -24,6 +25,60 @@ EXACT_RECALL_AT_5_GATE = QT_EVAL_007_EXACT_CODE_RECALL_AT_5
 ALIAS_RECALL_AT_10_GATE = QT_EVAL_008_ALIAS_RECALL_AT_10
 LOCATOR_GATE = QT_EVAL_002_LOCATOR_CORRECTNESS
 FIRST_EVIDENCE_P95_MS_GATE = 2000.0
+
+
+class GoldLossStage(StrEnum):
+    """Count-only ranked-ID loss stage after authorized recheck.
+
+    Values:
+        ABSENT_ALL_CHANNELS: Gold IDs missed every channel.
+        CHANNEL_NOT_FUSED: Present in a channel, absent from fused IDs.
+        FUSED_DROPPED: Fused then dropped by rerank, MMR, or quota.
+        SELECTED: Present in selected/ranked evidence.
+    """
+
+    ABSENT_ALL_CHANNELS = "absent_all_channels"
+    CHANNEL_NOT_FUSED = "channel_not_fused"
+    FUSED_DROPPED = "fused_dropped"
+    SELECTED = "selected"
+
+
+def gold_loss_stage(
+    gold_ids: Sequence[UUID],
+    *,
+    dense_ids: Sequence[UUID] = (),
+    bm25_ids: Sequence[UUID] = (),
+    term_ids: Sequence[UUID] = (),
+    fused_ids: Sequence[UUID] = (),
+    selected_ids: Sequence[UUID] = (),
+) -> str:
+    """Classify one labeled case into a count-only loss stage.
+
+    Args:
+        gold_ids: Gold chunk IDs. No question text.
+        dense_ids: Authorized dense IDs.
+        bm25_ids: Authorized BM25 IDs. Never snippets.
+        term_ids: Authorized term IDs.
+        fused_ids: Authorized fused IDs.
+        selected_ids: Final selected IDs.
+
+    Returns:
+        One ``GoldLossStage`` value. Empty gold is ``absent_all_channels``.
+    """
+
+    gold = frozenset(gold_ids)
+    if not gold:
+        return GoldLossStage.ABSENT_ALL_CHANNELS.value
+    selected = frozenset(selected_ids)
+    if gold & selected:
+        return GoldLossStage.SELECTED.value
+    fused = frozenset(fused_ids)
+    if gold & fused:
+        return GoldLossStage.FUSED_DROPPED.value
+    channels = frozenset(dense_ids) | frozenset(bm25_ids) | frozenset(term_ids)
+    if gold & channels:
+        return GoldLossStage.CHANNEL_NOT_FUSED.value
+    return GoldLossStage.ABSENT_ALL_CHANNELS.value
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +102,7 @@ class PrivatePdfRetrieveScore:
         fused_hit_any: Gold present anywhere in fused IDs. Not a pass gate.
         fused_gold_rank: One-based rank of the first gold ID in fused IDs.
         rerank_fallback: Named rerank fallback token.
+        loss_stage: Count-only channel/fusion/selection loss stage.
     """
 
     case_id: str
@@ -65,6 +121,7 @@ class PrivatePdfRetrieveScore:
     fused_hit_any: bool | None = None
     fused_gold_rank: int | None = None
     rerank_fallback: str = ""
+    loss_stage: str = ""
 
 
 def score_retrieve_case(
@@ -84,6 +141,10 @@ def score_retrieve_case(
     bm25_fallback: str = "none",
     fused_ids: Sequence[UUID] = (),
     rerank_fallback: str = "",
+    selected_ids: Sequence[UUID] = (),
+    dense_ids: Sequence[UUID] = (),
+    bm25_ids: Sequence[UUID] = (),
+    term_ids: Sequence[UUID] = (),
 ) -> PrivatePdfRetrieveScore:
     """Score one Hybrid retrieve against sealed gold chunk ids.
 
@@ -104,11 +165,24 @@ def score_retrieve_case(
         fused_ids: Fused occupancy IDs. Occupancy is never the Recall@10
             gate.
         rerank_fallback: Named rerank fallback token.
+        selected_ids: Final selected IDs. Defaults to ``ranked_ids``.
+        dense_ids: Authorized dense IDs after recheck.
+        bm25_ids: Authorized BM25 IDs after recheck. Never snippets.
+        term_ids: Authorized term IDs after recheck.
 
     Returns:
         Per-case score without source text.
     """
 
+    selected = selected_ids or ranked_ids
+    stage = gold_loss_stage(
+        gold_ids,
+        dense_ids=dense_ids,
+        bm25_ids=bm25_ids,
+        term_ids=term_ids,
+        fused_ids=fused_ids,
+        selected_ids=selected,
+    )
     locator_ok = bool(gold_ids) and all(
         item in set(ranked_ids[:12]) for item in gold_ids
     )
@@ -129,6 +203,7 @@ def score_retrieve_case(
             rerank_call_count=rerank_call_count,
             bm25_fallback=bm25_fallback,
             rerank_fallback=rerank_fallback,
+            loss_stage=stage,
         )
     recall10 = recall_hit_at_k(ranked_ids, gold_ids, 10)
     fused10 = recall_hit_at_k(fused_ids, gold_ids, 10) if fused_ids else None
@@ -164,6 +239,7 @@ def score_retrieve_case(
         fused_hit_any=fused_any,
         fused_gold_rank=fused_rank,
         rerank_fallback=rerank_fallback,
+        loss_stage=stage,
     )
 
 
@@ -245,6 +321,7 @@ def aggregate_retrieve_gates(
     rerank_ones = sum(1 for item in rerank_eligible if item.rerank_call_count == 1)
     fallback_histogram: dict[str, int] = {}
     rerank_fallback_histogram: dict[str, int] = {}
+    gold_loss_histogram: dict[str, int] = {}
     for item in scores:
         token = item.bm25_fallback or "none"
         fallback_histogram[token] = fallback_histogram.get(token, 0) + 1
@@ -252,6 +329,8 @@ def aggregate_retrieve_gates(
         rerank_fallback_histogram[rerank_token] = (
             rerank_fallback_histogram.get(rerank_token, 0) + 1
         )
+        stage = item.loss_stage or GoldLossStage.ABSENT_ALL_CHANNELS.value
+        gold_loss_histogram[stage] = gold_loss_histogram.get(stage, 0) + 1
     fused_flags = tuple(
         bool(item.fused_hit_at_10)
         for item in scores
@@ -285,6 +364,7 @@ def aggregate_retrieve_gates(
         "fused_occupancy_at_10": _mean(fused_flags),
         "gold_in_fused_any": _mean(fused_any_flags),
         "fused_gold_rank_p50": fused_rank_p50,
+        "gold_loss_histogram": gold_loss_histogram,
         "gates": {
             "hybrid_recall_at_10": HYBRID_RECALL_AT_10_GATE,
             "exact_term_recall_at_5": EXACT_RECALL_AT_5_GATE,
@@ -365,4 +445,31 @@ def gold_id_overlap_counts(
         "cases_missing_all": missing_all,
         "gold_ids_per_case_min": min(sizes) if sizes else 0,
         "gold_ids_per_case_max": max(sizes) if sizes else 0,
+    }
+
+
+def citation_gold_overlap(
+    *,
+    gold_ids: Sequence[UUID],
+    citation_chunk_ids: Sequence[UUID | None],
+) -> dict[str, int]:
+    """Count citation-ID overlap with gold chunk IDs. No passage text.
+
+    Args:
+        gold_ids: Gold chunk UUIDs for one case.
+        citation_chunk_ids: ACL-rechecked citation chunk IDs. Missing chunks
+            are omitted.
+
+    Returns:
+        Count-only overlap. Never includes questions or excerpts.
+    """
+
+    gold = frozenset(gold_ids)
+    cited = tuple(item for item in citation_chunk_ids if item is not None)
+    intersection = len(gold.intersection(cited))
+    return {
+        "gold_count": len(gold),
+        "citation_count": len(cited),
+        "intersection": intersection,
+        "ranked_hit_at_10": int(any(item in gold for item in cited[:10])),
     }

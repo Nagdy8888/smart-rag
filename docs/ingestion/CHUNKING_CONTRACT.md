@@ -2,7 +2,7 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 owning_phase: 3
 audience: engineering
 ---
@@ -30,8 +30,14 @@ Count-only analysis of private PDF SHA-256
 `72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1`
 on 2026-09-09: 640 ordinary passages, 495 in 200–400 (**0.7734**), 134
 under 200, 11 in 401–600, 0 over 600. Parser kinds were paragraph/page_break/figure
-only (zero headings). The 90% gate is a Packet 5 stop, not a reason to
-relax merge rules.
+only (zero headings). PDF heading extraction (`parser_v1_pdf_headings_v1`)
+is additive and does not relax the 200–400 token band or 600-token cap.
+Live heading-count metrics for the private PDF remain operator-owned until
+a new Graph-disabled ingest. The 90% gate is a Packet 5 stop, not a reason to
+relax merge rules. `document_chunks.page_number` is the 1-based PDF file
+page (`page_index + 1`). Printed `/PageLabels` values (roman or arabic) are
+copied onto provenance locators as `page_label` for citation display; they
+do not replace `page_number`.
 
 ## Atomicity
 

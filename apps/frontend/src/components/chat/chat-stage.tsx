@@ -27,10 +27,11 @@ import { RunDetailsSheet } from "./run-details-sheet";
 import type { FeedbackTag } from "../../lib/types";
 import chatStyles from "./chat-transcript.module.css";
 
+/** Starter prompts grounded in the live company corpus (agent PDF + CMU plots). */
 const PROMPT_CHIPS = [
-  "Summarize an uploaded policy",
-  "Compare two documented values",
-  "Find a relationship between entities",
+  "What is LCEL according to the uploaded PDF?",
+  "How does Single Tool Execution differ from Parallel Tool Execution?",
+  "What is the relationship between Katniss Everdeen and Peeta Mellark?",
 ] as const;
 
 export type ChatStageProps = {

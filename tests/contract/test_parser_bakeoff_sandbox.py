@@ -22,6 +22,24 @@ def test_anydoc_dockerfile_is_non_root_and_local_only() -> None:
 
     content = DOCKERFILE.read_text(encoding="utf-8")
     assert "USER 10001:10001" in content
+    assert (
+        "COPY infra/parser-bakeoff/sandbox_evaluation_init.py "
+        "/app/smart_rag_core/evaluation/__init__.py"
+    ) in content
+    assert (
+        "COPY infra/parser-bakeoff/sandbox_adapters_init.py "
+        "/app/smart_rag_core/ingestion/parser/adapters/__init__.py"
+    ) in content
+    eval_stub = (
+        REPO_ROOT / "infra" / "parser-bakeoff" / "sandbox_evaluation_init.py"
+    ).read_text(encoding="utf-8")
+    adapter_stub = (
+        REPO_ROOT / "infra" / "parser-bakeoff" / "sandbox_adapters_init.py"
+    ).read_text(encoding="utf-8")
+    for stub in (eval_stub, adapter_stub):
+        assert not any(
+            line.lstrip().startswith(("import ", "from ")) for line in stub.splitlines()
+        )
     requirements = (
         REPO_ROOT / "infra" / "parser-bakeoff" / "requirements.txt"
     ).read_text(encoding="utf-8")
@@ -58,6 +76,7 @@ def test_anydoc_docker_command_is_airgapped() -> None:
     assert "--cpus" in command
     assert "--pids-limit" in command
     assert "RAYON_NUM_THREADS=1" in joined
+    assert "size=256m" in joined
     assert ANYDOC_IMAGE in command
     for secret in FORBIDDEN_SANDBOX_ENV:
         assert secret not in joined

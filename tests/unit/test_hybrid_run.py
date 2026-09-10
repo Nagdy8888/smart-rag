@@ -939,3 +939,33 @@ def test_retrieve_rerank_fails_closed_when_reservation_short() -> None:
     assert rerank_calls == []
     assert budget.remaining_usd == Decimal("0.08")
     assert result.rerank_call_count == 0
+
+
+def test_retrieve_records_authorized_channel_ids() -> None:
+    """Per-channel IDs are authorized IDs after recheck, never BM25 snippets."""
+
+    dense = _candidate(rank=1)
+    bm25 = _candidate(rank=1)
+    term = _candidate(rank=1)
+    contexts = {
+        dense.chunk_id: _context(dense, text="canonical dense"),
+        bm25.chunk_id: _context(bm25, text="canonical bm25"),
+        term.chunk_id: _context(term, text="canonical term"),
+    }
+    retriever = _retriever(contexts=contexts)
+    result = retriever.retrieve(
+        query="annual leave policy",
+        caller=_caller(),
+        channel_jobs={
+            "dense": lambda: (dense,),
+            "bm25": lambda: Bm25RetrievalResult(
+                scanned_ids=(bm25.chunk_id,),
+                candidates=(bm25,),
+            ),
+            "term": lambda: (term,),
+        },
+    )
+    assert result.dense_ids == (dense.chunk_id,)
+    assert result.bm25_ids == (bm25.chunk_id,)
+    assert result.term_ids == (term.chunk_id,)
+    assert BM25_SNIPPET not in " ".join(unit.citation_text for unit in result.evidence)

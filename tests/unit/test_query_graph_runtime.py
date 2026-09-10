@@ -47,6 +47,7 @@ from smart_rag_core.query_fusion.models import (
     PassageOrigin,
     ScoredPassage,
 )
+from smart_rag_core.runtime.valkey import MemoryValkeyClient
 from smart_rag_core.security.identity import CallerContext, UserRole
 from smart_rag_core.settings import SharedSettings
 
@@ -160,6 +161,19 @@ def test_default_process_bindings_have_hybrid_and_gateway() -> None:
     empty = QueryGraphDeps()
     assert empty.hybrid_retriever is None
     assert empty.model_gateway is None
+
+
+def test_process_bindings_inject_retrieval_cache_from_app_state() -> None:
+    """Valkey on app.state is injected as an ID-only retrieval cache."""
+
+    client = MemoryValkeyClient()
+    bindings = build_query_process_bindings(
+        settings=SharedSettings(mock_model_mode=True),
+        supabase_dsn=_FAKE_DSN,
+        app_state=SimpleNamespace(valkey_cache_client=client),
+    )
+    hybrid = bindings.hybrid_retriever
+    assert getattr(hybrid, "_retrieval_cache", None) is not None
 
 
 def test_sse_execute_does_not_continue_without_app_api_connection() -> None:

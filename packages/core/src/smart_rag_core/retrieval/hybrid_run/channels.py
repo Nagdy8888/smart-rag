@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TypeGuard, cast
 from uuid import UUID
 
@@ -374,6 +374,26 @@ def flatten_channel_candidates(
                 continue
             seen.add(item.chunk_id)
             ordered.append(item)
+    return tuple(ordered)
+
+
+def unique_chunk_ids(candidates: Sequence[RetrievalCandidate]) -> tuple[UUID, ...]:
+    """Return first-seen authorized chunk IDs without BM25 text.
+
+    Args:
+        candidates: Authorized channel survivors.
+
+    Returns:
+        Unique IDs in first-seen order.
+    """
+
+    seen: set[UUID] = set()
+    ordered: list[UUID] = []
+    for item in candidates:
+        if item.chunk_id in seen:
+            continue
+        seen.add(item.chunk_id)
+        ordered.append(item.chunk_id)
     return tuple(ordered)
 
 

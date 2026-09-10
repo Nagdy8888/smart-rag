@@ -313,6 +313,12 @@ def create_app() -> FastAPI:
     from smart_rag_api.routers.ingestion_crawl import router as ingestion_crawl_router
     from smart_rag_api.routers.ingestion_status import router as ingestion_status_router
     from smart_rag_api.routers.ops import router as ops_router
+    from smart_rag_api.routers.pdf_eval import (
+        pdf_eval_routes_enabled,
+    )
+    from smart_rag_api.routers.pdf_eval import (
+        router as pdf_eval_router,
+    )
     from smart_rag_api.routers.query_runs import router as query_runs_router
     from smart_rag_api.routers.tables import router as tables_router
     from smart_rag_api.routers.tools import admin_router as tools_admin_router
@@ -334,6 +340,8 @@ def create_app() -> FastAPI:
     application.include_router(tools_catalog_router)
     application.include_router(tools_admin_router)
     application.include_router(usage_router)
+    if pdf_eval_routes_enabled(settings):
+        application.include_router(pdf_eval_router)
     return application
 
 

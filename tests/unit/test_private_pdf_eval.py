@@ -220,6 +220,14 @@ def test_draft_builder_meets_class_mix_and_is_deterministic() -> None:
         assert row["human_approved"] is False
         assert row["acl_actor_id"] == "actor-1"
         assert row["chunk_ids"]
+        question = str(row["question"])
+        assert "[p" not in question
+        if not bool(row["expected_refusal"]):
+            facts_raw = row["atomic_facts"]
+            assert isinstance(facts_raw, (list, tuple))
+            facts = cast(list[object] | tuple[object, ...], facts_raw)
+            for fact in facts:
+                assert any(str(fact) in locator.raw_text for locator in locators)
     for query_class, minimum in PRIVATE_PDF_CLASS_MINIMUMS.items():
         assert counts[query_class.value] >= minimum
     questions = tuple(str(row["question"]) for row in first)
@@ -247,7 +255,7 @@ def test_draft_does_not_cycle_unsupported_aliases() -> None:
             section_path=("Chapter 1", f"Alpha {index}"),
             raw_text=f"Alpha protocol {index} uses widgets in this passage.",
         )
-        for index in range(8)
+        for index in range(20)
     )
     rows = build_draft_rows(
         locators,

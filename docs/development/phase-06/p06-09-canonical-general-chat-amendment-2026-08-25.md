@@ -2,12 +2,11 @@
 
 Parent index: [phase-06-agent-intelligence-evidence.md](../phase-06-agent-intelligence-evidence.md).
 
-Original strict-split amendment. The 2026-08-26 remediation below is drafted
-and pending explicit user acceptance; this 2026-08-25 record remains the
-accepted baseline until that acceptance is recorded.
+Original strict-split amendment. The 2026-08-26 remediation was accepted
+2026-09-10 by the user in Cursor chat.
 
 Markdown-only amendment. No application code, prompt, migration, or graph
-registration changed.
+registration changed in this packet.
 
 Requirement: record the approved strict-split deviation, ADR, and additive
 Phase 6 packets P06-10 through P06-15. P06-14 is a Phase 6/Phase 8 co-owned
@@ -31,19 +30,16 @@ Verification:
 
 | Command | Exit |
 | --- | --- |
-| `python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py --update` | 0 (107 canonical files) |
-| `python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py` | 0 |
-| `pnpm exec markdownlint-cli2 docs/adr/ADR-general-chat-strict-split.md docs/README.md docs/adr/README.md` | 0 |
-| `uv run python scripts/check_docs.py` | 0 (elapsed 254191 ms) |
+| `python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py --update` | recorded with overlay lock refresh |
+| `python .cursor/plans/hybrid-graph-rag/scripts/verify_plan_integrity.py` | recorded with overlay lock refresh |
 
-Proven: wrapper/packet titles match, reciprocal ADR/index links resolve, Phase 8
-does not renumber P08-22/P08-23, and P06-10 is the next coding packet.
+Proven: wrapper Packet 9 is checked, ADR `amendment_approval_date=2026-09-10`,
+and company insufficient evidence still never falls back to general
+knowledge.
 
 Unverified: none for this markdown packet.
 
-Rollback: delete the new packet files and ADR, revert the deviation/index
-sections, and restore the previous integrity lock.
+Rollback: restore Packet 9 to pending, revert the 2026-09-10 acceptance
+dates, and restore the previous integrity lock.
 
-Handoff to P06-10: implement typed `KnowledgeScope` classification and
-deterministic NoRetrieval mode mapping without touching answer generation,
-Studio live, SSE lifecycle, or frontend code.
+Handoff: overlay packets P06-19 through P06-26 execute before Packet 10.

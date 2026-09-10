@@ -203,6 +203,80 @@ def build_pdf_text_fixture() -> tuple[bytes, str]:
     return payload, sha256_bytes(payload)
 
 
+def build_pdf_page_label_fixture() -> tuple[bytes, str]:
+    """Build a one-page PDF whose printed label is 50, not file page 1.
+
+    Returns:
+        PDF bytes and SHA-256 digest.
+    """
+
+    document = _open_pdf()
+    page = _call_vendor(document, "new_page")
+    _call_vendor(page, "insert_text", (72, 120), "Printed label body")
+    _call_vendor(
+        document,
+        "set_page_labels",
+        [{"startpage": 0, "prefix": "", "style": "D", "firstpagenum": 50}],
+    )
+    payload = cast(bytes, _call_vendor(document, "tobytes"))
+    _call_vendor(document, "close")
+    return payload, sha256_bytes(payload)
+
+
+def build_pdf_heading_fixture() -> tuple[bytes, str]:
+    """Build a two-page PDF with a large heading, bold body, and repeated header.
+
+    Returns:
+        PDF bytes and SHA-256 digest.
+    """
+
+    document = _open_pdf()
+    for page_number in range(2):
+        page = _call_vendor(document, "new_page")
+        _call_vendor(page, "insert_text", (72, 50), "HEADER")
+        heading = "Chapter One Title" if page_number == 0 else "Chapter Two Title"
+        _call_vendor(
+            page,
+            "insert_text",
+            (72, 96),
+            heading,
+            fontsize=18,
+            fontname="hebo",
+        )
+        _call_vendor(
+            page,
+            "insert_text",
+            (72, 160),
+            (
+                "This bold sentence stays a paragraph because it is long enough "
+                f"to look like body copy on page {page_number + 1}."
+            ),
+            fontsize=11,
+            fontname="hebo",
+        )
+        _call_vendor(
+            page,
+            "insert_text",
+            (72, 220),
+            f"Regular body paragraph about policies and leave on page {page_number + 1}.",
+            fontsize=11,
+            fontname="helv",
+        )
+        mixed = "Mixed heading path" if page_number == 0 else "Second mixed heading"
+        _call_vendor(
+            page,
+            "insert_text",
+            (72, 280),
+            mixed,
+            fontsize=16,
+            fontname="hebo",
+        )
+        _call_vendor(page, "insert_text", (72, 750), "FOOTER")
+    payload = cast(bytes, _call_vendor(document, "tobytes"))
+    _call_vendor(document, "close")
+    return payload, sha256_bytes(payload)
+
+
 def build_encrypted_zip_bomb_attempt() -> bytes:
     """Return a small zip with high declared ratio (not extracted by parser)."""
 

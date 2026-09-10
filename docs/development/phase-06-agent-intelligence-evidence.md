@@ -2,7 +2,7 @@
 title: Phase 6 agent-intelligence evidence index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-09-10
 audience: engineering, reviewers
 ---
 
@@ -44,7 +44,15 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | Packet 8 residual close-out (2026-08-16) | [phase-06/packet-8-residual-close-out-2026-08-16.md](./phase-06/packet-8-residual-close-out-2026-08-16.md) | 69 |
 | P08-09 co-owned amendment — durable input and verified-final SSE | [phase-06/p08-09-co-owned-amendment-durable-input-and-verified-final-sse.md](./phase-06/p08-09-co-owned-amendment-durable-input-and-verified-final-sse.md) | 30 |
 | P06-08 narrow fix — LangSmith Studio Chat compatibility (2026-08-25) | [phase-06/p06-08-narrow-fix-langsmith-studio-chat-compatibility-2026-08-25.md](./phase-06/p06-08-narrow-fix-langsmith-studio-chat-compatibility-2026-08-25.md) | 46 |
-| P06-09 — Canonical general-chat amendment (2026-08-25) | [phase-06/p06-09-canonical-general-chat-amendment-2026-08-25.md](./phase-06/p06-09-canonical-general-chat-amendment-2026-08-25.md) | 49 |
+| P06-09 — Canonical general-chat amendment (2026-08-25; accepted 2026-09-10) | [phase-06/p06-09-canonical-general-chat-amendment-2026-08-25.md](./phase-06/p06-09-canonical-general-chat-amendment-2026-08-25.md) | 49 |
+| P06-19 — Local PDF evaluation overlay (2026-09-10) | [phase-06/p06-19-local-pdf-evaluation-overlay-2026-09-10.md](./phase-06/p06-19-local-pdf-evaluation-overlay-2026-09-10.md) | 47 |
+| P06-20 — PDF eval workspace store (2026-09-10) | [phase-06/p06-20-pdf-eval-workspace-store-2026-09-10.md](./phase-06/p06-20-pdf-eval-workspace-store-2026-09-10.md) | 40 |
+| P06-21 — PDF eval workspace API (2026-09-10) | [phase-06/p06-21-pdf-eval-workspace-api-2026-09-10.md](./phase-06/p06-21-pdf-eval-workspace-api-2026-09-10.md) | 40 |
+| P06-22 — PDF eval workspace UI (2026-09-10) | [phase-06/p06-22-pdf-eval-workspace-ui-2026-09-10.md](./phase-06/p06-22-pdf-eval-workspace-ui-2026-09-10.md) | 39 |
+| P06-23 — PDF heading extraction (2026-09-10) | [phase-06/p06-23-pdf-heading-extraction-2026-09-10.md](./phase-06/p06-23-pdf-heading-extraction-2026-09-10.md) | 40 |
+| P06-24 — PDF eval channel diagnostics (2026-09-10) | [phase-06/p06-24-pdf-eval-channel-diagnostics-2026-09-10.md](./phase-06/p06-24-pdf-eval-channel-diagnostics-2026-09-10.md) | 38 |
+| P06-25 — PDF eval retrieval repair (2026-09-10) | [phase-06/p06-25-pdf-eval-retrieval-repair-2026-09-10.md](./phase-06/p06-25-pdf-eval-retrieval-repair-2026-09-10.md) | 37 |
+| P06-26 — Retrieval cache and holdout gates (2026-09-10) | [phase-06/p06-26-retrieval-cache-and-holdout-gates-2026-09-10.md](./phase-06/p06-26-retrieval-cache-and-holdout-gates-2026-09-10.md) | 41 |
 | P06-10 — Typed knowledge-scope routing (2026-08-25) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 49 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (2026-08-25) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 47 |
 | P06-12 — General and user-text execution (2026-08-25) | [phase-06/p06-12-general-and-user-text-execution-2026-08-25.md](./phase-06/p06-12-general-and-user-text-execution-2026-08-25.md) | 146 |

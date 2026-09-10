@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from uuid import UUID
 
 import psycopg
@@ -11,6 +12,7 @@ from smart_rag_core.evaluation.schema import ExpectedProfile
 from smart_rag_core.gateways.embedding import EmbeddingGateway
 from smart_rag_core.query_admission.retrieve_budget import QueryRetrieveBudget
 from smart_rag_core.query_profile.extract import extract_deterministic
+from smart_rag_core.retrieval.cache_store import RetrievalCacheStore
 from smart_rag_core.retrieval.context import ContextFn, RerankFn, select_hybrid_context
 from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
@@ -18,6 +20,7 @@ from smart_rag_core.retrieval.context_loader import (
     fetch_authorized_heading_inventory,
     heading_inventory_from_contexts,
 )
+from smart_rag_core.retrieval.coverage import CoverageSignal, HybridCoverage
 from smart_rag_core.retrieval.coverage_score import attach_numeric_coverage
 from smart_rag_core.retrieval.frozen_profile import FrozenHybridProfile
 from smart_rag_core.retrieval.hybrid import run_channels_parallel
@@ -25,6 +28,7 @@ from smart_rag_core.retrieval.hybrid_run.assemble import (
     call_assemble_hybrid,
     closed_result,
     compute_principal_scope_hash,
+    elapsed_ms,
     fail_closed_query,
     fused_first_evidence_ms,
     hybrid_assemble_kwargs,
@@ -39,6 +43,7 @@ from smart_rag_core.retrieval.hybrid_run.channels import (
     flatten_channel_candidates,
     identity_rerank,
     restrict_channel_candidates,
+    unique_chunk_ids,
     unpack_bm25,
     unpack_dense,
     unpack_term,
@@ -46,6 +51,7 @@ from smart_rag_core.retrieval.hybrid_run.channels import (
 from smart_rag_core.retrieval.hybrid_run.embed import embed_query_texts
 from smart_rag_core.retrieval.hybrid_run.evidence import (
     evidence_units,
+    evidence_units_from_context,
 )
 from smart_rag_core.retrieval.hybrid_run.jobs import HybridChannelJobsMixin
 from smart_rag_core.retrieval.hybrid_run.profile_fields import (
@@ -75,8 +81,9 @@ from smart_rag_core.retrieval.profiles import (
     RETRIEVAL_SLICE_SECONDS,
     RetrievalFallbackReason,
 )
+from smart_rag_core.retrieval.recheck import recheck_retrieval_candidates
 from smart_rag_core.retrieval.rerank import RerankFallbackReason, rerank_preload_ids
-from smart_rag_core.retrieval.types import Bm25RetrievalResult
+from smart_rag_core.retrieval.types import Bm25RetrievalResult, RetrievalCandidate
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
@@ -119,6 +126,7 @@ class HybridRetriever(HybridChannelJobsMixin):
         channel_jobs: dict[str, ChannelJob] | None = None,
         supabase_dsn: str | None = None,
         retrieval_profile: FrozenHybridProfile | None = None,
+        retrieval_cache: RetrievalCacheStore | None = None,
     ) -> None:
         """Bind gateways, optional retrievers, and test doubles.
 
@@ -141,6 +149,7 @@ class HybridRetriever(HybridChannelJobsMixin):
                 frozen default; evaluation may inject the long-document
                 candidate. Unfrozen ids stay rejected by
                 ``load_frozen_profile``.
+            retrieval_cache: Optional ID/rank cache. Hits still recheck ACL.
         """
 
         self._embedding_gateway = embedding_gateway
@@ -154,6 +163,7 @@ class HybridRetriever(HybridChannelJobsMixin):
         self._rerank = rerank
         self._channel_jobs = channel_jobs
         self._retrieval_profile = retrieval_profile
+        self._retrieval_cache = retrieval_cache
         self.query_budget: QueryRetrieveBudget | None = None
 
     def retrieve(
@@ -207,6 +217,20 @@ class HybridRetriever(HybridChannelJobsMixin):
         query_check = fail_closed_query(query)
         if query_check is not None:
             return closed_result(query_check, started=started)
+        query_normalized = normalize_arabic_v1(query)[:MAX_NORMALIZED_QUERY_CHARS]
+        profile_id = HYBRID_DEFAULT_PROFILE_ID
+        if self._retrieval_profile is not None:
+            profile_id = self._retrieval_profile.profile_id
+        cached = self._cached_result(
+            caller=caller,
+            query_normalized=query_normalized,
+            visibility_generation=visibility_generation,
+            started=started,
+            profile_id=profile_id,
+            scope_hash=scope_hash,
+        )
+        if cached is not None:
+            return cached
 
         texts = query_texts(query, profile)
         embed_response, embed_error = embed_query_texts(
@@ -258,6 +282,13 @@ class HybridRetriever(HybridChannelJobsMixin):
             bm25_result,
             term_lists,
             restrict_version_id,
+        )
+        dense_ids = unique_chunk_ids(
+            tuple(item for variant in dense_lists for item in variant)
+        )
+        bm25_ids = unique_chunk_ids(bm25_result.candidates)
+        term_ids = unique_chunk_ids(
+            tuple(item for variant in term_lists for item in variant)
         )
         fallback = compose_fallback(
             dense_reason=dense_reason,
@@ -314,7 +345,7 @@ class HybridRetriever(HybridChannelJobsMixin):
             negation_scope=negation_scope,
             historical_relationship=historical,
             principal_scope_hash=scope_hash,
-            query_normalized=normalize_arabic_v1(query)[:MAX_NORMALIZED_QUERY_CHARS],
+            query_normalized=query_normalized,
             visibility_generation=visibility_generation,
             scanned_bm25=bm25_result.scanned_ids,
             query_type=query_type,
@@ -361,9 +392,6 @@ class HybridRetriever(HybridChannelJobsMixin):
         rerank_order: tuple[UUID, ...] = fused_ids
         rerank_fallback = ""
         rerank_top_support: float | None = None
-        profile_id = HYBRID_DEFAULT_PROFILE_ID
-        if self._retrieval_profile is not None:
-            profile_id = self._retrieval_profile.profile_id
         selection_profile = self._retrieval_profile
         coverage = assembled.coverage
         if assembled.fused:
@@ -431,6 +459,19 @@ class HybridRetriever(HybridChannelJobsMixin):
         if fallback is RetrievalFallbackReason.NONE:
             fallback = assembled.fallback_reason
         ranked = selected_ids or fused_ids
+        if (
+            self._retrieval_cache is not None
+            and fallback is RetrievalFallbackReason.NONE
+            and ranked
+        ):
+            self._retrieval_cache.put_results(
+                principal_scope_hash=scope_hash,
+                query_normalized=query_normalized,
+                visibility_generation=visibility_generation,
+                chunk_ids=ranked,
+                ranks=tuple(range(1, len(ranked) + 1)),
+                retrieval_profile_id=profile_id,
+            )
         return HybridRunResult(
             ranked_ids=ranked,
             evidence=evidence[:FINAL_EVIDENCE_MAX],
@@ -450,7 +491,139 @@ class HybridRetriever(HybridChannelJobsMixin):
             retrieval_profile_id=profile_id,
             rerank_fallback=rerank_fallback,
             rerank_top_support=rerank_top_support,
+            dense_ids=dense_ids,
+            bm25_ids=bm25_ids,
+            term_ids=term_ids,
         )
+
+    def _cached_result(
+        self,
+        *,
+        caller: CallerContext,
+        query_normalized: str,
+        visibility_generation: int,
+        started: float,
+        profile_id: str,
+        scope_hash: str,
+    ) -> HybridRunResult | None:
+        """Return a rechecked cache hit, or None on miss/outage.
+
+        Args:
+            caller: Server-derived identity.
+            query_normalized: Normalized query used in the cache key.
+            visibility_generation: ACL/visibility generation.
+            started: Retrieve start timestamp.
+            profile_id: Profile id used in the cache key.
+            scope_hash: Principal ACL-scope hash.
+
+        Returns:
+            Cached Hybrid result after recheck, or None.
+
+        Side Effects:
+            Rechecks cached IDs through Postgres or the injected loader.
+            Unauthorized IDs invalidate the key and become a miss.
+        """
+
+        store = self._retrieval_cache
+        if store is None:
+            return None
+
+        def recheck(chunk_ids: Sequence[UUID]) -> tuple[RetrievalCandidate, ...]:
+            """Recheck cached IDs before they become evidence.
+
+            Args:
+                chunk_ids: Cached IDs. Never trusted.
+
+            Returns:
+                Authorized current-version candidates.
+            """
+
+            return self._recheck_cached_ids(caller, chunk_ids)
+
+        cached = store.get_results(
+            principal_scope_hash=scope_hash,
+            query_normalized=query_normalized,
+            visibility_generation=visibility_generation,
+            recheck=recheck,
+            retrieval_profile_id=profile_id,
+        )
+        if cached is None:
+            return None
+        loader = self._bound_loader(caller, {})
+        contexts = loader(cached.chunk_ids)
+        fused = tuple(
+            RetrievalCandidate(
+                chunk_id=row.chunk_id,
+                document_id=row.document_id,
+                version_id=row.version_id,
+                channel_rank=index + 1,
+                channel_score=0.0,
+            )
+            for index, row in enumerate(contexts)
+        )
+        evidence = evidence_units_from_context(fused, contexts)
+        signal = CoverageSignal.NONE if evidence else CoverageSignal.WEAK_EVIDENCE
+        return HybridRunResult(
+            ranked_ids=cached.chunk_ids,
+            evidence=evidence[:FINAL_EVIDENCE_MAX],
+            coverage=HybridCoverage(signal=signal, notes=("cache_hit",)),
+            fallback_reason=RetrievalFallbackReason.NONE,
+            deadline_exhausted=False,
+            first_evidence_ms=elapsed_ms(started),
+            embedding_call_count=0,
+            rerank_call_count=0,
+            selected_ids=cached.chunk_ids,
+            retrieval_profile_id=profile_id,
+        )
+
+    def _recheck_cached_ids(
+        self,
+        caller: CallerContext,
+        chunk_ids: Sequence[UUID],
+    ) -> tuple[RetrievalCandidate, ...]:
+        """Recheck cached IDs through Postgres or the injected loader.
+
+        Args:
+            caller: Server-derived identity.
+            chunk_ids: Cached IDs.
+
+        Returns:
+            Authorized survivors in scan order. Empty on connection failure.
+        """
+
+        if self._supabase is not None:
+            return recheck_retrieval_candidates(
+                self._supabase,
+                caller=caller,
+                chunk_ids=chunk_ids,
+            )
+        if self._supabase_dsn:
+            try:
+                with psycopg.connect(self._supabase_dsn) as connection:
+                    return recheck_retrieval_candidates(
+                        connection,
+                        caller=caller,
+                        chunk_ids=chunk_ids,
+                    )
+            except (psycopg.Error, OSError):
+                return ()
+        rows = self._fetch_context(caller, tuple(chunk_ids))
+        found = {row.chunk_id: row for row in rows}
+        survivors: list[RetrievalCandidate] = []
+        for index, chunk_id in enumerate(chunk_ids):
+            row = found.get(chunk_id)
+            if row is None:
+                continue
+            survivors.append(
+                RetrievalCandidate(
+                    chunk_id=row.chunk_id,
+                    document_id=row.document_id,
+                    version_id=row.version_id,
+                    channel_rank=index + 1,
+                    channel_score=0.0,
+                )
+            )
+        return tuple(survivors)
 
     def authorized_chunk_loader(self, caller: CallerContext) -> ContextFn:
         """Return the ACL-rechecking context loader for canonical citation text.

@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 9
-status: pending
+status: complete
 title: "Canonical amendment for general-chat strict-split, ADR, and packets P06-10 through P06-15."
 requirement_ids: [P06-09]
 ---

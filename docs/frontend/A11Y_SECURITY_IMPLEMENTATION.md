@@ -25,7 +25,9 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 ## Logical citation offsets
 
 `GET /runs/{id}/citations` has no offset fields (GAP-07-09). The production
-citation drawer shows page, title, and section locators when present, then
+citation drawer shows the printed PDF page label when present, the 1-based
+file PDF page when it differs or when labels are missing, title, and section
+locators, then
 technical ids. `highlightLogicalRange`
 slices with `Array.from` / codepoint indexes. The reviewed fixture is
 canonical text `الشركة ACME وقعت العقد.` with offsets **7–11** selecting

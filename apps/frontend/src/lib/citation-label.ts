@@ -18,7 +18,7 @@ export type CitationLocatorField = {
  * Return a finite page number from provenance, or null.
  *
  * @param value - `page_number` or `page` candidate.
- * @returns 1-based page, or null when missing.
+ * @returns 1-based file page, or null when missing.
  */
 export function citationPageNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -31,6 +31,36 @@ export function citationPageNumber(value: unknown): number | null {
     }
   }
   return null;
+}
+
+/**
+ * Return the printed PDF page label when present.
+ *
+ * @param value - `page_label` candidate.
+ * @returns Printed label such as `179` or `vii`, or empty.
+ */
+export function citationPageLabel(value: unknown): string {
+  return locatorString(value);
+}
+
+/**
+ * Return the page string users should open in the original file.
+ *
+ * Prefers the PDF `/PageLabels` value (printed roman or arabic) over the
+ * 1-based file index. File index is a fallback when the PDF has no labels.
+ *
+ * @param provenance - Citation provenance mapping.
+ * @returns Printed or file page text, or empty.
+ */
+export function citationDisplayPage(
+  provenance: Record<string, unknown>,
+): string {
+  const printed = citationPageLabel(provenance.page_label);
+  if (printed) {
+    return printed;
+  }
+  const filePage = citationPageNumber(provenance.page_number ?? provenance.page);
+  return filePage === null ? "" : String(filePage);
 }
 
 /**
@@ -47,8 +77,9 @@ export function citationHeading(value: unknown): string {
 /**
  * Return a chip label from locator provenance.
  *
- * Prefers document title, page, then heading or sheet/range. Falls back to
- * "Evidence" rather than a UUID. Unavailable sources stay labeled as such.
+ * Prefers document title, printed page, then heading or sheet/range. Falls
+ * back to "Evidence" rather than a UUID. Unavailable sources stay labeled
+ * as such.
  *
  * @param citation - Authorized citation row.
  * @returns Visible source label without passage text.
@@ -59,7 +90,7 @@ export function citationSourceLabel(citation: CitationResponse): string {
   }
   const provenance = citation.provenance;
   const title = locatorString(provenance.document_title);
-  const page = citationPageNumber(provenance.page_number ?? provenance.page);
+  const page = citationDisplayPage(provenance);
   const heading = citationHeading(provenance.section_path);
   const sheet = locatorString(provenance.sheet_name);
   const range = locatorString(provenance.range_ref);
@@ -67,12 +98,12 @@ export function citationSourceLabel(citation: CitationResponse): string {
   if (title) {
     parts.push(title);
   }
-  if (page !== null) {
-    parts.push(`p. ${String(page)}`);
+  if (page) {
+    parts.push(`p. ${page}`);
   } else if (sheet) {
     parts.push(range ? `${sheet} ${range}` : sheet);
   }
-  if (heading && (page !== null || title || !sheet)) {
+  if (heading && (page || title || !sheet)) {
     if (!title || heading !== title) {
       parts.push(heading);
     }
@@ -86,6 +117,9 @@ export function citationSourceLabel(citation: CitationResponse): string {
 /**
  * Return labeled locator rows for the sources drawer.
  *
+ * Printed `page_label` is "Page". The 1-based file index is "PDF page" when
+ * it differs from the printed label, or when no printed label exists.
+ *
  * @param citation - Authorized citation row.
  * @returns Locator rows then technical ids. Omits empty values.
  */
@@ -95,7 +129,8 @@ export function citationLocatorFields(
   const provenance = citation.provenance;
   const locators: CitationLocatorField[] = [];
   const title = locatorString(provenance.document_title);
-  const page = citationPageNumber(provenance.page_number ?? provenance.page);
+  const printed = citationPageLabel(provenance.page_label);
+  const filePage = citationPageNumber(provenance.page_number ?? provenance.page);
   const section = citationSectionParts(provenance.section_path).join(" / ");
   const sheet = locatorString(provenance.sheet_name);
   const range = locatorString(provenance.range_ref);
@@ -106,8 +141,18 @@ export function citationLocatorFields(
   if (title) {
     locators.push({ key: "document_title", label: "Document", value: title });
   }
-  if (page !== null) {
-    locators.push({ key: "page_number", label: "Page", value: String(page) });
+  if (printed) {
+    locators.push({ key: "page_label", label: "Page", value: printed });
+  }
+  if (filePage !== null) {
+    const fileText = String(filePage);
+    if (!printed || printed !== fileText) {
+      locators.push({
+        key: "page_number",
+        label: "PDF page",
+        value: fileText,
+      });
+    }
   }
   if (section) {
     locators.push({ key: "section_path", label: "Section", value: section });

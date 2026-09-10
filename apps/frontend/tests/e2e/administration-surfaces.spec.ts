@@ -15,6 +15,16 @@ test("authenticated chrome includes administration nav links", async ({
   await expect(page.getByRole("link", { name: "Curation" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Usage" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Profile" })).toHaveCount(0);
+  await expect(page.getByTestId("admin-tab-evaluation")).toHaveCount(0);
+});
+
+test("member administration workspace has no Evaluation tab", async ({
+  page,
+  request,
+}) => {
+  await signInLiveMember(page, request);
+  await page.goto("/admin");
+  await expect(page.getByTestId("admin-tab-evaluation")).toHaveCount(0);
 });
 
 test("unauthenticated administration routes redirect to login", async ({

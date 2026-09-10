@@ -35,6 +35,7 @@ def anydoc_config_extra() -> dict[str, object]:
         "anydoc_version": ANYDOC_PACKAGE_VERSION,
         "ocr": ANYDOC_OCR_MODE,
         "output": "markdown",
+        "scanned_pages": "omit",
     }
 
 
@@ -111,8 +112,90 @@ def stamp_anydoc_parse(result: ParseResult, content_hash: str) -> ParseResult:
     )
 
 
+def _write_pdf_without_pages(source: Path, omit: tuple[int, ...], dest: Path) -> int:
+    """Copy a PDF excluding 1-indexed scanned pages. Never extracts text.
+
+    Args:
+        source: Original PDF.
+        omit: 1-indexed pages AnyDoc named as needing OCR.
+        dest: Destination path.
+
+    Returns:
+        Number of pages kept.
+
+    Raises:
+        BakeoffError: When every page was omitted or no writer is available.
+    """
+
+    omitted = {int(page) for page in omit if int(page) > 0}
+    if not omitted:
+        raise BakeoffError("needs_ocr", "NeedsOcrError listed no pages")
+    try:
+        from pypdf import PdfReader, PdfWriter
+    except ImportError:
+        return _write_pdf_without_pages_fitz(source, omitted, dest)
+    reader = PdfReader(str(source))
+    writer = PdfWriter()
+    kept = 0
+    for index, page in enumerate(reader.pages, start=1):
+        if index in omitted:
+            continue
+        writer.add_page(page)
+        kept += 1
+    if kept == 0:
+        raise BakeoffError("needs_ocr", "all pages need OCR")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("wb") as handle:
+        writer.write(handle)
+    return kept
+
+
+def _write_pdf_without_pages_fitz(source: Path, omitted: set[int], dest: Path) -> int:
+    """Omit scanned pages with PyMuPDF when pypdf is not installed.
+
+    Args:
+        source: Original PDF.
+        omitted: 1-indexed pages to drop.
+        dest: Destination path.
+
+    Returns:
+        Number of pages kept.
+
+    Raises:
+        BakeoffError: When PyMuPDF is missing or every page was omitted.
+    """
+
+    try:
+        import fitz
+    except ImportError as exc:
+        raise BakeoffError(
+            "anydoc_missing", "pypdf or PyMuPDF is required to omit scanned pages"
+        ) from exc
+    source_doc = fitz.open(source)
+    kept_doc = fitz.open()
+    try:
+        kept = 0
+        for index in range(int(source_doc.page_count)):
+            if (index + 1) in omitted:
+                continue
+            kept_doc.insert_pdf(source_doc, from_page=index, to_page=index)
+            kept += 1
+        if kept == 0:
+            raise BakeoffError("needs_ocr", "all pages need OCR")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        kept_doc.save(dest, garbage=4, deflate=True)
+        return kept
+    finally:
+        kept_doc.close()
+        source_doc.close()
+
+
 def convert_with_anydoc(path: Path) -> str:
-    """Convert one local PDF to Markdown with OCR rejected.
+    """Convert one local PDF to Markdown. Hosted OCR is never used.
+
+    AnyDoc 0.2.4 raises ``NeedsOcrError`` for the whole file when any page is
+    image-only. This helper drops those named pages and converts the rest
+    locally. It does not call Firecrawl Parse.
 
     Args:
         path: Readable PDF path.
@@ -121,7 +204,8 @@ def convert_with_anydoc(path: Path) -> str:
         Markdown string.
 
     Raises:
-        BakeoffError: When AnyDoc is missing.
+        BakeoffError: When AnyDoc is missing, hosted OCR is requested, or the
+            remaining pages still need OCR.
     """
 
     try:
@@ -130,7 +214,24 @@ def convert_with_anydoc(path: Path) -> str:
         raise BakeoffError(
             "anydoc_missing", "firecrawl-anydoc is not installed"
         ) from exc
-    return str(anydoc.to_markdown(str(path), ocr=ANYDOC_OCR_MODE))
+    if ANYDOC_OCR_MODE != "reject":
+        raise BakeoffError("hosted_forbidden", "hosted AnyDoc OCR is forbidden")
+    try:
+        return str(anydoc.to_markdown(str(path), ocr="reject"))
+    except anydoc.NeedsOcrError as exc:
+        pages = tuple(int(page) for page in (getattr(exc, "pages", ()) or ()))
+        if not pages:
+            raise BakeoffError("needs_ocr", "NeedsOcrError listed no pages") from exc
+        stripped = path.with_name(f"{path.stem}.textpages.pdf")
+        try:
+            _write_pdf_without_pages(path, pages, stripped)
+            return str(anydoc.to_markdown(str(stripped), ocr="reject"))
+        except anydoc.NeedsOcrError as retry_exc:
+            raise BakeoffError(
+                "needs_ocr", "remaining pages still need OCR"
+            ) from retry_exc
+        finally:
+            stripped.unlink(missing_ok=True)
 
 
 def map_anydoc_exception(exc: BaseException) -> str:

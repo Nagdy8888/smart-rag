@@ -21,6 +21,7 @@ class MetaResponse(BaseModel):
     api_version: str
     sse_schema_version: str
     min_client_version: str
+    pdf_eval_workspace: bool = False
 
 
 class CurrentUserResponse(BaseModel):

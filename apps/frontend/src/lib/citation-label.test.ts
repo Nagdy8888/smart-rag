@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   citationChipName,
+  citationDisplayPage,
   citationLocatorFields,
   citationSourceLabel,
 } from "./citation-label";
@@ -44,6 +45,23 @@ describe("citationSourceLabel", () => {
     ).toBe("Citation 1, p. 3");
   });
 
+  it("prefers the printed page label over the file index", () => {
+    expect(
+      citationSourceLabel(
+        citation({
+          provenance: {
+            document_title: "AI agents",
+            page_number: 201,
+            page_label: "179",
+          },
+        }),
+      ),
+    ).toBe("AI agents · p. 179");
+    expect(citationDisplayPage({ page_number: 201, page_label: "179" })).toBe(
+      "179",
+    );
+  });
+
   it("falls back to Evidence instead of a citation UUID", () => {
     expect(citationSourceLabel(citation())).toBe("Evidence");
     expect(citationChipName(citation({ citation_index: 2 }))).toBe("Citation 2");
@@ -74,12 +92,29 @@ describe("citationLocatorFields", () => {
     );
     expect(fields.locators).toEqual([
       { key: "document_title", label: "Document", value: "Policy" },
-      { key: "page_number", label: "Page", value: "12" },
+      { key: "page_number", label: "PDF page", value: "12" },
       { key: "section_path", label: "Section", value: "Refunds" },
     ]);
     expect(fields.technical.map((item) => item.key)).toEqual([
       "citation_id",
       "chunk_id",
+    ]);
+  });
+
+  it("shows printed page and PDF page when they differ", () => {
+    const fields = citationLocatorFields(
+      citation({
+        provenance: {
+          document_title: "AI agents",
+          page_number: 201,
+          page_label: "179",
+        },
+      }),
+    );
+    expect(fields.locators).toEqual([
+      { key: "document_title", label: "Document", value: "AI agents" },
+      { key: "page_label", label: "Page", value: "179" },
+      { key: "page_number", label: "PDF page", value: "201" },
     ]);
   });
 });

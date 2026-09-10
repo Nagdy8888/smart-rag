@@ -3,10 +3,10 @@ title: ADR — General-chat strict split
 adr_id: ADR-general-chat-strict-split
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-08-26
+last-reviewed: 2026-09-10
 approver: "user (Cursor chat; no legal name provided)"
 approval_date: "2026-08-25"
-amendment_approval_date: pending
+amendment_approval_date: "2026-09-10"
 audience: frontend, backend, security, reviewers
 ---
 
@@ -15,12 +15,12 @@ audience: frontend, backend, security, reviewers
 ## Status
 
 `accepted` on 2026-08-25 for the original strict split. The 2026-08-26
-remediation amendment is drafted and pending explicit user acceptance: a
-counted live profile call, model-classified/model-answered greetings, honest
-non-document degradation when scope inference fails, and explicit post-plan
-graph paths. The original dual-mode contract remains in force: general
-questions may use OpenAI world knowledge, while company/document questions
-remain citation-required RAG with no world-knowledge fallback.
+remediation amendment was accepted on 2026-09-10: a counted live profile
+call, model-classified/model-answered greetings, honest non-document
+degradation when scope inference fails, and explicit post-plan graph paths.
+The original dual-mode contract remains in force: general questions may use
+OpenAI world knowledge, while company/document questions remain
+citation-required RAG with no world-knowledge fallback.
 
 ## Context
 

@@ -255,6 +255,18 @@ describe("AdminApp", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Tools" }));
     expect(routerReplace).toHaveBeenCalledWith("/admin?tab=tools");
     expect(screen.getByRole("tab", { name: "Names & aliases" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Evaluation" })).toBeNull();
+  });
+
+  it("shows Evaluation only when /api/meta reports the capability", async () => {
+    fetchMeta.mockResolvedValue({
+      api_version: "1",
+      sse_schema_version: "1",
+      min_client_version: "0.1.0",
+      pdf_eval_workspace: true,
+    });
+    renderSurface(<AdminApp />);
+    expect(await screen.findByRole("tab", { name: "Evaluation" })).toBeInTheDocument();
   });
 });
 

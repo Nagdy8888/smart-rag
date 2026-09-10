@@ -368,3 +368,96 @@ def fetch_authorized_heading_inventory(
         seen.add(label)
         ordered.append(label)
     return tuple(ordered)
+
+
+EVAL_PASSAGE_LIMIT = 60
+
+
+def list_authorized_eval_passages(
+    connection: psycopg.Connection,
+    caller: CallerContext,
+    *,
+    version_id: UUID,
+    limit: int = 40,
+    after_chunk_id: UUID | None = None,
+) -> tuple[ChunkContext, ...]:
+    """List current authorized representative passages for one PDF version.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived identity.
+        version_id: Current document version.
+        limit: Page size, capped at 60.
+        after_chunk_id: Keyset cursor. None starts at the first child.
+
+    Returns:
+        Authorized current representative chunks. Cross-document IDs
+        are omitted by the RPC.
+
+    Raises:
+        ContextBatchError: Limit exceeds 60.
+    """
+
+    bounded = min(max(limit, 1), EVAL_PASSAGE_LIMIT)
+    if limit > EVAL_PASSAGE_LIMIT:
+        raise ContextBatchError("eval_passage_limit")
+    with retrieval_transaction(
+        connection,
+        caller=caller,
+        profile="low",
+        apply_hnsw=False,
+    ):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                  chunk_id,
+                  document_id,
+                  version_id,
+                  page_number,
+                  section_path,
+                  raw_text,
+                  is_search_representative
+                FROM app.list_authorized_eval_passages(
+                  %s::uuid,
+                  %s::text,
+                  %s::bigint,
+                  %s::uuid,
+                  %s::integer,
+                  %s::uuid
+                )
+                """,
+                (
+                    caller.rpc_user_id(),
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    version_id,
+                    bounded,
+                    after_chunk_id,
+                ),
+            )
+            rows = cursor.fetchall()
+    results: list[ChunkContext] = []
+    for raw_row in rows:
+        row = cast(Sequence[object], raw_row)
+        section = row[4]
+        path = (
+            tuple(str(item) for item in cast(Sequence[object], section))
+            if section
+            else ()
+        )
+        results.append(
+            ChunkContext(
+                chunk_id=UUID(str(row[0])),
+                document_id=UUID(str(row[1])),
+                version_id=UUID(str(row[2])),
+                parent_chunk_id=None,
+                chunk_index=0,
+                page_number=int(str(row[3])) if row[3] is not None else None,
+                section_path=path,
+                token_count=None,
+                raw_text=str(row[5]),
+                is_search_representative=bool(row[6]),
+            )
+        )
+    return tuple(results)

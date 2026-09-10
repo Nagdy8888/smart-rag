@@ -132,10 +132,10 @@ flowchart TB
 - Use `EmptyState` with the brand gradient tile.
 - Title: “Ask your company knowledge”
 - Body: “Answers come from your authorized documents, with citations you can inspect.”
-- Three prompt-fill chips maximum:
-  - “Summarize an uploaded policy”
-  - “Compare two documented values”
-  - “Find a relationship between entities”
+- Three prompt-fill chips maximum (live corpus examples):
+  - “What is LCEL according to the uploaded PDF?”
+  - “How does Single Tool Execution differ from Parallel Tool Execution?”
+  - “What is the relationship between Katniss Everdeen and Peeta Mellark?”
 - Chips populate composer only; they never submit.
 
 #### User message
@@ -225,7 +225,7 @@ flowchart LR
 - Width 560px desktop, full width mobile.
 - Header “Sources.”
 - Group citations by safe source identity only when actual provenance supports it.
-- Citation card shows index, document/chunk identifiers, page/sheet/range/URL locator fields actually present, and “Source unavailable” status when true.
+- Citation card shows index, document/chunk identifiers, printed page label and file PDF page when they differ, sheet/range/URL locator fields actually present, and “Source unavailable” status when true.
 - No fake excerpt, preview, download, relevance score, or open-source button.
 
 #### `RunDetailsDrawer`

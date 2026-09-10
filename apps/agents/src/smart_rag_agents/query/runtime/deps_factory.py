@@ -16,6 +16,8 @@ from smart_rag_core.query_routing.branches import (
     GraphRetrieveLike,
     HybridRetrieveLike,
 )
+from smart_rag_core.retrieval.cache_store import RetrievalCacheStore
+from smart_rag_core.runtime.valkey import ValkeyClient
 from smart_rag_core.settings import SharedSettings, load_backend_settings
 
 from smart_rag_agents.prompts import (
@@ -112,6 +114,11 @@ def build_query_process_bindings(
         graph = getattr(state, "lightrag_adapter", None)
     parade = paradedb_url or secret_url(getattr(loaded, "paradedb_url", None))
     bm25 = DsnBm25Retriever(parade) if parade else None
+    cache_store: RetrievalCacheStore | None = None
+    if state is not None:
+        cache_client = getattr(state, "valkey_cache_client", None)
+        if cache_client is not None:
+            cache_store = RetrievalCacheStore(cast(ValkeyClient, cache_client))
     try:
         embedding = create_embedding_gateway(loaded)
     except ModelGatewayUnavailableError as exc:
@@ -122,6 +129,7 @@ def build_query_process_bindings(
         bm25=bm25,
         model_gateway=gateway,  # type: ignore[arg-type]
         rerank_prompt_text=rerank_prompt_text(),
+        retrieval_cache=cache_store,
     )
     graph_retriever: GraphRetrieveLike | None = None
     if graph is not None and all(

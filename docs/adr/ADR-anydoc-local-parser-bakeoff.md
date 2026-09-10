@@ -2,7 +2,7 @@
 title: ADR — Local AnyDoc parser bake-off (no Firecrawl upload)
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: engineering, security, reviewers
 ---
 
@@ -48,7 +48,9 @@ one sealed book PDF without changing production parser selection.
   while physical-page citations are required.
 - Hosted Firecrawl OCR is out of scope until a separate subprocessor ADR and
   Zero Data Retention decision exist.
-- Parser failures stay fail-closed with zero canonical elements.
+- When AnyDoc names scanned pages (`NeedsOcrError.pages`), the bake-off omits
+  those pages and converts the remaining PDF locally. That is not OCR and not
+  a hosted Parse call. An all-scanned PDF still fails closed.
 
 ## Related
 

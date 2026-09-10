@@ -165,9 +165,12 @@ def test_persist_answer_citations_lists_for_owned_run(
             """
             INSERT INTO app.document_chunks (
               id, document_id, version_id, chunk_index, raw_text,
-              page_number, section_path
+              page_number, section_path, provenance
             )
-            VALUES (%s, %s, %s, 0, 'Refund period is 30 days.', 12, ARRAY['Refunds'])
+            VALUES (
+              %s, %s, %s, 0, 'Refund period is 30 days.', 12, ARRAY['Refunds'],
+              '{"locators": [{"format": "pdf", "page_index": 11, "page_label": "xii"}]}'::jsonb
+            )
             """,
             (chunk_id, document_id, version_id),
         )
@@ -218,5 +221,6 @@ def test_persist_answer_citations_lists_for_owned_run(
     assert records[0].citation_index == 0
     assert records[0].chunk_id == UUID(str(chunk_id))
     assert records[0].provenance.get("page_number") == 12
+    assert records[0].provenance.get("page_label") == "xii"
     assert records[0].provenance.get("document_title") == "Citation persist fixture"
     assert "Refund period" not in str(records[0].provenance)

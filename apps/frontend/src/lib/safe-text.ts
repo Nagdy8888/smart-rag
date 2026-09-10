@@ -79,6 +79,7 @@ export function formatProvenance(provenance: Record<string, unknown>): string {
   const keys = [
     "document_title",
     "page",
+    "page_label",
     "page_number",
     "section",
     "section_path",

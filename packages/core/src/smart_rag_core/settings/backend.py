@@ -80,6 +80,10 @@ class BackendSettings(SharedSettings):
         langgraph_checkpoint_url: Optional session/direct Postgres DSN for
             query checkpoints and the LangGraph store. Defaults to
             ``SUPABASE_DB_URL``. Runtime never auto-migrates.
+        pdf_eval_workspace_enabled: Local-only evaluation workspace flag.
+            Default false. Staging and production reject true.
+        pdf_eval_workspace_root: Server-owned workspace directory. HTTP
+            callers never supply a path.
     """
 
     service_name: ClassVar[Literal["backend"]] = "backend"
@@ -234,6 +238,26 @@ class BackendSettings(SharedSettings):
         ),
         json_schema_extra={"security": "secret"},
     )
+    pdf_eval_workspace_enabled: bool = Field(
+        default=False,
+        validation_alias="PDF_EVAL_WORKSPACE_ENABLED",
+        description=(
+            "Local-only owner/admin PDF evaluation workspace. Default false. "
+            "Staging and production fail closed if true."
+        ),
+        json_schema_extra={"security": "public"},
+    )
+    pdf_eval_workspace_root: str = Field(
+        default="/app/.private-eval",
+        validation_alias="PDF_EVAL_WORKSPACE_ROOT",
+        min_length=1,
+        max_length=512,
+        description=(
+            "Server-owned evaluation workspace directory. HTTP callers never "
+            "supply a filesystem path. Default /app/.private-eval."
+        ),
+        json_schema_extra={"security": "public"},
+    )
 
     @field_validator("cors_allow_origins")
     @classmethod
@@ -349,6 +373,24 @@ class BackendSettings(SharedSettings):
         if self.app_env in _HOSTED_ENVIRONMENTS and self.valkey_limits_url is None:
             raise ValueError(
                 "VALKEY_LIMITS_URL is required when APP_ENV is staging or production"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def reject_pdf_eval_workspace_in_hosted_environments(self) -> Self:
+        """Forbid the local evaluation workspace in staging and production.
+
+        Returns:
+            This settings instance.
+
+        Raises:
+            ValueError: If the workspace flag is true in a hosted environment.
+        """
+
+        if self.pdf_eval_workspace_enabled and self.app_env in _HOSTED_ENVIRONMENTS:
+            raise ValueError(
+                "PDF_EVAL_WORKSPACE_ENABLED is forbidden when APP_ENV is "
+                "staging or production"
             )
         return self
 

@@ -57,6 +57,8 @@ def test_deployable_settings_are_typed_and_share_secure_defaults(
     assert agents.langgraph_studio_live_enabled is False
     assert agents.langgraph_studio_access_token is None
     assert not issubclass(AgentSettings, BackendSettings)
+    assert backend.pdf_eval_workspace_enabled is False
+    assert backend.pdf_eval_workspace_root == "/app/.private-eval"
 
 
 def test_agent_studio_live_token_is_redacted(
@@ -387,3 +389,19 @@ def test_allow_inprocess_parser_rejected_outside_test(
     settings = load_worker_settings()
     assert settings.allow_inprocess_parser is True
     assert settings.app_env is Environment.TEST
+
+
+def test_pdf_eval_workspace_rejected_in_hosted_environments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Staging and production fail closed if the workspace flag is true."""
+
+    configure_hosted_backend_env(monkeypatch, app_env="staging")
+    monkeypatch.setenv("PDF_EVAL_WORKSPACE_ENABLED", "true")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
+
+    configure_hosted_backend_env(monkeypatch, app_env="production")
+    monkeypatch.setenv("PDF_EVAL_WORKSPACE_ENABLED", "true")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()

@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import sys
+import types
 from pathlib import Path
 from typing import Any, cast
 
 import fitz
-from smart_rag_core.evaluation.parser_bakeoff.anydoc import map_anydoc_exception
+from smart_rag_core.evaluation.parser_bakeoff.anydoc import (
+    convert_with_anydoc,
+    map_anydoc_exception,
+)
 from smart_rag_core.evaluation.parser_bakeoff.constants import (
     ANYDOC_CLEANING_VERSION,
     ANYDOC_PARSER_VERSION,
@@ -188,6 +193,63 @@ def test_map_anydoc_exception_never_uses_payload() -> None:
         """Local OCR error."""
 
     assert map_anydoc_exception(NeedsOcrError("secret source text")) == "needs_ocr"
+
+
+def test_convert_with_anydoc_omits_named_scanned_pages(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """NeedsOcrError drops named pages and converts the rest locally."""
+
+    source = tmp_path / "book.pdf"
+    document = cast(Any, fitz.open())
+    first = document.new_page()
+    first.insert_text((72, 72), "Keep")
+    second = document.new_page()
+    second.insert_text((72, 72), "Scan")
+    source.write_bytes(bytes(document.tobytes()))
+    document.close()
+
+    class NeedsOcrError(Exception):
+        """Named like the vendor exception."""
+
+        def __init__(self, pages: list[int]) -> None:
+            """Store 1-indexed pages.
+
+            Args:
+                pages: 1-indexed scanned pages.
+            """
+
+            super().__init__("needs ocr")
+            self.pages = pages
+
+    calls = {"count": 0}
+
+    def _to_markdown(path: str, ocr: str = "reject") -> str:
+        """Fail the original file, succeed after omit.
+
+        Args:
+            path: PDF path.
+            ocr: Must stay reject.
+
+        Returns:
+            Markdown for the omitted-page file.
+
+        Raises:
+            NeedsOcrError: First call only.
+        """
+
+        del ocr
+        calls["count"] += 1
+        if Path(path).name == "book.pdf":
+            raise NeedsOcrError([2])
+        return "# Kept\n\nLocal AnyDoc text.\n"
+
+    fake = types.SimpleNamespace(to_markdown=_to_markdown, NeedsOcrError=NeedsOcrError)
+    monkeypatch.setitem(sys.modules, "anydoc", fake)
+    markdown = convert_with_anydoc(source)
+    assert "Local AnyDoc text" in markdown
+    assert calls["count"] == 2
+    assert not source.with_name("book.textpages.pdf").exists()
 
 
 def test_current_lane_inprocess_pdf() -> None:

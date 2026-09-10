@@ -164,6 +164,9 @@ class HybridRunResult:
         retrieval_profile_id: Frozen or evaluation profile id used for quotas.
         rerank_fallback: Named rerank skip/failure reason, or empty.
         rerank_top_support: Top selected child's model support, else None.
+        dense_ids: Authorized dense IDs after recheck.
+        bm25_ids: Authorized BM25 IDs after recheck. Never snippets.
+        term_ids: Authorized term IDs after recheck.
     """
 
     ranked_ids: tuple[UUID, ...]
@@ -181,3 +184,6 @@ class HybridRunResult:
     retrieval_profile_id: str = ""
     rerank_fallback: str = ""
     rerank_top_support: float | None = None
+    dense_ids: tuple[UUID, ...] = ()
+    bm25_ids: tuple[UUID, ...] = ()
+    term_ids: tuple[UUID, ...] = ()

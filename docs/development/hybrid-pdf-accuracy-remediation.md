@@ -10,12 +10,14 @@ audience: engineering, reviewers, security
 
 Additive overlay after Phase 3/4 engineering-complete. It does not uncheck
 historical packets or open the synthetic holdout. Canonical packet contracts
-live in the Phase 3/4 wrappers and in Phase 6 packets P06-10, P06-17, and
-P06-18. This file is the navigation index, honest baseline freeze, and
-rollback map.
+live in the Phase 3/4 wrappers and in Phase 6 packets P06-10, P06-17,
+P06-18, and P06-19 through P06-26. This file is the navigation index, honest
+baseline freeze, and rollback map.
 
 Related: [ADR-hybrid-long-document-profile.md](../adr/ADR-hybrid-long-document-profile.md) ·
 [ADR-detector-finding-reviews.md](../adr/ADR-detector-finding-reviews.md) ·
+[ADR-local-pdf-evaluation-workspace.md](../adr/ADR-local-pdf-evaluation-workspace.md) ·
+[PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md) ·
 [PHASE4_RANKED_IDS.md](../evaluation/PHASE4_RANKED_IDS.md) ·
 [PDF_HYBRID_EVALUATION.md](../evaluation/PDF_HYBRID_EVALUATION.md) ·
 [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) ·
@@ -58,15 +60,20 @@ flowchart LR
 | P10 post-selection coverage | Phase 4 Packet 13 | Phase 4 wrapper | none |
 | P11 BM25 variants | Phase 4 Packet 14 | Phase 4 wrapper | ParadeDB pin proof |
 | P12 dense escalation | Phase 4 Packet 15 | Phase 4 wrapper | pgvector contract |
-| P13 production rerank/scope | Phase 6 Packet 10 | [10-knowledge-scope-routing.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md) | P06-09 accepted first |
+| P13 production rerank/scope | Phase 6 Packet 10 | [10-knowledge-scope-routing.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md) | P06-09 accepted; overlay P06-19–P06-26 before Packet 10 coding |
+| P13b local eval workspace | Phase 6 Packets 19–22 | [19-local-pdf-evaluation-overlay.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/19-local-pdf-evaluation-overlay.md) | local `APP_ENV` only |
+| P13c heading extraction | Phase 6 Packet 23 | [23-pdf-heading-extraction.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/23-pdf-heading-extraction.md) | new ingest version |
+| P13d channel diagnostics | Phase 6 Packet 24 | [24-pdf-eval-channel-diagnostics.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/24-pdf-eval-channel-diagnostics.md) | human reseal |
+| P13e measured retrieval repair | Phase 6 Packet 25 | [25-pdf-eval-retrieval-repair.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/25-pdf-eval-retrieval-repair.md) | grounded labels |
+| P13f cache and Combined/holdout record | Phase 6 Packet 26 | [26-retrieval-cache-and-holdout-gates.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/26-retrieval-cache-and-holdout-gates.md) | holdout sealed |
 | P14 freeze/qualify | Phase 4 Packet 16 | Phase 4 wrapper | live full Hybrid; holdout sealed |
 | P15 PDF agent eval | Phase 6 Packet 17 | [17-pdf-agent-evaluation.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/17-pdf-agent-evaluation.md) | P14 freeze + P1 |
 | P16 holdout close | Phase 6 Packet 18 | [18-pdf-holdout-close.md](../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/18-pdf-holdout-close.md) | named SME open-once |
 
-Phase 6 Packet 9 remains the next unchecked historical packet. Overlay P13
-requirements are markdown-only on Packet 10 until Packet 9 is accepted.
-Do not edit `apps/agents/` in Phase 4 overlay packets. Do not repurpose
-`eval_judge_v1.md`.
+Phase 6 Packet 9 is accepted (2026-09-10). Overlay P06-19 through P06-26
+run before Packet 10 coding. Overlay P13 requirements remain on Packet 10
+for production rerank/scope. Do not edit `apps/agents/` in Phase 4 overlay
+packets. Do not repurpose `eval_judge_v1.md`.
 
 ## Frozen baseline (2026-09-09, pre-change)
 
@@ -77,7 +84,7 @@ No source text is recorded here.
 | PDF bytes SHA-256 | `72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1` |
 | PDF byte length | 12,990,407 |
 | Content class | `real_company` (enum; not synthetic) |
-| Parser policy | `parser_v1` |
+| Parser policy | `parser_v1`; PDF `parser_v1_pdf_headings_v1` |
 | Chunking policy | `chunking_v1` |
 | Tokenizer | `cl100k_base_v1` |
 | Dedup policy | `dedup_v1` |

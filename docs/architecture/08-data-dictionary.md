@@ -164,18 +164,19 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - Restricted visibility uses per-user `document_acl` grants only.
 - `document_chunks.embedding` is `vector(1024)` per [ADR-embedding-model-dimension](../adr/ADR-embedding-model-dimension.md). Packet 2 adds HNSW cosine index `document_chunks_embedding_hnsw_idx` and trigram GIN indexes on `term_normalized` / `alias_normalized`.
 - Retrieval RPCs `retrieve_dense_candidates`, `retrieve_term_candidates`,
-  `recheck_retrieval_candidates`, `fetch_authorized_chunk_context`, and
-  `resolve_structured_table` are `SECURITY INVOKER` for `app_api` only.
-  Authorization predicates run before rank/limit or artifact return. Context
-  fetch may return non-representative parent rows and trailing `provenance jsonb`
-  (sheet/range/URL locators). Table paths never come from
-  the client or model.
+  `recheck_retrieval_candidates`, `fetch_authorized_chunk_context`,
+  `list_authorized_eval_passages`, and `resolve_structured_table` are
+  `SECURITY INVOKER` for `app_api` only. Authorization predicates run before
+  rank/limit or artifact return. Context fetch may return non-representative
+  parent rows and trailing `provenance jsonb` (sheet/range/URL locators).
+  Eval passages return current, authorized, representative rows only (limit 60).
+  Table paths never come from the client or model.
 - `search_normalized` / `term_normalized` / `alias_normalized` use `search.normalize_arabic_v1` only.
 - Pending glossary imports never write `search_aliases`; approval projects aliases; rollback deletes that projection.
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
 - `app.runs` also has unique `(creator_user_id, conversation_id, idempotency_key)` where the key is not null. The global `runs_idempotency_key_uq` remains.
 - `app.load_query_memory` is SECURITY DEFINER, `validate_caller_context`, creator-only, fails on deleted conversations, returns at most 12 recent messages, EXECUTE to `app_api` only. Compact summaries live in `langgraph.store`, never source documents.
-- `app.citations.provenance` jsonb (existing column, expand-only payload) stores fusion algorithm, config hash, hybrid/graph ranks, combined score, requested/effective route, atomic-link id, and inference flag. Packet 3 added no citation table or column. `chunk_id` remains nullable so table-range citations can persist without a passage.
+- `app.citations.provenance` jsonb (existing column, expand-only payload) stores fusion algorithm, config hash, hybrid/graph ranks, combined score, requested/effective route, atomic-link id, and inference flag. Packet 3 added no citation table or column. `chunk_id` remains nullable so table-range citations can persist without a passage. Citation GET v2 overlays `page_number` (1-based file page), printed `page_label` from chunk locators, title, and section. ACL failure strips locator identity including `page_label`.
 - `audit_events` rejects UPDATE/DELETE (append-only trigger).
 - `llm_usage` rejects UPDATE/DELETE (append-only trigger). Runtime roles have no table DML; query usage is inserted only through `app.record_query_llm_usage`.
 - RLS is enabled on all exposed tables; Storage quarantine INSERT is reservation-scoped; no authenticated SELECT on quarantine.

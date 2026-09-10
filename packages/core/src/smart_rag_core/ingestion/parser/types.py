@@ -223,7 +223,14 @@ class ParseWarning(BaseModel):
 
 
 class ParseResult(BaseModel):
-    """Closed typed parse output for one Storage object."""
+    """Closed typed parse output for one Storage object.
+
+    Attributes:
+        page_labels: Printed PDF labels aligned with zero-based ``page_index``.
+            Empty strings mean the page has no ``/PageLabels`` entry. Unused
+            for element identity; chunking copies non-empty values onto
+            provenance locators as ``page_label``.
+    """
 
     disposition: ParseDisposition
     format: str
@@ -232,6 +239,7 @@ class ParseResult(BaseModel):
     cleaning_version: str
     config_hash: str
     elements: tuple[TypedElement, ...] = Field(default_factory=tuple)
+    page_labels: tuple[str, ...] = Field(default_factory=tuple)
     removals: tuple[RemovalDiagnostic, ...] = Field(default_factory=tuple)
     coverage: CoverageAccounting
     warnings: tuple[ParseWarning, ...] = Field(default_factory=tuple)
