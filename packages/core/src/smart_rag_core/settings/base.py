@@ -242,6 +242,22 @@ class SharedSettings(BaseSettings):
         description="Private deny-by-default crawl-proxy URL.",
         json_schema_extra={"security": "internal"},
     )
+    web_search_enabled: bool = Field(
+        default=False,
+        validation_alias="WEB_SEARCH_ENABLED",
+        description=(
+            "Local-only Exa web research. Python default false. Staging and "
+            "production reject true. Production Web stays disabled until a "
+            "paid budget and managed egress are approved."
+        ),
+        json_schema_extra={"security": "public"},
+    )
+    exa_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias="EXA_API_KEY",
+        description="Exa REST credential. Server-only. Never logged or committed.",
+        json_schema_extra={"security": "secret"},
+    )
 
     @model_validator(mode="after")
     def require_provider_key_outside_mock_mode(self) -> Self:
@@ -308,6 +324,27 @@ class SharedSettings(BaseSettings):
             )
         if self.langsmith_export_io and self.app_env is not Environment.LOCAL:
             raise ValueError("LANGSMITH_EXPORT_IO is allowed only when APP_ENV=local")
+        return self
+
+    @model_validator(mode="after")
+    def require_exa_key_when_web_search_enabled(self) -> Self:
+        """Require a local Exa credential when web research is enabled.
+
+        Returns:
+            The validated settings instance.
+
+        Raises:
+            ValueError: If Web is enabled outside ``APP_ENV=local`` or without
+                ``EXA_API_KEY``.
+        """
+
+        if not self.web_search_enabled:
+            return self
+        if self.app_env is not Environment.LOCAL:
+            raise ValueError("WEB_SEARCH_ENABLED is forbidden unless APP_ENV=local")
+        secret = self.exa_api_key
+        if secret is None or not secret.get_secret_value().strip():
+            raise ValueError("EXA_API_KEY is required when WEB_SEARCH_ENABLED=true")
         return self
 
     def allows_unsigned_local_live_providers(self) -> bool:

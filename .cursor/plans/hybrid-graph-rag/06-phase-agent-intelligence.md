@@ -86,7 +86,7 @@ Packets P06-09 through P06-43 are additive after the completed historical packet
 35. [x] [Implement the Admin Recall@10 scoreboard, exam progress, and qualification confirmation.](./06-phase-agent-intelligence/packets/35-admin-exam-board.md)
 36. [x] [Run integrated verification, reconcile docs, and write the close evidence.](./06-phase-agent-intelligence/packets/36-hosted-eval-verification.md)
 37. [x] [Authorize advanced web research overlay, ADR, and packets P06-38 through P06-43.](./06-phase-agent-intelligence/packets/37-advanced-web-research-amendment.md)
-38. [ ] [Implement bounded Exa REST gateway, configuration, and controlled provider egress.](./06-phase-agent-intelligence/packets/38-exa-rest-gateway-controlled-egress.md)
+38. [x] [Implement bounded Exa REST gateway, configuration, and controlled provider egress.](./06-phase-agent-intelligence/packets/38-exa-rest-gateway-controlled-egress.md)
 39. [ ] [Add durable run-scoped web evidence, URL citations, and merged source_kind listing.](./06-phase-agent-intelligence/packets/39-run-web-evidence.md)
 40. [ ] [Implement four-mode admission, Auto default, exactly-one-source routing, and Web envelope.](./06-phase-agent-intelligence/packets/40-four-mode-admission-routing.md)
 41. [ ] [Implement bounded iterative Web research graph, synthesis, verification, and fail-closed routes.](./06-phase-agent-intelligence/packets/41-web-research-graph.md)

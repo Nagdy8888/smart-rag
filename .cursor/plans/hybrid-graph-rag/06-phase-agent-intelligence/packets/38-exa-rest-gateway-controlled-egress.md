@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 38
-status: pending
+status: complete
 title: "Implement bounded Exa REST gateway, configuration, and controlled provider egress."
 requirement_ids: [P06-38]
 ---

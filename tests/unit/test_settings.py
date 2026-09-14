@@ -13,6 +13,7 @@ from smart_rag_core.settings import (
     WorkerSettings,
     load_backend_settings,
     load_jwks_rollover_settings,
+    load_settings,
     load_worker_settings,
 )
 
@@ -59,6 +60,8 @@ def test_deployable_settings_are_typed_and_share_secure_defaults(
     assert not issubclass(AgentSettings, BackendSettings)
     assert backend.pdf_eval_workspace_enabled is False
     assert backend.pdf_eval_workspace_root == "/app/.private-eval"
+    assert backend.web_search_enabled is False
+    assert backend.exa_api_key is None
 
 
 def test_agent_studio_live_token_is_redacted(
@@ -403,5 +406,35 @@ def test_pdf_eval_workspace_rejected_in_hosted_environments(
 
     configure_hosted_backend_env(monkeypatch, app_env="production")
     monkeypatch.setenv("PDF_EVAL_WORKSPACE_ENABLED", "true")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
+
+
+def test_web_search_rejected_outside_local(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WEB_SEARCH_ENABLED is local-only and requires EXA_API_KEY."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("WEB_SEARCH_ENABLED", "true")
+    monkeypatch.delenv("EXA_API_KEY", raising=False)
+    with pytest.raises(SettingsValidationError):
+        load_settings(SharedSettings)
+
+    monkeypatch.setenv("EXA_API_KEY", "exa-settings-canary")
+    local = load_settings(SharedSettings)
+    assert local.web_search_enabled is True
+    assert local.exa_api_key is not None
+    assert "exa-settings-canary" not in repr(local)
+
+    configure_hosted_backend_env(monkeypatch, app_env="staging")
+    monkeypatch.setenv("WEB_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("EXA_API_KEY", "exa-settings-canary")
+    with pytest.raises(SettingsValidationError):
+        load_backend_settings()
+
+    configure_hosted_backend_env(monkeypatch, app_env="production")
+    monkeypatch.setenv("WEB_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("EXA_API_KEY", "exa-settings-canary")
     with pytest.raises(SettingsValidationError):
         load_backend_settings()

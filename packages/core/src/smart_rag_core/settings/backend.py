@@ -396,6 +396,27 @@ class BackendSettings(SharedSettings):
         return self
 
     @model_validator(mode="after")
+    def reject_web_search_in_hosted_environments(self) -> Self:
+        """Forbid Exa web research in staging and production.
+
+        Shared settings already reject ``WEB_SEARCH_ENABLED`` outside
+        ``APP_ENV=local``. This backend-specific check keeps the hosted
+        fail-closed contract next to the PDF-eval workspace gate.
+
+        Returns:
+            This settings instance.
+
+        Raises:
+            ValueError: If the Web flag is true in a hosted environment.
+        """
+
+        if self.web_search_enabled and self.app_env in _HOSTED_ENVIRONMENTS:
+            raise ValueError(
+                "WEB_SEARCH_ENABLED is forbidden when APP_ENV is staging or production"
+            )
+        return self
+
+    @model_validator(mode="after")
     def reject_transaction_pooler_session_dsns(self) -> Self:
         """Reject transaction-pooler URLs for LangGraph and LightRAG.
 
