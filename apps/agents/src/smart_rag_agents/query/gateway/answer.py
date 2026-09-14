@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from pydantic import ValidationError
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_answer.assembly import assemble_source_records
 from smart_rag_core.query_answer.exceptions import AnswerError
@@ -46,17 +47,21 @@ def gateway_answer(
         Parsed answer payload plus provider prompt and completion tokens.
 
     Raises:
-        AnswerError: If the gateway is unbound.
+        AnswerError: If the gateway is unbound or the provider payload
+            cannot be parsed as ``AnswerPayload``.
     """
 
     from smart_rag_core.gateways.model import AnswerModelRequest
 
-    typed_tables = tuple(
-        item
-        if isinstance(item, TableEvidenceRecord)
-        else TableEvidenceRecord.model_validate(item)
-        for item in tables
-    )
+    try:
+        typed_tables = tuple(
+            item
+            if isinstance(item, TableEvidenceRecord)
+            else TableEvidenceRecord.model_validate(item)
+            for item in tables
+        )
+    except ValidationError as exc:
+        raise AnswerError("answer_schema_invalid") from exc
     records = assemble_source_records(fusion, typed_tables)
     timeout_seconds = gateway_timeout_seconds(context)
     request = AnswerModelRequest(
@@ -80,7 +85,10 @@ def gateway_answer(
             timeout_seconds=request.remaining_deadline_seconds,
         ),
     )
-    payload = AnswerPayload.model_validate(response.payload)
+    try:
+        payload = AnswerPayload.model_validate(response.payload)
+    except ValidationError as exc:
+        raise AnswerError("answer_schema_invalid") from exc
     filtered = filter_invented_ids(payload, fusion, typed_tables)
     prompt_tokens, completion_tokens = tokens_from_gateway_response(response)
     return (

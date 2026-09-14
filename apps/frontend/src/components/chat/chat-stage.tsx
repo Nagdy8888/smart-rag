@@ -22,7 +22,7 @@ import { LimitationCallout } from "../ui/limitation-callout";
 import { AnswerSurface } from "./answer-surface";
 import { ChatComposer } from "./chat-composer";
 import { FeedbackPopover } from "./feedback-popover";
-import { SaveToQuizPopover, type SaveToQuizPopoverProps } from "./save-to-quiz-popover";
+import { SaveToQuizSheet, type SaveToQuizSheetProps } from "./save-to-quiz-sheet";
 import type { UseChatRunResult } from "./hooks/use-chat-run";
 import { RunDetailsSheet } from "./run-details-sheet";
 import type { FeedbackTag } from "../../lib/types";
@@ -75,7 +75,7 @@ export type ChatStageProps = {
   onFeedback: () => void;
   feedbackPending: boolean;
   showSaveToQuiz?: boolean;
-  quiz?: SaveToQuizPopoverProps | null;
+  quiz?: SaveToQuizSheetProps | null;
 };
 
 /**
@@ -290,7 +290,7 @@ export function ChatStage(props: ChatStageProps) {
               onSubmit={onFeedback}
               pending={feedbackPending}
             />
-            {showSaveToQuiz && quiz ? <SaveToQuizPopover {...quiz} /> : null}
+            {showSaveToQuiz && quiz ? <SaveToQuizSheet {...quiz} /> : null}
           </div>
         ) : null}
       </div>

@@ -1365,5 +1365,12 @@ describe("ChatApp Save to quiz gating", () => {
     await completeAsk(user);
     expect(screen.getByRole("button", { name: "Give feedback" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save to quiz" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save to quiz" }));
+    expect(screen.getByRole("dialog", { name: "Save to quiz" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "New case" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Give feedback" })).toBeInTheDocument();
   });
 });

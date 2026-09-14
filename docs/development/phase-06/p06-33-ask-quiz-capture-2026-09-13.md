@@ -29,7 +29,7 @@ expected answer is not sent to Ask or compare; forged member POST still 403s.
 
 ## Files
 
-- [save-to-quiz-popover.tsx](../../../apps/frontend/src/components/chat/save-to-quiz-popover.tsx)
+- [save-to-quiz-sheet.tsx](../../../apps/frontend/src/components/chat/save-to-quiz-sheet.tsx)
 - [use-quiz-capture.ts](../../../apps/frontend/src/components/chat/hooks/use-quiz-capture.ts)
 - [chat-app.tsx](../../../apps/frontend/src/components/chat/chat-app.tsx)
 - [chat-stage.tsx](../../../apps/frontend/src/components/chat/chat-stage.tsx)
@@ -78,3 +78,43 @@ Next packet is
 (Admin case review, gold picker, stale repair, regenerate). Switch the
 frontend off `expected_revision` to `expected_row_version`. Do not add the
 exam scoreboard. Do not start P06-11 until P06-36 closes.
+
+## UX refinement (2026-09-14)
+
+Ask **Save to quiz** now opens a two-tab right-side sheet instead of a
+narrow popover. Packet 33 remains complete. Phase 6 status is unchanged.
+
+Changed files:
+
+- [save-to-quiz-sheet.tsx](../../../apps/frontend/src/components/chat/save-to-quiz-sheet.tsx)
+- [save-to-quiz-sheet.module.css](../../../apps/frontend/src/components/chat/save-to-quiz-sheet.module.css)
+- [save-to-quiz-sheet.test.tsx](../../../apps/frontend/src/components/chat/save-to-quiz-sheet.test.tsx)
+- [use-quiz-capture.ts](../../../apps/frontend/src/components/chat/hooks/use-quiz-capture.ts)
+- [chat-app.tsx](../../../apps/frontend/src/components/chat/chat-app.tsx)
+- [chat-stage.tsx](../../../apps/frontend/src/components/chat/chat-stage.tsx)
+- [chat-banners.tsx](../../../apps/frontend/src/components/chat/chat-banners.tsx)
+- [chat-transcript.module.css](../../../apps/frontend/src/components/chat/chat-transcript.module.css)
+- [action-inventory.json](../../frontend/action-inventory.json)
+- [workspace-screens.md](../../frontend/workspace-screens.md)
+- [PDF_EVAL_WORKSPACE.md](../../evaluation/PDF_EVAL_WORKSPACE.md)
+- [CORE_RAG_SURFACES.md](../../frontend/CORE_RAG_SURFACES.md)
+
+Removed `save-to-quiz-popover.tsx` and its test.
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend test -- src/components/chat/save-to-quiz-sheet.test.tsx` | 0; 15 passed |
+| `pnpm --filter smart-rag-frontend test -- src/components/chat-app.test.tsx` | 0; gating plus sheet-open assertions |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend test` | 0; 582 passed |
+| `pnpm --filter smart-rag-frontend build` | 0 |
+| `uv run python scripts/check_frontend_action_inventory.py` | 0 |
+| `pnpm check:docs` | 1; pre-existing MD012 in `p06-16-sse-custom-progress-amendment-2026-08-26.md`. Changed docs lint clean. |
+
+Create payload, idempotency, role/capability gating, question-only Ask reuse,
+and **not Recall@10** score guards are unchanged.
+
+Unverified: live owner/admin desktop and mobile screenshots of the opened
+sheet. `E2E_LIVE_EMAIL` / `E2E_LIVE_PASSWORD` were unset, so the completed-answer
+flow was not exercised in a browser this run.

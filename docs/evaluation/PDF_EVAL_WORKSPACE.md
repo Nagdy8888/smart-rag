@@ -235,7 +235,8 @@ including BM25 outage.
 
 Owner/admin Ask shows **Save to quiz** beside **Give feedback** when
 `GET /api/meta` `pdf_eval_workspace` is true. Members and viewers keep
-ordinary thumbs feedback only. The quiz control never replaces thumbs.
+ordinary thumbs feedback only. The quiz control never replaces thumbs. The
+footer trigger opens a two-tab side sheet (**New case** and **Saved cases**).
 
 ```mermaid
 flowchart LR
@@ -248,12 +249,13 @@ flowchart LR
 ```
 
 Create sends the completed run ID. The server loads the question. Zero to
-three citation chunk IDs are optional gold suggestions. Chat deletion does
+three citation chunk IDs are optional source suggestions. Chat deletion does
 not delete the saved case. The new row is a development draft and is never
-approved from Ask. **Ask this question** fills the composer with the saved
-question only. **Score this answer (not Recall@10)** is citation overlap
-for a pre-existing approved case whose normalized question matches. A draft
-created from the current run cannot score that run as quality.
+approved from Ask. **Save quiz case** submits the draft. **Ask this question**
+fills the composer with the saved question only. **Score this answer (not
+Recall@10)** is citation overlap for a pre-existing approved case whose
+normalized question matches. A draft created from the current run cannot
+score that run as quality.
 
 ## Rollback
 

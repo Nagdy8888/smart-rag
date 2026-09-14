@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import cast
 
 import psycopg
+from pydantic import ValidationError
 from smart_rag_core.query_admission.ceilings import assert_call_available
 from smart_rag_core.query_admission.exceptions import (
     QueryAdmissionError,
@@ -71,9 +72,11 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     Failure/fallback route:
         Unsupported links are removed or refused. Unsupported chains drop
         the composed conclusion. Inspection/NoRetrieval stay refused.
-        Missing gateway or omitted verifier links never terminate
-        ``verified``. Omitted IDs force ``verified_partial`` and
-        ``verifier_omitted_links``.
+        Missing gateway, omitted verifier links, or a schema-invalid
+        verifier payload never terminate ``verified``. Omitted IDs force
+        ``verified_partial`` and ``verifier_omitted_links``. Invalid
+        verifier JSON degrades to ``verified_partial`` with the
+        already-generated answer.
 
     Args:
         state: State after answer generation.
@@ -85,8 +88,6 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
 
     if skip_closed_nodes(state):
         return state
-    fusion = fusion_from_state(state.get("fusion"))
-    tables = tables_from_state(state.get("table_composition"))
     raw_answer = state.get("answer")
     if raw_answer is None:
         return {
@@ -94,7 +95,18 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "status": "insufficient_evidence",
             "detail": "missing_answer",
         }
-    payload = AnswerPayload.model_validate(raw_answer)
+    try:
+        fusion = fusion_from_state(state.get("fusion"))
+        tables = tables_from_state(state.get("table_composition"))
+        payload = AnswerPayload.model_validate(raw_answer)
+    except ValidationError:
+        preserved = raw_answer if isinstance(raw_answer, dict) else {}
+        return {
+            **state,
+            "status": "verified_partial",
+            "detail": "payload_schema_invalid",
+            "answer": preserved,
+        }
     plan = None
     if state.get("retrieval_plan") is not None:
         try:

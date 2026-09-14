@@ -151,7 +151,11 @@ def verifier_json_schema(link_ids: tuple[str, ...]) -> dict[str, object]:
                     "properties": {
                         "link_id": {"type": "string", "enum": enum_ids},
                         "supported": {"type": "boolean"},
-                        "reason": {"type": "string"},
+                        "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                        },
                     },
                 },
             }

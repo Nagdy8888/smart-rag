@@ -252,15 +252,17 @@ flowchart LR
 - Failure copy: “Feedback could not be recorded. Try again.”
 - Popover remains open on failure.
 
-#### `SaveToQuizPopover`
+#### `SaveToQuizSheet`
 
 - Separate owner/admin control beside Give feedback. Never replaces thumbs.
 - Visible only when `GET /me` is owner/admin and `/api/meta` `pdf_eval_workspace` is true. Hidden chrome is not authorization; members still 403 on `POST /admin/pdf-eval/cases`.
+- Opens a right-side sheet titled **Save to quiz** (34rem desktop, full width at 767px and below). Local tabs are **New case** and **Saved cases**. Opening always lands on New case. Form values persist in `useQuizCapture` across close/reopen.
+- New case shows a read-only question card, question type, optional expected answer, 0–3 suggested sources, retention copy, and **Save quiz case**. Save statuses stay in the sheet. **View saved cases** appears after a successful save.
+- Paginated saved-case selector lists summaries only (friendly query class, review status, source count). Detail, including the question, loads after selection. List, detail, and load-more have local loading, empty, error, and Retry states.
 - Create posts the completed run ID, query class, optional expected answer, 0–3 citation chunk IDs, and an idempotency key. Browser question text is omitted. Split is always `development`. Never approves.
 - Retention copy: “Deleting this chat does not delete the saved quiz case.”
-- Paginated saved-case selector lists summaries only. Detail (including the question) loads after selection.
-- **Ask this question** fills the composer with the saved question only.
-- **Score this answer (not Recall@10)** is enabled only for a pre-existing approved case whose normalized question matches. Newly saved drafts cannot score the run that created them. Compare sends `{ run_id }` only.
+- **Ask this question** fills the composer with the saved question only, then closes the sheet.
+- **Score this answer (not Recall@10)** is enabled only for a pre-existing approved case whose normalized question matches. Newly saved drafts cannot score the run that created them. Compare sends `{ run_id }` only. Score success and failure stay on the selected-case card.
 
 ### Documents page component specification
 
