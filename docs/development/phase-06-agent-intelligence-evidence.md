@@ -63,6 +63,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-34 — Admin case review, gold picker, stale repair (2026-09-13) | [phase-06/p06-34-admin-eval-curation-2026-09-13.md](./phase-06/p06-34-admin-eval-curation-2026-09-13.md) | 87 |
 | P06-35 — Admin Recall@10 scoreboard, exam progress (2026-09-13) | [phase-06/p06-35-admin-exam-board-2026-09-13.md](./phase-06/p06-35-admin-exam-board-2026-09-13.md) | 91 |
 | P06-36 — Hosted evaluation workspace close (2026-09-13) | [phase-06/p06-36-hosted-eval-verification-2026-09-13.md](./phase-06/p06-36-hosted-eval-verification-2026-09-13.md) | 115 |
+| P06-37 — Advanced web research overlay (2026-09-14) | [phase-06/p06-37-advanced-web-research-amendment-2026-09-14.md](./phase-06/p06-37-advanced-web-research-amendment-2026-09-14.md) | 90 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

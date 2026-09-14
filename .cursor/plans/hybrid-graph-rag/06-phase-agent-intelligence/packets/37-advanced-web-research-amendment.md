@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 37
-status: pending
+status: complete
 title: "Authorize advanced web research overlay, ADR, and packets P06-38 through P06-43."
 requirement_ids: [P06-37]
 ---
@@ -35,7 +35,7 @@ This packet names no implementation skill. It edits Markdown only.
   [`docs/adr/README.md`](../../../../../docs/adr/README.md).
 - Packet files P06-38 through P06-43 under this directory and wrapper links.
 - Navigation note in
-  [`hybrid-graph-rag_ab5281ef.plan.md`](../../hybrid-graph-rag_ab5281ef.plan.md).
+  [`hybrid-graph-rag_ab5281ef.plan.md`](../../../hybrid-graph-rag_ab5281ef.plan.md).
 - Amendment log in [`99-source-coverage.md`](../../99-source-coverage.md).
 - Plan-integrity lock update after structural checks pass.
 - Evidence handoff in

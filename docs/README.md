@@ -120,6 +120,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-general-chat-strict-split.md](./adr/ADR-general-chat-strict-split.md) | engineering-lead | accepted | 2026-09-10 | frontend, eng, security, reviewers |
 | [adr/ADR-local-pdf-evaluation-workspace.md](./adr/ADR-local-pdf-evaluation-workspace.md) | engineering-lead | superseded | 2026-09-13 | eng, reviewers, security, frontend |
 | [adr/ADR-hosted-webapp-evaluation-workspace.md](./adr/ADR-hosted-webapp-evaluation-workspace.md) | engineering-lead | accepted | 2026-09-13 | eng, reviewers, security, frontend |
+| [adr/ADR-advanced-web-research.md](./adr/ADR-advanced-web-research.md) | engineering-lead | accepted | 2026-09-14 | eng, reviewers, security, frontend |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-09 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
 | [adr/ADR-local-langsmith-export-io.md](./adr/ADR-local-langsmith-export-io.md) | engineering-lead | accepted | 2026-08-26 | eng, security |
