@@ -55,16 +55,16 @@ Complete these in order. A checked box requires committed implementation evidenc
 7. [x] [Implement Supabase checkpoints/store memory, idempotency/run-event GC, full governance enforcement, trace redaction, prompt versions, usage accounting, feedback, and immediate conversation deletion.](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md)
 8. [x] [Ship the thin authenticated developer UI and prove route, fallback, injection, idempotency, budget, outage, event-loop, and privacy gates.](./06-phase-agent-intelligence/packets/08-thin-developer-ui.md)
 
-Packets P06-09 through P06-26 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract. P06-17 and P06-18 are the 2026-09-09 private-PDF agent evaluation and holdout overlay; they do not start until Packet 9 is accepted and Packet 10 includes the production rerank/scope contract. Packets P06-19 through P06-26 are the 2026-09-10 local PDF evaluation workspace overlay. Integrity requires contiguous packet numbers, so they follow P06-18. User approval on 2026-09-10: execute P06-19 through P06-26 immediately after Packet 9, then resume Packet 10. Do not start Packet 10 coding until the overlay packets are accepted or an explicit blocker is recorded.
+Packets P06-09 through P06-36 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract. P06-17 and P06-18 are the 2026-09-09 private-PDF agent evaluation and holdout overlay; they do not start until Packet 9 is accepted and Packet 10 includes the production rerank/scope contract. Packets P06-19 through P06-26 are the 2026-09-10 local PDF evaluation workspace overlay. Packets P06-27 through P06-36 are the 2026-09-10 hosted webapp evaluation amendment. Integrity requires contiguous packet numbers, so they follow P06-26. Execution after P06-26: accept P06-27, then existing Packet 10, then P06-28 through P06-36, then resume P06-11. Do not start Packet 10 coding until overlay packets 19–26 are accepted. Do not start P06-28 until Packet 10 is accepted.
 
 9. [x] [Canonical amendment for general-chat strict-split, ADR, and packets P06-10 through P06-15.](./06-phase-agent-intelligence/packets/09-canonical-general-chat-amendment.md)
-10. [ ] [Implement typed knowledge-scope classification, the live profile gateway, and deterministic route compilation.](./06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md)
-11. [ ] [Drain successful LangGraph streams and classify expected cancellation without hiding real trace errors.](./06-phase-agent-intelligence/packets/11-sse-stream-lifecycle-tracing.md)
-12. [ ] [Implement bounded, budgeted general and user-text model answers without weakening document grounding.](./06-phase-agent-intelligence/packets/12-general-chat-execution.md)
-13. [ ] [Add authenticated query_studio_live with per-run resources and normal ACL, admission, and budget controls.](./06-phase-agent-intelligence/packets/13-authenticated-studio-live.md)
-14. [ ] [Add answer-origin, clarification, and citation-safe behavior to the main chat UI.](./06-phase-agent-intelligence/packets/14-chat-origin-ux.md)
-15. [ ] [Run all deterministic and live gates, inspect LangSmith traces, and update evidence and runbooks.](./06-phase-agent-intelligence/packets/15-integrated-verification.md)
-16. [ ] [Add LangGraph custom SSE progress and paced verified-answer presentation contract.](./06-phase-agent-intelligence/packets/16-sse-custom-progress.md)
+10. [x] [Implement typed knowledge-scope classification, the live profile gateway, and deterministic route compilation.](./06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md)
+11. [x] [Drain successful LangGraph streams and classify expected cancellation without hiding real trace errors.](./06-phase-agent-intelligence/packets/11-sse-stream-lifecycle-tracing.md)
+12. [x] [Implement bounded, budgeted general and user-text model answers without weakening document grounding.](./06-phase-agent-intelligence/packets/12-general-chat-execution.md)
+13. [x] [Add authenticated query_studio_live with per-run resources and normal ACL, admission, and budget controls.](./06-phase-agent-intelligence/packets/13-authenticated-studio-live.md)
+14. [x] [Add answer-origin, clarification, and citation-safe behavior to the main chat UI.](./06-phase-agent-intelligence/packets/14-chat-origin-ux.md)
+15. [x] [Run all deterministic and live gates, inspect LangSmith traces, and update evidence and runbooks.](./06-phase-agent-intelligence/packets/15-integrated-verification.md)
+16. [x] [Add LangGraph custom SSE progress and paced verified-answer presentation contract.](./06-phase-agent-intelligence/packets/16-sse-custom-progress.md)
 17. [ ] [Qualify PDF Hybrid agent answers on development and qualification without reusing the synthetic judge.](./06-phase-agent-intelligence/packets/17-pdf-agent-evaluation.md)
 18. [ ] [Execute one immutable private-PDF holdout and close with redacted evidence.](./06-phase-agent-intelligence/packets/18-pdf-holdout-close.md)
 19. [x] [Authorize the local-only PDF evaluation workspace overlay, ADR, and packets P06-20 through P06-26.](./06-phase-agent-intelligence/packets/19-local-pdf-evaluation-overlay.md)
@@ -75,6 +75,16 @@ Packets P06-09 through P06-26 are additive after the completed historical packet
 24. [x] [Add ranked-ID channel diagnostics and local evaluation baseline tooling.](./06-phase-agent-intelligence/packets/24-pdf-eval-channel-diagnostics.md)
 25. [x] [Repair measured Hybrid candidate and rerank failures without opening holdout.](./06-phase-agent-intelligence/packets/25-pdf-eval-retrieval-repair.md)
 26. [x] [Wire ACL-safe retrieval caching and record Combined plus holdout gates.](./06-phase-agent-intelligence/packets/26-retrieval-cache-and-holdout-gates.md)
+27. [x] [Authorize the hosted-evaluation workspace amendment, ADR, and packets P06-28 through P06-36.](./06-phase-agent-intelligence/packets/27-hosted-webapp-evaluation-amendment.md)
+28. [x] [Implement hosted quiz-case schema, gold rows, and app_api RPCs.](./06-phase-agent-intelligence/packets/28-eval-quiz-case-database.md)
+29. [x] [Replace the HTTP file store with a typed DB-backed case API.](./06-phase-agent-intelligence/packets/29-eval-quiz-case-api.md)
+30. [x] [Add durable exam-run, result, report, and hidden-conversation database contracts.](./06-phase-agent-intelligence/packets/30-eval-exam-database.md)
+31. [x] [Implement the restart-safe production-corpus Hybrid exam runner.](./06-phase-agent-intelligence/packets/31-eval-exam-runner.md)
+32. [x] [Expose exam start, poll, cancel, latest report, and missed-case APIs.](./06-phase-agent-intelligence/packets/32-eval-exam-api.md)
+33. [x] [Add owner/admin Save to quiz beside existing thumbs feedback.](./06-phase-agent-intelligence/packets/33-ask-quiz-capture.md)
+34. [x] [Implement Admin case review, gold picker, stale repair, and draft regeneration.](./06-phase-agent-intelligence/packets/34-admin-eval-curation.md)
+35. [x] [Implement the Admin Recall@10 scoreboard, exam progress, and qualification confirmation.](./06-phase-agent-intelligence/packets/35-admin-exam-board.md)
+36. [x] [Run integrated verification, reconcile docs, and write the close evidence.](./06-phase-agent-intelligence/packets/36-hosted-eval-verification.md)
 
 ## Approved planned deviation: general-chat strict split
 
@@ -86,17 +96,27 @@ User approval on 2026-08-25; 2026-08-26 remediation accepted 2026-09-10: add a s
 - The production query path may spend one counted `profile` call under existing caps. Pure greetings/small talk are profile-model classified and general-model answered, normally consuming one profile plus one answer call.
 - Keep existing scope values and route families. Deterministic company signals override model output; a server-derived degradation reason never authorizes evidence.
 - After plan compilation, validated plans select explicit company, general, mixed, or fail-closed nodes. Direct paths skip retrieval/correction/fusion/table/tool/verifier-model work and still receive deterministic verification.
-- P06-10 remains the first historical coding packet after this markdown amendment. User-approved 2026-09-10 overlay packets P06-19 through P06-26 run before Packet 10.
+- P06-10 remains the first historical coding packet after the P06-09 markdown amendment. User-approved 2026-09-10 overlay packets P06-19 through P06-26 run before Packet 10. After P06-26, execute P06-27, then Packet 10, then P06-28 through P06-36, then P06-11.
 
 ## Approved planned deviation: local PDF evaluation workspace
 
-User approval on 2026-09-10: after Packet 9, prioritize a local-only owner/admin PDF evaluation workspace, label repair, and evidence-driven retrieval diagnosis before Packet 10 coding. Private questions and answers stay under gitignored `.private-eval/`. The API process never uses an operator or service-role DSN. Holdout custody stays outside the repository and is never listed or opened from the workspace. The feature is disabled by default and forbidden in staging and production.
+User approval on 2026-09-10: after Packet 9, prioritize a local-only owner/admin PDF evaluation workspace, label repair, and evidence-driven retrieval diagnosis before Packet 10 coding. Historical P06-19 through P06-26 remain. Hosted-label custody is superseded by the deviation below.
 
-- Recorded in [`docs/adr/ADR-local-pdf-evaluation-workspace.md`](../../../docs/adr/ADR-local-pdf-evaluation-workspace.md).
-- Integrity cannot insert packets between 9 and 10, so overlay packets are P06-19 through P06-26. Execute them immediately after Packet 9, then resume Packet 10.
-- Automatic draft generation may propose questions and extractive answers. A named human must approve. The answering model never receives expected answers before a run.
-- Do not freeze `hybrid_long_document_v1`, retune RRF, or open holdout until grounded labels and open-split gates pass.
-- Rollback disables `PDF_EVAL_WORKSPACE_ENABLED`, removes the Compose bind mount, and leaves historical packets 1–18 unchanged.
+- Recorded in [`docs/adr/ADR-local-pdf-evaluation-workspace.md`](../../../docs/adr/ADR-local-pdf-evaluation-workspace.md) (superseded for custody and official Recall@10).
+- FastAPI uses `app_api` plus server-derived owner/admin identity. Operator and service-role DSNs are forbidden on this path.
+- Holdout files remain outside the repository. The workspace never lists, fetches, or opens holdout.
+- Automatic drafts may propose extractive questions. A named human must approve. The answering model receives only the question.
+- Do not freeze `hybrid_long_document_v1`, retune frozen Hybrid weights, or open holdout until grounded labels and open-split gates pass.
+
+## Approved planned deviation: hosted webapp evaluation workspace
+
+User approval on 2026-09-10: store quiz questions, expected answers, gold metadata, and exam state in the existing hosted Supabase project. Day-to-day evaluation happens in the local/test webapp. The web exam measures production-corpus Hybrid Recall@10 (all required gold chunks in the signed-in examiner's production Hybrid top 10). Ordinary thumbs feedback stays. Holdout and freeze stay out.
+
+- Recorded in [`docs/adr/ADR-hosted-webapp-evaluation-workspace.md`](../../../docs/adr/ADR-hosted-webapp-evaluation-workspace.md).
+- Integrity keeps packet numbers contiguous, so hosted packets are P06-27 through P06-36. Execute P06-27, then existing Packet 10, then P06-28 through P06-36, then resume P06-11.
+- RLS, `app_api` RPCs, content-free audit, immediate delete, and 365-day retention are mandatory. Browser clients never talk to evaluation tables.
+- Staging and production keep `PDF_EVAL_WORKSPACE_ENABLED` false. Packet 29 may default the local Compose flag to true.
+- Rollback disables `PDF_EVAL_WORKSPACE_ENABLED`. Do not down-migrate populated hosted tables.
 
 ## Phase sequence requirement
 
@@ -130,7 +150,7 @@ Do not set `status: complete` until every `Done when` item below is proven.
 
 ## Canonical detailed requirements
 
-The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Additive packet P06-16 records the co-owned LangGraph custom SSE progress and paced verified-answer presentation contract. Additive packets P06-19 through P06-26 record the 2026-09-10 local PDF evaluation workspace overlay. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
+The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Additive packet P06-16 records the co-owned LangGraph custom SSE progress and paced verified-answer presentation contract. Additive packets P06-19 through P06-26 record the 2026-09-10 local PDF evaluation workspace overlay. Additive packets P06-27 through P06-36 record the 2026-09-10 hosted webapp evaluation workspace. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
 
 ### Phase 6 runtime Hybrid dependency contract
 

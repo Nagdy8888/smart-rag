@@ -152,6 +152,16 @@ def test_failed_write_leaves_original(
     before = store.load()
 
     def _boom(_path: Path, _payload: bytes) -> None:
+        """Fail the atomic replace.
+
+        Args:
+            _path: Unused destination.
+            _payload: Unused bytes.
+
+        Raises:
+            OSError: Always ``disk_full``.
+        """
+
         raise OSError("disk_full")
 
     monkeypatch.setattr(

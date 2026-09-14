@@ -2,7 +2,7 @@
 title: PDF Hybrid evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-13
 audience: engineering, reviewers
 ---
 
@@ -15,6 +15,7 @@ Related: [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy
 [PHASE4_RANKED_IDS.md](./PHASE4_RANKED_IDS.md) ·
 [ADR-hybrid-long-document-profile.md](../adr/ADR-hybrid-long-document-profile.md) ·
 [ADR-local-pdf-evaluation-workspace.md](../adr/ADR-local-pdf-evaluation-workspace.md) ·
+[ADR-hosted-webapp-evaluation-workspace.md](../adr/ADR-hosted-webapp-evaluation-workspace.md) ·
 [PDF_EVAL_WORKSPACE.md](./PDF_EVAL_WORKSPACE.md) ·
 [PARSER_BAKEOFF.md](./PARSER_BAKEOFF.md) ·
 [docs index](../README.md)
@@ -136,6 +137,13 @@ count-only tokens. BM25 snippets are never diagnostics.
 
 Do not retune from the 2026-09-10 2/24 ungrounded baseline. Do not freeze
 `hybrid_long_document_v1` without live development and qualification reports.
+
+P06-27 authorizes a hosted webapp exam that measures **production-corpus**
+Hybrid Recall@10 (all required gold chunks in the examiner's production
+Hybrid top 10). That metric is distinct from this CLI version-restricted
+PDF report. Packets P06-28 through P06-36 implemented the hosted workspace.
+A live official web exam number is still a blocker until a provisioned
+exam run is recorded. Holdout stays sealed (`holdout_opened=false`).
 
 ## Verification
 

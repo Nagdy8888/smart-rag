@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-07
+last-reviewed: 2026-09-13
 audience: engineering, security
 ---
 
@@ -87,6 +87,7 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | GET | `/usage/me` | authenticated | caller totals; `scope=me` | No prompt text |
 | GET | `/usage/company` | owner/admin | company totals; `scope=company` | Members/viewers 403 |
 | GET | `/admin/graph/entity-rules` | owner/admin | list RPC | LOW_RISK_READ 120 after the role gate. Members/viewers 403 |
+| GET/POST/PATCH/PUT/DELETE | `/admin/pdf-eval/*` | owner/admin | hosted quiz RPCs; exam start/cancel are `COST_MUTATION`; polls/reports are `LOW_RISK_READ`. `APP_ENV` local/test and `PDF_EVAL_WORKSPACE_ENABLED` | Members 403. Disabled 404. Missing schema 503. Exam HTTP returns 202 and never scores cases inline. No operator DSN. See [PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md) |
 
 Existing ingestion/glossary/entity-rule mutations keep owner/admin checks and
 now consume FastAPI-owned rate limits after the role gate.

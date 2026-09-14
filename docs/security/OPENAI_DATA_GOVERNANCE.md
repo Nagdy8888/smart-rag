@@ -2,7 +2,7 @@
 title: OpenAI data governance
 owner: product-owner
 status: accepted
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-10
 audience: client-approver, security
 approver: "user (Cursor chat; Phase 1–5 mandate; no legal name provided)"
 approval_date: 2026-08-13
@@ -30,6 +30,7 @@ Related: [SUBPROCESSOR_GOVERNANCE.md](./SUBPROCESSOR_GOVERNANCE.md) · [Phase 3 
 | OAI-CHAT | Query answer / summary / verifier | Bounded authorized evidence passages, citations IDs, user question | Chat run (Phase 6+) | Same + budget reservation |
 | OAI-RERANK | Accuracy-first rerank | Candidate passage texts (top-20 bound) | Hybrid retrieval (Phase 4+) | Same |
 | OAI-EXTRACT | LightRAG extraction callbacks | Graph-eligible chunk text only | Phase 5 graph indexing | Same + graph eligibility |
+| OAI-OCR | Isolated parser bake-off AnyDoc lane only | One PNG page raster (150 DPI, max 5 MiB) plus a transcription prompt. No Files API. `store=False`. No figure captioning | Operator bake-off parse after named/date approval 2026-09-10 | Same laptop overlay; experiment-only; never production ParserService |
 | OAI-SUPPORT | Provider support/abuse logs | Provider-side abuse monitoring of prompts/responses | Any live API call | Org retention/ZDR setting |
 
 No undocumented company-content path to OpenAI is authorized. Direct SDK use outside the shared gateway is forbidden.
@@ -153,3 +154,24 @@ Detector false-positive reviews for this PDF use hash-bound finding IDs
 `payload_ref.review_approved` is not an authoritative override.
 
 Related: [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy-remediation.md)
+
+## 10. 2026-09-10 parser bake-off page OCR named approval
+
+The product owner named this Cursor session as approver for sending
+**page rasters of this one PDF** through OpenAI Vision so the isolated AnyDoc
+bake-off lane can recover pages AnyDoc refuses (`NeedsOcrError`) and pages
+with no selectable text. This is flow **OAI-OCR**. It is not production
+ingest, not Firecrawl Parse, and not figure captioning.
+
+| Control | Overlay record |
+| --- | --- |
+| Approver | user (Cursor chat; product-owner; no legal name provided) |
+| Date | 2026-09-10 |
+| Model | `gpt-4o-mini` (existing allow-listed chat model) |
+| Transport | Responses `input_image` data URL; `store=False`; no Files API |
+| Sandbox | API key never mounted; `--network none` remains |
+| `LANGSMITH_EXPORT_IO` | forced `false`; page rasters are never exported |
+| ZDR | **not** enabled; not claimed |
+| Staging / production | still prohibited |
+
+Related: [PARSER_BAKEOFF.md](../evaluation/PARSER_BAKEOFF.md) · [ADR-anydoc-local-parser-bakeoff.md](../adr/ADR-anydoc-local-parser-bakeoff.md)

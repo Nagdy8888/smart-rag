@@ -1,7 +1,18 @@
-"""Local AnyDoc conversion helpers with no Firecrawl network fallback."""
+"""Local AnyDoc conversion helpers with no Firecrawl network fallback.
+
+Optional pypdf and PyMuPDF stubs are incomplete; unknown-member diagnostics
+are suppressed in this module only.
+"""
+
+# pyright: reportMissingImports=false
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownVariableType=false
+# pyright: reportUnknownArgumentType=false
+# pyright: reportAttributeAccessIssue=false
 
 from __future__ import annotations
 
+import os
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -11,6 +22,7 @@ from smart_rag_core.evaluation.parser_bakeoff.constants import (
     ANYDOC_OCR_MODE,
     ANYDOC_PACKAGE_VERSION,
     ANYDOC_PARSER_VERSION,
+    ANYDOC_SCANNED_PAGES,
 )
 from smart_rag_core.evaluation.parser_bakeoff.models import BakeoffError
 from smart_rag_core.ingestion.parser.adapters.markdown_adapter import parse_markdown
@@ -35,7 +47,7 @@ def anydoc_config_extra() -> dict[str, object]:
         "anydoc_version": ANYDOC_PACKAGE_VERSION,
         "ocr": ANYDOC_OCR_MODE,
         "output": "markdown",
-        "scanned_pages": "omit",
+        "scanned_pages": ANYDOC_SCANNED_PAGES,
     }
 
 
@@ -84,12 +96,15 @@ def failed_lane_result(
     )
 
 
-def stamp_anydoc_parse(result: ParseResult, content_hash: str) -> ParseResult:
+def stamp_anydoc_parse(
+    result: ParseResult, content_hash: str, *, ocr_pages: int = 0
+) -> ParseResult:
     """Rewrite Markdown-adapter identity onto AnyDoc pins.
 
     Args:
         result: Markdown adapter output.
         content_hash: Original PDF SHA-256.
+        ocr_pages: Host OpenAI Vision pages merged into this result.
 
     Returns:
         Parse result with AnyDoc versions, original hash, and Markdown locators.
@@ -106,7 +121,7 @@ def stamp_anydoc_parse(result: ParseResult, content_hash: str) -> ParseResult:
                 ANYDOC_PARSER_VERSION, ANYDOC_CLEANING_VERSION, extra=extra
             ),
             "resource_metrics": result.resource_metrics.model_copy(
-                update={"pages_processed": 0, "ocr_pages": 0}
+                update={"pages_processed": 0, "ocr_pages": ocr_pages}
             ),
         }
     )
@@ -190,12 +205,44 @@ def _write_pdf_without_pages_fitz(source: Path, omitted: set[int], dest: Path) -
         source_doc.close()
 
 
+def probe_anydoc_ocr_pages(path: Path) -> tuple[int, ...]:
+    """Return 1-indexed pages AnyDoc names as needing OCR. No omit, no Firecrawl.
+
+    Args:
+        path: Readable PDF path.
+
+    Returns:
+        Named pages, or empty when AnyDoc converts the file.
+
+    Raises:
+        BakeoffError: When AnyDoc is missing or hosted OCR is requested.
+    """
+
+    try:
+        import anydoc
+    except ImportError as exc:
+        raise BakeoffError(
+            "anydoc_missing", "firecrawl-anydoc is not installed"
+        ) from exc
+    if ANYDOC_OCR_MODE != "reject":
+        raise BakeoffError("hosted_forbidden", "hosted AnyDoc OCR is forbidden")
+    try:
+        anydoc.to_markdown(str(path), ocr="reject")
+    except anydoc.NeedsOcrError as exc:
+        pages = tuple(int(page) for page in (getattr(exc, "pages", ()) or ()))
+        if not pages:
+            raise BakeoffError("needs_ocr", "NeedsOcrError listed no pages") from exc
+        return pages
+    return ()
+
+
 def convert_with_anydoc(path: Path) -> str:
     """Convert one local PDF to Markdown. Hosted OCR is never used.
 
     AnyDoc 0.2.4 raises ``NeedsOcrError`` for the whole file when any page is
     image-only. This helper drops those named pages and converts the rest
-    locally. It does not call Firecrawl Parse.
+    locally. Live bake-off assembly OCRs named/empty pages on the host and
+    only sends AnyDoc-safe slices here. It does not call Firecrawl Parse.
 
     Args:
         path: Readable PDF path.
@@ -222,7 +269,11 @@ def convert_with_anydoc(path: Path) -> str:
         pages = tuple(int(page) for page in (getattr(exc, "pages", ()) or ()))
         if not pages:
             raise BakeoffError("needs_ocr", "NeedsOcrError listed no pages") from exc
-        stripped = path.with_name(f"{path.stem}.textpages.pdf")
+        handle, stripped_name = tempfile.mkstemp(
+            prefix="anydoc-textpages-", suffix=".pdf"
+        )
+        os.close(handle)
+        stripped = Path(stripped_name)
         try:
             _write_pdf_without_pages(path, pages, stripped)
             return str(anydoc.to_markdown(str(stripped), ocr="reject"))
@@ -268,12 +319,15 @@ def map_anydoc_exception(exc: BaseException) -> str:
     return "convert_failed"
 
 
-def parse_anydoc_markdown_bytes(markdown: str, *, content_hash: str) -> ParseResult:
+def parse_anydoc_markdown_bytes(
+    markdown: str, *, content_hash: str, ocr_pages: int = 0
+) -> ParseResult:
     """Parse AnyDoc Markdown through the existing Markdown adapter.
 
     Args:
         markdown: AnyDoc Markdown output.
         content_hash: Original PDF SHA-256.
+        ocr_pages: Host OpenAI Vision pages included in ``markdown``.
 
     Returns:
         Stamped AnyDoc ``ParseResult``.
@@ -283,4 +337,4 @@ def parse_anydoc_markdown_bytes(markdown: str, *, content_hash: str) -> ParseRes
         path = Path(temp_dir) / "anydoc.md"
         path.write_text(markdown, encoding="utf-8")
         parsed = parse_markdown(path, content_hash, "markdown")
-    return stamp_anydoc_parse(parsed, content_hash)
+    return stamp_anydoc_parse(parsed, content_hash, ocr_pages=ocr_pages)

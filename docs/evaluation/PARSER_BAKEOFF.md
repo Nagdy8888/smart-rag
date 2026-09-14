@@ -15,6 +15,7 @@ Related: [ADR-anydoc-local-parser-bakeoff.md](../adr/ADR-anydoc-local-parser-bak
 · [PDF_HYBRID_EVALUATION.md](./PDF_HYBRID_EVALUATION.md)
 · [PARSER_SANDBOX.md](../ingestion/PARSER_SANDBOX.md)
 · [CHUNKING_CONTRACT.md](../ingestion/CHUNKING_CONTRACT.md)
+· [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md)
 · [docs index](../README.md)
 
 ```mermaid
@@ -22,8 +23,11 @@ flowchart LR
   sourcePdf[SelectedPDF] --> preflight[HashBoundsClamAV]
   preflight --> currentPath[CurrentSandboxParser]
   preflight --> anydocPath[LocalAnyDocSandbox]
+  preflight --> hostOcr[HostOpenAIVisionOCR]
   currentPath --> currentResult[TypedPdfParseResult]
-  anydocPath --> anydocResult[MarkdownLocatedParseResult]
+  anydocPath --> mergeMd[OrderedMarkdownMerge]
+  hostOcr --> mergeMd
+  mergeMd --> anydocResult[MarkdownLocatedParseResult]
   currentResult --> sharedDownstream[SharedChunkEmbedBM25]
   anydocResult --> sharedDownstream
   sharedDownstream --> currentVersion[RestrictedCurrentVersion]
@@ -41,7 +45,7 @@ flowchart LR
 | Lane `current` | PyMuPDF + local Tesseract (`parser_v1`) in `smart-rag-parser-sandbox:local` |
 | Lane `anydoc_local` | `firecrawl-anydoc==0.2.4`, `ocr=reject`, image `smart-rag-parser-bakeoff:local` |
 | Firecrawl Parse / hosted OCR | Forbidden |
-| OpenAI | Existing `OPENAI_API_KEY` through shared gateways only |
+| OpenAI | Existing `OPENAI_API_KEY` through shared gateways only. Experiment-only Vision OCR of AnyDoc-named and empty-text pages uses `gpt-4o-mini`, `store=False`, no Files API. The key never enters the parser sandbox. |
 | Graph | Disabled; both versions `graph_eligible=false` |
 | Holdout | Never opened |
 | Generalization | `generalization_claim=false` |
@@ -54,8 +58,11 @@ flowchart LR
 | Pages | 500 | `limit_exceeded:pages` |
 | AnyDoc sandbox memory | 1024 MiB hard | kill + failed parse |
 | CPUs / PIDs | 1.0 / 64 | sandbox policy |
-| Timeout | 120 s | `timeout` |
-| AnyDoc OCR | `reject` only | `needs_ocr` (no hosted fallback) |
+| Timeout | 300 s AnyDoc sandbox / 120 s current sandbox | `timeout` |
+| AnyDoc OCR | `reject` only | `needs_ocr` (no hosted Firecrawl fallback) |
+| OpenAI Vision OCR pages | 20 | `openai_ocr_limit` |
+| OpenAI Vision OCR PNG | 5 MiB, 150 DPI | `openai_ocr_image_limit` |
+| OpenAI Vision OCR timeout | 60 s / page | `openai_ocr_timeout` |
 | Network | `--network none` | block launch |
 | Secrets in parser | none | block launch |
 
@@ -70,6 +77,16 @@ This repository has no document workspace column. Isolation is:
 - cleanup by exact manifest UUIDs only.
 
 This is logical isolation on one hosted stack, not a separate database.
+
+## OpenAI Vision OCR (AnyDoc lane)
+
+The AnyDoc sandbox still uses `ocr=reject` and never receives `OPENAI_API_KEY`.
+On the host, the lane unions AnyDoc-named OCR pages with PyMuPDF pages that
+have no selectable text, rasters each page at 150 DPI, and transcribes with
+the shared OpenAI gateway. Contiguous AnyDoc-safe page runs convert in Docker.
+Markdown is spliced in original page order, then parsed once through the
+Markdown adapter. Replay uses an in-process cache so Vision non-determinism
+does not fail the second parse. A failed OCR call fails the lane.
 
 ## Artifact layout
 
@@ -123,6 +140,12 @@ uv run python scripts/parser_bakeoff.py run --pdf $Pdf --lanes current,anydoc_lo
 holdout denial. Qualification is blocked until development protocol hashes
 are frozen. Holdout is never a valid split.
 
+Build the dedicated AnyDoc image from the repository root:
+
+```powershell
+docker build -f infra/parser-bakeoff/Dockerfile -t smart-rag-parser-bakeoff:local .
+```
+
 ## Evaluation dimensions
 
 Primary paired metrics (same sealed cases, same downstream settings):
@@ -156,7 +179,8 @@ Do not collapse these into one weighted accuracy score.
 | Wrong PDF path | `blocked=selected_pdf_required` |
 | Size/page overflow | Failed prepare, no run directory mutation beyond the attempt |
 | ClamAV not clean | `blocked=scan_not_clean` |
-| AnyDoc `NeedsOcrError` | Drop named scanned pages and convert the rest locally. If every remaining page still needs OCR, lane failed, `failure_code=needs_ocr`. No Firecrawl |
+| AnyDoc `NeedsOcrError` | Probe named pages. OCR those pages plus empty selectable-text pages with host OpenAI Vision. AnyDoc-safe contiguous runs stay in the no-network sandbox. If a remaining AnyDoc slice still needs OCR, or every page needs OCR beyond the page cap, lane failed. No Firecrawl |
+| OpenAI Vision OCR failure | Lane failed, `failure_code` is the typed reason (`openai_ocr_timeout`, `openai_required`, …). Zero elements |
 | Encrypted / malformed PDF | Lane failed, zero elements |
 | Nondeterministic replay | Stop before index |
 | Unapproved gold map | Stop before live evaluate |
@@ -167,9 +191,9 @@ Do not collapse these into one weighted accuracy score.
 ## Verification
 
 ```powershell
-uv run ruff format --check packages/core/src/smart_rag_core/evaluation/parser_bakeoff scripts/parser_bakeoff.py infra/parser-bakeoff tests/unit/test_parser_bakeoff_lanes.py tests/unit/test_parser_bakeoff_mapping.py tests/unit/test_parser_bakeoff_metrics.py tests/unit/test_parser_bakeoff_report.py tests/contract/test_parser_bakeoff_sandbox.py tests/contract/test_parser_bakeoff_index.py tests/contract/test_parser_bakeoff_retrieval.py tests/contract/test_parser_bakeoff_cleanup.py
-uv run ruff check packages/core/src/smart_rag_core/evaluation/parser_bakeoff scripts/parser_bakeoff.py infra/parser-bakeoff tests/unit/test_parser_bakeoff_lanes.py tests/unit/test_parser_bakeoff_mapping.py tests/unit/test_parser_bakeoff_metrics.py tests/unit/test_parser_bakeoff_report.py tests/contract/test_parser_bakeoff_sandbox.py tests/contract/test_parser_bakeoff_index.py tests/contract/test_parser_bakeoff_retrieval.py tests/contract/test_parser_bakeoff_cleanup.py
-uv run pytest tests/unit/test_parser_bakeoff_lanes.py tests/unit/test_parser_bakeoff_mapping.py tests/unit/test_parser_bakeoff_metrics.py tests/unit/test_parser_bakeoff_report.py -q
+uv run ruff format --check packages/core/src/smart_rag_core/evaluation/parser_bakeoff packages/core/src/smart_rag_core/gateways/openai_page_ocr.py packages/core/src/smart_rag_core/observability/langsmith_tracing.py scripts/parser_bakeoff.py infra/parser-bakeoff tests/unit/test_parser_bakeoff_lanes.py tests/unit/test_parser_bakeoff_page_ocr.py tests/unit/test_openai_page_ocr.py tests/unit/test_parser_bakeoff_mapping.py tests/unit/test_parser_bakeoff_metrics.py tests/unit/test_parser_bakeoff_report.py tests/contract/test_parser_bakeoff_sandbox.py tests/contract/test_parser_bakeoff_index.py tests/contract/test_parser_bakeoff_retrieval.py tests/contract/test_parser_bakeoff_cleanup.py
+uv run ruff check packages/core/src/smart_rag_core/evaluation/parser_bakeoff packages/core/src/smart_rag_core/gateways/openai_page_ocr.py packages/core/src/smart_rag_core/observability/langsmith_tracing.py scripts/parser_bakeoff.py infra/parser-bakeoff tests/unit/test_parser_bakeoff_lanes.py tests/unit/test_parser_bakeoff_page_ocr.py tests/unit/test_openai_page_ocr.py tests/unit/test_parser_bakeoff_mapping.py tests/unit/test_parser_bakeoff_metrics.py tests/unit/test_parser_bakeoff_report.py tests/contract/test_parser_bakeoff_sandbox.py tests/contract/test_parser_bakeoff_index.py tests/contract/test_parser_bakeoff_retrieval.py tests/contract/test_parser_bakeoff_cleanup.py
+uv run pytest tests/unit/test_parser_bakeoff_lanes.py tests/unit/test_parser_bakeoff_page_ocr.py tests/unit/test_openai_page_ocr.py tests/unit/test_parser_bakeoff_mapping.py tests/unit/test_parser_bakeoff_metrics.py tests/unit/test_parser_bakeoff_report.py tests/unit/test_langsmith_tracing.py -q
 uv run pytest tests/contract/test_parser_bakeoff_sandbox.py tests/contract/test_parser_bakeoff_index.py tests/contract/test_parser_bakeoff_retrieval.py tests/contract/test_parser_bakeoff_cleanup.py -q
 ```
 
@@ -185,11 +209,17 @@ blocker, not a silent skip in the CLI.
 - `sandbox_nonzero` on `anydoc_local`: rebuild
   `smart-rag-parser-bakeoff:local`. The image must overlay the evaluation and
   adapter package inits so the runner does not import SharedSettings or
-  PyMuPDF. Do not add Firecrawl or OCR fallback.
-- `needs_ocr`: remaining pages are still image-only after dropping the pages
-  AnyDoc named. Do not enable hosted OCR. The first failure used to abort the
-  whole book; the lane now omits those scanned pages and converts the rest.
+  PyMuPDF. Do not add Firecrawl or hosted OCR fallback.
+- `needs_ocr`: an AnyDoc-safe slice still raised `NeedsOcrError` after omit,
+  or the probe listed no pages. Do not enable hosted OCR. Named and empty
+  pages are OCRd on the host with OpenAI Vision (`flow OAI-OCR`).
+- `openai_required` / `openai_ocr_timeout`: live OpenAI settings are required
+  for the AnyDoc OCR splice. `LANGSMITH_EXPORT_IO` must stay false. Rebuild
+  is not a substitute for a missing key.
 - `provider_matrix_unverified`: set `SMART_RAG_SUBPROCESSOR_MATRIX_VERIFIED`
   only after the signed matrix exists.
-- Cross-lane hits: confirm `restrict_version_id` and distinct
-  `ingest-ids.json` files.
+- `bm25_verify_failed`: persist may already have committed when ParadeDB
+  verify loses a race with the laptop ingest worker. If the version is
+  `graph_ineligible` and `is_current=true`, the CLI skip path stamps
+  `hybrid_ready` and does not re-embed. Do not treat that skip as a failed
+  parse.

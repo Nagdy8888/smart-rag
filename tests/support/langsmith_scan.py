@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 ALLOWED_OPENAI_CTOR = {
     Path("packages/core/src/smart_rag_core/observability/langsmith_tracing.py"),
+    Path("packages/core/src/smart_rag_core/gateways/openai_page_ocr.py"),
 }
 
 ALLOWED_RESPONSES_CREATE = {
@@ -25,6 +26,7 @@ ALLOWED_RESPONSES_CREATE = {
     Path("packages/core/src/smart_rag_core/gateways/openai_general_chat.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_profile.py"),
     Path("packages/core/src/smart_rag_core/gateways/openai_conversation_title.py"),
+    Path("packages/core/src/smart_rag_core/gateways/openai_page_ocr.py"),
 }
 
 ALLOWED_EMBEDDINGS_CREATE = {

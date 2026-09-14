@@ -50,3 +50,29 @@ major version `1`.
 
 Handoff to P06-15: run deterministic plus live gates, inspect LangSmith
 or mark blocked, and update routing/budget/SSE/Studio docs.
+
+## 2026-09-13 close-out (resume after P06-36)
+
+Wrapper Packet 14 stayed unchecked. Ask empty-state copy had drifted back
+to “Ask your company knowledge”. Restored the packet title and a body that
+does not claim every answer is cited.
+
+Also repaired leftover hosted-eval frontend gates that blocked this
+close-out: `createPdfEvalCase` parser null counts in `api.test.ts`, and
+ChatApp/api barrel physical-line budgets (`toSaveToQuizPopoverProps`).
+
+2026-09-13 commands:
+
+| Command | Exit |
+| --- | --- |
+| `pnpm --filter smart-rag-frontend test` | 0 (555 passed / 79 files) |
+| `pnpm --filter smart-rag-frontend lint` | 0 |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 |
+| `pnpm --filter smart-rag-frontend build` | 0 (Next.js 16.3.3) |
+
+Playwright Ask journey: **skipped**. Config still targets local GoTrue
+`:54321` and API `:8000`. Those processes were not started for this
+close-out.
+
+Rollback: restore the previous empty-state title; leave SSE major
+version `1`.

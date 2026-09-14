@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 16
-status: pending
+status: complete
 title: "Add LangGraph custom SSE progress and paced verified-answer presentation contract."
 requirement_ids: [P06-16]
 ---

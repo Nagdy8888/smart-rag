@@ -223,7 +223,21 @@ def _cmd_parse(args: argparse.Namespace) -> int:
 
     repo = repo_root_from(REPO)
     try:
+        env = apply_merged_env()
+        if env.get("LANGSMITH_EXPORT_IO", "false").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            raise BakeoffError(
+                "langsmith_export_io", "LANGSMITH_EXPORT_IO must be false"
+            )
         lanes = _parse_lanes(args.lanes)
+        if ANYDOC_LANE in lanes and not matrix_verified(env):
+            raise BakeoffError(
+                "provider_matrix_unverified", "provider matrix is not verified"
+            )
         manifest = load_manifest(repo, args.run_id)
         payload = _source_bytes(repo, manifest)
         ingest: dict[LaneId, LaneIngestIds] = {}
@@ -241,7 +255,8 @@ def _cmd_parse(args: argparse.Namespace) -> int:
             summaries[lane_id] = summary
             print(
                 f"lane={lane_id} disposition={summary.disposition} "
-                f"chunks={summary.chunk_count} replay_matched={summary.replay_matched}"
+                f"chunks={summary.chunk_count} extracted_chars={summary.extracted_chars} "
+                f"ocr_pages={summary.ocr_pages} replay_matched={summary.replay_matched}"
             )
             if summary.failure_code:
                 print(f"lane={lane_id} failure_code={summary.failure_code}")
@@ -406,20 +421,28 @@ def _cmd_index(args: argparse.Namespace) -> int:
                 supabase.execute("SET ROLE postgres")
                 existing = supabase.execute(
                     """
-                    SELECT status::text
+                    SELECT status::text, is_current
                     FROM app.document_versions
                     WHERE id = %s
                       AND deleted_at IS NULL
                     """,
                     (allocated.version_id,),
                 ).fetchone()
-                if existing is not None and str(existing[0]) in {
-                    "hybrid_ready",
-                    "graph_ineligible",
-                    "graph_pending",
-                }:
+                status = str(existing[0]) if existing is not None else ""
+                is_current = bool(existing[1]) if existing is not None else False
+                already_indexed = status == "hybrid_ready" or status == "graph_pending"
+                if status == "graph_ineligible" and is_current:
+                    already_indexed = True
+                if already_indexed:
+                    stamped = allocated.model_copy(
+                        update={"status": status, "hybrid_ready": True}
+                    )
+                    write_json_atomic(
+                        lane_dir(repo, manifest.run_id, lane_id) / "ingest-ids.json",
+                        stamped,
+                    )
                     print(f"lane={lane_id} skipped=already_indexed")
-                    ingest_map[lane_id] = allocated
+                    ingest_map[lane_id] = stamped
                     summaries[lane_id] = load_chunk_summary(
                         repo, manifest.run_id, lane_id
                     )

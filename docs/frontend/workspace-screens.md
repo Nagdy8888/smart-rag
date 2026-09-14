@@ -130,8 +130,8 @@ flowchart TB
 #### Chat empty state
 
 - Use `EmptyState` with the brand gradient tile.
-- Title: “Ask your company knowledge”
-- Body: “Answers come from your authorized documents, with citations you can inspect.”
+- Title: “Ask a general question, or ask about your company documents for a cited answer.”
+- Body: “General questions use the assistant. Company-document questions return citations you can inspect.”
 - Three prompt-fill chips maximum (live corpus examples):
   - “What is LCEL according to the uploaded PDF?”
   - “How does Single Tool Execution differ from Parallel Tool Execution?”
@@ -251,6 +251,16 @@ flowchart LR
 - Success copy: “Feedback recorded.”
 - Failure copy: “Feedback could not be recorded. Try again.”
 - Popover remains open on failure.
+
+#### `SaveToQuizPopover`
+
+- Separate owner/admin control beside Give feedback. Never replaces thumbs.
+- Visible only when `GET /me` is owner/admin and `/api/meta` `pdf_eval_workspace` is true. Hidden chrome is not authorization; members still 403 on `POST /admin/pdf-eval/cases`.
+- Create posts the completed run ID, query class, optional expected answer, 0–3 citation chunk IDs, and an idempotency key. Browser question text is omitted. Split is always `development`. Never approves.
+- Retention copy: “Deleting this chat does not delete the saved quiz case.”
+- Paginated saved-case selector lists summaries only. Detail (including the question) loads after selection.
+- **Ask this question** fills the composer with the saved question only.
+- **Score this answer (not Recall@10)** is enabled only for a pre-existing approved case whose normalized question matches. Newly saved drafts cannot score the run that created them. Compare sends `{ run_id }` only.
 
 ### Documents page component specification
 

@@ -2,7 +2,7 @@
 title: Administration surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-14
 audience: engineering, frontend, security
 packet: P08-19
 ---
@@ -37,7 +37,7 @@ Related: [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
 | `/admin?tab=tools` | Catalog search, enable/permissions, details drawer. No seed form | `GET /tools?q=`, `POST /admin/tools/{tool_key}/enable`, `POST /admin/tools/{tool_key}/permissions` |
 | `/admin?tab=curation` | Word aliases (glossary import) and people/things (entity rules) | `/admin/glossary/imports*`, `/admin/graph/entity-rules*` |
 | `/admin?tab=usage` | Caller totals; company totals for owner/admin. Rate-degraded banner only when `rate_limit_degraded` | `GET /usage/me`, `GET /usage/company`. Totals only, no prompt text |
-| `/admin?tab=evaluation` | Local PDF evaluation workspace. Hidden unless `/api/meta` `pdf_eval_workspace` is true. Member/viewer still 403. | `/admin/pdf-eval/*`. Question-only Ask comparison. Official Recall@10 stays CLI |
+| `/admin?tab=evaluation` | Hosted PDF evaluation workspace with three local task views: **Overview**, **Review cases**, and **Exam results**. Hidden unless `/api/meta` `pdf_eval_workspace` is true. Member/viewer still 403. Ask **Save to quiz** is a separate owner/admin control beside Give feedback. Overview shows readiness counts and **Generate review cases**. Review cases holds the queue, required-source picker, and case editor. Official Recall@10 lives on Exam results. | `/admin/pdf-eval/*` with `expected_row_version` CAS. Question-only Ask comparison. Citation overlap is labelled **not official Recall@10**. Official production-corpus Recall@10 is **All required gold chunks in the production Hybrid top 10**. `POST /admin/pdf-eval/exams` is 202 COST_MUTATION. No freeze or holdout control |
 | `/account` | Read-only four `/me` fields. `/profile` redirects here | `user_id`, `role`, `authorization_version`, `upload_enabled`. Sign out stays in the shell menu |
 
 Nav shows **Admin** for owner/admin convenience and **Account** for every

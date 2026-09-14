@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 13
-status: pending
+status: complete
 title: "Add authenticated query_studio_live with per-run resources and normal ACL, admission, and budget controls."
 requirement_ids: [P06-13]
 ---

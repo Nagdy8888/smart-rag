@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-13
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -413,6 +413,17 @@ where listed.
 | F Citations | chips | `citation_preview` then `GET /runs/{id}/citations` | creator | locators; no snippets |
 | F Source drawer | preview/download | GAP-07-09 | — | printed page plus PDF page when they differ; title/section plus technical IDs |
 | F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | polarity catalogs, unmerged |
+| F Save to quiz | owner/admin draft | `POST /admin/pdf-eval/cases` run id only | owner/admin + `pdf_eval_workspace` | `idempotency_key`; never replaces thumbs |
+| F Quiz score | citation overlap | `POST /admin/pdf-eval/cases/{id}/compare-run` `{ run_id }` | owner/admin | not Recall@10; drafts from this run cannot score it |
+| Admin eval list | summaries | `GET /admin/pdf-eval/cases` | owner/admin | first 20, Load more to 60; never `split=holdout` |
+| Admin eval save | labels | `PATCH /admin/pdf-eval/cases/{id}` `expected_row_version` | owner/admin | CAS; edit clears approval |
+| Admin eval gold | 0–3 current chunks | `PUT /admin/pdf-eval/cases/{id}/gold` | owner/admin | locators server-derived; stale blocks approve |
+| Admin eval regenerate | generated drafts | `POST /admin/pdf-eval/drafts/regenerate` `{ document_id }` | owner/admin | never self-approves; 409 `capacity_exceeded` |
+| Admin exam latest | official Recall@10 | `GET /admin/pdf-eval/reports/latest?split=` | owner/admin | `present=false` when none; partials omitted |
+| Admin exam start | development or qualification | `POST /admin/pdf-eval/exams` COST_MUTATION | owner/admin | 202; never scores in-request; qualification confirms once |
+| Admin exam poll | progress | `GET /admin/pdf-eval/exams/{id}` | owner/admin | sessionStorage pointer; 2s–15s backoff |
+| Admin exam cancel | cancel | `POST /admin/pdf-eval/exams/{id}/cancel` COST_MUTATION | owner/admin | prior official report retained |
+| Admin exam cases | hit/miss counts | `GET /admin/pdf-eval/reports/{id}/cases` | owner/admin | ordinal/hit/gold_count only; not Recall@10 citation overlap |
 | F Usage strip | account totals | `GET /usage/me` | caller | no prompt text |
 | F Run tokens | this run / this chat | SSE `usage`; title POST tokens on this chat | creator | this chat includes later questions in the live session |
 | F Profile rewrite / candidates / BM25 bytes / rerank / inferences / latency | — | GAP-07-02 | — | do not invent |

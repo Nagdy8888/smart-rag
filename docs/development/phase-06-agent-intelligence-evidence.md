@@ -2,7 +2,7 @@
 title: Phase 6 agent-intelligence evidence index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-13
 audience: engineering, reviewers
 ---
 
@@ -53,12 +53,26 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-24 — PDF eval channel diagnostics (2026-09-10) | [phase-06/p06-24-pdf-eval-channel-diagnostics-2026-09-10.md](./phase-06/p06-24-pdf-eval-channel-diagnostics-2026-09-10.md) | 38 |
 | P06-25 — PDF eval retrieval repair (2026-09-10) | [phase-06/p06-25-pdf-eval-retrieval-repair-2026-09-10.md](./phase-06/p06-25-pdf-eval-retrieval-repair-2026-09-10.md) | 37 |
 | P06-26 — Retrieval cache and holdout gates (2026-09-10) | [phase-06/p06-26-retrieval-cache-and-holdout-gates-2026-09-10.md](./phase-06/p06-26-retrieval-cache-and-holdout-gates-2026-09-10.md) | 41 |
-| P06-10 — Typed knowledge-scope routing (2026-08-25) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 49 |
-| P06-11 — SSE stream lifecycle and LangSmith tracing (2026-08-25) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 47 |
-| P06-12 — General and user-text execution (2026-08-25) | [phase-06/p06-12-general-and-user-text-execution-2026-08-25.md](./phase-06/p06-12-general-and-user-text-execution-2026-08-25.md) | 146 |
-| P06-13 — Authenticated `query_studio_live` (2026-08-25) | [phase-06/p06-13-authenticated-query-studio-live-2026-08-25.md](./phase-06/p06-13-authenticated-query-studio-live-2026-08-25.md) | 54 |
-| P06-14 — Main chat origin UX (2026-08-25) | [phase-06/p06-14-main-chat-origin-ux-2026-08-25.md](./phase-06/p06-14-main-chat-origin-ux-2026-08-25.md) | 52 |
-| P06-15 — Integrated verification (2026-08-25) | [phase-06/p06-15-integrated-verification-2026-08-25.md](./phase-06/p06-15-integrated-verification-2026-08-25.md) | 100 |
+| P06-27 — Hosted webapp evaluation amendment (2026-09-10) | [phase-06/p06-27-hosted-webapp-evaluation-amendment-2026-09-10.md](./phase-06/p06-27-hosted-webapp-evaluation-amendment-2026-09-10.md) | 90 |
+| P06-28 — Hosted quiz-case schema and app_api RPCs (2026-09-10) | [phase-06/p06-28-eval-quiz-case-database-2026-09-10.md](./phase-06/p06-28-eval-quiz-case-database-2026-09-10.md) | 108 |
+| P06-29 — DB-backed pdf-eval case API (2026-09-10) | [phase-06/p06-29-eval-quiz-case-api-2026-09-10.md](./phase-06/p06-29-eval-quiz-case-api-2026-09-10.md) | 108 |
+| P06-30 — Durable exam-run schema and hidden conversations (2026-09-10) | [phase-06/p06-30-eval-exam-database-2026-09-10.md](./phase-06/p06-30-eval-exam-database-2026-09-10.md) | 114 |
+| P06-31 — Restart-safe production-corpus Hybrid exam runner (2026-09-13) | [phase-06/p06-31-eval-exam-runner-2026-09-13.md](./phase-06/p06-31-eval-exam-runner-2026-09-13.md) | 96 |
+| P06-32 — Exam start, poll, cancel, latest report APIs (2026-09-13) | [phase-06/p06-32-eval-exam-api-2026-09-13.md](./phase-06/p06-32-eval-exam-api-2026-09-13.md) | 93 |
+| P06-33 — Ask Save to quiz beside thumbs (2026-09-13) | [phase-06/p06-33-ask-quiz-capture-2026-09-13.md](./phase-06/p06-33-ask-quiz-capture-2026-09-13.md) | 80 |
+| P06-34 — Admin case review, gold picker, stale repair (2026-09-13) | [phase-06/p06-34-admin-eval-curation-2026-09-13.md](./phase-06/p06-34-admin-eval-curation-2026-09-13.md) | 87 |
+| P06-35 — Admin Recall@10 scoreboard, exam progress (2026-09-13) | [phase-06/p06-35-admin-exam-board-2026-09-13.md](./phase-06/p06-35-admin-exam-board-2026-09-13.md) | 91 |
+| P06-36 — Hosted evaluation workspace close (2026-09-13) | [phase-06/p06-36-hosted-eval-verification-2026-09-13.md](./phase-06/p06-36-hosted-eval-verification-2026-09-13.md) | 115 |
+
+| P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
+| P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |
+| P06-12 — General and user-text execution (closed 2026-09-13) | [phase-06/p06-12-general-and-user-text-execution-2026-08-25.md](./phase-06/p06-12-general-and-user-text-execution-2026-08-25.md) | 165 |
+| P06-13 — Authenticated `query_studio_live` (closed 2026-09-13) | [phase-06/p06-13-authenticated-query-studio-live-2026-08-25.md](./phase-06/p06-13-authenticated-query-studio-live-2026-08-25.md) | 70 |
+| P06-14 — Main chat origin UX (closed 2026-09-13) | [phase-06/p06-14-main-chat-origin-ux-2026-08-25.md](./phase-06/p06-14-main-chat-origin-ux-2026-08-25.md) | 75 |
+| P06-15 — Integrated verification (closed 2026-09-13) | [phase-06/p06-15-integrated-verification-2026-08-25.md](./phase-06/p06-15-integrated-verification-2026-08-25.md) | 145 |
+| P06-16 — Custom SSE progress and paced-reveal contract (closed 2026-09-13) | [phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md](./phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md) | 42 |
+| P06-17 — PDF Hybrid agent evaluation (live qualification blocked) | [phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md](./phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md) | 40 |
+| P06-18 — Private-PDF holdout (blocked; not opened) | [phase-06/p06-18-pdf-holdout-blocked-2026-09-13.md](./phase-06/p06-18-pdf-holdout-blocked-2026-09-13.md) | 22 |
 | LangSmith hosted online evaluators (2026-08-26) | [phase-06/langsmith-hosted-online-evaluators-2026-08-26.md](./phase-06/langsmith-hosted-online-evaluators-2026-08-26.md) | 105 |
 | BR-1A — Brain-repair governance amendment (2026-08-26, pending acceptance) | [phase-06/br-1a-brain-repair-governance-amendment-2026-08-26-pending-acceptance.md](./phase-06/br-1a-brain-repair-governance-amendment-2026-08-26-pending-acceptance.md) | 65 |
 | BR-2 — Profile classification gateway and runtime binding (2026-08-26, pending acceptance) | [phase-06/br-2-profile-classification-gateway-and-runtime-binding-2026-08-26-pending-accep.md](./phase-06/br-2-profile-classification-gateway-and-runtime-binding-2026-08-26-pending-accep.md) | 112 |
@@ -73,5 +87,4 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | Cleanup packet 8 — Query tracing and evaluation (2026-08-26) | [phase-06/cleanup-packet-8-query-tracing-and-evaluation-2026-08-26.md](./phase-06/cleanup-packet-8-query-tracing-and-evaluation-2026-08-26.md) | 58 |
 | Cleanup packet 9 — Tests, docs, and dead-code closure (2026-08-26) | [phase-06/cleanup-packet-9-tests-docs-dead-code-2026-08-26.md](./phase-06/cleanup-packet-9-tests-docs-dead-code-2026-08-26.md) | 52 |
 | Cleanup final-gates — Architecture, work counts, and repository gates (2026-08-26) | [phase-06/cleanup-final-gates-2026-08-26.md](./phase-06/cleanup-final-gates-2026-08-26.md) | 88 |
-| P06-16 — Custom SSE progress and paced-reveal contract (2026-08-26) | [phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md](./phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md) | 32 |
 | Overlay PDF Hybrid P13/P15/P16 (2026-09-09, blocked live gates) | [phase-06/overlay-pdf-hybrid-packets.md](./phase-06/overlay-pdf-hybrid-packets.md) | 86 |

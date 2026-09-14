@@ -10,6 +10,7 @@ from smart_rag_core.retrieval.bm25_query import (
 from smart_rag_core.retrieval.cache_store import (
     CachedRetrieval,
     CacheEvent,
+    RetrievalCacheMode,
     RetrievalCacheStore,
 )
 from smart_rag_core.retrieval.dense import DenseRetriever
@@ -101,6 +102,7 @@ __all__ = [
     "HybridRetriever",
     "HybridRunResult",
     "RecheckRejectedError",
+    "RetrievalCacheMode",
     "RetrievalCacheStore",
     "RetrievalCandidate",
     "RetrievalFallbackReason",

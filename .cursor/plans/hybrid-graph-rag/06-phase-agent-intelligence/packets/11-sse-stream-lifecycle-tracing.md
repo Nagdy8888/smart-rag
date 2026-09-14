@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 11
-status: pending
+status: complete
 title: "Drain successful LangGraph streams and classify expected cancellation without hiding real trace errors."
 requirement_ids: [P06-11]
 ---

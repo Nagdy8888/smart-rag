@@ -39,6 +39,8 @@ import {
   fetchRun,
   fetchConversation,
   submitFeedback,
+  createPdfEvalCase,
+  comparePdfEvalRun,
   ClassifiedApiError,
 } from "./api";
 import { clientComputedTableTotal } from "./table-plan";
@@ -1712,5 +1714,89 @@ describe("cancelRun failures", () => {
     await expect(
       cancelRun({ accessToken: "jwt-token" }, "run-1", fetchImpl),
     ).rejects.toBeInstanceOf(ClassifiedApiError);
+  });
+});
+
+describe("createPdfEvalCase", () => {
+  it("posts the run id without question text and treats member 403 as forbidden", async () => {
+    const bodies: string[] = [];
+    const ok: typeof fetch = async (_input, init) => {
+      bodies.push(String(init?.body ?? ""));
+      return new Response(
+        JSON.stringify({
+          case_id: "11111111-1111-4111-8111-111111111111",
+          row_version: 1,
+          replayed: false,
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    await expect(
+      createPdfEvalCase(
+        { accessToken: "jwt-token" },
+        {
+          source_run_id: "22222222-2222-4222-8222-222222222222",
+          query_class: "factual_definition",
+          split: "development",
+          idempotency_key: "idem-quiz-1",
+          chunk_ids: [],
+        },
+        ok,
+      ),
+    ).resolves.toEqual({
+      case_id: "11111111-1111-4111-8111-111111111111",
+      row_version: 1,
+      replayed: false,
+      inserted_count: null,
+      gold_chunk_count: null,
+    });
+    const parsed = JSON.parse(bodies[0] ?? "{}") as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty("question");
+    expect(parsed.source_run_id).toBe("22222222-2222-4222-8222-222222222222");
+    expect(parsed.split).toBe("development");
+
+    const forbidden: typeof fetch = async () =>
+      new Response(JSON.stringify({ detail: "forbidden" }), { status: 403 });
+    await expect(
+      createPdfEvalCase(
+        { accessToken: "jwt-token" },
+        {
+          source_run_id: "22222222-2222-4222-8222-222222222222",
+          query_class: "factual_definition",
+          idempotency_key: "idem-quiz-2",
+        },
+        forbidden,
+      ),
+    ).rejects.toThrow("forbidden");
+  });
+});
+
+describe("comparePdfEvalRun", () => {
+  it("sends only run_id and never expected_answer", async () => {
+    const bodies: string[] = [];
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      bodies.push(String(init?.body ?? ""));
+      return new Response(
+        JSON.stringify({
+          case_id: "case-1",
+          split: "development",
+          gold_count: 2,
+          citation_count: 3,
+          intersection: 1,
+          ranked_hit_at_10: 0,
+          run_id: "run-1",
+          manual_ai_test: true,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const result = await comparePdfEvalRun(
+      { accessToken: "jwt-token" },
+      "case-1",
+      "run-1",
+      fetchImpl,
+    );
+    expect(result.manual_ai_test).toBe(true);
+    expect(JSON.parse(bodies[0] ?? "{}")).toEqual({ run_id: "run-1" });
   });
 });

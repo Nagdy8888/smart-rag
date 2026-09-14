@@ -22,6 +22,7 @@ import { LimitationCallout } from "../ui/limitation-callout";
 import { AnswerSurface } from "./answer-surface";
 import { ChatComposer } from "./chat-composer";
 import { FeedbackPopover } from "./feedback-popover";
+import { SaveToQuizPopover, type SaveToQuizPopoverProps } from "./save-to-quiz-popover";
 import type { UseChatRunResult } from "./hooks/use-chat-run";
 import { RunDetailsSheet } from "./run-details-sheet";
 import type { FeedbackTag } from "../../lib/types";
@@ -73,6 +74,8 @@ export type ChatStageProps = {
   onComment: (value: string) => void;
   onFeedback: () => void;
   feedbackPending: boolean;
+  showSaveToQuiz?: boolean;
+  quiz?: SaveToQuizPopoverProps | null;
 };
 
 /**
@@ -119,6 +122,8 @@ export function ChatStage(props: ChatStageProps) {
     onComment,
     onFeedback,
     feedbackPending,
+    showSaveToQuiz = false,
+    quiz = null,
   } = props;
   const running = chat.terminal === null && chat.runId !== null;
   const sendBlockReason = paidSendBlockReason(
@@ -274,16 +279,19 @@ export function ChatStage(props: ChatStageProps) {
           </div>
         ) : null}
         {chat.terminal !== null && chat.answerText !== "" ? (
-          <FeedbackPopover
-            thumbsUp={thumbsUp}
-            onThumbs={onThumbs}
-            tag={feedbackTag}
-            onTag={onTag}
-            comment={feedbackComment}
-            onComment={onComment}
-            onSubmit={onFeedback}
-            pending={feedbackPending}
-          />
+          <div className={chatStyles.answerFooter}>
+            <FeedbackPopover
+              thumbsUp={thumbsUp}
+              onThumbs={onThumbs}
+              tag={feedbackTag}
+              onTag={onTag}
+              comment={feedbackComment}
+              onComment={onComment}
+              onSubmit={onFeedback}
+              pending={feedbackPending}
+            />
+            {showSaveToQuiz && quiz ? <SaveToQuizPopover {...quiz} /> : null}
+          </div>
         ) : null}
       </div>
       <ChatComposer

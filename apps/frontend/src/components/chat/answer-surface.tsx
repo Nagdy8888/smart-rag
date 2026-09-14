@@ -308,8 +308,8 @@ export const AnswerSurface = memo(function AnswerSurface({
       ) : null}
       {empty ? (
         <EmptyState
-          title="Ask your company knowledge"
-          body="Answers come from your authorized documents, with citations you can inspect."
+          title="Ask a general question, or ask about your company documents for a cited answer."
+          body="General questions use the assistant. Company-document questions return citations you can inspect."
         />
       ) : null}
       {messages.map((item) =>

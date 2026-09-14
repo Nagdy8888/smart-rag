@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 14
-status: pending
+status: complete
 title: "Add answer-origin, clarification, and citation-safe behavior to the main chat UI."
 requirement_ids: [P06-14]
 ---

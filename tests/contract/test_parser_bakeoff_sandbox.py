@@ -44,6 +44,7 @@ def test_anydoc_dockerfile_is_non_root_and_local_only() -> None:
         REPO_ROOT / "infra" / "parser-bakeoff" / "requirements.txt"
     ).read_text(encoding="utf-8")
     assert "firecrawl-anydoc==0.2.4" in requirements
+    assert "pypdf==5.9.0" in requirements
     adapters = (
         REPO_ROOT
         / "packages"
@@ -80,21 +81,39 @@ def test_anydoc_docker_command_is_airgapped() -> None:
     assert ANYDOC_IMAGE in command
     for secret in FORBIDDEN_SANDBOX_ENV:
         assert secret not in joined
-        runner = RUNNER.read_text(encoding="utf-8")
-        assert "convert_with_anydoc" in runner
-        assert "print(markdown" not in runner
-        assert "FIRECRAWL_API_KEY" not in runner
-        constants = (
-            REPO_ROOT
-            / "packages"
-            / "core"
-            / "src"
-            / "smart_rag_core"
-            / "evaluation"
-            / "parser_bakeoff"
-            / "constants.py"
-        ).read_text(encoding="utf-8")
-        assert 'ANYDOC_OCR_MODE = "reject"' in constants
+    runner = RUNNER.read_text(encoding="utf-8")
+    assert "convert_with_anydoc" in runner
+    assert "print(markdown" not in runner
+    assert "FIRECRAWL_API_KEY" not in runner
+    constants = (
+        REPO_ROOT
+        / "packages"
+        / "core"
+        / "src"
+        / "smart_rag_core"
+        / "evaluation"
+        / "parser_bakeoff"
+        / "constants.py"
+    ).read_text(encoding="utf-8")
+    assert 'ANYDOC_OCR_MODE = "reject"' in constants
+    assert 'ANYDOC_SCANNED_PAGES = "openai_ocr"' in constants
+    ocr_gateway = (
+        REPO_ROOT
+        / "packages"
+        / "core"
+        / "src"
+        / "smart_rag_core"
+        / "gateways"
+        / "openai_page_ocr.py"
+    ).read_text(encoding="utf-8")
+    assert "files.create" not in ocr_gateway
+    assert "client.files" not in ocr_gateway
+    assert "traced_openai_client" not in ocr_gateway
+    assert "wrap_openai(" not in ocr_gateway
+    assert "FIRECRAWL" not in ocr_gateway
+    assert "store=False" in ocr_gateway
+    assert '"emit_markdown"' in runner
+    assert '"probe_ocr_pages"' in runner
 
 
 def test_anydoc_docker_command_rejects_secret_request() -> None:

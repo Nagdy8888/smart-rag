@@ -147,7 +147,7 @@ Normal-operation OpenAI spend and the graph compliance/maintenance reserve are *
 | QT-EVAL-003 | Citation completeness ≥90% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 answer citations | Same |
 | QT-EVAL-004 | Answer faithfulness ≥90% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
 | QT-EVAL-005 | Routing accuracy ≥90% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 6/9 | Same |
-| QT-EVAL-006 | Hybrid Recall@10 ≥85% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 on `runtime_owner=phase_4` open splits; SME holdout is launch/Phase 9 | Same |
+| QT-EVAL-006 | Hybrid Recall@10 ≥85% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 on `runtime_owner=phase_4` open splits; SME holdout is launch/Phase 9. Hosted web exam (P06-31+) uses production-corpus all-required-gold@10, which is not the CLI version-restricted PDF metric | Same |
 | QT-EVAL-007 | Exact-identifier/code Recall@5 ≥98% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 open splits; launch holdout Phase 9 | Same |
 | QT-EVAL-008 | Approved-alias Recall@10 ≥95% | % | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 4 Packet 9 open splits; launch holdout Phase 9 | Same |
 | QT-EVAL-009 | Combined improves relationship/multi-hop success by ≥10 percentage points over Hybrid alone without violating latency/cost ceilings | percentage points | global contracts | accepted | user (Cursor chat) | 2026-08-12 | Phase 5/6/9 | Do not launch Combined as default if unmet |

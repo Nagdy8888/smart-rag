@@ -55,6 +55,17 @@ def _default_index() -> str:
     return BM25_INDEX_SCHEMA_VERSION
 
 
+class RetrievalCacheMode(StrEnum):
+    """Whether Hybrid may read or write the ID/rank cache.
+
+    ``cold_bypass`` still uses the production ranking path. It skips cache
+    get/put so exams cannot reuse a warm Ask result.
+    """
+
+    NORMAL = "normal"
+    COLD_BYPASS = "cold_bypass"
+
+
 class CacheEvent(StrEnum):
     """Observability events required by Phase 6 packet 5."""
 

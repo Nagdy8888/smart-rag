@@ -69,9 +69,8 @@ export function FeedbackPopover({
 }: FeedbackPopoverProps) {
   const tagOptions = feedbackTagsFor(thumbsUp);
   return (
-    <div className={styles.answerFooter}>
-      <Popover label="Give feedback" trigger="Give feedback">
-        <div className={styles.feedbackForm}>
+    <Popover label="Give feedback" trigger="Give feedback">
+      <div className={styles.feedbackForm}>
           <div className={styles.row}>
             <Button
               type="button"
@@ -110,6 +109,5 @@ export function FeedbackPopover({
           </Button>
         </div>
       </Popover>
-    </div>
   );
 }

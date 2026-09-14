@@ -147,6 +147,51 @@
   flex-direction: column;
   gap: calc(var(--space) * 2);
   min-width: 16rem;
+  max-width: 24rem;
+}
+
+.quizGoldFieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 1);
+}
+
+.quizGoldLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--space) * 1);
+  font-size: 0.875rem;
+}
+
+.quizHeading {
+  margin: calc(var(--space) * 2) 0 0;
+  font-size: 0.875rem;
+}
+
+.quizCaseList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 1);
+}
+
+.quizCaseButton,
+.quizCaseButtonCurrent {
+  width: 100%;
+  text-align: start;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  padding: calc(var(--space) * 1.5);
+}
+
+.quizCaseButtonCurrent {
+  border-color: var(--color-accent);
 }
 
 .muted {

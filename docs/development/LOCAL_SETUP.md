@@ -2,7 +2,7 @@
 title: Local setup
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-07
+last-reviewed: 2026-09-13
 audience: engineering
 ---
 
@@ -50,11 +50,14 @@ flowchart LR
 Compose only.
 
 The optional PDF evaluation workspace (`PDF_EVAL_WORKSPACE_ENABLED`,
-default false) bind-mounts gitignored `./.private-eval` on the API only.
-The API container is read-only and runs as uid 10001, so create the
-directory first (`mkdir .private-eval`) and grant that uid write access
-on Linux (`chown 10001:10001 .private-eval`). Staging and production reject
-the flag. See [PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md).
+local Compose default `true`) uses hosted quiz RPCs through `app_api`.
+When the flag is true and `SUPABASE_DB_URL` is set, the API lifespan starts
+one exam supervisor. SQL claim/heartbeat remains durable authority; HTTP
+start/poll is Packet 32. The API container is read-only. `.private-eval/`
+remains the CLI/legacy file store only; HTTP does not fall back to it.
+Staging and production reject the flag. See
+[PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md)
+and [ADR-hosted-webapp-evaluation-workspace.md](../adr/ADR-hosted-webapp-evaluation-workspace.md).
 
 See [CONFIGURATION.md](./CONFIGURATION.md), [TOOL_VERSIONS.md](./TOOL_VERSIONS.md),
 [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md),

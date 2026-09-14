@@ -57,8 +57,7 @@ export {
   listConversations,
 } from "./api/chat";
 export { cancelRun, listCitations, submitFeedback } from "./api/chat-run";
-export { deleteDocument, fetchDocument, fetchVersionStatus, listDocuments } from "./api/documents";
-export type { DocumentFetchResult } from "./api/documents";
+export { deleteDocument, fetchDocument, fetchVersionStatus, listDocuments, type DocumentFetchResult } from "./api/documents";
 export {
   enqueueWebsiteCrawl,
   finalizeUpload,
@@ -72,21 +71,24 @@ export { acceptInvitation, createInvitation, listWorkspaceUsers, offboardUser } 
 export { enableTool, listTools, seedTool, setToolPermission } from "./api/tools";
 export { approveGlossaryImport, importGlossary, rollbackGlossaryImport } from "./api/knowledge";
 export {
+  cancelPdfEvalExam,
   comparePdfEvalRun,
+  createPdfEvalCase,
+  deletePdfEvalCase,
   fetchPdfEvalCase,
+  fetchPdfEvalExam,
+  fetchPdfEvalLatestReport,
   fetchPdfEvalStatus,
   listPdfEvalCases,
+  listPdfEvalExamCases,
   listPdfEvalPassages,
   patchPdfEvalCase,
+  regeneratePdfEvalDrafts,
+  replacePdfEvalGold,
   setPdfEvalApproval,
+  startPdfEvalExam,
+  type PdfEvalCaseListQuery,
+  type PdfEvalPassageListQuery,
 } from "./api/pdf-eval";
-export {
-  approveEntityRule,
-  listEntityRules,
-  patchEntityRule,
-  revokeEntityRule,
-  suggestEntityRule,
-  upsertEntityRule,
-} from "./api/knowledge-rules";
-export type { PaidRunPointer, StreamStart } from "./api/sse";
-export { resumeEventStream, shouldResumeExistingRun, startMessageStream, startOrResumeMessageStream } from "./api/sse";
+export { approveEntityRule, listEntityRules, patchEntityRule, revokeEntityRule, suggestEntityRule, upsertEntityRule } from "./api/knowledge-rules";
+export { resumeEventStream, shouldResumeExistingRun, startMessageStream, startOrResumeMessageStream, type PaidRunPointer, type StreamStart } from "./api/sse";

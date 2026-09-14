@@ -98,3 +98,42 @@ Full types tier, full contract tier, live LangSmith UI, live Studio, live
 Ask, and Playwright remain **blocked**. Phase 6 wrapper items stay
 unchecked until you accept this evidence and the remaining live blockers
 are cleared or waived.
+
+## 2026-09-13 close-out (resume after P06-36)
+
+P06-12 supersedes Packet 15 scenario 1: “Hi” is `general_knowledge` with
+one profile call plus one answer call, not a zero-call deterministic
+greeting. Scenario-matrix unit tests follow that amendment.
+
+Bounded repairs in this close-out:
+
+- Reinstalled a corrupt empty `regex` wheel so tiktoken `regex.escape`
+  worked (`regex==2026.7.19`).
+- Pyright 0: PyMuPDF/pypdf unknown-member suppressions in bake-off OCR
+  modules, typed OCR redaction, OCR test payload typing.
+- Extracted Hybrid cache lookup into
+  `packages/core/src/smart_rag_core/retrieval/hybrid_run/cache_lookup.py`
+  so `retriever.py` stays under the 600-line hard cap.
+- Added missing test docstrings on pdf-eval HTTP doubles.
+
+2026-09-13 deterministic gates
+(`MOCK_MODEL_MODE=true`, `LANGSMITH_TRACING=false`,
+`SUPABASE_URL=http://127.0.0.1:54321`, `APP_ENV` unset):
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run python scripts/check.py --tier unit` | 0 | 1324 passed, 4 skipped |
+| `uv run python scripts/check.py --tier contract` | 0 | 264 passed, 233 skipped (live-stack skips, not mocked pass) |
+| `uv run python scripts/check.py --tier types` | 0 | Pyright ratchet 0 / baseline 0 |
+| `uv run ruff check .` | 0 | |
+| `uv run pyright` | 0 | |
+| `pnpm --filter smart-rag-frontend test` | 0 | 555 passed / 79 files |
+| `pnpm --filter smart-rag-frontend lint` | 0 | |
+| `pnpm --filter smart-rag-frontend typecheck` | 0 | |
+| `pnpm --filter smart-rag-frontend build` | 0 | Next.js 16.3.3 |
+
+Live LangSmith UI, live Ask SSE, live `query_studio_live`, and Playwright
+Ask remain **blocked**. Do not treat unit traces as UI proof.
+
+Handoff to P06-16: documentation/custom-progress contract already landed;
+producer proof remains BEP-02.

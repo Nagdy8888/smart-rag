@@ -183,7 +183,7 @@ services:
       VALKEY_CACHE_URL: redis://:${VALKEY_CACHE_PASSWORD}@valkey-cache:6379/0
       PARADEDB_URL: postgresql://${PARADEDB_READER_USER:-paradedb_reader}:${PARADEDB_READER_PASSWORD}@paradedb:5432/${PARADEDB_DB:-paradedb}
       CRAWL_PROXY_URL: http://crawl-proxy:8080
-      PDF_EVAL_WORKSPACE_ENABLED: ${PDF_EVAL_WORKSPACE_ENABLED:-false}
+      PDF_EVAL_WORKSPACE_ENABLED: ${PDF_EVAL_WORKSPACE_ENABLED:-true}
       PDF_EVAL_WORKSPACE_ROOT: /app/.private-eval
     ports:
       - "${API_HOST_PORT:-8000}:8000"

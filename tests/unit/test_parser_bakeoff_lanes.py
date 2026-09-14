@@ -252,6 +252,60 @@ def test_convert_with_anydoc_omits_named_scanned_pages(
     assert not source.with_name("book.textpages.pdf").exists()
 
 
+def test_probe_anydoc_ocr_pages_does_not_omit(tmp_path: Path, monkeypatch: Any) -> None:
+    """Probe returns named pages without converting an omitted-page copy."""
+
+    from smart_rag_core.evaluation.parser_bakeoff.anydoc import probe_anydoc_ocr_pages
+
+    source = tmp_path / "book.pdf"
+    document = cast(Any, fitz.open())
+    first = document.new_page()
+    first.insert_text((72, 72), "Keep")
+    second = document.new_page()
+    second.insert_text((72, 72), "Scan")
+    source.write_bytes(bytes(document.tobytes()))
+    document.close()
+
+    class NeedsOcrError(Exception):
+        """Named like the vendor exception."""
+
+        def __init__(self, pages: list[int]) -> None:
+            """Store 1-indexed pages.
+
+            Args:
+                pages: 1-indexed scanned pages.
+            """
+
+            super().__init__("needs ocr")
+            self.pages = pages
+
+    calls = {"count": 0}
+
+    def _to_markdown(path: str, ocr: str = "reject") -> str:
+        """Always reject. Probe must not retry an omitted file.
+
+        Args:
+            path: PDF path.
+            ocr: Must stay reject.
+
+        Returns:
+            Never returns.
+
+        Raises:
+            NeedsOcrError: Always.
+        """
+
+        del ocr, path
+        calls["count"] += 1
+        raise NeedsOcrError([2])
+
+    fake = types.SimpleNamespace(to_markdown=_to_markdown, NeedsOcrError=NeedsOcrError)
+    monkeypatch.setitem(sys.modules, "anydoc", fake)
+    pages = probe_anydoc_ocr_pages(source)
+    assert pages == (2,)
+    assert calls["count"] == 1
+
+
 def test_current_lane_inprocess_pdf() -> None:
     """Current lane in-process path returns the original PDF hash."""
 

@@ -11,12 +11,13 @@ audience: engineering, reviewers, security
 Additive overlay after Phase 3/4 engineering-complete. It does not uncheck
 historical packets or open the synthetic holdout. Canonical packet contracts
 live in the Phase 3/4 wrappers and in Phase 6 packets P06-10, P06-17,
-P06-18, and P06-19 through P06-26. This file is the navigation index, honest
-baseline freeze, and rollback map.
+P06-18, P06-19 through P06-26, and P06-27 through P06-36. This file is the
+navigation index, honest baseline freeze, and rollback map.
 
 Related: [ADR-hybrid-long-document-profile.md](../adr/ADR-hybrid-long-document-profile.md) ·
 [ADR-detector-finding-reviews.md](../adr/ADR-detector-finding-reviews.md) ·
 [ADR-local-pdf-evaluation-workspace.md](../adr/ADR-local-pdf-evaluation-workspace.md) ·
+[ADR-hosted-webapp-evaluation-workspace.md](../adr/ADR-hosted-webapp-evaluation-workspace.md) ·
 [PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md) ·
 [PHASE4_RANKED_IDS.md](../evaluation/PHASE4_RANKED_IDS.md) ·
 [PDF_HYBRID_EVALUATION.md](../evaluation/PDF_HYBRID_EVALUATION.md) ·

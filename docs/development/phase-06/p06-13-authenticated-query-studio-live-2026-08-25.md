@@ -52,3 +52,20 @@ Rollback: remove the `query_studio_live` graph entry; leave
 Handoff to P06-14: add answer-origin, clarification, and citation-safe
 behavior to the main chat UI. `KNOWN_SSE_EVENT_TYPES` must include
 `answer_origin`.
+
+## 2026-09-13 close-out (resume after P06-36)
+
+Wrapper Packet 13 stayed unchecked while hosted eval packets ran. Studio
+live tests were split into `test_query_studio_admission.py`,
+`test_query_studio_auth.py`, `test_query_studio_execution.py`, and
+`test_query_studio_introspection.py`. Unbound `query_studio` is unchanged.
+Live JWT success remains **blocked**.
+
+2026-09-13 commands (`APP_ENV=test`, `ALLOW_TEST_IDENTITY=true`,
+`MOCK_MODEL_MODE=true`):
+
+| Command | Exit |
+| --- | --- |
+| `uv run pytest tests/contract/test_langgraph_config.py tests/contract/test_import_boundaries.py tests/unit/test_query_studio.py tests/unit/test_query_studio_admission.py tests/unit/test_query_studio_auth.py tests/unit/test_query_studio_execution.py tests/unit/test_query_studio_introspection.py tests/unit/test_query_graph_runtime.py -q` | 0 |
+| `uv run ruff check` on `studio_live.py`, `live_runtime.py`, `graph.py`, `profile_snapshot.py` | 0 |
+| `uv run pyright` on the same four files | 0 |

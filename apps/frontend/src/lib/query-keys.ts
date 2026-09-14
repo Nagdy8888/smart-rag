@@ -99,9 +99,19 @@ export function sessionQueryKeys(accessToken: string | null) {
     workspaceUsers: ["workspace-users", scope] as const,
     pdfEvalStatus: ["pdf-eval-status", scope] as const,
     pdfEvalCases: ["pdf-eval-cases", scope] as const,
+    pdfEvalCaseList: (split: string, review: string) =>
+      ["pdf-eval-cases", scope, split, review] as const,
+    pdfEvalAskCases: ["pdf-eval-ask-cases", scope] as const,
     pdfEvalCase: (caseId: string | null) =>
       ["pdf-eval-case", scope, caseId] as const,
-    pdfEvalPassages: ["pdf-eval-passages", scope] as const,
+    pdfEvalPassages: (documentId: string | null) =>
+      ["pdf-eval-passages", scope, documentId] as const,
+    pdfEvalLatestReport: (split: string) =>
+      ["pdf-eval-latest-report", scope, split] as const,
+    pdfEvalExam: (examRunId: string | null) =>
+      ["pdf-eval-exam", scope, examRunId] as const,
+    pdfEvalExamCases: (examRunId: string | null) =>
+      ["pdf-eval-exam-cases", scope, examRunId] as const,
     consoleReady: (role: string | null) =>
       ["console-ready", scope, role ?? "pending"] as const,
   };

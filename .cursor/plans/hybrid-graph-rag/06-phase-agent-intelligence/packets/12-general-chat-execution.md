@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 12
-status: pending
+status: complete
 title: "Implement bounded, budgeted general and user-text model answers without weakening document grounding."
 requirement_ids: [P06-12]
 ---

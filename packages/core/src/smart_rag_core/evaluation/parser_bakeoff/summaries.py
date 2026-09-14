@@ -94,7 +94,8 @@ def summarize_parse_chunk(
         ocr_pages = result.resource_metrics.ocr_pages
     else:
         pages = None
-        ocr_pages = None
+        recorded = result.resource_metrics.ocr_pages
+        ocr_pages = recorded if recorded else None
     return ChunkSummary(
         lane_id=lane_id,
         disposition=result.disposition.value,

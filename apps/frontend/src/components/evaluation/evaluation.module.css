@@ -1,18 +1,73 @@
 /**
- * Admin Evaluation workspace: review, approve, and a manual AI test.
+ * Admin Evaluation workspace: overview, case review, and official exams.
  */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 6);
+  width: 100%;
+  min-width: 0;
+}
+
+.lead {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 6);
+}
+
+.taskTabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.taskPanel {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 4);
+  min-width: 0;
+}
+
+.card,
+.editor,
+.examBoard {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 3);
+  padding: calc(var(--space) * 5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 3);
+}
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
-  gap: calc(var(--space) * 4);
+  grid-template-columns: minmax(17rem, 20rem) minmax(0, 1fr);
+  gap: calc(var(--space) * 6);
   align-items: start;
 }
 
-@media (max-width: 720px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
+.queue {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 3);
+  min-width: 0;
 }
 
 .caseList {
@@ -36,17 +91,43 @@
   background: var(--color-surface);
   cursor: pointer;
   color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
 }
 
 .caseButtonCurrent {
-  border-color: var(--color-accent);
-  background: var(--color-accent-muted);
+  border-color: var(--color-accent-border);
+  background: var(--color-surface-selected);
 }
 
-.actions {
+.caseTitle {
+  font-weight: 600;
+}
+
+.caseMeta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+}
+
+.filters,
+.actions,
+.editorFooter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editorFooter {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding: 12px 0;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
 }
 
 .muted {
@@ -60,6 +141,98 @@
   border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 8px;
+}
+
+.goldPicker,
+.goldList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.goldList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.goldItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.goldBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.goldItem input {
+  margin-top: 4px;
+}
+
+.goldItemSelected {
+  border-color: var(--color-evidence);
+  background: var(--color-evidence-muted);
+}
+
+.answerSurface {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--color-surface-muted);
+}
+
+.progressTrack {
+  height: 0.4rem;
+  width: 100%;
+  background: var(--color-accent-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.editorHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 1279px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .queue,
+  .editorFooter {
+    position: static;
+  }
+}
+
+@media (max-width: 767px) {
+  .filters > *,
+  .actions > *,
+  .editorFooter > * {
+    flex: 1 1 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .taskTabs {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-13
 audience: developers, operators
 ---
 
@@ -110,7 +110,7 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `MIN_CLIENT_VERSION` | `major.minor.patch`; `0.1.0` | public | Clients send `X-Client-Version` on new paid POST. Missing/below → 426 `client_version_unsupported` before admit. Resume GET does not require the header |
 | `RETRIEVAL_CACHE_RESULT_TTL_SECONDS` | 1–300; `30` | public | ID/rank cache TTL |
 | `RETRIEVAL_CACHE_PROFILE_TTL_SECONDS` | 1–3600; `300` | public | Profile/embedding cache TTL |
-| `PDF_EVAL_WORKSPACE_ENABLED` | boolean; `false` | public | Local-only owner/admin PDF evaluation workspace. Staging and production reject `true` at settings load |
+| `PDF_EVAL_WORKSPACE_ENABLED` | boolean; Python `false`; local Compose default `true` | public | Local/test owner/admin PDF evaluation workspace. Staging and production reject `true` at settings load. HTTP uses hosted quiz RPCs; missing schema is 503. When true with `SUPABASE_DB_URL`, the API lifespan starts one exam supervisor. Kill switch remains this flag |
 | `PDF_EVAL_WORKSPACE_ROOT` | path; `/app/.private-eval` | public | Server-owned gitignored workspace. HTTP callers never supply a path. Compose bind-mounts `./.private-eval` on the API only |
 | `REQUEST_MAX_BODY_BYTES` | 1024–16_777_216; `1048576` | public | JSON/body cap; oversized → 413 |
 | `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |

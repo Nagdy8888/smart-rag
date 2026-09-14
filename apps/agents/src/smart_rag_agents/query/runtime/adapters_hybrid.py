@@ -12,7 +12,7 @@ from smart_rag_core.gateways.embedding import EmbeddingGateway
 from smart_rag_core.gateways.model import ModelGateway
 from smart_rag_core.query_routing.profile_fields import profile_strings
 from smart_rag_core.retrieval.bm25 import Bm25Retriever
-from smart_rag_core.retrieval.cache_store import RetrievalCacheStore
+from smart_rag_core.retrieval.cache_store import RetrievalCacheMode, RetrievalCacheStore
 from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     fetch_authorized_chunk_context,
@@ -161,6 +161,7 @@ class ProcessHybridRetriever:
         profile: object | None = None,
         deadline_seconds: float | None = None,
         query_budget: object | None = None,
+        cache_mode: RetrievalCacheMode = RetrievalCacheMode.NORMAL,
     ) -> object:
         """Run one Hybrid retrieve with per-channel connections.
 
@@ -171,6 +172,8 @@ class ProcessHybridRetriever:
             deadline_seconds: Remaining retrieval slice.
             query_budget: Optional per-run retrieve ledger. Copied onto the
                 inner retriever so concurrent SSE runs do not share it.
+            cache_mode: Exam retrieve passes ``cold_bypass`` so ranking
+                still uses this production path without a warm cache hit.
 
         Returns:
             ``HybridRunResult`` with ranked IDs. BM25 snippets are never evidence.
@@ -238,6 +241,7 @@ class ProcessHybridRetriever:
             profile=typed_profile,
             deadline_seconds=deadline_seconds,
             restrict_version_id=restrict_version_id,
+            cache_mode=cache_mode,
         )
 
     def _resolve_version_id(
@@ -334,6 +338,7 @@ class RunScopedHybrid:
         caller: CallerContext,
         profile: object | None = None,
         deadline_seconds: float | None = None,
+        cache_mode: RetrievalCacheMode = RetrievalCacheMode.NORMAL,
     ) -> object:
         """Forward retrieve with this run's budget.
 
@@ -342,6 +347,7 @@ class RunScopedHybrid:
             caller: Server-derived caller.
             profile: Typed query profile when present.
             deadline_seconds: Remaining retrieval slice.
+            cache_mode: Forwarded to the process Hybrid retrieve.
 
         Returns:
             ``HybridRunResult``.
@@ -353,6 +359,7 @@ class RunScopedHybrid:
             profile=profile,
             deadline_seconds=deadline_seconds,
             query_budget=self.query_budget,
+            cache_mode=cache_mode,
         )
 
     def authorized_chunk_loader(self, caller: CallerContext) -> object:

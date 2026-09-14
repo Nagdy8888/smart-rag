@@ -720,7 +720,7 @@ describe("ChatApp Ask workspace", () => {
     renderChat(<ChatApp />);
     expect(
       await screen.findByText(
-        "Ask your company knowledge",
+        "Ask a general question, or ask about your company documents for a cited answer.",
       ),
     ).toBeInTheDocument();
   });
@@ -1051,6 +1051,7 @@ describe("ChatApp Ask workspace", () => {
     streamCtl.send("event: completed\nid: 5\ndata: {}\n\n");
     streamCtl.close();
     expect(await screen.findByRole("button", { name: "Give feedback" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save to quiz" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Inspect" })).toBeNull();
@@ -1270,5 +1271,99 @@ describe("ChatApp Ask workspace", () => {
       title: "Chat",
       created_at: "2026-08-17T00:00:00Z",
     });
+  });
+});
+
+describe("ChatApp Save to quiz gating", () => {
+  beforeEach(() => {
+    vi.mocked(createConversation).mockResolvedValue({
+      conversation_id: "conv-created",
+      creator_user_id: "u1",
+      title: "Chat",
+      created_at: "2026-08-17T00:00:00Z",
+    });
+  });
+
+  async function completeAsk(
+    user: ReturnType<typeof userEvent.setup>,
+  ): Promise<void> {
+    vi.mocked(listConversations).mockResolvedValue([]);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events:
+          'event: status\nid: 1\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\nevent: token_delta\nid: 2\ndata: {"delta":"Hi"}\n\nevent: completed\nid: 3\ndata: {}\n\n',
+      }),
+    );
+    renderChat(<ChatApp />);
+    await screen.findByRole("button", { name: "Send" });
+    await user.type(screen.getByLabelText("Message"), "What is LCEL?");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByRole("button", { name: "Give feedback" });
+  }
+
+  it("hides Save to quiz for members when the workspace capability is on", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue({
+      ...ALLOWED_META,
+      pdf_eval_workspace: true,
+    });
+    await completeAsk(user);
+    expect(screen.getByRole("button", { name: "Give feedback" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save to quiz" })).toBeNull();
+  });
+
+  it("hides Save to quiz for viewers when the workspace capability is on", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue({
+      ...ALLOWED_META,
+      pdf_eval_workspace: true,
+    });
+    vi.mocked(fetchMe).mockResolvedValue({
+      user_id: "u1",
+      role: "viewer",
+      authorization_version: 1,
+      upload_enabled: false,
+    });
+    await completeAsk(user);
+    expect(screen.queryByRole("button", { name: "Save to quiz" })).toBeNull();
+  });
+
+  it("hides Save to quiz for owners when the workspace capability is off", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(fetchMe).mockResolvedValue({
+      user_id: "u1",
+      role: "owner",
+      authorization_version: 1,
+      upload_enabled: true,
+    });
+    await completeAsk(user);
+    expect(screen.getByRole("button", { name: "Give feedback" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save to quiz" })).toBeNull();
+  });
+
+  it("shows Save to quiz beside Give feedback for owners when capability is on", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue({
+      ...ALLOWED_META,
+      pdf_eval_workspace: true,
+    });
+    vi.mocked(fetchMe).mockResolvedValue({
+      user_id: "u1",
+      role: "owner",
+      authorization_version: 1,
+      upload_enabled: true,
+    });
+    await completeAsk(user);
+    expect(screen.getByRole("button", { name: "Give feedback" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save to quiz" })).toBeInTheDocument();
   });
 });

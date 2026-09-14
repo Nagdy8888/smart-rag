@@ -2155,6 +2155,11 @@
             "title": "Min Client Version",
             "type": "string"
           },
+          "pdf_eval_workspace": {
+            "default": false,
+            "title": "Pdf Eval Workspace",
+            "type": "boolean"
+          },
           "sse_schema_version": {
             "title": "Sse Schema Version",
             "type": "string"
@@ -5549,7 +5554,7 @@
     },
     "/api/meta": {
       "get": {
-        "description": "Publish version handshake fields. Packet 6 owns enforcement.\n\nThis handler is async so a full sync thread pool cannot stall the\nAsk compatibility handshake.\n\nArgs:\n    request: Request with settings.\n\nReturns:\n    api_version, sse_schema_version, min_client_version.",
+        "description": "Publish version handshake fields. Packet 6 owns enforcement.\n\nThis handler is async so a full sync thread pool cannot stall the\nAsk compatibility handshake.\n\nArgs:\n    request: Request with settings.\n\nReturns:\n    api_version, sse_schema_version, min_client_version,\n    pdf_eval_workspace.",
         "operationId": "api_meta_api_meta_get",
         "responses": {
           "200": {

@@ -172,7 +172,9 @@ describe("AnswerSurface origin chrome", () => {
       screen.getByText("Couldn't load this conversation."),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText("Ask your company knowledge"),
+      screen.queryByText(
+        "Ask a general question, or ask about your company documents for a cited answer.",
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -190,7 +192,9 @@ describe("AnswerSurface origin chrome", () => {
     );
     expect(screen.getByText("Loading conversation…")).toBeInTheDocument();
     expect(
-      screen.queryByText("Ask your company knowledge"),
+      screen.queryByText(
+        "Ask a general question, or ask about your company documents for a cited answer.",
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -308,7 +312,7 @@ describe("AnswerSurface origin chrome", () => {
     );
     expect(
       screen.getByText(
-        "Ask your company knowledge",
+        "Ask a general question, or ask about your company documents for a cited answer.",
       ),
     ).toBeInTheDocument();
   });

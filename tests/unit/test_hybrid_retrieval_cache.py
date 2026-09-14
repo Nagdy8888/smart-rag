@@ -127,6 +127,63 @@ def test_identical_query_hits_cache_without_channels() -> None:
     )
 
 
+def test_cold_bypass_skips_warm_cache_and_reruns_channels() -> None:
+    """Exam cache_mode skips ID/rank cache get/put without cloning ranking."""
+
+    from smart_rag_core.retrieval.cache_store import RetrievalCacheMode
+
+    item = _candidate()
+    rows = {item.chunk_id: _context(item)}
+    store = RetrievalCacheStore.in_memory()
+    ran = {"value": 0}
+
+    def load(ids: tuple[UUID, ...]) -> tuple[ChunkContext, ...]:
+        """Return authorized rows.
+
+        Args:
+            ids: Requested IDs.
+
+        Returns:
+            Matching context rows.
+        """
+
+        return tuple(rows[item] for item in ids if item in rows)
+
+    def job() -> object:
+        """Count channel invocations.
+
+        Returns:
+            One dense candidate.
+        """
+
+        ran["value"] += 1
+        return (item,)
+
+    retriever = HybridRetriever(
+        embedding_gateway=EmbeddingGateway(
+            MockEmbeddingAdapter(fixture_id="cache-bypass")
+        ),
+        load_context=load,
+        retrieval_cache=store,
+    )
+    caller = _caller()
+    first = retriever.retrieve(
+        query="annual leave policy",
+        caller=caller,
+        channel_jobs={"dense": job},
+    )
+    assert ran["value"] == 1
+    bypassed = retriever.retrieve(
+        query="annual leave policy",
+        caller=caller,
+        channel_jobs={"dense": job},
+        cache_mode=RetrievalCacheMode.COLD_BYPASS,
+    )
+    assert bypassed.ranked_ids == first.ranked_ids
+    assert bypassed.embedding_call_count == 1
+    assert ran["value"] == 2
+
+
 def test_acl_downgrade_does_not_serve_stale_ids() -> None:
     """Unauthorized cached IDs are dropped by recheck and do not become evidence."""
 

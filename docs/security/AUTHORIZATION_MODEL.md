@@ -2,7 +2,7 @@
 title: Authorization model
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-13
 audience: engineering, security, reviewers
 ---
 
@@ -103,6 +103,17 @@ Packet 3 **revokes** all `app`/`private`/`langgraph`/`lightrag` grants from `ano
 | `private.set_document_acl` | caller context, document, grantee, grant/revoke | Idempotent owner/admin-only ACL mutation with audit |
 | `app.set_document_visibility` | caller context, document, visibility | Owner/admin-only flip; restricted downgrade clears graph eligibility |
 | `app.append_audit_event` | event metadata | **SECURITY DEFINER** single insert path for `app_audit_writer` (fixed `search_path`) |
+| `app.create_eval_quiz_case` | caller context, optional run, labels, gold IDs, idempotency | Owner/admin draft. Question comes from a caller-owned completed run when `source_run_id` is set. Holdout rejected. Capacity 60. |
+| `app.list_eval_quiz_case_summaries` | caller context, split, status, keyset | Owner/admin summaries without questions, answers, facts, or excerpts |
+| `app.get_eval_quiz_case` | caller context, case_id | Owner/admin detail. Missing/expired IDs raise `eval_quiz:not_found` |
+| `app.patch_eval_quiz_case` / `app.replace_eval_quiz_gold` | caller context, case_id, row_version | CAS edits. Reset approval. Gold locators are server-derived |
+| `app.approve_eval_quiz_case` / `app.reject_eval_quiz_case` / `app.delete_eval_quiz_case` | caller context, case_id, row_version | Named-human review or immediate delete. Content-free audit |
+| `app.count_eval_quiz_case_status` / `app.purge_expired_eval_quiz_cases` | caller context | Counts only; bounded 365-day purge |
+| `app.enqueue_eval_exam` | caller context, split, idempotency, hashes | Owner/admin. Hidden evaluation conversation. One active exam. Holdout rejected |
+| `app.claim_eval_exam` / `app.heartbeat_eval_exam` / `app.reclaim_eval_exam` | caller context, lease | `FOR UPDATE SKIP LOCKED` claim; expired lease reclaimable; live lease not |
+| `app.persist_eval_exam_case_result` | caller context, counts | Idempotent count-only result. Duplicate does not increment progress |
+| `app.finalize_eval_exam` / `app.cancel_eval_exam` | caller context | Immutable successful report; partial/failed never become latest |
+| `app.get_eval_exam_run` / `app.get_latest_eval_exam_report` / `app.get_latest_eval_exam_report_for_split` / `app.list_eval_exam_report_cases` / `app.purge_expired_eval_exam_runs` | caller context | Status/report counts only; 365-day purge; latest is split-isolated |
 
 Read RPCs that filter with caller context may be `SECURITY INVOKER`
 (Hybrid retrieval) or `SECURITY DEFINER` (status, citation GET, paginated
@@ -123,11 +134,24 @@ lives in the unexposed `private` schema.
 - `app_audit_writer` cannot UPDATE or DELETE audit rows (trigger + grants).
 - `app_worker` cannot SELECT conversations.
 - `app_api` cannot INSERT/UPDATE canonical tables directly.
+- `app_api`, `anon`, `authenticated`, and `PUBLIC` cannot INSERT/UPDATE/DELETE
+  `app.eval_quiz_cases` or `app.eval_quiz_gold_chunks`. Quiz mutations go through
+  `SECURITY DEFINER` RPCs with `validate_caller_context` and owner/admin checks.
+  HTTP (P06-29) wraps those RPCs and never falls back to `.private-eval/`.
+- `app_api`, `anon`, `authenticated`, and `PUBLIC` cannot INSERT/UPDATE/DELETE
+  `app.eval_exam_runs`, `app.eval_exam_case_results`, or
+  `app.eval_exam_reports`. Successful reports reject UPDATE. `app_worker`
+  still cannot SELECT chat conversations. Evaluation conversations are hidden
+  from browser list/get/messages/title RPCs.
 - Member, upload-capable member, viewer, disabled, forged, missing, and stale
   contexts cannot mutate ACLs.
-- The local PDF evaluation workspace (`PDF_EVAL_WORKSPACE_ENABLED`) is
+- The local/test PDF evaluation workspace (`PDF_EVAL_WORKSPACE_ENABLED`) is
   owner/admin only, uses `app_api`, and is forbidden in staging and production.
-  Holdout custody paths are never listed.
+  Holdout custody paths are never listed. P06-27 authorizes hosted quiz
+  tables with the same role gate, 365-day retention, and no holdout split.
+  Admin Recall@10 is **All required gold chunks in the production Hybrid
+  top 10**. Citation overlap is not that metric. Exam start/cancel are
+  `COST_MUTATION` and never score inside the HTTP request.
 - Reusing one physical connection across transactions cannot make a retained
   `request.jwt.claims` GUC override the next call's typed RPC arguments.
 

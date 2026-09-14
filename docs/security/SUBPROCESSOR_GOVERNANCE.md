@@ -86,6 +86,15 @@ Sources: [GDPR / residency](https://supabase.com/docs/guides/security/gdpr-compl
 
 **Application rule:** Local Supabase may hold synthetic and development fixtures. Managed Supabase must not receive real company corpus until region/DPA/backup rows are `verified`.
 
+### 3.1 2026-09-10 hosted quiz residual-risk exception
+
+User named/date approval on 2026-09-10: quiz questions, expected answers, gold
+metadata, and exam state may be stored in the existing hosted project that
+already holds the laptop-runtime corpus. This exception does **not** change
+the unverified region/DPA/backup/subprocessor rows above and does **not**
+authorize staging or production evaluation UI. Recorded in
+[ADR-hosted-webapp-evaluation-workspace.md](../adr/ADR-hosted-webapp-evaluation-workspace.md).
+
 ## 4. Vercel settings matrix
 
 | Setting | Documented posture | Org value | Status | Verification owner |

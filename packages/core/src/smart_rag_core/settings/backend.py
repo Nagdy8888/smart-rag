@@ -242,8 +242,9 @@ class BackendSettings(SharedSettings):
         default=False,
         validation_alias="PDF_EVAL_WORKSPACE_ENABLED",
         description=(
-            "Local-only owner/admin PDF evaluation workspace. Default false. "
-            "Staging and production fail closed if true."
+            "Local/test owner/admin PDF evaluation workspace. Python default "
+            "false. Local Compose interpolates true. Staging and production "
+            "fail closed if true."
         ),
         json_schema_extra={"security": "public"},
     )

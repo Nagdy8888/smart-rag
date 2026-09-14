@@ -38,7 +38,13 @@ one sealed book PDF without changing production parser selection.
 6. **OpenAI stays on the existing gateway.** Embeddings, rerank, answers, and
    the PDF judge use `SharedSettings.openai_api_key`. The key is never copied
    into the parser sandbox or child-process command lines.
-7. **Single-document scope.** The first report must set
+7. **Experiment-only host Vision OCR.** After named/date owner approval on
+   2026-09-10, the AnyDoc lane may raster AnyDoc-named pages and pages with no
+   selectable text and transcribe them with `gpt-4o-mini` (`store=False`, no
+   Files API, no `wrap_openai`). This is transcription OCR, not figure
+   captioning, and is not a production `ParserService` path. Firecrawl Parse
+   remains forbidden.
+8. **Single-document scope.** The first report must set
    `generalization_claim=false`. A primary-parser replacement requires later
    multi-PDF qualification and an ADR that changes production defaults.
 
@@ -48,9 +54,11 @@ one sealed book PDF without changing production parser selection.
   while physical-page citations are required.
 - Hosted Firecrawl OCR is out of scope until a separate subprocessor ADR and
   Zero Data Retention decision exist.
-- When AnyDoc names scanned pages (`NeedsOcrError.pages`), the bake-off omits
-  those pages and converts the remaining PDF locally. That is not OCR and not
-  a hosted Parse call. An all-scanned PDF still fails closed.
+- When AnyDoc names pages (`NeedsOcrError.pages`) or a page has no selectable
+  text, the bake-off OCRs those pages on the host with OpenAI Vision and
+  splices Markdown in original page order. AnyDoc-safe runs stay in the
+  no-network sandbox. That is not Firecrawl Parse. An all-scanned PDF still
+  fails closed if the page cap is exceeded or any OCR call fails.
 
 ## Related
 
@@ -66,3 +74,4 @@ one sealed book PDF without changing production parser selection.
 | Role | Name | Date |
 | --- | --- | --- |
 | Engineering lead | user (Cursor chat; bake-off mandate) | 2026-09-09 |
+| Product owner | user (Cursor chat; OpenAI Vision OCR of bake-off pages) | 2026-09-10 |

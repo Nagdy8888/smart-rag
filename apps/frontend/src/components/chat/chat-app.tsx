@@ -5,15 +5,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  isClassifiedApiError,
-  submitFeedback,
-  type ApiFailure,
-} from "../../lib/api";
+import { isClassifiedApiError, submitFeedback, type ApiFailure } from "../../lib/api";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { useSession } from "../../lib/auth/session-provider";
 import { citationChipHref } from "../../lib/citation-drawer";
 import { overlaySettledTurns } from "../../lib/chat-history";
+import { showSaveToQuizConvenience } from "../../lib/eval-workspace";
 import { evaluatePaidHandshake } from "../../lib/handshake";
 import { shouldShowCitations } from "../../lib/answer-origin";
 import { FEEDBACK_TAGS_UP, type CitationResponse, type FeedbackTag } from "../../lib/types";
@@ -35,6 +32,7 @@ import { useChatRun } from "./hooks/use-chat-run";
 import { useChatSelection } from "./hooks/use-chat-selection";
 import { useConversationActions } from "./hooks/use-conversation-actions";
 import { useConversationScroll } from "./hooks/use-conversation-scroll";
+import { toSaveToQuizPopoverProps, useQuizCapture } from "./hooks/use-quiz-capture";
 import { useVerifiedAnswerReveal } from "./hooks/use-verified-answer-reveal";
 import chatStyles from "./chat.module.css";
 
@@ -157,6 +155,19 @@ export function ChatApp() {
     liveQueries.ready?.dependencies.some(
       (item) => item.name === "paradedb" && item.status === "down",
     ) === true;
+  const showSaveToQuiz = showSaveToQuizConvenience(
+    liveQueries.currentUser?.role,
+    queries.meta,
+  );
+  const quiz = useQuizCapture({
+    auth: queries.auth,
+    enabled: showSaveToQuiz,
+    runId: run.chat.runId,
+    terminal: run.chat.terminal,
+    question: run.lastUserMessage,
+    citations: visibleCitations,
+    onFillComposer: selection.fillComposer,
+  });
 
   const sendFeedback = useCallback(async () => {
     if (queries.auth === null || run.chat.runId === null) return;
@@ -210,6 +221,7 @@ export function ChatApp() {
         reconnectExhausted={run.reconnectExhausted}
         nextRetryMs={run.nextRetryMs}
         feedbackStatus={feedbackStatus}
+        quizStatus={quiz.saveNotice ?? quiz.saveError ?? quiz.scoreNotice}
         deleteSuccess={actions.deleteSuccess}
       />
       <div className={chatStyles.mobileBar}>
@@ -274,6 +286,8 @@ export function ChatApp() {
               void sendFeedback();
             }}
             feedbackPending={feedbackPending}
+            showSaveToQuiz={showSaveToQuiz}
+            quiz={toSaveToQuizPopoverProps(quiz, run.lastUserMessage, visibleCitations)}
           />
         }
         sessionsExpanded={selection.sessionsExpanded}

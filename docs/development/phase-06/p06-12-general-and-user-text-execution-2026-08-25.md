@@ -45,6 +45,26 @@ Rollback: remove `general_chat_v1`, `openai_general_chat.py`,
 Handoff to P06-13: add authenticated `query_studio_live` without changing
 unbound `query_studio`.
 
+## 2026-09-13 close-out (resume after P06-36)
+
+Wrapper Packet 12 stayed unchecked while hosted eval packets ran. This
+close-out re-ran the packet gates. No general-chat contract changed.
+
+`general_chat_v1`, `openai_general_chat.py`, `answer_origin`, and
+`usage_kind="answer"` remain in place. Company grounding and
+`filter_invented_ids` are unchanged. Mock mode performs no DNS.
+
+2026-09-13 commands (`APP_ENV=test`, `ALLOW_TEST_IDENTITY=true`,
+`MOCK_MODEL_MODE=true`):
+
+| Command | Exit |
+| --- | --- |
+| `uv run pytest tests/unit/test_general_chat_gateway.py tests/unit/test_general_chat_generate.py tests/unit/test_answer_verifier.py tests/unit/test_query_graph_runtime.py tests/unit/test_query_sse_mapping.py tests/unit/test_prompt_registry.py -q` | 0 |
+| `uv run ruff check` on gateways, query_answer, prompts, query, `query_graph_runtime.py` | 0 |
+| `uv run pyright packages/core/src/smart_rag_core/gateways/openai_general_chat.py packages/core/src/smart_rag_core/query_answer` | 0 |
+
+Handoff to P06-13: authenticated `query_studio_live`.
+
 ## 2026-08-26 tracing latency repair
 
 Observed run `38aed2cd-b1bb-4f2c-8761-13c478669a68` completed in

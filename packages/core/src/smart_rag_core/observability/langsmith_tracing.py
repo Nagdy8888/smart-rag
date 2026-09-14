@@ -58,6 +58,8 @@ _SENSITIVE_KEYS = frozenset(
     {
         "api_key",
         "excerpts",
+        "image_png",
+        "image_url",
         "input",
         "inputs",
         "instructions",
@@ -987,6 +989,91 @@ def query_profile_responses_traceable(func: Any) -> Any:
         run_type="llm",
         process_inputs=redact_openai_call_inputs,
         process_outputs=redact_rerank_call_outputs,
+    )(func)
+
+
+def redact_page_ocr_inputs(inputs: Mapping[str, Any]) -> dict[str, Any]:
+    """Export bake-off page-OCR metadata without page rasters or text.
+
+    ``image_png``, ``image_url``, and ``api_key`` are never copied, including
+    when ``LANGSMITH_EXPORT_IO`` is on.
+
+    Args:
+        inputs: Traceable keyword arguments.
+
+    Returns:
+        Page index, image hash/size, model id, timeout, and prompt version.
+    """
+
+    payload: dict[str, Any] = {"correlation": current_correlation_ids()}
+    page_index = inputs.get("page_index")
+    if isinstance(page_index, int):
+        payload["page_index"] = page_index
+    image_sha256 = inputs.get("image_sha256")
+    if isinstance(image_sha256, str):
+        payload["image_sha256"] = image_sha256
+    image_png = inputs.get("image_png")
+    if isinstance(image_png, (bytes, bytearray)):
+        payload["image_bytes"] = len(image_png)
+    model_id = inputs.get("model_id")
+    if isinstance(model_id, str):
+        payload["model_id"] = model_id
+    timeout_seconds = inputs.get("timeout_seconds")
+    if isinstance(timeout_seconds, (int, float)):
+        payload["timeout_seconds"] = float(timeout_seconds)
+    payload["prompt_version"] = "parser_bakeoff_page_ocr_v1"
+    return payload
+
+
+def redact_page_ocr_outputs(outputs: object) -> dict[str, Any]:
+    """Export OCR usage without transcribed page text.
+
+    Args:
+        outputs: ``(markdown, request_id, input_tokens, output_tokens)``.
+
+    Returns:
+        Request id, token counts, and markdown length/hash.
+    """
+
+    raw = outputs
+    if isinstance(outputs, Mapping):
+        raw = cast(Mapping[str, Any], outputs).get("output", outputs)
+    if not isinstance(raw, tuple):
+        return {}
+    items: list[object] = list(cast(tuple[object, ...], raw))
+    if len(items) < 4:
+        return {}
+    markdown = items[0]
+    request_id = items[1]
+    input_tokens = items[2]
+    output_tokens = items[3]
+    payload: dict[str, Any] = {"request_id": str(request_id)}
+    if isinstance(markdown, str):
+        payload["markdown_chars"] = len(markdown)
+        payload["markdown_sha256"] = short_content_hash(markdown)
+    try:
+        payload["input_tokens"] = int(cast(Any, input_tokens))
+        payload["output_tokens"] = int(cast(Any, output_tokens))
+    except (TypeError, ValueError):
+        pass
+    return payload
+
+
+def page_ocr_responses_traceable(func: Any) -> Any:
+    """Apply the redacted bake-off page-OCR span decorator.
+
+    Args:
+        func: ``execute_openai_page_ocr`` implementation.
+
+    Returns:
+        Traceable wrapper that never exports page rasters.
+    """
+
+    return traceable(
+        name="openai.responses.parser_bakeoff_page_ocr",
+        run_type="llm",
+        process_inputs=redact_page_ocr_inputs,
+        process_outputs=redact_page_ocr_outputs,
     )(func)
 
 

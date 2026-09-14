@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 15
-status: pending
+status: complete
 title: "Run all deterministic and live gates, inspect LangSmith traces, and update evidence and runbooks."
 requirement_ids: [P06-15]
 ---

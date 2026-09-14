@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-13
 audience: engineering, reviewers
 ---
 
@@ -42,6 +42,12 @@ erDiagram
   runs ||--o{ llm_usage : records
   runs ||--o{ citations : cites
   runs ||--o{ user_feedback : receives
+  eval_quiz_cases ||--|{ eval_quiz_gold_chunks : gold
+  eval_quiz_cases }o--o| runs : source_run
+  eval_quiz_gold_chunks }o--|| document_chunks : locates
+  eval_exam_runs ||--|{ eval_exam_case_results : scores
+  eval_exam_runs ||--o| eval_exam_reports : report
+  eval_exam_runs }o--|| conversations : hidden_eval
   ingestion_jobs }o--|| document_versions : targets
   bm25_index_jobs }o--|| document_chunks : projects
   lightrag_index_jobs }o--|| document_versions : indexes
@@ -124,6 +130,8 @@ erDiagram
 | `run_events` | `app` | authority | `app.append_run_event` (`app_api` EXECUTE) | creator SELECT; resume via `app.list_run_events_after` | 30d completed (packet 7 reaper) | monotonic `(run_id, sequence)` | cascade on run; tombstoned conversation denies resume immediately | PK `(run_id, sequence)`; one terminal per run | 6 packet 6 SSE |
 | `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade; `source_unavailable` when source deleted | `(run_id, citation_index)` | 6 packet 3 / 7 |
 | `user_feedback` | `app` | authority | chat UI | eval pipelines | 12 months | sparse | cascade on conversation delete | feedback `id`; required unmerged `tag` | 6 packet 7 |
+| `eval_quiz_cases` / `eval_quiz_gold_chunks` | `app` | authority (authorized P06-27) | owner/admin RPCs | owner/admin RPCs | 365d | ≤60 | immediate delete RPC + expiry purge | `(creator_user_id, idempotency_key)` | 6 packet 28 |
+| `eval_exam_runs` / `eval_exam_case_results` / `eval_exam_reports` | `app` | authority (authorized P06-27) | exam RPCs | owner/admin RPCs | 365d | one active exam | expiry purge; reports immutable while current | exam `id`; qualification `(dataset_hash, candidate_fingerprint)` | 6 packet 30 |
 | `tool_catalog` / `tool_versions` / `tool_permissions` / `tool_usage_events` | `app` | authority (Phase 2 schema) | admin/catalog | progressive disclosure | catalog lifetime | small | deactivate/delete | tool_key unique | 6 packet 4 uses the **in-code** `optional_tools_v1` allow-list as runtime authority; DB rows are expand-ready for later admin UI seed |
 
 ## Usage, audit, checkpoints

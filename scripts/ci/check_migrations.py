@@ -90,6 +90,9 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260910120000_list_run_citations_locators_v2.sql",
     "20260910133000_list_run_citations_page_label_v2.sql",
     "20260910140000_list_authorized_eval_passages_v1.sql",
+    "20260910150000_eval_quiz_cases_v1.sql",
+    "20260910160000_eval_exam_runs_v1.sql",
+    "20260913170000_eval_exam_report_read_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

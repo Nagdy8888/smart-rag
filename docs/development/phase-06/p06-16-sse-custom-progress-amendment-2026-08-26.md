@@ -2,14 +2,13 @@
 title: P06-16 SSE custom progress amendment
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-09-13
 audience: engineering, reviewers
 ---
 
 # P06-16 — LangGraph custom SSE progress contract
 
-**Status:** PARTIAL — documentation and integrity amendment landed; producer
-contract test remains BEP-02 (P08-49).
+**Status:** documentation complete 2026-09-13. Producer contract test remains BEP-02 (P08-49).
 
 ## Requirement quoted
 
@@ -31,6 +30,16 @@ contract test remains BEP-02 (P08-49).
 ## Commands
 
 Recorded with P08-24 evidence after `verify_plan_integrity.py`.
+
+## 2026-09-13 close-out
+
+This packet is documentation. P08-24 integrity already passed historically.
+Producer proof remains BEP-02 / P08-49. Wrapper Packet 16 is closed as
+the co-owned contract; it does not activate sibling Phase 6 coding.
+
+Rollback: delete P06-16 wording and revert the shared-contract sentence.
+Do not renumber P08-22/P08-23.
+
 
 ## Rollback
 

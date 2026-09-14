@@ -700,3 +700,44 @@ def test_lightrag_trace_exports_usage_cost_without_extract_text() -> None:
         CANARY_EMAIL,
         CANARY_PASSAGE,
     )
+
+
+def test_page_ocr_redactor_never_exports_image_even_with_export_io(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bake-off page OCR traces omit rasters and transcriptions when I/O export is on."""
+
+    from smart_rag_core.evaluation.parser_bakeoff.constants import (
+        PAGE_OCR_PROMPT_VERSION,
+    )
+    from smart_rag_core.observability.langsmith_tracing import (
+        redact_page_ocr_inputs,
+        redact_page_ocr_outputs,
+    )
+
+    monkeypatch.setenv(LANGSMITH_EXPORT_IO_ENV, "true")
+    raster = b"\x89PNG secret-raster-bytes"
+    inputs = redact_page_ocr_inputs(
+        {
+            "api_key": CANARY_TOKEN,
+            "image_png": raster,
+            "image_url": "data:image/png;base64,secret",
+            "image_sha256": "abc123",
+            "page_index": 7,
+            "model_id": "gpt-4o-mini",
+            "timeout_seconds": 60.0,
+        }
+    )
+    outputs = redact_page_ocr_outputs((CANARY_PASSAGE, "resp_ocr_1", 80, 12))
+    dumped = json.dumps({"inputs": inputs, "outputs": outputs})
+    assert PAGE_OCR_PROMPT_VERSION == inputs["prompt_version"]
+    assert inputs["page_index"] == 7
+    assert inputs["image_bytes"] == len(raster)
+    assert "image_png" not in inputs
+    assert "image_url" not in inputs
+    assert "api_key" not in inputs
+    assert outputs["markdown_chars"] == len(CANARY_PASSAGE)
+    assert CANARY_TOKEN not in dumped
+    assert CANARY_PASSAGE not in dumped
+    assert "secret-raster-bytes" not in dumped
+    assert "data:image/png" not in dumped

@@ -1,9 +1,9 @@
 ---
 title: ADR — Local PDF evaluation workspace
 adr_id: ADR-local-pdf-evaluation-workspace
-status: accepted
+status: superseded
 owner: engineering-lead
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-13
 approver: "user (Cursor chat; no legal name provided)"
 approval_date: "2026-09-10"
 audience: engineering, reviewers, security, frontend
@@ -13,9 +13,12 @@ audience: engineering, reviewers, security, frontend
 
 ## Status
 
-`accepted` on 2026-09-10. This is a local-only owner/admin overlay after
-Phase 6 Packet 9. It does not authorize staging or production evaluation UI,
-holdout opening, or frozen Hybrid retune.
+`superseded` on 2026-09-10 by
+[ADR-hosted-webapp-evaluation-workspace.md](./ADR-hosted-webapp-evaluation-workspace.md).
+Historical P06-19 through P06-26 remain the local-file overlay record.
+Hosted quiz labels, production-corpus Recall@10, and the web exam are
+authorized by the successor ADR. This file does not authorize staging or
+production evaluation UI, holdout opening, or frozen Hybrid retune.
 
 ## Context
 
@@ -40,10 +43,11 @@ flowchart LR
   compare --> measuredFix["Measured retrieval repair"]
 ```
 
-## Decision (accepted)
+## Decision (accepted historically; custody superseded 2026-09-10)
 
-1. Keep private questions, answers, facts, and excerpts in gitignored
-   `.private-eval/`. Do not add evaluation-label tables.
+1. Keep private questions in gitignored `.private-eval/` was the original
+   no-table decision. It is superseded by
+   [ADR-hosted-webapp-evaluation-workspace.md](./ADR-hosted-webapp-evaluation-workspace.md).
 2. Enable the workspace only when `APP_ENV=local` or isolated tests and
    `PDF_EVAL_WORKSPACE_ENABLED` is true. Staging and production fail closed.
 3. FastAPI uses `app_api` and server-derived owner/admin identity. Operator
@@ -77,16 +81,18 @@ flowchart LR
 
 - Compose must bind-mount `.private-eval` for the local API only.
 - Passage previews use ACL-rechecked canonical `raw_text`.
-- Official Recall@10 remains the CLI ranked-ID path. The page is a manual
-  AI test plus citation overlap.
-- Operator seal and holdout export stay CLI-only.
+- Official Recall@10 for the hosted workspace is the production-corpus web
+  exam implemented in P06-28 through P06-36. This overlay page remains a
+  manual AI test plus citation overlap; the Admin scoreboard is the official
+  web number. Operator holdout export stays CLI-only.
 
 ## Rollback
 
 Set `PDF_EVAL_WORKSPACE_ENABLED=false`, remove the Compose bind mount, and
 leave packets 1–18 and frozen Hybrid bytes unchanged.
 
-Related: [PDF_HYBRID_EVALUATION.md](../evaluation/PDF_HYBRID_EVALUATION.md) ·
+Related: [ADR-hosted-webapp-evaluation-workspace.md](./ADR-hosted-webapp-evaluation-workspace.md) ·
+[PDF_HYBRID_EVALUATION.md](../evaluation/PDF_HYBRID_EVALUATION.md) ·
 [PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md) ·
 [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy-remediation.md) ·
 [AUTHORIZATION_MODEL.md](../security/AUTHORIZATION_MODEL.md) ·

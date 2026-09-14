@@ -277,15 +277,25 @@ User approval on 2026-08-25; 2026-08-26 remediation accepted 2026-09-10: the pro
 
 ## Approved planned deviation: local PDF evaluation workspace
 
-User approval on 2026-09-10: after Phase 6 Packet 9, run a local-only owner/admin PDF evaluation workspace and label-repair overlay before Packet 10 coding. Integrity keeps packet numbers contiguous, so overlay packets are P06-19 through P06-26 and execute immediately after Packet 9.
+User approval on 2026-09-10: after Phase 6 Packet 9, run a local-only owner/admin PDF evaluation workspace and label-repair overlay before Packet 10 coding. Integrity keeps packet numbers contiguous, so overlay packets are P06-19 through P06-26 and execute immediately after Packet 9. Hosted-label custody is superseded by the deviation below.
 
-- Recorded in `docs/adr/ADR-local-pdf-evaluation-workspace.md`.
-- Private questions, answers, facts, and excerpts stay in gitignored `.private-eval/`. No evaluation-label tables and no staging/production UI.
+- Recorded in `docs/adr/ADR-local-pdf-evaluation-workspace.md` (superseded for custody and official Recall@10).
 - FastAPI uses `app_api` plus server-derived owner/admin identity. Operator and service-role DSNs are forbidden on this path.
 - Holdout files remain outside the repository. The workspace never lists, fetches, or opens holdout.
 - Automatic drafts may propose extractive questions. A named human must approve. The answering model receives only the question.
 - Do not freeze `hybrid_long_document_v1`, retune frozen Hybrid weights, or open holdout until grounded labels and open-split gates pass.
-- Rollback disables `PDF_EVAL_WORKSPACE_ENABLED` and removes the local Compose mount without changing document RAG.
+- Rollback disables `PDF_EVAL_WORKSPACE_ENABLED` without changing document RAG.
+
+## Approved planned deviation: hosted webapp evaluation workspace
+
+User approval on 2026-09-10: store quiz questions, expected answers, gold metadata, and exam state in the existing hosted Supabase project. Day-to-day evaluation happens in the local/test webapp. The web exam measures production-corpus Hybrid Recall@10 (all required gold chunks in the signed-in examiner's production Hybrid top 10). Ordinary thumbs feedback stays. Holdout and freeze stay out.
+
+- Recorded in `docs/adr/ADR-hosted-webapp-evaluation-workspace.md`.
+- Integrity keeps packet numbers contiguous, so hosted packets are P06-27 through P06-36. Execute P06-27, then existing Packet 10, then P06-28 through P06-36, then resume P06-11.
+- RLS, `app_api` RPCs, content-free audit, immediate delete, and 365-day retention are mandatory.
+- Staging and production keep `PDF_EVAL_WORKSPACE_ENABLED` false.
+- Managed Supabase region/DPA/backup rows remain unverified; this deviation is a named residual-risk exception, not matrix verification.
+- Rollback disables `PDF_EVAL_WORKSPACE_ENABLED`. Do not down-migrate populated hosted tables.
 
 ## Approved planned deviation: paced verified-answer reveal and custom progress
 
