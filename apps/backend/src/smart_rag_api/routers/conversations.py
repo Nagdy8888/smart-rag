@@ -23,6 +23,7 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_api.dependencies.identity import CallerContextDep
 from smart_rag_api.dependencies.services import (
     enforce_rate_limit,
+    get_backend_settings,
     get_model_gateway,
     get_postgres_url,
     get_sse_stream_service,
@@ -126,9 +127,13 @@ def get_query_run_service(
         Query-run service.
     """
 
+    settings = get_backend_settings(request)
+    exa_key = settings.exa_api_key
     return QueryRunService(
         postgres_url,
         valkey_client=get_valkey_limits_client(request),
+        web_search_enabled=settings.web_search_enabled,
+        web_search_configured=bool(exa_key.get_secret_value() if exa_key else ""),
     )
 
 

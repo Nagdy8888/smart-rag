@@ -45,6 +45,8 @@ class QueryGraphProcessBindings:
         query_profile_prompt_text: Pinned ``query_profile_v1`` body.
         profile_model_id: Allow-listed profile model recorded on usage.
         supabase_dsn: Canonical Postgres URL for per-run ``app_api`` connections.
+        web_search_enabled: ``WEB_SEARCH_ENABLED`` snapshot. Default false.
+        web_search_configured: True when a non-empty Exa key is present.
     """
 
     hybrid_retriever: HybridRetrieveLike
@@ -57,3 +59,5 @@ class QueryGraphProcessBindings:
     query_profile_prompt_text: str
     profile_model_id: str
     supabase_dsn: str
+    web_search_enabled: bool = False
+    web_search_configured: bool = False

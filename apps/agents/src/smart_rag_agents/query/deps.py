@@ -52,6 +52,9 @@ class QueryGraphDeps:
         unbound_model: Original model after bind, for unbind proofs.
         store_get: Optional LangGraph store reader for compact summaries.
         store_put: Optional LangGraph store writer for compact summaries.
+        web_search_enabled: ``WEB_SEARCH_ENABLED`` snapshot for fail-closed
+            Web routing. Default false.
+        web_search_configured: True when a non-empty Exa key is present.
     """
 
     connection: psycopg.Connection | None = None
@@ -79,6 +82,8 @@ class QueryGraphDeps:
     store_put: Callable[[tuple[str, str, str], str, dict[str, object]], None] | None = (
         None
     )
+    web_search_enabled: bool = False
+    web_search_configured: bool = False
 
 
 @dataclass(slots=True)

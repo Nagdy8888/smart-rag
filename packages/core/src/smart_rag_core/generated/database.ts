@@ -3926,6 +3926,44 @@ export type Database = {
           tool_ceiling: number
         }[]
       }
+      admit_query_run_v3: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+          p_idempotency_key: string
+          p_payload_hash: string
+          p_requested_search_scope: string
+          p_route_family: string
+          p_session_id?: string
+          p_token_issued_at?: string
+        }
+        Returns: {
+          correction_ceiling: number
+          deadline_at: string
+          discovery_ceiling: number
+          heartbeat_at: string
+          manifest_ceiling: number
+          model_call_ceiling: number
+          optimistic_version: number
+          reconnect: boolean
+          recursion_limit: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          request_payload_hash: string
+          requested_search_scope: string
+          reservation_id: string
+          reserved_amount_usd: number
+          route_family: string
+          run_id: string
+          side_effect_ceiling: number
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number
+          tool_ceiling: number
+        }[]
+      }
       advance_promotion_saga_step: {
         Args: { p_expected_step: string; p_new_step: string; p_saga_id: string }
         Returns: boolean
@@ -4713,6 +4751,23 @@ export type Database = {
           status: Database["app"]["Enums"]["run_status"]
         }[]
       }
+      get_query_run_v3: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          creator_user_id: string
+          id: string
+          requested_search_scope: string
+          reservation_id: string
+          status: Database["app"]["Enums"]["run_status"]
+        }[]
+      }
       get_version_ingestion_status: {
         Args: {
           caller_authorization_version: number
@@ -5195,6 +5250,39 @@ export type Database = {
         }[]
       }
       load_query_run_runtime_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          conversation_id: string
+          correction_ceiling: number
+          deadline_at: string
+          discovery_ceiling: number
+          heartbeat_at: string
+          manifest_ceiling: number
+          model_call_ceiling: number
+          optimistic_version: number
+          recursion_limit: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          request_payload_hash: string
+          requested_search_scope: string
+          reservation_id: string
+          reserved_amount_usd: number
+          route_family: string
+          run_id: string
+          side_effect_ceiling: number
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number
+          tool_ceiling: number
+          user_message: string
+        }[]
+      }
+      load_query_run_runtime_v3: {
         Args: {
           caller_authorization_version: number
           caller_role: string

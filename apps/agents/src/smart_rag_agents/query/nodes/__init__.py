@@ -17,6 +17,7 @@ from smart_rag_agents.query.nodes.plan import compile_plan_node
 from smart_rag_agents.query.nodes.prepare import prepare_query_node
 from smart_rag_agents.query.nodes.tables import compose_tables_node
 from smart_rag_agents.query.nodes.verify import verify_answer_node
+from smart_rag_agents.query.nodes.web_scope import web_scope_node
 
 __all__ = [
     "apply_correction_node",
@@ -34,4 +35,5 @@ __all__ = [
     "mixed_scope_node",
     "prepare_query_node",
     "verify_answer_node",
+    "web_scope_node",
 ]

@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 40
-status: pending
+status: complete
 title: "Implement four-mode admission, Auto default, exactly-one-source routing, and Web envelope."
 requirement_ids: [P06-40]
 ---

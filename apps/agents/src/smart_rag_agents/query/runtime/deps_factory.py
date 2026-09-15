@@ -148,6 +148,9 @@ def build_query_process_bindings(
         query_profile_prompt_text=query_profile_prompt_text(),
         profile_model_id=PROFILE_MODEL_ID,
         supabase_dsn=dsn,
+        web_search_enabled=bool(getattr(loaded, "web_search_enabled", False)),
+        web_search_configured=secret_url(getattr(loaded, "exa_api_key", None))
+        is not None,
     )
 
 
@@ -210,6 +213,8 @@ def build_query_graph_deps(
         model_gateway=bindings.model_gateway,
         store_get=store_get,
         store_put=store_put,
+        web_search_enabled=bindings.web_search_enabled,
+        web_search_configured=bindings.web_search_configured,
     )
 
 

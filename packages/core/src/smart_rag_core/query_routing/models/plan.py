@@ -43,6 +43,7 @@ class BranchKind(StrEnum):
     NO_RETRIEVAL = "no_retrieval"
     SCOPED_REFUSAL = "scoped_refusal"
     CITATION_LOOKUP = "citation_lookup"
+    WEB_RESEARCH = "web_research"
 
 
 class CorrectionKind(StrEnum):
@@ -58,6 +59,7 @@ class Phase6Extension(StrEnum):
 
     GRAPH_INSPECTION = "graph_inspection"
     NO_RETRIEVAL = "no_retrieval"
+    WEB_RESEARCH = "web_research"
     NONE = "none"
 
 

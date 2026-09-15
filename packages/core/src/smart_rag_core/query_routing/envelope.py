@@ -48,9 +48,22 @@ def clamp_family_to_reservation(
 
     Returns:
         Effective family and optional ``envelope_cannot_enlarge`` reason.
+
+    Raises:
+        QueryRoutingError: ``web_envelope_cannot_fit`` when a desired Web
+            route cannot run inside the reservation. Web never Hybrid-clamps.
     """
 
     reserved = runtime.route_family
+    if desired is Phase6RouteFamily.WEB_RESEARCH:
+        needed = envelope_for_family(desired)
+        remaining_ok = (
+            needed.model_call_ceiling <= runtime.model_call_ceiling
+            and needed.tool_ceiling <= runtime.tool_ceiling
+        )
+        if family_fits_reservation(desired, reserved) and remaining_ok:
+            return desired, None
+        raise QueryRoutingError("web_envelope_cannot_fit")
     if family_fits_reservation(desired, reserved):
         remaining_ok = (
             envelope_for_family(desired).model_call_ceiling

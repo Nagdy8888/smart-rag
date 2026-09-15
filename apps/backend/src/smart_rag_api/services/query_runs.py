@@ -62,16 +62,22 @@ class QueryRunService:
         postgres_url: str,
         *,
         valkey_client: ValkeyClient | None = None,
+        web_search_enabled: bool = False,
+        web_search_configured: bool = False,
     ) -> None:
-        """Store DSN and optional limits client.
+        """Store DSN, optional limits client, and Web feature flags.
 
         Args:
             postgres_url: app_api URL.
             valkey_client: FastAPI-owned limits Valkey.
+            web_search_enabled: ``WEB_SEARCH_ENABLED`` snapshot. Default false.
+            web_search_configured: True when a non-empty Exa key is present.
         """
 
         self._postgres_url = postgres_url
         self._valkey_client = valkey_client
+        self._web_search_enabled = web_search_enabled
+        self._web_search_configured = web_search_configured
 
     def submit_auto_message(
         self,
@@ -82,7 +88,7 @@ class QueryRunService:
         message: str,
         requested_search_scope: RequestedSearchScope,
     ) -> tuple[AuthorizedRuntimeContext, str]:
-        """Admit a Composite envelope for Auto chat. Does not start SSE.
+        """Admit Auto chat. Composite unless forced Web reserves WEB_RESEARCH.
 
         Args:
             caller: Authenticated caller.
@@ -95,16 +101,25 @@ class QueryRunService:
             Authorized context and the packet 6 stream path.
 
         Raises:
-            QueryAdmissionError: Rate, ownership, budget, or idempotency.
+            QueryAdmissionError: Rate, ownership, budget, idempotency, or
+                disabled/unconfigured Web.
         """
 
+        if requested_search_scope is RequestedSearchScope.WEB:
+            if not self._web_search_enabled:
+                raise QueryAdmissionError("web_search_disabled")
+            if not self._web_search_configured:
+                raise QueryAdmissionError("web_search_unconfigured")
+            route_family = Phase6RouteFamily.WEB_RESEARCH
+        else:
+            route_family = Phase6RouteFamily.COMPOSITE
         result = admit_query_run_for_caller(
             self._postgres_url,
             caller=caller,
             conversation_id=conversation_id,
             idempotency_key=idempotency_key,
             message=message,
-            route_family=Phase6RouteFamily.COMPOSITE,
+            route_family=route_family,
             requested_search_scope=requested_search_scope,
             postgres_rate_limit_url=SecretStr(self._postgres_url),
             valkey_client=self._valkey_client,

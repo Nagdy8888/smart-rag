@@ -113,7 +113,7 @@ def get_query_run(
             cursor.execute(
                 """
                 SELECT *
-                FROM app.get_query_run_v2(%s, %s, %s, %s)
+                FROM app.get_query_run_v3(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,
@@ -166,7 +166,7 @@ def load_query_run_runtime(
             cursor.execute(
                 """
                 SELECT *
-                FROM app.load_query_run_runtime_v2(%s, %s, %s, %s)
+                FROM app.load_query_run_runtime_v3(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,

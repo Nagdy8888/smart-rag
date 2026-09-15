@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.query_routing.knowledge_scope import NoRetrievalAnswerMode
+from smart_rag_core.query_routing.models.plan import BranchKind
 from smart_rag_core.query_routing.serde import plan_from_state
 
 from smart_rag_agents.query.state import QueryGraphState
@@ -47,7 +48,7 @@ def route_after_plan(state: QueryGraphState) -> str:
 
     Returns:
         ``company_scope``, ``general_scope``, ``mixed_scope``,
-        ``invalid_scope``, or ``end``.
+        ``web_scope``, ``invalid_scope``, or ``end``.
     """
 
     if state["status"] in {"admission_rejected", "routing_rejected"}:
@@ -59,6 +60,12 @@ def route_after_plan(state: QueryGraphState) -> str:
         plan = plan_from_state(raw_plan)
     except ValueError:
         return "invalid_scope"
+    if plan.effective_route is Phase6RouteFamily.WEB_RESEARCH:
+        if not plan.company_claim_forbidden:
+            return "invalid_scope"
+        if {branch.kind for branch in plan.branches} != {BranchKind.WEB_RESEARCH}:
+            return "invalid_scope"
+        return "web_scope"
     if plan.effective_route is Phase6RouteFamily.NO_RETRIEVAL:
         if not plan.company_claim_forbidden:
             return "invalid_scope"
@@ -108,3 +115,22 @@ def route_after_correction(state: QueryGraphState) -> str:
     }:
         return "end"
     return "fuse_evidence"
+
+
+def route_after_web_scope(state: QueryGraphState) -> str:
+    """Continue to verification only when Web produced a draft.
+
+    Args:
+        state: State after ``web_scope``.
+
+    Returns:
+        ``verify_answer`` or ``end``. The P06-40 stub always ends.
+    """
+
+    if state["status"] in {
+        "admission_rejected",
+        "routing_rejected",
+        "insufficient_evidence",
+    }:
+        return "end"
+    return "verify_answer"

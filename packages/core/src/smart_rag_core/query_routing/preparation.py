@@ -131,9 +131,12 @@ def _extension_for_scope(scope: KnowledgeScope, query: str) -> Phase6Extension:
         query: Original query.
 
     Returns:
-        Graph inspection or none for company documents; otherwise no-retrieval.
+        Graph inspection or none for company documents; Web research for
+        public-web scope; otherwise no-retrieval.
     """
 
+    if scope is KnowledgeScope.WEB:
+        return Phase6Extension.WEB_RESEARCH
     if scope is KnowledgeScope.COMPANY_DOCUMENTS:
         if is_graph_inspection(query):
             return Phase6Extension.GRAPH_INSPECTION

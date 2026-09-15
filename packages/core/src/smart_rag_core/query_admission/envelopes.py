@@ -30,6 +30,7 @@ FAMILY_DEADLINE_SECONDS: dict[Phase6RouteFamily, int] = {
     # QUALITY_TARGETS has no sixth deadline. Packet 1 uses the Hybrid 25s envelope.
     Phase6RouteFamily.NO_RETRIEVAL: 25,
     Phase6RouteFamily.SCOPED_REFUSAL: 25,
+    Phase6RouteFamily.WEB_RESEARCH: 50,
 }
 
 FAMILY_MODEL_CALL_CEILING: dict[Phase6RouteFamily, int] = {
@@ -40,6 +41,7 @@ FAMILY_MODEL_CALL_CEILING: dict[Phase6RouteFamily, int] = {
     Phase6RouteFamily.GRAPH_INSPECTION: 3,
     Phase6RouteFamily.NO_RETRIEVAL: 7,
     Phase6RouteFamily.SCOPED_REFUSAL: 7,
+    Phase6RouteFamily.WEB_RESEARCH: 5,
 }
 """Signed call ceilings already include retrieve-time work.
 
@@ -58,6 +60,7 @@ FAMILY_TOOL_CEILING: dict[Phase6RouteFamily, int] = {
     Phase6RouteFamily.GRAPH_INSPECTION: 4,
     Phase6RouteFamily.NO_RETRIEVAL: 4,
     Phase6RouteFamily.SCOPED_REFUSAL: 4,
+    Phase6RouteFamily.WEB_RESEARCH: 5,
 }
 
 FAMILY_PER_CALL_USD_CAP: dict[Phase6RouteFamily, Decimal] = {
@@ -68,6 +71,7 @@ FAMILY_PER_CALL_USD_CAP: dict[Phase6RouteFamily, Decimal] = {
     Phase6RouteFamily.GRAPH_INSPECTION: Decimal("0.25"),
     Phase6RouteFamily.NO_RETRIEVAL: Decimal("0.40"),
     Phase6RouteFamily.SCOPED_REFUSAL: Decimal("0.40"),
+    Phase6RouteFamily.WEB_RESEARCH: Decimal("0.40"),
 }
 
 FAMILY_PROMPT_TOKENS_PER_CALL: dict[Phase6RouteFamily, int] = {
@@ -78,6 +82,7 @@ FAMILY_PROMPT_TOKENS_PER_CALL: dict[Phase6RouteFamily, int] = {
     Phase6RouteFamily.GRAPH_INSPECTION: 4000,
     Phase6RouteFamily.NO_RETRIEVAL: 8000,
     Phase6RouteFamily.SCOPED_REFUSAL: 8000,
+    Phase6RouteFamily.WEB_RESEARCH: 8000,
 }
 
 FAMILY_COMPLETION_TOKENS_PER_CALL: dict[Phase6RouteFamily, int] = {
@@ -88,6 +93,7 @@ FAMILY_COMPLETION_TOKENS_PER_CALL: dict[Phase6RouteFamily, int] = {
     Phase6RouteFamily.GRAPH_INSPECTION: 1500,
     Phase6RouteFamily.NO_RETRIEVAL: 2000,
     Phase6RouteFamily.SCOPED_REFUSAL: 2000,
+    Phase6RouteFamily.WEB_RESEARCH: 2000,
 }
 
 
@@ -149,11 +155,12 @@ def envelope_for_family(family: Phase6RouteFamily) -> RouteCeiling:
         raise QueryCeilingError("unknown_route_family")
     model_calls = FAMILY_MODEL_CALL_CEILING[family]
     per_call = FAMILY_PER_CALL_USD_CAP[family]
+    correction = 0 if family is Phase6RouteFamily.WEB_RESEARCH else CORRECTION_CEILING
     return RouteCeiling(
         family=family,
         deadline_seconds=FAMILY_DEADLINE_SECONDS[family],
         recursion_limit=RECURSION_LIMIT,
-        correction_ceiling=CORRECTION_CEILING,
+        correction_ceiling=correction,
         subquestion_ceiling=SUBQUESTION_CEILING,
         model_call_ceiling=model_calls,
         tool_ceiling=FAMILY_TOOL_CEILING[family],

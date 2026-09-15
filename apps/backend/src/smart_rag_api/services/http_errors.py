@@ -35,6 +35,8 @@ _ADMISSION_STATUS: dict[str, int] = {
     "database_rejected": status.HTTP_503_SERVICE_UNAVAILABLE,
     "conversation_create_failed": status.HTTP_503_SERVICE_UNAVAILABLE,
     "message_persist_failed": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "web_search_disabled": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "web_search_unconfigured": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

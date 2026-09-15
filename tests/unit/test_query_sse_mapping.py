@@ -111,6 +111,20 @@ def test_mapper_emits_one_answer_origin_before_token_delta() -> None:
     assert types.count("answer_origin") == 1
     assert types.index("answer_origin") < types.index("token_delta")
     assert events[types.index("answer_origin")][1] == {"origin": "general_knowledge"}
+    web_events = QuerySseMapper().consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified",
+                "answer": AnswerPayload(
+                    answer_text="Public web draft.",
+                    status="complete",
+                    answer_origin=KnowledgeScope.WEB,
+                ).model_dump(mode="json"),
+            }
+        }
+    )
+    web_types = [item[0] for item in web_events]
+    assert web_events[web_types.index("answer_origin")][1] == {"origin": "web"}
     assert "citation_preview" not in types
     historical = QuerySseMapper().consume_chunk(
         {

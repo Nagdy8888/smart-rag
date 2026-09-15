@@ -102,6 +102,12 @@ def generate_answer(
             answer_text="Graph inspection cannot answer from graph leads.",
             status="refused",
         )
+    if knowledge_scope is KnowledgeScope.WEB:
+        return AnswerPayload(
+            answer_text="Web research is not bound on this run.",
+            status="refused",
+            answer_origin=KnowledgeScope.WEB,
+        )
     if company_claim_forbidden or knowledge_scope in {
         KnowledgeScope.GENERAL_KNOWLEDGE,
         KnowledgeScope.USER_SUPPLIED_TEXT,

@@ -156,10 +156,27 @@
             "title": "Provenance",
             "type": "object"
           },
+          "source_kind": {
+            "default": "company_document",
+            "title": "Source Kind",
+            "type": "string"
+          },
           "source_unavailable": {
             "default": false,
             "title": "Source Unavailable",
             "type": "boolean"
+          },
+          "web_source_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Source Id"
           }
         },
         "required": [
@@ -2295,11 +2312,12 @@
         "type": "object"
       },
       "RequestedSearchScope": {
-        "description": "Client source preference fixed at admission.\n\nValues:\n    AUTO: Existing server classifier decides company versus general.\n    COMPANY_DOCUMENTS: Force company retrieval for substantive prompts.\n    GENERAL_KNOWLEDGE: Forbid company retrieval and company claims.",
+        "description": "Client source preference fixed at admission.\n\nValues:\n    AUTO: Existing server classifier decides company, general, or web.\n    COMPANY_DOCUMENTS: Force company retrieval for substantive prompts.\n    GENERAL_KNOWLEDGE: Forbid company retrieval and company claims.\n    WEB: Force the Web research path. Never blended with company.",
         "enum": [
           "auto",
           "company_documents",
-          "general_knowledge"
+          "general_knowledge",
+          "web"
         ],
         "title": "RequestedSearchScope",
         "type": "string"

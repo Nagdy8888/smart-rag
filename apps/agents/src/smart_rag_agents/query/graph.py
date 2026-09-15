@@ -19,6 +19,7 @@ from smart_rag_agents.query.nodes.topology import (
     route_after_plan,
     route_after_prepare,
     route_after_studio_seed,
+    route_after_web_scope,
 )
 from smart_rag_agents.query.runtime.bound_nodes import bind_query_nodes
 from smart_rag_agents.query.state import (
@@ -45,6 +46,7 @@ __all__ = [
 _route_after_studio_seed = route_after_studio_seed
 _route_after_admission = route_after_admission
 _route_after_plan = route_after_plan
+_route_after_web_scope = route_after_web_scope
 _route_after_prepare = route_after_prepare
 _route_after_correction = route_after_correction
 
@@ -57,6 +59,7 @@ _PRODUCTION_STAGE_NAMES: tuple[str, ...] = (
     "general_scope",
     "mixed_scope",
     "invalid_scope",
+    "web_scope",
     "apply_correction",
     "fuse_evidence",
     "compose_tables",
@@ -89,9 +92,10 @@ def build_query_graph(
 
     Returns:
         An uncompiled graph: admission → memory → prepare → plan →
-        one of company/general/mixed/invalid scope → verify → END.
+        one of company/general/mixed/web/invalid scope → verify → END.
         Company scope still runs branches, one correction, fusion,
-        tables, optional tools, and grounded answer. Studio adds a seed
+        tables, optional tools, and grounded answer. Web scope is
+        fail-closed until P06-41 binds an executor. Studio adds a seed
         before admission.
 
     Notes:
@@ -183,6 +187,7 @@ def build_query_graph(
             "company_scope": "company_scope",
             "general_scope": "general_scope",
             "mixed_scope": "mixed_scope",
+            "web_scope": "web_scope",
             "invalid_scope": "invalid_scope",
             "end": terminal_target,
         },
@@ -190,6 +195,11 @@ def build_query_graph(
     builder.add_edge("company_scope", "apply_correction")
     builder.add_edge("general_scope", "verify_answer")
     builder.add_edge("mixed_scope", "verify_answer")
+    builder.add_conditional_edges(
+        "web_scope",
+        _route_after_web_scope,
+        {"verify_answer": "verify_answer", "end": terminal_target},
+    )
     builder.add_edge("invalid_scope", terminal_target)
     builder.add_conditional_edges(
         "apply_correction",

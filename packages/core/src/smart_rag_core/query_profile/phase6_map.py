@@ -23,10 +23,10 @@ from smart_rag_core.evaluation.schema import QueryType
 class Phase6RouteFamily(StrEnum):
     """Phase 6 answering or limitation family names.
 
-    ``graph_inspection`` and ``no_retrieval`` are Phase-6-only extensions.
-    They are valid values on this enum so Phase 6 can reuse the type, but
-    :func:`map_query_type_to_phase6_family` never produces them from a
-    Phase 4 ``QueryType`` alone.
+    ``graph_inspection``, ``no_retrieval``, and ``web_research`` are
+    Phase-6-only extensions. They are valid values on this enum so Phase 6
+    can reuse the type, but :func:`map_query_type_to_phase6_family` never
+    produces them from a Phase 4 ``QueryType`` alone.
     """
 
     HYBRID = "hybrid"
@@ -36,6 +36,7 @@ class Phase6RouteFamily(StrEnum):
     SCOPED_REFUSAL = "scoped_refusal"
     GRAPH_INSPECTION = "graph_inspection"
     NO_RETRIEVAL = "no_retrieval"
+    WEB_RESEARCH = "web_research"
 
 
 class Phase6Limitation(StrEnum):
@@ -48,6 +49,7 @@ PHASE6_EXTENSION_FAMILIES: frozenset[Phase6RouteFamily] = frozenset(
     {
         Phase6RouteFamily.GRAPH_INSPECTION,
         Phase6RouteFamily.NO_RETRIEVAL,
+        Phase6RouteFamily.WEB_RESEARCH,
     }
 )
 

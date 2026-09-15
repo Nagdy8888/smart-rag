@@ -2,7 +2,7 @@
 title: Authorization model
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-14
+last-reviewed: 2026-09-15
 audience: engineering, security, reviewers
 ---
 
@@ -99,6 +99,8 @@ Packet 3 **revokes** all `app`/`private`/`langgraph`/`lightrag` grants from `ano
 | `app.list_run_citations` | caller context, run_id | Creator-only. ACL + current-version recheck nulls `chunk_id` when unavailable |
 | `app.list_run_citations_v2` | caller context, run_id | Creator-only. Same recheck as v1; overlays authorized page/title/section plus printed `page_label` onto provenance; omits passage text |
 | `app.list_run_citations_v3` | caller context, run_id | Creator-only. Company branch copies v2 ACL/current-version recheck and locator stripping. Web branch returns url/title/`content_hash` plus `source_kind=web`; never excerpt, span, HTML, or query text |
+| `app.admit_query_run_v3` | caller context, conversation, key, hash, family, scope | Creator-only. Persists `auto`/`company_documents`/`general_knowledge`/`web`. Calls `admit_query_run` once. v2 stays callable |
+| `app.load_query_run_runtime_v3` / `app.get_query_run_v3` | caller context, run_id | Creator-only wrappers of v2 including persisted `requested_search_scope` |
 | `app.begin_web_research_operation` / `app.mark_web_research_operation_sent` / `app.complete_web_research_operation` | caller context, run/operation | Creator-owned run. Same key+hash replays; different hash conflicts; `sent` without a terminal is ambiguous and must not auto-repeat |
 | `app.insert_web_source` / `app.insert_web_citation` | caller context, run, source/citation | Creator-owned run. Caps 6 sources / 12 citations. URL policy, SHA-256 hash, and exact span containment. Cross-run sources are `not_found` |
 | `app.accept_invitation` | token_hash, user_id, email, assurance_level | Refuses demotion; privileged/upload upgrades revoke sessions. `assurance_level` is ignored |

@@ -30,6 +30,7 @@ from smart_rag_agents.query.nodes import (
     mixed_scope_node,
     prepare_query_node,
     verify_answer_node,
+    web_scope_node,
 )
 from smart_rag_agents.query.state import QueryGraphState
 
@@ -48,6 +49,7 @@ class BoundQueryNodes:
         company_scope: Company retrieval.
         general_scope: General or user-text draft.
         mixed_scope: Mixed-scope clarification.
+        web_scope: Fail-closed Web research until P06-41.
         invalid_scope: Fail-closed invalid plan.
         apply_correction: Single global correction.
         fuse_evidence: Combined fusion.
@@ -63,6 +65,7 @@ class BoundQueryNodes:
     company_scope: QueryNode
     general_scope: QueryNode
     mixed_scope: QueryNode
+    web_scope: QueryNode
     invalid_scope: QueryNode
     apply_correction: QueryNode
     fuse_evidence: QueryNode
@@ -176,6 +179,21 @@ def bind_query_nodes(bound: QueryGraphDeps) -> BoundQueryNodes:
 
         return mixed_scope_node(state, deps_from_runtime(runtime, bound))
 
+    def web_scope(
+        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
+    ) -> QueryGraphState:
+        """LangGraph wrapper for fail-closed Web research.
+
+        Args:
+            state: Planned Web-research state.
+            runtime: Per-invocation deps context.
+
+        Returns:
+            Routing-rejected state until P06-41 binds an executor.
+        """
+
+        return web_scope_node(state, deps_from_runtime(runtime, bound))
+
     def invalid_scope(
         state: QueryGraphState, runtime: Runtime[QueryGraphContext]
     ) -> QueryGraphState:
@@ -288,6 +306,7 @@ def bind_query_nodes(bound: QueryGraphDeps) -> BoundQueryNodes:
         company_scope=company_scope,
         general_scope=general_scope,
         mixed_scope=mixed_scope,
+        web_scope=web_scope,
         invalid_scope=invalid_scope,
         apply_correction=apply_correction,
         fuse_evidence=fuse_evidence,

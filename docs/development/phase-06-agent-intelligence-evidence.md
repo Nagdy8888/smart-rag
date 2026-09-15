@@ -2,7 +2,7 @@
 title: Phase 6 agent-intelligence evidence index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: engineering, reviewers
 ---
 
@@ -66,6 +66,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-37 — Advanced web research overlay (2026-09-14) | [phase-06/p06-37-advanced-web-research-amendment-2026-09-14.md](./phase-06/p06-37-advanced-web-research-amendment-2026-09-14.md) | 90 |
 | P06-38 — Bounded Exa REST gateway (2026-09-14) | [phase-06/p06-38-exa-rest-gateway-2026-09-14.md](./phase-06/p06-38-exa-rest-gateway-2026-09-14.md) | 70 |
 | P06-39 — Run-scoped web evidence store (2026-09-15) | [phase-06/p06-39-web-evidence-store-2026-09-15.md](./phase-06/p06-39-web-evidence-store-2026-09-15.md) | 106 |
+| P06-40 — Four-mode admission and Web envelope (2026-09-15) | [phase-06/p06-40-four-mode-routing-2026-09-15.md](./phase-06/p06-40-four-mode-routing-2026-09-15.md) | 141 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

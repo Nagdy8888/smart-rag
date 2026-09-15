@@ -59,6 +59,7 @@ def test_signed_monthly_and_concurrency_defaults() -> None:
         (Phase6RouteFamily.GRAPH_INSPECTION, 10, 3, 4, Decimal("0.75")),
         (Phase6RouteFamily.NO_RETRIEVAL, 25, 7, 4, Decimal("2.80")),
         (Phase6RouteFamily.SCOPED_REFUSAL, 25, 7, 4, Decimal("2.80")),
+        (Phase6RouteFamily.WEB_RESEARCH, 50, 5, 5, Decimal("2.00")),
     ],
 )
 def test_route_envelopes_match_quality_targets(
@@ -76,12 +77,27 @@ def test_route_envelopes_match_quality_targets(
     assert ceiling.tool_ceiling == tools
     assert ceiling.envelope_usd == usd
     assert ceiling.recursion_limit == 24
-    assert ceiling.correction_ceiling == 1
+    expected_correction = 0 if family is Phase6RouteFamily.WEB_RESEARCH else 1
+    assert ceiling.correction_ceiling == expected_correction
     assert ceiling.subquestion_ceiling == 3
     assert ceiling.discovery_ceiling == 1
     assert ceiling.manifest_ceiling == 3
     assert ceiling.side_effect_ceiling == 1
     assert ceiling.envelope_usd == ceiling.per_call_usd_cap * calls
+
+
+def test_web_research_envelope_fits_inside_composite() -> None:
+    """Forced Web 50s/5/5/2.00 stays inside Composite 50s/9/5/3.60."""
+
+    web = envelope_for_family(Phase6RouteFamily.WEB_RESEARCH)
+    composite = envelope_for_family(Phase6RouteFamily.COMPOSITE)
+    assert web.deadline_seconds <= composite.deadline_seconds
+    assert web.model_call_ceiling <= composite.model_call_ceiling
+    assert web.tool_ceiling <= composite.tool_ceiling
+    assert web.envelope_usd <= composite.envelope_usd
+    assert web.envelope_prompt_tokens <= composite.envelope_prompt_tokens
+    assert web.envelope_completion_tokens <= composite.envelope_completion_tokens
+    assert web.correction_ceiling == 0
 
 
 def test_client_usd_cannot_enlarge_hybrid_envelope() -> None:
@@ -179,6 +195,14 @@ def test_payload_hash_changes_with_message_not_with_key() -> None:
     assert first != changed
     assert first != company
     assert company != general
+    web = hash_query_admission_payload(
+        conversation_id=conversation_id,
+        route_family=Phase6RouteFamily.WEB_RESEARCH,
+        message="hello",
+        requested_search_scope=RequestedSearchScope.WEB,
+    )
+    assert first != web
+    assert company != web
 
 
 def test_legacy_runtime_mapping_defaults_requested_scope_auto() -> None:

@@ -146,10 +146,13 @@ def test_graph_inspection_and_no_retrieval_cannot_come_from_query_type() -> None
     assert "no_retrieval" not in {member.value for member in QueryType}
     assert Phase6RouteFamily.GRAPH_INSPECTION.value == "graph_inspection"
     assert Phase6RouteFamily.NO_RETRIEVAL.value == "no_retrieval"
+    assert Phase6RouteFamily.WEB_RESEARCH.value == "web_research"
+    assert "web_research" not in {member.value for member in QueryType}
     assert PHASE6_EXTENSION_FAMILIES == frozenset(
         {
             Phase6RouteFamily.GRAPH_INSPECTION,
             Phase6RouteFamily.NO_RETRIEVAL,
+            Phase6RouteFamily.WEB_RESEARCH,
         }
     )
 

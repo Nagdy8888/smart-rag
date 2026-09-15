@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-14
+last-reviewed: 2026-09-15
 audience: engineering, reviewers
 ---
 
@@ -220,6 +220,7 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, `graph_maintenance`, or `query_run`. The kinds never share caps. `query_run` consume uses run-local optimistic version and never `SELECT FOR UPDATE` on `company_settings` or `profiles`.
 - Phase 6 packet 5 adds SECURITY DEFINER RPCs (`app.create_conversation`, `app.get_conversation`, `app.get_query_run`, `app.cancel_query_run`, `app.list_run_citations`, `app.list_run_citations_v2`, `app.submit_run_feedback`, `app.summarize_caller_usage`, `app.summarize_company_usage`, `app.list_authorized_table_manifests`, `app.get_visible_document`, `app.search_graph_entities`, `app.upsert_tool_catalog_seed`, `app.set_tool_permission`, `app.list_tool_catalog_seeds`) with `SET search_path = pg_catalog, app` and `EXECUTE` to `app_api` only. Conversation deletion remains packet 7. Retrieval cache is Valkey IDs/ranks only; `app.recheck_retrieval_candidates` stays authority.
 - P06-39 adds `app.begin_web_research_operation`, `app.mark_web_research_operation_sent`, `app.complete_web_research_operation`, `app.insert_web_source`, `app.insert_web_citation`, and `app.list_run_citations_v3` (`EXECUTE` to `app_api` only; `_web_require_run_owner` is not granted to `app_api`). Tables use FORCE RLS with no DML grants to `app_api`/`anon`/`authenticated`.
+- P06-40 widens `app.runs` CHECKs to `requested_search_scope` `web` and `route_family` `web_research`, replaces `app.query_route_envelope` with a `web_research` arm (50s / 5 model / 5 tools / 2.00 USD / 40000 prompt / 10000 completion / `correction_ceiling=0`), and adds `app.admit_query_run_v3`, `app.load_query_run_runtime_v3`, and `app.get_query_run_v3` (`EXECUTE` to `app_api` only). v2 signatures stay callable.
 - `app.set_tool_permission` upserts `(tool_id, role)` when `user_id` is null and inserts a catalog row when the key is missing. `GET /tools` overlays `app.tool_catalog.active` onto the in-code registry; executor authorization stays in-code.
 - Owner/admin workspace listing uses `app.list_workspace_members` and `app.list_pending_team_invitations` (`EXECUTE` to `app_api` only, max 200 each). Members join `auth.users` for email. Invitation RPCs never select `token_hash`. See [ADR-workspace-member-list.md](../adr/ADR-workspace-member-list.md).
 - Phase 6 packet 6 adds `app.run_events` (FORCE RLS, creator-private SELECT, no authenticated INSERT) plus `app.append_run_event` / `app.list_run_events_after` (`EXECUTE` to `app_api` only). Sequences are `COALESCE(MAX(sequence),0)+1` under a run lock. Payload keys `passage` / `snippet` / `html` / traceback-like names are stripped or rejected. See [SSE.md](../api/SSE.md).

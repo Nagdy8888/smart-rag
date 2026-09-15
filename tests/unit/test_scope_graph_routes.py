@@ -124,6 +124,7 @@ def test_query_graph_registers_explicit_scope_nodes() -> None:
     assert "general_scope" in names
     assert "mixed_scope" in names
     assert "invalid_scope" in names
+    assert "web_scope" in names
     assert "generate_answer" in names
     assert "verify_answer" in names
     assert "execute_branches" not in names
@@ -282,6 +283,7 @@ def test_studio_graphs_use_the_same_post_plan_router() -> None:
         assert "general_scope" in names
         assert "mixed_scope" in names
         assert "invalid_scope" in names
+        assert "web_scope" in names
         assert "execute_branches" not in names
     assert "seed_studio_runtime" in local
     assert "seed_studio_live_runtime" in live

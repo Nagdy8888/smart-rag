@@ -50,6 +50,7 @@ def test_matrix_rule_names_preserve_documented_precedence() -> None:
     """The immutable rule tuple order is the accepted precedence."""
 
     assert tuple(name for name, _rule in MATRIX_RULES) == (
+        "web_research",
         "no_retrieval",
         "graph_inspection",
         "unsupported_media",
@@ -69,6 +70,7 @@ def test_named_rules_win_in_isolation() -> None:
     """Each representative query selects the expected named rule."""
 
     cases = (
+        ("search the web for latest news", "web_research"),
         ("Hello", "no_retrieval"),
         ("Inspect the current graph workspace", "graph_inspection"),
         ("Describe the unlabeled chart in the figure", "unsupported_media"),

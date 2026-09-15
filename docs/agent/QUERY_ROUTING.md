@@ -2,7 +2,7 @@
 title: Query routing matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-15
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 2
 ---
@@ -54,24 +54,30 @@ world knowledge when evidence is missing; they refuse.
 | `user_supplied_text` | `NoRetrieval` / `user_text_model` | one `usage_kind=answer` | none / `user_supplied_text` |
 | `ambiguous` | `NoRetrieval` / `clarification` | 0 | none / `ambiguous` |
 | `company_documents` | Hybrid / Combined / table / inspection as before | existing RAG | cited or refusal / `company_documents` |
+| `web` | `web_research` | P06-41 Exa/crawl-proxy | web citations / `web` |
 
 ### Requested search scope
 
 `requested_search_scope` is a client **source preference** fixed at admission.
 It is not authorization, not `route_family`, and not effective
-`knowledge_scope`. Values: `auto`, `company_documents`, `general_knowledge`.
+`knowledge_scope`. Values: `auto`, `company_documents`, `general_knowledge`,
+`web`. Omitted requests stay Auto. Exactly one source is selected; company
+and web never blend. Company-insufficient evidence never falls back to web
+or general.
 
 ```mermaid
 flowchart TD
   requested["requested_search_scope"]
   requested --> greeting["Greeting, small talk, product help, or user text"]
-  requested --> autoNode["auto: existing classifier"]
+  requested --> autoNode["auto: existing classifier including web"]
   requested --> companyNode["company_documents: force company_documents"]
   requested --> generalNode["general_knowledge: NoRetrieval plus company_claim_forbidden"]
+  requested --> webNode["web: web_research plus company_claim_forbidden"]
   greeting --> keep["Keep current handling"]
   autoNode --> origin["Effective knowledge_scope"]
   companyNode --> origin
   generalNode --> origin
+  webNode --> origin
 ```
 
 Precedence after classification:
@@ -83,7 +89,16 @@ Precedence after classification:
 3. Other substantive prompts with `general_knowledge` force
    `KnowledgeScope.GENERAL_KNOWLEDGE`, one NoRetrieval branch, and
    `company_claim_forbidden=True`.
-4. `auto` keeps the classifier, including degradation reasons.
+4. `auto` keeps the classifier, including degradation reasons. Explicit or
+   time-sensitive public-web intent without company signals selects `web`.
+   Company plus explicit web intent uses mixed-scope clarification.
+5. Other substantive prompts with `web` force `KnowledgeScope.WEB` and one
+   `BranchKind.WEB_RESEARCH` branch when the message has no company,
+   private, or secret signals. Forced Web plus those signals clarifies.
+   Disabled or unconfigured Web is typed fail-closed
+   (`web_search_disabled` / `web_search_unconfigured`), not a general
+   answer. A desired Web route that cannot fit the reservation is rejected;
+   it never Hybrid-clamps.
 
 Requested Company never manufactures `company_signal=True`. Explicit Company
 or General does not spend the profile model merely to decide company versus

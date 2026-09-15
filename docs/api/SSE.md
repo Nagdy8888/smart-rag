@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-14
+last-reviewed: 2026-09-15
 audience: engineering, frontend
 ---
 
@@ -56,7 +56,8 @@ resume with 404. Reconnect never starts a second paid graph.
   admits (after handshake) then streams. JSON Accept keeps HTTP 202
   `{run_id, stream_path, requested_search_scope}` where
   `stream_path=/runs/{run_id}/events`. Optional POST body `search_scope` is
-  `auto` when omitted. Resume is GET-only and never sends `search_scope`.
+  `auto` when omitted (`company_documents`, `general_knowledge`, and `web`
+  are also valid). Resume is GET-only and never sends `search_scope`.
 - Duplicate idempotency keys return the existing run stream. A different
   `search_scope` on the same key is a key collision.
 - `GET /runs/{run_id}/events?after={sequence}` also honors `Last-Event-ID`.
@@ -84,7 +85,7 @@ tracebacks, secrets, source HTML, or passages.
 | `coverage` | Coverage score without passage text. |
 | `optional_tool_disclosure` | Selected optional tool keys. |
 | `citation_preview` | Citation IDs and ranks. Company rows use chunk/table IDs. Web rows use `web_source_id` values. No passage, excerpt, or span text. |
-| `answer_origin` | Additive origin (`origin` only). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
+| `answer_origin` | Additive origin (`origin` only: `general_knowledge`, `company_documents`, `user_supplied_text`, `ambiguous`, `web`). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
 | `token_delta` | Generated token delta. Never retrieved source. |
 | `usage` | Accumulated provider prompt and completion tokens for this query run (profile, search, answer, verifier). Optional billed `cost_usd` when `app.llm_usage` is available. Emitted after verify, before the terminal. Counts are 0 when no model ran. Conversation-title generation is not in this event; Ask Run Details adds it under **This chat**. No prompts. |
 | `completed` | Success terminal. |
