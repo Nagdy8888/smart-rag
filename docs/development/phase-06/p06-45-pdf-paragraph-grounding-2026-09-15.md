@@ -100,7 +100,8 @@ Recorded pytest files: `test_answer_paragraph_citations.py`,
 
 ## Unverified
 
-- SQL persistence, leaf resolution, and PDF page repair remain P06-46.
+- SQL persistence, leaf resolution, and PDF page repair are recorded in
+  [p06-46-pdf-citation-persistence-2026-09-15.md](./p06-46-pdf-citation-persistence-2026-09-15.md).
 - Inline UI remains P06-47.
 - Full `scripts/check.py --tier unit` was not run in this packet.
 

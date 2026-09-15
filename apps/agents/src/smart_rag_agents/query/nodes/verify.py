@@ -61,7 +61,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
 
     Persistence writes:
         Counted ``verifier`` usage when a connection and gateway are bound.
-        Citation provenance may be inserted when a connection is bound.
+        Bound citation persistence failure degrades to
+        ``insufficient_evidence`` and never streams a verified uncited
+        answer. Unbound Studio graphs skip persistence.
 
     External/model calls:
         Zero or one small verifier call covering at most six material
@@ -281,13 +283,18 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 terminal = "insufficient_evidence"
                 detail = "web_evidence_insufficient"
     else:
-        maybe_persist_verified_citations(
-            deps.connection,
-            caller=caller_from_runtime(context) if context is not None else None,
-            run_id=context.run_id if context is not None else None,
-            fusion=fusion,
-            answer=checked,
-        )
+        try:
+            maybe_persist_verified_citations(
+                deps.connection,
+                caller=caller_from_runtime(context) if context is not None else None,
+                run_id=context.run_id if context is not None else None,
+                fusion=fusion,
+                answer=checked,
+            )
+        except (QueryAdmissionError, psycopg.Error):
+            if deps.connection is not None and context is not None:
+                terminal = "insufficient_evidence"
+                detail = "citation_persist_failed"
     result = VerificationResult(
         answer=checked,
         deterministic_failures=failures,

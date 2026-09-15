@@ -1175,3 +1175,23 @@ def test_document_delete_is_owner_admin_only(
     )
     invite_props = json_object(invite_schema.get("properties", {}))
     assert "raw_token" not in invite_props
+
+
+def test_citation_and_transcript_schemas_include_pdf_trace_fields() -> None:
+    """OpenAPI citation and message models expose additive PDF trace fields."""
+
+    from smart_rag_api.schemas.fastapi_security import (
+        CitationResponse,
+        ConversationMessage,
+    )
+
+    citation_props = CitationResponse.model_json_schema()["properties"]
+    message_props = ConversationMessage.model_json_schema()["properties"]
+    assert "evidence_excerpt" in citation_props
+    assert "pdf_page_number" in citation_props
+    assert "document_title" in citation_props
+    assert "paragraph_index" in citation_props
+    assert "run_id" in message_props
+    assert "citations" in message_props
+    assert "span" not in citation_props
+    assert "html" not in citation_props

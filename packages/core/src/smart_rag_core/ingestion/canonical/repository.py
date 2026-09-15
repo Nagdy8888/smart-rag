@@ -118,6 +118,7 @@ class CanonicalRepository:
                       raw_text = EXCLUDED.raw_text,
                       embedding = EXCLUDED.embedding,
                       token_count = EXCLUDED.token_count,
+                      page_number = EXCLUDED.page_number,
                       section_path = EXCLUDED.section_path,
                       provenance = EXCLUDED.provenance,
                       contextual_text = EXCLUDED.contextual_text,
