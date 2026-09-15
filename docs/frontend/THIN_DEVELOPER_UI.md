@@ -2,7 +2,7 @@
 title: Thin authenticated developer UI
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-15
 audience: engineering, frontend
 ---
 
@@ -58,7 +58,8 @@ flowchart TD
 | Cancel | `POST /runs/{id}/cancel` |
 | Delete | `DELETE /conversations/{id}` → 204 |
 | Feedback | `POST /runs/{id}/feedback` with exact packet-7 tags |
-| Citations | `GET /runs/{id}/citations` (printed page_label plus file PDF page; no snippets) |
+| Citations | `GET /runs/{id}/citations` (typed title and PDF toolbar page; ACL-safe excerpt; no provenance snippets) |
+| History | `GET /conversations/{id}/messages` includes the same typed citations; the client does not N+1 `GET /citations` |
 | Upload reserve | `POST /documents/uploads`; local `signed_url` is null |
 | Version status | `GET /ingestion/versions/{id}/status` for Hybrid/BM25/graph-handoff |
 | Readiness | public `GET /health/ready`; named ParadeDB/Valkey/LightRAG probes on `GET /ops/ready` (owner/admin) |

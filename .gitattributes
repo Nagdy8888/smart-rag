@@ -1,2 +1,5 @@
 # Prompt hashes are SHA-256 of LF bytes. Keep prompt markdown LF on every checkout.
 apps/agents/src/smart_rag_agents/prompts/*.md text eol=lf
+# Exa envelope pins and the OpenAPI snapshot hash LF bytes.
+tests/fixtures/exa/*.json text eol=lf
+docs/api/openapi.foundation.json text eol=lf

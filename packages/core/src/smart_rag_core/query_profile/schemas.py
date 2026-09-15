@@ -8,6 +8,7 @@ _KNOWLEDGE_SCOPES = (
     "user_supplied_text",
     "deterministic",
     "ambiguous",
+    "web",
 )
 
 

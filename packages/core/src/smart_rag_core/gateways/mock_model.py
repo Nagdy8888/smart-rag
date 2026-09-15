@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from smart_rag_core.conversations.title import mock_conversation_title_payload
 from smart_rag_core.gateways.model_types import (
     AnswerModelRequest,
@@ -26,6 +28,7 @@ from smart_rag_core.gateways.model_types import (
     string_tuple,
 )
 from smart_rag_core.query_answer.models import AtomicLink
+from smart_rag_core.query_answer.paragraphs import exact_source_span
 from smart_rag_core.query_answer.verifier import mock_verifier_payload
 from smart_rag_core.query_answer.versions import (
     ANSWER_PROMPT_SHA256,
@@ -36,6 +39,8 @@ from smart_rag_core.query_answer.versions import (
     EVAL_JUDGE_PROMPT_VERSION,
     GENERAL_CHAT_PROMPT_SHA256,
     GENERAL_CHAT_PROMPT_VERSION,
+    MAX_ANSWER_PARAGRAPHS,
+    MAX_VERIFIER_LINKS,
     VERIFIER_PROMPT_SHA256,
     VERIFIER_PROMPT_VERSION,
 )
@@ -233,49 +238,111 @@ class MockModelAdapter:
             raise ValueError(
                 f"Model input exceeds configured {self._max_input_chars}-character bound"
             )
-        citations: list[dict[str, object]] = [
-            {
-                "chunk_id": chunk_id,
-                "table_id": None,
-                "span": None,
-                "source_ranges": [],
-                "inference": False,
-                "atomic_link_id": f"link-{index}",
-            }
-            for index, chunk_id in enumerate(request.chunk_ids, start=1)
-        ]
-        table_citations: list[dict[str, object]] = [
-            {
-                "chunk_id": None,
-                "table_id": table_id,
-                "span": None,
-                "source_ranges": [],
-                "inference": False,
-                "atomic_link_id": f"table-{index}",
-            }
-            for index, table_id in enumerate(request.table_ids, start=1)
-        ]
-        links: list[dict[str, object]] = [
-            {
-                "link_id": f"link-{index}",
-                "claim": f"Canonical passage {chunk_id}",
-                "chunk_ids": [chunk_id],
-                "table_id": None,
-                "source_ranges": [],
-                "kind": "fact",
-                "priority": index,
-            }
-            for index, chunk_id in enumerate(request.chunk_ids, start=1)
-        ]
+        sources = _parse_untrusted_sources(request.source_records)
+        fallback_span = next(
+            (
+                exact_source_span(body)
+                for kind, body, _ranges in sources.values()
+                if kind != "structured-table" and exact_source_span(body)
+            ),
+            "",
+        )
+        paragraphs: list[dict[str, object]] = []
+        citations: list[dict[str, object]] = []
+        table_citations: list[dict[str, object]] = []
+        links: list[dict[str, object]] = []
+        for index, chunk_id in enumerate(request.chunk_ids, start=1):
+            if len(paragraphs) >= MAX_ANSWER_PARAGRAPHS:
+                break
+            if len(links) >= MAX_VERIFIER_LINKS:
+                break
+            record = sources.get(chunk_id)
+            if record is not None and record[0] == "structured-table":
+                continue
+            span = exact_source_span(record[1]) if record is not None else fallback_span
+            if not span:
+                continue
+            paragraph_index = len(paragraphs)
+            link_id = f"link-{index}"
+            paragraphs.append(
+                {
+                    "paragraph_index": paragraph_index,
+                    "text": span[:4000],
+                    "link_ids": [link_id],
+                }
+            )
+            citations.append(
+                {
+                    "chunk_id": chunk_id,
+                    "table_id": None,
+                    "span": span,
+                    "source_ranges": [],
+                    "inference": False,
+                    "atomic_link_id": link_id,
+                    "paragraph_index": paragraph_index,
+                }
+            )
+            links.append(
+                {
+                    "link_id": link_id,
+                    "claim": f"Canonical passage {chunk_id}",
+                    "chunk_ids": [chunk_id],
+                    "table_id": None,
+                    "source_ranges": [],
+                    "kind": "fact",
+                    "priority": index,
+                }
+            )
+        for index, table_id in enumerate(request.table_ids, start=1):
+            if len(paragraphs) >= MAX_ANSWER_PARAGRAPHS:
+                break
+            if len(links) >= MAX_VERIFIER_LINKS:
+                break
+            record = sources.get(table_id)
+            ranges = record[2] if record is not None else ()
+            if not ranges:
+                continue
+            body = exact_source_span(record[1]) if record is not None else ""
+            if not body:
+                body = f"Deterministic table {table_id}"
+            paragraph_index = len(paragraphs)
+            link_id = f"table-{index}"
+            paragraphs.append(
+                {
+                    "paragraph_index": paragraph_index,
+                    "text": body[:4000],
+                    "link_ids": [link_id],
+                }
+            )
+            table_citations.append(
+                {
+                    "chunk_id": None,
+                    "table_id": table_id,
+                    "span": None,
+                    "source_ranges": list(ranges),
+                    "inference": False,
+                    "atomic_link_id": link_id,
+                    "paragraph_index": paragraph_index,
+                }
+            )
+            links.append(
+                {
+                    "link_id": link_id,
+                    "claim": f"Canonical table {table_id}",
+                    "chunk_ids": [],
+                    "table_id": table_id,
+                    "source_ranges": list(ranges),
+                    "kind": "fact",
+                    "priority": 100 + index,
+                }
+            )
         payload: dict[str, object] = {
-            "answer_text": "Frozen answer fixture citing supplied canonical IDs.",
+            "paragraphs": paragraphs,
             "citations": citations,
             "atomic_links": links,
             "composed_conclusion": None,
             "table_citations": table_citations,
-            "status": "complete"
-            if request.chunk_ids or request.table_ids
-            else "refused",
+            "status": "complete" if paragraphs else "refused",
             "refused_links": [],
         }
         return AnswerModelResponse(
@@ -498,3 +565,44 @@ class MockModelAdapter:
             ),
             retrieval_performed=False,
         )
+
+
+_SOURCE_BLOCK = re.compile(
+    r'<<untrusted-source id="(?P<id>[^"]+)"(?P<header>[^>]*)>>\s*'
+    r"(?P<body>.*?)\s*</untrusted-source>",
+    re.DOTALL,
+)
+_KIND_ATTR = re.compile(r'kind="([^"]*)"')
+_RANGES_ATTR = re.compile(r'ranges="([^"]*)"')
+
+
+def _parse_untrusted_sources(
+    source_records: str,
+) -> dict[str, tuple[str, str, tuple[str, ...]]]:
+    """Parse delimited source records into id, kind, body, and table ranges.
+
+    Args:
+        source_records: Concatenated ``<<untrusted-source>>`` blocks.
+
+    Returns:
+        Mapping of source id to ``(kind, body, ranges)``. Missing ``kind``
+        is treated as a canonical passage so compact fixtures still parse.
+    """
+
+    parsed: dict[str, tuple[str, str, tuple[str, ...]]] = {}
+    for match in _SOURCE_BLOCK.finditer(source_records):
+        header = match.group("header")
+        kind_match = _KIND_ATTR.search(header)
+        kind = kind_match.group(1) if kind_match is not None else "canonical-passage"
+        ranges_match = _RANGES_ATTR.search(header)
+        ranges = (
+            tuple(
+                item.strip()
+                for item in ranges_match.group(1).split(",")
+                if item.strip()
+            )
+            if ranges_match is not None
+            else ()
+        )
+        parsed[match.group("id")] = (kind, match.group("body"), ranges)
+    return parsed

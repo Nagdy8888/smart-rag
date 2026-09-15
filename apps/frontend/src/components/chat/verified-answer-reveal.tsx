@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "../ui/button";
 import { LiveRegion } from "../ui/live-region";
 import { UserText } from "../ui/user-text";
@@ -21,6 +21,8 @@ export type VerifiedAnswerRevealProps = {
   authoritativeReady: boolean;
   /** Complete the reveal immediately. */
   onShowFull: () => void;
+  /** Optional paragraph renderer. Defaults to a single `UserText` block. */
+  children?: ReactNode;
 };
 
 /**
@@ -35,12 +37,20 @@ export function VerifiedAnswerReveal({
   isRevealing,
   authoritativeReady,
   onShowFull,
+  children = null,
 }: VerifiedAnswerRevealProps) {
   const [announcedKey, setAnnouncedKey] = useState<string | null>(null);
   if (authoritativeReady && announcedKey !== presentationKey) {
     setAnnouncedKey(presentationKey);
   }
   const announce = authoritativeReady && announcedKey === presentationKey;
+  const body =
+    children ??
+    (visibleText ? (
+      <p className={styles.answerProse} dir="auto">
+        <UserText value={visibleText} />
+      </p>
+    ) : null);
 
   return (
     <div data-testid="verified-answer-reveal">
@@ -53,15 +63,13 @@ export function VerifiedAnswerReveal({
           Verified answer ready
         </LiveRegion>
       ) : null}
-      {visibleText ? (
-        <p
-          className={styles.answerProse}
-          dir="auto"
+      {body ? (
+        <div
           onPointerDown={isRevealing ? onShowFull : undefined}
           onCopy={isRevealing ? onShowFull : undefined}
         >
-          <UserText value={visibleText} />
-        </p>
+          {body}
+        </div>
       ) : null}
       {isRevealing ? (
         <Button

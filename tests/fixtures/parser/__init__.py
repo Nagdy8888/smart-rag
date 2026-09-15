@@ -342,3 +342,61 @@ def build_encrypted_pdf() -> tuple[bytes, str]:
     )
     _call_vendor(document, "close")
     return payload, sha256_bytes(payload)
+
+
+AI_AGENTS_TITLE = "AI Agents"
+AI_AGENTS_UNIQUE_SPAN = "Refunds close in thirty calendar days."
+AI_AGENTS_DUPLICATE_SPAN = "Shared child span used for ambiguity."
+AI_AGENTS_PAGE_INDEX = 24
+AI_AGENTS_VIEWER_PAGE = 25
+AI_AGENTS_PAGE_LABEL = "12"
+AI_AGENTS_CHIP_LABEL = "AI Agents · PDF page 25"
+AI_AGENTS_PAGE_COUNT = 26
+
+
+def build_ai_agents_paragraph_citation_fixture() -> tuple[bytes, str]:
+    """Build a 26-page PDF whose toolbar page 25 prints as label 12.
+
+    Page index 24 carries the unique refund span. Pages 22 and 23 carry the
+    same child span so leaf resolution can fail on duplicates. A parent
+    heading on page 22 starts a multi-page section.
+
+    Returns:
+        PDF bytes and SHA-256 digest. Title metadata is ``AI Agents``.
+    """
+
+    document = _open_pdf()
+    _call_vendor(document, "set_metadata", {"title": AI_AGENTS_TITLE})
+    for page_index in range(AI_AGENTS_PAGE_COUNT):
+        page = _call_vendor(document, "new_page")
+        _call_vendor(page, "insert_text", (72, 72), f"Filler page {page_index + 1}.")
+        if page_index == 22:
+            _call_vendor(
+                page,
+                "insert_text",
+                (72, 120),
+                "Chapter Refunds",
+                fontsize=18,
+                fontname="hebo",
+            )
+            _call_vendor(page, "insert_text", (72, 160), AI_AGENTS_DUPLICATE_SPAN)
+        if page_index == 23:
+            _call_vendor(page, "insert_text", (72, 160), AI_AGENTS_DUPLICATE_SPAN)
+        if page_index == 24:
+            _call_vendor(page, "insert_text", (72, 160), AI_AGENTS_UNIQUE_SPAN)
+    _call_vendor(
+        document,
+        "set_page_labels",
+        [
+            {"startpage": 0, "prefix": "", "style": "D", "firstpagenum": 1},
+            {
+                "startpage": AI_AGENTS_PAGE_INDEX,
+                "prefix": "",
+                "style": "D",
+                "firstpagenum": 12,
+            },
+        ],
+    )
+    payload = cast(bytes, _call_vendor(document, "tobytes"))
+    _call_vendor(document, "close")
+    return payload, sha256_bytes(payload)

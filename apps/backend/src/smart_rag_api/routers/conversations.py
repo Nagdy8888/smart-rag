@@ -23,12 +23,14 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_api.dependencies.identity import CallerContextDep
 from smart_rag_api.dependencies.services import (
     enforce_rate_limit,
+    get_backend_settings,
     get_model_gateway,
     get_postgres_url,
     get_sse_stream_service,
     get_valkey_limits_client,
 )
 from smart_rag_api.schemas.fastapi_security import (
+    CitationResponse,
     ConversationCreateRequest,
     ConversationMessage,
     ConversationMessagesResponse,
@@ -126,9 +128,13 @@ def get_query_run_service(
         Query-run service.
     """
 
+    settings = get_backend_settings(request)
+    exa_key = settings.exa_api_key
     return QueryRunService(
         postgres_url,
         valkey_client=get_valkey_limits_client(request),
+        web_search_enabled=settings.web_search_enabled,
+        web_search_configured=bool(exa_key.get_secret_value() if exa_key else ""),
     )
 
 
@@ -345,6 +351,23 @@ def list_conversation_messages_route(
             role=item.role,
             content=item.content,
             created_at=item.created_at,
+            run_id=item.run_id,
+            citations=[
+                CitationResponse(
+                    citation_id=citation.citation_id,
+                    citation_index=citation.citation_index,
+                    chunk_id=citation.chunk_id,
+                    provenance=citation.provenance,
+                    source_unavailable=citation.source_unavailable,
+                    source_kind=citation.source_kind,
+                    web_source_id=citation.web_source_id,
+                    paragraph_index=citation.paragraph_index,
+                    document_title=citation.document_title,
+                    pdf_page_number=citation.pdf_page_number,
+                    evidence_excerpt=citation.evidence_excerpt,
+                )
+                for citation in item.citations
+            ],
         )
         for item in records
     ]

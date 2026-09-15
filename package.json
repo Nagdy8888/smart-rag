@@ -20,7 +20,8 @@
   "pnpm": {
     "overrides": {
       "sharp": ">=0.35.4",
-      "js-yaml": ">=4.3.2"
+      "js-yaml": ">=4.3.2",
+      "smol-toml": ">=1.7.1"
     }
   },
   "devDependencies": {

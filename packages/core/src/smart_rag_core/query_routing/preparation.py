@@ -27,10 +27,12 @@ from smart_rag_core.query_routing.fidelity import score_rewrite_fidelity
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
     ScopeDegradationReason,
-    apply_requested_search_scope,
     classify_knowledge_scope,
     company_intent_signal,
     scope_requires_model,
+)
+from smart_rag_core.query_routing.knowledge_scope_preference import (
+    apply_requested_search_scope,
 )
 from smart_rag_core.query_routing.models import (
     REQUIRED_PREPARATION_FIELDS,
@@ -131,9 +133,12 @@ def _extension_for_scope(scope: KnowledgeScope, query: str) -> Phase6Extension:
         query: Original query.
 
     Returns:
-        Graph inspection or none for company documents; otherwise no-retrieval.
+        Graph inspection or none for company documents; Web research for
+        public-web scope; otherwise no-retrieval.
     """
 
+    if scope is KnowledgeScope.WEB:
+        return Phase6Extension.WEB_RESEARCH
     if scope is KnowledgeScope.COMPANY_DOCUMENTS:
         if is_graph_inspection(query):
             return Phase6Extension.GRAPH_INSPECTION

@@ -13,15 +13,19 @@ import { paidMutationHeaders, resumeHeaders } from "./headers";
 import { apiUrl, readJsonObject } from "./http";
 import { parseFeedbackResponse, parseRunResponse } from "./parsers";
 
-const CITATION_SNIPPET_KEYS = /^(snippet|passage|text|html|content|body)$/i;
+const CITATION_SNIPPET_KEYS =
+  /^(snippet|passage|text|html|content|body|excerpt|span|quote|evidence_excerpt|passage_text)$/i;
 
 /**
- * Keep citation ids and coordinate provenance. Drop passage/snippet fields.
+ * Keep citation ids, typed PDF fields, and locator provenance.
+ *
+ * Drops passage/snippet keys from provenance. Reads `evidence_excerpt` only
+ * from the top-level field so nested copies cannot leak into chips.
  *
  * @param item - One JSON citation object.
  * @returns Typed citation, or null when `citation_id` is missing.
  */
-function parseCitationItem(item: unknown): CitationResponse | null {
+export function parseCitationItem(item: unknown): CitationResponse | null {
   if (item === null || typeof item !== "object" || Array.isArray(item)) {
     return null;
   }
@@ -55,7 +59,88 @@ function parseCitationItem(item: unknown): CitationResponse | null {
         : String(row.chunk_id),
     provenance,
     source_unavailable: Boolean(row.source_unavailable),
+    source_kind: parseSourceKind(row.source_kind),
+    web_source_id: parseOptionalString(row.web_source_id),
+    paragraph_index: parseParagraphIndex(row.paragraph_index),
+    document_title: parseOptionalString(row.document_title),
+    pdf_page_number: parsePdfPageNumber(row.pdf_page_number),
+    evidence_excerpt: parseEvidenceExcerpt(row.evidence_excerpt),
   };
+}
+
+/**
+ * Parse catalog source kind. Missing values are company documents.
+ *
+ * @param value - Raw `source_kind`.
+ * @returns Non-empty kind string.
+ */
+function parseSourceKind(value: unknown): string {
+  if (typeof value === "string" && value.trim() !== "") {
+    return value;
+  }
+  return "company_document";
+}
+
+/**
+ * Parse a nullable string field.
+ *
+ * @param value - Raw JSON value.
+ * @returns Null when missing, non-string, or empty.
+ */
+function parseOptionalString(value: unknown): string | null {
+  if (typeof value !== "string" || value === "") {
+    return null;
+  }
+  return value;
+}
+
+/**
+ * Parse a paragraph mapping. Invalid or out-of-range values become null.
+ *
+ * @param value - Raw `paragraph_index`.
+ * @returns Integer 0–5, or null.
+ */
+function parseParagraphIndex(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 5) {
+    return value;
+  }
+  if (typeof value === "string" && /^(0|[1-9]\d*)$/.test(value)) {
+    const parsed = Number(value);
+    if (parsed >= 0 && parsed <= 5) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse a 1-based PDF toolbar page. Invalid or negative values become null.
+ *
+ * @param value - Raw `pdf_page_number`.
+ * @returns Integer ≥ 1, or null.
+ */
+function parsePdfPageNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) {
+    return value;
+  }
+  if (typeof value === "string" && /^(0|[1-9]\d*)$/.test(value)) {
+    const parsed = Number(value);
+    return parsed >= 1 ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * Parse the exact supporting span. Preserve interior whitespace.
+ *
+ * @param value - Raw top-level `evidence_excerpt`.
+ * @returns The string as sent, or null when missing, empty, or non-string.
+ */
+function parseEvidenceExcerpt(value: unknown): string | null {
+  if (typeof value !== "string" || value === "") {
+    return null;
+  }
+  return value;
 }
 
 /**
@@ -64,7 +149,7 @@ function parseCitationItem(item: unknown): CitationResponse | null {
  * @param auth - Access token.
  * @param runId - Run UUID.
  * @param fetchImpl - Injected fetch.
- * @returns Citation identifiers. No passage text.
+ * @returns ACL-safe locators and optional top-level excerpts. Provenance snippets stripped.
  */
 export async function listCitations(
   auth: ApiAuth,

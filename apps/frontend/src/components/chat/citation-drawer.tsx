@@ -6,7 +6,11 @@
 
 import type { RefObject } from "react";
 import { SOURCE_PREVIEW_UNAVAILABLE } from "../../lib/citation-drawer";
-import { citationLocatorFields } from "../../lib/citation-label";
+import {
+  LEGACY_EXCERPT_COPY,
+  citationDrawerTitle,
+  citationLocatorFields,
+} from "../../lib/citation-label";
 import { limitationCopy } from "../../lib/limitations";
 import type { CitationResponse } from "../../lib/types";
 import { Drawer } from "../ui/drawer";
@@ -21,7 +25,9 @@ export type CitationDrawerProps = {
 };
 
 /**
- * Render citation locators and technical ids. No privileged href and no snippet HTML.
+ * Render citation locators, optional supporting passage, and technical ids.
+ *
+ * No privileged href, no snippet HTML, and no Storage download.
  *
  * @param props - Selected citation or null.
  * @returns Drawer region, or null when closed.
@@ -35,15 +41,16 @@ export function CitationDrawer({
     return null;
   }
   const fields = citationLocatorFields(citation);
-  const page =
-    fields.locators.find((item) => item.key === "page_label") ??
-    fields.locators.find((item) => item.key === "page_number");
-  const title =
-    page === undefined
-      ? `Citation ${String(citation.citation_index)}`
-      : `Page ${page.value}`;
+  const excerpt =
+    citation.source_unavailable || typeof citation.evidence_excerpt !== "string"
+      ? null
+      : citation.evidence_excerpt;
   return (
-    <Drawer title={title} onClose={onClose} returnFocusRef={returnFocusRef}>
+    <Drawer
+      title={citationDrawerTitle(citation)}
+      onClose={onClose}
+      returnFocusRef={returnFocusRef}
+    >
       <dl className={chatStyles.sourceDl}>
         {fields.locators.map((item) => (
           <div key={item.key}>
@@ -62,12 +69,24 @@ export function CitationDrawer({
           </div>
         ))}
       </dl>
+      {excerpt !== null ? (
+        <div>
+          <p className={chatStyles.supportingPassageLabel}>Supporting passage</p>
+          <p className={chatStyles.supportingPassage} dir="auto">
+            <UserText value={excerpt} />
+          </p>
+        </div>
+      ) : citation.source_unavailable ? null : (
+        <p className={chatStyles.muted}>{LEGACY_EXCERPT_COPY}</p>
+      )}
       {citation.source_unavailable ? (
         <LimitationCallout tone="warning">
           {limitationCopy("source_unavailable")}
         </LimitationCallout>
       ) : null}
-      <p className={chatStyles.muted}>{SOURCE_PREVIEW_UNAVAILABLE}</p>
+      {excerpt === null ? (
+        <p className={chatStyles.muted}>{SOURCE_PREVIEW_UNAVAILABLE}</p>
+      ) : null}
     </Drawer>
   );
 }

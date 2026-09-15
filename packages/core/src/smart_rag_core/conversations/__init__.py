@@ -208,9 +208,9 @@ def delete_conversation(
 
     Side Effects:
         Sets ``conversations.deleted_at``, deletes messages/runs/events/
-        citations/feedback/checkpoints/store rows, appends a content-free
-        audit event, and inserts a durable LangSmith deletion request.
-        Idempotent when already tombstoned.
+        citations/web evidence/feedback/checkpoints/store rows, appends a
+        content-free audit event, and inserts a durable LangSmith deletion
+        request. Idempotent when already tombstoned.
     """
 
     try:

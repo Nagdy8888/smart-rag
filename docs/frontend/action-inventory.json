@@ -440,9 +440,23 @@
       "test_id": "src/components/chat-app.test.tsx"
     },
     {
+      "action_id": "ask.quiz.save",
+      "route": "/",
+      "label": "Save to quiz",
+      "control_kind": "local-state",
+      "contract_owner": "frontend-shell",
+      "contract": "Open the Save to quiz sheet; create still posts run id only",
+      "role": "owner-admin",
+      "success_state": "sheet dialog on New case",
+      "failure_state": "hidden without owner/admin capability",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/chat/save-to-quiz-sheet.test.tsx"
+    },
+    {
       "action_id": "ask.quiz.submit",
       "route": "/",
-      "label": "Save draft",
+      "label": "Save quiz case",
       "control_kind": "submit",
       "contract_owner": "fastapi",
       "contract": "POST /admin/pdf-eval/cases { source_run_id, query_class, split=development, idempotency_key }",
@@ -451,7 +465,7 @@
       "failure_state": "Quiz case could not be saved. Try again.",
       "idempotency": "idempotency_key until payload changes",
       "disposition": "keep",
-      "test_id": "src/components/chat/save-to-quiz-popover.test.tsx"
+      "test_id": "src/components/chat/save-to-quiz-sheet.test.tsx"
     },
     {
       "action_id": "ask.quiz.load_more",
@@ -465,7 +479,7 @@
       "failure_state": "Saved cases could not load. Try again.",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "src/components/chat/save-to-quiz-popover.test.tsx"
+      "test_id": "src/components/chat/save-to-quiz-sheet.test.tsx"
     },
     {
       "action_id": "ask.quiz.ask_question",
@@ -479,7 +493,7 @@
       "failure_state": "disabled until a case is selected",
       "idempotency": "read",
       "disposition": "keep",
-      "test_id": "src/components/chat/save-to-quiz-popover.test.tsx"
+      "test_id": "src/components/chat/save-to-quiz-sheet.test.tsx"
     },
     {
       "action_id": "ask.quiz.score",
@@ -493,7 +507,7 @@
       "failure_state": "newly saved draft cannot score its creating run",
       "idempotency": "owned run id",
       "disposition": "keep",
-      "test_id": "src/components/chat/save-to-quiz-popover.test.tsx"
+      "test_id": "src/components/chat/save-to-quiz-sheet.test.tsx"
     },
     {
       "action_id": "documents.upload",

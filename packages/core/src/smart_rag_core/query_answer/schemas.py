@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
-from smart_rag_core.query_answer.versions import MAX_VERIFIER_LINKS
+from smart_rag_core.query_answer.versions import (
+    MAX_ANSWER_CITATIONS,
+    MAX_ANSWER_PARAGRAPHS,
+    MAX_CITATION_SPAN_CHARS,
+    MAX_VERIFIER_LINKS,
+)
 
 
 def answer_json_schema() -> dict[str, object]:
     """Return the strict answer structured-output schema.
+
+    Provider output omits ``answer_text``. Application code joins
+    paragraph bodies after verification.
 
     Returns:
         OpenAI ``json_schema`` document.
@@ -22,21 +30,41 @@ def answer_json_schema() -> dict[str, object]:
             "source_ranges",
             "inference",
             "atomic_link_id",
+            "paragraph_index",
         ],
         "properties": {
             "chunk_id": {"type": ["string", "null"]},
             "table_id": {"type": ["string", "null"]},
-            "span": {"type": ["string", "null"]},
+            "span": {
+                "type": ["string", "null"],
+                "maxLength": MAX_CITATION_SPAN_CHARS,
+            },
             "source_ranges": {"type": "array", "items": {"type": "string"}},
             "inference": {"type": "boolean"},
             "atomic_link_id": {"type": ["string", "null"]},
+            "paragraph_index": {"type": ["integer", "null"]},
+        },
+    }
+    paragraph = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["paragraph_index", "text", "link_ids"],
+        "properties": {
+            "paragraph_index": {"type": "integer", "minimum": 0, "maximum": 5},
+            "text": {"type": "string", "minLength": 1, "maxLength": 4000},
+            "link_ids": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": MAX_VERIFIER_LINKS,
+                "items": {"type": "string"},
+            },
         },
     }
     return {
         "type": "object",
         "additionalProperties": False,
         "required": [
-            "answer_text",
+            "paragraphs",
             "citations",
             "atomic_links",
             "composed_conclusion",
@@ -45,10 +73,20 @@ def answer_json_schema() -> dict[str, object]:
             "refused_links",
         ],
         "properties": {
-            "answer_text": {"type": "string"},
-            "citations": {"type": "array", "items": citation},
+            "paragraphs": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": MAX_ANSWER_PARAGRAPHS,
+                "items": paragraph,
+            },
+            "citations": {
+                "type": "array",
+                "maxItems": MAX_ANSWER_CITATIONS,
+                "items": citation,
+            },
             "atomic_links": {
                 "type": "array",
+                "maxItems": MAX_VERIFIER_LINKS,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
@@ -93,7 +131,11 @@ def answer_json_schema() -> dict[str, object]:
                     },
                 ]
             },
-            "table_citations": {"type": "array", "items": citation},
+            "table_citations": {
+                "type": "array",
+                "maxItems": MAX_ANSWER_CITATIONS,
+                "items": citation,
+            },
             "status": {
                 "type": "string",
                 "enum": ["complete", "partial", "refused"],
@@ -151,7 +193,11 @@ def verifier_json_schema(link_ids: tuple[str, ...]) -> dict[str, object]:
                     "properties": {
                         "link_id": {"type": "string", "enum": enum_ids},
                         "supported": {"type": "boolean"},
-                        "reason": {"type": "string"},
+                        "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                        },
                     },
                 },
             }

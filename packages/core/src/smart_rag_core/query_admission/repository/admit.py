@@ -45,7 +45,7 @@ def admit_query_run(
     requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
     token_issued_at: datetime | None = None,
 ) -> QueryAdmissionResult:
-    """Admit one query run or reconnect through ``app.admit_query_run_v2``.
+    """Admit one query run or reconnect through ``app.admit_query_run_v3``.
 
     Args:
         connection: Open connection. Caller must ``SET ROLE app_api`` and
@@ -75,7 +75,7 @@ def admit_query_run(
             cursor.execute(
                 """
                 SELECT *
-                FROM app.admit_query_run_v2(
+                FROM app.admit_query_run_v3(
                   %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
                 """,

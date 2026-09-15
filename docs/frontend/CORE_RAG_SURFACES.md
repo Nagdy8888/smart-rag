@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -21,6 +21,7 @@ Related: [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
+[p06-47 inline citations](../development/phase-06/p06-47-inline-pdf-citation-ui-2026-09-15.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [VISUAL_MAP.md](./VISUAL_MAP.md) ·
@@ -44,7 +45,7 @@ Related: [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh
 Ask stays at `/` (`apps/frontend/src/components/chat/chat-app.tsx`). After a
 terminal answer, Give feedback stays for eligible users. Owner/admin also
 see Save to quiz when `/api/meta` `pdf_eval_workspace` is true; that control
-posts the run ID and never replaces thumbs. Admin Evaluation at
+opens a two-tab side sheet, posts the run ID, and never replaces thumbs. Admin Evaluation at
 `/admin?tab=evaluation` lists hosted quiz cases, remaps gold from current
 passages with `expected_row_version`, and regenerates unapproved drafts.
 Official Recall@10 stays off this page. Documents live under `apps/frontend/src/components/documents/` (`document-library.tsx`, `document-detail.tsx`). Tables live under `apps/frontend/src/components/tables/` (`tables-app.tsx`). Graph lives under `apps/frontend/src/components/graph/` (`graph-explorer.tsx`): search hits become chips; Inspect graph POSTs `/graph/inspect`. List is the default accessible view. Canvas is optional `@xyflow/react`. There is no custom SVG neighborhood and no relationship editor. List pagination uses the real `created_at,id` cursor and page length; the client never invents `next_cursor`. `IngestionStatus` is shared by list pills and the detail timeline. Owner/admin delete uses `DELETE /documents/{id}` behind a name-bearing confirmation. There is no `app/chat` folder. Sessions use `GET /conversations`, `GET /conversations/{id}`, creator-only `GET /conversations/{id}/messages` (newest-first keyset, rendered oldest-first; “Load earlier messages” when `next_before_id` is set), and `POST /conversations/{id}/title` for LLM session titles. Prompt chips fill the composer only; verified `token_delta` arrives after the status line (Preparing/Retrieving/Generating/Verifying); sources open in a drawer. Draft state lives in the composer so typing does not re-render the rail. `/ops/ready` is fetched only for owner/admin; `ReadinessIndicator` owns the 15s poll. There is no `app/admin`
@@ -77,7 +78,7 @@ flowchart TD
 | --- | --- |
 | GAP-07-01 | Auto envelope only. Advanced panel is display-only of `route_family` and `route_correction`. No Hybrid/Combined/Table/Inspect send buttons. `search_scope` is allowed |
 | GAP-07-02 | SSE catalog only. Inference-chain objects are absent; citation chips only |
-| GAP-07-09 | Source drawer: printed page label when the PDF has one, file PDF page when it differs, title/section, technical ids. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
+| GAP-07-09 | Source drawer: company PDFs show typed book title, toolbar PDF page, optional section, and supporting passage. Printed `page_label` is not the chip/drawer page. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
 | GAP-07-10 | No rolling ETA/cost. Authorized `graph_handoff` counts + `graphNotReadyCopy(n)` only |
 | GAP-07-12 | No anomaly toast counts or audit tabs |
 | GAP-07-14 | `DELETE /documents/{id}` is wired for owner/admin with confirmation. Members still 403. No source preview/download |

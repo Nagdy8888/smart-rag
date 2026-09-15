@@ -2,7 +2,7 @@
 title: Answer verification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-09-15
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 3
 ---
@@ -26,6 +26,9 @@ Related: [COMBINED_FUSION.md](./COMBINED_FUSION.md) ·
 - Canonical Hybrid/Combined `EvidenceUnit` / `ScoredPassage` citation text
   and locators.
 - StructuredTable sandbox results with exact cell or range provenance.
+- Run-scoped `app.web_sources` excerpts on the Web path only. Spans must
+  be exact substrings of the persisted excerpt. Invented `web_source_id`
+  values are dropped. Company `citations` stay empty on Web answers.
 - Not native graph prose, BM25 snippets, unresolved paths, or numbers the
   model calculates from prose.
 
@@ -63,19 +66,38 @@ catalog LLM, and LightRAG `answer_generate` stay 0.
 
 Empty `citation_text` cannot pass deterministic `complete`. Graph locators
 load canonical `raw_text` through `fetch_authorized_chunk_context`; empty
-text is dropped. Empty spans are whole-passage only when canonical text
-is present.
+text is dropped. Company `answer_v2` passage citations require an exact
+1–1000 character span contained in canonical text. Empty spans are
+legacy whole-passage only when paragraph mappings are not required.
 
-Prompt versions: `answer_v1` and `verifier_v1` under
-`apps/agents/src/smart_rag_agents/prompts/`. Hashes are LF-normalized
-SHA-256 in `smart_rag_core.query_answer.versions`.
+Prompt versions: `answer_v2`, `answer_v1` (historical), `verifier_v1`,
+`web_critique_v1`, and `web_answer_v1` under
+`apps/agents/src/smart_rag_agents/prompts/`. Company hashes are
+LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Live
+company answers derive `answer_text` from ordered paragraphs. Fusion
+passages are never backfilled as citations.
+
+Company PDF chat chips use the typed toolbar page (`pdf_page_number` =
+locator `page_index + 1`) and canonical `document_title`. Printed
+`page_label` stays on locators and is not the displayed page. Persistence
+resolves one leaf chunk that contains the exact span. Two matching
+children, multi-page locators, or a missing span fail closed. HTTP
+`evidence_excerpt` is disclosed only after live ACL and current-version
+recheck. SSE `citation_preview` still carries IDs only. History loads
+citations with `list_conversation_citations_v1` on the messages payload.
+Legacy rows with null `paragraph_index` stay in a footer. Evaluation
+scores resolved leaf IDs and `pdf_page_number` versus gold
+`page_number`, never `page_label`. The AI Agents fixture (viewer page 25,
+printed 12) is deterministic proof. The global ≥98% citation target stays
+unverified until an approved evaluation run.
 
 ## Graph nodes
 
 After `apply_correction`:
 
-`fuse_evidence` → `compose_tables` → `disclose_optional_tools` →
-`generate_answer` → `verify_answer` → END.
+Web: `web_scope` (search → critique → optional follow-ups → contents →
+persist sources → draft) → `verify_answer` → END. Hold-until-verify:
+`token_delta` is emitted only after verification.
 
 Compile still constructs no sockets or OpenAI clients. Mock mode works
 without network.
@@ -100,4 +122,15 @@ flowchart TD
   terminal -->|yes| ok[verified]
   terminal -->|partial| partial[verified_partial]
   terminal -->|none| refuse[refused or insufficient_evidence]
+```
+
+```mermaid
+flowchart TD
+  webScope[web_scope search critique contents persist]
+  webDet[Deterministic web excerpt store]
+  webVerify[verify_answer no fusion verifier]
+  webScope --> webDet
+  webDet --> webVerify
+  webVerify --> webOk[verified answer_origin web]
+  webDet -->|"invented id or span"| webFail[insufficient_evidence]
 ```

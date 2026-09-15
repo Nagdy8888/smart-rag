@@ -2,7 +2,7 @@
 title: Phase 6 agent-intelligence evidence index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: engineering, reviewers
 ---
 
@@ -63,6 +63,16 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-34 — Admin case review, gold picker, stale repair (2026-09-13) | [phase-06/p06-34-admin-eval-curation-2026-09-13.md](./phase-06/p06-34-admin-eval-curation-2026-09-13.md) | 87 |
 | P06-35 — Admin Recall@10 scoreboard, exam progress (2026-09-13) | [phase-06/p06-35-admin-exam-board-2026-09-13.md](./phase-06/p06-35-admin-exam-board-2026-09-13.md) | 91 |
 | P06-36 — Hosted evaluation workspace close (2026-09-13) | [phase-06/p06-36-hosted-eval-verification-2026-09-13.md](./phase-06/p06-36-hosted-eval-verification-2026-09-13.md) | 115 |
+| P06-37 — Advanced web research overlay (2026-09-14) | [phase-06/p06-37-advanced-web-research-amendment-2026-09-14.md](./phase-06/p06-37-advanced-web-research-amendment-2026-09-14.md) | 90 |
+| P06-38 — Bounded Exa REST gateway (2026-09-14) | [phase-06/p06-38-exa-rest-gateway-2026-09-14.md](./phase-06/p06-38-exa-rest-gateway-2026-09-14.md) | 70 |
+| P06-39 — Run-scoped web evidence store (2026-09-15) | [phase-06/p06-39-web-evidence-store-2026-09-15.md](./phase-06/p06-39-web-evidence-store-2026-09-15.md) | 106 |
+| P06-40 — Four-mode admission and Web envelope (2026-09-15) | [phase-06/p06-40-four-mode-routing-2026-09-15.md](./phase-06/p06-40-four-mode-routing-2026-09-15.md) | 141 |
+| P06-41 — Bounded iterative Web research graph (2026-09-15) | [phase-06/p06-41-web-research-graph-2026-09-15.md](./phase-06/p06-41-web-research-graph-2026-09-15.md) | 124 |
+| P06-44 — PDF paragraph-citation overlay (2026-09-15) | [phase-06/p06-44-pdf-paragraph-citations-amendment-2026-09-15.md](./phase-06/p06-44-pdf-paragraph-citations-amendment-2026-09-15.md) | 93 |
+| P06-45 — Paragraph mappings and fail-closed verification (2026-09-15) | [phase-06/p06-45-pdf-paragraph-grounding-2026-09-15.md](./phase-06/p06-45-pdf-paragraph-grounding-2026-09-15.md) | 110 |
+| P06-46 — ACL-safe PDF citation persistence (2026-09-15) | [phase-06/p06-46-pdf-citation-persistence-2026-09-15.md](./phase-06/p06-46-pdf-citation-persistence-2026-09-15.md) | 108 |
+| P06-47 — Inline PDF paragraph citation UI (2026-09-15) | [phase-06/p06-47-inline-pdf-citation-ui-2026-09-15.md](./phase-06/p06-47-inline-pdf-citation-ui-2026-09-15.md) | 88 |
+| P06-48 — PDF citation accuracy gates (2026-09-15) | [phase-06/p06-48-pdf-citation-gates-2026-09-15.md](./phase-06/p06-48-pdf-citation-gates-2026-09-15.md) | 118 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

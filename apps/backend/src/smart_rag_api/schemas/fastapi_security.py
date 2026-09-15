@@ -97,6 +97,34 @@ class ConversationResponse(BaseModel):
     completion_tokens: int = Field(default=0, ge=0)
 
 
+class CitationResponse(BaseModel):
+    """Citation identifiers plus ACL-checked title, PDF page, and excerpt."""
+
+    model_config = ConfigDict(frozen=True)
+
+    citation_id: UUID
+    citation_index: int
+    chunk_id: UUID | None = None
+    provenance: dict[str, Any] = Field(default_factory=dict)
+    source_unavailable: bool = False
+    source_kind: str = "company_document"
+    web_source_id: UUID | None = None
+    paragraph_index: int | None = None
+    document_title: str | None = None
+    pdf_page_number: int | None = None
+    evidence_excerpt: str | None = None
+
+
+def _empty_citation_responses() -> list[CitationResponse]:
+    """Return an empty citation list for additive HTTP defaults.
+
+    Returns:
+        Empty list. Never shared across model instances.
+    """
+
+    return []
+
+
 class ConversationMessage(BaseModel):
     """One creator-owned transcript message. Content is escaped untrusted text."""
 
@@ -106,6 +134,8 @@ class ConversationMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str
     created_at: datetime
+    run_id: UUID | None = None
+    citations: list[CitationResponse] = Field(default_factory=_empty_citation_responses)
 
 
 class ConversationMessagesResponse(BaseModel):
@@ -163,18 +193,6 @@ class RunResponse(BaseModel):
     reservation_id: UUID | None = None
     created_at: datetime | None = None
     requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO
-
-
-class CitationResponse(BaseModel):
-    """Citation identifiers. No passage text."""
-
-    model_config = ConfigDict(frozen=True)
-
-    citation_id: UUID
-    citation_index: int
-    chunk_id: UUID | None = None
-    provenance: dict[str, Any] = Field(default_factory=dict)
-    source_unavailable: bool = False
 
 
 class FeedbackRequest(BaseModel):

@@ -16,6 +16,7 @@ from smart_rag_api.services.query_sse_mapping import (
     MIXED_SCOPE_NODE,
     TOKEN_DELTA_LIMIT,
     VERIFY_ANSWER_NODE,
+    WEB_SCOPE_NODE,
     QuerySseMapper,
     assert_catalog_event,
     chunk_answer_text,
@@ -111,6 +112,20 @@ def test_mapper_emits_one_answer_origin_before_token_delta() -> None:
     assert types.count("answer_origin") == 1
     assert types.index("answer_origin") < types.index("token_delta")
     assert events[types.index("answer_origin")][1] == {"origin": "general_knowledge"}
+    web_events = QuerySseMapper().consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified",
+                "answer": AnswerPayload(
+                    answer_text="Public web draft.",
+                    status="complete",
+                    answer_origin=KnowledgeScope.WEB,
+                ).model_dump(mode="json"),
+            }
+        }
+    )
+    web_types = [item[0] for item in web_events]
+    assert web_events[web_types.index("answer_origin")][1] == {"origin": "web"}
     assert "citation_preview" not in types
     historical = QuerySseMapper().consume_chunk(
         {
@@ -243,7 +258,7 @@ def test_mapper_empty_verified_answer_is_error_not_completed() -> None:
 def test_mapper_holds_general_and_mixed_scope_drafts() -> None:
     """Direct scope nodes hold draft text until verify_answer."""
 
-    for node_name in (GENERAL_SCOPE_NODE, MIXED_SCOPE_NODE):
+    for node_name in (GENERAL_SCOPE_NODE, MIXED_SCOPE_NODE, WEB_SCOPE_NODE):
         mapper = QuerySseMapper()
         draft_events = mapper.consume_chunk(
             {
@@ -270,6 +285,73 @@ def test_mapper_holds_general_and_mixed_scope_drafts() -> None:
         ]
         assert deltas == ["SCOPE_PUBLIC_FINAL"]
         assert final_events[-1][0] == "completed"
+
+
+def test_mapper_strips_web_excerpts_and_holds_web_draft() -> None:
+    """Web node updates never leak excerpts; token_delta waits for verify."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            WEB_SCOPE_NODE: {
+                "status": "answered",
+                "answer": _payload("SECRET_WEB_DRAFT"),
+                "web_sources": [
+                    {
+                        "excerpt": "SECRET_EXCERPT_BODY",
+                        "url": "https://example.com/news",
+                    }
+                ],
+            }
+        }
+    )
+    dumped = str(events)
+    assert "token_delta" not in [item[0] for item in events]
+    assert "SECRET_WEB_DRAFT" not in dumped
+    assert "SECRET_EXCERPT_BODY" not in dumped
+    assert "https://example.com/news" not in dumped
+    for event_type, payload in events:
+        assert_catalog_event(event_type, payload)
+
+
+def test_mapper_web_scope_reject_is_terminal_without_token_delta() -> None:
+    """Fail-closed Web still maps to catalog error, not a draft answer."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            WEB_SCOPE_NODE: {
+                "status": "routing_rejected",
+                "detail": "web_search_disabled",
+            }
+        }
+    )
+    assert ("error", {"code": "routing_rejected"}) in events
+    assert "token_delta" not in [item[0] for item in events]
+    assert mapper.terminal_emitted is True
+
+
+def test_custom_web_progress_keys_omit_query_and_bodies() -> None:
+    """``web_search`` / ``web_read`` custom events are keys only."""
+
+    mapper = QuerySseMapper()
+    started = mapper.consume_custom({"kind": "node_start", "stage": "web_search"})
+    assert started == [
+        ("status", {"stage": "web_search", "status": "running", "phase": "started"})
+    ]
+    dropped = mapper.consume_custom(
+        {
+            "kind": "node_start",
+            "stage": "web_read",
+            "excerpt": "SECRET_BODY",
+            "query": "search the web for latest news",
+        }
+    )
+    assert dropped == []
+    read = mapper.consume_custom({"kind": "node_start", "stage": "web_read"})
+    assert read == [
+        ("status", {"stage": "web_read", "status": "running", "phase": "started"})
+    ]
 
 
 def test_mapper_unverified_draft_at_finish_is_error() -> None:

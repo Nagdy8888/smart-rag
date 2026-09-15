@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Final, cast
 
 from smart_rag_core.query_answer.models import AnswerPayload
 
@@ -19,6 +19,20 @@ from smart_rag_api.services.sse.mapping.status import (
 from smart_rag_api.services.sse.mapping.verified import (
     emit_verified_events,
     payload_from_update,
+)
+
+_STRIP_UPDATE_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "passage",
+        "snippet",
+        "html",
+        "traceback",
+        "excerpt",
+        "excerpts",
+        "web_sources",
+        "body",
+        "text",
+    }
 )
 
 
@@ -81,7 +95,7 @@ class QuerySseMapper:
                 update = {
                     str(key): value
                     for key, value in typed_update.items()
-                    if str(key) not in {"passage", "snippet", "html", "traceback"}
+                    if str(key) not in _STRIP_UPDATE_KEYS
                 }
             events.append(status_event(node_name, update))
             self._progress.note_stage_terminal(node_name[:64])
@@ -92,6 +106,12 @@ class QuerySseMapper:
             if node_name in DRAFT_ANSWER_NODES:
                 if parsed is not None:
                     self._draft = parsed
+                if not self.verified:
+                    reject_events = reject_terminal_events(update)
+                    if reject_events:
+                        events.extend(reject_events)
+                        self.terminal_emitted = True
+                        return events
                 continue
             if node_name == VERIFY_ANSWER_NODE:
                 self.verified = True

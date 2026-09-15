@@ -2,7 +2,7 @@
 title: Accessibility and security implementation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-15
 audience: frontend, security, reviewers
 packet: P08-20
 ---
@@ -25,10 +25,10 @@ Related: [STITCH_BRIEF.md](./STITCH_BRIEF.md) ·
 ## Logical citation offsets
 
 `GET /runs/{id}/citations` has no offset fields (GAP-07-09). The production
-citation drawer shows the printed PDF page label when present, the 1-based
-file PDF page when it differs or when labels are missing, title, and section
-locators, then
-technical ids. `highlightLogicalRange`
+citation drawer for company PDFs shows typed book title, the 1-based PDF
+toolbar page (`pdf_page_number`), optional section, and an authorized
+supporting passage. Printed `page_label` is not the displayed page. Technical
+ids follow. `highlightLogicalRange`
 slices with `Array.from` / codepoint indexes. The reviewed fixture is
 canonical text `الشركة ACME وقعت العقد.` with offsets **7–11** selecting
 `ACME`, rendered in `ReviewedContentFixtures`, not in `CitationDrawer`.

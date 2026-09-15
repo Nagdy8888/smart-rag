@@ -32,7 +32,7 @@ import { useChatRun } from "./hooks/use-chat-run";
 import { useChatSelection } from "./hooks/use-chat-selection";
 import { useConversationActions } from "./hooks/use-conversation-actions";
 import { useConversationScroll } from "./hooks/use-conversation-scroll";
-import { toSaveToQuizPopoverProps, useQuizCapture } from "./hooks/use-quiz-capture";
+import { toSaveToQuizSheetProps, useQuizCapture } from "./hooks/use-quiz-capture";
 import { useVerifiedAnswerReveal } from "./hooks/use-verified-answer-reveal";
 import chatStyles from "./chat.module.css";
 
@@ -221,7 +221,6 @@ export function ChatApp() {
         reconnectExhausted={run.reconnectExhausted}
         nextRetryMs={run.nextRetryMs}
         feedbackStatus={feedbackStatus}
-        quizStatus={quiz.saveNotice ?? quiz.saveError ?? quiz.scoreNotice}
         deleteSuccess={actions.deleteSuccess}
       />
       <div className={chatStyles.mobileBar}>
@@ -287,7 +286,7 @@ export function ChatApp() {
             }}
             feedbackPending={feedbackPending}
             showSaveToQuiz={showSaveToQuiz}
-            quiz={toSaveToQuizPopoverProps(quiz, run.lastUserMessage, visibleCitations)}
+            quiz={toSaveToQuizSheetProps(quiz, run.lastUserMessage, visibleCitations)}
           />
         }
         sessionsExpanded={selection.sessionsExpanded}

@@ -2,7 +2,7 @@
 title: Query budget engineering defaults
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-15
 audience: engineering
 phase_packet: Phase 6 Packet 1
 ---
@@ -90,11 +90,14 @@ per-call cap is the conservative maximum kind used on that route (answer
 | graph_inspection | 10 | 3 | 4 | 0.75 | 12000 | 4500 |
 | no_retrieval | 25 | 7 | 4 | 2.80 | 56000 | 14000 |
 | scoped_refusal | 25 | 7 | 4 | 2.80 | 56000 | 14000 |
+| web_research | 50 | 5 | 5 | 2.00 | 40000 | 10000 |
 
-Shared ceilings: `recursion_limit=24`, 1 correction, 3 subquestions, 1
-discovery round, 3 optional manifests, 1 side-effecting tool. Hybrid call 7
-includes batched query embed, one rerank, and answer-class headroom
-(profile/answer/verifier/correction). Combined 8 adds LightRAG consume.
+Shared ceilings: `recursion_limit=24`, 1 correction (0 on `web_research`),
+3 subquestions, 1 discovery round, 3 optional manifests, 1 side-effecting
+tool. Hybrid call 7 includes batched query embed, one rerank, and
+answer-class headroom (profile/answer/verifier/correction). Combined 8 adds
+LightRAG consume. Forced Web reserves `web_research` and must fit inside
+Composite when Auto later selects Web. A Web plan never Hybrid-clamps.
 
 Monthly query spend uses
 `COALESCE(profile.monthly_llm_budget_usd, company.monthly_llm_budget_usd, 200)`.

@@ -2,7 +2,7 @@
 title: ADR index and backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-15
 audience: engineering
 ---
 
@@ -36,6 +36,8 @@ audience: engineering
 | General-chat strict split | accepted | 6/8 amendment | [ADR-general-chat-strict-split.md](./ADR-general-chat-strict-split.md) |
 | Local PDF evaluation workspace | superseded | 6 overlay | [ADR-local-pdf-evaluation-workspace.md](./ADR-local-pdf-evaluation-workspace.md) |
 | Hosted webapp evaluation workspace | accepted | 6 overlay | [ADR-hosted-webapp-evaluation-workspace.md](./ADR-hosted-webapp-evaluation-workspace.md) |
+| Advanced web research mode | accepted | 6 overlay | [ADR-advanced-web-research.md](./ADR-advanced-web-research.md) |
+| PDF paragraph citations | accepted | 6 overlay | [ADR-pdf-paragraph-citations.md](./ADR-pdf-paragraph-citations.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | Canonical-passage LightRAG sources | accepted | 5 | [ADR-canonical-passage-lightrag-sources.md](./ADR-canonical-passage-lightrag-sources.md) |

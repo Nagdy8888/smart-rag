@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import cast
 
 import psycopg
+from pydantic import ValidationError
 from smart_rag_core.query_admission.ceilings import assert_call_available
 from smart_rag_core.query_admission.exceptions import (
     QueryAdmissionError,
@@ -12,8 +13,8 @@ from smart_rag_core.query_admission.exceptions import (
 )
 from smart_rag_core.query_admission.service import summarize_run_usage
 from smart_rag_core.query_answer.citations import (
-    ensure_fusion_source_citations,
     maybe_persist_verified_citations,
+    persist_web_answer_citations,
 )
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
@@ -31,6 +32,7 @@ from smart_rag_core.query_routing.constants import (
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.query_routing.serde import plan_from_state
+from smart_rag_core.web_research.models import WebSourceRecord
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.verifier import gateway_verifier
@@ -59,7 +61,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
 
     Persistence writes:
         Counted ``verifier`` usage when a connection and gateway are bound.
-        Citation provenance may be inserted when a connection is bound.
+        Bound citation persistence failure degrades to
+        ``insufficient_evidence`` and never streams a verified uncited
+        answer. Unbound Studio graphs skip persistence.
 
     External/model calls:
         Zero or one small verifier call covering at most six material
@@ -71,9 +75,13 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     Failure/fallback route:
         Unsupported links are removed or refused. Unsupported chains drop
         the composed conclusion. Inspection/NoRetrieval stay refused.
-        Missing gateway or omitted verifier links never terminate
-        ``verified``. Omitted IDs force ``verified_partial`` and
-        ``verifier_omitted_links``.
+        Missing gateway, omitted verifier links, or a schema-invalid
+        verifier payload never terminate ``verified``. Omitted IDs force
+        ``verified_partial`` and ``verifier_omitted_links``. Invalid
+        verifier JSON degrades to ``verified_partial`` with the
+        already-generated answer. Company answers without valid paragraph
+        mappings become a citation-free refusal; fusion passages are never
+        backfilled as citations.
 
     Args:
         state: State after answer generation.
@@ -85,8 +93,6 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
 
     if skip_closed_nodes(state):
         return state
-    fusion = fusion_from_state(state.get("fusion"))
-    tables = tables_from_state(state.get("table_composition"))
     raw_answer = state.get("answer")
     if raw_answer is None:
         return {
@@ -94,25 +100,57 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "status": "insufficient_evidence",
             "detail": "missing_answer",
         }
-    payload = AnswerPayload.model_validate(raw_answer)
+    try:
+        fusion = fusion_from_state(state.get("fusion"))
+        tables = tables_from_state(state.get("table_composition"))
+        payload = AnswerPayload.model_validate(raw_answer)
+    except ValidationError:
+        preserved = raw_answer
+        return {
+            **state,
+            "status": "verified_partial",
+            "detail": "payload_schema_invalid",
+            "answer": preserved,
+        }
     plan = None
     if state.get("retrieval_plan") is not None:
         try:
             plan = plan_from_state(state["retrieval_plan"])
         except ValueError:
             plan = None
+    web_records: list[WebSourceRecord] = []
+    web_excerpts: dict[str, str] = {}
+    for raw_source in state.get("web_sources") or []:
+        try:
+            record = WebSourceRecord.model_validate(raw_source)
+        except ValidationError:
+            continue
+        web_records.append(record)
+        web_excerpts[record.web_source_id] = record.excerpt
+    is_web = payload.answer_origin is KnowledgeScope.WEB or (
+        plan is not None and plan.knowledge_scope is KnowledgeScope.WEB
+    )
+    if is_web and not web_excerpts:
+        return {
+            **state,
+            "status": "insufficient_evidence",
+            "detail": "web_evidence_insufficient",
+            "answer": payload.model_dump(mode="json"),
+        }
     checked, failures = deterministic_check_answer(
         payload,
         fusion=fusion,
         tables=tables.records,
-        evidence_required=route_needs_retrieval(plan),
+        evidence_required=route_needs_retrieval(plan) and not is_web,
+        web_excerpts=web_excerpts if is_web else None,
+        require_paragraphs=route_needs_retrieval(plan) and not is_web,
     )
     remaining = state["remaining_model_calls"]
     verifier_calls = state.get("verifier_call_count") or 0
     omitted: tuple[str, ...] = ()
     added_prompt_tokens = 0
     added_completion_tokens = 0
-    if checked.atomic_links:
+    if checked.atomic_links and not is_web:
         caller = None
         if deps.model_gateway is not None and deps.verifier_prompt_text:
 
@@ -199,16 +237,6 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     ):
         terminal = "insufficient_evidence"
         detail = FALLBACK_RETRIEVERS_UNBOUND
-    result = VerificationResult(
-        answer=checked,
-        deterministic_failures=failures,
-        verifier_call_count=1 if verifier_calls else 0,
-        omitted_link_ids=omitted,
-        status=terminal
-        if terminal
-        in {"verified", "verified_partial", "refused", "insufficient_evidence"}
-        else "verified_partial",
-    )
     context = runtime_from_state(state)
     billed_prompt = int(state.get("prompt_tokens") or 0) + max(0, added_prompt_tokens)
     billed_completion = int(state.get("completion_tokens") or 0) + max(
@@ -227,21 +255,55 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             billed_cost_usd = float(billed.cost_usd)
         except (QueryAdmissionError, psycopg.Error):
             pass
-    checked = ensure_fusion_source_citations(
-        checked,
-        fusion=fusion,
-        tables=tables.records,
-    )
     if route_needs_retrieval(plan) and checked.answer_origin is None:
         checked = checked.model_copy(
             update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
         )
-    maybe_persist_verified_citations(
-        deps.connection,
-        caller=caller_from_runtime(context) if context is not None else None,
-        run_id=context.run_id if context is not None else None,
-        fusion=fusion,
+    if is_web:
+        checked = checked.model_copy(
+            update={
+                "citations": (),
+                "table_citations": (),
+                "answer_origin": KnowledgeScope.WEB,
+            }
+        )
+        if not checked.web_citations:
+            terminal = "insufficient_evidence"
+            detail = "web_evidence_insufficient"
+        elif deps.connection is not None and context is not None:
+            try:
+                persist_web_answer_citations(
+                    deps.connection,
+                    caller=caller_from_runtime(context),
+                    run_id=context.run_id,
+                    sources=tuple(web_records),
+                    answer=checked,
+                )
+            except (QueryAdmissionError, psycopg.Error, ValueError):
+                terminal = "insufficient_evidence"
+                detail = "web_evidence_insufficient"
+    else:
+        try:
+            maybe_persist_verified_citations(
+                deps.connection,
+                caller=caller_from_runtime(context) if context is not None else None,
+                run_id=context.run_id if context is not None else None,
+                fusion=fusion,
+                answer=checked,
+            )
+        except (QueryAdmissionError, psycopg.Error):
+            if deps.connection is not None and context is not None:
+                terminal = "insufficient_evidence"
+                detail = "citation_persist_failed"
+    result = VerificationResult(
         answer=checked,
+        deterministic_failures=failures,
+        verifier_call_count=1 if verifier_calls else 0,
+        omitted_link_ids=omitted,
+        status=terminal
+        if terminal
+        in {"verified", "verified_partial", "refused", "insufficient_evidence"}
+        else "verified_partial",
     )
     return cast(
         QueryGraphState,

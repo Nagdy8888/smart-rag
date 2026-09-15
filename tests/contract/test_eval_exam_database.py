@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MIGRATION = REPO_ROOT / "supabase" / "migrations" / "20260910160000_eval_exam_runs_v1.sql"
+MIGRATION = (
+    REPO_ROOT / "supabase" / "migrations" / "20260910160000_eval_exam_runs_v1.sql"
+)
 
 
 def _sql() -> str:
@@ -51,8 +53,13 @@ def test_exam_reports_holdout_stays_closed() -> None:
     """Successful reports CHECK holdout_opened false."""
 
     sql = _sql()
-    assert "CONSTRAINT eval_exam_reports_holdout_chk CHECK (holdout_opened IS FALSE)" in sql
-    assert "CONSTRAINT eval_exam_runs_holdout_chk CHECK (holdout_opened IS FALSE)" in sql
+    assert (
+        "CONSTRAINT eval_exam_reports_holdout_chk CHECK (holdout_opened IS FALSE)"
+        in sql
+    )
+    assert (
+        "CONSTRAINT eval_exam_runs_holdout_chk CHECK (holdout_opened IS FALSE)" in sql
+    )
     assert "metric_version = 'production_corpus_all_required_gold_at_10_v1'" in sql
     assert "cache_mode = 'cold_bypass'" in sql
 

@@ -32,6 +32,8 @@ from smart_rag_core.evaluation.private_pdf.agent_scores import (
     UNSCORED,
     PrivatePdfAgentScore,
     aggregate_agent_gates,
+    pdf_locator_ok,
+    resolved_citation_ids,
 )
 from smart_rag_core.evaluation.private_pdf.metrics import PrivatePdfRetrieveScore
 from smart_rag_core.evaluation.schema import ExpectedProfile
@@ -566,10 +568,17 @@ def score_agent_rows(
     for row, result, answer, judge in zip(
         labeled, results, answers, judge_pairs, strict=True
     ):
-        cited: list[UUID] = []
+        cited_leaf: list[UUID] = []
+        cited_pages: list[int | None] = []
+        evidence_by_id = {unit.chunk_id: unit for unit in result.evidence}
         for citation in answer.citations:
-            if citation.chunk_id:
-                cited.append(UUID(str(citation.chunk_id)))
+            if not citation.chunk_id:
+                continue
+            leaf_id = UUID(str(citation.chunk_id))
+            cited_leaf.append(leaf_id)
+            unit = evidence_by_id.get(leaf_id)
+            cited_pages.append(None if unit is None else unit.locator.page_number)
+        cited = list(resolved_citation_ids(cited_leaf, result.ranked_ids))
         gold_ids = row.meta.chunk_ids
         fact_ids: tuple[tuple[UUID, ...], ...]
         if row.atomic_facts:
@@ -578,16 +587,17 @@ def score_agent_rows(
             fact_ids = (gold_ids,)
         else:
             fact_ids = ()
-        pages = tuple(
-            int(unit.locator.page_number)
-            for unit in result.evidence
-            if unit.locator.page_number is not None
-        )
-        locator_ok = bool(row.meta.chunk_ids) and all(
-            item in set(result.ranked_ids[:12]) for item in row.meta.chunk_ids
-        )
-        if row.meta.page_numbers and pages:
-            locator_ok = locator_ok and bool(set(row.meta.page_numbers) & set(pages))
+        paragraph_supported: tuple[bool, ...] | None = None
+        if answer.paragraphs:
+            paragraph_supported = tuple(
+                any(
+                    citation.paragraph_index == paragraph.paragraph_index
+                    and citation.chunk_id is not None
+                    for citation in answer.citations
+                )
+                for paragraph in answer.paragraphs
+            )
+        locator_ok = pdf_locator_ok(cited_pages, row.meta.page_numbers)
         expected_profile = row.meta.expected_profile_id
         route_ok = result.retrieval_profile_id == expected_profile
         if row.meta.query_class != EXACT_DEFAULT:
@@ -598,6 +608,8 @@ def score_agent_rows(
         refused = answer.status == "refused" or (
             result.coverage.decision is CoverageDecision.REFUSE
         )
+        if row.meta.expected_refusal and refused:
+            locator_ok = True
         scores.append(
             score_agent_case(
                 case_id=row.meta.case_id,
@@ -605,12 +617,13 @@ def score_agent_rows(
                 allowed_ids=row.meta.chunk_ids,
                 fact_chunk_ids=fact_ids,
                 forbidden_ids=(),
-                locator_ok=locator_ok or (row.meta.expected_refusal and refused),
+                locator_ok=locator_ok,
                 route_ok=route_ok,
                 expected_refusal=row.meta.expected_refusal,
                 refused=refused,
                 judge_status=judge[0],
                 judge_faithfulness=judge[1],
+                paragraph_supported=paragraph_supported,
             )
         )
     report = aggregate_agent_gates(tuple(scores))

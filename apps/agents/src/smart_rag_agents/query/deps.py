@@ -39,10 +39,14 @@ class QueryGraphDeps:
         query_profile_prompt_text: Pinned ``query_profile_v1`` body when a
             live or mock profile adapter runs.
         profile_model_id: Provider model id recorded on profile usage.
-        answer_prompt_text: Pinned ``answer_v1`` body when a live adapter runs.
+        answer_prompt_text: Pinned ``answer_v2`` body when a live adapter runs.
         general_chat_prompt_text: Pinned ``general_chat_v1`` body when a live
             general-chat adapter runs.
         verifier_prompt_text: Pinned ``verifier_v1`` body when a live adapter runs.
+        web_critique_prompt_text: Pinned ``web_critique_v1`` body. Critique
+            itself is deterministic; the file pins the live-model contract.
+        web_answer_prompt_text: Pinned ``web_answer_v1`` body. Synthesis uses
+            persisted excerpts; the file pins the live-model contract.
         model_gateway: Optional ``ModelGateway``. Compile constructs none.
         optional_policy: Frozen mapping-versus-discovery policy.
         force_discovery: Test hook for the one catalog round.
@@ -52,6 +56,11 @@ class QueryGraphDeps:
         unbound_model: Original model after bind, for unbind proofs.
         store_get: Optional LangGraph store reader for compact summaries.
         store_put: Optional LangGraph store writer for compact summaries.
+        web_search_enabled: ``WEB_SEARCH_ENABLED`` snapshot for fail-closed
+            Web routing. Default false.
+        web_search_configured: True when a non-empty Exa key is present.
+        exa_search_gateway: Injected Exa REST client, or None.
+        crawl_proxy_gateway: Injected crawl-proxy client, or None.
     """
 
     connection: psycopg.Connection | None = None
@@ -66,6 +75,8 @@ class QueryGraphDeps:
     answer_prompt_text: str | None = None
     general_chat_prompt_text: str | None = None
     verifier_prompt_text: str | None = None
+    web_critique_prompt_text: str | None = None
+    web_answer_prompt_text: str | None = None
     model_gateway: object | None = None
     optional_policy: SelectionPolicy = RUNTIME_SELECTION_POLICY
     force_discovery: bool = False
@@ -79,6 +90,10 @@ class QueryGraphDeps:
     store_put: Callable[[tuple[str, str, str], str, dict[str, object]], None] | None = (
         None
     )
+    web_search_enabled: bool = False
+    web_search_configured: bool = False
+    exa_search_gateway: object | None = None
+    crawl_proxy_gateway: object | None = None
 
 
 @dataclass(slots=True)

@@ -2,7 +2,7 @@
 title: Query run admission
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-15
 audience: engineering, security
 phase_packet: Phase 6 Packet 1
 ---
@@ -94,7 +94,12 @@ failure returns limiter unavailable and inserts no reservation. FastAPI does
 not throttle hosted Supabase Auth.
 
 `POST /conversations/{id}/messages` admits Auto chat as
-`Phase6RouteFamily.COMPOSITE` after the `X-Client-Version` handshake.
+`Phase6RouteFamily.COMPOSITE` after the `X-Client-Version` handshake unless
+`search_scope=web` and Web is enabled, which reserves
+`Phase6RouteFamily.WEB_RESEARCH` (50s / 5 calls / 5 tools, 2.00 USD).
+Forced Web when `WEB_SEARCH_ENABLED` is false returns 503
+`web_search_disabled`. Enabled without an Exa key returns 503
+`web_search_unconfigured`. Neither case inserts a reservation.
 JSON Accept returns `{run_id, stream_path, requested_search_scope}` where
 `stream_path` is `/runs/{run_id}/events`. `Accept: text/event-stream`
 streams immediately. See [SSE.md](../api/SSE.md). Public `GET /health/ready`
@@ -103,13 +108,14 @@ also clears `query_ready` until Valkey recovers; readiness probes and a later
 successful limits `INCR` clear that latch. Named ParadeDB/Valkey/LightRAG
 probes stay on authenticated `GET /ops/ready`.
 
-The request body may include `search_scope` (`auto` default). Responses and
+The request body may include `search_scope` (`auto` default; also
+`company_documents`, `general_knowledge`, `web`). Responses and
 durable run rows echo `requested_search_scope`. Scope is hashed into the
 idempotency payload unless it is `auto`, so an old Auto retry keeps the
 legacy hash. Same key plus a different scope is `key_collision`. Reconnect
 and `GET /runs/{run_id}` reload the stored value and never mutate it.
-`app.admit_query_run_v2`, `app.load_query_run_runtime_v2`, and
-`app.get_query_run_v2` wrap the previous RPCs. Old signatures stay callable.
+`app.admit_query_run_v3`, `app.load_query_run_runtime_v3`, and
+`app.get_query_run_v3` wrap the previous RPCs. v2 signatures stay callable.
 
 See [FASTAPI_SECURITY.md](../api/FASTAPI_SECURITY.md).
 

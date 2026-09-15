@@ -89,6 +89,38 @@ def _assert_subquestions(items: tuple[str, ...]) -> tuple[str, ...]:
     return items
 
 
+def rule_web_research(ctx: MatrixContext) -> MatrixDecision | None:
+    """Select a Web-only branch when the Phase 6 extension is set.
+
+    A Web plan cannot contain Hybrid, Combined, StructuredTable, graph,
+    correction, fusion, or optional-tool branches.
+
+    Args:
+        ctx: Shared matrix context.
+
+    Returns:
+        Web-research decision, or None when this rule does not apply.
+    """
+
+    if ctx.prep.phase6_extension is not Phase6Extension.WEB_RESEARCH:
+        return None
+    ctx.flags["company_claim_forbidden"] = True
+    ctx.flags["relationship_signal_retained"] = False
+    return MatrixDecision(
+        Phase6RouteFamily.WEB_RESEARCH,
+        ("web_research",),
+        (
+            BranchSpec(
+                branch_id="web-0",
+                kind=BranchKind.WEB_RESEARCH,
+                family=Phase6RouteFamily.WEB_RESEARCH,
+                query_text=ctx.prep.original,
+                parallel_group=0,
+            ),
+        ),
+    )
+
+
 def rule_no_retrieval(ctx: MatrixContext) -> MatrixDecision | None:
     """Select NoRetrieval when the Phase 6 extension is set.
 
@@ -502,6 +534,7 @@ def rule_ordinary_hybrid(ctx: MatrixContext) -> MatrixDecision:
 
 
 MATRIX_RULES: tuple[tuple[str, MatrixRuleFn], ...] = (
+    ("web_research", rule_web_research),
     ("no_retrieval", rule_no_retrieval),
     ("graph_inspection", rule_graph_inspection),
     ("unsupported_media", rule_unsupported_media),

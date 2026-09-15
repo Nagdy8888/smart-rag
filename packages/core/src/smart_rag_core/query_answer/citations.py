@@ -14,6 +14,7 @@ from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.web_research.models import WebSourceRecord
 
 LOGGER = logging.getLogger(__name__)
 
@@ -47,9 +48,9 @@ def ensure_fusion_source_citations(
 ) -> AnswerPayload:
     """Attach fusion/table citations when the model omitted structured sources.
 
-    Live answer models often return prose without ``citations`` even though
-    canonical passages were supplied in the prompt. The Sources tab and
-    ``citation_preview`` SSE event rely on explicit citation rows.
+    This helper is not used on the live company verify path. Live answers
+    without valid paragraph mappings must refuse instead of citing every
+    retrieved fusion passage.
 
     Args:
         answer: Verified or checked answer payload.
@@ -181,6 +182,9 @@ def persist_answer_citations(
 ) -> tuple[UUID, ...]:
     """Insert citation rows with fusion provenance. Expand-only on jsonb.
 
+    Passage citations resolve one page-bounded leaf through
+    ``insert_run_citation_v2``. Table citations keep the v1 path.
+
     Args:
         connection: Open ``app_api`` connection.
         caller: Server-derived caller. Used only to set the role.
@@ -191,14 +195,70 @@ def persist_answer_citations(
     Returns:
         Inserted citation UUIDs.
 
+    Raises:
+        QueryAdmissionError: Span, leaf, ACL, replay, or cap failure.
+
     Side Effects:
         Inserts into ``app.citations``. Does not create tables or columns.
+        Writes are ordered by paragraph index, then original model order.
     """
 
     ids: list[UUID] = []
     index = 0
+    ordered_passages = sorted(
+        enumerate(answer.citations),
+        key=lambda item: (
+            10_000 if item[1].paragraph_index is None else item[1].paragraph_index,
+            item[0],
+        ),
+    )
     with connection.cursor() as cursor:
-        for citation in (*answer.citations, *answer.table_citations):
+        for _, citation in ordered_passages:
+            if index >= 12:
+                raise QueryAdmissionError("answer_bounds_exceeded")
+            span = (citation.span or "").strip()
+            if not citation.chunk_id:
+                raise QueryAdmissionError("chunk_required")
+            if not span:
+                raise QueryAdmissionError("citation_span_required")
+            provenance = citation_provenance_payload(
+                fusion=fusion,
+                answer=answer,
+                chunk_id=citation.chunk_id,
+                table_id=citation.table_id,
+                atomic_link_id=citation.atomic_link_id,
+                inference=citation.inference,
+                source_ranges=citation.source_ranges,
+            )
+            try:
+                cursor.execute(
+                    """
+                    SELECT citation_id
+                    FROM app.insert_run_citation_v2(
+                      %s, %s, %s, %s, %s, %s::uuid, %s, %s, %s::jsonb
+                    )
+                    """,
+                    (
+                        caller.user_id,
+                        caller.rpc_role(),
+                        caller.rpc_authorization_version(),
+                        str(run_id),
+                        index,
+                        citation.chunk_id,
+                        span[:1000],
+                        citation.paragraph_index,
+                        _json(provenance),
+                    ),
+                )
+            except psycopg.Error as exc:
+                _raise_citation_error(exc)
+            row = cursor.fetchone()
+            if row is not None:
+                ids.append(UUID(str(row[0])))
+            index += 1
+        for citation in answer.table_citations:
+            if index >= 12:
+                raise QueryAdmissionError("answer_bounds_exceeded")
             provenance = citation_provenance_payload(
                 fusion=fusion,
                 answer=answer,
@@ -255,8 +315,12 @@ def maybe_persist_verified_citations(
         answer: Verified answer payload.
 
     Returns:
-        Inserted citation UUIDs, or an empty tuple when skipped or already
-        persisted.
+        Inserted citation UUIDs, or an empty tuple when skipped because the
+        graph is unbound, the answer has no citations, or rows already exist.
+
+    Raises:
+        QueryAdmissionError: Bound existence-check or persist failure. Callers
+            must not treat this as a verified uncited success.
 
     Side Effects:
         Inserts into ``app.citations`` at most once per ``run_id``. Does not
@@ -268,18 +332,26 @@ def maybe_persist_verified_citations(
     if not answer.citations and not answer.table_citations:
         return ()
     try:
-        if list_run_citations(connection, caller=caller, run_id=run_id):
-            return ()
+        existing = list_run_citations(connection, caller=caller, run_id=run_id)
     except QueryAdmissionError:
-        return ()
-    except psycopg.Error:
         LOGGER.info(
-            "citation persist skipped",
+            "citation persist existence check failed",
             extra={
                 "event": "query.verify.citation_existence_check_failed",
                 "run_id": str(run_id),
             },
         )
+        raise
+    except psycopg.Error as exc:
+        LOGGER.info(
+            "citation persist existence check failed",
+            extra={
+                "event": "query.verify.citation_existence_check_failed",
+                "run_id": str(run_id),
+            },
+        )
+        raise QueryAdmissionError("database_rejected") from exc
+    if existing:
         return ()
     try:
         return persist_answer_citations(
@@ -291,13 +363,59 @@ def maybe_persist_verified_citations(
         )
     except (psycopg.Error, QueryAdmissionError):
         LOGGER.info(
-            "citation persist skipped",
+            "citation persist failed",
             extra={
                 "event": "query.verify.citation_persist_failed",
                 "run_id": str(run_id),
             },
         )
-        return ()
+        raise
+
+
+def persist_web_answer_citations(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+    sources: tuple[WebSourceRecord, ...],
+    answer: AnswerPayload,
+) -> tuple[UUID, ...]:
+    """Insert verified Web citations. Company ``app.citations`` stay empty.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived owner.
+        run_id: Query run.
+        sources: Persisted Web sources for this run.
+        answer: Verified answer with ``web_citations``.
+
+    Returns:
+        Inserted Web citation UUIDs.
+
+    Raises:
+        ValueError: If a span is not contained in the matching excerpt.
+        QueryAdmissionError: Cap or ownership failure.
+    """
+
+    from smart_rag_core.web_research.store import insert_web_citation
+
+    by_id = {item.web_source_id: item for item in sources}
+    ids: list[UUID] = []
+    for index, citation in enumerate(answer.web_citations):
+        source = by_id.get(citation.web_source_id)
+        if source is None:
+            raise ValueError("web_evidence:not_found")
+        ids.append(
+            insert_web_citation(
+                connection,
+                caller=caller,
+                run_id=run_id,
+                citation_index=index,
+                source=source,
+                citation=citation,
+            )
+        )
+    return tuple(ids)
 
 
 def _json(payload: dict[str, object]) -> str:

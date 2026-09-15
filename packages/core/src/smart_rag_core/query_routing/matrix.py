@@ -64,7 +64,8 @@ def compile_retrieval_plan(
 
     Raises:
         QueryRoutingError: Production manual override, fourth subquestion,
-            unproved complement, graph-only answer, or NoRetrieval claim.
+            unproved complement, graph-only answer, NoRetrieval claim, or
+            ``web_envelope_cannot_fit``.
     """
 
     reject_production_manual_override(

@@ -3471,6 +3471,48 @@ export type Database = {
           },
         ]
       }
+      web_citations: {
+        Row: {
+          citation_index: number
+          created_at: string
+          id: string
+          run_id: string
+          span: string
+          web_source_id: string
+        }
+        Insert: {
+          citation_index: number
+          created_at?: string
+          id?: string
+          run_id: string
+          span: string
+          web_source_id: string
+        }
+        Update: {
+          citation_index?: number
+          created_at?: string
+          id?: string
+          run_id?: string
+          span?: string
+          web_source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_citations_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_citations_web_source_id_fkey"
+            columns: ["web_source_id"]
+            isOneToOne: false
+            referencedRelation: "web_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       web_crawl_runs: {
         Row: {
           completed_at: string | null
@@ -3536,6 +3578,56 @@ export type Database = {
             columns: ["version_id"]
             isOneToOne: false
             referencedRelation: "document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      web_research_operations: {
+        Row: {
+          attempts: number
+          created_at: string
+          failure_reason: string | null
+          id: string
+          kind: string
+          operation_key: string
+          provider_request_id: string | null
+          request_hash: string
+          run_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          kind: string
+          operation_key: string
+          provider_request_id?: string | null
+          request_hash: string
+          run_id: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          kind?: string
+          operation_key?: string
+          provider_request_id?: string | null
+          request_hash?: string
+          run_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_research_operations_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
             referencedColumns: ["id"]
           },
         ]
@@ -3612,6 +3704,50 @@ export type Database = {
           },
         ]
       }
+      web_sources: {
+        Row: {
+          content_hash: string
+          created_at: string
+          excerpt: string
+          id: string
+          published_date: string | null
+          run_id: string
+          source_index: number
+          title: string
+          url: string
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string
+          excerpt: string
+          id?: string
+          published_date?: string | null
+          run_id: string
+          source_index: number
+          title?: string
+          url: string
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string
+          excerpt?: string
+          id?: string
+          published_date?: string | null
+          run_id?: string
+          source_index?: number
+          title?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_sources_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       company_health: {
@@ -3675,6 +3811,21 @@ export type Database = {
         Returns: undefined
       }
       _validate_job_owner: { Args: { p_owner: string }; Returns: undefined }
+      _web_require_run_owner: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: Database["app"]["Tables"]["runs"]["Row"]
+        SetofOptions: {
+          from: "*"
+          to: "runs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       accept_invitation: {
         Args: { p_token_hash: string; p_user_email: string; p_user_id: string }
         Returns: string
@@ -3738,6 +3889,44 @@ export type Database = {
         }[]
       }
       admit_query_run_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_conversation_id: string
+          p_idempotency_key: string
+          p_payload_hash: string
+          p_requested_search_scope: string
+          p_route_family: string
+          p_session_id?: string
+          p_token_issued_at?: string
+        }
+        Returns: {
+          correction_ceiling: number
+          deadline_at: string
+          discovery_ceiling: number
+          heartbeat_at: string
+          manifest_ceiling: number
+          model_call_ceiling: number
+          optimistic_version: number
+          reconnect: boolean
+          recursion_limit: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          request_payload_hash: string
+          requested_search_scope: string
+          reservation_id: string
+          reserved_amount_usd: number
+          route_family: string
+          run_id: string
+          side_effect_ceiling: number
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number
+          tool_ceiling: number
+        }[]
+      }
+      admit_query_run_v3: {
         Args: {
           caller_authorization_version: number
           caller_role: string
@@ -3906,6 +4095,22 @@ export type Database = {
           p_version_id: string
         }
         Returns: string
+      }
+      begin_web_research_operation: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_kind: string
+          p_operation_key: string
+          p_request_hash: string
+          p_run_id: string
+        }
+        Returns: {
+          operation_id: string
+          replayed: boolean
+          status: string
+        }[]
       }
       bootstrap_owner: { Args: { p_user_id: string }; Returns: boolean }
       caller_can_read_document: {
@@ -4109,6 +4314,21 @@ export type Database = {
           p_version_id: string
         }
         Returns: boolean
+      }
+      complete_web_research_operation: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_failure_reason: string
+          p_ok: boolean
+          p_operation_id: string
+          p_provider_request_id: string
+        }
+        Returns: {
+          operation_id: string
+          status: string
+        }[]
       }
       consume_query_reservation: {
         Args: {
@@ -4531,6 +4751,23 @@ export type Database = {
           status: Database["app"]["Enums"]["run_status"]
         }[]
       }
+      get_query_run_v3: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          creator_user_id: string
+          id: string
+          requested_search_scope: string
+          reservation_id: string
+          status: Database["app"]["Enums"]["run_status"]
+        }[]
+      }
       get_version_ingestion_status: {
         Args: {
           caller_authorization_version: number
@@ -4647,6 +4884,37 @@ export type Database = {
         }
         Returns: {
           citation_id: string
+        }[]
+      }
+      insert_web_citation: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_citation_index: number
+          p_run_id: string
+          p_span: string
+          p_web_source_id: string
+        }
+        Returns: {
+          web_citation_id: string
+        }[]
+      }
+      insert_web_source: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_content_hash: string
+          p_excerpt: string
+          p_published_date: string
+          p_run_id: string
+          p_source_index: number
+          p_title: string
+          p_url: string
+        }
+        Returns: {
+          web_source_id: string
         }[]
       }
       inspect_graph_neighborhood: {
@@ -4787,6 +5055,23 @@ export type Database = {
           citation_index: number
           provenance: Json
           source_unavailable: boolean
+        }[]
+      }
+      list_run_citations_v3: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          chunk_id: string
+          citation_id: string
+          citation_index: number
+          provenance: Json
+          source_kind: string
+          source_unavailable: boolean
+          web_source_id: string
         }[]
       }
       list_run_events_after: {
@@ -4997,6 +5282,39 @@ export type Database = {
           user_message: string
         }[]
       }
+      load_query_run_runtime_v3: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          conversation_id: string
+          correction_ceiling: number
+          deadline_at: string
+          discovery_ceiling: number
+          heartbeat_at: string
+          manifest_ceiling: number
+          model_call_ceiling: number
+          optimistic_version: number
+          recursion_limit: number
+          remaining_completion_tokens: number
+          remaining_prompt_tokens: number
+          remaining_usd: number
+          request_payload_hash: string
+          requested_search_scope: string
+          reservation_id: string
+          reserved_amount_usd: number
+          route_family: string
+          run_id: string
+          side_effect_ceiling: number
+          status: Database["app"]["Enums"]["run_status"]
+          subquestion_ceiling: number
+          tool_ceiling: number
+          user_message: string
+        }[]
+      }
       load_query_run_user_message: {
         Args: {
           caller_authorization_version: number
@@ -5015,6 +5333,19 @@ export type Database = {
       mark_quarantine_cleanup_done: {
         Args: { p_reservation_id: string }
         Returns: undefined
+      }
+      mark_web_research_operation_sent: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_operation_id: string
+        }
+        Returns: {
+          attempts: number
+          operation_id: string
+          status: string
+        }[]
       }
       occupy_graph_writer_lease: {
         Args: { p_lease_seconds: number; p_owner: string; p_token: string }

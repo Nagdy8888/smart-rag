@@ -2,6 +2,9 @@
 
 from smart_rag_core.evaluation.private_pdf.agent_scores import (
     aggregate_agent_gates,
+    paragraph_completeness,
+    pdf_locator_ok,
+    resolved_citation_ids,
     score_agent_case,
 )
 from smart_rag_core.evaluation.private_pdf.draft import (
@@ -179,12 +182,15 @@ __all__ = [
     "near_duplicate_pairs",
     "normalize_question",
     "open_splits_are_sealed",
+    "paragraph_completeness",
+    "pdf_locator_ok",
     "question_hash",
     "quiz_error_code",
     "read_private_pdf_labeled",
     "read_private_pdf_payload",
     "required_term_for_locator",
     "resolve_workspace_path",
+    "resolved_citation_ids",
     "retrieve_gates_pass",
     "score_agent_case",
     "score_retrieve_case",

@@ -23,7 +23,6 @@ export type ChatBannersProps = {
   reconnectExhausted: boolean;
   nextRetryMs: number | null;
   feedbackStatus: string | null;
-  quizStatus?: string | null;
   deleteSuccess: boolean;
 };
 
@@ -41,7 +40,6 @@ export function ChatBanners({
   reconnectExhausted,
   nextRetryMs,
   feedbackStatus,
-  quizStatus = null,
   deleteSuccess,
 }: ChatBannersProps) {
   const showChatFailureBanner = shouldShowChatFailureBanner(chat);
@@ -83,11 +81,6 @@ export function ChatBanners({
       {feedbackStatus ? (
         <StatusBanner kind="info" role="status">
           {feedbackStatus}
-        </StatusBanner>
-      ) : null}
-      {quizStatus ? (
-        <StatusBanner kind="info" role="status">
-          {quizStatus}
         </StatusBanner>
       ) : null}
       <LiveRegion politeness="assertive" aria-label="Blocking errors" visuallyHidden>

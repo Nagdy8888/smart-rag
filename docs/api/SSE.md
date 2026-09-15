@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-15
 audience: engineering, frontend
 ---
 
@@ -56,7 +56,8 @@ resume with 404. Reconnect never starts a second paid graph.
   admits (after handshake) then streams. JSON Accept keeps HTTP 202
   `{run_id, stream_path, requested_search_scope}` where
   `stream_path=/runs/{run_id}/events`. Optional POST body `search_scope` is
-  `auto` when omitted. Resume is GET-only and never sends `search_scope`.
+  `auto` when omitted (`company_documents`, `general_knowledge`, and `web`
+  are also valid). Resume is GET-only and never sends `search_scope`.
 - Duplicate idempotency keys return the existing run stream. A different
   `search_scope` on the same key is a key collision.
 - `GET /runs/{run_id}/events?after={sequence}` also honors `Last-Event-ID`.
@@ -73,7 +74,7 @@ tracebacks, secrets, source HTML, or passages.
 | Type | Role |
 | --- | --- |
 | `schema` | First event on a new stream. Carries `sse_schema_version`. |
-| `status` | Stage/status. Optional additive `phase` (`started`/`completed`/`failed`) for live progress; omitted on legacy rows. |
+| `status` | Stage/status. Optional additive `phase` (`started`/`completed`/`failed`) for live progress; omitted on legacy rows. Web research emits `web_search` (Searching…) and `web_read` (Reading…) before the existing `verify_answer` (Verifying…). Payloads are keys only: never query text, URL bodies, or excerpts. |
 | `tool_progress` | Optional-tool progress. `tool_key` and `phase` only. No args, results, or display text. |
 | `heartbeat` | Every 15 seconds, persisted, while the run is non-terminal. |
 | `route_correction` | Single-correction diagnostic. |
@@ -83,8 +84,8 @@ tracebacks, secrets, source HTML, or passages.
 | `cache` | Cache diagnostic. |
 | `coverage` | Coverage score without passage text. |
 | `optional_tool_disclosure` | Selected optional tool keys. |
-| `citation_preview` | Citation IDs and ranks. No passage text. |
-| `answer_origin` | Additive origin (`origin` only). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
+| `citation_preview` | Citation IDs and ranks. Company rows use chunk/table IDs. Web rows use `web_source_id` values. No passage, excerpt, or span text. HTTP `GET /runs/{id}/citations` may include an ACL-rechecked `evidence_excerpt`; SSE never copies it. |
+| `answer_origin` | Additive origin (`origin` only: `general_knowledge`, `company_documents`, `user_supplied_text`, `ambiguous`, `web`). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
 | `token_delta` | Generated token delta. Never retrieved source. |
 | `usage` | Accumulated provider prompt and completion tokens for this query run (profile, search, answer, verifier). Optional billed `cost_usd` when `app.llm_usage` is available. Emitted after verify, before the terminal. Counts are 0 when no model ran. Conversation-title generation is not in this event; Ask Run Details adds it under **This chat**. No prompts. |
 | `completed` | Success terminal. |
@@ -144,8 +145,9 @@ sequenceDiagram
 ## Sanitization and reconnect
 
 - Exception messages are discarded. Retrieved source text is never stored
-  or streamed. Payload keys `passage`, `snippet`, `html`, and traceback-like
-  names are stripped or rejected in `app.append_run_event`.
+  or streamed. Payload keys `passage`, `snippet`, `html`, `excerpt`,
+  `excerpts`, `web_sources`, `body`, `text`, and traceback-like names are
+  stripped or rejected in the SSE mapper and `app.append_run_event`.
 - Disconnect without cancel keeps already-paid usage. Reconnect resumes
   from `after` and does not invoke LangGraph again when status is already
   running/completed/cancelled/partial or this process has no live executor.

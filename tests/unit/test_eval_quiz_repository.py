@@ -26,7 +26,9 @@ def test_quiz_error_code_does_not_return_sql_text() -> None:
 def test_canonical_payload_hash_is_stable() -> None:
     """Idempotency hashes are 64 hex characters."""
 
-    digest = canonical_payload_hash({"split": "development", "query_class": "factual_definition"})
+    digest = canonical_payload_hash(
+        {"split": "development", "query_class": "factual_definition"}
+    )
     assert len(digest) == 64
     assert digest == canonical_payload_hash(
         {"query_class": "factual_definition", "split": "development"}

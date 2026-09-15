@@ -11,8 +11,12 @@ import {
   shouldShowCitations,
 } from "../../lib/answer-origin";
 import {
+  LEGACY_RUN_SOURCES_LABEL,
   citationChipName,
   citationSourceLabel,
+  citationsForParagraph,
+  splitVerifiedParagraphs,
+  unmappedCitations,
 } from "../../lib/citation-label";
 import type { RunProgressItem } from "../../lib/run-progress";
 import type { ChatViewState } from "../../lib/chat-view";
@@ -163,25 +167,29 @@ export function transcriptTextMatches(
  */
 function CitationRow({
   citations,
-  answerOrigin,
   hrefForCitation,
   onSelectCitation,
+  testId,
+  className,
 }: {
   citations: CitationResponse[];
-  answerOrigin: string | null;
   hrefForCitation: (citation: CitationResponse) => string | undefined;
   onSelectCitation: (
     citation: CitationResponse,
     trigger: HTMLButtonElement,
   ) => void;
+  testId?: string;
+  className?: string;
 }) {
-  const visible = shouldShowCitations(answerOrigin) ? citations : [];
-  if (visible.length === 0) {
+  if (citations.length === 0) {
     return null;
   }
   return (
-    <ul className={styles.citationRow} data-testid="answer-citations">
-      {visible.map((citation) => (
+    <ul
+      className={className ? `${styles.citationRow} ${className}` : styles.citationRow}
+      data-testid={testId}
+    >
+      {citations.map((citation) => (
         <li key={citation.citation_id}>
           <CitationChip
             index={citation.citation_index}
@@ -196,6 +204,135 @@ function CitationRow({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Render chips that belong to one verified paragraph.
+ *
+ * @param props - Mapped citations and chip handlers.
+ * @returns Citation list, or null.
+ */
+export function ParagraphCitations({
+  citations,
+  hrefForCitation,
+  onSelectCitation,
+}: {
+  citations: CitationResponse[];
+  hrefForCitation: (citation: CitationResponse) => string | undefined;
+  onSelectCitation: (
+    citation: CitationResponse,
+    trigger: HTMLButtonElement,
+  ) => void;
+}) {
+  return (
+    <CitationRow
+      citations={citations}
+      hrefForCitation={hrefForCitation}
+      onSelectCitation={onSelectCitation}
+      testId="paragraph-citations"
+    />
+  );
+}
+
+/**
+ * Return the visible slice of one paragraph during paced reveal.
+ *
+ * @param paragraphs - Full `\n\n`-split answer.
+ * @param paragraphIndex - 0-based paragraph.
+ * @param visibleText - Currently presented prefix of the full answer.
+ * @returns Visible text and whether the paragraph is complete.
+ */
+export function visibleParagraphSlice(
+  paragraphs: readonly string[],
+  paragraphIndex: number,
+  visibleText: string,
+): { text: string; complete: boolean } {
+  const start = paragraphs.slice(0, paragraphIndex).join("\n\n");
+  const startLen = start.length === 0 ? 0 : start.length + 2;
+  if (visibleText.length <= startLen) {
+    return { text: "", complete: false };
+  }
+  const paragraph = paragraphs[paragraphIndex] ?? "";
+  const available = visibleText.slice(startLen);
+  if (available.length >= paragraph.length) {
+    return { text: paragraph, complete: true };
+  }
+  return { text: available, complete: false };
+}
+
+/**
+ * Render verified paragraphs with inline chips and a legacy footer.
+ *
+ * @param props - Full answer, visible prefix, citations, and chip handlers.
+ * @returns Paragraph blocks. Chips wait until their paragraph is fully visible.
+ */
+function AnswerParagraphs({
+  answerText,
+  visibleText,
+  citations,
+  answerOrigin,
+  hrefForCitation,
+  onSelectCitation,
+}: {
+  answerText: string;
+  visibleText: string;
+  citations: readonly CitationResponse[];
+  answerOrigin: string | null;
+  hrefForCitation: (citation: CitationResponse) => string | undefined;
+  onSelectCitation: (
+    citation: CitationResponse,
+    trigger: HTMLButtonElement,
+  ) => void;
+}) {
+  const paragraphs = splitVerifiedParagraphs(answerText);
+  const showChips = shouldShowCitations(answerOrigin);
+  const visibleCitations = showChips ? [...citations] : [];
+  const leftover = unmappedCitations(visibleCitations, paragraphs.length);
+
+  return (
+    <div
+      data-testid={
+        showChips && visibleCitations.length > 0 ? "answer-citations" : undefined
+      }
+    >
+      {paragraphs.map((_, index) => {
+        const slice = visibleParagraphSlice(paragraphs, index, visibleText);
+        if (slice.text === "") {
+          return null;
+        }
+        const mapped = slice.complete
+          ? citationsForParagraph(visibleCitations, index)
+          : [];
+        return (
+          <div
+            className={styles.paragraphBlock}
+            data-paragraph-index={String(index)}
+            key={`p-${String(index)}`}
+          >
+            <p className={styles.answerProse} dir="auto">
+              <UserText value={slice.text} />
+            </p>
+            <ParagraphCitations
+              citations={mapped}
+              hrefForCitation={hrefForCitation}
+              onSelectCitation={onSelectCitation}
+            />
+          </div>
+        );
+      })}
+      {showChips && leftover.length > 0 && visibleText === answerText ? (
+        <div className={styles.legacySources}>
+          <p className={styles.legacySourcesLabel}>{LEGACY_RUN_SOURCES_LABEL}</p>
+          <CitationRow
+            citations={leftover}
+            hrefForCitation={hrefForCitation}
+            onSelectCitation={onSelectCitation}
+            testId="legacy-citations"
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -320,9 +457,14 @@ export const AnswerSurface = memo(function AnswerSurface({
         ) : (
           <div key={item.message_id} className={styles.assistantBlock}>
             <LiveRegion aria-label="Answer" politeness="polite">
-              <p className={styles.answerProse} dir="auto">
-                <UserText value={item.content} />
-              </p>
+              <AnswerParagraphs
+                answerText={item.content}
+                visibleText={item.content}
+                citations={item.citations ?? []}
+                answerOrigin={null}
+                hrefForCitation={hrefForCitation}
+                onSelectCitation={onSelectCitation}
+              />
             </LiveRegion>
             <p className={styles.messageMeta}>
               {formatRelativeTime(item.created_at)}
@@ -371,14 +513,19 @@ export const AnswerSurface = memo(function AnswerSurface({
               isRevealing={revealing}
               authoritativeReady={answer.trim() !== ""}
               onShowFull={onShowFullAnswer ?? (() => undefined)}
-            />
+            >
+              {shouldShowCitations(answerOrigin) ? (
+                <AnswerParagraphs
+                  answerText={answer}
+                  visibleText={visibleAnswer ?? answer}
+                  citations={citations}
+                  answerOrigin={answerOrigin}
+                  hrefForCitation={hrefForCitation}
+                  onSelectCitation={onSelectCitation}
+                />
+              ) : null}
+            </VerifiedAnswerReveal>
           ) : null}
-          <CitationRow
-            citations={citations}
-            answerOrigin={answerOrigin}
-            hrefForCitation={hrefForCitation}
-            onSelectCitation={onSelectCitation}
-          />
           {showClarification ? (
             <LimitationCallout tone="warning">{MIXED_SCOPE_CLARIFICATION}</LimitationCallout>
           ) : null}

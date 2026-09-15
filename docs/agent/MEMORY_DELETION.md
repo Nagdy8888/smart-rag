@@ -2,7 +2,7 @@
 title: Conversation memory, retention, and immediate deletion
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-27
+last-reviewed: 2026-09-14
 audience: engineering, security
 ---
 
@@ -49,7 +49,7 @@ flowchart TD
   req["DELETE /conversations/{id}"] --> auth{Creator or owner/admin?}
   auth -->|no| notFound["404 not_found"]
   auth -->|yes| tombstone["SET conversations.deleted_at"]
-  tombstone --> cascade["Delete messages, runs, events, citations, private feedback"]
+  tombstone --> cascade["Delete messages, runs, events, citations, web evidence, private feedback"]
   cascade --> ckpt["Delete langgraph.checkpoints* where thread_id = conversation_id"]
   ckpt --> store["Delete langgraph.store rows whose prefix contains conversation_id"]
   store --> audit["Content-free audit event plus LangSmith deletion request"]
@@ -58,7 +58,8 @@ flowchart TD
 
 One Postgres transaction (`app.delete_conversation`) tombstones first, then
 purges conversation-scoped rows. `app.search_conversation_lingering_ids`
-must return zero matches for messages, runs, events, citations, private
+must return zero matches for messages, runs, events, citations, web
+research operations/sources/citations, private
 feedback, checkpoints, and store namespaces. Tombstone row, content-free
 audit, and pseudonymized aggregate `llm_usage` may remain.
 

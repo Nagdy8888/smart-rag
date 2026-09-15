@@ -16,6 +16,16 @@ from smart_rag_core.gateways.embedding import (
 )
 
 if TYPE_CHECKING:
+    from smart_rag_core.gateways.exa_search import (
+        ExaContentItem,
+        ExaContentsResponse,
+        ExaProviderMetadata,
+        ExaSearchCandidate,
+        ExaSearchError,
+        ExaSearchGateway,
+        ExaSearchResponse,
+        create_exa_search_gateway,
+    )
     from smart_rag_core.gateways.model import (
         AnswerModelRequest,
         AnswerModelResponse,
@@ -36,6 +46,19 @@ if TYPE_CHECKING:
         block_openai_network,
         create_model_gateway,
     )
+
+_EXA_EXPORTS = frozenset(
+    {
+        "ExaContentItem",
+        "ExaContentsResponse",
+        "ExaProviderMetadata",
+        "ExaSearchCandidate",
+        "ExaSearchError",
+        "ExaSearchGateway",
+        "ExaSearchResponse",
+        "create_exa_search_gateway",
+    }
+)
 
 _MODEL_EXPORTS = frozenset(
     {
@@ -66,6 +89,13 @@ __all__ = [
     "EmbeddingGateway",
     "EmbeddingRequest",
     "EmbeddingResponse",
+    "ExaContentItem",
+    "ExaContentsResponse",
+    "ExaProviderMetadata",
+    "ExaSearchCandidate",
+    "ExaSearchError",
+    "ExaSearchGateway",
+    "ExaSearchResponse",
     "LightRagLlmRequest",
     "LightRagLlmResponse",
     "MockModelAdapter",
@@ -82,23 +112,28 @@ __all__ = [
     "VerifierModelResponse",
     "block_openai_network",
     "create_embedding_gateway",
+    "create_exa_search_gateway",
     "create_model_gateway",
 ]
 
 
 def __getattr__(name: str) -> Any:
-    """Load model-gateway exports on first attribute access.
+    """Load model and Exa gateway exports on first attribute access.
 
     Args:
         name: Requested public attribute.
 
     Returns:
-        The model-module attribute.
+        The lazy module attribute.
 
     Raises:
         AttributeError: When ``name`` is not a published export.
     """
 
+    if name in _EXA_EXPORTS:
+        from smart_rag_core.gateways import exa_search as exa_module
+
+        return getattr(exa_module, name)
     if name not in _MODEL_EXPORTS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     from smart_rag_core.gateways import model as model_module
@@ -107,10 +142,10 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    """List lazy model exports alongside eager embedding symbols.
+    """List lazy Exa and model exports alongside eager embedding symbols.
 
     Returns:
         Sorted public names for tab completion and ``dir()``.
     """
 
-    return sorted({*globals().keys(), *_MODEL_EXPORTS})
+    return sorted({*globals().keys(), *_MODEL_EXPORTS, *_EXA_EXPORTS})

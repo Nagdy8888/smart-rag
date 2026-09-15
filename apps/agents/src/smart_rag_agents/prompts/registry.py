@@ -76,6 +76,7 @@ PROMPT_REGISTRY: dict[str, PromptVersion] = {
     "query_profile_v1": _entry("query_profile_v1", "query_profile_v1.md"),
     "rerank_v1": _entry("rerank_v1", "rerank_v1.md"),
     "answer_v1": _entry("answer_v1", "answer_v1.md"),
+    "answer_v2": _entry("answer_v2", "answer_v2.md"),
     "general_chat_v1": _entry("general_chat_v1", "general_chat_v1.md"),
     "verifier_v1": _entry("verifier_v1", "verifier_v1.md"),
     "optional_catalog_v1": _entry("optional_catalog_v1", "optional_catalog_v1.md"),
@@ -85,6 +86,8 @@ PROMPT_REGISTRY: dict[str, PromptVersion] = {
     "conversation_title_v1": _entry(
         "conversation_title_v1", "conversation_title_v1.md"
     ),
+    "web_critique_v1": _entry("web_critique_v1", "web_critique_v1.md"),
+    "web_answer_v1": _entry("web_answer_v1", "web_answer_v1.md"),
 }
 
 

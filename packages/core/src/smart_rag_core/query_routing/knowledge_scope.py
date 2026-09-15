@@ -20,6 +20,10 @@ from smart_rag_core.query_profile.extract import (
     DeterministicExtract,
     extract_deterministic,
 )
+from smart_rag_core.query_routing.knowledge_scope_web import (
+    has_web_intent,
+    has_web_privacy_risk,
+)
 from smart_rag_core.query_routing.signals import (
     is_corpus_wide_theme,
     is_current_relationship,
@@ -32,7 +36,6 @@ from smart_rag_core.query_routing.signals import (
     is_user_text_transform,
     is_whole_document_summary,
 )
-from smart_rag_core.search_scope import RequestedSearchScope
 
 SCOPE_CONFIDENCE_THRESHOLD = 0.80
 """Minimum accepted model confidence for a non-degraded scope."""
@@ -80,6 +83,7 @@ class KnowledgeScope(StrEnum):
     USER_SUPPLIED_TEXT = "user_supplied_text"
     DETERMINISTIC = "deterministic"
     AMBIGUOUS = "ambiguous"
+    WEB = "web"
 
 
 class ScopeDegradationReason(StrEnum):
@@ -327,7 +331,12 @@ def scope_requires_model(
     social = _social_opener(query)
     memory_company = has_company_followup_memory(memory) and not social
     general = general_intent_signal(query)
+    web_intent = has_web_intent(query)
     if query_company and general:
+        return False
+    if query_company and web_intent:
+        return False
+    if web_intent and not query_company:
         return False
     if social and not query_company:
         return True
@@ -365,11 +374,11 @@ def classify_knowledge_scope(
     Returns:
         Frozen scope decision. Company signals override model output.
         Unavailable, malformed, or low-confidence profile output degrades
-        to company-claim-forbidden general knowledge. Model-emitted
-        ``ambiguous`` is not mixed unless deterministic company and
-        general signals already conflicted. A standalone greeting or
-        small-talk opener stays general even when the profile model
-        emits ``ambiguous`` or ``company_documents``.
+        to company-claim-forbidden general knowledge and never authorizes
+        Web. Model-emitted ``ambiguous`` is not mixed unless deterministic
+        company and general or Web signals already conflicted. A standalone
+        greeting or small-talk opener stays general even when the profile
+        model emits ``ambiguous``, ``company_documents``, or ``web``.
 
     Raises:
         ValueError: If a constructed decision violates degradation rules.
@@ -382,6 +391,8 @@ def classify_knowledge_scope(
     company = query_company or memory_company
     general = general_intent_signal(query)
     user_text = is_user_text_transform(query)
+    web_intent = has_web_intent(query)
+    privacy_risk = has_web_privacy_risk(query)
 
     if is_product_help(query) and not query_company:
         return KnowledgeScopeDecision(
@@ -390,12 +401,12 @@ def classify_knowledge_scope(
             company_signal=False,
             general_signal=True,
         )
-    if company and general:
+    if company and (general or web_intent):
         return KnowledgeScopeDecision(
             knowledge_scope=KnowledgeScope.AMBIGUOUS,
             confidence=1.0,
             company_signal=True,
-            general_signal=True,
+            general_signal=general,
         )
     if company:
         return KnowledgeScopeDecision(
@@ -417,6 +428,20 @@ def classify_knowledge_scope(
             confidence=1.0,
             company_signal=False,
             general_signal=True,
+        )
+    if web_intent:
+        if privacy_risk:
+            return KnowledgeScopeDecision(
+                knowledge_scope=KnowledgeScope.AMBIGUOUS,
+                confidence=1.0,
+                company_signal=False,
+                general_signal=False,
+            )
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.WEB,
+            confidence=1.0,
+            company_signal=False,
+            general_signal=False,
         )
     if not model_available:
         reason = forced_degradation or ScopeDegradationReason.PROFILE_UNAVAILABLE
@@ -467,72 +492,25 @@ def classify_knowledge_scope(
             general_signal=general,
             scope_degradation_reason=ScopeDegradationReason.PROFILE_MALFORMED,
         )
+    if parsed is KnowledgeScope.WEB:
+        if privacy_risk:
+            return KnowledgeScopeDecision(
+                knowledge_scope=KnowledgeScope.AMBIGUOUS,
+                confidence=1.0,
+                company_signal=False,
+                general_signal=False,
+            )
+        return KnowledgeScopeDecision(
+            knowledge_scope=KnowledgeScope.WEB,
+            confidence=confidence,
+            company_signal=False,
+            general_signal=False,
+        )
     return KnowledgeScopeDecision(
         knowledge_scope=parsed,
         confidence=confidence,
         company_signal=company,
         general_signal=parsed is KnowledgeScope.GENERAL_KNOWLEDGE or general,
-    )
-
-
-def apply_requested_search_scope(
-    query: str,
-    automatic: KnowledgeScopeDecision,
-    requested: RequestedSearchScope,
-) -> KnowledgeScopeDecision:
-    """Apply a client source preference to an automatic scope decision.
-
-    Greetings, small talk, product help, and user-text transforms keep their
-    current handling. Other substantive prompts honor explicit Company or
-    General. Auto returns the automatic decision unchanged. Requested
-    Company never manufactures ``company_signal=True``.
-
-    Args:
-        query: Original user text. Untrusted.
-        automatic: Decision from ``classify_knowledge_scope``.
-        requested: Client source preference fixed at admission.
-
-    Returns:
-        Effective scope decision used by preparation and the route matrix.
-    """
-
-    if requested is RequestedSearchScope.AUTO:
-        return automatic
-    extract = extract_deterministic(query)
-    query_company = company_intent_signal(query, extract)
-    if is_product_help(query) and not query_company:
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
-            confidence=1.0,
-            company_signal=False,
-            general_signal=True,
-        )
-    if _social_opener(query) and not query_company:
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
-            confidence=1.0,
-            company_signal=False,
-            general_signal=True,
-        )
-    if is_user_text_transform(query):
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.USER_SUPPLIED_TEXT,
-            confidence=1.0,
-            company_signal=automatic.company_signal,
-            general_signal=automatic.general_signal,
-        )
-    if requested is RequestedSearchScope.COMPANY_DOCUMENTS:
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.COMPANY_DOCUMENTS,
-            confidence=1.0,
-            company_signal=automatic.company_signal,
-            general_signal=automatic.general_signal,
-        )
-    return KnowledgeScopeDecision(
-        knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
-        confidence=1.0,
-        company_signal=automatic.company_signal,
-        general_signal=automatic.general_signal,
     )
 
 
@@ -552,9 +530,10 @@ def mock_profile_knowledge_scope(query: str) -> tuple[KnowledgeScope, float]:
     extract = extract_deterministic(query)
     company = company_intent_signal(query, extract)
     general = general_intent_signal(query)
+    web_intent = has_web_intent(query)
     if _social_opener(query):
         return KnowledgeScope.GENERAL_KNOWLEDGE, 0.95
-    if company and general:
+    if company and (general or web_intent):
         return KnowledgeScope.AMBIGUOUS, 1.0
     if company:
         return KnowledgeScope.COMPANY_DOCUMENTS, 1.0
@@ -562,6 +541,8 @@ def mock_profile_knowledge_scope(query: str) -> tuple[KnowledgeScope, float]:
         return KnowledgeScope.USER_SUPPLIED_TEXT, 1.0
     if has_general_fixture(query):
         return KnowledgeScope.GENERAL_KNOWLEDGE, 1.0
+    if web_intent and not has_web_privacy_risk(query):
+        return KnowledgeScope.WEB, 0.95
     return KnowledgeScope.GENERAL_KNOWLEDGE, 0.85
 
 
@@ -573,8 +554,9 @@ def no_retrieval_mode_for_scope(scope: KnowledgeScope) -> NoRetrievalAnswerMode 
 
     Returns:
         A NoRetrieval mode, or ``None`` when company documents require
-        citations and the existing retrieval matrix. Defensive
-        ``DETERMINISTIC`` model output maps to ``GENERAL_MODEL``.
+        citations and the existing retrieval matrix, or when Web uses the
+        dedicated ``web_research`` family. Defensive ``DETERMINISTIC``
+        model output maps to ``GENERAL_MODEL``.
     """
 
     mapping = {
@@ -583,5 +565,6 @@ def no_retrieval_mode_for_scope(scope: KnowledgeScope) -> NoRetrievalAnswerMode 
         KnowledgeScope.USER_SUPPLIED_TEXT: NoRetrievalAnswerMode.USER_TEXT_MODEL,
         KnowledgeScope.AMBIGUOUS: NoRetrievalAnswerMode.CLARIFICATION,
         KnowledgeScope.COMPANY_DOCUMENTS: None,
+        KnowledgeScope.WEB: None,
     }
     return mapping[scope]

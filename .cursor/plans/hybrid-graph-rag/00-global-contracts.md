@@ -22,7 +22,7 @@ Repository reality does not silently override the plan. A conflict affecting sec
 
 ## Non-negotiable implementation behavior
 
-- Supabase canonical passages and deterministic table values are the only final-answer evidence; graph output is a lead resolved back to authorized canonical sources.
+- Supabase canonical passages and deterministic table values are the only final-answer evidence for company RAG; graph output is a lead resolved back to authorized canonical sources. The advanced-web-research deviation below is the only exception: Web answers may cite creator-owned, run-scoped `app.web_sources` / `app.web_citations` persisted from bounded Exa or crawl-proxy results. Those rows are never company RAG, BM25, LightRAG, or StructuredTable evidence.
 - Core routing is deterministic. Graph-only is inspection, not an answering fallback.
 - Every read/write/retrieval path enforces role, ownership, current-version, deletion, and ACL rules at the authoritative boundary.
 - Budgets, jobs, checkpoints, idempotency keys, usage, and security state are durable; Valkey and process memory are never authoritative.
@@ -194,7 +194,7 @@ Runtime boundaries:
 - EC2 Docker Compose hosts Caddy, two health-gated FastAPI slots for same-host blue/green deployment, the ingestion worker, digest-pinned private ParadeDB/`pg_search`, separate Valkey limit/cache instances, and a restricted crawl-egress proxy. LightRAG runs as pinned Python code inside FastAPI/worker and uses managed Supabase PostgreSQL; no ParadeDB/Valkey/proxy service publishes a public host port.
 - Production egress is deny-by-default at the host/Docker boundary. API/agent traffic is allow-listed to required Supabase, OpenAI, LangSmith, and AWS endpoints through a controlled provider-egress path. Website retrieval alone uses the dedicated crawl proxy, which repeats DNS/private-IP/redirect/peer-IP policy and logs destination/decision metadata. Parser/OCR sandboxes keep zero network. If the selected single-host platform cannot enforce these boundaries, Phase 10 blocks production until an explicit client-approved egress-risk ADR and compensating monitoring are accepted.
 - FastAPI runs the query LangGraph in-process for low-latency streaming. The worker runs the checkpointed ingestion graph. [`apps/agents/langgraph.json`](../../../apps/agents/langgraph.json) keeps both graphs inspectable in LangGraph Studio and allows a later independent agent deployment without redesigning the graph code.
-- Supabase is canonical for documents, authorization, BM25 projection jobs/active-index version, conversations, citations, vector/term indexes, typed table artifacts, LangGraph checkpoints, and private LightRAG storage. ParadeDB is derived and rebuildable; it returns canonical chunk IDs/ranks only. Final answers use Supabase-revalidated canonical passages or deterministic spreadsheet values linked to exact source cells; BM25 snippets and graph prose are never standalone evidence.
+- Supabase is canonical for documents, authorization, BM25 projection jobs/active-index version, conversations, citations, vector/term indexes, typed table artifacts, LangGraph checkpoints, and private LightRAG storage. ParadeDB is derived and rebuildable; it returns canonical chunk IDs/ranks only. Final answers use Supabase-revalidated canonical passages or deterministic spreadsheet values linked to exact source cells; BM25 snippets and graph prose are never standalone evidence. Web answers, when the advanced-web-research deviation is enabled, use only run-scoped `app.web_sources` persisted from bounded Exa/crawl-proxy results and never mix those rows into company RAG.
 
 ### Where each kind of data lives
 
@@ -296,6 +296,28 @@ User approval on 2026-09-10: store quiz questions, expected answers, gold metada
 - Staging and production keep `PDF_EVAL_WORKSPACE_ENABLED` false.
 - Managed Supabase region/DPA/backup rows remain unverified; this deviation is a named residual-risk exception, not matrix verification.
 - Rollback disables `PDF_EVAL_WORKSPACE_ENABLED`. Do not down-migrate populated hosted tables.
+
+## Approved planned deviation: advanced web research mode
+
+User approval on 2026-09-10: add Ask dropdown Auto, Company documents, General, Web. Auto is the default and chooses exactly one source. Web research uses Exa REST plus the existing crawl proxy, only when `APP_ENV=local` and `WEB_SEARCH_ENABLED=true`. Staging and production reject the flag. Production Web stays disabled until a paid budget and managed egress are approved.
+
+- Recorded in `docs/adr/ADR-advanced-web-research.md`.
+- Integrity keeps packet numbers contiguous after P06-36, so overlay packets are P06-37 through P06-43. Do not reuse P06-27 through P06-36.
+- Web is a deterministic `web_scope` subgraph, not an optional catalog tool.
+- Never blend company documents and Web in one answer. Company-insufficient evidence never falls back to Web or general knowledge.
+- Never send company passages, conversation memory, internal IDs, JWTs, or signed URLs to Exa. API/agent code never `httpx` public result URLs.
+- Rollback sets `WEB_SEARCH_ENABLED=false`. Do not down-migrate populated Web tables.
+
+## Approved planned deviation: PDF paragraph citations
+
+User approval on 2026-09-15: company-PDF answers cite each factual paragraph with live authorized `app.documents.title`, the 1-based PDF viewer file page (`page_index + 1` displayed as `PDF page N`), and an ACL-checked exact supporting excerpt of at most 1000 characters. Printed `page_label` may remain in stored locators and must not drive the chat page. General, user-text, deterministic, and Web answers stay unchanged.
+
+- Recorded in `docs/adr/ADR-pdf-paragraph-citations.md`.
+- Integrity keeps packet numbers contiguous after P06-43, so overlay packets are P06-44 through P06-48. Do not reuse P06-37 through P06-43.
+- Execute after P06-41, then resume P06-42, P06-43, then P06-17.
+- Creator-owned citation GET may return the bounded excerpt only after live run-ownership and chunk ACL/current-version/deletion recheck. SSE `citation_preview` remains ID/ordinal metadata.
+- Missing, ambiguous, unsupported, or uncontained mappings fail closed. Retrieval is not citation proof. Historical rows with no paragraph index or exact span stay unmapped.
+- Rollback stops using `answer_v2` and `list_run_citations_v4` in application code. Do not down-migrate populated citation rows. Do not present `page_label` as the PDF viewer page.
 
 ## Approved planned deviation: paced verified-answer reveal and custom progress
 

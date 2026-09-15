@@ -47,7 +47,7 @@ class QueryRunRecord:
 
 @dataclass(frozen=True, slots=True)
 class RunCitationRecord:
-    """Citation identifiers without passage text.
+    """Citation identifiers plus the ACL-checked excerpt when authorized.
 
     Attributes:
         citation_id: Citation row.
@@ -55,8 +55,15 @@ class RunCitationRecord:
         chunk_id: Canonical chunk when present.
         provenance: JSON object without source HTML. Locator keys such as
             page number, heading path, and document title are included when
-            the cited chunk is still authorized.
+            the cited chunk is still authorized. Web rows include url, title,
+            and content_hash only. Excerpt is never stored here.
         source_unavailable: True when the cited source was deleted.
+        source_kind: ``company_document`` or ``web``.
+        web_source_id: Web source UUID when ``source_kind`` is ``web``.
+        paragraph_index: Owning paragraph, or ``None`` on legacy/Web rows.
+        document_title: Live authorized document title.
+        pdf_page_number: 1-based PDF viewer page from locator ``page_index``.
+        evidence_excerpt: Exact span still present in live canonical text.
     """
 
     citation_id: UUID
@@ -64,6 +71,12 @@ class RunCitationRecord:
     chunk_id: UUID | None
     provenance: dict[str, object]
     source_unavailable: bool = False
+    source_kind: str = "company_document"
+    web_source_id: UUID | None = None
+    paragraph_index: int | None = None
+    document_title: str | None = None
+    pdf_page_number: int | None = None
+    evidence_excerpt: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +121,7 @@ def get_query_run(
             cursor.execute(
                 """
                 SELECT *
-                FROM app.get_query_run_v2(%s, %s, %s, %s)
+                FROM app.get_query_run_v3(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,
@@ -161,7 +174,7 @@ def load_query_run_runtime(
             cursor.execute(
                 """
                 SELECT *
-                FROM app.load_query_run_runtime_v2(%s, %s, %s, %s)
+                FROM app.load_query_run_runtime_v3(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,
@@ -240,8 +253,10 @@ def list_run_citations(
             cursor.execute(
                 """
                 SELECT citation_id, citation_index, chunk_id, provenance,
-                       source_unavailable
-                FROM app.list_run_citations_v2(%s, %s, %s, %s)
+                       source_unavailable, source_kind, web_source_id,
+                       paragraph_index, document_title, pdf_page_number,
+                       evidence_excerpt
+                FROM app.list_run_citations_v4(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,
@@ -264,6 +279,9 @@ def list_run_citations(
         chunk = row.get("chunk_id")
         unavailable = bool(row.get("source_unavailable"))
         chunk_id = None if unavailable or chunk is None else UUID(str(chunk))
+        web_raw = row.get("web_source_id")
+        source_kind = str(row.get("source_kind") or "company_document")
+        web_source_id = None if web_raw is None else UUID(str(web_raw))
         records.append(
             RunCitationRecord(
                 citation_id=UUID(str(row["citation_id"])),
@@ -271,9 +289,137 @@ def list_run_citations(
                 chunk_id=chunk_id,
                 provenance=provenance,
                 source_unavailable=unavailable,
+                source_kind=source_kind,
+                web_source_id=web_source_id,
+                paragraph_index=_optional_int(row.get("paragraph_index")),
+                document_title=_optional_str(row.get("document_title")),
+                pdf_page_number=_optional_int(row.get("pdf_page_number")),
+                evidence_excerpt=_optional_str(row.get("evidence_excerpt")),
             )
         )
     return tuple(records)
+
+
+def list_conversation_citations(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    conversation_id: UUID,
+    run_ids: tuple[UUID, ...],
+) -> tuple[tuple[UUID, RunCitationRecord], ...]:
+    """Load citations for at most 50 owned run IDs on one conversation.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived owner.
+        conversation_id: Conversation the caller must own.
+        run_ids: Candidate run primary keys. Extra IDs are ignored. More than
+            50 unique IDs fail closed.
+
+    Returns:
+        ``(run_id, citation)`` pairs. Foreign runs are omitted.
+
+    Raises:
+        QueryAdmissionError: Authorization or batch-cap failure.
+    """
+
+    unique_ids = tuple(dict.fromkeys(run_ids))
+    if not unique_ids:
+        return ()
+    if len(unique_ids) > 50:
+        raise QueryAdmissionError("batch_cap")
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT run_id, citation_id, citation_index, chunk_id, provenance,
+                       source_unavailable, source_kind, web_source_id,
+                       paragraph_index, document_title, pdf_page_number,
+                       evidence_excerpt
+                FROM app.list_conversation_citations_v1(
+                  %s, %s, %s, %s::uuid, %s::uuid[]
+                )
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    str(conversation_id),
+                    [str(item) for item in unique_ids],
+                ),
+            )
+            rows = cursor.fetchall()
+    except psycopg.Error as exc:
+        message = str(exc)
+        if "query_memory:" in message:
+            raise QueryAdmissionError("not_found") from exc
+        if "query_citation:batch_cap" in message:
+            raise QueryAdmissionError("batch_cap") from exc
+        raise_admission(exc)
+    records: list[tuple[UUID, RunCitationRecord]] = []
+    for row in rows:
+        provenance_raw = row.get("provenance")
+        provenance: dict[str, object] = (
+            cast(dict[str, object], provenance_raw)
+            if isinstance(provenance_raw, dict)
+            else {}
+        )
+        chunk = row.get("chunk_id")
+        unavailable = bool(row.get("source_unavailable"))
+        chunk_id = None if unavailable or chunk is None else UUID(str(chunk))
+        web_raw = row.get("web_source_id")
+        source_kind = str(row.get("source_kind") or "company_document")
+        web_source_id = None if web_raw is None else UUID(str(web_raw))
+        records.append(
+            (
+                UUID(str(row["run_id"])),
+                RunCitationRecord(
+                    citation_id=UUID(str(row["citation_id"])),
+                    citation_index=int(str(row["citation_index"])),
+                    chunk_id=chunk_id,
+                    provenance=provenance,
+                    source_unavailable=unavailable,
+                    source_kind=source_kind,
+                    web_source_id=web_source_id,
+                    paragraph_index=_optional_int(row.get("paragraph_index")),
+                    document_title=_optional_str(row.get("document_title")),
+                    pdf_page_number=_optional_int(row.get("pdf_page_number")),
+                    evidence_excerpt=_optional_str(row.get("evidence_excerpt")),
+                ),
+            )
+        )
+    return tuple(records)
+
+
+def _optional_int(value: object) -> int | None:
+    """Parse a nullable integer column.
+
+    Args:
+        value: Driver value.
+
+    Returns:
+        Integer or ``None``.
+    """
+
+    if value is None:
+        return None
+    return int(str(value))
+
+
+def _optional_str(value: object) -> str | None:
+    """Parse a nullable text column.
+
+    Args:
+        value: Driver value.
+
+    Returns:
+        Non-empty string or ``None``.
+    """
+
+    if value is None:
+        return None
+    text = str(value)
+    return text if text else None
 
 
 def summarize_run_usage(

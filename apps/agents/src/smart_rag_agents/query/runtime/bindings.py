@@ -39,12 +39,18 @@ class QueryGraphProcessBindings:
         model_gateway: Counted gateway. Mock mode is still a gateway.
         graph_retriever: Process LightRAG adapter, or None when unbound.
         table_executor: Structured-table path using ``app_api`` ACL.
-        answer_prompt_text: Pinned ``answer_v1`` body.
+        answer_prompt_text: Pinned ``answer_v2`` body.
         general_chat_prompt_text: Pinned ``general_chat_v1`` body.
         verifier_prompt_text: Pinned ``verifier_v1`` body.
         query_profile_prompt_text: Pinned ``query_profile_v1`` body.
         profile_model_id: Allow-listed profile model recorded on usage.
         supabase_dsn: Canonical Postgres URL for per-run ``app_api`` connections.
+        web_search_enabled: ``WEB_SEARCH_ENABLED`` snapshot. Default false.
+        web_search_configured: True when a non-empty Exa key is present.
+        exa_search_gateway: Injected Exa REST client, or None.
+        crawl_proxy_gateway: Injected crawl-proxy client, or None.
+        web_critique_prompt_text: Pinned ``web_critique_v1`` body.
+        web_answer_prompt_text: Pinned ``web_answer_v1`` body.
     """
 
     hybrid_retriever: HybridRetrieveLike
@@ -57,3 +63,9 @@ class QueryGraphProcessBindings:
     query_profile_prompt_text: str
     profile_model_id: str
     supabase_dsn: str
+    web_search_enabled: bool = False
+    web_search_configured: bool = False
+    exa_search_gateway: object | None = None
+    crawl_proxy_gateway: object | None = None
+    web_critique_prompt_text: str = ""
+    web_answer_prompt_text: str = ""

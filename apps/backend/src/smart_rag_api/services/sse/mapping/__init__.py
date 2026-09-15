@@ -11,6 +11,7 @@ from smart_rag_api.services.sse.mapping.contracts import (
     REJECT_STATUSES,
     TOKEN_DELTA_LIMIT,
     VERIFY_ANSWER_NODE,
+    WEB_SCOPE_NODE,
     assert_catalog_event,
 )
 from smart_rag_api.services.sse.mapping.mapper import QuerySseMapper
@@ -27,6 +28,7 @@ __all__ = [
     "REJECT_STATUSES",
     "TOKEN_DELTA_LIMIT",
     "VERIFY_ANSWER_NODE",
+    "WEB_SCOPE_NODE",
     "QuerySseMapper",
     "assert_catalog_event",
     "chunk_answer_text",

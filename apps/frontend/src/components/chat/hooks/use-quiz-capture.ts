@@ -26,7 +26,7 @@ import type {
   PdfEvalQueryClass,
 } from "../../../lib/types";
 import { PDF_EVAL_QUERY_CLASSES } from "../../../lib/types";
-import type { SaveToQuizPopoverProps } from "../save-to-quiz-popover";
+import type { SaveToQuizSheetProps } from "../save-to-quiz-sheet";
 
 const QUIZ_SCORE_COPY = "not Recall@10";
 
@@ -62,18 +62,23 @@ export type UseQuizCaptureResult = {
   cases: PdfEvalCaseSummary[];
   casesPending: boolean;
   casesError: boolean;
+  onRetryCases: () => void;
   nextCaseId: string | null;
   loadMorePending: boolean;
+  loadMoreError: boolean;
   onLoadMore: () => void;
   selectedCaseId: string | null;
   onSelectCase: (caseId: string) => void;
   selectedQuestion: string;
   detailPending: boolean;
+  detailError: boolean;
+  onRetryDetail: () => void;
   onAskQuestion: () => void;
   scoreAllowed: boolean;
   scoreReason: string;
   scorePending: boolean;
   scoreNotice: string | null;
+  scoreError: string | null;
   onScore: () => void;
   createdFromThisRun: ReadonlySet<string>;
 };
@@ -86,6 +91,7 @@ type QuizFormState = {
   saveNotice: string | null;
   saveError: string | null;
   scoreNotice: string | null;
+  scoreError: string | null;
   selectedCaseId: string | null;
   createdIds: string[];
 };
@@ -105,6 +111,7 @@ function emptyForm(runId: string | null): QuizFormState {
     saveNotice: null,
     saveError: null,
     scoreNotice: null,
+    scoreError: null,
     selectedCaseId: null,
     createdIds: [],
   };
@@ -245,13 +252,15 @@ export function useQuizCapture(input: UseQuizCaptureInput): UseQuizCaptureResult
     onSuccess: (result) => {
       setForm((current) => ({
         ...current,
+        scoreError: null,
         scoreNotice: `Citation overlap ${String(result.intersection)} of ${String(result.gold_count)} gold IDs (${QUIZ_SCORE_COPY}).`,
       }));
     },
     onError: () => {
       setForm((current) => ({
         ...current,
-        scoreNotice: "Citation overlap could not be scored. Try again.",
+        scoreNotice: null,
+        scoreError: "Citation overlap could not be scored. Try again.",
       }));
     },
   });
@@ -320,8 +329,12 @@ export function useQuizCapture(input: UseQuizCaptureInput): UseQuizCaptureResult
     cases,
     casesPending: listQuery.isPending,
     casesError: listQuery.isError,
+    onRetryCases: () => {
+      void listQuery.refetch();
+    },
     nextCaseId,
     loadMorePending: loadMore.isPending,
+    loadMoreError: loadMore.isError,
     onLoadMore: () => {
       if (nextCaseId === null || loadMore.isPending) {
         return;
@@ -330,10 +343,24 @@ export function useQuizCapture(input: UseQuizCaptureInput): UseQuizCaptureResult
     },
     selectedCaseId: form.selectedCaseId,
     onSelectCase: (caseId) => {
-      setForm((current) => ({ ...current, selectedCaseId: caseId }));
+      setForm((current) => ({
+        ...current,
+        selectedCaseId: caseId,
+        scoreNotice:
+          caseId === current.selectedCaseId ? current.scoreNotice : null,
+        scoreError:
+          caseId === current.selectedCaseId ? current.scoreError : null,
+      }));
     },
     selectedQuestion: detailQuery.data?.question ?? "",
     detailPending: detailQuery.isPending && form.selectedCaseId !== null,
+    detailError: detailQuery.isError && form.selectedCaseId !== null,
+    onRetryDetail: () => {
+      if (form.selectedCaseId === null) {
+        return;
+      }
+      void detailQuery.refetch();
+    },
     onAskQuestion: () => {
       const saved = detailQuery.data?.question ?? "";
       if (saved === "") {
@@ -345,6 +372,7 @@ export function useQuizCapture(input: UseQuizCaptureInput): UseQuizCaptureResult
     scoreReason: scoreDecision.reason,
     scorePending: score.isPending,
     scoreNotice: form.scoreNotice,
+    scoreError: form.scoreError,
     onScore: () => {
       if (!scoreDecision.allowed) {
         return;
@@ -356,18 +384,18 @@ export function useQuizCapture(input: UseQuizCaptureInput): UseQuizCaptureResult
 }
 
 /**
- * Map hook state onto the Save-to-quiz popover contract.
+ * Map hook state onto the Save-to-quiz sheet contract.
  *
  * @param quiz - Ask capture hook result.
  * @param question - Display-only question from the current run.
  * @param citations - ACL-rechecked citations for gold suggestions.
- * @returns Popover props. Create still posts the run id, never `question`.
+ * @returns Sheet props. Create still posts the run id, never `question`.
  */
-export function toSaveToQuizPopoverProps(
+export function toSaveToQuizSheetProps(
   quiz: UseQuizCaptureResult,
   question: string,
   citations: readonly CitationResponse[],
-): SaveToQuizPopoverProps {
+): SaveToQuizSheetProps {
   return {
     question,
     citations,
@@ -385,18 +413,23 @@ export function toSaveToQuizPopoverProps(
     cases: quiz.cases,
     casesPending: quiz.casesPending,
     casesError: quiz.casesError,
+    onRetryCases: quiz.onRetryCases,
     nextCaseId: quiz.nextCaseId,
     loadMorePending: quiz.loadMorePending,
+    loadMoreError: quiz.loadMoreError,
     onLoadMore: quiz.onLoadMore,
     selectedCaseId: quiz.selectedCaseId,
     onSelectCase: quiz.onSelectCase,
     selectedQuestion: quiz.selectedQuestion,
     detailPending: quiz.detailPending,
+    detailError: quiz.detailError,
+    onRetryDetail: quiz.onRetryDetail,
     onAskQuestion: quiz.onAskQuestion,
     scoreAllowed: quiz.scoreAllowed,
     scoreReason: quiz.scoreReason,
     scorePending: quiz.scorePending,
     scoreNotice: quiz.scoreNotice,
+    scoreError: quiz.scoreError,
     onScore: quiz.onScore,
   };
 }

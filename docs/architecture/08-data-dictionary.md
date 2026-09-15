@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: engineering, reviewers
 ---
 
@@ -41,6 +41,9 @@ erDiagram
   runs ||--o| budget_reservations : query_run
   runs ||--o{ llm_usage : records
   runs ||--o{ citations : cites
+  runs ||--o{ web_research_operations : web_ops
+  runs ||--o{ web_sources : web_evidence
+  web_sources ||--o{ web_citations : cites
   runs ||--o{ user_feedback : receives
   eval_quiz_cases ||--|{ eval_quiz_gold_chunks : gold
   eval_quiz_cases }o--o| runs : source_run
@@ -129,6 +132,9 @@ erDiagram
 | `runs` | `app` | authority | admit RPC (`app_api` EXECUTE) | creator (+ audit) | 30d payloads; completed key NULL after 7d | concurrent runs cap 5 | cascade on conversation delete | `(creator_user_id, conversation_id, idempotency_key)` plus `idempotency_key_hash` unique | 6 packet 1 / 7 reaper |
 | `run_events` | `app` | authority | `app.append_run_event` (`app_api` EXECUTE) | creator SELECT; resume via `app.list_run_events_after` | 30d completed (packet 7 reaper) | monotonic `(run_id, sequence)` | cascade on run; tombstoned conversation denies resume immediately | PK `(run_id, sequence)`; one terminal per run | 6 packet 6 SSE |
 | `citations` | `app` | authority | answer assembler | UI/audit | with run | bounded per answer | cascade; `source_unavailable` when source deleted | `(run_id, citation_index)` | 6 packet 3 / 7 |
+| `web_research_operations` | `app` | authority (P06-39) | `app_api` RPCs only | owner via RPCs | with run | ≤5 ops / run | `app.delete_conversation` + run cascade | `(run_id, operation_key)`; same hash replays | 6 packet 39 |
+| `web_sources` | `app` | authority (P06-39 public Web, never company RAG) | `app.insert_web_source` | listing omits excerpt | with run | ≤6 / run | conversation delete | `(run_id, source_index)` and `(run_id, url)` | 6 packet 39 |
+| `web_citations` | `app` | authority (P06-39) | `app.insert_web_citation` | listing omits span | with run | ≤12 / run | conversation delete | `(run_id, citation_index)` | 6 packet 39 |
 | `user_feedback` | `app` | authority | chat UI | eval pipelines | 12 months | sparse | cascade on conversation delete | feedback `id`; required unmerged `tag` | 6 packet 7 |
 | `eval_quiz_cases` / `eval_quiz_gold_chunks` | `app` | authority (authorized P06-27) | owner/admin RPCs | owner/admin RPCs | 365d | ≤60 | immediate delete RPC + expiry purge | `(creator_user_id, idempotency_key)` | 6 packet 28 |
 | `eval_exam_runs` / `eval_exam_case_results` / `eval_exam_reports` | `app` | authority (authorized P06-27) | exam RPCs | owner/admin RPCs | 365d | one active exam | expiry purge; reports immutable while current | exam `id`; qualification `(dataset_hash, candidate_fingerprint)` | 6 packet 30 |
@@ -184,7 +190,7 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - Queue tables share lease/idempotency columns; `idempotency_key` is UNIQUE per table.
 - `app.runs` also has unique `(creator_user_id, conversation_id, idempotency_key)` where the key is not null. The global `runs_idempotency_key_uq` remains.
 - `app.load_query_memory` is SECURITY DEFINER, `validate_caller_context`, creator-only, fails on deleted conversations, returns at most 12 recent messages, EXECUTE to `app_api` only. Compact summaries live in `langgraph.store`, never source documents.
-- `app.citations.provenance` jsonb (existing column, expand-only payload) stores fusion algorithm, config hash, hybrid/graph ranks, combined score, requested/effective route, atomic-link id, and inference flag. Packet 3 added no citation table or column. `chunk_id` remains nullable so table-range citations can persist without a passage. Citation GET v2 overlays `page_number` (1-based file page), printed `page_label` from chunk locators, title, and section. ACL failure strips locator identity including `page_label`.
+- `app.citations.provenance` jsonb (existing column, expand-only payload) stores fusion algorithm, config hash, hybrid/graph ranks, combined score, requested/effective route, atomic-link id, and inference flag. Packet 3 added no citation table or column. `chunk_id` remains nullable so table-range citations can persist without a passage. Citation GET v2 overlays `page_number` (1-based file page), printed `page_label` from chunk locators, title, and section. ACL failure strips locator identity including `page_label`. P06-39 adds `app.list_run_citations_v3` (v2 remains). Company rows copy the v2 recheck. Web rows return `source_kind=web` plus url/title/`content_hash` only; excerpt and span never leave the database.
 - `audit_events` rejects UPDATE/DELETE (append-only trigger).
 - `llm_usage` rejects UPDATE/DELETE (append-only trigger). Runtime roles have no table DML; query usage is inserted only through `app.record_query_llm_usage`.
 - RLS is enabled on all exposed tables; Storage quarantine INSERT is reservation-scoped; no authenticated SELECT on quarantine.
@@ -213,6 +219,8 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
 - `app.graph_workspaces.state` is exactly `building`, `active`, `updating`, `filtered_dirty`, `quarantined`, `disabled`, `retired`. Embedding pin CHECKs `text-embedding-3-large` / 1024. Packet 3 leaves successful index in `updating`. Packet 4 may set `active` when maps verify and the pointer already names the workspace. This is Graph Ready on the version, not a Packet 7 switch.
 - `app.budget_reservations.reservation_kind` is `ingestion_daily`, `graph_index`, `graph_maintenance`, or `query_run`. The kinds never share caps. `query_run` consume uses run-local optimistic version and never `SELECT FOR UPDATE` on `company_settings` or `profiles`.
 - Phase 6 packet 5 adds SECURITY DEFINER RPCs (`app.create_conversation`, `app.get_conversation`, `app.get_query_run`, `app.cancel_query_run`, `app.list_run_citations`, `app.list_run_citations_v2`, `app.submit_run_feedback`, `app.summarize_caller_usage`, `app.summarize_company_usage`, `app.list_authorized_table_manifests`, `app.get_visible_document`, `app.search_graph_entities`, `app.upsert_tool_catalog_seed`, `app.set_tool_permission`, `app.list_tool_catalog_seeds`) with `SET search_path = pg_catalog, app` and `EXECUTE` to `app_api` only. Conversation deletion remains packet 7. Retrieval cache is Valkey IDs/ranks only; `app.recheck_retrieval_candidates` stays authority.
+- P06-39 adds `app.begin_web_research_operation`, `app.mark_web_research_operation_sent`, `app.complete_web_research_operation`, `app.insert_web_source`, `app.insert_web_citation`, and `app.list_run_citations_v3` (`EXECUTE` to `app_api` only; `_web_require_run_owner` is not granted to `app_api`). Tables use FORCE RLS with no DML grants to `app_api`/`anon`/`authenticated`.
+- P06-40 widens `app.runs` CHECKs to `requested_search_scope` `web` and `route_family` `web_research`, replaces `app.query_route_envelope` with a `web_research` arm (50s / 5 model / 5 tools / 2.00 USD / 40000 prompt / 10000 completion / `correction_ceiling=0`), and adds `app.admit_query_run_v3`, `app.load_query_run_runtime_v3`, and `app.get_query_run_v3` (`EXECUTE` to `app_api` only). v2 signatures stay callable.
 - `app.set_tool_permission` upserts `(tool_id, role)` when `user_id` is null and inserts a catalog row when the key is missing. `GET /tools` overlays `app.tool_catalog.active` onto the in-code registry; executor authorization stays in-code.
 - Owner/admin workspace listing uses `app.list_workspace_members` and `app.list_pending_team_invitations` (`EXECUTE` to `app_api` only, max 200 each). Members join `auth.users` for email. Invitation RPCs never select `token_hash`. See [ADR-workspace-member-list.md](../adr/ADR-workspace-member-list.md).
 - Phase 6 packet 6 adds `app.run_events` (FORCE RLS, creator-private SELECT, no authenticated INSERT) plus `app.append_run_event` / `app.list_run_events_after` (`EXECUTE` to `app_api` only). Sequences are `COALESCE(MAX(sequence),0)+1` under a run lock. Payload keys `passage` / `snippet` / `html` / traceback-like names are stripped or rejected. See [SSE.md](../api/SSE.md).

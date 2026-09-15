@@ -19,6 +19,7 @@ CORE_FORBIDDEN_TOOL_KEYS: frozenset[str] = frozenset(
         "verifier",
         "answer_generate",
         "verify_answer",
+        "web_search",
     }
 )
 """Keys that must never appear in the optional catalog."""
