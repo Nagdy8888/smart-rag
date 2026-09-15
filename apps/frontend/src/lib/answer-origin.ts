@@ -18,6 +18,7 @@ const ORIGIN_LABELS: Record<AnswerOrigin, string> = {
   user_supplied_text: "Your text",
   deterministic: "Assistant",
   ambiguous: "Needs clarification",
+  web: "Web",
 };
 
 const ORIGIN_TONES: Record<AnswerOrigin, StatusTone> = {
@@ -26,13 +27,14 @@ const ORIGIN_TONES: Record<AnswerOrigin, StatusTone> = {
   user_supplied_text: "neutral",
   deterministic: "neutral",
   ambiguous: "warning",
+  web: "success",
 };
 
 /**
  * Return whether a value is a catalog answer origin.
  *
  * @param value - Untrusted origin string.
- * @returns True for the five catalog values.
+ * @returns True for the six catalog values.
  */
 export function isAnswerOrigin(value: string): value is AnswerOrigin {
   return (ANSWER_ORIGINS as readonly string[]).includes(value);
@@ -73,14 +75,14 @@ export function answerOriginTone(origin: string | null): StatusTone {
  * Return whether citation chips may render for this origin.
  *
  * Null preserves older servers that never emitted `answer_origin`.
- * Known non-company origins and unknown values hide chips.
+ * Known non-company, non-web origins and unknown values hide chips.
  *
  * @param origin - Stored origin, or null.
- * @returns True only for `company_documents` or a missing origin.
+ * @returns True for `company_documents`, `web`, or a missing origin.
  */
 export function shouldShowCitations(origin: string | null): boolean {
   if (origin === null || origin.trim() === "") {
     return true;
   }
-  return origin === "company_documents";
+  return origin === "company_documents" || origin === "web";
 }

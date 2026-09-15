@@ -13,6 +13,7 @@ import {
   holdoutCannotRun,
 } from "../../lib/eval-workspace";
 import { evaluatePaidHandshake } from "../../lib/handshake";
+import { webSearchCapability } from "../../lib/web-search";
 import { Button, PrimaryAction } from "../ui/button";
 import { UserText } from "../ui/user-text";
 import { useChatQueries } from "../chat/hooks/use-chat-queries";
@@ -69,6 +70,7 @@ export function EvaluationAiTestPanel({
     onConversationId: setConversationId,
     handshake,
     ready: queries.ready,
+    webSearchEnabled: webSearchCapability(queries.meta),
   });
   const holdout = holdoutCannotRun(split);
   const completed = citationCompareAllowed(run.chat.terminal);

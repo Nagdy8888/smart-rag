@@ -385,6 +385,8 @@ def test_api_meta_and_ready_never_claim_query_ready() -> None:
     assert "api_version" in meta
     assert "sse_schema_version" in meta
     assert "min_client_version" in meta
+    assert meta["web_search_enabled"] is False
+    assert "exa_api_key" not in meta
     assert ready["query_ready"] is False
     assert ready["status"] in {"unconfigured", "not_ready", "degraded"}
     assert "dependencies" not in ready

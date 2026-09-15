@@ -68,6 +68,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-39 — Run-scoped web evidence store (2026-09-15) | [phase-06/p06-39-web-evidence-store-2026-09-15.md](./phase-06/p06-39-web-evidence-store-2026-09-15.md) | 106 |
 | P06-40 — Four-mode admission and Web envelope (2026-09-15) | [phase-06/p06-40-four-mode-routing-2026-09-15.md](./phase-06/p06-40-four-mode-routing-2026-09-15.md) | 141 |
 | P06-41 — Bounded iterative Web research graph (2026-09-15) | [phase-06/p06-41-web-research-graph-2026-09-15.md](./phase-06/p06-41-web-research-graph-2026-09-15.md) | 124 |
+| P06-42 — Four-mode Ask dropdown UX (2026-09-15) | [phase-06/p06-42-four-mode-ask-ux-2026-09-15.md](./phase-06/p06-42-four-mode-ask-ux-2026-09-15.md) | 98 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

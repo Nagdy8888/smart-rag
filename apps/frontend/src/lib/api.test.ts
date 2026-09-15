@@ -1583,10 +1583,57 @@ describe("listCitations without snippets", () => {
         chunk_id: "chunk-1",
         provenance: { page_number: 3, url: "https://example.com/doc" },
         source_unavailable: false,
+        source_kind: "company_document",
+        web_source_id: null,
       },
     ]);
     expect(JSON.stringify(citations)).not.toContain("SECRET");
     expect(JSON.stringify(citations)).not.toContain("snippet");
+  });
+
+  it("keeps web source_kind and URL while dropping excerpt", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            citation_id: "cite-web",
+            citation_index: 0,
+            chunk_id: null,
+            provenance: {
+              source_kind: "web",
+              url: "https://example.test/brief",
+              title: "Brief",
+              excerpt: "SECRET PASSAGE",
+            },
+            source_unavailable: false,
+            source_kind: "web",
+            web_source_id: "ws-1",
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const citations = await listCitations(
+      { accessToken: "jwt-token" },
+      "run-web",
+      fetchImpl,
+    );
+    expect(citations).toEqual([
+      {
+        citation_id: "cite-web",
+        citation_index: 0,
+        chunk_id: null,
+        provenance: {
+          source_kind: "web",
+          url: "https://example.test/brief",
+          title: "Brief",
+        },
+        source_unavailable: false,
+        source_kind: "web",
+        web_source_id: "ws-1",
+      },
+    ]);
+    expect(JSON.stringify(citations)).not.toContain("SECRET");
+    expect(JSON.stringify(citations)).not.toContain("excerpt");
   });
 
   it("returns an empty list for a 404 private run", async () => {

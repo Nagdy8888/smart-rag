@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 import { useChatScope } from "./use-chat-scope";
 
 describe("useChatScope", () => {
-  it("defaults a blank chat to Company files", () => {
+  it("defaults a blank chat to Auto", () => {
     const { result } = renderHook(() => useChatScope(null));
-    expect(result.current.scope).toBe("company_documents");
+    expect(result.current.scope).toBe("auto");
   });
 
   it("keeps the pre-send selection when a conversation is created", () => {
@@ -26,7 +26,7 @@ describe("useChatScope", () => {
       result.current.setScope("general_knowledge");
       result.current.activateConversation("conv-b");
     });
-    expect(result.current.scope).toBe("company_documents");
+    expect(result.current.scope).toBe("auto");
     act(() => {
       result.current.activateConversation("conv-a");
     });
@@ -38,10 +38,27 @@ describe("useChatScope", () => {
     act(() => {
       result.current.resetForNewChat();
     });
-    expect(result.current.scope).toBe("company_documents");
+    expect(result.current.scope).toBe("auto");
     act(() => {
       result.current.activateConversation("conv-a");
     });
     expect(result.current.scope).toBe("general_knowledge");
+  });
+
+  it("restores Web when enabled and clamps to Auto when hidden", () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useChatScope("conv-web", enabled),
+      { initialProps: { enabled: true } },
+    );
+    act(() => {
+      result.current.restoreConversationScope("conv-web", "web");
+    });
+    expect(result.current.scope).toBe("web");
+    rerender({ enabled: false });
+    expect(result.current.scope).toBe("auto");
+    act(() => {
+      result.current.setScope("web");
+    });
+    expect(result.current.scope).toBe("auto");
   });
 });

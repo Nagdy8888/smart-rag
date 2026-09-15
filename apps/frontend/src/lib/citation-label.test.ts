@@ -117,4 +117,34 @@ describe("citationLocatorFields", () => {
       { key: "page_number", label: "PDF page", value: "201" },
     ]);
   });
+
+  it("labels web citations with title and URL, never a company document title", () => {
+    expect(
+      citationSourceLabel(
+        citation({
+          source_kind: "web",
+          chunk_id: null,
+          provenance: {
+            title: "Example briefing",
+            url: "https://example.test/brief",
+          },
+        }),
+      ),
+    ).toBe("Example briefing");
+    expect(
+      citationLocatorFields(
+        citation({
+          source_kind: "web",
+          chunk_id: null,
+          provenance: {
+            title: "Example briefing",
+            url: "https://example.test/brief",
+          },
+        }),
+      ).locators,
+    ).toEqual([
+      { key: "title", label: "Title", value: "Example briefing" },
+      { key: "url", label: "URL", value: "https://example.test/brief" },
+    ]);
+  });
 });

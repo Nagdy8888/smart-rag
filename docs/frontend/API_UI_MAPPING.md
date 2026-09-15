@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -60,7 +60,7 @@ appear in `NEXT_PUBLIC_*`. UI role hiding is convenience only.
 
 | Concern | Contract | Source |
 | --- | --- | --- |
-| Publish | `GET /api/meta` → `api_version`, `sse_schema_version`, `min_client_version` | `MetaResponse` |
+| Publish | `GET /api/meta` → `api_version`, `sse_schema_version`, `min_client_version`, additive `pdf_eval_workspace`, additive `web_search_enabled` (default false; never keys) | `MetaResponse` |
 | Enforce | `X-Client-Version` on `POST /conversations/{conversation_id}/messages` only | `enforce_client_handshake` |
 | Below minimum | HTTP **426** `client_version_unsupported` before reserve | `client_handshake.py` |
 | Client pin | Frontend `CLIENT_VERSION` = `0.1.0` | `apps/frontend/src/lib/client-version.ts` |
@@ -74,9 +74,11 @@ appear in `NEXT_PUBLIC_*`. UI role hiding is convenience only.
 
 `SubmitMessageRequest` fields are `message`, optional `idempotency_key`,
 and optional `search_scope` (`auto` | `company_documents` |
-`general_knowledge`). There is **no** client route override. Admission is
-Auto Composite (`route_family` is server-derived). Manual
-Hybrid/Combined/table/inspection controls are [GAP-07-01](#gap-register).
+`general_knowledge` | `web`). There is **no** client route override.
+Admission is Auto Composite (`route_family` is server-derived) unless
+forced `web` reserves `web_research`. Manual Hybrid/Combined/table/inspection
+controls are [GAP-07-01](#gap-register). Ask labels are Auto, Company
+documents, General, Web. Web is hidden unless `web_search_enabled` is true.
 
 ## SSE catalog
 

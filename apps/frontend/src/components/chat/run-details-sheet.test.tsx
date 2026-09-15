@@ -89,7 +89,7 @@ describe("RunDetailsSheet", () => {
     expect(details).toHaveTextContent("Verified and ready.");
     expect(details).toHaveTextContent("Composite");
     expect(details).toHaveTextContent("Requested source");
-    expect(details).toHaveTextContent("Company files");
+    expect(details).toHaveTextContent("Company documents");
     expect(details).toHaveTextContent("Answer origin");
     expect(details).toHaveTextContent("Company documents");
     expect(details).toHaveTextContent("Searches documents, tables, and relationships.");

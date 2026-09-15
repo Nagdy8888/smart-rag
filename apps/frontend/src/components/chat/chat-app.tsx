@@ -8,12 +8,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isClassifiedApiError, submitFeedback, type ApiFailure } from "../../lib/api";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { useSession } from "../../lib/auth/session-provider";
-import { citationChipHref } from "../../lib/citation-drawer";
+import { hrefForCitationRecord } from "../../lib/citation-drawer";
 import { overlaySettledTurns } from "../../lib/chat-history";
 import { showSaveToQuizConvenience } from "../../lib/eval-workspace";
 import { evaluatePaidHandshake } from "../../lib/handshake";
 import { shouldShowCitations } from "../../lib/answer-origin";
 import { FEEDBACK_TAGS_UP, type CitationResponse, type FeedbackTag } from "../../lib/types";
+import { webSearchCapability } from "../../lib/web-search";
 import { Button } from "../ui/button";
 import { Sheet } from "../ui/sheet";
 import { ChatBanners } from "./chat-banners";
@@ -57,12 +58,14 @@ export function ChatApp() {
     queries.meta ?? null,
     queries.metaPending ? "loading" : queries.metaError ? "error" : "ok",
   );
+  const webSearchEnabled = webSearchCapability(queries.meta);
   const run = useChatRun({
     auth: queries.auth,
     conversationId: selection.conversationId,
     onConversationId: selection.setConversationId,
     handshake,
     ready: queries.ready,
+    webSearchEnabled,
   });
   const liveQueries = useChatQueries({
     accessToken,
@@ -287,6 +290,7 @@ export function ChatApp() {
             feedbackPending={feedbackPending}
             showSaveToQuiz={showSaveToQuiz}
             quiz={toSaveToQuizSheetProps(quiz, run.lastUserMessage, visibleCitations)}
+            webSearchEnabled={webSearchEnabled}
           />
         }
         sessionsExpanded={selection.sessionsExpanded}
@@ -300,7 +304,7 @@ export function ChatApp() {
         open={selection.sourcesOpen}
         onClose={() => selection.setSourcesOpen(false)}
         citations={visibleCitations}
-        hrefForCitation={(citation) => citationChipHref(citation.provenance.url) ?? undefined}
+        hrefForCitation={(citation) => hrefForCitationRecord(citation)}
         onSelectCitation={(citation, trigger) => {
           citationTriggerRef.current = trigger;
           setSelectedCitation(citation);

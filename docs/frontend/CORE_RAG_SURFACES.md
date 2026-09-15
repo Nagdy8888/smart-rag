@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -77,7 +77,7 @@ flowchart TD
 | --- | --- |
 | GAP-07-01 | Auto envelope only. Advanced panel is display-only of `route_family` and `route_correction`. No Hybrid/Combined/Table/Inspect send buttons. `search_scope` is allowed |
 | GAP-07-02 | SSE catalog only. Inference-chain objects are absent; citation chips only |
-| GAP-07-09 | Source drawer: printed page label when the PDF has one, file PDF page when it differs, title/section, technical ids. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
+| GAP-07-09 | Source drawer: printed page label when the PDF has one, file PDF page when it differs, title/section, technical ids. No ACME fixture. No privileged Storage URL. Preview/download unavailable. Web chips may be http(s) href after `isSafeHttpUrl`; company citations stay non-href |
 | GAP-07-10 | No rolling ETA/cost. Authorized `graph_handoff` counts + `graphNotReadyCopy(n)` only |
 | GAP-07-12 | No anomaly toast counts or audit tabs |
 | GAP-07-14 | `DELETE /documents/{id}` is wired for owner/admin with confirmation. Members still 403. No source preview/download |
@@ -87,9 +87,15 @@ flowchart TD
 - `SubmitMessageRequest` is `{ message, idempotency_key?, search_scope? }`.
   Omitted `search_scope` is `auto`. There is still **no** client
   `route_family` (GAP-07-01). New chats default the Answer source selector
-  to Company files. The selector is disabled while sending or while a
-  run is admitted and non-terminal. Run Details show **Requested source**
-  separately from SSE **Answer origin**.
+  to **Auto**. Labels are exactly Auto, Company documents, General, and
+  Web (Web is hidden unless `/api/meta` `web_search_enabled` is true).
+  Exactly one source; company and web never blend. The selector is
+  disabled while sending or while a run is admitted and non-terminal.
+  Run Details show **Requested source** separately from SSE **Answer
+  origin**. `answer_origin=web` shows origin Web and URL chips.
+  Company chips stay non-clickable. Progress copy includes Searching…,
+  Reading…, and Verifying… for Web runs. Hidden Web chrome is not
+  authorization; FastAPI still 503s forced Web when disabled.
 - Local `signed_url` is **null**. `upload_method` is `supabase_storage_jwt`.
 - Reserve is never Hybrid Ready.
 - Graph Pending is warning, distinct from ACL blindness. ACL copy is

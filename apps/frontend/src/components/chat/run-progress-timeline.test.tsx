@@ -7,6 +7,7 @@ import "@testing-library/jest-dom/vitest";
 import { createChatViewState } from "../../lib/chat-view";
 import { EMPTY_DEADLINE_PARTIAL_COPY } from "../../lib/run-details";
 import type { RunProgressItem } from "../../lib/run-progress";
+import { runStatusLine } from "./run-progress";
 import {
   progressSummary,
   RunProgressTimeline,
@@ -61,6 +62,7 @@ describe("RunProgressTimeline", () => {
     );
     expect(screen.getByText(/Company retrieval/)).toBeInTheDocument();
     expect(screen.getByText(/Optional tools/)).toBeInTheDocument();
+    expect(screen.getByText(/Searching/)).toBeInTheDocument();
     expect(screen.getByText("web_search")).toBeInTheDocument();
     expect(screen.getAllByText("Generating…").length).toBeGreaterThan(0);
     expect(screen.queryByText("General answer")).not.toBeInTheDocument();
@@ -188,5 +190,20 @@ describe("progressSummary", () => {
       }),
     ).toBe(EMPTY_DEADLINE_PARTIAL_COPY);
     expect(screen.queryByText("%")).toBeNull();
+  });
+});
+
+describe("runStatusLine", () => {
+  it("maps web stages before generic search retrieval copy", () => {
+    const chat = createChatViewState("k");
+    chat.runId = "run-1";
+    chat.stage = "web_search";
+    expect(runStatusLine(chat)).toBe("Searching…");
+    chat.stage = "web_scope";
+    expect(runStatusLine(chat)).toBe("Searching…");
+    chat.stage = "web_read";
+    expect(runStatusLine(chat)).toBe("Reading…");
+    chat.stage = "verify_answer";
+    expect(runStatusLine(chat)).toBe("Verifying…");
   });
 });

@@ -425,6 +425,7 @@ def test_disabled_workspace_discloses_no_status(
         client = as_openapi_client(raw)
         meta = json_object(client.get("/api/meta").json())
         assert meta["pdf_eval_workspace"] is False
+        assert meta["web_search_enabled"] is False
         denied = client.get(
             "/admin/pdf-eval/status", headers=_identity(_OWNER, "owner")
         )

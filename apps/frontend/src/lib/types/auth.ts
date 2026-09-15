@@ -11,6 +11,11 @@ export type MetaResponse = {
   min_client_version: string;
   /** Local-only Admin Evaluation workspace. Default false. Not authorization. */
   pdf_eval_workspace?: boolean;
+  /**
+   * When true, Ask may offer Web. Default false. Never includes keys.
+   * Hidden chrome is not authorization.
+   */
+  web_search_enabled?: boolean;
 };
 
 /** `POST /invitations/accept` response. Email is not a request field. */

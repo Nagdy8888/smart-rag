@@ -88,6 +88,7 @@ where they disagree.
 - At `<1280px`: the desktop Sessions rail is omitted from the workspace grid. Sessions open in a left Sheet. Composer card is full-width with 12px margins; hint text is hidden; transcript uses 16px padding.
 - Transcript column is centered at `max-width: 760px`. Opening a session loads `GET /conversations/{id}/messages` (newest 50, rendered oldest-first). “Load earlier messages” prepends the previous page when `next_before_id` is set.
 - The Message field opts out of the 520px form-field cap. New sessions store a first-question fallback on `POST /conversations`. After the first completed or partial turn, and when the creator re-opens a fallback-titled thread, `POST /conversations/{id}/title` replaces that fallback with an LLM summary. Null titles render exactly “Untitled chat”. See [ADR-llm-conversation-titles.md](../adr/ADR-llm-conversation-titles.md).
+- Answer source labels are exactly Auto, Company documents, General, Web in that order. New chats default Auto. Web is omitted unless `/api/meta` `web_search_enabled` is true. Hidden chrome is not authorization.
 - There is no permanent right sources/diagnostics column and no permanent 4-step stepper.
 
 ```mermaid
@@ -156,7 +157,7 @@ flowchart TB
 
 #### Status line
 
-- While a run is active, render the server-originated node/tool timeline (started/completed/failed only). Known labels include Preparing, Retrieving, Generating, and Verifying when those stages actually arrive. After verification the status may read “Verified — displaying answer” during paced reveal. Skipped nodes never appear.
+- While a run is active, render the server-originated node/tool timeline (started/completed/failed only). Known labels include Preparing, Retrieving, Searching, Reading, Generating, and Verifying when those stages actually arrive. After verification the status may read “Verified — displaying answer” during paced reveal. Skipped nodes never appear.
 - Not rendered when idle. The permanent 4-item stepper is removed.
 - Unknown stage stays in Run details, not as a new primary phase.
 - Server progress may complete faster than a paint; history still retains started/completed rows.
@@ -217,8 +218,7 @@ flowchart LR
 
 - 28px high evidence-muted pill, evidence text, evidence border, 12px/16px weight 600.
 - Label format: `[1] Source` when a safe source label exists; otherwise `[1] Evidence`.
-- Opens real Sources drawer.
-- No external-link icon unless a safe authorized URL exists in the actual contract.
+- Opens real Sources drawer for company citations. Web chips with a safe http(s) URL are anchors (`rel="noreferrer"`). Company Storage URLs stay non-href.
 
 #### `SourcesDrawer`
 
@@ -232,7 +232,7 @@ flowchart LR
 
 - Width 440px. Closed by default behind a ghost “Run details” control.
 - Render only rows whose value is real. Skip “—”, empty, and `none` rows.
-- Card layout: status, search mode, token metrics, account spend, and run id. Human labels: Status (`Completed` / `In progress` / `Partial` / `Cancelled` / `Error` / `Deadline reached`), Search mode (`Hybrid` / `Combined` / `Composite` / `Tables` / `Graph inspection`) plus a one-line summary for known families.
+- Card layout: status, search mode, token metrics, account spend, and run id. Human labels: Status (`Completed` / `In progress` / `Partial` / `Cancelled` / `Error` / `Deadline reached`), Search mode (`Hybrid` / `Combined` / `Composite` / `Tables` / `Graph inspection` / `Web research`) plus a one-line summary for known families.
 - Show “Started as” and “Why it changed” only after a real `route_correction`. Do not duplicate requested and effective when they match.
 - Tools, cache, coverage, and ignored stream events appear only when the stream supplied a value.
 - Do not show heartbeat counts, raw node names such as `verify_answer`, or placeholder `none` diagnostics.

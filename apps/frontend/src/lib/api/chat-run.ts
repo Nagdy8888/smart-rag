@@ -13,7 +13,8 @@ import { paidMutationHeaders, resumeHeaders } from "./headers";
 import { apiUrl, readJsonObject } from "./http";
 import { parseFeedbackResponse, parseRunResponse } from "./parsers";
 
-const CITATION_SNIPPET_KEYS = /^(snippet|passage|text|html|content|body)$/i;
+const CITATION_SNIPPET_KEYS =
+  /^(snippet|passage|text|html|content|body|excerpt|span)$/i;
 
 /**
  * Keep citation ids and coordinate provenance. Drop passage/snippet fields.
@@ -46,6 +47,12 @@ function parseCitationItem(item: unknown): CitationResponse | null {
       provenance[key] = value;
     }
   }
+  const sourceKind =
+    row.source_kind === "web" ? "web" : "company_document";
+  const webSourceId =
+    row.web_source_id === null || row.web_source_id === undefined
+      ? null
+      : String(row.web_source_id);
   return {
     citation_id: citationId,
     citation_index: Number(row.citation_index ?? 0),
@@ -55,6 +62,8 @@ function parseCitationItem(item: unknown): CitationResponse | null {
         : String(row.chunk_id),
     provenance,
     source_unavailable: Boolean(row.source_unavailable),
+    source_kind: sourceKind,
+    web_source_id: webSourceId,
   };
 }
 

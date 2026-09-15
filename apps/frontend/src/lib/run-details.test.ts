@@ -35,6 +35,7 @@ describe("routeLabel", () => {
     expect(routeLabel("combined")).toBe("Combined");
     expect(routeLabel("structured_table")).toBe("Tables");
     expect(routeLabel("graph_inspection")).toBe("Graph inspection");
+    expect(routeLabel("web_research")).toBe("Web research");
     expect(routeLabel("<script>x</script>")).toBe("<script>x</script>");
     expect(routeLabel(null)).toBeNull();
     expect(routeLabel("none")).toBeNull();
@@ -45,6 +46,9 @@ describe("routeSummary", () => {
   it("explains known families only", () => {
     expect(routeSummary("composite")).toBe(
       "Searches documents, tables, and relationships.",
+    );
+    expect(routeSummary("web_research")).toBe(
+      "Searches the public web. Does not search company documents.",
     );
     expect(routeSummary("custom_family")).toBeNull();
     expect(routeSummary(null)).toBeNull();
