@@ -124,7 +124,8 @@ def route_after_web_scope(state: QueryGraphState) -> str:
         state: State after ``web_scope``.
 
     Returns:
-        ``verify_answer`` or ``end``. The P06-40 stub always ends.
+        ``verify_answer`` or ``end``. Drafts go to verification; typed
+        fail-closed statuses end.
     """
 
     if state["status"] in {

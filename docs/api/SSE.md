@@ -74,7 +74,7 @@ tracebacks, secrets, source HTML, or passages.
 | Type | Role |
 | --- | --- |
 | `schema` | First event on a new stream. Carries `sse_schema_version`. |
-| `status` | Stage/status. Optional additive `phase` (`started`/`completed`/`failed`) for live progress; omitted on legacy rows. |
+| `status` | Stage/status. Optional additive `phase` (`started`/`completed`/`failed`) for live progress; omitted on legacy rows. Web research emits `web_search` (Searching…) and `web_read` (Reading…) before the existing `verify_answer` (Verifying…). Payloads are keys only: never query text, URL bodies, or excerpts. |
 | `tool_progress` | Optional-tool progress. `tool_key` and `phase` only. No args, results, or display text. |
 | `heartbeat` | Every 15 seconds, persisted, while the run is non-terminal. |
 | `route_correction` | Single-correction diagnostic. |
@@ -145,8 +145,9 @@ sequenceDiagram
 ## Sanitization and reconnect
 
 - Exception messages are discarded. Retrieved source text is never stored
-  or streamed. Payload keys `passage`, `snippet`, `html`, and traceback-like
-  names are stripped or rejected in `app.append_run_event`.
+  or streamed. Payload keys `passage`, `snippet`, `html`, `excerpt`,
+  `excerpts`, `web_sources`, `body`, `text`, and traceback-like names are
+  stripped or rejected in the SSE mapper and `app.append_run_event`.
 - Disconnect without cancel keeps already-paid usage. Reconnect resumes
   from `after` and does not invoke LangGraph again when status is already
   running/completed/cancelled/partial or this process has no live executor.

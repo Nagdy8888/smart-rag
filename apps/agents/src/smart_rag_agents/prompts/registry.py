@@ -85,6 +85,8 @@ PROMPT_REGISTRY: dict[str, PromptVersion] = {
     "conversation_title_v1": _entry(
         "conversation_title_v1", "conversation_title_v1.md"
     ),
+    "web_critique_v1": _entry("web_critique_v1", "web_critique_v1.md"),
+    "web_answer_v1": _entry("web_answer_v1", "web_answer_v1.md"),
 }
 
 

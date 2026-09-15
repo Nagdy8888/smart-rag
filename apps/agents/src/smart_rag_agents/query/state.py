@@ -63,6 +63,8 @@ class QueryGraphState(TypedDict):
         prompt_tokens: Accumulated provider prompt tokens for this run.
         completion_tokens: Accumulated provider completion tokens for this run.
         cost_usd: Billed USD total from ``app.llm_usage`` when set at verify.
+        web_sources: Persisted Web source mappings for the verify excerpt
+            store. Empty on company routes.
     """
 
     status: Literal[
@@ -132,6 +134,7 @@ class QueryGraphState(TypedDict):
     prompt_tokens: int
     completion_tokens: int
     cost_usd: float | None
+    web_sources: list[dict[str, object]]
 
 
 QueryStateGraph: TypeAlias = StateGraph[
@@ -217,4 +220,5 @@ def pending_query_state(
         "prompt_tokens": 0,
         "completion_tokens": 0,
         "cost_usd": None,
+        "web_sources": [],
     }

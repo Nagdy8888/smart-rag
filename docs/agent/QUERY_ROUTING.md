@@ -54,7 +54,7 @@ world knowledge when evidence is missing; they refuse.
 | `user_supplied_text` | `NoRetrieval` / `user_text_model` | one `usage_kind=answer` | none / `user_supplied_text` |
 | `ambiguous` | `NoRetrieval` / `clarification` | 0 | none / `ambiguous` |
 | `company_documents` | Hybrid / Combined / table / inspection as before | existing RAG | cited or refusal / `company_documents` |
-| `web` | `web_research` | P06-41 Exa/crawl-proxy | web citations / `web` |
+| `web` | `web_research` | Bounded Exa search/contents plus crawl-proxy fallback | web citations / `web` |
 
 ### Requested search scope
 
@@ -99,6 +99,15 @@ Precedence after classification:
    (`web_search_disabled` / `web_search_unconfigured`), not a general
    answer. A desired Web route that cannot fit the reservation is rejected;
    it never Hybrid-clamps.
+
+The Web subgraph runs at most two rounds: one search, one critique, at
+most two follow-up searches, one batched contents call, and optional
+crawl-proxy fallback only for current-run Exa URLs. Caps: three
+formulations, twelve candidates per round, six sources, twelve citations,
+five external operations, 50s. Empty or unsafe evidence is
+`web_evidence_insufficient` or `web_content_unavailable`. Ambiguous
+durable operations do not retry. Company passages, memory, IDs, JWTs, and
+signed URLs are never sent to Exa.
 
 Requested Company never manufactures `company_signal=True`. Explicit Company
 or General does not spend the profile model merely to decide company versus

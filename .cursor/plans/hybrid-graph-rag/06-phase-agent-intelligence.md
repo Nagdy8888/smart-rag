@@ -89,7 +89,7 @@ Packets P06-09 through P06-43 are additive after the completed historical packet
 38. [x] [Implement bounded Exa REST gateway, configuration, and controlled provider egress.](./06-phase-agent-intelligence/packets/38-exa-rest-gateway-controlled-egress.md)
 39. [x] [Add durable run-scoped web evidence, URL citations, and merged source_kind listing.](./06-phase-agent-intelligence/packets/39-run-web-evidence.md)
 40. [x] [Implement four-mode admission, Auto default, exactly-one-source routing, and Web envelope.](./06-phase-agent-intelligence/packets/40-four-mode-admission-routing.md)
-41. [ ] [Implement bounded iterative Web research graph, synthesis, verification, and fail-closed routes.](./06-phase-agent-intelligence/packets/41-web-research-graph.md)
+41. [x] [Implement bounded iterative Web research graph, synthesis, verification, and fail-closed routes.](./06-phase-agent-intelligence/packets/41-web-research-graph.md)
 42. [ ] [Implement four-option Ask dropdown, Web origin, progress, citations, and resume.](./06-phase-agent-intelligence/packets/42-four-mode-ask-ux.md)
 43. [ ] [Verify integrated Web gates, then resume P06-17.](./06-phase-agent-intelligence/packets/43-web-research-gates.md)
 

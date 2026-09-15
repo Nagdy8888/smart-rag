@@ -9,8 +9,14 @@ from smart_rag_core.sse.catalog import ALLOWED_SSE_EVENT_TYPES, PAYLOAD_MODELS
 GENERATE_ANSWER_NODE: Final[str] = "generate_answer"
 GENERAL_SCOPE_NODE: Final[str] = "general_scope"
 MIXED_SCOPE_NODE: Final[str] = "mixed_scope"
+WEB_SCOPE_NODE: Final[str] = "web_scope"
 DRAFT_ANSWER_NODES: Final[frozenset[str]] = frozenset(
-    {GENERATE_ANSWER_NODE, GENERAL_SCOPE_NODE, MIXED_SCOPE_NODE}
+    {
+        GENERATE_ANSWER_NODE,
+        GENERAL_SCOPE_NODE,
+        MIXED_SCOPE_NODE,
+        WEB_SCOPE_NODE,
+    }
 )
 VERIFY_ANSWER_NODE: Final[str] = "verify_answer"
 TOKEN_DELTA_LIMIT: Final[int] = 4096

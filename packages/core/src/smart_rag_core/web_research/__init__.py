@@ -1,5 +1,7 @@
-"""Run-scoped public Web evidence for Ask Web research."""
+"""Run-scoped public Web evidence and bounded research execution."""
 
+from smart_rag_core.web_research.bound_store import BoundWebStore
+from smart_rag_core.web_research.exceptions import WebResearchError
 from smart_rag_core.web_research.models import (
     WebCitation,
     WebOperationState,
@@ -19,8 +21,10 @@ from smart_rag_core.web_research.store import (
 )
 
 __all__ = [
+    "BoundWebStore",
     "WebCitation",
     "WebOperationState",
+    "WebResearchError",
     "WebSourceRecord",
     "assert_span_contained",
     "begin_web_research_operation",

@@ -49,7 +49,7 @@ class BoundQueryNodes:
         company_scope: Company retrieval.
         general_scope: General or user-text draft.
         mixed_scope: Mixed-scope clarification.
-        web_scope: Fail-closed Web research until P06-41.
+        web_scope: Bounded Web research with fail-closed provider errors.
         invalid_scope: Fail-closed invalid plan.
         apply_correction: Single global correction.
         fuse_evidence: Combined fusion.
@@ -182,14 +182,15 @@ def bind_query_nodes(bound: QueryGraphDeps) -> BoundQueryNodes:
     def web_scope(
         state: QueryGraphState, runtime: Runtime[QueryGraphContext]
     ) -> QueryGraphState:
-        """LangGraph wrapper for fail-closed Web research.
+        """LangGraph wrapper for bounded Web research.
 
         Args:
             state: Planned Web-research state.
             runtime: Per-invocation deps context.
 
         Returns:
-            Routing-rejected state until P06-41 binds an executor.
+            Answered draft for ``verify_answer``, or a typed fail-closed
+            terminal. Never emits ``token_delta``.
         """
 
         return web_scope_node(state, deps_from_runtime(runtime, bound))

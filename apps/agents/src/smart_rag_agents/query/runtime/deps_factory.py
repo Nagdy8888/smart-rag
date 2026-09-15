@@ -6,7 +6,9 @@ from collections.abc import Callable
 from typing import cast
 
 import psycopg
+from smart_rag_core.gateways.crawl_proxy import CrawlProxyGateway
 from smart_rag_core.gateways.embedding import create_embedding_gateway
+from smart_rag_core.gateways.exa_search import ExaSearchError, create_exa_search_gateway
 from smart_rag_core.gateways.model import (
     ModelGatewayUnavailableError,
     create_model_gateway,
@@ -26,6 +28,8 @@ from smart_rag_agents.prompts import (
     query_profile_prompt_text,
     rerank_prompt_text,
     verifier_prompt_text,
+    web_answer_prompt_text,
+    web_critique_prompt_text,
 )
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.runtime.adapters import (
@@ -137,6 +141,16 @@ def build_query_process_bindings(
         for name in ("retrieve_local", "retrieve_hybrid", "retrieve_global_steering")
     ):
         graph_retriever = cast(GraphRetrieveLike, graph)
+    exa_gateway = None
+    if bool(getattr(loaded, "web_search_enabled", False)):
+        try:
+            exa_gateway = create_exa_search_gateway(loaded)
+        except ExaSearchError:
+            exa_gateway = None
+    crawl_gateway = None
+    proxy_url = getattr(loaded, "crawl_proxy_url", None)
+    if proxy_url is not None:
+        crawl_gateway = CrawlProxyGateway(proxy_base_url=str(proxy_url))
     return QueryGraphProcessBindings(
         hybrid_retriever=hybrid,  # pyright: ignore[reportArgumentType]
         model_gateway=gateway,
@@ -151,6 +165,10 @@ def build_query_process_bindings(
         web_search_enabled=bool(getattr(loaded, "web_search_enabled", False)),
         web_search_configured=secret_url(getattr(loaded, "exa_api_key", None))
         is not None,
+        exa_search_gateway=exa_gateway,
+        crawl_proxy_gateway=crawl_gateway,
+        web_critique_prompt_text=web_critique_prompt_text(),
+        web_answer_prompt_text=web_answer_prompt_text(),
     )
 
 
@@ -210,11 +228,15 @@ def build_query_graph_deps(
         answer_prompt_text=bindings.answer_prompt_text,
         general_chat_prompt_text=bindings.general_chat_prompt_text,
         verifier_prompt_text=bindings.verifier_prompt_text,
+        web_critique_prompt_text=bindings.web_critique_prompt_text or None,
+        web_answer_prompt_text=bindings.web_answer_prompt_text or None,
         model_gateway=bindings.model_gateway,
         store_get=store_get,
         store_put=store_put,
         web_search_enabled=bindings.web_search_enabled,
         web_search_configured=bindings.web_search_configured,
+        exa_search_gateway=bindings.exa_search_gateway,
+        crawl_proxy_gateway=bindings.crawl_proxy_gateway,
     )
 
 

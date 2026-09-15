@@ -47,6 +47,10 @@ class QueryGraphProcessBindings:
         supabase_dsn: Canonical Postgres URL for per-run ``app_api`` connections.
         web_search_enabled: ``WEB_SEARCH_ENABLED`` snapshot. Default false.
         web_search_configured: True when a non-empty Exa key is present.
+        exa_search_gateway: Injected Exa REST client, or None.
+        crawl_proxy_gateway: Injected crawl-proxy client, or None.
+        web_critique_prompt_text: Pinned ``web_critique_v1`` body.
+        web_answer_prompt_text: Pinned ``web_answer_v1`` body.
     """
 
     hybrid_retriever: HybridRetrieveLike
@@ -61,3 +65,7 @@ class QueryGraphProcessBindings:
     supabase_dsn: str
     web_search_enabled: bool = False
     web_search_configured: bool = False
+    exa_search_gateway: object | None = None
+    crawl_proxy_gateway: object | None = None
+    web_critique_prompt_text: str = ""
+    web_answer_prompt_text: str = ""

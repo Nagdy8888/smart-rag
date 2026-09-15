@@ -15,6 +15,7 @@ from smart_rag_core.query_admission.service import summarize_run_usage
 from smart_rag_core.query_answer.citations import (
     ensure_fusion_source_citations,
     maybe_persist_verified_citations,
+    persist_web_answer_citations,
 )
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
@@ -32,6 +33,7 @@ from smart_rag_core.query_routing.constants import (
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.query_routing.serde import plan_from_state
+from smart_rag_core.web_research.models import WebSourceRecord
 
 from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.gateway.verifier import gateway_verifier
@@ -100,7 +102,7 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         tables = tables_from_state(state.get("table_composition"))
         payload = AnswerPayload.model_validate(raw_answer)
     except ValidationError:
-        preserved = raw_answer if isinstance(raw_answer, dict) else {}
+        preserved = raw_answer
         return {
             **state,
             "status": "verified_partial",
@@ -113,18 +115,39 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             plan = plan_from_state(state["retrieval_plan"])
         except ValueError:
             plan = None
+    web_records: list[WebSourceRecord] = []
+    web_excerpts: dict[str, str] = {}
+    for raw_source in state.get("web_sources") or []:
+        try:
+            record = WebSourceRecord.model_validate(raw_source)
+        except ValidationError:
+            continue
+        web_records.append(record)
+        web_excerpts[record.web_source_id] = record.excerpt
+    is_web = (
+        payload.answer_origin is KnowledgeScope.WEB
+        or (plan is not None and plan.knowledge_scope is KnowledgeScope.WEB)
+    )
+    if is_web and not web_excerpts:
+        return {
+            **state,
+            "status": "insufficient_evidence",
+            "detail": "web_evidence_insufficient",
+            "answer": payload.model_dump(mode="json"),
+        }
     checked, failures = deterministic_check_answer(
         payload,
         fusion=fusion,
         tables=tables.records,
-        evidence_required=route_needs_retrieval(plan),
+        evidence_required=route_needs_retrieval(plan) and not is_web,
+        web_excerpts=web_excerpts if is_web else None,
     )
     remaining = state["remaining_model_calls"]
     verifier_calls = state.get("verifier_call_count") or 0
     omitted: tuple[str, ...] = ()
     added_prompt_tokens = 0
     added_completion_tokens = 0
-    if checked.atomic_links:
+    if checked.atomic_links and not is_web:
         caller = None
         if deps.model_gateway is not None and deps.verifier_prompt_text:
 
@@ -211,16 +234,6 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     ):
         terminal = "insufficient_evidence"
         detail = FALLBACK_RETRIEVERS_UNBOUND
-    result = VerificationResult(
-        answer=checked,
-        deterministic_failures=failures,
-        verifier_call_count=1 if verifier_calls else 0,
-        omitted_link_ids=omitted,
-        status=terminal
-        if terminal
-        in {"verified", "verified_partial", "refused", "insufficient_evidence"}
-        else "verified_partial",
-    )
     context = runtime_from_state(state)
     billed_prompt = int(state.get("prompt_tokens") or 0) + max(0, added_prompt_tokens)
     billed_completion = int(state.get("completion_tokens") or 0) + max(
@@ -248,12 +261,46 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
         checked = checked.model_copy(
             update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}
         )
-    maybe_persist_verified_citations(
-        deps.connection,
-        caller=caller_from_runtime(context) if context is not None else None,
-        run_id=context.run_id if context is not None else None,
-        fusion=fusion,
+    if is_web:
+        checked = checked.model_copy(
+            update={
+                "citations": (),
+                "table_citations": (),
+                "answer_origin": KnowledgeScope.WEB,
+            }
+        )
+        if not checked.web_citations:
+            terminal = "insufficient_evidence"
+            detail = "web_evidence_insufficient"
+        elif deps.connection is not None and context is not None:
+            try:
+                persist_web_answer_citations(
+                    deps.connection,
+                    caller=caller_from_runtime(context),
+                    run_id=context.run_id,
+                    sources=tuple(web_records),
+                    answer=checked,
+                )
+            except (QueryAdmissionError, psycopg.Error, ValueError):
+                terminal = "insufficient_evidence"
+                detail = "web_evidence_insufficient"
+    else:
+        maybe_persist_verified_citations(
+            deps.connection,
+            caller=caller_from_runtime(context) if context is not None else None,
+            run_id=context.run_id if context is not None else None,
+            fusion=fusion,
+            answer=checked,
+        )
+    result = VerificationResult(
         answer=checked,
+        deterministic_failures=failures,
+        verifier_call_count=1 if verifier_calls else 0,
+        omitted_link_ids=omitted,
+        status=terminal
+        if terminal
+        in {"verified", "verified_partial", "refused", "insufficient_evidence"}
+        else "verified_partial",
     )
     return cast(
         QueryGraphState,

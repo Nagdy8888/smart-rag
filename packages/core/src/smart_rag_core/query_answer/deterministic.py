@@ -5,6 +5,7 @@ from __future__ import annotations
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload, AtomicLink
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.query_routing.models import TableEvidenceRecord
+from smart_rag_core.web_research.models import WebCitation
 
 
 def citation_span_aligns(span: str | None, citation_text: str) -> bool:
@@ -60,7 +61,8 @@ def inference_chain_complete(
         conclusion_link_ids: Ordered link IDs on the composed conclusion.
 
     Returns:
-        True when each listed link exists and has passage or table evidence.
+        True when each listed link exists and has passage, table, or Web
+        evidence.
     """
 
     by_id = {item.link_id: item for item in links}
@@ -69,7 +71,8 @@ def inference_chain_complete(
         if item is None:
             return False
         if not item.chunk_ids and not (item.table_id and item.source_ranges):
-            return False
+            if not item.web_source_ids:
+                return False
     return True
 
 
@@ -79,6 +82,7 @@ def deterministic_check_answer(
     fusion: FusionResult,
     tables: tuple[TableEvidenceRecord, ...],
     evidence_required: bool = True,
+    web_excerpts: dict[str, str] | None = None,
 ) -> tuple[AnswerPayload, tuple[str, ...]]:
     """Strip unauthorized, misaligned, or incomplete citations and links.
 
@@ -89,6 +93,9 @@ def deterministic_check_answer(
         evidence_required: Whether an empty evidence set must force refusal.
             NoRetrieval chat responses set this false because they make no
             company-knowledge claim.
+        web_excerpts: Persisted Web excerpt text by ``web_source_id``. When
+            set, company citations must stay empty and Web spans must be
+            substrings of the stored excerpt.
 
     Returns:
         Filtered payload and failure reason codes. Unsupported links are
@@ -97,18 +104,33 @@ def deterministic_check_answer(
 
     passages = {item.chunk_id: item for item in fusion.evidence}
     tables_by_id = {item.table_id: item for item in tables}
+    excerpts = web_excerpts or {}
     failures: list[str] = []
     kept_citations: list[AnswerCitation] = []
-    for citation in (*payload.citations, *payload.table_citations):
-        ok, reason = _citation_ok(citation, passages, tables_by_id)
-        if ok:
-            kept_citations.append(citation)
-        else:
-            failures.append(reason)
+    if excerpts:
+        if payload.citations or payload.table_citations:
+            failures.append("web_company_citation_forbidden")
+    else:
+        for citation in (*payload.citations, *payload.table_citations):
+            ok, reason = _citation_ok(citation, passages, tables_by_id)
+            if ok:
+                kept_citations.append(citation)
+            else:
+                failures.append(reason)
+    kept_web: list[WebCitation] = []
+    for citation in payload.web_citations:
+        excerpt = excerpts.get(citation.web_source_id)
+        if excerpt is None:
+            failures.append("invented_web_source")
+            continue
+        if citation.span not in excerpt:
+            failures.append("web_span_not_contained")
+            continue
+        kept_web.append(citation)
     kept_links: list[AtomicLink] = []
     refused: list[str] = list(payload.refused_links)
     for link in payload.atomic_links:
-        if _link_supported(link, passages, tables_by_id):
+        if _link_supported(link, passages, tables_by_id, web_ids=frozenset(excerpts)):
             kept_links.append(link)
         else:
             refused.append(link.link_id)
@@ -139,6 +161,7 @@ def deterministic_check_answer(
             update={
                 "citations": passage_citations,
                 "table_citations": table_citations,
+                "web_citations": tuple(kept_web),
                 "atomic_links": tuple(kept_links),
                 "composed_conclusion": conclusion,
                 "refused_links": tuple(dict.fromkeys(refused)),
@@ -191,6 +214,8 @@ def _link_supported(
     link: AtomicLink,
     passages: dict[str, ScoredPassage],
     tables: dict[str, TableEvidenceRecord],
+    *,
+    web_ids: frozenset[str] = frozenset(),
 ) -> bool:
     """Return whether an atomic link cites at least one surviving source.
 
@@ -198,6 +223,7 @@ def _link_supported(
         link: Atomic claim.
         passages: Canonical passages.
         tables: Table records.
+        web_ids: Persisted Web source IDs when verifying a Web answer.
 
     Returns:
         True when at least one cited ID is present and authorized.
@@ -209,4 +235,6 @@ def _link_supported(
         return table_ranges_align(
             link.source_ranges, tables[link.table_id].source_ranges
         )
+    if web_ids and any(item in web_ids for item in link.web_source_ids):
+        return True
     return False

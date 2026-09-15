@@ -26,6 +26,10 @@ CONVERSATION_TITLE_PROMPT_PATH = (
 )
 EVAL_PDF_JUDGE_PROMPT_VERSION = "eval_pdf_judge_v1"
 EVAL_PDF_JUDGE_PROMPT_PATH = Path(__file__).resolve().parent / "eval_pdf_judge_v1.md"
+WEB_CRITIQUE_PROMPT_VERSION = "web_critique_v1"
+WEB_CRITIQUE_PROMPT_PATH = Path(__file__).resolve().parent / "web_critique_v1.md"
+WEB_ANSWER_PROMPT_VERSION = "web_answer_v1"
+WEB_ANSWER_PROMPT_PATH = Path(__file__).resolve().parent / "web_answer_v1.md"
 
 
 def query_profile_prompt_text() -> str:
@@ -143,3 +147,29 @@ def eval_pdf_judge_prompt_text() -> str:
     """
 
     return EVAL_PDF_JUDGE_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def web_critique_prompt_text() -> str:
+    """Return the Web research critique prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return WEB_CRITIQUE_PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def web_answer_prompt_text() -> str:
+    """Return the Web research synthesis prompt body.
+
+    Returns:
+        Markdown prompt text.
+
+    Raises:
+        OSError: If the prompt file is missing.
+    """
+
+    return WEB_ANSWER_PROMPT_PATH.read_text(encoding="utf-8")
