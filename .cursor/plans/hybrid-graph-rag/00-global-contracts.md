@@ -308,6 +308,17 @@ User approval on 2026-09-10: add Ask dropdown Auto, Company documents, General, 
 - Never send company passages, conversation memory, internal IDs, JWTs, or signed URLs to Exa. API/agent code never `httpx` public result URLs.
 - Rollback sets `WEB_SEARCH_ENABLED=false`. Do not down-migrate populated Web tables.
 
+## Approved planned deviation: PDF paragraph citations
+
+User approval on 2026-09-15: company-PDF answers cite each factual paragraph with live authorized `app.documents.title`, the 1-based PDF viewer file page (`page_index + 1` displayed as `PDF page N`), and an ACL-checked exact supporting excerpt of at most 1000 characters. Printed `page_label` may remain in stored locators and must not drive the chat page. General, user-text, deterministic, and Web answers stay unchanged.
+
+- Recorded in `docs/adr/ADR-pdf-paragraph-citations.md`.
+- Integrity keeps packet numbers contiguous after P06-43, so overlay packets are P06-44 through P06-48. Do not reuse P06-37 through P06-43.
+- Execute after P06-41, then resume P06-42, P06-43, then P06-17.
+- Creator-owned citation GET may return the bounded excerpt only after live run-ownership and chunk ACL/current-version/deletion recheck. SSE `citation_preview` remains ID/ordinal metadata.
+- Missing, ambiguous, unsupported, or uncontained mappings fail closed. Retrieval is not citation proof. Historical rows with no paragraph index or exact span stay unmapped.
+- Rollback stops using `answer_v2` and `list_run_citations_v4` in application code. Do not down-migrate populated citation rows. Do not present `page_label` as the PDF viewer page.
+
 ## Approved planned deviation: paced verified-answer reveal and custom progress
 
 User approval on 2026-08-26: keep progress-only before verification, then progressively reveal already-verified answer text so it does not appear as one bulk block.

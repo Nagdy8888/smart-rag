@@ -45,7 +45,7 @@ company+web blend.
 - [`.cursor/plans/hybrid-graph-rag_ab5281ef.plan.md`](../../../.cursor/plans/hybrid-graph-rag_ab5281ef.plan.md)
 - [`.cursor/plans/hybrid-graph-rag/99-source-coverage.md`](../../../.cursor/plans/hybrid-graph-rag/99-source-coverage.md)
 - [`.cursor/plans/hybrid-graph-rag/plan-integrity-lock.json`](../../../.cursor/plans/hybrid-graph-rag/plan-integrity-lock.json)
-- [docs/README.md](../README.md), [docs/adr/README.md](../../adr/README.md)
+- [docs/README.md](../../README.md), [docs/adr/README.md](../../adr/README.md)
 
 ## Numbering deviation
 
