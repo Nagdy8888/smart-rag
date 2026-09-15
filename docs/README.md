@@ -20,22 +20,22 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-09-15 | eng, reviewers |
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
 | [agent/MEMORY_DELETION.md](./agent/MEMORY_DELETION.md) | engineering-lead | draft | 2026-08-27 | eng, security |
-| [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-09-10 | eng, frontend |
+| [frontend/THIN_DEVELOPER_UI.md](./frontend/THIN_DEVELOPER_UI.md) | engineering-lead | draft | 2026-09-15 | eng, frontend |
 | [frontend/DESIGN_SYSTEM.md](./frontend/DESIGN_SYSTEM.md) | engineering-lead | draft | 2026-08-26 | frontend, reviewers |
 | [runbooks/managed-auth-totp-residue.md](./runbooks/managed-auth-totp-residue.md) | engineering-lead | accepted | 2026-08-24 | ops, security |
 | [frontend/AUTH_AND_STREAMING.md](./frontend/AUTH_AND_STREAMING.md) | engineering-lead | draft | 2026-08-26 | eng, frontend, security |
-| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-09-13 | eng, frontend |
+| [frontend/CORE_RAG_SURFACES.md](./frontend/CORE_RAG_SURFACES.md) | engineering-lead | draft | 2026-09-15 | eng, frontend |
 | [frontend/ADMINISTRATION.md](./frontend/ADMINISTRATION.md) | engineering-lead | draft | 2026-09-14 | eng, frontend, security |
-| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-09-13 | eng, frontend |
+| [frontend/API_UI_MAPPING.md](./frontend/API_UI_MAPPING.md) | engineering-lead | draft | 2026-09-15 | eng, frontend |
 | [frontend/STITCH_BRIEF.md](./frontend/STITCH_BRIEF.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_STATES.md](./frontend/STITCH_STATES.md) | engineering-lead | draft | 2026-08-24 | design, frontend |
 | [frontend/STITCH_A11Y_SECURITY.md](./frontend/STITCH_A11Y_SECURITY.md) | engineering-lead | draft | 2026-08-17 | frontend, security |
-| [frontend/A11Y_SECURITY_IMPLEMENTATION.md](./frontend/A11Y_SECURITY_IMPLEMENTATION.md) | engineering-lead | draft | 2026-09-10 | frontend, security |
+| [frontend/A11Y_SECURITY_IMPLEMENTATION.md](./frontend/A11Y_SECURITY_IMPLEMENTATION.md) | engineering-lead | draft | 2026-09-15 | frontend, security |
 | [frontend/PHASE8_JOURNEY_MATRIX.md](./frontend/PHASE8_JOURNEY_MATRIX.md) | engineering-lead | draft | 2026-08-27 | eng, frontend, reviewers |
 | [frontend/STITCH_REVIEW.md](./frontend/STITCH_REVIEW.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
 | [frontend/VISUAL_MAP.md](./frontend/VISUAL_MAP.md) | engineering-lead | draft | 2026-08-24 | frontend, reviewers |
 | [frontend/design-tokens-and-primitives.md](./frontend/design-tokens-and-primitives.md) | engineering-lead | draft | 2026-08-24 | frontend |
-| [frontend/workspace-screens.md](./frontend/workspace-screens.md) | engineering-lead | draft | 2026-09-13 | frontend |
+| [frontend/workspace-screens.md](./frontend/workspace-screens.md) | engineering-lead | draft | 2026-09-15 | frontend |
 | [frontend/admin-and-auth-screens.md](./frontend/admin-and-auth-screens.md) | engineering-lead | draft | 2026-08-27 | frontend, security |
 | [frontend/action-inventory.json](./frontend/action-inventory.json) | engineering-lead | draft | 2026-09-13 | frontend, reviewers |
 | [development/phase-07-stitch-specification-evidence.md](./development/phase-07-stitch-specification-evidence.md) | engineering-lead | draft | 2026-08-17 | eng, reviewers |
@@ -139,7 +139,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [retrieval/STRUCTURED_TABLE.md](./retrieval/STRUCTURED_TABLE.md) | engineering-lead | draft | 2026-08-14 | eng, security, reviewers |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
-| [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-10 | eng |
+| [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-15 | eng |
 | [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-10 | eng, ops |
 | [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-08-27 | eng |
 | [ingestion/SCAN_BEFORE_INDEX.md](./ingestion/SCAN_BEFORE_INDEX.md) | engineering-lead | draft | 2026-08-19 | eng, security |

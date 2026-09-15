@@ -8,6 +8,7 @@ import type {
   ConversationResponse,
   RunResponse,
 } from "../types";
+import { parseCitationItem } from "./chat-run";
 import { throwIfNotOk } from "./errors";
 import type { ApiAuth } from "./headers";
 import { paidMutationHeaders, resumeHeaders } from "./headers";
@@ -114,13 +115,56 @@ export async function fetchConversationMessages(
   const body = await readJsonObject(response);
   throwIfNotOk(response, body);
   const items = Array.isArray(body.items)
-    ? (body.items as ConversationMessage[])
+    ? body.items.flatMap((item) => {
+        const parsed = parseConversationMessage(item);
+        return parsed === null ? [] : [parsed];
+      })
     : [];
   const next =
     body.next_before_id === null || body.next_before_id === undefined
       ? null
       : String(body.next_before_id);
   return { items, next_before_id: next };
+}
+
+/**
+ * Parse one transcript row, including optional run citations.
+ *
+ * History chips use this payload. The client never fetches citations per
+ * historical message.
+ *
+ * @param item - Raw message JSON.
+ * @returns Typed message, or null when identity/role is invalid.
+ */
+function parseConversationMessage(item: unknown): ConversationMessage | null {
+  if (item === null || typeof item !== "object" || Array.isArray(item)) {
+    return null;
+  }
+  const row = item as Record<string, unknown>;
+  const role = row.role;
+  if (role !== "user" && role !== "assistant") {
+    return null;
+  }
+  const messageId = row.message_id;
+  if (typeof messageId !== "string" || messageId.trim() === "") {
+    return null;
+  }
+  const citations = Array.isArray(row.citations)
+    ? row.citations
+        .map(parseCitationItem)
+        .filter((citation): citation is NonNullable<typeof citation> => citation !== null)
+    : [];
+  return {
+    message_id: messageId,
+    role,
+    content: typeof row.content === "string" ? row.content : "",
+    created_at: typeof row.created_at === "string" ? row.created_at : "",
+    run_id:
+      typeof row.run_id === "string" && row.run_id.trim() !== ""
+        ? row.run_id
+        : null,
+    citations,
+  };
 }
 
 /**

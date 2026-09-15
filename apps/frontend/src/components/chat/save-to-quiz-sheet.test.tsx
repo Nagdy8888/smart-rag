@@ -18,6 +18,8 @@ function citation(index: number, chunkId: string): CitationResponse {
     citation_id: `cite-${String(index)}`,
     citation_index: index,
     chunk_id: chunkId,
+    document_title: `Doc ${String(index)} ${HOSTILE}`,
+    pdf_page_number: index + 1,
     provenance: { document_title: `Doc ${String(index)} ${HOSTILE}` },
     source_unavailable: false,
   };

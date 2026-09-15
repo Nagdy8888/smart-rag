@@ -99,10 +99,11 @@ worktree has no non-hosted `SUPABASE_DB_URL`, and
 - SQL leaf/ACL/history contract pytest against a labelled non-hosted
   `SUPABASE_DB_URL`.
 - Repair `--apply` against a live version.
-- Inline UI remains P06-47.
 
 ## Handoff for P06-47
 
 Typed HTTP fields: `paragraph_index`, `document_title`,
 `pdf_page_number`, `evidence_excerpt`, message `run_id`, and message
-`citations`. Excerpt is never copied into `provenance`.
+`citations`. Excerpt is never copied into `provenance`. Inline UI is
+recorded in
+[p06-47-inline-pdf-citation-ui-2026-09-15.md](./p06-47-inline-pdf-citation-ui-2026-09-15.md).

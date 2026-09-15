@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
@@ -180,22 +181,74 @@ describe("CitationDrawer", () => {
     expect(document.querySelector("script")).toBeNull();
   });
 
-  it("shows page and title locators instead of a provenance dump", () => {
+  it("shows book title, PDF page, and supporting passage", () => {
     const citation: CitationResponse = {
       citation_id: "cite-1",
       citation_index: 0,
       chunk_id: "chunk-1",
       provenance: {
         document_title: "Building applications with AI agents",
-        page_number: 129,
+        page_number: 12,
+        page_label: "12",
         section_path: ["Parallel Tool Execution"],
       },
       source_unavailable: false,
+      document_title: "Building applications with AI agents",
+      pdf_page_number: 129,
+      evidence_excerpt: "Parallel tool execution reduces latency.",
     };
     render(<CitationDrawer citation={citation} onClose={() => undefined} />);
-    expect(screen.getByRole("heading", { name: "Page 129" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Building applications with AI agents — PDF page 129",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Building applications with AI agents")).toBeInTheDocument();
+    expect(screen.getByText("129")).toBeInTheDocument();
     expect(screen.getByText("Parallel Tool Execution")).toBeInTheDocument();
+    expect(
+      screen.getByText("Parallel tool execution reduces latency."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(SOURCE_PREVIEW_UNAVAILABLE)).not.toBeInTheDocument();
+  });
+
+  it("renders hostile excerpt as text and keeps tab focus in the drawer", async () => {
+    const user = userEvent.setup();
+    const citation: CitationResponse = {
+      citation_id: "cite-x",
+      citation_index: 0,
+      chunk_id: "chunk-x",
+      provenance: {},
+      source_unavailable: false,
+      document_title: "<img src=x onerror=alert(1)>",
+      pdf_page_number: 25,
+      evidence_excerpt: "<script>alert(1)</script>",
+    };
+    render(<CitationDrawer citation={citation} onClose={() => undefined} />);
+    expect(screen.getByText("<script>alert(1)</script>")).toBeInTheDocument();
+    expect(document.querySelector("script")).toBeNull();
+    expect(document.querySelector("img")).toBeNull();
+    const dialog = screen.getByRole("dialog");
+    await user.tab();
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it("marks Arabic supporting passage as dir=auto", () => {
+    const citation: CitationResponse = {
+      citation_id: "cite-ar",
+      citation_index: 0,
+      chunk_id: "chunk-ar",
+      provenance: {},
+      source_unavailable: false,
+      document_title: "الدليل",
+      pdf_page_number: 3,
+      evidence_excerpt: "مدة الاسترداد ثلاثون يوماً.",
+    };
+    render(<CitationDrawer citation={citation} onClose={() => undefined} />);
+    expect(screen.getByText("مدة الاسترداد ثلاثون يوماً.").closest("span")).toHaveAttribute(
+      "dir",
+      "auto",
+    );
   });
 });
 
@@ -212,6 +265,8 @@ describe("CitationSheet", () => {
             chunk_id: "a035e243-03dd-4987-b7ed-fe00c0b9336c",
             provenance: { page_number: 129, document_title: "AI agents" },
             source_unavailable: false,
+            document_title: "AI agents",
+            pdf_page_number: 129,
           },
         ]}
         hrefForCitation={() => undefined}
@@ -219,7 +274,7 @@ describe("CitationSheet", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "Citation 0, AI agents · p. 129" }),
+      screen.getByRole("button", { name: "Citation 0, AI agents · PDF page 129" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("a035e243-03dd-4987-b7ed-fe00c0b9336c"),

@@ -225,7 +225,7 @@ flowchart LR
 - Width 560px desktop, full width mobile.
 - Header “Sources.”
 - Group citations by safe source identity only when actual provenance supports it.
-- Citation card shows index, document/chunk identifiers, printed page label and file PDF page when they differ, sheet/range/URL locator fields actually present, and “Source unavailable” status when true.
+- Citation card shows index, typed book/source title, PDF toolbar page, optional section, sheet/range/URL locators actually present, supporting passage when authorized, and “Source unavailable” status when true. Printed `page_label` is not the company PDF page.
 - No fake excerpt, preview, download, relevance score, or open-source button.
 
 #### `RunDetailsDrawer`

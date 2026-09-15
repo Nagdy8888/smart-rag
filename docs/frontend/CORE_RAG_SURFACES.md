@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -21,6 +21,7 @@ Related: [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh
 [AUTH_AND_STREAMING.md](./AUTH_AND_STREAMING.md) ·
 [THIN_DEVELOPER_UI.md](./THIN_DEVELOPER_UI.md) ·
 [API_UI_MAPPING.md](./API_UI_MAPPING.md) ·
+[p06-47 inline citations](../development/phase-06/p06-47-inline-pdf-citation-ui-2026-09-15.md) ·
 [STITCH_STATES.md](./STITCH_STATES.md) ·
 [STITCH_REVIEW.md](./STITCH_REVIEW.md) ·
 [VISUAL_MAP.md](./VISUAL_MAP.md) ·
@@ -77,7 +78,7 @@ flowchart TD
 | --- | --- |
 | GAP-07-01 | Auto envelope only. Advanced panel is display-only of `route_family` and `route_correction`. No Hybrid/Combined/Table/Inspect send buttons. `search_scope` is allowed |
 | GAP-07-02 | SSE catalog only. Inference-chain objects are absent; citation chips only |
-| GAP-07-09 | Source drawer: printed page label when the PDF has one, file PDF page when it differs, title/section, technical ids. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
+| GAP-07-09 | Source drawer: company PDFs show typed book title, toolbar PDF page, optional section, and supporting passage. Printed `page_label` is not the chip/drawer page. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
 | GAP-07-10 | No rolling ETA/cost. Authorized `graph_handoff` counts + `graphNotReadyCopy(n)` only |
 | GAP-07-12 | No anomaly toast counts or audit tabs |
 | GAP-07-14 | `DELETE /documents/{id}` is wired for owner/admin with confirmation. Members still 403. No source preview/download |

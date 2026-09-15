@@ -2,7 +2,7 @@
 title: Chunking contract
 owner: engineering-lead
 status: accepted
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-15
 owning_phase: 3
 audience: engineering
 ---
@@ -42,8 +42,9 @@ Graph-disabled ingest of that hash with `parser_v1_pdf_headings_v2` produced
 embedding input cap. The 90% gate
 is a Packet 5 stop, not a reason to relax merge rules. `document_chunks.page_number` is the 1-based PDF file
 page (`page_index + 1`). Printed `/PageLabels` values (roman or arabic) are
-copied onto provenance locators as `page_label` for citation display; they
-do not replace `page_number`.
+copied onto provenance locators as `page_label`. Chat company-PDF chips use
+the typed toolbar page (`pdf_page_number` = `page_index + 1`) and must not
+treat `page_label` as the displayed page.
 
 ## Atomicity
 

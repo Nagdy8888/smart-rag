@@ -102,7 +102,8 @@ Recorded pytest files: `test_answer_paragraph_citations.py`,
 
 - SQL persistence, leaf resolution, and PDF page repair are recorded in
   [p06-46-pdf-citation-persistence-2026-09-15.md](./p06-46-pdf-citation-persistence-2026-09-15.md).
-- Inline UI remains P06-47.
+- Inline UI is recorded in
+  [p06-47-inline-pdf-citation-ui-2026-09-15.md](./p06-47-inline-pdf-citation-ui-2026-09-15.md).
 - Full `scripts/check.py --tier unit` was not run in this packet.
 
 ## Handoff for P06-46

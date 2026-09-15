@@ -22,6 +22,10 @@ export type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  /** Owning run when the message was persisted with a citation batch. */
+  run_id?: string | null;
+  /** ACL-rechecked citations for this message. Never fetched N+1 from history. */
+  citations?: CitationResponse[];
 };
 
 /** Keyset page from `GET /conversations/{id}/messages`. */
@@ -64,6 +68,18 @@ export type CitationResponse = {
   chunk_id: string | null;
   provenance: Record<string, unknown>;
   source_unavailable: boolean;
+  /** Catalog kind. Missing values parse as `company_document`. */
+  source_kind?: string;
+  /** Web evidence id when `source_kind` is `web`. */
+  web_source_id?: string | null;
+  /** 0–5 paragraph mapping, or null for legacy/unmapped rows. */
+  paragraph_index?: number | null;
+  /** ACL-safe document title. Never copied from `page_label`. */
+  document_title?: string | null;
+  /** 1-based PDF toolbar page from locators, or null when unknown. */
+  pdf_page_number?: number | null;
+  /** Exact supporting span. Top-level only; never read from provenance. */
+  evidence_excerpt?: string | null;
 };
 
 export const ANSWER_ORIGINS = [
