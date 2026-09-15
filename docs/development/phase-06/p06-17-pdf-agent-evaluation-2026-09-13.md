@@ -2,7 +2,7 @@
 title: P06-17 PDF Hybrid agent evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: engineering, reviewers
 ---
 
@@ -15,6 +15,9 @@ Related: [PDF_HYBRID_EVALUATION.md](../../evaluation/PDF_HYBRID_EVALUATION.md) Â
 Requirement: qualify PDF Hybrid agent answers on development and
 qualification without reusing `eval_judge_v1.md`, and without opening
 holdout.
+
+P06-43 closed the advanced web research overlay on 2026-09-15. The
+canonical queue returns here. Holdout (P06-18) remains unopened.
 
 ```mermaid
 flowchart TD

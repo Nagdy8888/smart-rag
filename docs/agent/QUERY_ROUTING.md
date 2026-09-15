@@ -63,7 +63,9 @@ It is not authorization, not `route_family`, and not effective
 `knowledge_scope`. Values: `auto`, `company_documents`, `general_knowledge`,
 `web`. Omitted requests stay Auto. Exactly one source is selected; company
 and web never blend. Company-insufficient evidence never falls back to web
-or general.
+or general. Ask labels are Auto, Company documents, General, and Web.
+New chats default Auto. Web is hidden unless `/api/meta`
+`web_search_enabled` is true.
 
 ```mermaid
 flowchart TD
@@ -83,7 +85,7 @@ flowchart TD
 Precedence after classification:
 
 1. Pure greetings, small talk, product-help, and user-text transforms keep
-   their current handling even when Company files is selected.
+   their current handling even when Company documents is selected.
 2. Other substantive prompts with `company_documents` force
    `KnowledgeScope.COMPANY_DOCUMENTS` and the existing company matrix.
 3. Other substantive prompts with `general_knowledge` force

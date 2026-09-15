@@ -91,7 +91,7 @@ Packets P06-09 through P06-43 are additive after the completed historical packet
 40. [x] [Implement four-mode admission, Auto default, exactly-one-source routing, and Web envelope.](./06-phase-agent-intelligence/packets/40-four-mode-admission-routing.md)
 41. [x] [Implement bounded iterative Web research graph, synthesis, verification, and fail-closed routes.](./06-phase-agent-intelligence/packets/41-web-research-graph.md)
 42. [x] [Implement four-option Ask dropdown, Web origin, progress, citations, and resume.](./06-phase-agent-intelligence/packets/42-four-mode-ask-ux.md)
-43. [ ] [Verify integrated Web gates, then resume P06-17.](./06-phase-agent-intelligence/packets/43-web-research-gates.md)
+43. [x] [Verify integrated Web gates, then resume P06-17.](./06-phase-agent-intelligence/packets/43-web-research-gates.md)
 
 ## Approved planned deviation: general-chat strict split
 

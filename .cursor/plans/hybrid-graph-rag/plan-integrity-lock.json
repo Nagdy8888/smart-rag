@@ -6,7 +6,7 @@
     ".cursor/plans/hybrid-graph-rag/03-phase-ingestion.md": "25f823c33b337fef910cc1196f6841d741433f965f19adccd285acd642852452",
     ".cursor/plans/hybrid-graph-rag/04-phase-hybrid-rag.md": "2da5f270d73c26db7320189d8b26aeafc95c2bbb50cb4ca820eeeb2404acd67c",
     ".cursor/plans/hybrid-graph-rag/05-phase-graphrag.md": "c94458ffcb42b711c3f71f4ad1fd3bbe0ea71914c7cd9878d53ae50f81d8e9e6",
-    ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence.md": "50e68d3525f75557a52b1ef533bc26d948b6fa1146d7a609d4c19804e79bff52",
+    ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence.md": "9c9d6a42f34d6e72a781932e53eaa5ff22d13c10ee10f908138ca1f75f078486",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/00-shared-contracts.md": "79f7b53ba2377efbc14e65d16e4ec5ddcdf836910b8b662932d22c7420aabfd4",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/01-admission-budgets.md": "13336cf420c9175a0acd729ef78ac8f599a7f1bf9c9681595658bb17b26ff1c7",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/02-profiling-routing.md": "c94cc38f3d050d1ee3e1bdb38ff37e5ce3f75104cc48e5487977fd14ba4ecd9e",
@@ -50,7 +50,7 @@
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/40-four-mode-admission-routing.md": "07f06d7296640f6a77365189569f77d9291906774f75ed23dd8ed2f6cea129f5",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/41-web-research-graph.md": "549af778701a48f806b865b4832be2c1005755b029cb955174f62e14d333fe1a",
     ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/42-four-mode-ask-ux.md": "5c46039c9fed81c4383a1a52d491b863e2a2bef6e7030a3039397a01d8c171f9",
-    ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/43-web-research-gates.md": "2fa7159df69e41f73c61f6a7602bb7e6f4a43d9457e093f276cb12a997a2ff7f",
+    ".cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence/packets/43-web-research-gates.md": "a51796d4332410886f3160b2c8a5f950592935c7652dfc74d294e77374a6b2f8",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification.md": "591de2d86b19e31ccf269afbbe3ceadfb8d63989f2cb6935209a468a9f6c63f6",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/00-shared-contracts.md": "7eb5eb8b74e1b6d7616590f85fc5262a751d317c723902450f12d906a7a7e833",
     ".cursor/plans/hybrid-graph-rag/07-phase-stitch-specification/packets/01-inventory-real-phase-6-contracts.md": "bf200adfc3baa800c0ce5a8c11117570e8ac8ad19e21b6c2fb60cf32600bcf3b",
@@ -200,6 +200,6 @@
     ".cursor/skills/scaffold-monorepo-layout/SKILL.md": "de8386c1378d4a0dc83bebeb6b0209756e3fe3ab9193b9bd685444a9df018c3f",
     ".cursor/skills/verify-release-gates/SKILL.md": "6174e4d81e032c3d4c187ad638c0e1b36bbf30d9be3a8524f2bd044b3e8a7c57"
   },
-  "generated_at": "2026-09-15T10:43:03.384234+00:00",
+  "generated_at": "2026-09-15T10:52:20.695112+00:00",
   "schema_version": 1
 }

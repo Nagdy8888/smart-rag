@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-15
 audience: developers, operators
 ---
 
@@ -114,6 +114,7 @@ See [LIGHTRAG_CONTRACT.md](../graph/LIGHTRAG_CONTRACT.md).
 | `PDF_EVAL_WORKSPACE_ROOT` | path; `/app/.private-eval` | public | Server-owned gitignored workspace. HTTP callers never supply a path. Compose bind-mounts `./.private-eval` on the API only |
 | `WEB_SEARCH_ENABLED` | boolean; Python `false` | public | Local-only Exa web research. Staging and production reject `true` at settings load. Production Web stays disabled until a paid budget and managed `api.exa.ai` egress are approved |
 | `EXA_API_KEY` | optional secret | secret | Server-only Exa REST credential. Required when `WEB_SEARCH_ENABLED=true`. Never logged, committed, or sent to the browser |
+| `WEB_SEARCH_LIVE` | `1` to enable; unset skips | public | Local pytest gate for one live Exa search. Requires `APP_ENV=local`. Unset in CI. Never commit the key |
 | `REQUEST_MAX_BODY_BYTES` | 1024–16_777_216; `1048576` | public | JSON/body cap; oversized → 413 |
 | `VALKEY_TIMEOUT_SECONDS` | 0.05–2.0; `0.2` | public | Valkey connect/command timeout |
 | `RATE_LIMIT_RETRY_AFTER_SECONDS` | 1–3600; `60` | public | `Retry-After` on limiter 429/503 |

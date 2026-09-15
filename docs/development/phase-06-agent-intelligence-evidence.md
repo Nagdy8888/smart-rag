@@ -69,6 +69,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-40 — Four-mode admission and Web envelope (2026-09-15) | [phase-06/p06-40-four-mode-routing-2026-09-15.md](./phase-06/p06-40-four-mode-routing-2026-09-15.md) | 141 |
 | P06-41 — Bounded iterative Web research graph (2026-09-15) | [phase-06/p06-41-web-research-graph-2026-09-15.md](./phase-06/p06-41-web-research-graph-2026-09-15.md) | 124 |
 | P06-42 — Four-mode Ask dropdown UX (2026-09-15) | [phase-06/p06-42-four-mode-ask-ux-2026-09-15.md](./phase-06/p06-42-four-mode-ask-ux-2026-09-15.md) | 98 |
+| P06-43 — Integrated Web gates (2026-09-15) | [phase-06/p06-43-web-research-gates-2026-09-15.md](./phase-06/p06-43-web-research-gates-2026-09-15.md) | 68 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |
@@ -77,7 +78,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-14 — Main chat origin UX (closed 2026-09-13) | [phase-06/p06-14-main-chat-origin-ux-2026-08-25.md](./phase-06/p06-14-main-chat-origin-ux-2026-08-25.md) | 75 |
 | P06-15 — Integrated verification (closed 2026-09-13) | [phase-06/p06-15-integrated-verification-2026-08-25.md](./phase-06/p06-15-integrated-verification-2026-08-25.md) | 145 |
 | P06-16 — Custom SSE progress and paced-reveal contract (closed 2026-09-13) | [phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md](./phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md) | 42 |
-| P06-17 — PDF Hybrid agent evaluation (live qualification blocked) | [phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md](./phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md) | 40 |
+| P06-17 — PDF Hybrid agent evaluation (live qualification blocked) | [phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md](./phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md) | 57 |
 | P06-18 — Private-PDF holdout (blocked; not opened) | [phase-06/p06-18-pdf-holdout-blocked-2026-09-13.md](./phase-06/p06-18-pdf-holdout-blocked-2026-09-13.md) | 22 |
 | LangSmith hosted online evaluators (2026-08-26) | [phase-06/langsmith-hosted-online-evaluators-2026-08-26.md](./phase-06/langsmith-hosted-online-evaluators-2026-08-26.md) | 105 |
 | BR-1A — Brain-repair governance amendment (2026-08-26, pending acceptance) | [phase-06/br-1a-brain-repair-governance-amendment-2026-08-26-pending-acceptance.md](./phase-06/br-1a-brain-repair-governance-amendment-2026-08-26-pending-acceptance.md) | 65 |
