@@ -263,9 +263,7 @@ def test_leaf_citation_uses_locator_viewer_page_25(
         )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     inserted = _persist(
         db_connection,
         caller=member,
@@ -329,9 +327,7 @@ def test_parent_resolves_to_one_child_on_page_25(
         )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     _persist(
         db_connection,
         caller=member,
@@ -387,9 +383,7 @@ def test_two_matching_children_are_rejected(
             )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     with pytest.raises(QueryAdmissionError, match="leaf_ambiguous"):
         _persist(
             db_connection,
@@ -427,10 +421,10 @@ def test_null_empty_or_non_contained_span_is_rejected(
         )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
+    expected = (
+        "citation_span_required" if not (span or "").strip() else "span_not_contained"
     )
-    expected = "citation_span_required" if not (span or "").strip() else "span_not_contained"
     with pytest.raises(QueryAdmissionError, match=expected):
         _persist(
             db_connection,
@@ -469,9 +463,7 @@ def test_multi_page_locators_are_rejected(db_connection: psycopg.Connection) -> 
         )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     with pytest.raises(QueryAdmissionError, match="page_ambiguous"):
         _persist(
             db_connection,
@@ -507,9 +499,7 @@ def test_idempotent_replay_and_conflict_and_thirteenth_citation(
         )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     first = _persist(
         db_connection,
         caller=member,
@@ -594,9 +584,7 @@ def test_foreign_run_is_not_found(db_connection: psycopg.Connection) -> None:
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
     stranger = caller_context(stranger_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     db_connection.execute("SET ROLE app_api")
     try:
         with pytest.raises(QueryAdmissionError, match="not_found"):
@@ -631,9 +619,7 @@ def test_current_version_flip_strips_title_page_and_excerpt(
         )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     _persist(
         db_connection,
         caller=member,
@@ -701,9 +687,7 @@ def test_hostile_excerpt_is_escaped(db_connection: psycopg.Connection) -> None:
         )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     _persist(
         db_connection,
         caller=member,
@@ -754,9 +738,7 @@ def test_transcript_history_batches_assistant_citations(
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
     stranger = caller_context(stranger_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     _persist(
         db_connection,
         caller=member,
@@ -836,9 +818,7 @@ def test_legacy_null_paragraph_gains_no_invented_excerpt(
         )
         authz = authorization_version(cursor)
     member = caller_context(member_id, "member", authz)
-    admitted, _ = admit(
-        db_connection, caller=member, conversation_id=conversation_id
-    )
+    admitted, _ = admit(db_connection, caller=member, conversation_id=conversation_id)
     with db_connection.cursor() as cursor:
         cursor.execute(
             """

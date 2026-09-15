@@ -22,9 +22,7 @@ from smart_rag_core.web_research.policy import (
 )
 
 _REASON_PREFIXES = ("web_evidence:", "web_operation:", "query_admission:")
-_OPERATION_STATUSES = frozenset(
-    {"planned", "sent", "succeeded", "failed", "ambiguous"}
-)
+_OPERATION_STATUSES = frozenset({"planned", "sent", "succeeded", "failed", "ambiguous"})
 
 
 def _raise_web_error(exc: BaseException) -> NoReturn:
@@ -80,9 +78,9 @@ def _cell(row: dict[str, object], key: str) -> object:
     return row[key]
 
 
-def _operation_status(value: object) -> Literal[
-    "planned", "sent", "succeeded", "failed", "ambiguous"
-]:
+def _operation_status(
+    value: object,
+) -> Literal["planned", "sent", "succeeded", "failed", "ambiguous"]:
     """Parse a durable operation status.
 
     Args:

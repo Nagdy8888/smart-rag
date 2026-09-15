@@ -53,10 +53,11 @@ def parse_verifier_payload(raw: object) -> VerifierPayload:
     verdicts_raw = typed_raw.get("link_verdicts")
     if not isinstance(verdicts_raw, list):
         raise AnswerError("verifier_schema_invalid")
-    if len(verdicts_raw) > MAX_VERIFIER_LINKS:
+    verdicts_list = cast(list[object], verdicts_raw)
+    if len(verdicts_list) > MAX_VERIFIER_LINKS:
         raise AnswerError("verifier_batch_cap")
     cleaned: list[dict[str, object]] = []
-    for item in cast(list[object], verdicts_raw):
+    for item in verdicts_list:
         if not isinstance(item, dict):
             raise AnswerError("verifier_schema_invalid")
         typed_item = {

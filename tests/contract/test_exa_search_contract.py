@@ -98,6 +98,7 @@ def test_search_request_body_matches_documented_fields() -> None:
     captured: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return a mocked Exa HTTP response."""
         captured["url"] = str(request.url)
         captured["body"] = json.loads(request.content.decode("utf-8"))
         payload = json.loads(
@@ -106,6 +107,7 @@ def test_search_request_body_matches_documented_fields() -> None:
         return httpx.Response(200, json=payload)
 
     async def _run() -> None:
+        """Exercise one mocked gateway call."""
         gateway = ExaSearchGateway(
             api_key=SecretStr("contract-key"),
             transport=httpx.MockTransport(handler),

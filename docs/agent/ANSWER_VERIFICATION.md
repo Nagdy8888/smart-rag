@@ -77,6 +77,20 @@ LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Live
 company answers derive `answer_text` from ordered paragraphs. Fusion
 passages are never backfilled as citations.
 
+Company PDF chat chips use the typed toolbar page (`pdf_page_number` =
+locator `page_index + 1`) and canonical `document_title`. Printed
+`page_label` stays on locators and is not the displayed page. Persistence
+resolves one leaf chunk that contains the exact span. Two matching
+children, multi-page locators, or a missing span fail closed. HTTP
+`evidence_excerpt` is disclosed only after live ACL and current-version
+recheck. SSE `citation_preview` still carries IDs only. History loads
+citations with `list_conversation_citations_v1` on the messages payload.
+Legacy rows with null `paragraph_index` stay in a footer. Evaluation
+scores resolved leaf IDs and `pdf_page_number` versus gold
+`page_number`, never `page_label`. The AI Agents fixture (viewer page 25,
+printed 12) is deterministic proof. The global ≥98% citation target stays
+unverified until an approved evaluation run.
+
 ## Graph nodes
 
 After `apply_correction`:

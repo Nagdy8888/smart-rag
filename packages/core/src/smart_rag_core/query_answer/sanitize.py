@@ -6,7 +6,11 @@ import re
 from typing import Literal
 
 from smart_rag_core.query_answer.assembly import allowed_chunk_ids, allowed_table_ids
-from smart_rag_core.query_answer.models import AnswerCitation, AnswerParagraph, AnswerPayload
+from smart_rag_core.query_answer.models import (
+    AnswerCitation,
+    AnswerParagraph,
+    AnswerPayload,
+)
 from smart_rag_core.query_answer.paragraphs import with_derived_answer_text
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.knowledge_scope import (

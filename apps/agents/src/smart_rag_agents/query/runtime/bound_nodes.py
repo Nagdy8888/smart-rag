@@ -36,28 +36,12 @@ from smart_rag_agents.query.state import QueryGraphState
 
 QueryNode = Callable[[QueryGraphState, Runtime[QueryGraphContext]], QueryGraphState]
 QueryNodeNoRuntime = Callable[[QueryGraphState], QueryGraphState]
+DepsNode = Callable[[QueryGraphState, QueryGraphDeps], QueryGraphState]
 
 
 @dataclass(frozen=True, slots=True)
 class BoundQueryNodes:
-    """Production node callables bound to one ``QueryGraphDeps`` fallback.
-
-    Attributes:
-        load_memory: Bounded memory load.
-        prepare_query: Typed preparation.
-        compile_plan: Deterministic route matrix (no runtime deps).
-        company_scope: Company retrieval.
-        general_scope: General or user-text draft.
-        mixed_scope: Mixed-scope clarification.
-        web_scope: Bounded Web research with fail-closed provider errors.
-        invalid_scope: Fail-closed invalid plan.
-        apply_correction: Single global correction.
-        fuse_evidence: Combined fusion.
-        compose_tables: Deterministic table composition.
-        disclose_optional_tools: Optional-tool disclosure and execution.
-        generate_answer: Canonical answer generation.
-        verify_answer: Layered verification.
-    """
+    """Production node callables bound to one ``QueryGraphDeps`` fallback."""
 
     load_memory: QueryNode
     prepare_query: QueryNode
@@ -85,42 +69,38 @@ def bind_query_nodes(bound: QueryGraphDeps) -> BoundQueryNodes:
         Frozen callable bundle. Callables use ``deps_from_runtime``.
 
     Notes:
-        State inputs/outputs: ``QueryGraphState`` only.
-        Persistence writes: none in this owner.
-        External/model calls: delegated to the wrapped node.
-        Budget/deadline behavior: unchanged from the wrapped node.
-        Failure/fallback route: unchanged from the wrapped node.
+        State, persistence, models, budgets, and failure routes stay on the
+        wrapped node. This owner only injects runtime deps.
     """
 
-    def load_memory(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for bounded memory load.
+    def bind(node: DepsNode) -> QueryNode:
+        """Bind one deps-taking node to LangGraph runtime.
 
         Args:
-            state: Admitted state.
-            runtime: Per-invocation deps context.
+            node: Production node callable.
 
         Returns:
-            State with memory records.
+            Runtime-aware wrapper named after ``node``.
         """
 
-        return load_memory_node(state, deps_from_runtime(runtime, bound))
+        def wrapped(
+            state: QueryGraphState, runtime: Runtime[QueryGraphContext]
+        ) -> QueryGraphState:
+            """Invoke the bound node with runtime deps.
 
-    def prepare_query(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for typed preparation.
+            Args:
+                state: Graph state.
+                runtime: Per-invocation deps context.
 
-        Args:
-            state: State after memory load.
-            runtime: Per-invocation deps context.
+            Returns:
+                Node output state.
+            """
 
-        Returns:
-            State with preparation.
-        """
+            return node(state, deps_from_runtime(runtime, bound))
 
-        return prepare_query_node(state, deps_from_runtime(runtime, bound))
+        wrapped.__name__ = node.__name__
+        wrapped.__qualname__ = node.__qualname__
+        return wrapped
 
     def compile_plan(state: QueryGraphState) -> QueryGraphState:
         """LangGraph wrapper for the route matrix.
@@ -134,185 +114,19 @@ def bind_query_nodes(bound: QueryGraphDeps) -> BoundQueryNodes:
 
         return compile_plan_node(state)
 
-    def company_scope(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for company retrieval after plan compilation.
-
-        Args:
-            state: Planned company-document state.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            State with branch results.
-        """
-
-        return company_scope_node(state, deps_from_runtime(runtime, bound))
-
-    def general_scope(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for direct general/user-text answers.
-
-        Args:
-            state: Planned NoRetrieval general state.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            State with one general or user-text draft.
-        """
-
-        return general_scope_node(state, deps_from_runtime(runtime, bound))
-
-    def mixed_scope(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for mixed-scope clarification.
-
-        Args:
-            state: Planned NoRetrieval clarification state.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            State with a deterministic clarification draft.
-        """
-
-        return mixed_scope_node(state, deps_from_runtime(runtime, bound))
-
-    def web_scope(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for bounded Web research.
-
-        Args:
-            state: Planned Web-research state.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            Answered draft for ``verify_answer``, or a typed fail-closed
-            terminal. Never emits ``token_delta``.
-        """
-
-        return web_scope_node(state, deps_from_runtime(runtime, bound))
-
-    def invalid_scope(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for fail-closed invalid plans.
-
-        Args:
-            state: Planned or missing plan state.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            Routing-rejected state with no draft.
-        """
-
-        return invalid_scope_node(state, deps_from_runtime(runtime, bound))
-
-    def apply_correction(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for the single global correction.
-
-        Args:
-            state: State after branches.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            State after the single correction.
-        """
-
-        return apply_correction_node(state, deps_from_runtime(runtime, bound))
-
-    def fuse_evidence(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for Combined fusion.
-
-        Args:
-            state: State after correction.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            State with fused canonical evidence.
-        """
-
-        return fuse_evidence_node(state, deps_from_runtime(runtime, bound))
-
-    def compose_tables(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for deterministic table composition.
-
-        Args:
-            state: State after fusion.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            State with table provenance.
-        """
-
-        return compose_tables_node(state, deps_from_runtime(runtime, bound))
-
-    def generate_answer(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for one canonical answer generation.
-
-        Args:
-            state: State after optional tools.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            State with one answer payload.
-        """
-
-        return generate_answer_node(state, deps_from_runtime(runtime, bound))
-
-    def disclose_optional_tools(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for optional-tool disclosure and execution.
-
-        Args:
-            state: State after table composition.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            State with optional-tool telemetry and maybe one execution.
-        """
-
-        return disclose_optional_tools_node(state, deps_from_runtime(runtime, bound))
-
-    def verify_answer(
-        state: QueryGraphState, runtime: Runtime[QueryGraphContext]
-    ) -> QueryGraphState:
-        """LangGraph wrapper for layered verification.
-
-        Args:
-            state: State after answer generation.
-            runtime: Per-invocation deps context.
-
-        Returns:
-            Terminal verified state.
-        """
-
-        return verify_answer_node(state, deps_from_runtime(runtime, bound))
-
     return BoundQueryNodes(
-        load_memory=load_memory,
-        prepare_query=prepare_query,
+        load_memory=bind(load_memory_node),
+        prepare_query=bind(prepare_query_node),
         compile_plan=compile_plan,
-        company_scope=company_scope,
-        general_scope=general_scope,
-        mixed_scope=mixed_scope,
-        web_scope=web_scope,
-        invalid_scope=invalid_scope,
-        apply_correction=apply_correction,
-        fuse_evidence=fuse_evidence,
-        compose_tables=compose_tables,
-        disclose_optional_tools=disclose_optional_tools,
-        generate_answer=generate_answer,
-        verify_answer=verify_answer,
+        company_scope=bind(company_scope_node),
+        general_scope=bind(general_scope_node),
+        mixed_scope=bind(mixed_scope_node),
+        web_scope=bind(web_scope_node),
+        invalid_scope=bind(invalid_scope_node),
+        apply_correction=bind(apply_correction_node),
+        fuse_evidence=bind(fuse_evidence_node),
+        compose_tables=bind(compose_tables_node),
+        disclose_optional_tools=bind(disclose_optional_tools_node),
+        generate_answer=bind(generate_answer_node),
+        verify_answer=bind(verify_answer_node),
     )

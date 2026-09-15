@@ -175,7 +175,14 @@ def _seed_corpus(cursor: psycopg.Cursor) -> dict[str, Any]:
           (%s, %s, %s, 'completed'),
           (%s, %s, %s, 'completed')
         """,
-        (run_id, conversation_id, owner_id, foreign_run_id, member_conversation, member_id),
+        (
+            run_id,
+            conversation_id,
+            owner_id,
+            foreign_run_id,
+            member_conversation,
+            member_id,
+        ),
     )
     cursor.execute(
         """
@@ -456,7 +463,9 @@ def test_holdout_stale_auth_and_disabled_denied(
         seed = _seed_corpus(cursor)
         cursor.execute("SET ROLE app_api")
         cursor.execute("SAVEPOINT holdout")
-        with pytest.raises(psycopg.errors.RaiseException, match="eval_quiz:holdout_rejected"):
+        with pytest.raises(
+            psycopg.errors.RaiseException, match="eval_quiz:holdout_rejected"
+        ):
             cursor.execute(
                 _CREATE_SQL,
                 (
@@ -586,12 +595,19 @@ def test_gold_bounds_family_isolation_and_approval_reset(
                     seed["authz"],
                     case_id,
                     version,
-                    [seed["chunk_a"], seed["chunk_b"], seed["chunk_c"], seed["chunk_d"]],
+                    [
+                        seed["chunk_a"],
+                        seed["chunk_b"],
+                        seed["chunk_c"],
+                        seed["chunk_d"],
+                    ],
                 ),
             )
         cursor.execute("ROLLBACK TO SAVEPOINT fourth")
         cursor.execute("SAVEPOINT duplicate")
-        with pytest.raises(psycopg.errors.RaiseException, match="eval_quiz:gold_duplicate"):
+        with pytest.raises(
+            psycopg.errors.RaiseException, match="eval_quiz:gold_duplicate"
+        ):
             cursor.execute(
                 """
                 SELECT * FROM app.replace_eval_quiz_gold(
@@ -851,7 +867,9 @@ def test_zero_gold_draft_cannot_approve(
         )
         cursor.execute("SET ROLE app_api")
         cursor.execute("SAVEPOINT approve_zero")
-        with pytest.raises(psycopg.errors.RaiseException, match="eval_quiz:gold_required"):
+        with pytest.raises(
+            psycopg.errors.RaiseException, match="eval_quiz:gold_required"
+        ):
             cursor.execute(
                 """
                 SELECT * FROM app.approve_eval_quiz_case(%s, 'owner', %s, %s, %s)

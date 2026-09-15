@@ -187,9 +187,7 @@ def _attach_conversation_citations(
     """
 
     run_ids = tuple(
-        dict.fromkeys(
-            item.run_id for item in records if item.run_id is not None
-        )
+        dict.fromkeys(item.run_id for item in records if item.run_id is not None)
     )
     by_run: dict[UUID, list[RunCitationRecord]] = {}
     for offset in range(0, len(run_ids), 50):

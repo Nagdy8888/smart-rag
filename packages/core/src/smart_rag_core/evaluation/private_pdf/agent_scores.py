@@ -84,6 +84,77 @@ def citation_completeness(
     return supported / len(fact_chunk_ids)
 
 
+def resolved_citation_ids(
+    cited_leaf_ids: Sequence[UUID],
+    retrieved_ids: Sequence[UUID] = (),
+) -> tuple[UUID, ...]:
+    """Return persist-resolved leaf IDs, never retrieved occupancy.
+
+    Retrieved IDs that were not cited are discarded. Cited leaves remain
+    even when they are absent from the retrieve list after parent-to-leaf
+    resolution.
+
+    Args:
+        cited_leaf_ids: Leaf chunk IDs stored on citation rows.
+        retrieved_ids: Hybrid ranked IDs. Never treated as citations.
+
+    Returns:
+        Cited leaf IDs in the given order.
+    """
+
+    del retrieved_ids
+    return tuple(cited_leaf_ids)
+
+
+def paragraph_completeness(supported: Sequence[bool]) -> float:
+    """Return the fraction of factual paragraphs with a surviving citation.
+
+    Args:
+        supported: Per-paragraph flag, true when at least one verified
+            citation survived.
+
+    Returns:
+        1.0 when there are no factual paragraphs; otherwise completeness.
+    """
+
+    if not supported:
+        return 1.0
+    return sum(1 for item in supported if item) / len(supported)
+
+
+def pdf_locator_ok(
+    cited_pdf_pages: Sequence[int | None],
+    gold_page_numbers: Sequence[int],
+    *,
+    page_labels: Sequence[str] | None = None,
+) -> bool:
+    """Return whether cited PDF toolbar pages match gold ``page_number``.
+
+    Printed ``page_label`` is ignored even when supplied.
+
+    Args:
+        cited_pdf_pages: Typed ``pdf_page_number`` values from authorized rows.
+        gold_page_numbers: Gold 1-based viewer pages.
+        page_labels: Printed labels. Never consulted.
+
+    Returns:
+        True when every cited page is in gold and at least one gold page is
+        cited when gold pages exist.
+    """
+
+    del page_labels
+    gold = tuple(gold_page_numbers)
+    if any(page is None for page in cited_pdf_pages):
+        return False
+    cited = tuple(int(page) for page in cited_pdf_pages if page is not None)
+    if not gold:
+        return not cited
+    if not cited:
+        return False
+    gold_set = set(gold)
+    return all(page in gold_set for page in cited)
+
+
 def score_agent_case(
     *,
     case_id: str,
@@ -97,21 +168,24 @@ def score_agent_case(
     refused: bool,
     judge_status: str,
     judge_faithfulness: float | None,
+    paragraph_supported: Sequence[bool] | None = None,
 ) -> PrivatePdfAgentScore:
     """Score one agent answer with deterministic metrics.
 
     Args:
         case_id: Case id.
-        cited_ids: Cited chunk ids.
+        cited_ids: Persist-resolved leaf chunk ids, not retrieved occupancy.
         allowed_ids: Gold supporting ids.
         fact_chunk_ids: Per-fact supporting ids.
         forbidden_ids: Ids that must never be cited.
-        locator_ok: Locator check.
+        locator_ok: Locator check from ``pdf_locator_ok``, never ``page_label``.
         route_ok: Expected profile/route matched.
         expected_refusal: Gold refusal.
         refused: Observed refusal.
         judge_status: Judge completion status.
         judge_faithfulness: Faithfulness in ``[0, 1]`` when complete.
+        paragraph_supported: Optional per-paragraph surviving-citation flags.
+            When set, completeness uses those flags instead of fact groups.
 
     Returns:
         Per-case score. Invalid judge output is ``unscored``, never a pass.
@@ -120,10 +194,15 @@ def score_agent_case(
     status = judge_status if judge_status == "complete" else UNSCORED
     faithfulness = judge_faithfulness if status == "complete" else None
     forbidden = any(item in set(forbidden_ids) for item in cited_ids)
+    completeness = (
+        paragraph_completeness(paragraph_supported)
+        if paragraph_supported is not None
+        else citation_completeness(cited_ids, fact_chunk_ids)
+    )
     return PrivatePdfAgentScore(
         case_id=case_id,
         citation_precision=citation_precision(cited_ids, allowed_ids),
-        citation_completeness=citation_completeness(cited_ids, fact_chunk_ids),
+        citation_completeness=completeness,
         locator_ok=locator_ok,
         forbidden_cited=forbidden,
         route_ok=route_ok,

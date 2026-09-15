@@ -29,7 +29,9 @@ from smart_rag_agents.query.nodes.shared import runtime_from_state, skip_closed_
 from smart_rag_agents.query.state import QueryGraphState
 
 
-def _await_exa(factory: Callable[[], object], *, cancel_check: Callable[[], bool] | None) -> object:
+def _await_exa(
+    factory: Callable[[], object], *, cancel_check: Callable[[], bool] | None
+) -> object:
     """Run one Exa coroutine without rewriting typed ``ExaSearchError``.
 
     Args:
@@ -61,6 +63,8 @@ def _await_exa(factory: Callable[[], object], *, cancel_check: Callable[[], bool
         """Complete the awaitable on a dedicated loop."""
 
         def _inner() -> None:
+            """Run the awaitable on the copied context."""
+
             try:
                 produced = factory()
                 if asyncio.iscoroutine(produced):

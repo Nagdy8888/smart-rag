@@ -12,6 +12,7 @@ from smart_rag_core.conversations import delete_conversation
 from smart_rag_core.memory.reaper import search_conversation_lingering_ids
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import list_run_citations
+from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.web_research.models import WebCitation
 from smart_rag_core.web_research.policy import excerpt_sha256
 from smart_rag_core.web_research.store import (
@@ -60,7 +61,7 @@ def _hash(seed: str) -> str:
 
 def _admit_run(
     connection: psycopg.Connection, *, user_id: UUID, role: str
-) -> tuple:
+) -> tuple[CallerContext, UUID, UUID]:
     """Insert a profile, conversation, and admitted run as ``app_api``.
 
     Args:
@@ -76,8 +77,8 @@ def _admit_run(
     with connection.cursor() as cursor:
         insert_user_profile(cursor, user_id=user_id, role=role)
         conversation_id = insert_conversation(cursor, user_id=user_id)
-        version = authorization_version(cursor, user_id)
-    caller = caller_context(user_id=user_id, role=role, authorization_version=version)
+        version = authorization_version(cursor)
+    caller = caller_context(user_id, role, version)
     result, _key = admit(
         connection,
         caller=caller,

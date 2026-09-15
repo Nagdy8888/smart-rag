@@ -28,9 +28,11 @@ from smart_rag_core.query_routing.envelope import clamp_family_to_reservation
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
-    apply_requested_search_scope,
     classify_knowledge_scope,
     has_web_intent,
+)
+from smart_rag_core.query_routing.knowledge_scope_preference import (
+    apply_requested_search_scope,
 )
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.models import BranchKind
@@ -92,31 +94,35 @@ def _runtime(
     )
 
 
-def _prep(
-    query: str,
-    *,
-    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
-    route_family: Phase6RouteFamily = Phase6RouteFamily.COMPOSITE,
-):
-    """Prepare one query on the deterministic path.
+def _schema_mapping(value: object) -> dict[str, object]:
+    """Copy a JSON object into a string-keyed mapping.
 
     Args:
-        query: Original user text.
-        requested_search_scope: Client source preference.
-        route_family: Reserved family.
+        value: Untrusted schema fragment.
 
     Returns:
-        Typed preparation.
+        A shallow dict copy, or empty when ``value`` is not a mapping.
     """
 
-    return prepare_query(
-        query,
-        runtime=_runtime(
-            requested_search_scope=requested_search_scope,
-            route_family=route_family,
-        ),
-        requested_search_scope=requested_search_scope,
-    )
+    if isinstance(value, dict):
+        typed = cast(dict[object, object], value)
+        return {str(key): item for key, item in typed.items()}
+    return {}
+
+
+def _schema_enum(value: object) -> list[object]:
+    """Copy a JSON array used as a schema enum.
+
+    Args:
+        value: Untrusted schema fragment.
+
+    Returns:
+        A list copy, or empty when ``value`` is not a list.
+    """
+
+    if isinstance(value, list):
+        return list(cast(list[object], value))
+    return []
 
 
 def _plan(
@@ -360,26 +366,25 @@ def test_openapi_includes_web_scope_and_answer_origin() -> None:
     """Public contracts accept ``web`` search scope and ``answer_origin=web``."""
 
     schema = SubmitMessageRequest.model_json_schema()
-    defs = schema.get("$defs") or schema.get("definitions") or {}
-    scope = defs.get("RequestedSearchScope") if isinstance(defs, dict) else None
-    if not isinstance(scope, dict):
-        scope = schema
-    enum_values = scope.get("enum")
-    assert isinstance(enum_values, list)
+    defs = _schema_mapping(schema.get("$defs") or schema.get("definitions"))
+    scope = _schema_mapping(defs.get("RequestedSearchScope")) or _schema_mapping(schema)
+    enum_values = _schema_enum(scope.get("enum"))
     assert "web" in enum_values
     assert "auto" in enum_values
     origin = AnswerOriginPayload(origin="web")
     assert origin.origin == "web"
-    properties = query_profile_json_schema()["properties"]
-    assert isinstance(properties, dict)
-    knowledge = properties["knowledge_scope"]
-    assert isinstance(knowledge, dict)
-    any_of = knowledge["anyOf"]
+    properties = _schema_mapping(query_profile_json_schema().get("properties"))
+    knowledge = _schema_mapping(properties.get("knowledge_scope"))
+    any_of = knowledge.get("anyOf")
     assert isinstance(any_of, list)
-    string_enum = next(
-        item for item in any_of if isinstance(item, dict) and "enum" in item
-    )
-    assert "web" in string_enum["enum"]
+    string_enum: dict[str, object] | None = None
+    for raw in cast(list[object], any_of):
+        mapping = _schema_mapping(raw)
+        if "enum" in mapping:
+            string_enum = mapping
+            break
+    assert string_enum is not None
+    assert "web" in _schema_enum(string_enum.get("enum"))
 
 
 def test_optional_catalog_still_has_no_web_search() -> None:

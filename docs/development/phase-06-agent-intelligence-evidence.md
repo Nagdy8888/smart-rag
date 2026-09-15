@@ -72,6 +72,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-45 — Paragraph mappings and fail-closed verification (2026-09-15) | [phase-06/p06-45-pdf-paragraph-grounding-2026-09-15.md](./phase-06/p06-45-pdf-paragraph-grounding-2026-09-15.md) | 110 |
 | P06-46 — ACL-safe PDF citation persistence (2026-09-15) | [phase-06/p06-46-pdf-citation-persistence-2026-09-15.md](./phase-06/p06-46-pdf-citation-persistence-2026-09-15.md) | 108 |
 | P06-47 — Inline PDF paragraph citation UI (2026-09-15) | [phase-06/p06-47-inline-pdf-citation-ui-2026-09-15.md](./phase-06/p06-47-inline-pdf-citation-ui-2026-09-15.md) | 88 |
+| P06-48 — PDF citation accuracy gates (2026-09-15) | [phase-06/p06-48-pdf-citation-gates-2026-09-15.md](./phase-06/p06-48-pdf-citation-gates-2026-09-15.md) | 118 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

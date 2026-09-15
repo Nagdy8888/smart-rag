@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from smart_rag_agents.prompts import verifier_prompt_text
 from smart_rag_agents.query.deps import QueryGraphDeps
@@ -199,14 +201,10 @@ def test_verifier_json_schema_bounds_reason() -> None:
     schema = verifier_json_schema(("l1",))
     properties = schema["properties"]
     assert isinstance(properties, dict)
-    verdicts = properties["link_verdicts"]
-    assert isinstance(verdicts, dict)
-    items = verdicts["items"]
-    assert isinstance(items, dict)
-    item_properties = items["properties"]
-    assert isinstance(item_properties, dict)
-    reason = item_properties["reason"]
-    assert isinstance(reason, dict)
+    verdicts = cast(dict[str, object], properties["link_verdicts"])
+    items = cast(dict[str, object], verdicts["items"])
+    item_properties = cast(dict[str, object], items["properties"])
+    reason = cast(dict[str, object], item_properties["reason"])
     assert reason["minLength"] == 1
     assert reason["maxLength"] == 128
 
@@ -264,4 +262,6 @@ def test_verify_answer_node_invalid_answer_payload_is_partial() -> None:
     verified = verify_answer_node(state, QueryGraphDeps())
     assert verified["status"] == "verified_partial"
     assert verified["detail"] == "payload_schema_invalid"
-    assert verified["answer"]["answer_text"] == "kept"
+    answer_payload = verified["answer"]
+    assert isinstance(answer_payload, dict)
+    assert answer_payload["answer_text"] == "kept"

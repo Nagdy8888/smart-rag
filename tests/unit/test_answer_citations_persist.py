@@ -143,9 +143,15 @@ def test_verify_bound_persist_failure_is_not_verified(
     runtime.authorization_version = 1
     runtime.session_id = None
     runtime.run_id = uuid4()
+
+    def _runtime_from_state(_state: object) -> MagicMock:
+        """Return the mocked runtime regardless of graph state."""
+
+        return runtime
+
     monkeypatch.setattr(
         "smart_rag_agents.query.nodes.verify.runtime_from_state",
-        lambda _state: runtime,
+        _runtime_from_state,
     )
     monkeypatch.setattr(
         "smart_rag_agents.query.nodes.verify.summarize_run_usage",

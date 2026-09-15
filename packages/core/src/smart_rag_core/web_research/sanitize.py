@@ -36,7 +36,9 @@ _COMPANY_MARKERS = (
 )
 
 
-def assert_no_company_passage(text: str, *, forbidden_snippets: tuple[str, ...] = ()) -> None:
+def assert_no_company_passage(
+    text: str, *, forbidden_snippets: tuple[str, ...] = ()
+) -> None:
     """Refuse a query that already contains company or memory passages.
 
     Args:

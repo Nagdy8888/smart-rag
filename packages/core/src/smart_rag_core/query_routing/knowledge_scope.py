@@ -20,6 +20,10 @@ from smart_rag_core.query_profile.extract import (
     DeterministicExtract,
     extract_deterministic,
 )
+from smart_rag_core.query_routing.knowledge_scope_web import (
+    has_web_intent,
+    has_web_privacy_risk,
+)
 from smart_rag_core.query_routing.signals import (
     is_corpus_wide_theme,
     is_current_relationship,
@@ -32,7 +36,6 @@ from smart_rag_core.query_routing.signals import (
     is_user_text_transform,
     is_whole_document_summary,
 )
-from smart_rag_core.search_scope import RequestedSearchScope
 
 SCOPE_CONFIDENCE_THRESHOLD = 0.80
 """Minimum accepted model confidence for a non-degraded scope."""
@@ -62,44 +65,6 @@ _COMPANY_FIXTURES = (
 _MEMORY_COMPANY_HINT = re.compile(
     r"\b(chunk[_-]?id|source[_-]?id|INV-SR-\d{4}|p4-src-\d{4}|citation)\b",
     flags=re.IGNORECASE,
-)
-_WEB_PHRASES = (
-    "search the web",
-    "search online",
-    "search the internet",
-    "look online",
-    "look on the web",
-    "look it up online",
-    "on the internet",
-    "from the web",
-    "google this",
-    "latest news",
-    "latest headlines",
-)
-_TIME_SENSITIVE_WEB = re.compile(
-    r"(?i)\b("
-    r"today'?s\s+news|breaking\s+news|current\s+events|"
-    r"today'?s\s+weather|current\s+weather|live\s+score|"
-    r"stock\s+price\s+today|who\s+won\s+(last\s+night|today|yesterday)"
-    r")\b"
-)
-_PRIVATE_HOST = re.compile(
-    r"(?i)\b("
-    r"localhost|127\.0\.0\.1|0\.0\.0\.0|::1|"
-    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
-    r"192\.168\.\d{1,3}\.\d{1,3}|"
-    r"172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}"
-    r")\b"
-)
-_SECRETISH = re.compile(
-    r"(?i)("
-    r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b|"
-    r"\bsk-[A-Za-z0-9]{16,}\b|"
-    r"\bBearer\s+[A-Za-z0-9._\-]+|"
-    r"X-Amz-Signature=|"
-    r"/storage/v1/object/sign/|"
-    r"[?&](token|sig|signature)=[A-Za-z0-9%\-_]{16,}"
-    r")"
 )
 
 
@@ -243,40 +208,6 @@ def has_company_fixture(query: str) -> bool:
     """
 
     return any(pattern.search(query) for pattern in _COMPANY_FIXTURES)
-
-
-def has_web_intent(query: str) -> bool:
-    """Return whether the query has explicit or time-sensitive public-Web intent.
-
-    Isolated words such as ``latest`` or ``policy`` are not Web by themselves.
-
-    Args:
-        query: Original user text.
-
-    Returns:
-        True for explicit Web phrases or clearly time-sensitive public asks.
-    """
-
-    lowered = query.lower()
-    if any(phrase in lowered for phrase in _WEB_PHRASES):
-        return True
-    return _TIME_SENSITIVE_WEB.search(query) is not None
-
-
-def has_web_privacy_risk(query: str) -> bool:
-    """Return whether the message must not be sent to a public Web provider.
-
-    Args:
-        query: Original user text.
-
-    Returns:
-        True for loopback/private hosts, JWTs, signed URLs, or secret-like
-        tokens. Company source IDs are handled by ``has_company_phrase``.
-    """
-
-    return (
-        _PRIVATE_HOST.search(query) is not None or _SECRETISH.search(query) is not None
-    )
 
 
 def company_intent_signal(query: str, extract: DeterministicExtract) -> bool:
@@ -580,88 +511,6 @@ def classify_knowledge_scope(
         confidence=confidence,
         company_signal=company,
         general_signal=parsed is KnowledgeScope.GENERAL_KNOWLEDGE or general,
-    )
-
-
-def apply_requested_search_scope(
-    query: str,
-    automatic: KnowledgeScopeDecision,
-    requested: RequestedSearchScope,
-) -> KnowledgeScopeDecision:
-    """Apply a client source preference to an automatic scope decision.
-
-    Greetings, small talk, product help, and user-text transforms keep their
-    current handling. Other substantive prompts honor explicit Company,
-    General, or Web. Auto returns the automatic decision unchanged.
-    Requested Company never manufactures ``company_signal=True``. Explicit
-    Web with company signals, source IDs, or secret-like tokens clarifies
-    instead of calling a provider.
-
-    Args:
-        query: Original user text. Untrusted.
-        automatic: Decision from ``classify_knowledge_scope``.
-        requested: Client source preference fixed at admission.
-
-    Returns:
-        Effective scope decision used by preparation and the route matrix.
-    """
-
-    if requested is RequestedSearchScope.AUTO:
-        return automatic
-    extract = extract_deterministic(query)
-    query_company = company_intent_signal(query, extract)
-    if is_product_help(query) and not query_company:
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
-            confidence=1.0,
-            company_signal=False,
-            general_signal=True,
-        )
-    if _social_opener(query) and not query_company:
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
-            confidence=1.0,
-            company_signal=False,
-            general_signal=True,
-        )
-    if is_user_text_transform(query):
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.USER_SUPPLIED_TEXT,
-            confidence=1.0,
-            company_signal=automatic.company_signal,
-            general_signal=automatic.general_signal,
-        )
-    if requested is RequestedSearchScope.COMPANY_DOCUMENTS:
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.COMPANY_DOCUMENTS,
-            confidence=1.0,
-            company_signal=automatic.company_signal,
-            general_signal=automatic.general_signal,
-        )
-    if requested is RequestedSearchScope.WEB:
-        if (
-            query_company
-            or automatic.company_signal
-            or has_web_privacy_risk(query)
-            or has_company_phrase(query)
-        ):
-            return KnowledgeScopeDecision(
-                knowledge_scope=KnowledgeScope.AMBIGUOUS,
-                confidence=1.0,
-                company_signal=True,
-                general_signal=False,
-            )
-        return KnowledgeScopeDecision(
-            knowledge_scope=KnowledgeScope.WEB,
-            confidence=1.0,
-            company_signal=automatic.company_signal,
-            general_signal=automatic.general_signal,
-        )
-    return KnowledgeScopeDecision(
-        knowledge_scope=KnowledgeScope.GENERAL_KNOWLEDGE,
-        confidence=1.0,
-        company_signal=automatic.company_signal,
-        general_signal=automatic.general_signal,
     )
 
 

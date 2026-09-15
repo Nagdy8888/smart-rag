@@ -40,7 +40,6 @@ the co-owned contract; it does not activate sibling Phase 6 coding.
 Rollback: delete P06-16 wording and revert the shared-contract sentence.
 Do not renumber P08-22/P08-23.
 
-
 ## Rollback
 
 Delete P06-16 and revert the shared-contract sentence. Do not renumber

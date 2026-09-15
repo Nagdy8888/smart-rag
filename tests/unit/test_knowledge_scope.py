@@ -12,9 +12,11 @@ from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
     NoRetrievalAnswerMode,
     ScopeDegradationReason,
-    apply_requested_search_scope,
     classify_knowledge_scope,
     scope_requires_model,
+)
+from smart_rag_core.query_routing.knowledge_scope_preference import (
+    apply_requested_search_scope,
 )
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.models import (

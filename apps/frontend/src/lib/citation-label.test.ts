@@ -9,6 +9,11 @@ import {
   splitVerifiedParagraphs,
   unmappedCitations,
 } from "./citation-label";
+import {
+  AI_AGENTS_CHIP_LABEL,
+  AI_AGENTS_FORBIDDEN_PAGE_12,
+  AI_AGENTS_FORBIDDEN_PRINTED,
+} from "./pdf-paragraph-citation-fixture";
 import type { CitationResponse } from "./types";
 
 function citation(
@@ -51,31 +56,23 @@ describe("citationSourceLabel", () => {
   });
 
   it("does not use printed page_label for a company PDF chip", () => {
-    expect(
-      citationSourceLabel(
-        citation({
-          document_title: "AI agents",
-          pdf_page_number: 25,
-          provenance: {
-            document_title: "AI agents",
-            page_number: 201,
-            page_label: "12",
-          },
-        }),
-      ),
-    ).toBe("AI agents · PDF page 25");
+    const label = citationSourceLabel(
+      citation({
+        document_title: "AI Agents",
+        pdf_page_number: 25,
+        provenance: {
+          document_title: "AI Agents",
+          page_number: 201,
+          page_label: "12",
+        },
+      }),
+    );
+    expect(label).toBe(AI_AGENTS_CHIP_LABEL);
+    expect(label).not.toContain(AI_AGENTS_FORBIDDEN_PRINTED);
+    expect(label).not.toContain(AI_AGENTS_FORBIDDEN_PAGE_12);
     expect(citationDisplayPage({ page_number: 201, page_label: "179" })).toBe(
       "179",
     );
-    expect(
-      citationSourceLabel(
-        citation({
-          document_title: "AI agents",
-          pdf_page_number: 25,
-          provenance: { page_label: "12" },
-        }),
-      ),
-    ).not.toContain("12");
   });
 
   it("uses Source and unavailable when typed PDF fields are missing", () => {

@@ -30,7 +30,9 @@ from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_CITATIONS,
     MAX_VERIFIER_LINKS,
 )
+from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
+from smart_rag_core.query_routing.models import TableEvidenceRecord
 
 from tests.support.answer_verifier import (
     verifier_fusion,
@@ -51,7 +53,9 @@ VERIFY_SOURCE = (
 )
 
 
-def _mapped_payload() -> tuple[AnswerPayload, object, tuple[object, ...]]:
+def _mapped_payload() -> tuple[
+    AnswerPayload, FusionResult, tuple[TableEvidenceRecord, ...]
+]:
     """Return two grounded paragraphs citing two different chunks.
 
     Returns:
@@ -123,11 +127,19 @@ def test_answer_v2_is_registered_and_hashed() -> None:
     body = prompt_text("answer_v2")
     assert "Do not author `answer_text`" in body
     schema = answer_json_schema()
-    assert "answer_text" not in schema["properties"]
-    assert "paragraphs" in schema["required"]
+    properties = schema["properties"]
+    required = schema["required"]
+    assert isinstance(properties, dict)
+    assert isinstance(required, list)
+    assert "answer_text" not in properties
+    assert "paragraphs" in required
     general = general_chat_json_schema()
-    assert "paragraphs" not in general["properties"]
-    assert "answer_text" in general["required"]
+    general_properties = general["properties"]
+    general_required = general["required"]
+    assert isinstance(general_properties, dict)
+    assert isinstance(general_required, list)
+    assert "paragraphs" not in general_properties
+    assert "answer_text" in general_required
 
 
 def test_two_paragraphs_map_to_two_chunks() -> None:

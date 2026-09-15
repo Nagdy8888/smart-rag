@@ -129,7 +129,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Repair document_chunks.page_number from locator page_index + 1."
     )
-    parser.add_argument("--version-id", required=True, help="Target document version UUID.")
+    parser.add_argument(
+        "--version-id", required=True, help="Target document version UUID."
+    )
     parser.add_argument(
         "--batch-size",
         type=int,
