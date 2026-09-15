@@ -14,6 +14,7 @@ from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.web_research.models import WebSourceRecord
 
 LOGGER = logging.getLogger(__name__)
 
@@ -298,6 +299,52 @@ def maybe_persist_verified_citations(
             },
         )
         return ()
+
+
+def persist_web_answer_citations(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+    sources: tuple[WebSourceRecord, ...],
+    answer: AnswerPayload,
+) -> tuple[UUID, ...]:
+    """Insert verified Web citations. Company ``app.citations`` stay empty.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived owner.
+        run_id: Query run.
+        sources: Persisted Web sources for this run.
+        answer: Verified answer with ``web_citations``.
+
+    Returns:
+        Inserted Web citation UUIDs.
+
+    Raises:
+        ValueError: If a span is not contained in the matching excerpt.
+        QueryAdmissionError: Cap or ownership failure.
+    """
+
+    from smart_rag_core.web_research.store import insert_web_citation
+
+    by_id = {item.web_source_id: item for item in sources}
+    ids: list[UUID] = []
+    for index, citation in enumerate(answer.web_citations):
+        source = by_id.get(citation.web_source_id)
+        if source is None:
+            raise ValueError("web_evidence:not_found")
+        ids.append(
+            insert_web_citation(
+                connection,
+                caller=caller,
+                run_id=run_id,
+                citation_index=index,
+                source=source,
+                citation=citation,
+            )
+        )
+    return tuple(ids)
 
 
 def _json(payload: dict[str, object]) -> str:

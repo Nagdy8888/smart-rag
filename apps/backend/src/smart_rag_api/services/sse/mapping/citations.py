@@ -15,6 +15,8 @@ def citation_preview(
 
     Returns:
         ``citation_preview`` event or None when no identifiers exist.
+        Web rows contribute ``web_source_id`` values only. Span and
+        excerpt text are never included.
     """
 
     identifiers: list[str] = []
@@ -23,6 +25,8 @@ def citation_preview(
             identifiers.append(citation.chunk_id)
         elif citation.table_id:
             identifiers.append(citation.table_id)
+    for citation in payload.web_citations:
+        identifiers.append(citation.web_source_id)
     if not identifiers:
         return None
     ranks = tuple(range(1, len(identifiers) + 1))

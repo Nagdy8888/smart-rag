@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 39
-status: pending
+status: complete
 title: "Add durable run-scoped web evidence, URL citations, and merged source_kind listing."
 requirement_ids: [P06-39]
 ---

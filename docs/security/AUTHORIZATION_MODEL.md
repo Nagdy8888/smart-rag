@@ -2,7 +2,7 @@
 title: Authorization model
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-14
 audience: engineering, security, reviewers
 ---
 
@@ -98,6 +98,9 @@ Packet 3 **revokes** all `app`/`private`/`langgraph`/`lightrag` grants from `ano
 | `app.delete_visible_document` | caller context, document_id | Owner/admin tombstone wrapping `exclude_version_from_retrieval`. Unreadable ids return NULL |
 | `app.list_run_citations` | caller context, run_id | Creator-only. ACL + current-version recheck nulls `chunk_id` when unavailable |
 | `app.list_run_citations_v2` | caller context, run_id | Creator-only. Same recheck as v1; overlays authorized page/title/section plus printed `page_label` onto provenance; omits passage text |
+| `app.list_run_citations_v3` | caller context, run_id | Creator-only. Company branch copies v2 ACL/current-version recheck and locator stripping. Web branch returns url/title/`content_hash` plus `source_kind=web`; never excerpt, span, HTML, or query text |
+| `app.begin_web_research_operation` / `app.mark_web_research_operation_sent` / `app.complete_web_research_operation` | caller context, run/operation | Creator-owned run. Same key+hash replays; different hash conflicts; `sent` without a terminal is ambiguous and must not auto-repeat |
+| `app.insert_web_source` / `app.insert_web_citation` | caller context, run, source/citation | Creator-owned run. Caps 6 sources / 12 citations. URL policy, SHA-256 hash, and exact span containment. Cross-run sources are `not_found` |
 | `app.accept_invitation` | token_hash, user_id, email, assurance_level | Refuses demotion; privileged/upload upgrades revoke sessions. `assurance_level` is ignored |
 | `app.validate_caller_context` | caller_user_id, caller_role, authorization_version | Boolean membership + snapshot check |
 | `private.set_document_acl` | caller context, document, grantee, grant/revoke | Idempotent owner/admin-only ACL mutation with audit |

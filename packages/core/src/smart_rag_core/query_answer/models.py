@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from smart_rag_core.query_answer.versions import MAX_VERIFIER_LINKS
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.models import TableEvidenceRecord
+from smart_rag_core.web_research.models import WebCitation
 
 
 class AtomicLink(BaseModel):
@@ -18,6 +19,7 @@ class AtomicLink(BaseModel):
         link_id: Stable id within the answer.
         claim: Atomic claim text.
         chunk_ids: Canonical passage IDs supporting this link.
+        web_source_ids: Persisted Web source IDs when the answer is Web.
         table_id: Optional table UUID when the claim is a table value.
         source_ranges: Table cell/range provenance when ``table_id`` is set.
         kind: Fact link or multi-hop inference link.
@@ -29,6 +31,7 @@ class AtomicLink(BaseModel):
     link_id: str = Field(min_length=1, max_length=64)
     claim: str = Field(min_length=1, max_length=2000)
     chunk_ids: tuple[str, ...] = ()
+    web_source_ids: tuple[str, ...] = ()
     table_id: str | None = None
     source_ranges: tuple[str, ...] = ()
     kind: Literal["fact", "inference_link"] = "fact"
@@ -79,6 +82,7 @@ class AnswerPayload(BaseModel):
     Attributes:
         answer_text: Grounded answer prose.
         citations: Canonical citations only.
+        web_citations: Run-scoped Web citations. Empty on company answers.
         atomic_links: Ordered links. Each cites at least one source.
         composed_conclusion: Labeled inference, or None.
         table_citations: Deterministic table provenance.
@@ -92,6 +96,7 @@ class AnswerPayload(BaseModel):
 
     answer_text: str = Field(default="", max_length=16_384)
     citations: tuple[AnswerCitation, ...] = ()
+    web_citations: tuple[WebCitation, ...] = ()
     atomic_links: tuple[AtomicLink, ...] = ()
     composed_conclusion: ComposedConclusion | None = None
     table_citations: tuple[AnswerCitation, ...] = ()

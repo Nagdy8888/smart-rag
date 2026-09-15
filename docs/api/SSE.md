@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-14
 audience: engineering, frontend
 ---
 
@@ -83,7 +83,7 @@ tracebacks, secrets, source HTML, or passages.
 | `cache` | Cache diagnostic. |
 | `coverage` | Coverage score without passage text. |
 | `optional_tool_disclosure` | Selected optional tool keys. |
-| `citation_preview` | Citation IDs and ranks. No passage text. |
+| `citation_preview` | Citation IDs and ranks. Company rows use chunk/table IDs. Web rows use `web_source_id` values. No passage, excerpt, or span text. |
 | `answer_origin` | Additive origin (`origin` only). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
 | `token_delta` | Generated token delta. Never retrieved source. |
 | `usage` | Accumulated provider prompt and completion tokens for this query run (profile, search, answer, verifier). Optional billed `cost_usd` when `app.llm_usage` is available. Emitted after verify, before the terminal. Counts are 0 when no model ran. Conversation-title generation is not in this event; Ask Run Details adds it under **This chat**. No prompts. |

@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-14
 audience: engineering, security
 ---
 
@@ -73,7 +73,7 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
 | POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |
 | GET | `/runs/{run_id}/events` | creator only | Bearer resume; no handshake | `after` / `Last-Event-ID`; tombstone → 404 |
-| GET | `/runs/{run_id}/citations` | creator | IDs/provenance escaped | No snippet/passage. ACL + current-version recheck; failed recheck → `source_unavailable` and `chunk_id` null |
+| GET | `/runs/{run_id}/citations` | creator | IDs/provenance escaped | No snippet/passage/excerpt/span. Company ACL + current-version recheck via `list_run_citations_v3`; failed recheck → `source_unavailable` and `chunk_id` null. Web rows add `source_kind=web` and `web_source_id` with url/title/`content_hash` only |
 | POST | `/runs/{run_id}/feedback` | creator | thumbs 1 or 5 | Comment escaped |
 | GET | `/graph/entities/search` | authenticated | ACL SQL, 3s timeout | LOW_RISK_READ. No vendor prose |
 | POST | `/graph/inspect` | authenticated | existing inspect | FastAPI `COST_MUTATION`. Preauth `/graph` prefix is owned by the API-hardening agent |

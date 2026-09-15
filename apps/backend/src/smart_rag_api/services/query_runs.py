@@ -28,6 +28,32 @@ from smart_rag_api.services.query_admission import admit_query_run_for_caller
 STREAM_PATH_TEMPLATE = "/runs/{run_id}/events"
 
 
+def escape_run_citation(item: RunCitationRecord) -> RunCitationRecord:
+    """HTML-escape provenance strings without dropping Web metadata.
+
+    Args:
+        item: Citation row from ``list_run_citations``.
+
+    Returns:
+        Escaped record. ``source_kind`` and ``web_source_id`` are preserved.
+        Excerpt and span are never added.
+    """
+
+    provenance = {
+        str(key): isolate_untrusted_text(value) if isinstance(value, str) else value
+        for key, value in item.provenance.items()
+    }
+    return RunCitationRecord(
+        citation_id=item.citation_id,
+        citation_index=item.citation_index,
+        chunk_id=item.chunk_id,
+        provenance=provenance,
+        source_unavailable=item.source_unavailable,
+        source_kind=item.source_kind,
+        web_source_id=item.web_source_id,
+    )
+
+
 class QueryRunService:
     """Factory-injected run operations."""
 
@@ -160,27 +186,11 @@ class QueryRunService:
             run_id: Run id.
 
         Returns:
-            Citation records without passage text.
+            Citation records without passage, excerpt, or span text.
+            ``source_kind`` and ``web_source_id`` are preserved.
         """
 
         with psycopg.connect(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             records = list_run_citations(connection, caller=caller, run_id=run_id)
-        escaped: list[RunCitationRecord] = []
-        for item in records:
-            provenance = {
-                str(key): isolate_untrusted_text(value)
-                if isinstance(value, str)
-                else value
-                for key, value in item.provenance.items()
-            }
-            escaped.append(
-                RunCitationRecord(
-                    citation_id=item.citation_id,
-                    citation_index=item.citation_index,
-                    chunk_id=item.chunk_id,
-                    provenance=provenance,
-                    source_unavailable=item.source_unavailable,
-                )
-            )
-        return tuple(escaped)
+        return tuple(escape_run_citation(item) for item in records)

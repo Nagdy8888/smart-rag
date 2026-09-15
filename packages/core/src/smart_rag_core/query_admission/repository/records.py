@@ -55,8 +55,11 @@ class RunCitationRecord:
         chunk_id: Canonical chunk when present.
         provenance: JSON object without source HTML. Locator keys such as
             page number, heading path, and document title are included when
-            the cited chunk is still authorized.
+            the cited chunk is still authorized. Web rows include url, title,
+            and content_hash only.
         source_unavailable: True when the cited source was deleted.
+        source_kind: ``company_document`` or ``web``.
+        web_source_id: Web source UUID when ``source_kind`` is ``web``.
     """
 
     citation_id: UUID
@@ -64,6 +67,8 @@ class RunCitationRecord:
     chunk_id: UUID | None
     provenance: dict[str, object]
     source_unavailable: bool = False
+    source_kind: str = "company_document"
+    web_source_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,8 +245,8 @@ def list_run_citations(
             cursor.execute(
                 """
                 SELECT citation_id, citation_index, chunk_id, provenance,
-                       source_unavailable
-                FROM app.list_run_citations_v2(%s, %s, %s, %s)
+                       source_unavailable, source_kind, web_source_id
+                FROM app.list_run_citations_v3(%s, %s, %s, %s)
                 """,
                 (
                     caller.user_id,
@@ -264,6 +269,9 @@ def list_run_citations(
         chunk = row.get("chunk_id")
         unavailable = bool(row.get("source_unavailable"))
         chunk_id = None if unavailable or chunk is None else UUID(str(chunk))
+        web_raw = row.get("web_source_id")
+        source_kind = str(row.get("source_kind") or "company_document")
+        web_source_id = None if web_raw is None else UUID(str(web_raw))
         records.append(
             RunCitationRecord(
                 citation_id=UUID(str(row["citation_id"])),
@@ -271,6 +279,8 @@ def list_run_citations(
                 chunk_id=chunk_id,
                 provenance=provenance,
                 source_unavailable=unavailable,
+                source_kind=source_kind,
+                web_source_id=web_source_id,
             )
         )
     return tuple(records)

@@ -175,6 +175,8 @@ class CitationResponse(BaseModel):
     chunk_id: UUID | None = None
     provenance: dict[str, Any] = Field(default_factory=dict)
     source_unavailable: bool = False
+    source_kind: str = "company_document"
+    web_source_id: UUID | None = None
 
 
 class FeedbackRequest(BaseModel):

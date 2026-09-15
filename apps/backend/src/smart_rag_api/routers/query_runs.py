@@ -244,6 +244,8 @@ def list_citations_route(
             chunk_id=item.chunk_id,
             provenance=item.provenance,
             source_unavailable=item.source_unavailable,
+            source_kind=item.source_kind,
+            web_source_id=item.web_source_id,
         )
         for item in records
     ]
