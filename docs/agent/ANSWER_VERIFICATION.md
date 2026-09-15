@@ -66,12 +66,16 @@ catalog LLM, and LightRAG `answer_generate` stay 0.
 
 Empty `citation_text` cannot pass deterministic `complete`. Graph locators
 load canonical `raw_text` through `fetch_authorized_chunk_context`; empty
-text is dropped. Empty spans are whole-passage only when canonical text
-is present.
+text is dropped. Company `answer_v2` passage citations require an exact
+1–1000 character span contained in canonical text. Empty spans are
+legacy whole-passage only when paragraph mappings are not required.
 
-Prompt versions: `answer_v1`, `verifier_v1`, `web_critique_v1`, and
-`web_answer_v1` under `apps/agents/src/smart_rag_agents/prompts/`. Company
-hashes are LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`.
+Prompt versions: `answer_v2`, `answer_v1` (historical), `verifier_v1`,
+`web_critique_v1`, and `web_answer_v1` under
+`apps/agents/src/smart_rag_agents/prompts/`. Company hashes are
+LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Live
+company answers derive `answer_text` from ordered paragraphs. Fusion
+passages are never backfilled as citations.
 
 ## Graph nodes
 

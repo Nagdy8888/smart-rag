@@ -48,9 +48,9 @@ def ensure_fusion_source_citations(
 ) -> AnswerPayload:
     """Attach fusion/table citations when the model omitted structured sources.
 
-    Live answer models often return prose without ``citations`` even though
-    canonical passages were supplied in the prompt. The Sources tab and
-    ``citation_preview`` SSE event rely on explicit citation rows.
+    This helper is not used on the live company verify path. Live answers
+    without valid paragraph mappings must refuse instead of citing every
+    retrieved fusion passage.
 
     Args:
         answer: Verified or checked answer payload.

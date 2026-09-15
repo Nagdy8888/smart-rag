@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from smart_rag_core.query_answer.versions import MAX_VERIFIER_LINKS
+from smart_rag_core.query_answer.versions import (
+    MAX_VERIFIER_LINKS,
+    PARAGRAPH_DELIMITER,
+)
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.web_research.models import WebCitation
@@ -54,33 +57,73 @@ class ComposedConclusion(BaseModel):
     link_ids: tuple[str, ...] = ()
 
 
+class AnswerParagraph(BaseModel):
+    """One grounded answer paragraph and the atomic links that support it.
+
+    Attributes:
+        paragraph_index: Contiguous zero-based index in ``0..5``.
+        text: Paragraph body without an embedded blank-paragraph delimiter.
+        link_ids: One to six atomic-link IDs required to support the prose.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    paragraph_index: int = Field(ge=0, le=5)
+    text: str = Field(min_length=1, max_length=4000)
+    link_ids: tuple[str, ...] = Field(min_length=1, max_length=6)
+
+    @field_validator("text")
+    @classmethod
+    def _reject_embedded_delimiter(cls, value: str) -> str:
+        """Reject paragraph bodies that already contain the join delimiter.
+
+        Args:
+            value: Candidate paragraph text.
+
+        Returns:
+            The validated text.
+
+        Raises:
+            ValueError: If the body contains ``PARAGRAPH_DELIMITER``.
+        """
+
+        if PARAGRAPH_DELIMITER in value:
+            raise ValueError("paragraph_index_invalid")
+        return value
+
+
 class AnswerCitation(BaseModel):
     """One canonical citation span or table range.
 
     Attributes:
         chunk_id: Canonical chunk UUID when the evidence is a passage.
         table_id: Canonical table UUID when the evidence is a table value.
-        span: Substring of canonical citation text, when a passage.
+        span: Exact 1-1000 character substring of canonical citation text.
         source_ranges: Exact table ranges, when a table value.
         inference: True when this citation supports a composed inference.
         atomic_link_id: Owning atomic link.
+        paragraph_index: Owning paragraph, or ``None`` on legacy payloads.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     chunk_id: str | None = None
     table_id: str | None = None
-    span: str | None = Field(default=None, max_length=4000)
+    span: str | None = Field(default=None, max_length=1000)
     source_ranges: tuple[str, ...] = ()
     inference: bool = False
     atomic_link_id: str | None = None
+    paragraph_index: int | None = Field(default=None, ge=0, le=5)
 
 
 class AnswerPayload(BaseModel):
     """Structured answer generation result. Extra fields are forbidden.
 
     Attributes:
-        answer_text: Grounded answer prose.
+        answer_text: Grounded answer prose. Derived from ``paragraphs`` on
+            live company answers; never trusted from the provider.
+        paragraphs: Ordered company paragraphs. Empty on general/Web and
+            legacy fixtures.
         citations: Canonical citations only.
         web_citations: Run-scoped Web citations. Empty on company answers.
         atomic_links: Ordered links. Each cites at least one source.
@@ -95,6 +138,7 @@ class AnswerPayload(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     answer_text: str = Field(default="", max_length=16_384)
+    paragraphs: tuple[AnswerParagraph, ...] = ()
     citations: tuple[AnswerCitation, ...] = ()
     web_citations: tuple[WebCitation, ...] = ()
     atomic_links: tuple[AtomicLink, ...] = ()

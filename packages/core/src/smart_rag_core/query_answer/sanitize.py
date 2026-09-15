@@ -6,7 +6,8 @@ import re
 from typing import Literal
 
 from smart_rag_core.query_answer.assembly import allowed_chunk_ids, allowed_table_ids
-from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
+from smart_rag_core.query_answer.models import AnswerCitation, AnswerParagraph, AnswerPayload
+from smart_rag_core.query_answer.paragraphs import with_derived_answer_text
 from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
@@ -173,13 +174,63 @@ def filter_invented_ids(
         )
         or (item.table_id is not None and item.table_id in table_ids)
     )
-    return payload.model_copy(
+    kept_link_ids = {item.link_id for item in links}
+    kept_paragraphs: list[AnswerParagraph] = []
+    for paragraph in payload.paragraphs:
+        kept_ids = tuple(
+            link_id for link_id in paragraph.link_ids if link_id in kept_link_ids
+        )
+        if not kept_ids:
+            continue
+        kept_paragraphs.append(paragraph.model_copy(update={"link_ids": kept_ids}))
+    index_map = {
+        paragraph.paragraph_index: index
+        for index, paragraph in enumerate(kept_paragraphs)
+    }
+    paragraphs = tuple(
+        paragraph.model_copy(
+            update={"paragraph_index": index_map[paragraph.paragraph_index]}
+        )
+        for paragraph in kept_paragraphs
+    )
+
+    def _remap_citation(item: AnswerCitation) -> AnswerCitation | None:
+        """Drop citations whose paragraph was removed; reindex the rest.
+
+        Args:
+            item: Candidate citation after invented-ID filtering.
+
+        Returns:
+            Remapped citation, or ``None`` when its paragraph was dropped.
+        """
+
+        if item.paragraph_index is None:
+            return item
+        if item.paragraph_index not in index_map:
+            return None
+        return item.model_copy(
+            update={"paragraph_index": index_map[item.paragraph_index]}
+        )
+
+    remapped_citations = tuple(
+        item
+        for item in (_remap_citation(citation) for citation in citations)
+        if item is not None
+    )
+    remapped_tables = tuple(
+        item
+        for item in (_remap_citation(citation) for citation in table_citations)
+        if item is not None
+    )
+    updated = payload.model_copy(
         update={
-            "citations": citations,
-            "table_citations": table_citations,
+            "citations": remapped_citations,
+            "table_citations": remapped_tables,
             "atomic_links": links,
+            "paragraphs": paragraphs,
         }
     )
+    return with_derived_answer_text(updated)
 
 
 def citation_has_allowed_source(
