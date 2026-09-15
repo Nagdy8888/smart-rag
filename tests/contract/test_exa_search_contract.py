@@ -23,31 +23,34 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "exa"
 FIXTURE_SHA256 = {
     "contents_success.json": (
-        "2a72d25d1b77a9a881e43681f0e79cbcc23a9e0d7b5f870695559cfbce997074"
+        "a3678e1b78411c9c170372d39fb0ed06a113c5f349879275c83f4f11d610e06c"
     ),
     "error_error_field.json": (
-        "3a5abef1858283a07cec746ec061e0b763310ec5050058e80f45d6dca9e0aef3"
+        "04a49c65dbd3e28ed4e8e89d56aa989c22e8771e5e112f46557d48aea011d084"
     ),
     "error_message_field.json": (
-        "41f7b1c6ff9c3725029b21d454829916d7634fc149d49ba8fc16d72967dcb312"
+        "5339bd8282677fd08a34242651924d969ae253976ea1928d8b888bf817a65843"
     ),
     "search_success.json": (
-        "9945e0fe415e54990dedde77139eece24a413d68560e9cd86841aa6fcc8133c3"
+        "c5dc6abbb5ce4a2857a7340c72c8982f213404ac1c7f8b2a6091086dd381b19a"
     ),
 }
 
 
 def _sha256(path: Path) -> str:
-    """Return the hex digest of a fixture file.
+    """Return the LF-normalized hex digest of a fixture file.
+
+    Git may check the same JSON out with CRLF on Windows. The pin is the
+    committed LF bytes so Linux CI and local Windows agree.
 
     Args:
         path: Fixture path.
 
     Returns:
-        SHA-256 hex digest.
+        SHA-256 hex digest of LF-normalized bytes.
     """
 
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def test_official_docs_pins_are_current() -> None:

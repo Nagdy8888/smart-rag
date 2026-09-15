@@ -128,7 +128,7 @@
         "type": "object"
       },
       "CitationResponse": {
-        "description": "Citation identifiers. No passage text.",
+        "description": "Citation identifiers plus ACL-checked title, PDF page, and excerpt.",
         "properties": {
           "chunk_id": {
             "anyOf": [
@@ -150,6 +150,50 @@
           "citation_index": {
             "title": "Citation Index",
             "type": "integer"
+          },
+          "document_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Title"
+          },
+          "evidence_excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Excerpt"
+          },
+          "paragraph_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paragraph Index"
+          },
+          "pdf_page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Page Number"
           },
           "provenance": {
             "additionalProperties": true,
@@ -209,6 +253,13 @@
       "ConversationMessage": {
         "description": "One creator-owned transcript message. Content is escaped untrusted text.",
         "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationResponse"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -230,6 +281,18 @@
             ],
             "title": "Role",
             "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           }
         },
         "required": [
@@ -8992,7 +9055,7 @@
     },
     "/runs/{run_id}/citations": {
       "get": {
-        "description": "Return citation IDs for an owned run. No passage text.\n\nArgs:\n    request: Active request.\n    run_id: Run id.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Escaped citation payloads.",
+        "description": "Return citation IDs and ACL-checked excerpts for an owned run.\n\nArgs:\n    request: Active request.\n    run_id: Run id.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Escaped citation payloads. Excerpt is never placed in provenance.",
         "operationId": "list_citations_route_runs__run_id__citations_get",
         "parameters": [
           {
