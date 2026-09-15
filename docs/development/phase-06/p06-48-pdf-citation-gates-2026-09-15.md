@@ -113,6 +113,17 @@ not by a live signed-in browser walkthrough.
 ## Handoff
 
 Per-packet commits on `fix/pdf-paragraph-citations` stay un-squashed.
-Feature branch is not deleted. User acceptance is still required before
-checking the packet complete. Push, PR URL, and merge-commit verification
-are recorded after those git operations; this file does not invent them.
+Feature branch was not deleted. User acceptance is still required before
+checking the packet complete.
+
+| Git | Value |
+| --- | --- |
+| P06-44 | `89b0c1a` |
+| P06-45 | `b0d516e` |
+| P06-46 | `6edb5b8` |
+| P06-47 | `b735f14` |
+| P06-48 | `d42b4df` |
+| CI repair | `ef23c24` |
+| PR | [smart-rag#9](https://github.com/Nagdy8888/smart-rag/pull/9) |
+| Merge commit | `5434d6f` (parents `75402ce` and `ef23c24`; not squash) |
+| PR-fast | all required checks passed after `ef23c24` |
