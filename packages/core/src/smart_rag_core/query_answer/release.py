@@ -95,7 +95,12 @@ def render_verified_company_answer(
         refusal when no supported material link remains.
     """
 
-    guarded = drop_ungrounded_literals(payload, fusion=fusion, tables=tables)
+    working = payload
+    if not working.atomic_links:
+        synthesized = _links_from_paragraphs(working)
+        if synthesized:
+            working = working.model_copy(update={"atomic_links": synthesized})
+    guarded = drop_ungrounded_literals(working, fusion=fusion, tables=tables)
     surviving = tuple(
         sorted(guarded.atomic_links, key=lambda item: (item.priority, item.link_id))
     )
@@ -225,7 +230,7 @@ def _normalize(text: str) -> str:
         Lowercased collapsed form.
     """
 
-    return " ".join(text.strip().lower().split())
+    return " ".join(text.strip().lower().split()).strip(".,:;!?")
 
 
 def _acronym_expansions(text: str) -> dict[str, set[str]]:
@@ -274,8 +279,12 @@ def _acronym_expansion_fails(claim: str, source_text: str) -> bool:
 
     source_defs = _acronym_expansions(source_text)
     claim_defs = _acronym_expansions(claim)
+    normalized_source = _normalize(source_text)
     for acronym, expansions in claim_defs.items():
-        allowed = source_defs.get(acronym, set())
+        allowed = set(source_defs.get(acronym, set()))
+        for expansion in expansions:
+            if expansion and expansion in normalized_source:
+                allowed.add(expansion)
         if not allowed or any(item not in allowed for item in expansions):
             return True
     claim_phrases = _title_phrases(claim)
@@ -320,6 +329,61 @@ def _fact_literals_missing(claim: str, source_text: str) -> bool:
             if match.group(0) not in source_text:
                 return True
     return False
+
+
+def _links_from_paragraphs(payload: AnswerPayload) -> tuple[AtomicLink, ...]:
+    """Build fact links from grounded paragraphs when the model omitted them.
+
+    Args:
+        payload: Company answer with paragraphs and citations.
+
+    Returns:
+        One fact link per paragraph that cites at least one passage or
+        table. Empty when paragraphs cannot be grounded.
+    """
+
+    synthesized: list[AtomicLink] = []
+    for paragraph in payload.paragraphs:
+        chunk_ids: list[str] = []
+        for citation in payload.citations:
+            chunk_id = citation.chunk_id
+            if (
+                citation.paragraph_index != paragraph.paragraph_index
+                or not chunk_id
+                or chunk_id in chunk_ids
+            ):
+                continue
+            chunk_ids.append(chunk_id)
+        table_citation = next(
+            (
+                citation
+                for citation in payload.table_citations
+                if citation.paragraph_index == paragraph.paragraph_index
+                and citation.table_id
+            ),
+            None,
+        )
+        if not chunk_ids and table_citation is None:
+            continue
+        link_id = (
+            paragraph.link_ids[0]
+            if paragraph.link_ids
+            else f"p{paragraph.paragraph_index}"
+        )
+        synthesized.append(
+            AtomicLink(
+                link_id=link_id[:64],
+                claim=paragraph.text[:2000],
+                chunk_ids=tuple(chunk_ids[:12]),
+                table_id=None if table_citation is None else table_citation.table_id,
+                source_ranges=(
+                    () if table_citation is None else table_citation.source_ranges
+                ),
+                kind="fact",
+                priority=paragraph.paragraph_index + 1,
+            )
+        )
+    return tuple(synthesized)
 
 
 def _unique_claims(links: tuple[AtomicLink, ...]) -> tuple[AtomicLink, ...]:

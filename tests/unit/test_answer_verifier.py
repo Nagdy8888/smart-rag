@@ -485,6 +485,77 @@ def test_correct_mcp_expansion_passes() -> None:
     assert released.citations[0].atomic_link_id == "l1"
 
 
+def test_mcp_stands_for_passes_when_source_spells_expansion_without_parens() -> None:
+    """A stands-for claim survives when the source spells the expansion.
+
+    The cited passage may use the expansion as a heading or sentence
+    without ``MCP (Model Context Protocol)`` parentheses.
+    """
+
+    fusion = verifier_fusion(
+        verifier_passage(
+            1,
+            text="Model Context Protocol lets models call tools via MCP.",
+        )
+    )
+    chunk_id = fusion.evidence[0].chunk_id
+    claim = "MCP stands for Model Context Protocol."
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(AnswerParagraph(paragraph_index=0, text=claim, link_ids=("l1",)),),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="Model Context Protocol",
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim=claim,
+                chunk_ids=(chunk_id,),
+                kind="fact",
+                priority=1,
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    released = render_verified_company_answer(payload, fusion=fusion, tables=())
+    assert "Model Context Protocol" in released.answer_text
+    assert "Method Call Protocol" not in released.answer_text
+    assert released.status == "complete"
+    assert released.citations
+
+
+def test_paragraphs_without_atomic_links_still_release_grounded_mcp() -> None:
+    """Paragraph-grounded PDF answers synthesize links when the model omitted them."""
+
+    fusion = _mcp_fusion()
+    chunk_id = fusion.evidence[0].chunk_id
+    claim = "MCP (Model Context Protocol) lets models call tools."
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(AnswerParagraph(paragraph_index=0, text=claim, link_ids=("l1",)),),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="MCP (Model Context Protocol)",
+                paragraph_index=0,
+            ),
+        ),
+        atomic_links=(),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    released = render_verified_company_answer(payload, fusion=fusion, tables=())
+    assert "Model Context Protocol" in released.answer_text
+    assert released.citations
+    assert released.atomic_links
+
+
 def test_free_prose_mcp_expansion_cannot_stay_verified() -> None:
     """Unsupported Method Call Protocol prose cannot remain in a verified answer."""
 
