@@ -23,27 +23,40 @@ from smart_rag_api.services.sse.mapping.verified import (
 )
 
 
-def _release_gate_status(status: str) -> tuple[str, dict[str, object]]:
-    """Return a verify-answer completion so Ask can accept refusal tokens.
+def _release_gate_status(status: str) -> list[tuple[str, dict[str, object]]]:
+    """Return verify-answer started then completed for skipped verifiers.
 
-    Generate-time expected refusals skip the verifier node. The client
-    still requires ``verify_answer`` completed before ``token_delta``.
+    Generate-time expected refusals skip the verifier node. Ask still
+    requires ``verify_answer`` completed before ``token_delta``. Route
+    progress also requires a matching started event so skipped nodes
+    stay visible as one started/completed pair.
 
     Args:
-        status: Expected graceful node status copied onto the gate event.
+        status: Expected graceful node status copied onto the completed
+            event.
 
     Returns:
-        Catalog ``status`` event for ``verify_answer``.
+        Catalog ``status`` events for ``verify_answer``.
     """
 
-    return (
-        "status",
-        {
-            "stage": VERIFY_ANSWER_NODE,
-            "status": status[:64],
-            "phase": "completed",
-        },
-    )
+    return [
+        (
+            "status",
+            {
+                "stage": VERIFY_ANSWER_NODE,
+                "status": "running",
+                "phase": "started",
+            },
+        ),
+        (
+            "status",
+            {
+                "stage": VERIFY_ANSWER_NODE,
+                "status": status[:64],
+                "phase": "completed",
+            },
+        ),
+    ]
 
 
 _STRIP_UPDATE_KEYS: Final[frozenset[str]] = frozenset(
@@ -143,7 +156,7 @@ class QuerySseMapper:
             if not self.verified:
                 raw_status = update.get("status")
                 if isinstance(raw_status, str) and raw_status in PARTIAL_STATUSES:
-                    events.append(_release_gate_status(raw_status))
+                    events.extend(_release_gate_status(raw_status))
                     events.extend(self._emit_verified(parsed or self._draft, update))
                     return events
                 reject_events = reject_terminal_events(update)

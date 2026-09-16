@@ -508,6 +508,19 @@ def test_mapper_maps_generate_insufficient_evidence_to_partial() -> None:
     assert "error" not in types
     assert types.count("partial") == 1
     assert types.count("limitation") == 1
+    verify_events = [
+        item[1]
+        for item in events
+        if item[0] == "status" and item[1].get("stage") == VERIFY_ANSWER_NODE
+    ]
+    assert verify_events == [
+        {"stage": VERIFY_ANSWER_NODE, "status": "running", "phase": "started"},
+        {
+            "stage": VERIFY_ANSWER_NODE,
+            "status": "insufficient_evidence",
+            "phase": "completed",
+        },
+    ]
     assert types.index("token_delta") < types.index("limitation")
     assert types.index("limitation") < types.index("partial")
     assert events[types.index("limitation")][1] == {
