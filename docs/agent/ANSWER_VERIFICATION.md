@@ -82,8 +82,10 @@ Prompt versions: `answer_v3` (current), `answer_v2` and `answer_v1`
 `apps/agents/src/smart_rag_agents/prompts/`. Company hashes are
 LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Before
 deterministic paragraph mapping, company payloads bind omitted atomic
-links from paragraphs and replace missing or non-substring spans with
-bounded exact excerpts copied from authorized `citation_text`. Invented
+links from paragraphs (and omitted paragraphs from links) and replace
+missing or non-substring spans with the first non-empty paragraph of
+authorized `citation_text`. Blank-line collapses are not used because
+they are not source substrings. Invented
 span text is never persisted. Direct `deterministic_check_answer` still
 fail-closes unaligned spans that skip that bind step. Live
 company answers derive released `answer_text` from surviving atomic-link

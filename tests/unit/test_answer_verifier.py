@@ -5,8 +5,10 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 from smart_rag_agents.query.deps import QueryGraphDeps
+from smart_rag_agents.query.gateway.answer import gateway_answer
 from smart_rag_agents.query.nodes.verify import verify_answer_node
 from smart_rag_agents.query.state import pending_query_state
+from smart_rag_core.gateways.model import AnswerModelResponse
 from smart_rag_core.query_answer.citations import citation_provenance_payload
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
@@ -627,6 +629,115 @@ def test_atomic_links_without_paragraphs_still_release_grounded_mcp() -> None:
     )
     assert released_wrong.status == "refused"
     assert "Multi-Channel Protocol" not in released_wrong.answer_text
+
+
+def test_link_only_multiline_pdf_passage_still_maps_mcp_span() -> None:
+    """Link-only payloads citing a blank-line PDF passage stay grounded."""
+
+    fusion = verifier_fusion(
+        verifier_passage(
+            1,
+            text=(
+                "Model Context Protocol\n\n"
+                "MCP lets models call tools through a shared protocol."
+            ),
+        )
+    )
+    chunk_id = fusion.evidence[0].chunk_id
+    payload = AnswerPayload(
+        answer_text="",
+        paragraphs=(),
+        citations=(),
+        atomic_links=(
+            AtomicLink(
+                link_id="mcp_definition",
+                claim="MCP stands for Model Context Protocol.",
+                chunk_ids=(chunk_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    bound = bind_company_atomic_links(payload, fusion=fusion)
+    assert bound.citations
+    assert bound.citations[0].span in fusion.evidence[0].citation_text
+    checked, failures = deterministic_check_answer(
+        bound,
+        fusion=fusion,
+        tables=(),
+        require_paragraphs=True,
+    )
+    assert "citation_span_mismatch" not in failures
+    assert "paragraph_unmapped" not in failures
+    assert checked.atomic_links
+    released = render_verified_company_answer(checked, fusion=fusion, tables=())
+    assert "Model Context Protocol" in released.answer_text
+
+
+def test_gateway_answer_binds_omitted_paragraphs_from_live_links() -> None:
+    """The live answer gateway binds link-only payloads before verify."""
+
+    fusion = verifier_fusion(
+        verifier_passage(
+            1,
+            text=(
+                "Model Context Protocol\n\n"
+                "MCP lets models call tools through a shared protocol."
+            ),
+        )
+    )
+    chunk_id = fusion.evidence[0].chunk_id
+
+    class _LinkOnlyGateway:
+        """Return a complete answer with atomic links and no paragraphs."""
+
+        async def generate_answer(self, request: object) -> AnswerModelResponse:
+            """Return the live omitted-paragraph shape.
+
+            Args:
+                request: Unused structured answer request.
+
+            Returns:
+                Fixture payload matching live ``answer_v3`` omissions.
+            """
+
+            del request
+            return AnswerModelResponse(
+                mode="mock",
+                payload={
+                    "answer_text": "",
+                    "paragraphs": [],
+                    "citations": [],
+                    "atomic_links": [
+                        {
+                            "link_id": "mcp_definition",
+                            "claim": "MCP stands for Model Context Protocol.",
+                            "chunk_ids": [chunk_id],
+                        }
+                    ],
+                    "status": "complete",
+                },
+                request_id="gateway-bind-1",
+                input_tokens=12,
+                output_tokens=8,
+            )
+
+    payload, prompt_tokens, completion_tokens = gateway_answer(
+        QueryGraphDeps(
+            model_gateway=_LinkOnlyGateway(),
+            answer_prompt_text="answer",
+        ),
+        query="In the Model Context Protocol section, what does MCP stand for?",
+        fusion=fusion,
+        tables=(),
+        context=None,
+    )
+    assert prompt_tokens == 12
+    assert completion_tokens == 8
+    assert payload.paragraphs
+    assert payload.citations
+    assert payload.citations[0].span in fusion.evidence[0].citation_text
+    assert "Model Context Protocol" in (payload.citations[0].span or "")
 
 
 def test_free_prose_mcp_expansion_cannot_stay_verified() -> None:

@@ -11,6 +11,7 @@ from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import filter_invented_ids
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_answer.paragraphs import with_derived_answer_text
+from smart_rag_core.query_answer.release import bind_company_atomic_links
 from smart_rag_core.query_answer.versions import (
     ANSWER_PROMPT_SHA256,
     ANSWER_PROMPT_VERSION,
@@ -46,6 +47,9 @@ def gateway_answer(
 
     Returns:
         Parsed answer payload plus provider prompt and completion tokens.
+        Live company payloads bind omitted paragraphs/citations from links
+        before the node returns so compacted fusion hashes cannot empty
+        the paragraph contract.
 
     Raises:
         AnswerError: If the gateway is unbound or the provider payload
@@ -101,7 +105,10 @@ def gateway_answer(
         payload = AnswerPayload.model_validate(response.payload)
     except ValidationError as exc:
         raise AnswerError("answer_schema_invalid") from exc
-    filtered = filter_invented_ids(payload, fusion, typed_tables)
+    filtered = bind_company_atomic_links(
+        filter_invented_ids(payload, fusion, typed_tables),
+        fusion=fusion,
+    )
     derived = with_derived_answer_text(filtered)
     prompt_tokens, completion_tokens = tokens_from_gateway_response(response)
     return (

@@ -16,6 +16,7 @@ from smart_rag_core.query_answer.models import (
     VerifierLinkVerdict,
     VerifierPayload,
 )
+from smart_rag_core.query_answer.paragraphs import exact_source_span
 from smart_rag_core.query_answer.schemas import (
     answer_json_schema,
     general_chat_json_schema,
@@ -575,3 +576,21 @@ def test_run_verifier_batch_still_one_call() -> None:
     assert calls["count"] == 1
     assert omitted == ()
     assert updated.status == "complete"
+
+
+def test_exact_source_span_stays_substring_of_multiline_pdf_passage() -> None:
+    """PDF passages with blank lines still yield contained citation spans.
+
+    Collapsing paragraph delimiters into spaces made live MCP spans fail
+    ``citation_span_aligns`` even when the definition chunk was fitted.
+    """
+
+    text = (
+        "Model Context Protocol\n\n"
+        "MCP lets models call tools through a shared protocol."
+    )
+    span = exact_source_span(text)
+    assert span
+    assert span in text
+    assert "\n\n" not in span
+    assert span.startswith("Model Context Protocol")

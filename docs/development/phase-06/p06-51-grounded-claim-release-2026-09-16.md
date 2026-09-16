@@ -85,13 +85,15 @@ flowchart TD
 ## Follow-up (2026-09-16 bind/span)
 
 Live MCP after `answer_v3` still refused with `verifier_call_count=0`
-because omitted `atomic_links`, omitted paragraphs, and paraphrased
-spans emptied the paragraph contract before the verifier.
-`bind_company_atomic_links` now synthesizes missing paragraphs from
-links (and the inverse), fills `atomic_link_id`, and replaces missing
-or non-substring spans with `exact_source_span` of authorized
-`citation_text`. Direct `deterministic_check_answer` still records
-`citation_span_mismatch` when that bind step is skipped. Wrong
+because omitted `atomic_links`, omitted paragraphs, paraphrased spans,
+and blank-line span collapse emptied the paragraph contract before the
+verifier. `bind_company_atomic_links` now synthesizes missing
+paragraphs from links (and the inverse), fills `atomic_link_id`, and
+replaces missing or non-substring spans with the first non-empty
+paragraph of authorized `citation_text`. The live `gateway_answer`
+path binds before the generate checkpoint so compacted fusion hashes
+cannot drop those spans. Direct `deterministic_check_answer` still
+records `citation_span_mismatch` when that bind step is skipped. Wrong
 `Method Call Protocol` and `Multi-Channel Protocol` expansions remain
 refused.
 
