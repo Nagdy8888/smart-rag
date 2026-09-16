@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
-from smart_rag_core.query_answer.assembly import assemble_source_records
+from smart_rag_core.query_answer.assembly import fit_source_records
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import filter_invented_ids
 from smart_rag_core.query_answer.models import AnswerPayload
@@ -63,7 +63,18 @@ def gateway_answer(
         )
     except ValidationError as exc:
         raise AnswerError("answer_schema_invalid") from exc
-    records = assemble_source_records(fusion, typed_tables)
+    fit = fit_source_records(
+        user_query=query,
+        fusion=fusion,
+        tables=typed_tables,
+        max_input_chars=deps.model_input_max_chars,
+        route=fusion.effective_route,
+    )
+    if fit.trim_reason == "input_bound_exceeded":
+        raise AnswerError("input_bound_exceeded")
+    records = fit.records
+    fusion = fit.fusion
+    typed_tables = fit.tables
     timeout_seconds = gateway_timeout_seconds(context)
     request = AnswerModelRequest(
         query=query or "query",

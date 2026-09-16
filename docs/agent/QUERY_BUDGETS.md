@@ -2,7 +2,7 @@
 title: Query budget engineering defaults
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering
 phase_packet: Phase 6 Packet 1
 ---
@@ -61,7 +61,12 @@ LightRAG loop). Remaining model calls decrement. If remaining USD cannot
 cover the kind cap, retrieve fails closed and does not call the provider.
 Call ceilings already include those retrieve slots (Hybrid 7 includes
 embed + rerank). Envelope USD stays `model_call_ceiling ×` the family max
-kind cap and is not enlarged.
+kind cap and is not enlarged. Company answer plus verifier reserve two
+model calls and eight seconds: optional profile/correction/retrieve spends
+must leave `ANSWER_STAGE_RESERVED_MODEL_CALLS` (2) and
+`ANSWER_STAGE_MIN_SECONDS` (8.0). Exhaustion returns a non-empty
+partial/refusal and does not call the answer provider. General, user-text,
+and Web ceilings are unchanged.
 
 LangGraph `remaining_model_calls` starts at the family ceiling, decrements
 on the profile consume, then `execute_branches_node` / correction retrieve

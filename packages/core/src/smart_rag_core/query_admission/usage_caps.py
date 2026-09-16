@@ -42,6 +42,12 @@ USAGE_KIND_COMPLETION_TOKEN_CAPS: dict[str, int] = {
 
 ALLOWED_USAGE_KINDS: frozenset[str] = frozenset(USAGE_KIND_USD_CAPS)
 
+ANSWER_STAGE_RESERVED_MODEL_CALLS = 2
+"""One company answer call plus one verifier call. Does not raise ceilings."""
+
+ANSWER_STAGE_MIN_SECONDS = 8.0
+"""Minimum remaining wall time before a company answer provider call starts."""
+
 
 def usage_kind_caps(usage_kind: str) -> tuple[Decimal, int, int]:
     """Return conservative per-call USD and token caps for one usage kind.
@@ -97,6 +103,24 @@ def _assert_remaining(remaining: int, *, reason: str) -> int:
     if remaining <= 0:
         raise QueryCeilingError(reason)
     return remaining - 1
+
+
+def assert_optional_call_preserves_answer_reserve(remaining_model_calls: int) -> None:
+    """Refuse optional spends that would consume the company answer reserve.
+
+    Canonical Hybrid retrieval still runs; callers skip only the optional
+    profile, correction, embed, or rerank spend when this fails.
+
+    Args:
+        remaining_model_calls: Remaining counted gateway calls before the spend.
+
+    Raises:
+        QueryCeilingError: When spending one call would leave fewer than
+            ``ANSWER_STAGE_RESERVED_MODEL_CALLS``.
+    """
+
+    if remaining_model_calls - 1 < ANSWER_STAGE_RESERVED_MODEL_CALLS:
+        raise QueryCeilingError("answer_stage_reserve_exhausted")
 
 
 def assert_call_available(remaining_model_calls: int) -> int:

@@ -23,6 +23,7 @@ from smart_rag_core.gateways.model_types import (
     VerifierModelRequest,
     VerifierModelResponse,
     mock_lightrag_llm_content,
+    reject_oversize_model_input,
 )
 from smart_rag_core.gateways.openai_answer import (
     execute_openai_answer,
@@ -180,10 +181,7 @@ class OpenAIRerankAdapter:
         """
 
         joined = request.query + request.source_records
-        if len(joined) > self._max_input_chars:
-            raise ValueError(
-                f"Model input exceeds configured {self._max_input_chars}-character bound"
-            )
+        reject_oversize_model_input(joined, self._max_input_chars)
         payload, request_id, input_tokens, output_tokens = execute_openai_answer(
             api_key=self._api_key,
             prompt_text=request.prompt_text,

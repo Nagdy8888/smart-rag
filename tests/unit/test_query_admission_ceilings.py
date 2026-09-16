@@ -259,13 +259,19 @@ def test_retrieve_kind_caps_fail_closed_when_remaining_cannot_cover() -> None:
     """Embed/rerank/lightrag must not run when remaining USD or calls are gone."""
 
     usd, prompt, completion = assert_retrieve_kind_available(
-        remaining_model_calls=2,
+        remaining_model_calls=3,
         remaining_usd=Decimal("0.20"),
         usage_kind="rerank",
     )
     assert usd == Decimal("0.20")
     assert prompt == 12000
     assert completion == 2000
+    with pytest.raises(QueryCeilingError, match="answer_stage_reserve_exhausted"):
+        assert_retrieve_kind_available(
+            remaining_model_calls=2,
+            remaining_usd=Decimal("0.20"),
+            usage_kind="rerank",
+        )
     with pytest.raises(QueryBudgetError, match="reservation_exhausted"):
         assert_retrieve_kind_available(
             remaining_model_calls=7,

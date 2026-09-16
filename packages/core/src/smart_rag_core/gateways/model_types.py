@@ -66,6 +66,31 @@ class ModelGatewayUnavailableError(RuntimeError):
     """Report that the real provider adapter is not configured in Phase 1."""
 
 
+class ModelInputBoundError(ValueError):
+    """Raise when a model request exceeds the configured character bound.
+
+    ``run_coro`` maps this exact type to ``AnswerError("input_bound_exceeded")``
+    without inspecting exception strings.
+    """
+
+
+def reject_oversize_model_input(joined: str, max_input_chars: int) -> None:
+    """Reject a concatenated model request that exceeds the input bound.
+
+    Args:
+        joined: Query plus records, memory, or prompt already concatenated.
+        max_input_chars: Configured gateway bound.
+
+    Raises:
+        ModelInputBoundError: When ``len(joined)`` exceeds the bound.
+    """
+
+    if len(joined) > max_input_chars:
+        raise ModelInputBoundError(
+            f"Model input exceeds configured {max_input_chars}-character bound"
+        )
+
+
 class MockModelNetworkDeniedError(OSError):
     """Report an OpenAI network attempt while mock mode is active."""
 

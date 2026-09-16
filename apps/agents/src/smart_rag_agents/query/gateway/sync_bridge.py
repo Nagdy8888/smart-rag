@@ -9,6 +9,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from smart_rag_core.gateways.model_types import ModelInputBoundError
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_answer.exceptions import AnswerError
 
@@ -80,6 +81,8 @@ def run_coro(
                 return asyncio.run(_await_with_timeout())
             except AnswerError:
                 raise
+            except ModelInputBoundError as exc:
+                raise AnswerError("input_bound_exceeded") from exc
             except TimeoutError as exc:
                 raise AnswerError("deadline_exhausted") from exc
             except Exception as exc:
@@ -124,5 +127,7 @@ def run_coro(
         raised = errors["exc"]
         if isinstance(raised, AnswerError):
             raise raised
+        if isinstance(raised, ModelInputBoundError):
+            raise AnswerError("input_bound_exceeded") from raised
         raise AnswerError("gateway_failed") from raised
     return box.get("value")

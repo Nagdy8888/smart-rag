@@ -65,6 +65,7 @@ class QueryGraphState(TypedDict):
         cost_usd: Billed USD total from ``app.llm_usage`` when set at verify.
         web_sources: Persisted Web source mappings for the verify excerpt
             store. Empty on company routes.
+        answer_context_fit: ID-only source-fit diagnostics, or null.
     """
 
     status: Literal[
@@ -135,6 +136,7 @@ class QueryGraphState(TypedDict):
     completion_tokens: int
     cost_usd: float | None
     web_sources: list[dict[str, object]]
+    answer_context_fit: dict[str, object] | None
 
 
 QueryStateGraph: TypeAlias = StateGraph[
@@ -221,4 +223,5 @@ def pending_query_state(
         "completion_tokens": 0,
         "cost_usd": None,
         "web_sources": [],
+        "answer_context_fit": None,
     }

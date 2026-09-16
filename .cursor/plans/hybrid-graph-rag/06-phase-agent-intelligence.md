@@ -98,7 +98,7 @@ Packets P06-09 through P06-57 are additive after the completed historical packet
 47. [ ] [Render book title, PDF viewer page, and exact excerpt beside each answer paragraph.](./06-phase-agent-intelligence/packets/47-inline-pdf-citation-ui.md)
 48. [ ] [Prove PDF citation accuracy across regression, authorization, history, and UI gates.](./06-phase-agent-intelligence/packets/48-pdf-citation-gates.md)
 49. [x] [Authorize live RAG failure remediation overlay, ADR, and packets P06-50 through P06-57.](./06-phase-agent-intelligence/packets/49-live-rag-failure-remediation-amendment.md)
-50. [ ] [Implement deterministic evidence fitting, exact duplicate suppression, typed overflow handling, and answer/deadline reserves with Q15 regressions.](./06-phase-agent-intelligence/packets/50-bound-answer-context.md)
+50. [x] [Implement deterministic evidence fitting, exact duplicate suppression, typed overflow handling, and answer/deadline reserves with Q15 regressions.](./06-phase-agent-intelligence/packets/50-bound-answer-context.md)
 51. [ ] [Version answer/verifier prompts, release only supported atomic claims, and remove all-fusion citation backfill with MCP regressions.](./06-phase-agent-intelligence/packets/51-grounded-claim-release.md)
 52. [ ] [Map insufficient evidence/refusal/deadline to one truthful partial outcome and unify visible/accessibility copy.](./06-phase-agent-intelligence/packets/52-graceful-terminals.md)
 53. [ ] [Add additive transcript-v2 run metadata and ACL-safe bounded citation-detail contracts.](./06-phase-agent-intelligence/packets/53-run-linked-transcript.md)

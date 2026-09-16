@@ -2,7 +2,7 @@
 title: Answer verification
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 3
 ---
@@ -33,7 +33,13 @@ Related: [COMBINED_FUSION.md](./COMBINED_FUSION.md) ·
   model calculates from prose.
 
 Source records are delimited as `<<untrusted-source>>`. Embedded
-instructions stay inside the record.
+instructions stay inside the record. Company answers fit whole records
+under the existing `MODEL_INPUT_MAX_CHARS` bound (16,384) with
+`fit_source_records`. Later exact normalized duplicates drop. Passages
+are never truncated to fill leftover bytes. Overflow after fitting is
+`input_bound_exceeded` with a non-empty refusal. Dropped IDs cannot be
+cited. Company answer plus verifier reserve two model calls and eight
+seconds; optional profile/retrieve spends must not consume that reserve.
 
 ## Multi-hop citations
 

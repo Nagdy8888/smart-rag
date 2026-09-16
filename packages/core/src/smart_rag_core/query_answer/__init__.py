@@ -1,6 +1,9 @@
 """Canonical answer generation, inference citations, and layered verification."""
 
-from smart_rag_core.query_answer.assembly import assemble_source_records
+from smart_rag_core.query_answer.assembly import (
+    assemble_source_records,
+    fit_source_records,
+)
 from smart_rag_core.query_answer.citations import (
     citation_provenance_payload,
     persist_answer_citations,
@@ -43,6 +46,7 @@ __all__ = [
     "citation_provenance_payload",
     "compose_tables",
     "deterministic_check_answer",
+    "fit_source_records",
     "generate_answer",
     "mock_answer_payload",
     "mock_verifier_payload",

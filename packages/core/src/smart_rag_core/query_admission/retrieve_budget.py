@@ -12,6 +12,7 @@ from smart_rag_core.query_admission.exceptions import (
 )
 from smart_rag_core.query_admission.usage_caps import (
     assert_call_available,
+    assert_optional_call_preserves_answer_reserve,
     usage_kind_caps,
 )
 
@@ -74,14 +75,16 @@ def assert_retrieve_kind_available(
         ``(usd_cap, prompt_token_cap, completion_token_cap)``.
 
     Raises:
-        QueryCeilingError: When the call ceiling is exhausted or the kind
-            is unknown.
+        QueryCeilingError: When the call ceiling is exhausted, the kind is
+            unknown, or spending this retrieve call would leave fewer than
+            ``ANSWER_STAGE_RESERVED_MODEL_CALLS`` for answer plus verifier.
         QueryBudgetError: When remaining USD cannot cover the kind cap.
     """
 
     usd_cap, prompt_cap, completion_cap = usage_kind_caps(usage_kind)
     if remaining_model_calls < 1:
         raise QueryCeilingError("model_call_exhausted")
+    assert_optional_call_preserves_answer_reserve(remaining_model_calls)
     if remaining_usd < usd_cap:
         raise QueryBudgetError("reservation_exhausted")
     return usd_cap, prompt_cap, completion_cap
