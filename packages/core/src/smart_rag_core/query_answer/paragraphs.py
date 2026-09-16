@@ -381,21 +381,26 @@ def _reindex_paragraphs(
 
 
 def exact_source_span(text: str) -> str:
-    """Return a bounded exact span copied from canonical text.
+    """Return a bounded exact substring of canonical text.
+
+    Blank-line paragraph delimiters stay in the source. Joining them
+    into spaces produced spans that failed ``citation_span_aligns`` on
+    live PDF passages. The first non-empty paragraph is copied instead
+    so the span remains a substring and cannot embed the delimiter.
 
     Args:
         text: Canonical passage or table cell text.
 
     Returns:
-        1-1000 character substring with paragraph delimiters collapsed.
-        Empty when ``text`` has no non-whitespace characters.
+        1-1000 character substring of ``text``. Empty when ``text`` has
+        no non-whitespace characters.
     """
 
-    collapsed = " ".join(part.strip() for part in text.split(PARAGRAPH_DELIMITER))
-    stripped = collapsed.strip()
-    if not stripped:
-        return ""
-    return stripped[:MAX_CITATION_SPAN_CHARS]
+    for part in text.split(PARAGRAPH_DELIMITER):
+        stripped = part.strip()
+        if stripped:
+            return stripped[:MAX_CITATION_SPAN_CHARS]
+    return ""
 
 
 def _mapped_passage_ok(

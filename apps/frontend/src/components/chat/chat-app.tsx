@@ -4,16 +4,14 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isClassifiedApiError, submitFeedback, type ApiFailure } from "../../lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { isClassifiedApiError, type ApiFailure } from "../../lib/api";
 import { HandshakeBanner } from "../auth/auth-screens";
 import { useSession } from "../../lib/auth/session-provider";
 import { hrefForCitationRecord } from "../../lib/citation-drawer";
 import { overlaySettledTurns } from "../../lib/chat-history";
 import { showSaveToQuizConvenience } from "../../lib/eval-workspace";
 import { evaluatePaidHandshake } from "../../lib/handshake";
-import { shouldShowCitations } from "../../lib/answer-origin";
-import { FEEDBACK_TAGS_UP, type CitationResponse, type FeedbackTag } from "../../lib/types";
 import { webSearchCapability } from "../../lib/web-search";
 import { Button } from "../ui/button";
 import { Sheet } from "../ui/sheet";
@@ -29,9 +27,10 @@ import { CitationDrawer } from "./citation-drawer";
 import { CitationSheet } from "./citation-sheet";
 import { ConversationRail } from "./conversation-rail";
 import { useChatQueries } from "./hooks/use-chat-queries";
+import { useChatRestore } from "./hooks/use-chat-restore";
 import { useChatRun } from "./hooks/use-chat-run";
 import { useChatSelection } from "./hooks/use-chat-selection";
-import { useConversationActions } from "./hooks/use-conversation-actions";
+import { useConversationActions, ConversationDeleteDialog } from "./hooks/use-conversation-actions";
 import { useConversationScroll } from "./hooks/use-conversation-scroll";
 import { toSaveToQuizSheetProps, useQuizCapture } from "./hooks/use-quiz-capture";
 import { useVerifiedAnswerReveal } from "./hooks/use-verified-answer-reveal";
@@ -72,16 +71,12 @@ export function ChatApp() {
     conversationId: selection.conversationId,
     runId: run.chat.runId,
     terminal: run.chat.terminal !== null,
+    viewingRunId: selection.viewingRunId,
+    sourcesOpen: selection.sourcesOpen,
+    selectedCitationId: selection.selectedCitationId,
   });
   const [reducedMotion, setReducedMotion] = useState(false);
   const [compactAsk, setCompactAsk] = useState(false);
-  const [feedbackTag, setFeedbackTag] = useState<FeedbackTag>(FEEDBACK_TAGS_UP[0]);
-  const [feedbackComment, setFeedbackComment] = useState("");
-  const [thumbsUp, setThumbsUp] = useState(true);
-  const [selectedCitation, setSelectedCitation] = useState<CitationResponse | null>(null);
-  const [feedbackStatus, setFeedbackStatus] = useState<string | null>(null);
-  const [feedbackPending, setFeedbackPending] = useState(false);
-  const citationTriggerRef = useRef<HTMLElement | null>(null);
   const presentationKey = `${selection.conversationId ?? "none"}:${run.chat.runId ?? "none"}`;
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
@@ -154,9 +149,22 @@ export function ChatApp() {
       ),
     [actions.olderMessages, liveQueries.messages, run.settledTurns],
   );
-  const visibleCitations = shouldShowCitations(run.chat.answerOrigin)
-    ? [...liveQueries.citations]
-    : [];
+  const restore = useChatRestore({
+    conversationId: selection.conversationId,
+    auth: queries.auth,
+    activeRunId: run.chat.runId,
+    terminal: run.chat.terminal,
+    historyMessages,
+    viewingRunId: selection.viewingRunId,
+    selectedCitationId: selection.selectedCitationId,
+    liveCitations: liveQueries.citations,
+    viewingCitations: liveQueries.viewingCitations,
+    citationDetail: liveQueries.citationDetail,
+    answerOrigin: run.chat.answerOrigin,
+    setViewingRunId: selection.setViewingRunId,
+    setSelectedCitationId: selection.setSelectedCitationId,
+    setSourcesOpen: selection.setSourcesOpen,
+  });
   const paradeDbDown =
     liveQueries.ready?.dependencies.some(
       (item) => item.name === "paradedb" && item.status === "down",
@@ -171,25 +179,9 @@ export function ChatApp() {
     runId: run.chat.runId,
     terminal: run.chat.terminal,
     question: run.lastUserMessage,
-    citations: visibleCitations,
+    citations: [...restore.sheetCitations],
     onFillComposer: selection.fillComposer,
   });
-  const sendFeedback = useCallback(async () => {
-    if (queries.auth === null || run.chat.runId === null) return;
-    setFeedbackPending(true);
-    try {
-      await submitFeedback(queries.auth, run.chat.runId, thumbsUp, feedbackTag, feedbackComment || null);
-      setFeedbackStatus("Feedback recorded.");
-    } catch {
-      setFeedbackStatus("Feedback could not be recorded. Try again.");
-    } finally {
-      setFeedbackPending(false);
-    }
-  }, [feedbackComment, feedbackTag, queries.auth, run.chat.runId, thumbsUp]);
-  const handleSelectCitation = (citation: CitationResponse, trigger: HTMLButtonElement) => {
-    citationTriggerRef.current = trigger;
-    setSelectedCitation(citation);
-  };
   if (!session.ready) {
     return (
       <ChatRestoringGate
@@ -223,21 +215,23 @@ export function ChatApp() {
         reconnectAttempt={run.reconnectAttempt}
         reconnectExhausted={run.reconnectExhausted}
         nextRetryMs={run.nextRetryMs}
-        feedbackStatus={feedbackStatus}
+        feedbackStatus={restore.feedbackStatus}
         deleteSuccess={actions.deleteSuccess}
       />
       <div className={chatStyles.mobileBar}>
         <Button type="button" variant="secondary" onClick={() => selection.setSessionsOpen(true)}>
           Sessions
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          data-action-id="ask.sources"
-          onClick={() => selection.setSourcesOpen(true)}
-        >
-          Sources
-        </Button>
+        {restore.showSources ? (
+          <Button
+            type="button"
+            variant="ghost"
+            data-action-id="ask.sources"
+            onClick={restore.openLiveSources}
+          >
+            Sources
+          </Button>
+        ) : null}
       </div>
       <ChatWorkspace
         rail={
@@ -263,7 +257,7 @@ export function ChatApp() {
             revealing={reveal.isRevealing}
             presentationKey={presentationKey}
             onShowFullAnswer={reveal.showFullAnswer}
-            citations={visibleCitations}
+            citations={restore.sheetCitations}
             conversationRef={scroll.containerRef}
             pinned={scroll.pinned}
             onJumpToLatest={scroll.jumpToLatest}
@@ -274,20 +268,11 @@ export function ChatApp() {
             companyUsd={String(liveQueries.usage?.cost_usd ?? "0")}
             detailsOpen={selection.detailsOpen}
             onDetailsOpen={selection.setDetailsOpen}
-            onSourcesOpen={() => selection.setSourcesOpen(true)}
-            onSelectCitation={handleSelectCitation}
+            {...restore.stage}
             onFillComposer={selection.fillComposer}
             composerSeed={selection.composerSeed}
-            thumbsUp={thumbsUp}
-            onThumbs={setThumbsUp}
-            feedbackTag={feedbackTag}
-            onTag={setFeedbackTag}
-            feedbackComment={feedbackComment}
-            onComment={setFeedbackComment}
-            onFeedback={() => void sendFeedback()}
-            feedbackPending={feedbackPending}
             showSaveToQuiz={showSaveToQuiz}
-            quiz={toSaveToQuizSheetProps(quiz, run.lastUserMessage, visibleCitations)}
+            quiz={toSaveToQuizSheetProps(quiz, run.lastUserMessage, [...restore.sheetCitations])}
             webSearchEnabled={webSearchEnabled}
           />
         }
@@ -301,17 +286,24 @@ export function ChatApp() {
       <CitationSheet
         open={selection.sourcesOpen}
         onClose={() => selection.setSourcesOpen(false)}
-        citations={visibleCitations}
+        citations={[...restore.sheetCitations]}
         hrefForCitation={hrefForCitationRecord}
         onSelectCitation={(citation, trigger) => {
-          handleSelectCitation(citation, trigger);
+          restore.handleSelectCitation(citation, trigger);
           selection.setSourcesOpen(false);
         }}
       />
       <CitationDrawer
-        citation={selectedCitation}
-        onClose={() => setSelectedCitation(null)}
-        returnFocusRef={citationTriggerRef}
+        citation={restore.selectedCitation}
+        onClose={() => selection.setSelectedCitationId(null)}
+        returnFocusRef={restore.citationTriggerRef}
+      />
+      <ConversationDeleteDialog
+        pendingDeleteId={actions.pendingDeleteId}
+        pending={actions.deletePending}
+        returnFocusRef={actions.deleteTriggerRef}
+        onClose={actions.cancelDelete}
+        onConfirm={actions.confirmDelete}
       />
     </div>
   );

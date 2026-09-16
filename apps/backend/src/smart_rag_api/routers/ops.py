@@ -41,6 +41,10 @@ def _compose_request_readiness(
         lightrag_attached=getattr(request.app.state, "lightrag_adapter", None)
         is not None,
         rate_limit_degraded=rate_limit_degraded,
+        query_runtime_warmed=bool(
+            getattr(request.app.state, "query_runtime_warmed", False)
+        ),
+        run_event_store=getattr(request.app.state, "run_event_store", None),
     )
 
 

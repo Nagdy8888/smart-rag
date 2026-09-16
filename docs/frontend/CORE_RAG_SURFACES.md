@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -64,6 +64,9 @@ flowchart TD
   resume --> catalog[SSE catalog]
   catalog --> chips[Citation chips]
   chips --> drawer[Drawer ids plus provenance]
+  browser -->|GET messages citation_count| restore[Per-turn Sources]
+  restore -->|GET citations then one detail| drawer
+  browser -->|DELETE conversation after ConfirmDialog| tombstoneConv[Creator 204]
   browser -->|GET /documents| library[Library]
   library -->|POST uploads| reserve[Reserve signed_url null]
   reserve -->|Storage JWT plus SHA-256| finalize[POST finalize]
@@ -110,12 +113,15 @@ flowchart TD
 - Graph inspect has no edge list, so the canvas does not invent edges. Empty inspect copy is “No authorized graph evidence matched this inspection.”
 - Production UI never sends `X-Test-User-Id` or `X-Test-Role`.
 - Ask shows exactly one run-failure alert. `partial` stays on the answer
-  surface. `error` after tokens keeps the tokens and omits the generic
-  banner. `error` with no tokens shows one “Something went wrong”
-  reference and never echoes `run_failed`. Retrieve-time
-  `deadline_exhausted` is catalog `deadline` then `partial`, not
-  `error` `routing_rejected`. Empty-answer deadline copy tells the user
-  to send the question again.
+  surface. `insufficient_evidence` / `refused` are `partial` with
+  “Company sources could not support an answer. Narrow the question and
+  try again.” Visible and assertive copy match. “Something went wrong”
+  is reserved for unknown/server faults. `error` after tokens keeps the
+  tokens and omits the generic banner. `error` with no tokens shows one
+  “Something went wrong” reference and never echoes `run_failed`.
+  Retrieve-time `deadline_exhausted` is catalog `deadline` then
+  `partial`, not `error` `routing_rejected`. Empty-answer deadline copy
+  tells the user to send the question again.
 - Ask does not keep a second live question or answer when decoded
   `GET /conversations/{id}/messages` content already matches. API
   `content` is HTML-escaped; SSE `answerText` is not.
@@ -123,6 +129,21 @@ flowchart TD
   the transcript until `GET /conversations/{id}/messages` contains that
   assistant row. The next send must not blank `answerText` without that
   overlay; otherwise user bubbles remain and prior replies vanish.
+- Reload restore keeps three identities: `activeRunId` (in-flight SSE
+  only), `viewingRunId` (selected historical turn), and
+  `latestSettledRunId` (newest transcript assistant with `run_id`).
+  Historical run ids never write the reconnect pointer. Each historical
+  assistant shows `Sources (citation_count)` when count is 1–50 and
+  opens `GET /runs/{run_id}/citations`, then one
+  `GET /runs/{run_id}/citations/{citation_id}` on chip selection.
+  Transcript list rows do not carry excerpts. General answers with
+  `citation_count=0` hide Sources. Give feedback targets the live run
+  only after that answer is terminal; after reload it targets
+  `viewingRunId ?? latestSettledRunId`.
+- Conversation delete uses `ConfirmDialog` titled `Delete conversation?`
+  with initial focus on Cancel. Escape/Cancel send no request. Confirm
+  sends exactly one `DELETE /conversations/{id}` and invalidates the
+  session list. Server-side immediate purge is unchanged.
 - The composer field clears as soon as Send is accepted. Create or
   admission failure restores the draft. `send()` returns at stream
   handoff and does not wait for the verified answer.
@@ -171,8 +192,10 @@ flowchart TD
 | Table unknown column / SQL | Rejected before POST; Analyze is not sent |
 | Table analyze 403/422/429 | Classified banner; the guided draft stays |
 | Chat `partial` | Answer note only; no protocol-failure banner |
+| Chat `insufficient_evidence` / `refused` | Limitation plus refusal token; never “Something went wrong” |
 | Chat `error` after tokens | One “tokens are kept” note; no stacked generic banner |
 | Chat `error` with no tokens | One “Something went wrong” banner plus run reference |
+| Conversation delete Cancel | Dialog closes; zero DELETE requests |
 
 ## Verification
 

@@ -25,6 +25,7 @@ from smart_rag_core.gateways.model_types import (
     VerifierModelRequest,
     VerifierModelResponse,
     mock_lightrag_llm_content,
+    reject_oversize_model_input,
     string_tuple,
 )
 from smart_rag_core.query_answer.models import AtomicLink
@@ -87,10 +88,7 @@ class MockModelAdapter:
             None. No network, provider, persistence, or retrieval calls occur.
         """
 
-        if len(request.prompt) > self._max_input_chars:
-            raise ValueError(
-                f"Model input exceeds configured {self._max_input_chars}-character bound"
-            )
+        reject_oversize_model_input(request.prompt, self._max_input_chars)
         return ModelResponse(
             mode="mock",
             content=(
@@ -234,10 +232,7 @@ class MockModelAdapter:
         ):
             raise ValueError("answer_prompt_version_mismatch")
         joined = request.query + request.source_records
-        if len(joined) > self._max_input_chars:
-            raise ValueError(
-                f"Model input exceeds configured {self._max_input_chars}-character bound"
-            )
+        reject_oversize_model_input(joined, self._max_input_chars)
         sources = _parse_untrusted_sources(request.source_records)
         fallback_span = next(
             (

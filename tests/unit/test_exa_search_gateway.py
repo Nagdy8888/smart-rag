@@ -8,6 +8,7 @@ import json
 import logging
 import threading
 from collections.abc import Callable
+from types import TracebackType
 from typing import Any
 
 import httpx
@@ -626,3 +627,139 @@ def test_logs_omit_canary_query_and_urls(caplog: pytest.LogCaptureFixture) -> No
     assert CANARY_KEY not in combined
     assert "Latest research" not in combined
     assert "arxiv.org" not in combined
+
+
+def test_two_sequential_searches_open_fresh_clients() -> None:
+    """Two sequential Web runs succeed on one gateway without loop reuse."""
+
+    calls = {"n": 0}
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        """Count HTTP attempts.
+
+        Args:
+            _request: Mock transport request.
+
+        Returns:
+            Successful Exa payload.
+        """
+
+        calls["n"] += 1
+        return httpx.Response(200, json=_success_payload())
+
+    gateway = _gateway(handler)
+    first = asyncio.run(gateway.search(query="q1", remaining_deadline_seconds=5))
+    second = asyncio.run(gateway.search(query="q2", remaining_deadline_seconds=5))
+    assert len(first.candidates) == 1
+    assert len(second.candidates) == 1
+    assert calls["n"] == 2
+    assert gateway.closed is False
+
+
+def test_create_request_close_share_one_event_loop() -> None:
+    """Per-attempt clients are created, used, and closed on one loop."""
+
+    loops: list[tuple[str, int]] = []
+    unhandled: list[object] = []
+
+    class _TrackingTransport(httpx.MockTransport):
+        """Record the running loop during the HTTP request."""
+
+        def __init__(self, handler: Callable[[httpx.Request], httpx.Response]) -> None:
+            """Store the mock handler.
+
+            Args:
+                handler: Request handler.
+            """
+
+            super().__init__(handler)
+
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            """Dispatch and record the loop identity.
+
+            Args:
+                request: Outgoing request.
+
+            Returns:
+                Mock response.
+            """
+
+            loops.append(("request", id(asyncio.get_running_loop())))
+            return await super().handle_async_request(request)
+
+    class _TrackedClient(httpx.AsyncClient):
+        """Record close on the running loop."""
+
+        async def __aexit__(
+            self,
+            exc_type: type[BaseException] | None = None,
+            exc_value: BaseException | None = None,
+            traceback: TracebackType | None = None,
+        ) -> None:
+            """Close after recording the loop identity.
+
+            Args:
+                exc_type: Exception type.
+                exc_value: Exception value.
+                traceback: Traceback.
+
+            Returns:
+                None.
+            """
+
+            loops.append(("close", id(asyncio.get_running_loop())))
+            await super().__aexit__(exc_type, exc_value, traceback)
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            _request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
+        return httpx.Response(200, json=_success_payload())
+
+    tracking = _TrackingTransport(handler)
+
+    def _open(self: ExaSearchGateway, *, timeout: httpx.Timeout) -> httpx.AsyncClient:
+        """Open a tracked client on the running loop.
+
+        Args:
+            self: Gateway.
+            timeout: Attempt timeout.
+
+        Returns:
+            Tracked async client.
+        """
+
+        del self
+        loops.append(("create", id(asyncio.get_running_loop())))
+        return _TrackedClient(
+            base_url=EXA_API_ORIGIN,
+            timeout=timeout,
+            transport=tracking,
+            headers={"Accept": "application/json"},
+            limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
+        )
+
+    gateway = ExaSearchGateway(
+        api_key=SecretStr(CANARY_KEY),
+        transport=tracking,
+    )
+    gateway._open_client = _open.__get__(gateway, ExaSearchGateway)  # type: ignore[method-assign]
+
+    async def _run() -> None:
+        """Search once and assert no unhandled task exceptions."""
+
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(lambda _loop, context: unhandled.append(context))
+        await gateway.search(query="q", remaining_deadline_seconds=5)
+
+    asyncio.run(_run())
+    identities = {item[1] for item in loops}
+    assert len(identities) == 1
+    assert [item[0] for item in loops] == ["create", "request", "close"]
+    assert unhandled == []

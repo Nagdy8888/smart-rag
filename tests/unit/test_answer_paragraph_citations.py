@@ -16,6 +16,7 @@ from smart_rag_core.query_answer.models import (
     VerifierLinkVerdict,
     VerifierPayload,
 )
+from smart_rag_core.query_answer.paragraphs import exact_source_span
 from smart_rag_core.query_answer.schemas import (
     answer_json_schema,
     general_chat_json_schema,
@@ -117,15 +118,25 @@ def _mapped_payload() -> tuple[
     return payload, fusion, ()
 
 
-def test_answer_v2_is_registered_and_hashed() -> None:
-    """Pinned answer_v2 hash matches the immutable prompt file."""
+def test_answer_v2_remains_registered_and_hashed() -> None:
+    """Historical answer_v2 stays immutable and loadable."""
 
     entry = load_prompt("answer_v2", environment="dev")
-    assert ANSWER_PROMPT_VERSION == "answer_v2"
-    assert entry.sha256 == ANSWER_PROMPT_SHA256
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v2.md")
+    assert entry.sha256 == verifier_prompt_digest("answer_v2.md")
     body = prompt_text("answer_v2")
     assert "Do not author `answer_text`" in body
+
+
+def test_answer_v3_is_current_and_hashed() -> None:
+    """Pinned answer_v3 hash matches the immutable prompt file."""
+
+    entry = load_prompt("answer_v3", environment="dev")
+    assert ANSWER_PROMPT_VERSION == "answer_v3"
+    assert entry.sha256 == ANSWER_PROMPT_SHA256
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v3.md")
+    body = prompt_text("answer_v3")
+    assert "Do not author `answer_text`" in body
+    assert "acronym" in body.lower()
     schema = answer_json_schema()
     properties = schema["properties"]
     required = schema["required"]
@@ -565,3 +576,21 @@ def test_run_verifier_batch_still_one_call() -> None:
     assert calls["count"] == 1
     assert omitted == ()
     assert updated.status == "complete"
+
+
+def test_exact_source_span_stays_substring_of_multiline_pdf_passage() -> None:
+    """PDF passages with blank lines still yield contained citation spans.
+
+    Collapsing paragraph delimiters into spaces made live MCP spans fail
+    ``citation_span_aligns`` even when the definition chunk was fitted.
+    """
+
+    text = (
+        "Model Context Protocol\n\n"
+        "MCP lets models call tools through a shared protocol."
+    )
+    span = exact_source_span(text)
+    assert span
+    assert span in text
+    assert "\n\n" not in span
+    assert span.startswith("Model Context Protocol")

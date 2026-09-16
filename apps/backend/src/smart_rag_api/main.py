@@ -124,6 +124,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
     )
     application.state.settings = settings
     application.state.rate_limit_degraded = False
+    application.state.query_runtime_warmed = False
     offload_executor = ThreadPoolExecutor(
         max_workers=_OFFLOAD_MAX_WORKERS,
         thread_name_prefix="api-offload",
@@ -170,11 +171,13 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None]:
 
                     try:
                         await warmed_executor.warmup(settings)
+                        application.state.query_runtime_warmed = True
                         LOGGER.info(
                             "query runtime warmed",
                             extra={"event": "backend.query_runtime.warmed"},
                         )
                     except Exception as exc:
+                        application.state.query_runtime_warmed = False
                         LOGGER.warning(
                             "query runtime warmup failed; first Ask run opens lazily",
                             extra={

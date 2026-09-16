@@ -18,6 +18,7 @@ from smart_rag_api.dependencies.services import (
     get_valkey_limits_client,
 )
 from smart_rag_api.schemas.fastapi_security import (
+    CitationDetailResponse,
     CitationResponse,
     FeedbackRequest,
     FeedbackResponse,
@@ -253,6 +254,61 @@ def list_citations_route(
         )
         for item in records
     ]
+
+
+@router.get(
+    "/{run_id}/citations/{citation_id}",
+    response_model=CitationDetailResponse,
+)
+def get_citation_detail_route(
+    request: Request,
+    run_id: UUID,
+    citation_id: UUID,
+    caller: CallerContextDep,
+    service: Annotated[QueryRunService, Depends(get_query_run_service)],
+) -> CitationDetailResponse:
+    """Return one owned citation with a bounded ACL-checked excerpt.
+
+    Args:
+        request: Active request.
+        run_id: Run id.
+        citation_id: Citation id on that run.
+        caller: Authenticated caller.
+        service: Injected service.
+
+    Returns:
+        Escaped detail payload. Web URLs are HTTPS only. Unavailable
+        sources omit the excerpt.
+
+    Raises:
+        HTTPException: 404 for missing, foreign, or mismatched IDs.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"run-read:{caller.user_id}",
+        kind=RateLimitKind.LOW_RISK_READ,
+        max_attempts=120,
+    )
+    try:
+        detail = service.citation_detail(caller, run_id=run_id, citation_id=citation_id)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    item = detail.citation
+    return CitationDetailResponse(
+        citation_id=item.citation_id,
+        citation_index=item.citation_index,
+        chunk_id=item.chunk_id,
+        provenance=item.provenance,
+        source_unavailable=item.source_unavailable,
+        source_kind=item.source_kind,
+        web_source_id=item.web_source_id,
+        paragraph_index=item.paragraph_index,
+        document_title=item.document_title,
+        pdf_page_number=item.pdf_page_number,
+        evidence_excerpt=item.evidence_excerpt,
+        source_url=detail.source_url,
+    )
 
 
 @router.post(

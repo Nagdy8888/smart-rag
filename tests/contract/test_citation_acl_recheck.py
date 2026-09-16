@@ -153,3 +153,18 @@ def test_citation_get_marks_unavailable_after_acl_revoke(
     assert records[0].document_title is None
     assert records[0].pdf_page_number is None
     assert records[0].evidence_excerpt is None
+    from smart_rag_core.query_admission.service import get_run_citation_detail
+
+    db_connection.execute("SET ROLE app_api")
+    try:
+        detail = get_run_citation_detail(
+            db_connection,
+            caller=member_after,
+            run_id=admitted.context.run_id,
+            citation_id=records[0].citation_id,
+        )
+    finally:
+        db_connection.execute("RESET ROLE")
+    assert detail.citation.source_unavailable is True
+    assert detail.citation.evidence_excerpt is None
+    assert detail.source_url is None

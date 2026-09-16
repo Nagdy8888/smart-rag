@@ -104,7 +104,8 @@ flowchart TD
 | Reconnect 404 private-run | `src/lib/api.test.ts` | classifies a foreign or missing run as deleted without a second POST | vitest-unit | proven |
 | Reconnect 404 chrome | `src/components/chat-app.test.tsx` | reconnect 404 shows deleted copy without source text | vitest-component | proven |
 | Conversation DELETE | `src/lib/api.test.ts` | DELETEs the conversation and treats 204 as success | vitest-unit | proven |
-| Conversation delete chrome | `src/components/chat-app.test.tsx` | Delete conversation issues DELETE and shows deleted copy | vitest-component | proven |
+| Conversation delete chrome | `src/components/chat-app.test.tsx` | Delete conversation confirms before DELETE and Cancel sends zero requests | vitest-component | proven |
+| Transcript citation restore | `src/components/chat-app.test.tsx` | restores historical Sources from citation_count without N+1 detail | vitest-component | proven |
 | Live JWT chat/idempotency/delete | `tests/e2e/core-rag-surfaces.spec.ts` | authenticated Auto chrome when a session exists | playwright-live | proven |
 
 ## Routing and limitation families

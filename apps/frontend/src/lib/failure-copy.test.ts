@@ -3,7 +3,9 @@ import { classifyApiError } from "./api";
 import {
   apiFailureBanner,
   chatRunFailureBanner,
+  expectedRefusalCopy,
   GENERIC_PRODUCTION_ERROR,
+  INSUFFICIENT_EVIDENCE_COPY,
   mutationFailureBanner,
   WEB_SEARCH_DISABLED_COPY,
   WEB_SEARCH_UNCONFIGURED_COPY,
@@ -89,6 +91,19 @@ describe("approved HTTP failure copy", () => {
     expect(apiFailureBanner({ kind: "protocol", detail: "empty_answer" })).toBe(
       "The run completed without an answer.",
     );
+  });
+
+  it("maps insufficient evidence to company-source copy, not the generic fault", () => {
+    expect(
+      apiFailureBanner({ kind: "protocol", detail: "insufficient_evidence" }),
+    ).toBe(INSUFFICIENT_EVIDENCE_COPY);
+    expect(
+      apiFailureBanner({ kind: "protocol", detail: "insufficient_evidence" }),
+    ).not.toBe(GENERIC_PRODUCTION_ERROR);
+    expect(expectedRefusalCopy("partial", "insufficient_evidence", [])).toBe(
+      INSUFFICIENT_EVIDENCE_COPY,
+    );
+    expect(expectedRefusalCopy("error", "run_failed", [])).toBeNull();
   });
 
   it("maps run_failed to one generic alert without the internal code", () => {

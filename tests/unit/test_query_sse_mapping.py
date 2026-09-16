@@ -21,6 +21,7 @@ from smart_rag_api.services.query_sse_mapping import (
     assert_catalog_event,
     chunk_answer_text,
 )
+from smart_rag_api.services.sse.mapping.contracts import CANONICAL_REFUSAL_TEXT
 from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.sse.catalog import PAYLOAD_MODELS
 
@@ -474,3 +475,171 @@ def test_mini_compiled_graph_does_not_emit_draft_before_verify() -> None:
     assert "token_delta" in seen_types
     assert seen_types.count("completed") == 1
     assert mapper.verified_text == "MINI_PUBLIC_FINAL"
+
+
+_TERMINALS = frozenset({"completed", "cancelled", "error", "partial"})
+
+
+def _terminal_events(
+    events: list[tuple[str, dict[str, object]]],
+) -> list[tuple[str, dict[str, object]]]:
+    """Return catalog terminal drafts only.
+
+    Args:
+        events: Mapper drafts.
+
+    Returns:
+        Terminal (type, payload) pairs in arrival order.
+    """
+
+    return [item for item in events if item[0] in _TERMINALS]
+
+
+def test_mapper_maps_generate_insufficient_evidence_to_partial() -> None:
+    """Generate-time refusal is tokens, limitation, and one partial."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {GENERATE_ANSWER_NODE: {"status": "insufficient_evidence"}}
+    )
+    for event_type, payload in events:
+        assert_catalog_event(event_type, payload)
+    types = [item[0] for item in events]
+    assert "error" not in types
+    assert types.count("partial") == 1
+    assert types.count("limitation") == 1
+    verify_events = [
+        item[1]
+        for item in events
+        if item[0] == "status" and item[1].get("stage") == VERIFY_ANSWER_NODE
+    ]
+    assert verify_events == [
+        {"stage": VERIFY_ANSWER_NODE, "status": "running", "phase": "started"},
+        {
+            "stage": VERIFY_ANSWER_NODE,
+            "status": "insufficient_evidence",
+            "phase": "completed",
+        },
+    ]
+    assert types.index("token_delta") < types.index("limitation")
+    assert types.index("limitation") < types.index("partial")
+    assert events[types.index("limitation")][1] == {
+        "code": "insufficient_evidence",
+    }
+    assert events[types.index("partial")][1] == {
+        "reason": "insufficient_evidence",
+    }
+    deltas = [
+        payload["delta"]
+        for event_type, payload in events
+        if event_type == "token_delta"
+    ]
+    assert "".join(str(item) for item in deltas) == CANONICAL_REFUSAL_TEXT
+    assert mapper.terminal_emitted is True
+    assert mapper.finish() == []
+    assert _terminal_events(events) == [
+        ("partial", {"reason": "insufficient_evidence"}),
+    ]
+
+
+def test_mapper_maps_fusion_insufficient_evidence_without_empty_answer() -> None:
+    """Pre-answer insufficient_evidence is a graceful partial, not empty_answer."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {"fuse_evidence": {"status": "insufficient_evidence"}}
+    )
+    types = [item[0] for item in events]
+    assert "error" not in types
+    assert ("partial", {"reason": "insufficient_evidence"}) in events
+    assert any(item[0] == "token_delta" for item in events)
+    assert mapper.finish() == []
+
+
+def test_mapper_maps_refused_verify_to_partial_not_error() -> None:
+    """Verified refusal stays partial with a non-empty token."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "refused",
+                "answer": _payload("  ", status="refused"),
+            }
+        }
+    )
+    types = [item[0] for item in events]
+    assert "error" not in types
+    assert "empty_answer" not in str(events)
+    assert types[-1] == "partial"
+    assert events[-1][1] == {"reason": "refused"}
+    assert ("limitation", {"code": "insufficient_evidence"}) in events
+    assert _terminal_events(events) == [("partial", {"reason": "refused"})]
+
+
+def test_mapper_verified_partial_is_not_a_deadline() -> None:
+    """Ordinary verified_partial does not emit a deadline diagnostic."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified_partial",
+                "answer": _payload("Kept partial.", status="partial"),
+            }
+        }
+    )
+    types = [item[0] for item in events]
+    assert "deadline" not in types
+    assert types[-1] == "partial"
+    assert events[-1][1] == {"reason": "verified_partial"}
+    assert "error" not in types
+
+
+def test_mapper_answer_deadline_reserve_emits_deadline_then_partial() -> None:
+    """Answer-stage reserve exhaustion is deadline plus one partial."""
+
+    mapper = QuerySseMapper()
+    events = mapper.consume_chunk(
+        {
+            GENERATE_ANSWER_NODE: {
+                "status": "verified_partial",
+                "detail": "answer_deadline_reserve_exhausted",
+                "answer": _payload("Time ran out.", status="partial"),
+            }
+        }
+    )
+    types = [item[0] for item in events]
+    assert types.count("deadline") == 1
+    assert types.count("partial") == 1
+    assert types.index("token_delta") < types.index("deadline")
+    assert types.index("deadline") < types.index("partial")
+    assert events[types.index("partial")][1] == {"reason": "deadline_exhausted"}
+    assert "error" not in types
+
+
+def test_mapper_verify_update_is_idempotent() -> None:
+    """A second verify chunk after a terminal is a no-op."""
+
+    mapper = QuerySseMapper()
+    first = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified",
+                "answer": _payload("PUBLIC_FINAL_ANSWER"),
+            }
+        }
+    )
+    second = mapper.consume_chunk(
+        {
+            VERIFY_ANSWER_NODE: {
+                "status": "verified",
+                "answer": _payload("SECOND_VERIFY_MUST_NOT_EMIT"),
+            }
+        }
+    )
+    assert first[-1][0] == "completed"
+    assert second == []
+    assert "SECOND_VERIFY_MUST_NOT_EMIT" not in str(second)
+    assert mapper.finish() == []
+    assert _terminal_events(first) == [("completed", {})]

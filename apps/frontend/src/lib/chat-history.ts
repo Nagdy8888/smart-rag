@@ -102,6 +102,9 @@ export function overlaySettledTurns(
       role: "assistant",
       content: answer,
       created_at: turn.createdAt,
+      run_id: turn.runId,
+      citation_count: 0,
+      citations: [],
     };
     if (insertAt >= 0) {
       next.splice(insertAt, 0, assistant);

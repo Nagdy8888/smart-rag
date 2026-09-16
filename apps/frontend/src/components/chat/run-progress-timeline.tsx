@@ -7,6 +7,7 @@
 import { useState } from "react";
 import type { ChatViewState } from "../../lib/chat-view";
 import type { RunProgressItem } from "../../lib/run-progress";
+import { expectedRefusalCopy } from "../../lib/failure-copy";
 import {
   EMPTY_DEADLINE_PARTIAL_COPY,
   isDeadlinePartialStatus,
@@ -46,11 +47,19 @@ export function progressSummary(props: RunProgressTimelineProps): string {
       : "Something went wrong.";
   }
   if (props.terminal === "partial") {
-    if (props.answerAvailable) {
-      return "Partial";
-    }
     if (isDeadlinePartialStatus(props.chat?.status)) {
       return EMPTY_DEADLINE_PARTIAL_COPY;
+    }
+    const refusal = expectedRefusalCopy(
+      props.terminal,
+      props.chat?.status,
+      props.chat?.diagnostics.limitationCodes ?? [],
+    );
+    if (refusal !== null) {
+      return refusal;
+    }
+    if (props.answerAvailable) {
+      return "Partial";
     }
     return "Partial answer. Verified tokens are kept.";
   }

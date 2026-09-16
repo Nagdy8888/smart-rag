@@ -8,14 +8,19 @@ ParadeDB/ClamAV/API stay in Compose. Do not use this on EC2.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import quote
 
 from smart_rag_worker.main import main as worker_main
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+LAUNCHER_PATH = "scripts/ops/run_laptop_ingest_worker.py"
+WORKER_METADATA_PATH = REPO_ROOT / "logs" / "laptop-ingest-worker.meta.json"
 
 
 def _parse_env(path: Path) -> dict[str, str]:
@@ -38,6 +43,88 @@ def _parse_env(path: Path) -> dict[str, str]:
         key, _, value = line.partition("=")
         values[key.strip()] = value.strip().strip('"').strip("'")
     return values
+
+
+@dataclass(frozen=True)
+class WorkerProcessIdentity:
+    """PID, start time, and command line for the host ingest worker."""
+
+    pid: int
+    start_time: str
+    command_line: str
+
+
+def identities_match(
+    recorded: WorkerProcessIdentity, live: WorkerProcessIdentity
+) -> bool:
+    """Return whether a live process is the recorded repository launcher.
+
+    Args:
+        recorded: Metadata written at start.
+        live: Snapshot of the process currently holding that PID.
+
+    Returns:
+        True only when pid, start time, and launcher token all match.
+        Unrelated reused PIDs return False.
+    """
+
+    if recorded.pid != live.pid:
+        return False
+    if recorded.start_time != live.start_time:
+        return False
+    if LAUNCHER_PATH not in recorded.command_line:
+        return False
+    return LAUNCHER_PATH in live.command_line
+
+
+def write_worker_metadata(identity: WorkerProcessIdentity) -> None:
+    """Persist host-worker identity for stop/verify scripts.
+
+    Args:
+        identity: Process snapshot. Must include ``LAUNCHER_PATH``.
+
+    Side Effects:
+        Writes ``logs/laptop-ingest-worker.meta.json``. Never writes secrets.
+    """
+
+    WORKER_METADATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "pid": identity.pid,
+        "start_time": identity.start_time,
+        "command_line": identity.command_line,
+        "launcher": LAUNCHER_PATH,
+    }
+    WORKER_METADATA_PATH.write_text(
+        json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def load_worker_metadata() -> WorkerProcessIdentity | None:
+    """Load recorded host-worker identity.
+
+    Returns:
+        Identity, or None when the file is missing or malformed.
+    """
+
+    if not WORKER_METADATA_PATH.is_file():
+        return None
+    try:
+        raw = json.loads(WORKER_METADATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    payload = cast(dict[str, Any], raw)
+    pid = payload.get("pid")
+    start_time = payload.get("start_time")
+    command_line = payload.get("command_line")
+    if not isinstance(pid, int) or not isinstance(start_time, str):
+        return None
+    if not isinstance(command_line, str):
+        return None
+    return WorkerProcessIdentity(
+        pid=pid, start_time=start_time, command_line=command_line
+    )
 
 
 def apply_laptop_ingest_environ() -> None:

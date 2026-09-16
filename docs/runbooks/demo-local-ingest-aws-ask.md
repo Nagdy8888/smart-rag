@@ -2,7 +2,7 @@
 title: Demo local ingest and AWS ask later
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-07
+last-reviewed: 2026-09-16
 audience: engineering, ops
 ---
 
@@ -215,10 +215,10 @@ See
    ``lightrag_db_url_set=false`` and must not copy the worker DSN into
    LightRAG. Hybrid `[hybrid]` progress still completes.
 
-   Daily `.\scripts\dev.ps1` starts hosted-runtime Compose sidecars and does
-   not start local Supabase. This demo's host-worker ingest path is still
-   separate from Compose worker logs. Filter logs from the host worker
-   process, not `docker compose logs worker`.
+   Daily `.\scripts\dev.ps1` starts hosted-runtime Compose sidecars plus
+   the host ingest worker and does not start local Supabase or the
+   distroless Compose `worker`. Filter logs from gitignored
+   `logs/laptop-ingest-worker.log`, not `docker compose logs worker`.
 2. Upload `plot_summaries.hybrid-800.txt` through the local UI. Leave
    `graph_eligible` false (upload default). Wait for `[hybrid]` through
    `hybrid_ready` (public status `graph_ineligible`).

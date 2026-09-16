@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, frontend
 ---
 
@@ -84,7 +84,7 @@ tracebacks, secrets, source HTML, or passages.
 | `cache` | Cache diagnostic. |
 | `coverage` | Coverage score without passage text. |
 | `optional_tool_disclosure` | Selected optional tool keys. |
-| `citation_preview` | Citation IDs and ranks. Company rows use chunk/table IDs. Web rows use `web_source_id` values. No passage, excerpt, or span text. HTTP `GET /runs/{id}/citations` may include an ACL-rechecked `evidence_excerpt`; SSE never copies it. |
+| `citation_preview` | Citation IDs and ranks. Company rows use chunk/table IDs. Web rows use `web_source_id` values. No passage, excerpt, or span text. HTTP `GET /runs/{id}/citations` may include an ACL-rechecked `evidence_excerpt`; transcript listings never do. One-citation `GET /runs/{id}/citations/{citation_id}` is the bounded excerpt path. SSE never copies excerpts. |
 | `answer_origin` | Additive origin (`origin` only: `general_knowledge`, `company_documents`, `user_supplied_text`, `ambiguous`, `web`). Emitted before `token_delta` on new answers. Schema major version stays `1`. Historical/null payloads omit the event. |
 | `token_delta` | Generated token delta. Never retrieved source. |
 | `usage` | Accumulated provider prompt and completion tokens for this query run (profile, search, answer, verifier). Optional billed `cost_usd` when `app.llm_usage` is available. Emitted after verify, before the terminal. Counts are 0 when no model ran. Conversation-title generation is not in this event; Ask Run Details adds it under **This chat**. No prompts. |
@@ -99,6 +99,26 @@ deterministic, ambiguous, and unknown origins hide chips.
 Exactly one terminal among `completed`, `cancelled`, `error`, `partial`.
 Conversation summary and assistant-message persist run only after that
 terminal is yielded. Those writes must not emit a second `error`.
+
+Expected company refusals (`insufficient_evidence`, `refused`) and
+deadline/budget partials (`deadline_exhausted`,
+`answer_deadline_reserve_exhausted`) emit a non-empty refusal token when
+one is available, an optional `limitation`, and exactly one `partial`.
+They are not `error` and not `empty_answer`. `empty_answer` is reserved
+for a supposedly releasable `verified` payload that is blank. Unknown
+faults stay one sanitized `error`. Generate-time expected refusals skip
+the verifier node; the mapper still emits `verify_answer` completed so
+Ask can accept the refusal tokens.
+
+```mermaid
+flowchart TD
+  node["Graph node status"]
+  node -->|verified complete| completed["token_delta then completed"]
+  node -->|insufficient_evidence or refused| partialRefuse["token_delta limitation partial"]
+  node -->|deadline_exhausted| deadline["deadline then partial"]
+  node -->|blank verified payload| empty["error empty_answer"]
+  node -->|unknown fault| error["error sanitized code"]
+```
 
 Live `LangGraphQueryRunExecutor` is **process-cached** on `app.state`
 (checkpointer pool, memory store, compiled graph). Each execute still

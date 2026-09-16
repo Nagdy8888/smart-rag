@@ -411,3 +411,68 @@ def test_distroless_venv_images_copy_extra_shared_libs() -> None:
         runtime = content[runtime_idx:]
         assert "COPY --from=builder --chown=10001:10001 /runtime-so/ /" in runtime
         assert "/var/lib/dpkg" not in content
+
+
+def test_compose_worker_uses_non_default_profile() -> None:
+    """Default stack excludes the distroless Compose worker."""
+
+    worker = _service("worker")
+    assert _string_list(worker["profiles"]) == ["compose-worker"]
+
+
+def test_compose_files_do_not_mount_docker_sock() -> None:
+    """The worker never receives the raw Docker socket."""
+
+    packet8 = REPO_ROOT / "docker-compose.packet8.yml"
+    for path in (COMPOSE_PATH, packet8):
+        text = path.read_text(encoding="utf-8")
+        assert "docker.sock" not in text
+        assert "/var/run/docker.sock" not in text
+
+
+def test_packet8_overlay_binds_loopback_only() -> None:
+    """Host overlay ports stay on 127.0.0.1."""
+
+    packet8 = _mapping(
+        yaml.safe_load(
+            (REPO_ROOT / "docker-compose.packet8.yml").read_text(encoding="utf-8")
+        )
+    )
+    services = _mapping(packet8["services"])
+    expected = {
+        "paradedb": "127.0.0.1:54329:5432",
+        "clamav": "127.0.0.1:13310:3310",
+        "crawl-proxy": "127.0.0.1:18080:8080",
+    }
+    for name, mapping in expected.items():
+        ports = _string_list(_mapping(services[name])["ports"])
+        assert mapping in ports
+        for item in ports:
+            assert item.startswith("127.0.0.1:")
+
+
+def test_parser_sandbox_compose_uses_network_none() -> None:
+    """Parser image build/run service has no Compose network egress."""
+
+    sandbox = _service("parser-sandbox")
+    assert sandbox["network_mode"] == "none"
+    assert "networks" not in sandbox
+    assert _string_list(sandbox["profiles"]) == ["parser-build"]
+
+
+def test_local_scripts_use_host_worker_and_skip_compose_worker_exec() -> None:
+    """dev/stop/verify drive the approved launcher, not ``compose exec worker``."""
+
+    dev = (REPO_ROOT / "scripts" / "dev.ps1").read_text(encoding="utf-8")
+    stop = (REPO_ROOT / "scripts" / "stop.ps1").read_text(encoding="utf-8")
+    verify = (REPO_ROOT / "scripts" / "verify-local.ps1").read_text(encoding="utf-8")
+    launcher = "scripts/ops/run_laptop_ingest_worker.py"
+    assert launcher in dev
+    assert "parser-build" in dev
+    assert "docker-compose.packet8.yml" in dev
+    assert "compose-worker" not in dev
+    assert launcher in stop
+    assert "left untouched" in stop
+    assert launcher in verify
+    assert "compose exec worker" not in verify.casefold()
+    assert "exec -T worker" not in verify

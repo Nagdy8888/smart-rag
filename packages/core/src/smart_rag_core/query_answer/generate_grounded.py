@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from smart_rag_core.query_answer.assembly import assemble_source_records
+from smart_rag_core.query_answer.assembly import (
+    assemble_source_records,
+    company_input_bound_payload,
+    fit_source_records,
+)
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
     AnswerParagraph,
@@ -17,6 +21,7 @@ from smart_rag_core.query_answer.paragraphs import (
     join_paragraph_text,
     with_derived_answer_text,
 )
+from smart_rag_core.query_answer.release import bind_company_atomic_links
 from smart_rag_core.query_answer.sanitize import empty_no_retrieval, filter_invented_ids
 from smart_rag_core.query_answer.versions import (
     MAX_ANSWER_PARAGRAPHS,
@@ -84,12 +89,26 @@ def generate_grounded_answer(
             status="refused",
             origin=KnowledgeScope.COMPANY_DOCUMENTS,
         )
+    fit = fit_source_records(
+        user_query=user_query,
+        fusion=fusion,
+        tables=tables,
+        max_input_chars=16_384,
+        route=fusion.effective_route,
+    )
+    if fit.trim_reason == "input_bound_exceeded":
+        return company_input_bound_payload()
+    fusion = fit.fusion
+    tables = fit.tables
     records = assemble_source_records(fusion, tables)
     if caller is None:
         payload = mock_answer_payload(fusion, tables, user_query=user_query)
     else:
         payload = caller(records, fusion, tables)
-    filtered = filter_invented_ids(payload, fusion, tables)
+    filtered = bind_company_atomic_links(
+        filter_invented_ids(payload, fusion, tables),
+        fusion=fusion,
+    )
     derived = with_derived_answer_text(filtered)
     return derived.model_copy(
         update={"answer_origin": KnowledgeScope.COMPANY_DOCUMENTS}

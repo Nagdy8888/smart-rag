@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import cast
 
 import psycopg
+from pydantic import SecretStr
 from smart_rag_core.gateways.crawl_proxy import CrawlProxyGateway
 from smart_rag_core.gateways.embedding import create_embedding_gateway
 from smart_rag_core.gateways.exa_search import (
@@ -72,6 +73,28 @@ def secret_url(value: object) -> str | None:
     if isinstance(value, str) and value:
         return value
     return None
+
+
+def _web_gateway_stale(gateway: object, settings: object) -> bool:
+    """Return whether the cached Exa gateway cannot serve this Ask.
+
+    Args:
+        gateway: Current deps gateway.
+        settings: Process settings for this run.
+
+    Returns:
+        True when the gateway is missing, the wrong type, closed, or
+        bound to a different key.
+    """
+
+    if not isinstance(gateway, ExaSearchGateway):
+        return True
+    if gateway.closed:
+        return True
+    key = getattr(settings, "exa_api_key", None)
+    if not isinstance(key, SecretStr):
+        return True
+    return not gateway.credential_matches(key)
 
 
 def build_query_process_bindings(
@@ -174,6 +197,7 @@ def build_query_process_bindings(
         crawl_proxy_gateway=crawl_gateway,
         web_critique_prompt_text=web_critique_prompt_text(),
         web_answer_prompt_text=web_answer_prompt_text(),
+        model_input_max_chars=int(getattr(loaded, "model_input_max_chars", 16_384)),
     )
 
 
@@ -242,6 +266,7 @@ def build_query_graph_deps(
         web_search_configured=bindings.web_search_configured,
         exa_search_gateway=bindings.exa_search_gateway,
         crawl_proxy_gateway=bindings.crawl_proxy_gateway,
+        model_input_max_chars=bindings.model_input_max_chars,
     )
 
 
@@ -262,8 +287,9 @@ def refresh_web_search_deps(deps: QueryGraphDeps, settings: object) -> QueryGrap
         The same ``deps`` instance with Web flags and gateway refreshed.
 
     Side Effects:
-        May construct an ``ExaSearchGateway`` bound to ``https://api.exa.ai``.
-        Never logs the key.
+        May construct an ``ExaSearchGateway`` bound to ``https://api.exa.ai``
+        when the cached gateway is missing, the wrong type, closed, or
+        bound to a different key. Never logs the key.
     """
 
     enabled = bool(getattr(settings, "web_search_enabled", False))
@@ -271,7 +297,7 @@ def refresh_web_search_deps(deps: QueryGraphDeps, settings: object) -> QueryGrap
     gateway = deps.exa_search_gateway
     if not enabled:
         gateway = None
-    elif not isinstance(gateway, ExaSearchGateway):
+    elif _web_gateway_stale(gateway, settings):
         try:
             if isinstance(settings, SharedSettings):
                 gateway = create_exa_search_gateway(settings)

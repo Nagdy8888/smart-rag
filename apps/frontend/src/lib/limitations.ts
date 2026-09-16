@@ -3,6 +3,10 @@
  * payloads. The UI never invents a bypass.
  */
 
+/** Company refusal when retrieved sources cannot support an answer. */
+export const INSUFFICIENT_EVIDENCE_COPY =
+  "Company sources could not support an answer. Narrow the question and try again.";
+
 const LIMITATION_COPY: Record<string, string> = {
   temporal_graph_limitation:
     "Historical and as-of relationship questions stay on Hybrid. The graph is current-version only.",
@@ -14,8 +18,7 @@ const LIMITATION_COPY: Record<string, string> = {
     "The graph is not ready for these documents yet. Retrieval continues on Hybrid.",
   media_limitation:
     "This question needs media the current indexes cannot answer. The run refuses rather than guessing.",
-  insufficient_evidence:
-    "Retrieved evidence is insufficient. The answer is refused rather than overconfident.",
+  insufficient_evidence: INSUFFICIENT_EVIDENCE_COPY,
   coverage_gap:
     "Some requested sections are uncovered. The run reports gaps instead of filling them in.",
   negation_unresolved:

@@ -734,6 +734,20 @@
       "test_id": "src/components/chat-app.test.tsx"
     },
     {
+      "action_id": "ask.turn_sources",
+      "route": "/",
+      "label": "Sources (N)",
+      "control_kind": "local-state",
+      "contract_owner": "fastapi",
+      "contract": "GET /runs/{id}/citations then GET /runs/{id}/citations/{citation_id}",
+      "role": "authenticated",
+      "success_state": "per-turn sources drawer",
+      "failure_state": "none",
+      "idempotency": "read",
+      "disposition": "keep",
+      "test_id": "src/components/chat/answer-surface.test.tsx"
+    },
+    {
       "action_id": "ask.run_details",
       "route": "/",
       "label": "Run details",

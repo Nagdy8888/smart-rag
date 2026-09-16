@@ -2,7 +2,7 @@
 title: Ingestion operational limits
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-16
 audience: engineering, ops
 ---
 
@@ -163,7 +163,7 @@ Parser/OCR library pins (uv workspace `packages/core`):
 | pydantic | 2.13.4 | MIT | ParseResult JSON in sandbox runner |
 | Tesseract (image) | distro package | Apache-2.0 | OCR engine + eng/ara traineddata |
 
-Parser sandbox image: built from `infra/parser-sandbox` (`smart-rag-parser-sandbox:local`). Compose profile `parser-build` only; service stays on `private` network and is **not** attached to `egress`.
+Parser sandbox image: built from `infra/parser-sandbox` (`smart-rag-parser-sandbox:local`). Compose profile `parser-build` only; the service uses `network_mode: none` and is **not** attached to `egress` or `private`.
 
 Primary references: [PyMuPDF docs](https://pymupdf.readthedocs.io/), [python-docx](https://python-docx.readthedocs.io/), [python-pptx](https://python-pptx.readthedocs.io/), [openpyxl](https://openpyxl.readthedocs.io/), [Tesseract](https://tesseract-ocr.github.io/).
 

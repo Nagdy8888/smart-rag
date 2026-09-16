@@ -65,6 +65,14 @@ export type ChatStageProps = {
   onDetailsOpen: (open: boolean) => void;
   onSourcesOpen: () => void;
   onSelectCitation: (citation: CitationResponse, trigger: HTMLButtonElement) => void;
+  /** Open Sources for one historical owned run. */
+  onOpenTurnSources?: (runId: string) => void;
+  /** False hides header/mobile Sources (general origin with count 0). */
+  showSources?: boolean;
+  /** Header Sources count. Defaults to the live citation list length. */
+  sourcesCount?: number;
+  /** Settled run to POST feedback to. Null hides Give feedback. */
+  feedbackRunId?: string | null;
   onFillComposer: (text: string) => void;
   composerSeed: { text: string; key: number };
   thumbsUp: boolean;
@@ -115,6 +123,10 @@ export function ChatStage(props: ChatStageProps) {
     onDetailsOpen,
     onSourcesOpen,
     onSelectCitation,
+    onOpenTurnSources,
+    showSources = true,
+    sourcesCount,
+    feedbackRunId = null,
     onFillComposer,
     composerSeed,
     thumbsUp,
@@ -136,6 +148,7 @@ export function ChatStage(props: ChatStageProps) {
     chat,
   );
   const visibleCitations = shouldShowCitations(chat.answerOrigin) ? [...citations] : [];
+  const headerCount = sourcesCount ?? visibleCitations.length;
   const showEmptyPrompts =
     !messagesPending &&
     !messagesError &&
@@ -175,14 +188,16 @@ export function ChatStage(props: ChatStageProps) {
               ))}
             </select>
           </label>
-          <Button
-            type="button"
-            variant="ghost"
-            data-action-id="ask.sources"
-            onClick={onSourcesOpen}
-          >
-            Sources ({String(visibleCitations.length)})
-          </Button>
+          {showSources ? (
+            <Button
+              type="button"
+              variant="ghost"
+              data-action-id="ask.sources"
+              onClick={onSourcesOpen}
+            >
+              Sources ({String(headerCount)})
+            </Button>
+          ) : null}
           <RunDetailsSheet
             open={detailsOpen}
             onOpen={() => onDetailsOpen(true)}
@@ -222,6 +237,7 @@ export function ChatStage(props: ChatStageProps) {
           chat={chat}
           hrefForCitation={hrefForCitation}
           onSelectCitation={onSelectCitation}
+          onOpenTurnSources={onOpenTurnSources}
           promptTokens={chat.diagnostics.promptTokens}
           completionTokens={chat.diagnostics.completionTokens}
         />
@@ -274,19 +290,24 @@ export function ChatStage(props: ChatStageProps) {
             ))}
           </div>
         ) : null}
-        {chat.terminal !== null && chat.answerText !== "" ? (
+        {feedbackRunId !== null ||
+        (showSaveToQuiz && quiz !== null && chat.terminal !== null) ? (
           <div className={chatStyles.answerFooter}>
-            <FeedbackPopover
-              thumbsUp={thumbsUp}
-              onThumbs={onThumbs}
-              tag={feedbackTag}
-              onTag={onTag}
-              comment={feedbackComment}
-              onComment={onComment}
-              onSubmit={onFeedback}
-              pending={feedbackPending}
-            />
-            {showSaveToQuiz && quiz ? <SaveToQuizSheet {...quiz} /> : null}
+            {feedbackRunId !== null ? (
+              <FeedbackPopover
+                thumbsUp={thumbsUp}
+                onThumbs={onThumbs}
+                tag={feedbackTag}
+                onTag={onTag}
+                comment={feedbackComment}
+                onComment={onComment}
+                onSubmit={onFeedback}
+                pending={feedbackPending}
+              />
+            ) : null}
+            {showSaveToQuiz && quiz && chat.terminal !== null ? (
+              <SaveToQuizSheet {...quiz} />
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -10,14 +10,9 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
-from smart_rag_core.query_admission.service import (
-    RunCitationRecord,
-    list_conversation_citations,
-)
+from smart_rag_core.query_admission.service import RunCitationRecord
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.security.untrusted import isolate_untrusted_text
-
-from smart_rag_api.services.query_runs import escape_run_citation
 
 _REASON_PREFIX = "query_memory:"
 _REASON_MAP = {
@@ -38,8 +33,10 @@ class ConversationMessageRecord:
         role: ``user`` or ``assistant``.
         content: HTML-escaped untrusted text.
         created_at: Persist timestamp.
-        run_id: Owning query run, when the message was admitted.
-        citations: Escaped citations for assistant runs. Empty for user rows.
+        run_id: Owning query run when the message and run share ownership.
+        citation_count: Persisted citation rows for that run, clamped 0..50.
+        source_kind: ``company_document``, ``web``, or null when mixed/none.
+        citations: Always empty on the list path. Excerpts use citation detail.
     """
 
     message_id: UUID
@@ -47,6 +44,8 @@ class ConversationMessageRecord:
     content: str
     created_at: datetime
     run_id: UUID | None = None
+    citation_count: int = 0
+    source_kind: str | None = None
     citations: tuple[RunCitationRecord, ...] = field(default_factory=tuple)
 
 
@@ -97,8 +96,8 @@ def list_conversation_messages(
             after HTTP mapping.
 
     Side Effects:
-        Executes ``app.list_conversation_messages_v2`` and one bounded
-        ``app.list_conversation_citations_v1`` batch. No model calls and no SSE.
+        Executes ``app.list_conversation_messages_v3``. Citation excerpts
+        are not loaded on this path.
     """
 
     bounded = min(max(limit, 1), 100)
@@ -106,8 +105,9 @@ def list_conversation_messages(
         with connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(
                 """
-                SELECT message_id, role, content, created_at, run_id
-                FROM app.list_conversation_messages_v2(
+                SELECT message_id, role, content, created_at, run_id,
+                       citation_count, source_kind
+                FROM app.list_conversation_messages_v3(
                   %s::uuid, %s::text, %s::bigint, %s::uuid, %s::integer, %s::uuid
                 )
                 """,
@@ -132,6 +132,10 @@ def list_conversation_messages(
         role = str(row["role"])
         if role not in {"user", "assistant"}:
             continue
+        kind = row.get("source_kind")
+        source_kind = str(kind) if kind in {"company_document", "web"} else None
+        count_raw = row.get("citation_count")
+        citation_count = 0 if count_raw is None else max(0, min(int(count_raw), 50))
         records.append(
             ConversationMessageRecord(
                 message_id=UUID(str(row["message_id"])),
@@ -139,14 +143,11 @@ def list_conversation_messages(
                 content=isolate_untrusted_text(str(row["content"] or "")),
                 created_at=created,
                 run_id=_optional_uuid(row.get("run_id")),
+                citation_count=citation_count,
+                source_kind=source_kind,
             )
         )
-    return _attach_conversation_citations(
-        connection,
-        caller=caller,
-        conversation_id=conversation_id,
-        records=tuple(records),
-    )
+    return tuple(records)
 
 
 def _optional_uuid(value: object) -> UUID | None:
@@ -162,60 +163,6 @@ def _optional_uuid(value: object) -> UUID | None:
     if value is None:
         return None
     return UUID(str(value))
-
-
-def _attach_conversation_citations(
-    connection: psycopg.Connection,
-    *,
-    caller: CallerContext,
-    conversation_id: UUID,
-    records: tuple[ConversationMessageRecord, ...],
-) -> tuple[ConversationMessageRecord, ...]:
-    """Batch-load citations for assistant messages on one transcript page.
-
-    Args:
-        connection: Open ``app_api`` connection.
-        caller: Conversation owner.
-        conversation_id: Owned conversation.
-        records: Newest-first transcript rows.
-
-    Returns:
-        Records with escaped citations attached to assistant rows.
-
-    Raises:
-        QueryAdmissionError: Batch-cap or authorization failure.
-    """
-
-    run_ids = tuple(
-        dict.fromkeys(item.run_id for item in records if item.run_id is not None)
-    )
-    by_run: dict[UUID, list[RunCitationRecord]] = {}
-    for offset in range(0, len(run_ids), 50):
-        batch = run_ids[offset : offset + 50]
-        pairs = list_conversation_citations(
-            connection,
-            caller=caller,
-            conversation_id=conversation_id,
-            run_ids=batch,
-        )
-        for run_id, citation in pairs:
-            by_run.setdefault(run_id, []).append(escape_run_citation(citation))
-    attached: list[ConversationMessageRecord] = []
-    for item in records:
-        citations: tuple[RunCitationRecord, ...] = ()
-        if item.role == "assistant" and item.run_id is not None:
-            citations = tuple(by_run.get(item.run_id, ()))
-        attached.append(
-            ConversationMessageRecord(
-                message_id=item.message_id,
-                role=item.role,
-                content=item.content,
-                created_at=item.created_at,
-                run_id=item.run_id,
-                citations=citations,
-            )
-        )
-    return tuple(attached)
 
 
 class ConversationTranscriptService:

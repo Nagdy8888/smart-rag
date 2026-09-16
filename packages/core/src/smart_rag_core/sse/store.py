@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
+import logging
+import time
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -16,12 +18,18 @@ from psycopg.types.json import Json
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import QueryRunRecord
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.settings.postgres_connect import (
+    connect_postgres,
+    is_transient_connect_failure,
+)
 from smart_rag_core.sse.catalog import TERMINAL_SSE_EVENT_TYPES
 from smart_rag_core.sse.sanitize import as_json_object, validate_sse_payload
 
+LOGGER = logging.getLogger(__name__)
 _REASON_PREFIX = "query_admission:"
 EVENT_STORE_LOCK_TIMEOUT = "2s"
 EVENT_STORE_LOCK_TIMEOUT_SQL = "SET LOCAL lock_timeout TO '2s'"
+EVENT_STORE_IDLE_SECONDS = 60.0
 
 
 def sqlstate_of(exc: BaseException) -> str | None:
@@ -228,6 +236,11 @@ class MemoryRunEventStore:
         self._runs: dict[UUID, _MemoryRun] = {}
         self._lock = Lock()
 
+    def probe(self) -> None:
+        """In-memory stores are always ready."""
+
+        return
+
     def register_run(
         self,
         *,
@@ -412,16 +425,55 @@ class MemoryRunEventStore:
 class PostgresRunEventStore:
     """``app.append_run_event`` / ``app.list_run_events_after`` wrappers."""
 
-    def __init__(self, postgres_url: str) -> None:
+    def __init__(
+        self,
+        postgres_url: str,
+        *,
+        monotonic_clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         """Store the app_api DSN.
 
         Args:
             postgres_url: Postgres URL. No connection is opened here.
+            monotonic_clock: Injected clock for idle-reuse tests.
         """
 
         self._postgres_url = postgres_url
         self._connection: psycopg.Connection | None = None
         self._connection_lock = RLock()
+        self._last_used = 0.0
+        self._monotonic_clock = monotonic_clock
+
+    def _discard_connection(self) -> None:
+        """Close and drop the reusable session. Caller holds the lock."""
+
+        connection = self._connection
+        self._connection = None
+        self._last_used = 0.0
+        if connection is None:
+            return
+        try:
+            connection.close()
+        except Exception:
+            return
+
+    def _session(self) -> psycopg.Connection:
+        """Return a connection idle for less than 60 seconds.
+
+        Returns:
+            Open connection with prepares disabled.
+        """
+
+        connection = self._connection
+        if connection is not None and not connection.closed:
+            idle = self._monotonic_clock() - self._last_used
+            if idle < EVENT_STORE_IDLE_SECONDS:
+                return connection
+            self._discard_connection()
+        connection = connect_postgres(self._postgres_url)
+        self._connection = connection
+        self._last_used = self._monotonic_clock()
+        return connection
 
     @contextmanager
     def _transaction(self) -> Generator[psycopg.Connection, None, None]:
@@ -430,11 +482,14 @@ class PostgresRunEventStore:
         Reusing the API session avoids a TLS and hosted-pooler handshake for
         every SSE frame. Automatic prepared statements remain disabled because
         the configured Supabase transaction pooler can switch server sessions.
+        A session idle for 60 seconds or more is closed before the next yield.
         The lock prevents concurrent executor, heartbeat, and replay operations
         from sharing a Psycopg transaction. Each transaction sets
         ``lock_timeout`` to two seconds after ``SET ROLE app_api`` so a
         run-row lock wait fails closed instead of sitting until the login
-        role's 120-second statement timeout. Autocommit stays off.
+        role's 120-second statement timeout. Autocommit stays off. Any
+        operation error rolls back best-effort, discards the session, and
+        re-raises. Append/terminal callers must not replay the write.
 
         Yields:
             Open connection with ``app_api`` selected for this transaction.
@@ -444,20 +499,37 @@ class PostgresRunEventStore:
         """
 
         with self._connection_lock:
-            if self._connection is None or self._connection.closed:
-                self._connection = psycopg.connect(
-                    self._postgres_url,
-                    prepare_threshold=None,
-                )
-            connection = self._connection
+            connection = self._session()
             try:
                 connection.execute("SET ROLE app_api")
                 connection.execute(EVENT_STORE_LOCK_TIMEOUT_SQL)
                 yield connection
                 connection.commit()
+                self._last_used = self._monotonic_clock()
             except BaseException:
-                connection.rollback()
+                try:
+                    connection.rollback()
+                except Exception:
+                    LOGGER.info(
+                        "event store rollback failed",
+                        extra={
+                            "operation": "event_store_rollback",
+                            "attempt": 1,
+                            "reason": "rollback_failed",
+                        },
+                    )
+                self._discard_connection()
                 raise
+
+    def probe(self) -> None:
+        """Open a discarded-if-stale session and prove ``SELECT 1``.
+
+        Raises:
+            psycopg.Error: Connect or probe failure after discard.
+        """
+
+        with self._transaction() as connection:
+            connection.execute("SELECT 1")
 
     def close(self) -> None:
         """Close the reusable database session.
@@ -468,9 +540,7 @@ class PostgresRunEventStore:
         """
 
         with self._connection_lock:
-            if self._connection is not None:
-                self._connection.close()
-                self._connection = None
+            self._discard_connection()
 
     def register_run(
         self,
@@ -607,25 +677,50 @@ class PostgresRunEventStore:
             QueryAdmissionError: Access failure.
         """
 
-        try:
-            with self._transaction() as connection:
-                rows = connection.execute(
-                    """
-                    SELECT run_id, sequence, event_type, payload, created_at
-                    FROM app.list_run_events_after(
-                        %s::uuid, %s::text, %s::bigint, %s::uuid, %s::bigint
-                    )
-                    """,
-                    (
-                        caller.user_id,
-                        caller.rpc_role(),
-                        caller.rpc_authorization_version(),
-                        run_id,
-                        after,
-                    ),
-                ).fetchall()
-        except psycopg.Error as exc:
-            _raise_store_error(exc)
+        last_error: psycopg.Error | None = None
+        for attempt in (1, 2):
+            try:
+                return self._list_after_once(caller, run_id=run_id, after=after)
+            except psycopg.Error as exc:
+                last_error = exc
+                if attempt == 2 or not is_transient_connect_failure(exc):
+                    _raise_store_error(exc)
+        raise QueryAdmissionError("database_rejected") from last_error
+
+    def _list_after_once(
+        self, caller: CallerContext, *, run_id: UUID, after: int
+    ) -> tuple[PersistedRunEvent, ...]:
+        """Run one read-only replay RPC.
+
+        Args:
+            caller: Owner.
+            run_id: Run id.
+            after: Exclusive lower bound.
+
+        Returns:
+            Ordered events.
+
+        Raises:
+            psycopg.Error: Transport or RPC failure before mapping.
+            QueryAdmissionError: Access failure after mapping.
+        """
+
+        with self._transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT run_id, sequence, event_type, payload, created_at
+                FROM app.list_run_events_after(
+                    %s::uuid, %s::text, %s::bigint, %s::uuid, %s::bigint
+                )
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    run_id,
+                    after,
+                ),
+            ).fetchall()
         events: list[PersistedRunEvent] = []
         for row in rows:
             events.append(

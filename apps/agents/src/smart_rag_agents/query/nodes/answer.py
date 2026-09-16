@@ -8,6 +8,7 @@ from typing import cast
 from uuid import uuid4
 
 from smart_rag_core.query_admission.ceilings import (
+    ANSWER_STAGE_MIN_SECONDS,
     assert_call_available,
     assert_deadline_open,
 )
@@ -16,6 +17,11 @@ from smart_rag_core.query_admission.exceptions import (
     QueryCeilingError,
 )
 from smart_rag_core.query_admission.usage import execute_counted_model_call
+from smart_rag_core.query_answer.assembly import (
+    company_deadline_reserve_payload,
+    company_input_bound_payload,
+    fit_source_records,
+)
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import (
     apply_degraded_scope_framing,
@@ -122,6 +128,7 @@ def generate_answer_node(
     added_prompt_tokens = 0
     added_completion_tokens = 0
     runtime_update: dict[str, object] = {}
+    fit_update: dict[str, object] = {}
     needs_rag_model = (
         bool(fusion.evidence or tables.records)
         and knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS
@@ -137,6 +144,47 @@ def generate_answer_node(
     }
     if needs_rag_model:
         needs_general_model = False
+    working_fusion = fusion
+    working_tables = tables.records
+    if needs_rag_model:
+        fit = fit_source_records(
+            user_query=str(state.get("user_query") or ""),
+            fusion=fusion,
+            tables=tables.records,
+            max_input_chars=deps.model_input_max_chars,
+            route=fusion.effective_route,
+        )
+        fit_update["answer_context_fit"] = fit.diagnostics()
+        fit_update["fusion"] = fit.fusion.model_dump(mode="json")
+        working_fusion = fit.fusion
+        working_tables = fit.tables
+        if fit.trim_reason == "input_bound_exceeded":
+            return cast(
+                QueryGraphState,
+                {
+                    **state,
+                    "status": "insufficient_evidence",
+                    "detail": "input_bound_exceeded",
+                    "answer": company_input_bound_payload().model_dump(mode="json"),
+                    **fit_update,
+                },
+            )
+        clock = deps.now if deps.now is not None else (lambda: datetime.now(UTC))
+        if context is not None:
+            remaining_seconds = (context.deadline_at - clock()).total_seconds()
+            if remaining_seconds < ANSWER_STAGE_MIN_SECONDS:
+                return cast(
+                    QueryGraphState,
+                    {
+                        **state,
+                        "status": "verified_partial",
+                        "detail": "answer_deadline_reserve_exhausted",
+                        "answer": company_deadline_reserve_payload().model_dump(
+                            mode="json"
+                        ),
+                        **fit_update,
+                    },
+                )
     needs_model = needs_rag_model or needs_general_model
     if needs_model:
         try:
@@ -206,8 +254,8 @@ def generate_answer_node(
             return gateway_answer(
                 deps,
                 query=str(state.get("user_query") or ""),
-                fusion=fusion,
-                tables=tables.records,
+                fusion=working_fusion,
+                tables=working_tables,
                 context=context,
             )
 
@@ -246,16 +294,36 @@ def generate_answer_node(
             else:
                 answer, added_prompt_tokens, added_completion_tokens = _send()
         except (AnswerError, QueryBudgetError, QueryCeilingError) as exc:
-            if knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS:
-                return {
-                    **state,
-                    "status": "insufficient_evidence",
-                    "detail": exc.reason,
-                }
+            reason = exc.reason
+            if needs_rag_model:
+                payload = company_input_bound_payload()
+                status = "insufficient_evidence"
+                if reason == "answer_deadline_reserve_exhausted":
+                    payload = company_deadline_reserve_payload()
+                    status = "verified_partial"
+                elif reason != "input_bound_exceeded":
+                    payload = AnswerPayload(
+                        answer_text=(
+                            "The available company evidence could not support "
+                            "this answer."
+                        ),
+                        status="refused",
+                        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+                    )
+                return cast(
+                    QueryGraphState,
+                    {
+                        **state,
+                        "status": status,
+                        "detail": reason,
+                        "answer": payload.model_dump(mode="json"),
+                        **fit_update,
+                    },
+                )
             return {
                 **state,
                 "status": "verified_partial",
-                "detail": exc.reason,
+                "detail": reason,
                 "answer": AnswerPayload(
                     answer_text="Verified partial: answer generation stopped.",
                     status="partial",
@@ -268,8 +336,8 @@ def generate_answer_node(
     else:
         try:
             answer = generate_answer(
-                fusion=fusion,
-                tables=tables.records,
+                fusion=working_fusion,
+                tables=working_tables,
                 user_query=str(state.get("user_query") or "query"),
                 caller=caller,
                 already_generated=answer_calls,
@@ -281,16 +349,34 @@ def generate_answer_node(
                 scope_degradation_reason=degradation,
             )
         except AnswerError as exc:
-            if knowledge_scope is KnowledgeScope.COMPANY_DOCUMENTS:
-                return {
-                    **state,
-                    "status": "insufficient_evidence",
-                    "detail": exc.reason,
-                }
+            reason = exc.reason
+            if needs_rag_model:
+                payload = (
+                    company_input_bound_payload()
+                    if reason == "input_bound_exceeded"
+                    else AnswerPayload(
+                        answer_text=(
+                            "The available company evidence could not support "
+                            "this answer."
+                        ),
+                        status="refused",
+                        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+                    )
+                )
+                return cast(
+                    QueryGraphState,
+                    {
+                        **state,
+                        "status": "insufficient_evidence",
+                        "detail": reason,
+                        "answer": payload.model_dump(mode="json"),
+                        **fit_update,
+                    },
+                )
             return {
                 **state,
                 "status": "verified_partial",
-                "detail": exc.reason,
+                "detail": reason,
                 "answer": AnswerPayload(
                     answer_text="Verified partial: answer generation stopped.",
                     status="partial",
@@ -307,8 +393,8 @@ def generate_answer_node(
     }
     if (
         answer.status == "refused"
-        and not fusion.evidence
-        and not tables.records
+        and not working_fusion.evidence
+        and not working_tables
         and knowledge_scope not in general_origins
         and answer.answer_origin not in general_origins
     ):
@@ -326,5 +412,6 @@ def generate_answer_node(
             "keyword_extract_count": 0,
             **accumulated_tokens(state, added_prompt_tokens, added_completion_tokens),
             **runtime_update,
+            **fit_update,
         },
     )

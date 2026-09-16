@@ -24,6 +24,11 @@ from smart_rag_core.query_answer.models import (
     VerificationResult,
     VerifierPayload,
 )
+from smart_rag_core.query_answer.release import (
+    bind_company_atomic_links,
+    company_release_applies,
+    render_verified_company_answer,
+)
 from smart_rag_core.query_answer.verifier import run_verifier_batch
 from smart_rag_core.query_routing.constants import (
     FALLBACK_RETRIEVERS_UNBOUND,
@@ -137,8 +142,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "detail": "web_evidence_insufficient",
             "answer": payload.model_dump(mode="json"),
         }
+    prepared = payload if is_web else bind_company_atomic_links(payload, fusion=fusion)
     checked, failures = deterministic_check_answer(
-        payload,
+        prepared,
         fusion=fusion,
         tables=tables.records,
         evidence_required=route_needs_retrieval(plan) and not is_web,
@@ -200,6 +206,10 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
                 "detail": str(reason),
                 "answer": checked.model_dump(mode="json"),
             }
+    if company_release_applies(checked, is_web=is_web):
+        checked = render_verified_company_answer(
+            checked, fusion=fusion, tables=tables.records
+        )
     knowledge_scope = plan.knowledge_scope if plan is not None else None
     terminal = "verified_partial"
     if (

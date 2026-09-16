@@ -123,6 +123,9 @@ describe("isDeadlinePartialStatus", () => {
   it("recognizes retrieve-time deadline reasons", () => {
     expect(isDeadlinePartialStatus("deadline_exhausted")).toBe(true);
     expect(isDeadlinePartialStatus("deadline")).toBe(true);
+    expect(isDeadlinePartialStatus("answer_deadline_reserve_exhausted")).toBe(
+      true,
+    );
     expect(isDeadlinePartialStatus("verified_partial")).toBe(false);
     expect(isDeadlinePartialStatus(null)).toBe(false);
   });

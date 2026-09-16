@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import cast
 
-from smart_rag_core.query_admission.ceilings import assert_call_available
+from smart_rag_core.query_admission.ceilings import (
+    ANSWER_STAGE_RESERVED_MODEL_CALLS,
+    assert_call_available,
+)
 from smart_rag_core.query_admission.exceptions import QueryCeilingError
 from smart_rag_core.query_admission.service import ReservationConsumeResult
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
@@ -74,6 +77,11 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
     memory = memory_from_state(state.get("memory_records"))
     remaining_calls = state["remaining_model_calls"]
     consumed: list[ReservationConsumeResult] = []
+    model_caller = deps.model_caller
+    force_model = deps.force_model
+    if remaining_calls < ANSWER_STAGE_RESERVED_MODEL_CALLS + 1:
+        model_caller = None
+        force_model = False
     try:
         preparation = prepare_query(
             str(state.get("user_query") or ""),
@@ -82,8 +90,8 @@ def prepare_query_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             routing_surface=surface,
             requested_manual_route=state.get("requested_manual_route"),
             requested_search_scope=context.requested_search_scope,
-            model_caller=deps.model_caller,
-            force_model=deps.force_model,
+            model_caller=model_caller,
+            force_model=force_model,
             connection=deps.connection,
             caller=caller_from_runtime(context),
             model_id=deps.profile_model_id,

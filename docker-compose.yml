@@ -286,6 +286,8 @@ services:
     tmpfs:
       - /tmp
     user: "10001:10001"
+    profiles:
+      - compose-worker
 
   frontend:
     build:
@@ -322,8 +324,7 @@ services:
     image: smart-rag-parser-sandbox:local
     profiles:
       - parser-build
-    networks:
-      - private
+    network_mode: none
     read_only: true
     tmpfs:
       - /tmp

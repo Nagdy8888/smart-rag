@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -80,3 +81,48 @@ def test_refresh_web_search_deps_clears_gateway_when_disabled() -> None:
     assert deps.web_search_enabled is False
     assert deps.web_search_configured is False
     assert deps.exa_search_gateway is None
+
+
+def test_refresh_web_search_deps_replaces_closed_gateway(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A closed Exa client must not be reused across later Ask runs."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("WEB_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("EXA_API_KEY", "exa-closed-canary")
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
+    settings = SharedSettings()
+    closed = ExaSearchGateway(api_key=SecretStr("exa-closed-canary"))
+    asyncio.run(closed.aclose())
+    deps = QueryGraphDeps(
+        web_search_enabled=True,
+        web_search_configured=True,
+        exa_search_gateway=closed,
+    )
+    refresh_web_search_deps(deps, settings)
+    assert isinstance(deps.exa_search_gateway, ExaSearchGateway)
+    assert deps.exa_search_gateway is not closed
+    assert deps.exa_search_gateway.closed is False
+
+
+def test_refresh_web_search_deps_replaces_gateway_when_key_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Settings-changed credentials recreate the gateway."""
+
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("WEB_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("EXA_API_KEY", "exa-new-canary")
+    monkeypatch.setenv("MOCK_MODEL_MODE", "true")
+    settings = SharedSettings()
+    stale = ExaSearchGateway(api_key=SecretStr("exa-old-canary"))
+    deps = QueryGraphDeps(
+        web_search_enabled=True,
+        web_search_configured=True,
+        exa_search_gateway=stale,
+    )
+    refresh_web_search_deps(deps, settings)
+    assert isinstance(deps.exa_search_gateway, ExaSearchGateway)
+    assert deps.exa_search_gateway is not stale
+    assert deps.exa_search_gateway.credential_matches(SecretStr("exa-new-canary"))

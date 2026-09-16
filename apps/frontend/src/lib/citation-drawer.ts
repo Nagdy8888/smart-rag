@@ -50,7 +50,8 @@ export function citationChipHref(
 export function hrefForCitationRecord(
   citation: CitationResponse,
 ): string | undefined {
-  const url = citation.provenance.url ?? citation.provenance.source_url;
+  const url =
+    citation.source_url ?? citation.provenance.url ?? citation.provenance.source_url;
   return citationChipHref(url, citation.source_kind) ?? undefined;
 }
 

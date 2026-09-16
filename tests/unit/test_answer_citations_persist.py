@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -11,7 +12,6 @@ import pytest
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import list_run_citations
 from smart_rag_core.query_answer.citations import (
-    ensure_fusion_source_citations,
     maybe_persist_verified_citations,
     persist_answer_citations,
 )
@@ -198,16 +198,27 @@ def test_verify_bound_persist_failure_is_not_verified(
     assert verified["detail"] == "citation_persist_failed"
 
 
-def test_ensure_fusion_source_citations_backfills_model_gap() -> None:
-    """Live answers without structured citations still cite retrieved passages."""
+def test_live_persist_does_not_backfill_fusion_citations() -> None:
+    """Citation persist never reconstructs rows from every fusion passage."""
 
+    from smart_rag_core.query_answer import citations as citations_mod
+
+    source = Path(citations_mod.__file__).read_text(encoding="utf-8")
+    assert "ensure_fusion_source_citations" not in source
     fusion = verifier_fusion(verifier_passage(1, text="Refund period is 30 days."))
     answer = AnswerPayload(
         answer_text="The refund period is 30 days.",
         status="complete",
     )
-    enriched = ensure_fusion_source_citations(answer, fusion=fusion, tables=())
-    assert enriched.citations[0].chunk_id == fusion.evidence[0].chunk_id
+    assert answer.citations == ()
+    persisted = maybe_persist_verified_citations(
+        None,
+        caller=None,
+        run_id=None,
+        fusion=fusion,
+        answer=answer,
+    )
+    assert persisted == ()
 
 
 @pytest.fixture

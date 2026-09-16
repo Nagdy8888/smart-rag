@@ -27,6 +27,8 @@ from smart_rag_core.query_admission.retrieve_budget import (
 )
 from smart_rag_core.query_admission.usage_caps import (
     ALLOWED_USAGE_KINDS,
+    ANSWER_STAGE_MIN_SECONDS,
+    ANSWER_STAGE_RESERVED_MODEL_CALLS,
     USAGE_KIND_COMPLETION_TOKEN_CAPS,
     USAGE_KIND_PROMPT_TOKEN_CAPS,
     USAGE_KIND_USD_CAPS,
@@ -35,6 +37,7 @@ from smart_rag_core.query_admission.usage_caps import (
     assert_deadline_open,
     assert_discovery_available,
     assert_manifest_available,
+    assert_optional_call_preserves_answer_reserve,
     assert_recursion_available,
     assert_side_effect_available,
     assert_subquestion_available,
@@ -44,6 +47,8 @@ from smart_rag_core.query_admission.usage_caps import (
 
 __all__ = [
     "ALLOWED_USAGE_KINDS",
+    "ANSWER_STAGE_MIN_SECONDS",
+    "ANSWER_STAGE_RESERVED_MODEL_CALLS",
     "CORRECTION_CEILING",
     "DEFAULT_MONTHLY_LLM_BUDGET_USD",
     "DISCOVERY_CEILING",
@@ -70,6 +75,7 @@ __all__ = [
     "assert_deadline_open",
     "assert_discovery_available",
     "assert_manifest_available",
+    "assert_optional_call_preserves_answer_reserve",
     "assert_recursion_available",
     "assert_retrieve_kind_available",
     "assert_side_effect_available",

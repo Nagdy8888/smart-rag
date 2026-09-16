@@ -4768,6 +4768,32 @@ export type Database = {
           status: Database["app"]["Enums"]["run_status"]
         }[]
       }
+      get_run_citation_detail_v1: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_citation_id: string
+          p_run_id: string
+        }
+        Returns: {
+          citation_id: string
+          citation_index: number
+          chunk_id: string
+          document_id: string
+          document_title: string
+          document_visibility: string
+          evidence_excerpt: string
+          paragraph_index: number
+          pdf_page_number: number
+          provenance: Json
+          source_kind: string
+          source_unavailable: boolean
+          source_url: string
+          version_id: string
+          web_source_id: string
+        }[]
+      }
       get_version_ingestion_status: {
         Args: {
           caller_authorization_version: number
@@ -4973,6 +4999,42 @@ export type Database = {
           role: string
         }[]
       }
+      list_conversation_messages_v2: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_before_id?: string
+          p_conversation_id: string
+          p_limit?: number
+        }
+        Returns: {
+          content: string
+          created_at: string
+          message_id: string
+          role: string
+          run_id: string
+        }[]
+      }
+      list_conversation_messages_v3: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_before_id?: string
+          p_conversation_id: string
+          p_limit?: number
+        }
+        Returns: {
+          citation_count: number
+          content: string
+          created_at: string
+          message_id: string
+          role: string
+          run_id: string
+          source_kind: string
+        }[]
+      }
       list_graph_entity_rules: {
         Args: {
           caller_authorization_version: number
@@ -5068,6 +5130,27 @@ export type Database = {
           chunk_id: string
           citation_id: string
           citation_index: number
+          provenance: Json
+          source_kind: string
+          source_unavailable: boolean
+          web_source_id: string
+        }[]
+      }
+      list_run_citations_v4: {
+        Args: {
+          caller_authorization_version: number
+          caller_role: string
+          caller_user_id: string
+          p_run_id: string
+        }
+        Returns: {
+          chunk_id: string
+          citation_id: string
+          citation_index: number
+          document_title: string
+          evidence_excerpt: string
+          paragraph_index: number
+          pdf_page_number: number
           provenance: Json
           source_kind: string
           source_unavailable: boolean

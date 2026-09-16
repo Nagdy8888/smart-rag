@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import cast
 
 import psycopg
@@ -63,6 +64,9 @@ class QueryGraphDeps:
         web_search_configured: True when a non-empty Exa key is present.
         exa_search_gateway: Injected Exa REST client, or None.
         crawl_proxy_gateway: Injected crawl-proxy client, or None.
+        model_input_max_chars: Existing ``MODEL_INPUT_MAX_CHARS`` bound used
+            when fitting company source records. Never raised by fitting.
+        now: Optional UTC clock for answer-stage deadline tests.
     """
 
     connection: psycopg.Connection | None = None
@@ -96,6 +100,8 @@ class QueryGraphDeps:
     web_search_configured: bool = False
     exa_search_gateway: object | None = None
     crawl_proxy_gateway: object | None = None
+    model_input_max_chars: int = 16_384
+    now: Callable[[], datetime] | None = None
 
 
 @dataclass(slots=True)

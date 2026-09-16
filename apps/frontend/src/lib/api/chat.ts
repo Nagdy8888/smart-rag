@@ -2,13 +2,16 @@
  * Conversation and run HTTP helpers.
  */
 
+import {
+  clampCitationCount,
+  parseTranscriptSourceKind,
+} from "../chat-restore";
 import type {
   ConversationMessage,
   ConversationMessagesResponse,
   ConversationResponse,
   RunResponse,
 } from "../types";
-import { parseCitationItem } from "./chat-run";
 import { throwIfNotOk } from "./errors";
 import type { ApiAuth } from "./headers";
 import { paidMutationHeaders, resumeHeaders } from "./headers";
@@ -128,10 +131,10 @@ export async function fetchConversationMessages(
 }
 
 /**
- * Parse one transcript row, including optional run citations.
+ * Parse one transcript row.
  *
- * History chips use this payload. The client never fetches citations per
- * historical message.
+ * List payloads never include excerpts. `citations` stays empty so the
+ * client cannot N+1 detail fetches from the transcript page.
  *
  * @param item - Raw message JSON.
  * @returns Typed message, or null when identity/role is invalid.
@@ -149,11 +152,6 @@ function parseConversationMessage(item: unknown): ConversationMessage | null {
   if (typeof messageId !== "string" || messageId.trim() === "") {
     return null;
   }
-  const citations = Array.isArray(row.citations)
-    ? row.citations
-        .map(parseCitationItem)
-        .filter((citation): citation is NonNullable<typeof citation> => citation !== null)
-    : [];
   return {
     message_id: messageId,
     role,
@@ -163,7 +161,9 @@ function parseConversationMessage(item: unknown): ConversationMessage | null {
       typeof row.run_id === "string" && row.run_id.trim() !== ""
         ? row.run_id
         : null,
-    citations,
+    citation_count: clampCitationCount(row.citation_count),
+    source_kind: parseTranscriptSourceKind(row.source_kind),
+    citations: [],
   };
 }
 

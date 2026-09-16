@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import psycopg
 import pytest
 from smart_rag_agents.ingestion.checkpointer import open_ingestion_checkpointer
 from smart_rag_agents.query.store import open_query_memory_store
@@ -85,3 +86,152 @@ def test_connect_postgres_disables_automatic_prepares(
     )
     connect_postgres(_SESSION)
     assert captured["prepare_threshold"] is None
+
+
+class _TransientConnectError(psycopg.OperationalError):
+    """SQLSTATE class 08 connect failure."""
+
+    @property
+    def sqlstate(self) -> str:
+        """Return a retryable connect SQLSTATE.
+
+        Returns:
+            Class 08 SQLSTATE.
+        """
+
+        return "08006"
+
+
+class _InvalidPasswordError(psycopg.OperationalError):
+    """Permanent authentication failure."""
+
+    @property
+    def sqlstate(self) -> str:
+        """Return the InvalidPassword SQLSTATE.
+
+        Returns:
+            ``28P01``.
+        """
+
+        return "28P01"
+
+
+def test_connect_postgres_retries_transient_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A class-08 failure uses two attempts and a bounded delay."""
+
+    import logging
+
+    attempts = {"count": 0}
+    delays: list[float] = []
+
+    def _connect(dsn: str, **kwargs: object) -> object:
+        """Fail once, then succeed.
+
+        Args:
+            dsn: Caller DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Dummy connection on the second attempt.
+
+        Raises:
+            _TransientConnectError: First attempt.
+        """
+
+        del dsn, kwargs
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise _TransientConnectError("connection failure")
+        return object()
+
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
+    with caplog.at_level(
+        logging.INFO, logger="smart_rag_core.settings.postgres_connect"
+    ):
+        connect_postgres(_SESSION, sleep=delays.append)
+    assert attempts["count"] == 2
+    assert delays == [0.1]
+    assert len(caplog.records) == 1
+    record = caplog.records[0]
+    extra = record.__dict__
+    assert extra.get("operation") == "connect_postgres"
+    assert extra.get("attempt") == 1
+    assert extra.get("reason") == "transient_connect"
+    text = caplog.text.casefold()
+    assert "postgresql://" not in text
+    assert "super-secret" not in text
+    assert "connection failure" not in text
+
+
+def test_connect_postgres_does_not_retry_invalid_password(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Permanent auth failures use one attempt."""
+
+    attempts = {"count": 0}
+
+    def _connect(dsn: str, **kwargs: object) -> object:
+        """Always raise InvalidPassword.
+
+        Args:
+            dsn: Caller DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Never returns.
+
+        Raises:
+            _InvalidPasswordError: Always.
+        """
+
+        del dsn, kwargs
+        attempts["count"] += 1
+        raise _InvalidPasswordError("password authentication failed")
+
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
+    with pytest.raises(_InvalidPasswordError):
+        connect_postgres(_SESSION, sleep=lambda _delay: None)
+    assert attempts["count"] == 1
+
+
+def test_connect_postgres_retries_oserror_without_sqlstate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Wrapped DNS/socket failures with no SQLSTATE are retryable."""
+
+    attempts = {"count": 0}
+
+    def _connect(dsn: str, **kwargs: object) -> object:
+        """Fail with TimeoutError, then succeed.
+
+        Args:
+            dsn: Caller DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Dummy connection on the second attempt.
+
+        Raises:
+            TimeoutError: First attempt.
+        """
+
+        del dsn, kwargs
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise TimeoutError("timed out")
+        return object()
+
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
+    connect_postgres(_SESSION, sleep=lambda _delay: None)
+    assert attempts["count"] == 2

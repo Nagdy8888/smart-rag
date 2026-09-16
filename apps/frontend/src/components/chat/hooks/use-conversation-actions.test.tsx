@@ -270,4 +270,69 @@ describe("useConversationActions", () => {
     expect(result.current.nextBeforeId).toBeNull();
     expect(result.current.earlierError).toBeNull();
   });
+
+  it("requests confirm before DELETE and Cancel sends zero requests", () => {
+    deleteConversation.mockResolvedValue(true);
+    const { result } = renderHook(
+      () =>
+        useConversationActions({
+          auth: { accessToken: "jwt-token" },
+          conversationId: "conv-a",
+          keys: sessionQueryKeys("jwt-token"),
+          messagesNextBeforeId: null,
+          onSelect: () => undefined,
+          onBeginSelect: () => undefined,
+          onDeletedCurrent: () => undefined,
+          onFailure: () => undefined,
+          beginPrepend: () => undefined,
+          generation: () => 0,
+        }),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.handleDeleteConversation("conv-a");
+    });
+    expect(result.current.pendingDeleteId).toBe("conv-a");
+    expect(deleteConversation).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.cancelDelete();
+    });
+    expect(result.current.pendingDeleteId).toBeNull();
+    expect(deleteConversation).not.toHaveBeenCalled();
+  });
+
+  it("Confirm sends exactly one DELETE", async () => {
+    deleteConversation.mockResolvedValue(true);
+    const { result } = renderHook(
+      () =>
+        useConversationActions({
+          auth: { accessToken: "jwt-token" },
+          conversationId: "conv-a",
+          keys: sessionQueryKeys("jwt-token"),
+          messagesNextBeforeId: null,
+          onSelect: () => undefined,
+          onBeginSelect: () => undefined,
+          onDeletedCurrent: () => undefined,
+          onFailure: () => undefined,
+          beginPrepend: () => undefined,
+          generation: () => 0,
+        }),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.handleDeleteConversation("conv-a");
+    });
+    await act(async () => {
+      result.current.confirmDelete();
+      result.current.confirmDelete();
+    });
+    expect(deleteConversation).toHaveBeenCalledTimes(1);
+    expect(deleteConversation).toHaveBeenCalledWith(
+      { accessToken: "jwt-token" },
+      "conv-a",
+    );
+  });
 });

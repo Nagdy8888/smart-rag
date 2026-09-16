@@ -197,6 +197,25 @@ def test_transcript_route_is_registered() -> None:
     assert "post" in methods
 
 
+def test_transcript_schema_exposes_run_metadata_without_requiring_excerpts() -> None:
+    """Additive transcript fields exist; citation detail is a separate path."""
+
+    with TestClient(create_app()) as raw:
+        client = as_openapi_client(raw)
+        schema = json_object(client.get("/openapi.json").json())
+    components = json_object(schema.get("components", {}))
+    schemas = json_object(components.get("schemas", {}))
+    message = json_object(schemas["ConversationMessage"])
+    properties = json_object(message.get("properties", {}))
+    assert "run_id" in properties
+    assert "citation_count" in properties
+    assert "source_kind" in properties
+    paths = json_object(schema.get("paths", {}))
+    assert "/runs/{run_id}/citations/{citation_id}" in paths
+    detail = json_object(paths["/runs/{run_id}/citations/{citation_id}"])
+    assert "get" in detail
+
+
 def test_creator_receives_newest_first_user_and_assistant_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -221,6 +240,9 @@ def test_creator_receives_newest_first_user_and_assistant_only(
     assert [item["content"] for item in items] == ["answer", "question"]
     assert body["next_before_id"] is None
     assert all(item["role"] in {"user", "assistant"} for item in items)
+    assert all(item["citation_count"] == 0 for item in items)
+    assert all(item["citations"] == [] for item in items)
+    assert all(item.get("source_kind") is None for item in items)
 
 
 def test_second_page_via_before_has_no_overlap(
@@ -526,3 +548,263 @@ def test_transcript_service_factory_matches_router_dependency() -> None:
 
     service = get_conversation_transcript_service("postgresql://unused")
     assert isinstance(service, ConversationTranscriptService)
+
+
+def _v3_applied(connection: psycopg.Connection) -> bool:
+    """Return whether the v3 transcript RPC exists.
+
+    Args:
+        connection: Open connection.
+
+    Returns:
+        True when ``app.list_conversation_messages_v3`` is present.
+    """
+
+    row = connection.execute(
+        """
+        SELECT 1
+        FROM pg_proc AS p
+        JOIN pg_namespace AS n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'app'
+          AND p.proname = 'list_conversation_messages_v3'
+        """
+    ).fetchone()
+    return row is not None
+
+
+def test_v1_and_v2_remain_callable_alongside_v3(
+    db_connection: psycopg.Connection,
+) -> None:
+    """Historical transcript RPCs stay granted after the v3 overlay."""
+
+    if not _v3_applied(db_connection):
+        pytest.skip("app.list_conversation_messages_v3 is not applied")
+    names = {
+        str(row[0])
+        for row in db_connection.execute(
+            """
+            SELECT p.proname
+            FROM pg_proc AS p
+            JOIN pg_namespace AS n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'app'
+              AND p.proname IN (
+                'list_conversation_messages',
+                'list_conversation_messages_v2',
+                'list_conversation_messages_v3'
+              )
+            """
+        ).fetchall()
+    }
+    assert names == {
+        "list_conversation_messages",
+        "list_conversation_messages_v2",
+        "list_conversation_messages_v3",
+    }
+    grants = db_connection.execute(
+        """
+        SELECT p.proname
+        FROM pg_proc AS p
+        JOIN pg_namespace AS n ON n.oid = p.pronamespace
+        JOIN pg_roles AS r ON has_function_privilege(r.oid, p.oid, 'EXECUTE')
+        WHERE n.nspname = 'app'
+          AND r.rolname = 'app_api'
+          AND p.proname IN (
+            'list_conversation_messages',
+            'list_conversation_messages_v2',
+            'list_conversation_messages_v3'
+          )
+        """
+    ).fetchall()
+    assert {str(row[0]) for row in grants} == names
+
+
+def test_transcript_v3_owned_run_metadata_omits_excerpts(
+    db_connection: psycopg.Connection,
+) -> None:
+    """Owned assistant rows expose run_id and counts without excerpts."""
+
+    if not _v3_applied(db_connection):
+        pytest.skip("app.list_conversation_messages_v3 is not applied")
+    from tests.support.query_postgres import (
+        admit,
+        authorization_version,
+        caller_context,
+        insert_conversation,
+        insert_user_profile,
+    )
+
+    creator_id = uuid4()
+    with db_connection.cursor() as cursor:
+        insert_user_profile(cursor, user_id=creator_id, role="member")
+        conversation_id = insert_conversation(cursor, user_id=creator_id)
+        version = authorization_version(cursor)
+    caller = caller_context(creator_id, "member", version)
+    admitted, _key = admit(
+        db_connection, caller=caller, conversation_id=conversation_id
+    )
+    run_id = admitted.context.run_id
+    db_connection.execute("RESET ROLE")
+    with db_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO app.messages (
+              conversation_id, role, content, run_id
+            )
+            VALUES (%s, 'assistant', 'Answer without SECRET_EXCERPT leak.', %s)
+            """,
+            (conversation_id, run_id),
+        )
+        cursor.execute(
+            """
+            INSERT INTO app.citations (
+              run_id, citation_index, chunk_id, snippet, provenance
+            )
+            VALUES (%s, 0, NULL, 'SECRET_EXCERPT', '{}'::jsonb)
+            """,
+            (run_id,),
+        )
+    db_connection.execute("SET ROLE app_api")
+    page = list_conversation_messages(
+        db_connection, caller=caller, conversation_id=conversation_id
+    )
+    assistant = next(item for item in page if item.role == "assistant")
+    assert assistant.run_id == run_id
+    assert assistant.citation_count == 1
+    assert assistant.source_kind == "company_document"
+    assert assistant.citations == ()
+    assert "SECRET_EXCERPT" not in assistant.content
+    dumped = str(assistant)
+    assert "SECRET_EXCERPT" not in dumped
+
+
+def test_transcript_v3_mixed_source_kind_is_null(
+    db_connection: psycopg.Connection,
+) -> None:
+    """A run with company and Web citations does not pick one source_kind."""
+
+    if not _v3_applied(db_connection):
+        pytest.skip("app.list_conversation_messages_v3 is not applied")
+    from smart_rag_core.web_research.models import WebCitation
+    from smart_rag_core.web_research.store import insert_web_citation, insert_web_source
+
+    from tests.support.query_postgres import (
+        admit,
+        authorization_version,
+        caller_context,
+        insert_conversation,
+        insert_user_profile,
+    )
+
+    creator_id = uuid4()
+    with db_connection.cursor() as cursor:
+        insert_user_profile(cursor, user_id=creator_id, role="member")
+        conversation_id = insert_conversation(cursor, user_id=creator_id)
+        version = authorization_version(cursor)
+    caller = caller_context(creator_id, "member", version)
+    admitted, _key = admit(
+        db_connection, caller=caller, conversation_id=conversation_id
+    )
+    run_id = admitted.context.run_id
+    db_connection.execute("RESET ROLE")
+    with db_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO app.messages (
+              conversation_id, role, content, run_id
+            )
+            VALUES (%s, 'assistant', 'Mixed sources.', %s)
+            """,
+            (conversation_id, run_id),
+        )
+        cursor.execute(
+            """
+            INSERT INTO app.citations (
+              run_id, citation_index, snippet, provenance
+            )
+            VALUES (%s, 0, 'company span', '{}'::jsonb)
+            """,
+            (run_id,),
+        )
+    db_connection.execute("SET ROLE app_api")
+    source = insert_web_source(
+        db_connection,
+        caller=caller,
+        run_id=run_id,
+        source_index=0,
+        url="https://example.com/mixed",
+        title="Mixed",
+        excerpt="Public web excerpt about mixed sources.",
+    )
+    insert_web_citation(
+        db_connection,
+        caller=caller,
+        run_id=run_id,
+        citation_index=1,
+        source=source,
+        citation=WebCitation(
+            web_source_id=source.web_source_id,
+            span="Public web excerpt",
+        ),
+    )
+    db_connection.execute("SET ROLE app_api")
+    page = list_conversation_messages(
+        db_connection, caller=caller, conversation_id=conversation_id
+    )
+    assistant = next(item for item in page if item.role == "assistant")
+    assert assistant.run_id == run_id
+    assert assistant.citation_count == 2
+    assert assistant.source_kind is None
+
+
+def test_transcript_v3_mismatched_run_cannot_leak(
+    db_connection: psycopg.Connection,
+) -> None:
+    """A message pointing at another conversation's run omits run_id."""
+
+    if not _v3_applied(db_connection):
+        pytest.skip("app.list_conversation_messages_v3 is not applied")
+    from tests.support.query_postgres import (
+        admit,
+        authorization_version,
+        caller_context,
+        insert_conversation,
+        insert_user_profile,
+    )
+
+    creator_id = uuid4()
+    with db_connection.cursor() as cursor:
+        insert_user_profile(cursor, user_id=creator_id, role="member")
+        owned_id = insert_conversation(cursor, user_id=creator_id)
+        other_id = insert_conversation(cursor, user_id=creator_id)
+        version = authorization_version(cursor)
+    caller = caller_context(creator_id, "member", version)
+    other_run, _key = admit(db_connection, caller=caller, conversation_id=other_id)
+    db_connection.execute("RESET ROLE")
+    with db_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO app.messages (
+              conversation_id, role, content, run_id
+            )
+            VALUES (%s, 'assistant', 'should not leak', %s)
+            """,
+            (owned_id, other_run.context.run_id),
+        )
+        cursor.execute(
+            """
+            INSERT INTO app.citations (
+              run_id, citation_index, snippet, provenance
+            )
+            VALUES (%s, 0, 'FOREIGN_EXCERPT', '{}'::jsonb)
+            """,
+            (other_run.context.run_id,),
+        )
+    db_connection.execute("SET ROLE app_api")
+    page = list_conversation_messages(
+        db_connection, caller=caller, conversation_id=owned_id
+    )
+    assistant = next(item for item in page if item.role == "assistant")
+    assert assistant.run_id is None
+    assert assistant.citation_count == 0
+    assert assistant.source_kind is None
+    assert "FOREIGN_EXCERPT" not in str(assistant)

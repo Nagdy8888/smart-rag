@@ -41,10 +41,11 @@ def test_compose_parser_service_not_on_egress() -> None:
     """Parser sandbox build profile stays off egress/crawl networks."""
 
     compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-    assert "parser-sandbox:" in compose
-    assert "profiles:" in compose
+    assert "\n  parser-sandbox:" in compose
     assert "parser-build" in compose
-    assert "egress" not in compose.split("parser-sandbox:")[1].split("frontend:")[0]
+    parser_block = compose.split("\n  parser-sandbox:", 1)[1]
+    assert "network_mode: none" in parser_block
+    assert "egress" not in parser_block
 
 
 @pytest.mark.skipif(not docker_available(), reason="Docker unavailable")

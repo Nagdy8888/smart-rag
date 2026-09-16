@@ -393,3 +393,127 @@ def test_app_api_cannot_insert_web_tables_directly(
             """
         )
     db_connection.execute("RESET ROLE")
+
+
+def test_web_citation_detail_requires_https_and_returns_excerpt(
+    db_connection: psycopg.Connection,
+) -> None:
+    """HTTPS Web detail returns the persisted excerpt; HTTP omits it."""
+
+    from smart_rag_core.query_admission.service import get_run_citation_detail
+
+    exists = db_connection.execute(
+        """
+        SELECT 1
+        FROM pg_proc AS p
+        JOIN pg_namespace AS n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'app'
+          AND p.proname = 'get_run_citation_detail_v1'
+        """
+    ).fetchone()
+    if exists is None:
+        pytest.skip("app.get_run_citation_detail_v1 is not applied")
+    caller, run_id, _conversation_id = _admit_run(
+        db_connection, user_id=uuid4(), role="member"
+    )
+    excerpt = "Public excerpt about water."
+    source = insert_web_source(
+        db_connection,
+        caller=caller,
+        run_id=run_id,
+        source_index=0,
+        url="https://example.com/water",
+        title="Water",
+        excerpt=excerpt,
+    )
+    inserted = insert_web_citation(
+        db_connection,
+        caller=caller,
+        run_id=run_id,
+        citation_index=0,
+        source=source,
+        citation=WebCitation(web_source_id=source.web_source_id, span="Public excerpt"),
+    )
+    db_connection.execute("SET ROLE app_api")
+    detail = get_run_citation_detail(
+        db_connection,
+        caller=caller,
+        run_id=run_id,
+        citation_id=inserted,
+    )
+    db_connection.execute("RESET ROLE")
+    assert detail.citation.source_kind == "web"
+    assert detail.source_url == "https://example.com/water"
+    assert detail.citation.evidence_excerpt == excerpt[:1000]
+    assert detail.citation.source_unavailable is False
+
+    http_caller, http_run, _http_conv = _admit_run(
+        db_connection, user_id=uuid4(), role="member"
+    )
+    db_connection.execute("RESET ROLE")
+    http_source_id = uuid4()
+    http_citation_id = uuid4()
+    with db_connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO app.web_sources (
+              id, run_id, source_index, url, title, excerpt, content_hash
+            )
+            VALUES (
+              %s, %s, 0, 'http://example.com/insecure', 'Insecure',
+              'http excerpt body', repeat('ab', 32)
+            )
+            """,
+            (http_source_id, http_run),
+        )
+        cursor.execute(
+            """
+            INSERT INTO app.web_citations (
+              id, run_id, web_source_id, citation_index, span
+            )
+            VALUES (%s, %s, %s, 0, 'http excerpt')
+            """,
+            (http_citation_id, http_run, http_source_id),
+        )
+    db_connection.execute("SET ROLE app_api")
+    http_detail = get_run_citation_detail(
+        db_connection,
+        caller=http_caller,
+        run_id=http_run,
+        citation_id=http_citation_id,
+    )
+    db_connection.execute("RESET ROLE")
+    assert http_detail.citation.source_unavailable is True
+    assert http_detail.citation.evidence_excerpt is None
+    assert http_detail.source_url is None
+
+
+def test_web_citation_detail_unknown_id_is_not_found(
+    db_connection: psycopg.Connection,
+) -> None:
+    """A mismatched citation id raises not_found and returns no excerpt."""
+
+    from smart_rag_core.query_admission.service import get_run_citation_detail
+
+    exists = db_connection.execute(
+        """
+        SELECT 1
+        FROM pg_proc AS p
+        JOIN pg_namespace AS n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'app'
+          AND p.proname = 'get_run_citation_detail_v1'
+        """
+    ).fetchone()
+    if exists is None:
+        pytest.skip("app.get_run_citation_detail_v1 is not applied")
+    caller, run_id, _conversation_id = _admit_run(
+        db_connection, user_id=uuid4(), role="member"
+    )
+    db_connection.execute("SET ROLE app_api")
+    with pytest.raises(QueryAdmissionError, match="not_found"):
+        get_run_citation_detail(
+            db_connection,
+            caller=caller,
+            run_id=run_id,
+            citation_id=uuid4(),
+        )

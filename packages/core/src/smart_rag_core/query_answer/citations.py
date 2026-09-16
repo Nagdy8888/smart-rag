@@ -10,9 +10,8 @@ import psycopg
 
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.service import list_run_citations
-from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload
+from smart_rag_core.query_answer.models import AnswerPayload
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
-from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.web_research.models import WebSourceRecord
 
@@ -38,52 +37,6 @@ def _raise_citation_error(exc: BaseException) -> None:
         tail = message[start:].split()[0].strip("\"'")
         reason = tail.split("\n")[0]
     raise QueryAdmissionError(reason) from exc
-
-
-def ensure_fusion_source_citations(
-    answer: AnswerPayload,
-    *,
-    fusion: FusionResult,
-    tables: tuple[TableEvidenceRecord, ...],
-) -> AnswerPayload:
-    """Attach fusion/table citations when the model omitted structured sources.
-
-    This helper is not used on the live company verify path. Live answers
-    without valid paragraph mappings must refuse instead of citing every
-    retrieved fusion passage.
-
-    Args:
-        answer: Verified or checked answer payload.
-        fusion: Combined or Hybrid-effective evidence for this run.
-        tables: Deterministic table snapshots from composition.
-
-    Returns:
-        The original payload when citations already exist, otherwise a copy
-        citing every non-empty fusion passage and composed table snapshot.
-    """
-
-    if answer.citations or answer.table_citations:
-        return answer
-    citations = tuple(
-        AnswerCitation(chunk_id=item.chunk_id, span=None)
-        for item in fusion.evidence
-        if item.citation_text.strip()
-    )
-    table_citations = tuple(
-        AnswerCitation(
-            table_id=item.table_id,
-            source_ranges=item.source_ranges,
-        )
-        for item in tables
-    )
-    if not citations and not table_citations:
-        return answer
-    return answer.model_copy(
-        update={
-            "citations": citations,
-            "table_citations": table_citations,
-        }
-    )
 
 
 def _passage_locator_fields(scored: ScoredPassage | None) -> dict[str, object]:

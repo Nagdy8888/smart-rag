@@ -1,4 +1,9 @@
-"""Verified-answer extraction, hold/release, and catalog chunking."""
+"""Verified-answer extraction, hold/release, and catalog chunking.
+
+Expected refusals and deadline/budget partials emit a non-empty token
+plus one ``partial`` terminal. ``empty_answer`` is reserved for a
+supposedly releasable verified payload that is blank.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +11,9 @@ from smart_rag_core.query_answer.models import AnswerPayload
 
 from smart_rag_api.services.sse.mapping.citations import citation_preview
 from smart_rag_api.services.sse.mapping.contracts import (
+    CANONICAL_REFUSAL_TEXT,
+    DEADLINE_EXHAUSTED_DETAIL,
+    DEADLINE_REASONS,
     PARTIAL_STATUSES,
     TOKEN_DELTA_LIMIT,
 )
@@ -52,11 +60,42 @@ def payload_from_update(update: dict[str, object]) -> AnswerPayload | None:
         return None
 
 
+def _graceful_reason(
+    update: dict[str, object], payload: AnswerPayload | None
+) -> str | None:
+    """Return a catalog partial reason for expected refusals and budgets.
+
+    Args:
+        update: Node return mapping.
+        payload: Parsed answer, if any.
+
+    Returns:
+        Partial reason, or ``None`` when the update is a releasable
+        verified completion.
+    """
+
+    raw_status = update.get("status")
+    detail = update.get("detail")
+    if isinstance(detail, str) and detail in DEADLINE_REASONS:
+        return DEADLINE_EXHAUSTED_DETAIL
+    if isinstance(raw_status, str) and raw_status in DEADLINE_REASONS:
+        return DEADLINE_EXHAUSTED_DETAIL
+    if isinstance(raw_status, str) and raw_status in PARTIAL_STATUSES:
+        return raw_status
+    if payload is not None and payload.status in {"partial", "refused"}:
+        return payload.status
+    return None
+
+
 def emit_verified_events(
     payload: AnswerPayload | None,
     update: dict[str, object],
 ) -> tuple[list[tuple[str, dict[str, object]]], bool, AnswerPayload | None]:
     """Build token deltas and one terminal for a verified payload.
+
+    Expected refusals, insufficient evidence, and deadline/budget
+    partials emit a limitation/partial sequence. ``empty_answer`` is
+    reserved for a supposedly releasable verified payload that is blank.
 
     Args:
         payload: Final answer after verification, or None.
@@ -67,7 +106,10 @@ def emit_verified_events(
         payload when text was released.
     """
 
+    graceful_reason = _graceful_reason(update, payload)
     text = payload.answer_text.strip() if payload is not None else ""
+    if not text and graceful_reason is not None:
+        text = CANONICAL_REFUSAL_TEXT
     chunks = chunk_answer_text(text)
     usage = usage_event(update)
     if not chunks:
@@ -86,17 +128,12 @@ def emit_verified_events(
         events.append(preview)
     if usage is not None:
         events.append(usage)
-    raw_status = update.get("status")
-    answer_status = payload.status if payload is not None else "complete"
-    if (
-        isinstance(raw_status, str) and raw_status in PARTIAL_STATUSES
-    ) or answer_status in {"partial", "refused"}:
-        reason = (
-            raw_status if isinstance(raw_status, str) and raw_status else answer_status
-        )
-        if raw_status == "verified_partial" or answer_status == "partial":
-            events.append(("deadline", {"route_family": None}))
-        events.append(("partial", {"reason": str(reason)[:128]}))
+    if graceful_reason is not None:
+        if graceful_reason == DEADLINE_EXHAUSTED_DETAIL:
+            events.append(("deadline", {}))
+        if graceful_reason in {"insufficient_evidence", "refused"}:
+            events.append(("limitation", {"code": "insufficient_evidence"}))
+        events.append(("partial", {"reason": graceful_reason[:128]}))
         return events, True, payload
     events.append(("completed", {}))
     return events, True, payload

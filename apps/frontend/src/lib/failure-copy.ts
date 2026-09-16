@@ -9,7 +9,10 @@ import {
 import type { ApiFailure } from "./api";
 import { SESSION_REVOKED_BANNER } from "./auth/copy";
 import { handshakeBelowMinCopy } from "./handshake";
+import { INSUFFICIENT_EVIDENCE_COPY } from "./limitations";
 import { displayText } from "./safe-text";
+
+export { INSUFFICIENT_EVIDENCE_COPY };
 
 /** Unknown 5xx and unclassified failures. Never exception text. */
 export const GENERIC_PRODUCTION_ERROR = "Something went wrong.";
@@ -72,6 +75,12 @@ export function apiFailureBanner(failure: ApiFailure): string {
       if (failure.detail === "run_failed") {
         return GENERIC_PRODUCTION_ERROR;
       }
+      if (
+        failure.detail === "insufficient_evidence" ||
+        failure.detail === "refused"
+      ) {
+        return INSUFFICIENT_EVIDENCE_COPY;
+      }
       return `Run error (${displayText(failure.detail)}).`;
     case "server":
       return GENERIC_PRODUCTION_ERROR;
@@ -127,4 +136,31 @@ export function chatRunFailureBanner(
     return body;
   }
   return `${body} Reference ${runId}.`;
+}
+
+/**
+ * Return signed copy for an expected graceful Ask outcome.
+ *
+ * @param terminal - Catalog terminal, or null while the run is live.
+ * @param status - Partial reason or node status.
+ * @param limitationCodes - SSE limitation codes in arrival order.
+ * @returns Refusal copy, or null when the outcome is not an expected
+ *   company-evidence refusal.
+ */
+export function expectedRefusalCopy(
+  terminal: string | null,
+  status: string | null | undefined,
+  limitationCodes: readonly string[],
+): string | null {
+  if (terminal !== null && terminal !== "partial") {
+    return null;
+  }
+  if (
+    limitationCodes.includes("insufficient_evidence") ||
+    status === "insufficient_evidence" ||
+    status === "refused"
+  ) {
+    return INSUFFICIENT_EVIDENCE_COPY;
+  }
+  return null;
 }

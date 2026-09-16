@@ -2,7 +2,7 @@
 title: FastAPI security and thin routers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, security
 ---
 
@@ -51,7 +51,7 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | Method | Path | Caller | Authorization | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/health/live` | public | process up | Async; no dependency probe. Must not wait on readiness threads. |
-| GET | `/health/ready` | public | `{status, query_ready, detail}` only | Coarse `detail` (`ok` / `not_query_ready`). Never names ParadeDB/Valkey/LightRAG/checkpointer. Mock mode keeps `query_ready=false`. Missing LightRAG may still be query-ready when Hybrid is healthy. Clears a stale `rate_limit_degraded` latch when both Valkey probes are `ok`. |
+| GET | `/health/ready` | public | `{status, query_ready, detail}` only | Coarse `detail` (`ok` / `not_query_ready`). Never names ParadeDB/Valkey/LightRAG/checkpointer/query runtime/event store. Never echoes DSN or exception text. Mock mode keeps `query_ready=false`. `query_ready` requires Hybrid deps plus query-runtime warmup and a ready run-event store. Missing LightRAG may still be query-ready when Hybrid is healthy. Clears a stale `rate_limit_degraded` latch when both Valkey probes are `ok`. |
 | GET | `/ops/ready` | owner/admin | named dependency probes | Full operator payload |
 | GET | `/api/meta` | public | handshake fields | Packet 6 enforces `min_client_version`. Additive `web_search_enabled` (default false) never includes keys |
 | GET | `/me` | authenticated | live profile role | Client role claims ignored |
@@ -67,13 +67,14 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | POST/GET | `/conversations` | authenticated | creator insert / `list_user_conversations_page` | COST_MUTATION on create; GET `limit` default 50 max 200; keyset `cursor` |
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
 | DELETE | `/conversations/{id}` | creator or owner/admin | **204**; foreign/tombstoned **404** | Immediate purge; see [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) |
-| GET | `/conversations/{id}/messages` | creator | `app.list_conversation_messages_v2` plus one bounded `list_conversation_citations_v1` | `limit` default 50 max 100; `before` UUID keyset. 200 `{items:[{message_id, role, content, created_at, run_id, citations}], next_before_id}`. Roles `user`/`assistant` only. Full content, HTML-escaped. Citations are ACL-rechecked; foreign run IDs omitted. Foreign/deleted/missing → generic **404** `not_found`. LOW_RISK_READ. |
+| GET | `/conversations/{id}/messages` | creator | `app.list_conversation_messages_v3` (v1 and v2 remain callable) | `limit` default 50 max 100; `before` UUID keyset. 200 `{items:[{message_id, role, content, created_at, run_id, citation_count, source_kind, citations:[]}], next_before_id}`. Roles `user`/`assistant` only. Full content, HTML-escaped. `run_id` only when the run is owned and matches conversation. `citation_count` is 0..50. Mixed company+Web `source_kind` is null. List path never returns excerpts. Foreign/deleted/missing → generic **404** `not_found`. LOW_RISK_READ. |
 | POST | `/conversations/{id}/title` | creator | `app.get_conversation_title_source` then optional `app.update_conversation_title` | COST_MUTATION. One bounded `conversation_title_v1` call while the stored title is still the first-prompt fallback. Model failure keeps the fallback. JSON includes `prompt_tokens` and `completion_tokens` for this call (0 when skipped). Same generic **404** as GET. See [ADR-llm-conversation-titles.md](../adr/ADR-llm-conversation-titles.md). |
 | POST | `/conversations/{id}/messages` | creator | handshake then idempotent admit | **Requires** `Idempotency-Key` header or body `idempotency_key` (400 if missing). Body `search_scope` defaults to `auto` (exactly one of `auto` / `company_documents` / `general_knowledge` / `web`; invalid is 422). Auto still reserves **composite**; forced `web` reserves **web_research** via `app.admit_query_run_v3` (v2 remains). Forced Web when search is disabled or unconfigured is **503** `web_search_disabled` / `web_search_unconfigured` with no reservation. JSON Accept → 202 `{run_id, stream_path, requested_search_scope}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) and [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) |
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
 | POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |
 | GET | `/runs/{run_id}/events` | creator only | Bearer resume; no handshake | `after` / `Last-Event-ID`; tombstone → 404 |
 | GET | `/runs/{run_id}/citations` | creator | IDs, typed title/PDF page, optional ACL-safe excerpt | Company ACL + current-version + locator/span recheck via `list_run_citations_v4` (v3 remains). Failed recheck → `source_unavailable` and null title/page/excerpt. SSE `citation_preview` still omits excerpts. Web rows add `source_kind=web` and `web_source_id` with url/title/`content_hash` only |
+| GET | `/runs/{run_id}/citations/{citation_id}` | creator | `app.get_run_citation_detail_v1` wrapping `list_run_citations_v4` | One citation. Company excerpt requires live ACL/current/non-deleted recheck, cap 1–1000, restricted-read audit `purpose=preview`. Web excerpt/URL only for fragment-free HTTPS. Foreign/deleted/unavailable → **404** `not_found` or `source_unavailable` with no excerpt. LOW_RISK_READ. |
 | POST | `/runs/{run_id}/feedback` | creator | thumbs 1 or 5 | Comment escaped |
 | GET | `/graph/entities/search` | authenticated | ACL SQL, 3s timeout | LOW_RISK_READ. No vendor prose |
 | POST | `/graph/inspect` | authenticated | existing inspect | FastAPI `COST_MUTATION`. Preauth `/graph` prefix is owned by the API-hardening agent |
@@ -167,28 +168,35 @@ See [SSE.md](./SSE.md). Handshake (`X-Client-Version`) is enforced on
 ### Conversation transcript
 
 `GET /conversations/{conversation_id}/messages` is a creator-only read of
-persisted `app.messages` rows plus one bounded
-`app.list_conversation_citations_v1` batch. It does not invent history:
-only `user` and `assistant` roles are returned, with full HTML-escaped
-`content` and ACL-rechecked `citations`. Query parameters: `limit`
-(default 50, minimum 1, maximum 100) and optional `before` (UUID of the
-previous page's last `message_id`). Response `next_before_id` is that
-last id when the page is full, otherwise `null`. Missing, deleted, and
-foreign conversations return the same generic `404 {"detail":"not_found"}`
-as `GET /conversations/{id}`.
+persisted `app.messages` rows through `app.list_conversation_messages_v3`.
+It does not invent history: only `user` and `assistant` roles are
+returned, with full HTML-escaped `content`. Additive metadata is
+nullable owned `run_id`, `citation_count` (0..50), and nullable
+`source_kind` (`company_document`, `web`, or null when mixed or none).
+The list `citations` array stays empty. Excerpts are loaded only from
+`GET /runs/{run_id}/citations/{citation_id}` after live ACL/HTTPS checks.
+Query parameters: `limit` (default 50, minimum 1, maximum 100) and
+optional `before` (UUID of the previous page's last `message_id`).
+Response `next_before_id` is that last id when the page is full,
+otherwise `null`. Missing, deleted, and foreign conversations return the
+same generic `404 {"detail":"not_found"}` as `GET /conversations/{id}`.
+v1 `list_conversation_messages` and v2 remain callable.
 
 ```mermaid
 sequenceDiagram
     participant Browser
     participant API as FastAPI
-    participant Rpc as app.list_conversation_messages_v2
+    participant Rpc as app.list_conversation_messages_v3
+    participant Detail as app.get_run_citation_detail_v1
     Browser->>API: GET /conversations/{id}/messages?limit=50
-    API->>Rpc: creator-only keyset page plus citation batch
-    Rpc-->>API: newest-first user/assistant rows with citations
-    API-->>Browser: 200 items plus next_before_id
-    opt Older page
-        Browser->>API: GET .../messages?before=next_before_id
-        API-->>Browser: strictly older rows
+    API->>Rpc: creator-only keyset page
+    Rpc-->>API: newest-first rows plus run_id citation_count source_kind
+    API-->>Browser: 200 items without excerpts
+    opt Source selected
+        Browser->>API: GET /runs/{run_id}/citations/{citation_id}
+        API->>Detail: ACL or HTTPS recheck
+        Detail-->>API: bounded excerpt or unavailable
+        API-->>Browser: 200 CitationDetailResponse
     end
 ```
 

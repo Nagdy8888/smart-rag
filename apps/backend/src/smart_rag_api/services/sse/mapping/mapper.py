@@ -8,6 +8,7 @@ from smart_rag_core.query_answer.models import AnswerPayload
 
 from smart_rag_api.services.sse.mapping.contracts import (
     DRAFT_ANSWER_NODES,
+    PARTIAL_STATUSES,
     VERIFY_ANSWER_NODE,
 )
 from smart_rag_api.services.sse.mapping.limitations import limitation_from_update
@@ -20,6 +21,43 @@ from smart_rag_api.services.sse.mapping.verified import (
     emit_verified_events,
     payload_from_update,
 )
+
+
+def _release_gate_status(status: str) -> list[tuple[str, dict[str, object]]]:
+    """Return verify-answer started then completed for skipped verifiers.
+
+    Generate-time expected refusals skip the verifier node. Ask still
+    requires ``verify_answer`` completed before ``token_delta``. Route
+    progress also requires a matching started event so skipped nodes
+    stay visible as one started/completed pair.
+
+    Args:
+        status: Expected graceful node status copied onto the completed
+            event.
+
+    Returns:
+        Catalog ``status`` events for ``verify_answer``.
+    """
+
+    return [
+        (
+            "status",
+            {
+                "stage": VERIFY_ANSWER_NODE,
+                "status": "running",
+                "phase": "started",
+            },
+        ),
+        (
+            "status",
+            {
+                "stage": VERIFY_ANSWER_NODE,
+                "status": status[:64],
+                "phase": "completed",
+            },
+        ),
+    ]
+
 
 _STRIP_UPDATE_KEYS: Final[frozenset[str]] = frozenset(
     {
@@ -72,6 +110,12 @@ class QuerySseMapper:
     def consume_chunk(self, chunk: object) -> list[tuple[str, dict[str, object]]]:
         """Translate one compiled ``updates`` chunk into SSE drafts.
 
+        Expected ``insufficient_evidence`` / ``refused`` / ``verified_partial``
+        outcomes become one ``partial`` terminal even when later nodes,
+        including ``verify_answer``, are skipped. A synthetic
+        ``verify_answer`` status is emitted first so Ask can accept the
+        refusal tokens.
+
         Args:
             chunk: Node-keyed mapping ``{node_name: update}``. Other shapes
                 are ignored.
@@ -103,22 +147,18 @@ class QuerySseMapper:
             if limitation is not None:
                 events.append(limitation)
             parsed = payload_from_update(update)
-            if node_name in DRAFT_ANSWER_NODES:
-                if parsed is not None:
-                    self._draft = parsed
-                if not self.verified:
-                    reject_events = reject_terminal_events(update)
-                    if reject_events:
-                        events.extend(reject_events)
-                        self.terminal_emitted = True
-                        return events
-                continue
+            if node_name in DRAFT_ANSWER_NODES and parsed is not None:
+                self._draft = parsed
             if node_name == VERIFY_ANSWER_NODE:
                 self.verified = True
-                final = parsed or self._draft
-                events.extend(self._emit_verified(final, update))
+                events.extend(self._emit_verified(parsed or self._draft, update))
                 continue
             if not self.verified:
+                raw_status = update.get("status")
+                if isinstance(raw_status, str) and raw_status in PARTIAL_STATUSES:
+                    events.extend(_release_gate_status(raw_status))
+                    events.extend(self._emit_verified(parsed or self._draft, update))
+                    return events
                 reject_events = reject_terminal_events(update)
                 if reject_events:
                     events.extend(reject_events)
@@ -149,11 +189,14 @@ class QuerySseMapper:
         payload: AnswerPayload | None,
         update: dict[str, object],
     ) -> list[tuple[str, dict[str, object]]]:
-        """Emit token deltas and one terminal for a verified payload.
+        """Emit token deltas and one terminal for a released payload.
+
+        Also used for generate-time expected refusals when the verifier
+        node is skipped.
 
         Args:
-            payload: Final answer after verification, or None.
-            update: Verify-node mapping for status/limitation.
+            payload: Final answer after verification, or a refusal payload.
+            update: Node mapping for status/limitation.
 
         Returns:
             SSE drafts including exactly one terminal.

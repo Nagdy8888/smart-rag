@@ -8,6 +8,7 @@ logs or exception messages.
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import time
@@ -462,6 +463,32 @@ class ExaSearchGateway:
 
         self._closed = True
 
+    @property
+    def closed(self) -> bool:
+        """Return whether ``aclose`` has already run.
+
+        Returns:
+            True after ``aclose``. Further HTTP calls fail closed.
+        """
+
+        return self._closed
+
+    def credential_matches(self, api_key: SecretStr) -> bool:
+        """Return whether ``api_key`` is the credential this gateway holds.
+
+        Args:
+            api_key: Candidate Exa secret.
+
+        Returns:
+            True when the secrets are equal. Never logs either value.
+        """
+
+        current = self._api_key.get_secret_value()
+        candidate = api_key.get_secret_value()
+        if len(current) != len(candidate):
+            return False
+        return hmac.compare_digest(current, candidate)
+
     async def search(
         self,
         *,
@@ -702,7 +729,7 @@ class ExaSearchGateway:
             )
             started = time.monotonic()
             try:
-                async with self._open_client(timeout=self._timeout) as client:
+                async with self._open_client(timeout=timeout) as client:
                     try:
                         response = await client.post(
                             path,

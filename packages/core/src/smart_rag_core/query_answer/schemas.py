@@ -13,8 +13,8 @@ from smart_rag_core.query_answer.versions import (
 def answer_json_schema() -> dict[str, object]:
     """Return the strict answer structured-output schema.
 
-    Provider output omits ``answer_text``. Application code joins
-    paragraph bodies after verification.
+    Provider output omits ``answer_text``. Application code releases
+    surviving atomic-link claims after verification.
 
     Returns:
         OpenAI ``json_schema`` document.
