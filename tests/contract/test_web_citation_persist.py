@@ -432,9 +432,7 @@ def test_web_citation_detail_requires_https_and_returns_excerpt(
         run_id=run_id,
         citation_index=0,
         source=source,
-        citation=WebCitation(
-            web_source_id=source.web_source_id, span="Public excerpt"
-        ),
+        citation=WebCitation(web_source_id=source.web_source_id, span="Public excerpt"),
     )
     db_connection.execute("SET ROLE app_api")
     detail = get_run_citation_detail(

@@ -291,9 +291,7 @@ def get_citation_detail_route(
         max_attempts=120,
     )
     try:
-        detail = service.citation_detail(
-            caller, run_id=run_id, citation_id=citation_id
-        )
+        detail = service.citation_detail(caller, run_id=run_id, citation_id=citation_id)
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
     item = detail.citation

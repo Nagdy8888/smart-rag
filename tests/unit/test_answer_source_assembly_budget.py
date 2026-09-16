@@ -70,7 +70,9 @@ def _passage(*, index: int, text: str, document: str | None = None) -> ScoredPas
     )
 
 
-def _fusion(passages: tuple[ScoredPassage, ...], *, route: str = "hybrid") -> FusionResult:
+def _fusion(
+    passages: tuple[ScoredPassage, ...], *, route: str = "hybrid"
+) -> FusionResult:
     """Return Hybrid-effective fusion wrapping passages.
 
     Args:

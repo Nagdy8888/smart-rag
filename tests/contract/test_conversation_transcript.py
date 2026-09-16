@@ -778,9 +778,7 @@ def test_transcript_v3_mismatched_run_cannot_leak(
         other_id = insert_conversation(cursor, user_id=creator_id)
         version = authorization_version(cursor)
     caller = caller_context(creator_id, "member", version)
-    other_run, _key = admit(
-        db_connection, caller=caller, conversation_id=other_id
-    )
+    other_run, _key = admit(db_connection, caller=caller, conversation_id=other_id)
     db_connection.execute("RESET ROLE")
     with db_connection.cursor() as cursor:
         cursor.execute(

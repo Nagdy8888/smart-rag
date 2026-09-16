@@ -457,9 +457,7 @@ def test_correct_mcp_expansion_passes() -> None:
     claim = "MCP (Model Context Protocol) lets models call tools."
     payload = AnswerPayload(
         answer_text=claim,
-        paragraphs=(
-            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("l1",)),
-        ),
+        paragraphs=(AnswerParagraph(paragraph_index=0, text=claim, link_ids=("l1",)),),
         citations=(
             AnswerCitation(
                 chunk_id=chunk_id,
@@ -579,7 +577,9 @@ def test_one_supported_link_produces_one_citation() -> None:
                 VerifierLinkVerdict(
                     link_id=item.link_id,
                     supported=item.link_id == "keep",
-                    reason="supported" if item.link_id == "keep" else "unsupported_link",
+                    reason="supported"
+                    if item.link_id == "keep"
+                    else "unsupported_link",
                 )
                 for item in batch
             )
