@@ -2,7 +2,7 @@
 title: Core RAG surfaces
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, frontend, reviewers
 packet: P08-18
 ---
@@ -110,12 +110,15 @@ flowchart TD
 - Graph inspect has no edge list, so the canvas does not invent edges. Empty inspect copy is “No authorized graph evidence matched this inspection.”
 - Production UI never sends `X-Test-User-Id` or `X-Test-Role`.
 - Ask shows exactly one run-failure alert. `partial` stays on the answer
-  surface. `error` after tokens keeps the tokens and omits the generic
-  banner. `error` with no tokens shows one “Something went wrong”
-  reference and never echoes `run_failed`. Retrieve-time
-  `deadline_exhausted` is catalog `deadline` then `partial`, not
-  `error` `routing_rejected`. Empty-answer deadline copy tells the user
-  to send the question again.
+  surface. `insufficient_evidence` / `refused` are `partial` with
+  “Company sources could not support an answer. Narrow the question and
+  try again.” Visible and assertive copy match. “Something went wrong”
+  is reserved for unknown/server faults. `error` after tokens keeps the
+  tokens and omits the generic banner. `error` with no tokens shows one
+  “Something went wrong” reference and never echoes `run_failed`.
+  Retrieve-time `deadline_exhausted` is catalog `deadline` then
+  `partial`, not `error` `routing_rejected`. Empty-answer deadline copy
+  tells the user to send the question again.
 - Ask does not keep a second live question or answer when decoded
   `GET /conversations/{id}/messages` content already matches. API
   `content` is HTML-escaped; SSE `answerText` is not.
@@ -171,6 +174,7 @@ flowchart TD
 | Table unknown column / SQL | Rejected before POST; Analyze is not sent |
 | Table analyze 403/422/429 | Classified banner; the guided draft stays |
 | Chat `partial` | Answer note only; no protocol-failure banner |
+| Chat `insufficient_evidence` / `refused` | Limitation plus refusal token; never “Something went wrong” |
 | Chat `error` after tokens | One “tokens are kept” note; no stacked generic banner |
 | Chat `error` with no tokens | One “Something went wrong” banner plus run reference |
 

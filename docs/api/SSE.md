@@ -2,7 +2,7 @@
 title: SSE protocol and resume
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, frontend
 ---
 
@@ -99,6 +99,26 @@ deterministic, ambiguous, and unknown origins hide chips.
 Exactly one terminal among `completed`, `cancelled`, `error`, `partial`.
 Conversation summary and assistant-message persist run only after that
 terminal is yielded. Those writes must not emit a second `error`.
+
+Expected company refusals (`insufficient_evidence`, `refused`) and
+deadline/budget partials (`deadline_exhausted`,
+`answer_deadline_reserve_exhausted`) emit a non-empty refusal token when
+one is available, an optional `limitation`, and exactly one `partial`.
+They are not `error` and not `empty_answer`. `empty_answer` is reserved
+for a supposedly releasable `verified` payload that is blank. Unknown
+faults stay one sanitized `error`. Generate-time expected refusals skip
+the verifier node; the mapper still emits `verify_answer` completed so
+Ask can accept the refusal tokens.
+
+```mermaid
+flowchart TD
+  node["Graph node status"]
+  node -->|verified complete| completed["token_delta then completed"]
+  node -->|insufficient_evidence or refused| partialRefuse["token_delta limitation partial"]
+  node -->|deadline_exhausted| deadline["deadline then partial"]
+  node -->|blank verified payload| empty["error empty_answer"]
+  node -->|unknown fault| error["error sanitized code"]
+```
 
 Live `LangGraphQueryRunExecutor` is **process-cached** on `app.state`
 (checkpointer pool, memory store, compiled graph). Each execute still

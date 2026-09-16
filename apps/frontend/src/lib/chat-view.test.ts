@@ -229,6 +229,46 @@ describe("chat view", () => {
     expect(shouldShowChatFailureBanner(state)).toBe(false);
   });
 
+  it("keeps insufficient evidence as a graceful partial, not a protocol failure", () => {
+    let state = createChatViewState("k");
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: status\nid: 1\ndata: {"stage":"generate_answer","status":"insufficient_evidence","phase":"completed"}',
+      ),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: status\nid: 2\ndata: {"stage":"verify_answer","status":"insufficient_evidence","phase":"completed"}',
+      ),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: token_delta\nid: 3\ndata: {"delta":"Company sources could not support an answer. Narrow the question and try again."}',
+      ),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: limitation\nid: 4\ndata: {"code":"insufficient_evidence"}',
+      ),
+    );
+    state = applySseFrame(
+      state,
+      parseSseBlock(
+        'event: partial\nid: 5\ndata: {"reason":"insufficient_evidence"}',
+      ),
+    );
+    expect(state.answerText).toContain("Company sources could not support");
+    expect(state.terminal).toBe("partial");
+    expect(state.status).toBe("insufficient_evidence");
+    expect(state.failure).toBeNull();
+    expect(state.diagnostics.limitationCodes).toEqual(["insufficient_evidence"]);
+    expect(shouldShowChatFailureBanner(state)).toBe(false);
+  });
+
   it("keeps the first terminal when a later error arrives", () => {
     let state = createChatViewState("k");
     state = applySseFrame(state, verifyFrame(1));

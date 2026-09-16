@@ -189,6 +189,19 @@ describe("progressSummary", () => {
         chat: deadlineChat,
       }),
     ).toBe(EMPTY_DEADLINE_PARTIAL_COPY);
+    const refusalChat = createChatViewState("k");
+    refusalChat.status = "insufficient_evidence";
+    refusalChat.diagnostics.limitationCodes = ["insufficient_evidence"];
+    expect(
+      progressSummary({
+        ...base,
+        terminal: "partial",
+        answerAvailable: true,
+        chat: refusalChat,
+      }),
+    ).toBe(
+      "Company sources could not support an answer. Narrow the question and try again.",
+    );
     expect(screen.queryByText("%")).toBeNull();
   });
 });

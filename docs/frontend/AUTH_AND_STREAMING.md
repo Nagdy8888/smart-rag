@@ -2,7 +2,7 @@
 title: Auth and streaming frontend
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-26
+last-reviewed: 2026-09-16
 audience: engineering, frontend, security
 packet: P08-02
 ---
@@ -141,7 +141,7 @@ wizard is **not** shipped (GAP-07-08). Invitation accept fills team entry.
 | 402 `budget_exhausted` | Budget banner |
 | 429 `rate_limited` / `concurrency_limit` | Rate banner + Retry-After |
 | 503 `limiter_unavailable` | Fail-closed banner |
-| SSE `partial` | Answer note only: “Partial answer. Verified tokens are kept.” |
+| SSE `partial` | Answer note only. `insufficient_evidence` / `refused` use company-source copy, never “Something went wrong.” |
 | SSE `error` with tokens | Answer note only: “The run ended in an error. Received tokens are kept.” |
 | SSE `error` without tokens | One banner: “Something went wrong.” plus at most one run reference. Never `run_failed` |
 | Unknown SSE | Logged; stream continues |

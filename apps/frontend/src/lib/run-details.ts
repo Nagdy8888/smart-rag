@@ -48,10 +48,15 @@ export const EMPTY_DEADLINE_PARTIAL_COPY =
  * Return whether a chat-view status is a retrieve-time deadline partial.
  *
  * @param status - SSE `partial.reason` stored on the view, or null.
- * @returns True for `deadline_exhausted` and the shorter `deadline` alias.
+ * @returns True for retrieve-time `deadline_exhausted`, the answer-stage
+ *   reserve reason, and the shorter `deadline` alias.
  */
 export function isDeadlinePartialStatus(status: string | null | undefined): boolean {
-  return status === "deadline_exhausted" || status === "deadline";
+  return (
+    status === "deadline_exhausted" ||
+    status === "deadline" ||
+    status === "answer_deadline_reserve_exhausted"
+  );
 }
 
 const CORRECTION_REASONS: Readonly<Record<string, string>> = {

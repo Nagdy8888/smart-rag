@@ -8,6 +8,7 @@ import type { ApiFailure } from "../../lib/api";
 import {
   apiFailureBanner,
   chatRunFailureBanner,
+  expectedRefusalCopy,
   GENERIC_PRODUCTION_ERROR,
 } from "../../lib/failure-copy";
 import { shouldShowChatFailureBanner, type ChatViewState } from "../../lib/chat-view";
@@ -43,9 +44,17 @@ export function ChatBanners({
   deleteSuccess,
 }: ChatBannersProps) {
   const showChatFailureBanner = shouldShowChatFailureBanner(chat);
+  const refusalCopy = expectedRefusalCopy(
+    chat.terminal,
+    chat.status,
+    chat.diagnostics.limitationCodes,
+  );
   const assertiveCopy = (() => {
     if (visibleFailure?.kind === "upgrade" || visibleFailure?.kind === "budget") {
       return apiFailureBanner(visibleFailure);
+    }
+    if (refusalCopy !== null) {
+      return refusalCopy;
     }
     if (showChatFailureBanner) {
       return GENERIC_PRODUCTION_ERROR;

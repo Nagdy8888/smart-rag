@@ -2,7 +2,7 @@
 title: API / Auth / SSE to UI mapping
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, frontend, reviewers
 packet: P07-01
 ---
@@ -114,7 +114,9 @@ Reconnect never starts a second paid graph.
 
 Signed limitation codes with UI copy today (`apps/frontend/src/lib/limitations.ts`):
 `temporal_graph_limitation`, `graph_outage`, `bm25_unavailable`,
-`graph_updating`, `media_limitation`, `insufficient_evidence`, `coverage_gap`,
+`graph_updating`, `media_limitation`, `insufficient_evidence` (“Company
+sources could not support an answer. Narrow the question and try
+again.”), `coverage_gap`,
 `negation_unresolved`, `source_unavailable`. Additional graph codes exist in
 `GraphLimitationCode` (`graph_partial_readiness`, `graph_acl_blindness`,
 `graph_survival_below_threshold`, `graph_filtered_dirty`,

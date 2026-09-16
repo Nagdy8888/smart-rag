@@ -78,6 +78,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-49 — Live RAG failure remediation overlay (2026-09-16) | [phase-06/p06-49-live-rag-failure-remediation-amendment-2026-09-16.md](./phase-06/p06-49-live-rag-failure-remediation-amendment-2026-09-16.md) | 93 |
 | P06-50 — Bound answer context and answer-stage reserve (2026-09-16) | [phase-06/p06-50-bound-answer-context-2026-09-16.md](./phase-06/p06-50-bound-answer-context-2026-09-16.md) | 113 |
 | P06-51 — Grounded claim release (2026-09-16) | [phase-06/p06-51-grounded-claim-release-2026-09-16.md](./phase-06/p06-51-grounded-claim-release-2026-09-16.md) | 95 |
+| P06-52 — Graceful terminals (2026-09-16) | [phase-06/p06-52-graceful-terminals-2026-09-16.md](./phase-06/p06-52-graceful-terminals-2026-09-16.md) | 97 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 52
-status: pending
+status: complete
 title: "Map insufficient evidence/refusal/deadline to one truthful partial outcome and unify visible/accessibility copy."
 requirement_ids: [P06-52]
 ---

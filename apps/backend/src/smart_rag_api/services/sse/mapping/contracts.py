@@ -38,6 +38,15 @@ REJECT_STATUSES: Final[frozenset[str]] = frozenset(
     }
 )
 DEADLINE_EXHAUSTED_DETAIL: Final[str] = "deadline_exhausted"
+DEADLINE_REASONS: Final[frozenset[str]] = frozenset(
+    {
+        "deadline_exhausted",
+        "answer_deadline_reserve_exhausted",
+    }
+)
+CANONICAL_REFUSAL_TEXT: Final[str] = (
+    "Company sources could not support an answer. Narrow the question and try again."
+)
 
 
 def assert_catalog_event(event_type: str, payload: dict[str, object]) -> None:

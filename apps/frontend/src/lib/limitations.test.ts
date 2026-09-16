@@ -4,6 +4,12 @@ import { graphNotReadyCopy, limitationCopy, limitationTone } from "./limitations
 
 describe("limitationCopy", () => {
   it("uses signed historical-graph language", () => {
+    expect(limitationCopy("insufficient_evidence")).toBe(
+      "Company sources could not support an answer. Narrow the question and try again.",
+    );
+    expect(limitationCopy("insufficient_evidence")).not.toMatch(
+      /Something went wrong/i,
+    );
     expect(limitationCopy("temporal_graph_limitation")).toContain("Hybrid");
     expect(limitationCopy("bm25_unavailable")).toContain("dense plus exact");
     expect(limitationCopy("graph_outage")).toContain("relabeled to Hybrid");
