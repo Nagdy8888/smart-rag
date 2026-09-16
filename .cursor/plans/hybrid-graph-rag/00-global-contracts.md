@@ -319,6 +319,17 @@ User approval on 2026-09-15: company-PDF answers cite each factual paragraph wit
 - Missing, ambiguous, unsupported, or uncontained mappings fail closed. Retrieval is not citation proof. Historical rows with no paragraph index or exact span stay unmapped.
 - Rollback stops using `answer_v2` and `list_run_citations_v4` in application code. Do not down-migrate populated citation rows. Do not present `page_label` as the PDF viewer page.
 
+## Approved planned deviation: live RAG failure remediation
+
+User approval on 2026-09-16: bound company evidence to the existing model input limit, release only verifier-supported claims, map expected refusals to one truthful partial terminal, add additive transcript run metadata and citation detail, restore Sources/feedback after reload, reconnect stale Postgres sockets, and use the documented local host-worker plus same-loop Exa clients. Do not raise `MODEL_INPUT_MAX_CHARS`. Do not open holdout.
+
+- Recorded in `docs/adr/ADR-live-rag-failure-remediation.md`.
+- Integrity keeps packet numbers contiguous after P06-48, so overlay packets are P06-49 through P06-57. Do not reuse P06-44 through P06-48.
+- Execute after P06-48, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
+- New company prompt pins are `answer_v3` and `verifier_v2` because `answer_v2` already owns PDF paragraph citations. Transcript SQL is `app.list_conversation_messages_v3` because v2 already returns `run_id`.
+- Company insufficient evidence never falls back to Web or general knowledge. SSE and transcript listings stay excerpt-free. Parser isolation stays `--network none` with no raw Docker socket.
+- Rollback stops using the fit/renderer/v3 transcript/citation-detail/reconnect/host-worker overlay in application code. Do not down-migrate populated rows.
+
 ## Approved planned deviation: paced verified-answer reveal and custom progress
 
 User approval on 2026-08-26: keep progress-only before verification, then progressively reveal already-verified answer text so it does not appear as one bulk block.

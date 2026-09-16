@@ -2,7 +2,7 @@
 title: Phase 6 agent-intelligence evidence index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, reviewers
 ---
 
@@ -75,6 +75,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-46 — ACL-safe PDF citation persistence (2026-09-15) | [phase-06/p06-46-pdf-citation-persistence-2026-09-15.md](./phase-06/p06-46-pdf-citation-persistence-2026-09-15.md) | 108 |
 | P06-47 — Inline PDF paragraph citation UI (2026-09-15) | [phase-06/p06-47-inline-pdf-citation-ui-2026-09-15.md](./phase-06/p06-47-inline-pdf-citation-ui-2026-09-15.md) | 88 |
 | P06-48 — PDF citation accuracy gates (2026-09-15) | [phase-06/p06-48-pdf-citation-gates-2026-09-15.md](./phase-06/p06-48-pdf-citation-gates-2026-09-15.md) | 129 |
+| P06-49 — Live RAG failure remediation overlay (2026-09-16) | [phase-06/p06-49-live-rag-failure-remediation-amendment-2026-09-16.md](./phase-06/p06-49-live-rag-failure-remediation-amendment-2026-09-16.md) | 93 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

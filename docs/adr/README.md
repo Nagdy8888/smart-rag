@@ -2,7 +2,7 @@
 title: ADR index and backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering
 ---
 
@@ -38,6 +38,7 @@ audience: engineering
 | Hosted webapp evaluation workspace | accepted | 6 overlay | [ADR-hosted-webapp-evaluation-workspace.md](./ADR-hosted-webapp-evaluation-workspace.md) |
 | Advanced web research mode | accepted | 6 overlay | [ADR-advanced-web-research.md](./ADR-advanced-web-research.md) |
 | PDF paragraph citations | accepted | 6 overlay | [ADR-pdf-paragraph-citations.md](./ADR-pdf-paragraph-citations.md) |
+| Live RAG failure remediation | accepted | 6 overlay | [ADR-live-rag-failure-remediation.md](./ADR-live-rag-failure-remediation.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | Canonical-passage LightRAG sources | accepted | 5 | [ADR-canonical-passage-lightrag-sources.md](./ADR-canonical-passage-lightrag-sources.md) |

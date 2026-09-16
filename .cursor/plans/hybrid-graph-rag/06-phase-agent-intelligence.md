@@ -55,7 +55,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 7. [x] [Implement Supabase checkpoints/store memory, idempotency/run-event GC, full governance enforcement, trace redaction, prompt versions, usage accounting, feedback, and immediate conversation deletion.](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md)
 8. [x] [Ship the thin authenticated developer UI and prove route, fallback, injection, idempotency, budget, outage, event-loop, and privacy gates.](./06-phase-agent-intelligence/packets/08-thin-developer-ui.md)
 
-Packets P06-09 through P06-48 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract. P06-17 and P06-18 are the 2026-09-09 private-PDF agent evaluation and holdout overlay; they do not start until Packet 9 is accepted and Packet 10 includes the production rerank/scope contract. Packets P06-19 through P06-26 are the 2026-09-10 local PDF evaluation workspace overlay. Packets P06-27 through P06-36 are the 2026-09-10 hosted webapp evaluation amendment. Packets P06-37 through P06-43 are the 2026-09-10 advanced web research overlay. Packets P06-44 through P06-48 are the 2026-09-15 PDF paragraph-citation overlay. Integrity requires contiguous packet numbers, so Web packets follow P06-36 and citation packets follow P06-43. After P06-41, execute P06-44 through P06-48, then resume P06-42, P06-43, then P06-17. Do not reuse P06-27 through P06-43 for citations.
+Packets P06-09 through P06-57 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract. P06-17 and P06-18 are the 2026-09-09 private-PDF agent evaluation and holdout overlay; they do not start until Packet 9 is accepted and Packet 10 includes the production rerank/scope contract. Packets P06-19 through P06-26 are the 2026-09-10 local PDF evaluation workspace overlay. Packets P06-27 through P06-36 are the 2026-09-10 hosted webapp evaluation amendment. Packets P06-37 through P06-43 are the 2026-09-10 advanced web research overlay. Packets P06-44 through P06-48 are the 2026-09-15 PDF paragraph-citation overlay. Packets P06-49 through P06-57 are the 2026-09-16 live RAG failure remediation overlay. Integrity requires contiguous packet numbers, so Web packets follow P06-36, citation packets follow P06-43, and live-failure packets follow P06-48. After P06-41, execute P06-44 through P06-48, then resume P06-42, P06-43, then P06-49 through P06-57, then leftover P06-17. Do not reuse P06-27 through P06-48 for live-failure work. Do not mark P06-17, P06-18, or Phase 6 complete in this overlay.
 
 9. [x] [Canonical amendment for general-chat strict-split, ADR, and packets P06-10 through P06-15.](./06-phase-agent-intelligence/packets/09-canonical-general-chat-amendment.md)
 10. [x] [Implement typed knowledge-scope classification, the live profile gateway, and deterministic route compilation.](./06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md)
@@ -97,6 +97,15 @@ Packets P06-09 through P06-48 are additive after the completed historical packet
 46. [ ] [Persist ACL-safe PDF citation traces, page repair, and conversation history.](./06-phase-agent-intelligence/packets/46-pdf-citation-persistence.md)
 47. [ ] [Render book title, PDF viewer page, and exact excerpt beside each answer paragraph.](./06-phase-agent-intelligence/packets/47-inline-pdf-citation-ui.md)
 48. [ ] [Prove PDF citation accuracy across regression, authorization, history, and UI gates.](./06-phase-agent-intelligence/packets/48-pdf-citation-gates.md)
+49. [x] [Authorize live RAG failure remediation overlay, ADR, and packets P06-50 through P06-57.](./06-phase-agent-intelligence/packets/49-live-rag-failure-remediation-amendment.md)
+50. [ ] [Implement deterministic evidence fitting, exact duplicate suppression, typed overflow handling, and answer/deadline reserves with Q15 regressions.](./06-phase-agent-intelligence/packets/50-bound-answer-context.md)
+51. [ ] [Version answer/verifier prompts, release only supported atomic claims, and remove all-fusion citation backfill with MCP regressions.](./06-phase-agent-intelligence/packets/51-grounded-claim-release.md)
+52. [ ] [Map insufficient evidence/refusal/deadline to one truthful partial outcome and unify visible/accessibility copy.](./06-phase-agent-intelligence/packets/52-graceful-terminals.md)
+53. [ ] [Add additive transcript-v2 run metadata and ACL-safe bounded citation-detail contracts.](./06-phase-agent-intelligence/packets/53-run-linked-transcript.md)
+54. [ ] [Restore per-turn citations and feedback after reload and add accessible conversation deletion confirmation.](./06-phase-agent-intelligence/packets/54-restore-frontend-state.md)
+55. [ ] [Add bounded transient reconnect behavior, stale SSE connection retirement, and honest query-runtime readiness.](./06-phase-agent-intelligence/packets/55-postgres-readiness.md)
+56. [ ] [Use the approved local host-worker parser topology and prove sequential Exa runs without cross-loop cleanup errors.](./06-phase-agent-intelligence/packets/56-worker-async-lifecycle.md)
+57. [ ] [Run full deterministic/live/browser gates and existing P06-17 development/qualification without opening holdout.](./06-phase-agent-intelligence/packets/57-integrated-qualification.md)
 
 ## Approved planned deviation: general-chat strict split
 
@@ -151,6 +160,18 @@ User approval on 2026-09-15: company-PDF answers cite each factual paragraph wit
 - Missing, ambiguous, unsupported, or uncontained mappings fail closed. Retrieval is not citation proof. Legacy null-span rows stay unmapped.
 - Rollback stops using `answer_v2` and `list_run_citations_v4` in application code. Do not down-migrate populated citation rows. Do not present `page_label` as the PDF viewer page.
 
+## Approved planned deviation: live RAG failure remediation
+
+User approval on 2026-09-16: bound company evidence to the existing model input limit, release only verifier-supported claims, map expected refusals to one truthful partial terminal, add additive transcript run metadata and citation detail, restore Sources/feedback after reload, reconnect stale Postgres sockets, and use the documented local host-worker plus same-loop Exa clients. Do not raise `MODEL_INPUT_MAX_CHARS`. Do not open holdout.
+
+- Recorded in [`docs/adr/ADR-live-rag-failure-remediation.md`](../../../docs/adr/ADR-live-rag-failure-remediation.md).
+- Integrity keeps packet numbers contiguous after P06-48, so overlay packets are P06-49 through P06-57. Do not reuse P06-44 through P06-48.
+- Execute after P06-48, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
+- New company prompt pins are `answer_v3` and `verifier_v2` because `answer_v2` already owns PDF paragraph citations.
+- Transcript SQL is `app.list_conversation_messages_v3` because v2 already returns `run_id`. Keep v1 and v2 callable. Company citation-detail excerpt remains 1–1000 characters.
+- Company insufficient evidence never falls back to Web or general knowledge.
+- Rollback stops using the fit/renderer/v3 transcript/citation-detail/reconnect/host-worker overlay in application code. Do not down-migrate populated rows.
+
 ## Phase sequence requirement
 
 **Program sequence item 6:** Agent intelligence covers deadline-bounded LangGraph, complete composable route matrix, escalation, deterministic Combined fusion/ablation, inference verification, optional-tool disclosure, memory, resumable streaming, reserve-once durable budgets, Valkey-down rate behavior, bounded CPU offload/event-loop telemetry, conversation deletion, traces, and thin UI.
@@ -183,7 +204,7 @@ Do not set `status: complete` until every `Done when` item below is proven.
 
 ## Canonical detailed requirements
 
-The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Additive packet P06-16 records the co-owned LangGraph custom SSE progress and paced verified-answer presentation contract. Additive packets P06-19 through P06-26 record the 2026-09-10 local PDF evaluation workspace overlay. Additive packets P06-27 through P06-36 record the 2026-09-10 hosted webapp evaluation workspace. Additive packets P06-37 through P06-43 record the 2026-09-10 advanced web research overlay. Additive packets P06-44 through P06-48 record the 2026-09-15 PDF paragraph-citation overlay. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
+The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Additive packet P06-16 records the co-owned LangGraph custom SSE progress and paced verified-answer presentation contract. Additive packets P06-19 through P06-26 record the 2026-09-10 local PDF evaluation workspace overlay. Additive packets P06-27 through P06-36 record the 2026-09-10 hosted webapp evaluation workspace. Additive packets P06-37 through P06-43 record the 2026-09-10 advanced web research overlay. Additive packets P06-44 through P06-48 record the 2026-09-15 PDF paragraph-citation overlay. Additive packets P06-49 through P06-57 record the 2026-09-16 live RAG failure remediation overlay. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
 
 ### Phase 6 runtime Hybrid dependency contract
 

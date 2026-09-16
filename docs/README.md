@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, reviewers, client-approver
 ---
 
@@ -50,8 +50,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [deployment/MANAGED_STAGING.md](./deployment/MANAGED_STAGING.md) | engineering-lead | draft | 2026-08-19 | eng, ops, reviewers |
 | [development/phase-09-local-release-candidate-evidence.md](./development/phase-09-local-release-candidate-evidence.md) | engineering-lead | accepted | 2026-08-18 | eng, reviewers |
 | [development/phase-10-managed-staging-evidence.md](./development/phase-10-managed-staging-evidence.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
-| [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-09-15 | eng, reviewers |
-| [development/phase-06/](./development/phase-06/) | engineering-lead | draft | 2026-09-15 | eng, reviewers |
+| [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-09-16 | eng, reviewers |
+| [development/phase-06/](./development/phase-06/) | engineering-lead | draft | 2026-09-16 | eng, reviewers |
 | [development/phase-06-query-agent-cleanup-baseline.md](./development/phase-06-query-agent-cleanup-baseline.md) | engineering-lead | draft | 2026-08-26 | eng, reviewers |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
@@ -122,6 +122,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-hosted-webapp-evaluation-workspace.md](./adr/ADR-hosted-webapp-evaluation-workspace.md) | engineering-lead | accepted | 2026-09-13 | eng, reviewers, security, frontend |
 | [adr/ADR-advanced-web-research.md](./adr/ADR-advanced-web-research.md) | engineering-lead | accepted | 2026-09-15 | eng, reviewers, security, frontend |
 | [adr/ADR-pdf-paragraph-citations.md](./adr/ADR-pdf-paragraph-citations.md) | engineering-lead | accepted | 2026-09-15 | eng, reviewers, security, frontend |
+| [adr/ADR-live-rag-failure-remediation.md](./adr/ADR-live-rag-failure-remediation.md) | engineering-lead | accepted | 2026-09-16 | eng, reviewers, security, frontend |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-09 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
 | [adr/ADR-local-langsmith-export-io.md](./adr/ADR-local-langsmith-export-io.md) | engineering-lead | accepted | 2026-08-26 | eng, security |
