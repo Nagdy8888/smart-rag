@@ -1652,7 +1652,7 @@ describe("listCitations without snippets", () => {
       },
     ]);
     expect(JSON.stringify(citations)).not.toContain("SECRET");
-    expect(JSON.stringify(citations)).not.toContain("excerpt");
+    expect(citations[0]?.provenance).not.toHaveProperty("excerpt");
   });
 
   it("keeps top-level evidence_excerpt and drops provenance excerpt copies", async () => {
