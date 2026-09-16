@@ -107,7 +107,7 @@ def test_citation_get_marks_unavailable_after_acl_revoke(
               run_id, citation_index, chunk_id, snippet, provenance
             )
             VALUES (
-              %s, 0, %s, 'must not leak',
+              %s, 0, %s, 'restricted passage',
               '{"page_number": 7, "page_label": "vii", "document_title": "SECRET TITLE"}'::jsonb
             )
             """,
@@ -150,3 +150,6 @@ def test_citation_get_marks_unavailable_after_acl_revoke(
     assert records[0].provenance.get("page_number") is None
     assert records[0].provenance.get("page_label") is None
     assert "SECRET TITLE" not in str(records[0].provenance)
+    assert records[0].document_title is None
+    assert records[0].pdf_page_number is None
+    assert records[0].evidence_excerpt is None

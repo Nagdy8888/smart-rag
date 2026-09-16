@@ -15,7 +15,12 @@ from smart_rag_agents.query.nodes.verify import verify_answer_node
 from smart_rag_agents.query.state import QueryGraphState, pending_query_state
 from smart_rag_core.gateways.model import VerifierModelResponse
 from smart_rag_core.query_answer.exceptions import AnswerError
-from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload, AtomicLink
+from smart_rag_core.query_answer.models import (
+    AnswerCitation,
+    AnswerParagraph,
+    AnswerPayload,
+    AtomicLink,
+)
 from smart_rag_core.query_answer.schemas import verifier_json_schema
 from smart_rag_core.query_fusion import fusion_config_hash
 from smart_rag_core.query_fusion.models import (
@@ -86,7 +91,21 @@ def _answered_state() -> QueryGraphState:
     state["fusion"] = fusion.model_dump(mode="json")
     state["answer"] = AnswerPayload(
         answer_text="The refund period is 30 days.",
-        citations=(AnswerCitation(chunk_id=chunk_id),),
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="The refund period is 30 days.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="The refund period is 30 days.",
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
         atomic_links=(
             AtomicLink(
                 link_id="l1",

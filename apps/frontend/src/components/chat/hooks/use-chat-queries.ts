@@ -57,6 +57,9 @@ export type UseChatQueriesResult = {
 /**
  * Load handshake, identity, sessions, transcript, usage, and citations.
  *
+ * Live citations load once for the current terminal run. Historical chips
+ * come from `ConversationMessage.citations` and are never fetched N+1.
+ *
  * @param input - Token, conversation, and run identity. No stream ownership.
  * @returns Explicit pending/error/data fields. Never a ReadableStream.
  */

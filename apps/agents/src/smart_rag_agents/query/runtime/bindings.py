@@ -39,7 +39,7 @@ class QueryGraphProcessBindings:
         model_gateway: Counted gateway. Mock mode is still a gateway.
         graph_retriever: Process LightRAG adapter, or None when unbound.
         table_executor: Structured-table path using ``app_api`` ACL.
-        answer_prompt_text: Pinned ``answer_v1`` body.
+        answer_prompt_text: Pinned ``answer_v2`` body.
         general_chat_prompt_text: Pinned ``general_chat_v1`` body.
         verifier_prompt_text: Pinned ``verifier_v1`` body.
         query_profile_prompt_text: Pinned ``query_profile_v1`` body.

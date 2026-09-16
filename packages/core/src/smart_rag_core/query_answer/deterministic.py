@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from smart_rag_core.query_answer.models import AnswerCitation, AnswerPayload, AtomicLink
+from smart_rag_core.query_answer.paragraphs import apply_paragraph_contract
 from smart_rag_core.query_fusion.models import FusionResult, ScoredPassage
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 from smart_rag_core.web_research.models import WebCitation
@@ -83,6 +84,7 @@ def deterministic_check_answer(
     tables: tuple[TableEvidenceRecord, ...],
     evidence_required: bool = True,
     web_excerpts: dict[str, str] | None = None,
+    require_paragraphs: bool = False,
 ) -> tuple[AnswerPayload, tuple[str, ...]]:
     """Strip unauthorized, misaligned, or incomplete citations and links.
 
@@ -96,6 +98,8 @@ def deterministic_check_answer(
         web_excerpts: Persisted Web excerpt text by ``web_source_id``. When
             set, company citations must stay empty and Web spans must be
             substrings of the stored excerpt.
+        require_paragraphs: When true, live company answers without valid
+            paragraph mappings become a citation-free refusal.
 
     Returns:
         Filtered payload and failure reason codes. Unsupported links are
@@ -156,20 +160,26 @@ def deterministic_check_answer(
         status = "partial"
     elif refused and status == "complete":
         status = "partial"
-    return (
-        payload.model_copy(
-            update={
-                "citations": passage_citations,
-                "table_citations": table_citations,
-                "web_citations": tuple(kept_web),
-                "atomic_links": tuple(kept_links),
-                "composed_conclusion": conclusion,
-                "refused_links": tuple(dict.fromkeys(refused)),
-                "status": status,
-            }
-        ),
-        tuple(dict.fromkeys(failures)),
+    filtered = payload.model_copy(
+        update={
+            "citations": passage_citations,
+            "table_citations": table_citations,
+            "web_citations": tuple(kept_web),
+            "atomic_links": tuple(kept_links),
+            "composed_conclusion": conclusion,
+            "refused_links": tuple(dict.fromkeys(refused)),
+            "status": status,
+        }
     )
+    if excerpts:
+        return filtered, tuple(dict.fromkeys(failures))
+    contracted, paragraph_failures = apply_paragraph_contract(
+        filtered,
+        fusion=fusion,
+        tables=tables,
+        required=require_paragraphs,
+    )
+    return contracted, tuple(dict.fromkeys((*failures, *paragraph_failures)))
 
 
 def _citation_ok(

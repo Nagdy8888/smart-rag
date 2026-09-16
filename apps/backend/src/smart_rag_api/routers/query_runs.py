@@ -215,7 +215,7 @@ def list_citations_route(
     caller: CallerContextDep,
     service: Annotated[QueryRunService, Depends(get_query_run_service)],
 ) -> list[CitationResponse]:
-    """Return citation IDs for an owned run. No passage text.
+    """Return citation IDs and ACL-checked excerpts for an owned run.
 
     Args:
         request: Active request.
@@ -224,7 +224,7 @@ def list_citations_route(
         service: Injected service.
 
     Returns:
-        Escaped citation payloads.
+        Escaped citation payloads. Excerpt is never placed in provenance.
     """
 
     enforce_rate_limit(
@@ -246,6 +246,10 @@ def list_citations_route(
             source_unavailable=item.source_unavailable,
             source_kind=item.source_kind,
             web_source_id=item.web_source_id,
+            paragraph_index=item.paragraph_index,
+            document_title=item.document_title,
+            pdf_page_number=item.pdf_page_number,
+            evidence_excerpt=item.evidence_excerpt,
         )
         for item in records
     ]

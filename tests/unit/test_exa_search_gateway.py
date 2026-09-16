@@ -26,6 +26,19 @@ from smart_rag_core.settings.base import SharedSettings
 CANARY_KEY = "exa-unit-canary-key-do-not-log"
 
 
+def _ok_response(_request: httpx.Request) -> httpx.Response:
+    """Return a successful Exa-shaped HTTP response.
+
+    Args:
+        _request: Incoming mock request. Unused.
+
+    Returns:
+        HTTP 200 with the bounded success payload.
+    """
+
+    return httpx.Response(200, json=_success_payload())
+
+
 def _gateway(handler: Callable[[httpx.Request], httpx.Response]) -> ExaSearchGateway:
     """Build a gateway with a MockTransport.
 
@@ -98,7 +111,7 @@ def test_constructor_rejects_caller_base_url() -> None:
 def test_canary_key_is_absent_from_repr_and_errors() -> None:
     """Credentials never appear in repr or exception text."""
 
-    gateway = _gateway(lambda request: httpx.Response(200, json=_success_payload()))
+    gateway = _gateway(_ok_response)
     text = repr(gateway) + str(ExaSearchError("web_search_auth_failed"))
     assert CANARY_KEY not in text
     assert "web_search_auth_failed" in repr(ExaSearchError("web_search_auth_failed"))
@@ -444,10 +457,19 @@ def test_get_contents_rejects_urls_outside_allow_list() -> None:
     """Contents may only fetch current-run search URLs."""
 
     async def _run() -> None:
-        """Run the bounded gateway call under test."""
+        """Exercise one mocked gateway call."""
 
-        gateway = _gateway(
-            lambda request: httpx.Response(
+        def _reject(_request: httpx.Request) -> httpx.Response:
+            """Return a contents payload that must not be used.
+
+            Args:
+                _request: Incoming mock request. Unused.
+
+            Returns:
+                HTTP 200 with an allow-listed URL body.
+            """
+
+            return httpx.Response(
                 200,
                 json={
                     "results": [
@@ -458,7 +480,8 @@ def test_get_contents_rejects_urls_outside_allow_list() -> None:
                     ]
                 },
             )
-        )
+
+        gateway = _gateway(_reject)
         try:
             with pytest.raises(ExaSearchError, match="web_search_invalid_response"):
                 await gateway.get_contents(
@@ -476,10 +499,19 @@ def test_get_contents_happy_path() -> None:
     """Allowed URLs return bounded contents items."""
 
     async def _run() -> None:
-        """Run the bounded gateway call under test."""
+        """Exercise one mocked gateway call."""
 
-        gateway = _gateway(
-            lambda request: httpx.Response(
+        def _contents(_request: httpx.Request) -> httpx.Response:
+            """Return one allow-listed contents item.
+
+            Args:
+                _request: Incoming mock request. Unused.
+
+            Returns:
+                HTTP 200 with bounded contents JSON.
+            """
+
+            return httpx.Response(
                 200,
                 json={
                     "requestId": "e492118ccdedcba5088bfc4357a8a125",
@@ -495,7 +527,8 @@ def test_get_contents_happy_path() -> None:
                     "statuses": [{"id": "https://example.com/ok", "status": "success"}],
                 },
             )
-        )
+
+        gateway = _gateway(_contents)
         try:
             result = await gateway.get_contents(
                 urls=("https://example.com/ok",),
@@ -513,7 +546,7 @@ def test_get_contents_happy_path() -> None:
 def test_client_close_prevents_further_requests() -> None:
     """Closing the client prevents further HTTP calls."""
 
-    gateway = _gateway(lambda request: httpx.Response(200, json=_success_payload()))
+    gateway = _gateway(_ok_response)
     asyncio.run(gateway.aclose())
     with pytest.raises(ExaSearchError, match="web_search_transport_failed"):
         asyncio.run(gateway.search(query="q", remaining_deadline_seconds=5))

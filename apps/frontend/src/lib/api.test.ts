@@ -38,6 +38,7 @@ import {
   fetchMe,
   fetchRun,
   fetchConversation,
+  fetchConversationMessages,
   submitFeedback,
   createPdfEvalCase,
   comparePdfEvalRun,
@@ -1595,6 +1596,10 @@ describe("listCitations without snippets", () => {
         source_unavailable: false,
         source_kind: "company_document",
         web_source_id: null,
+        paragraph_index: null,
+        document_title: null,
+        pdf_page_number: null,
+        evidence_excerpt: null,
       },
     ]);
     expect(JSON.stringify(citations)).not.toContain("SECRET");
@@ -1640,10 +1645,85 @@ describe("listCitations without snippets", () => {
         source_unavailable: false,
         source_kind: "web",
         web_source_id: "ws-1",
+        paragraph_index: null,
+        document_title: null,
+        pdf_page_number: null,
+        evidence_excerpt: null,
       },
     ]);
     expect(JSON.stringify(citations)).not.toContain("SECRET");
     expect(JSON.stringify(citations)).not.toContain("excerpt");
+  });
+
+  it("keeps top-level evidence_excerpt and drops provenance excerpt copies", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            citation_id: "cite-2",
+            citation_index: 0,
+            chunk_id: "chunk-2",
+            evidence_excerpt: "Refunds close in 30 days.",
+            paragraph_index: 0,
+            document_title: "AI Agents",
+            pdf_page_number: 25,
+            provenance: {
+              excerpt: "NESTED SECRET",
+              span: "NESTED SECRET",
+              page_label: "12",
+              page_number: 12,
+            },
+            source_unavailable: false,
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const citations = await listCitations(
+      { accessToken: "jwt-token" },
+      "run-1",
+      fetchImpl,
+    );
+    expect(citations).toEqual([
+      {
+        citation_id: "cite-2",
+        citation_index: 0,
+        chunk_id: "chunk-2",
+        provenance: { page_label: "12", page_number: 12 },
+        source_unavailable: false,
+        source_kind: "company_document",
+        web_source_id: null,
+        paragraph_index: 0,
+        document_title: "AI Agents",
+        pdf_page_number: 25,
+        evidence_excerpt: "Refunds close in 30 days.",
+      },
+    ]);
+    expect(JSON.stringify(citations)).not.toContain("NESTED SECRET");
+  });
+
+  it("treats invalid PDF page and paragraph index as null", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            citation_id: "cite-3",
+            citation_index: 0,
+            chunk_id: "chunk-3",
+            paragraph_index: 7,
+            pdf_page_number: -1,
+            provenance: {},
+            source_unavailable: false,
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const citations = await listCitations(
+      { accessToken: "jwt-token" },
+      "run-1",
+      fetchImpl,
+    );
+    expect(citations[0]?.paragraph_index).toBeNull();
+    expect(citations[0]?.pdf_page_number).toBeNull();
   });
 
   it("returns an empty list for a 404 private run", async () => {
@@ -1655,6 +1735,54 @@ describe("listCitations without snippets", () => {
       fetchImpl,
     );
     expect(citations).toEqual([]);
+  });
+});
+
+describe("fetchConversationMessages citations", () => {
+  it("parses message run_id and citations without N+1 fields", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      expect(String(input)).toContain("/conversations/conv-1/messages");
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              message_id: "m-assistant",
+              role: "assistant",
+              content: "Refunds close in 30 days.",
+              created_at: "2026-09-15T00:00:00Z",
+              run_id: "run-1",
+              citations: [
+                {
+                  citation_id: "cite-1",
+                  citation_index: 0,
+                  chunk_id: "chunk-1",
+                  paragraph_index: 0,
+                  document_title: "AI Agents",
+                  pdf_page_number: 25,
+                  evidence_excerpt: "close in 30 days",
+                  provenance: { excerpt: "NESTED" },
+                  source_unavailable: false,
+                },
+              ],
+            },
+          ],
+          next_before_id: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const page = await fetchConversationMessages(
+      { accessToken: "jwt-token" },
+      "conv-1",
+      {},
+      fetchImpl,
+    );
+    expect(page.items[0]?.run_id).toBe("run-1");
+    expect(page.items[0]?.citations?.[0]?.pdf_page_number).toBe(25);
+    expect(page.items[0]?.citations?.[0]?.evidence_excerpt).toBe(
+      "close in 30 days",
+    );
+    expect(JSON.stringify(page)).not.toContain("NESTED");
   });
 });
 

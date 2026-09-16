@@ -2,7 +2,7 @@
 name: hybrid-graph-rag-source-coverage
 status: verified-at-split-amended-current-locked
 original_monolith_sha256: 41e3ee603ddb25d985b3636f13969e942cb8f53d0ab9c0753234f71fe46bb8ab
-last_amended: 2026-09-10
+last_amended: 2026-09-15
 current_integrity_lock: ./plan-integrity-lock.json
 ---
 
@@ -21,7 +21,7 @@ The original monolith SHA-256 proves only the source read by the one-time split.
 - **Section 5:** Phase 3 owns ingestion through verified canonical vector/term plus BM25 projection `Hybrid Ready`/`Graph Pending`; Phase 5 owns graph mutation, `Graph Ready`, version switching, and graph cleanup. _The former mixed lifecycle text is now phase-scoped._
 - **Section 6:** Phase 4 owns Supabase vector/term plus private ParadeDB BM25 retrieval/fusion/tuning; Phase 6 embeds a short frozen runtime Hybrid contract. _Phase 6 does not need to load Phase 4 or retune it._
 - **Section 7:** Phase 5. _GraphRAG owner._
-- **Sections 8–10:** Phase 6 wrapper and [`06-phase-agent-intelligence/`](./06-phase-agent-intelligence/). _Agent, tools, and API/security requirements are redistributed across one shared contract and eight historical packets, plus additive P06-09 through P06-15 for the approved general-chat strict split, P06-16 for custom SSE progress / paced verified-answer presentation, P06-17/P06-18 for the 2026-09-09 private-PDF agent evaluation overlay, P06-19 through P06-26 for the 2026-09-10 local PDF evaluation workspace overlay, and P06-27 through P06-36 for the hosted webapp evaluation workspace. Production Hybrid rerank/scope binding is an additive P06-10 contract. After P06-27, Packet 10 must be accepted before P06-28._
+- **Sections 8–10:** Phase 6 wrapper and [`06-phase-agent-intelligence/`](./06-phase-agent-intelligence/). _Agent, tools, and API/security requirements are redistributed across one shared contract and eight historical packets, plus additive P06-09 through P06-15 for the approved general-chat strict split, P06-16 for custom SSE progress / paced verified-answer presentation, P06-17/P06-18 for the 2026-09-09 private-PDF agent evaluation overlay, P06-19 through P06-26 for the 2026-09-10 local PDF evaluation workspace overlay, P06-27 through P06-36 for the hosted webapp evaluation workspace, P06-37 through P06-43 for advanced web research, and P06-44 through P06-48 for PDF paragraph citations. Production Hybrid rerank/scope binding is an additive P06-10 contract. After P06-27, Packet 10 must be accepted before P06-28._
 - **Section 11:** Phase 3 owns signed OpenAI governance; Phase 4 owns dataset/retrieval evaluation; Phase 6 owns prompts, production tracing, agent/API evaluation, and feedback wiring. _Later phases consume rather than recreate earlier artifacts._
 - **Section 12:** Phase 6 owns the thin UI, Phase 7 owns complete Stitch/API specifications and design decision, and Phase 8 owns implementation/E2E. _The shared [`stitch-nextjs-contract.md`](./shared/frontend/stitch-nextjs-contract.md) records the consumer boundary; Phase 7/8 actions remain in their own packet files._
 - **Section 13:** Phase 1 owns CI tiers, Phase 9 owns only local release gates, and Phase 10 owns managed OIDC/CDN/KMS/IaC gates. _Canonical local and managed release concerns are split under [`shared/release/`](./shared/release/) and consumed only by the owning packets._
@@ -61,6 +61,7 @@ Do not use `--update` merely to hide an unexplained mismatch.
 - **2026-09-10 — Local PDF evaluation workspace overlay:** added P06-19 through P06-26 and ADR-local-pdf-evaluation-workspace. Integrity keeps packet numbers contiguous after P06-18. User-approved execution is immediately after Packet 9, then Packet 10. Local-only `.private-eval` storage; no holdout API; no staging/production enablement.
 - **2026-09-13 — P06-11 through P06-16 close after hosted eval:** resumed after P06-36. Packets 11–16 checked with re-run gates. P06-17 live qualification remains blocked. P06-18 was not opened.
 - **2026-09-14 — Advanced web research overlay:** added P06-37 through P06-43 and ADR-advanced-web-research. Integrity keeps packet numbers contiguous after P06-36 because P06-27–36 already authorize hosted evaluation. Ask dropdown Auto / Company documents / General / Web; Auto default; exactly-one-source; Exa local/free-tier only; production Web disabled. Resume P06-17 after P06-43.
+- **2026-09-15 — PDF paragraph-citation overlay:** added P06-44 through P06-48 and ADR-pdf-paragraph-citations. Integrity keeps packet numbers contiguous after P06-43. Company-PDF answers cite each factual paragraph with canonical title, 1-based PDF viewer page, and an ACL-checked exact excerpt of at most 1000 characters. Printed `page_label` is not the chat page. Execute after P06-41, then resume P06-42, P06-43, then P06-17.
 - **2026-08-26 — Streaming overhaul amendment:** added P06-16 and P08-24 through P08-87, ADR-verified-answer-paced-reveal, and superseding notes for P08-09/P08-15 updates-only / no-artificial-delay presentation rules. P08-07 evidence was reconciled and checked. Do not renumber P08-22/P08-23.
 
 ## Preserved split evidence

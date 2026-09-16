@@ -28,9 +28,11 @@ from smart_rag_core.query_routing.envelope import clamp_family_to_reservation
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
-    apply_requested_search_scope,
     classify_knowledge_scope,
     has_web_intent,
+)
+from smart_rag_core.query_routing.knowledge_scope_preference import (
+    apply_requested_search_scope,
 )
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.models import (
@@ -130,7 +132,7 @@ def _prep(
         runtime: Optional admission envelope. Built when omitted.
 
     Returns:
-        Typed preparation.
+        Frozen query preparation.
     """
 
     bound_runtime = runtime or _runtime(

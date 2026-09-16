@@ -1,4 +1,4 @@
-"""Public-Web intent and privacy-risk detectors for knowledge-scope routing."""
+"""Web-intent and privacy-risk detectors for knowledge-scope classification."""
 
 from __future__ import annotations
 

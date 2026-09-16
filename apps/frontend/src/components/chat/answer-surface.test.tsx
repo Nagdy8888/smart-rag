@@ -94,7 +94,7 @@ describe("AnswerSurface origin chrome", () => {
     expect(screen.getByTestId("answer-citations")).toBeInTheDocument();
   });
 
-  it("labels company citations with page numbers instead of UUIDs", () => {
+  it("labels company citations with typed title and PDF page", () => {
     renderSurface({
       answerOrigin: "company_documents",
       citations: [
@@ -102,15 +102,19 @@ describe("AnswerSurface origin chrome", () => {
           citation_id: "cite-1",
           citation_index: 0,
           chunk_id: "chunk-1",
-          provenance: { page_number: 129, document_title: "AI agents" },
+          provenance: { page_number: 12, page_label: "12", document_title: "AI agents" },
           source_unavailable: false,
+          document_title: "AI agents",
+          pdf_page_number: 129,
+          paragraph_index: 0,
         },
       ],
     });
     expect(
-      screen.getByRole("button", { name: "Citation 0, AI agents · p. 129" }),
+      screen.getByRole("button", { name: "Citation 0, AI agents · PDF page 129" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("cite-1")).not.toBeInTheDocument();
+    expect(screen.queryByText("p. 12")).not.toBeInTheDocument();
   });
 
   it("shows clarification and no citation chips for an ambiguous origin", () => {
@@ -328,6 +332,187 @@ describe("AnswerSurface origin chrome", () => {
         "Ask a general question, or ask about your company documents for a cited answer.",
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe("AnswerSurface paragraph citations", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("puts each mapped citation after its own paragraph", () => {
+    renderSurface({
+      answerOrigin: "company_documents",
+      answer: "Refunds close in 30 days.\n\nAppeals go to finance.",
+      citations: [
+        {
+          citation_id: "cite-a",
+          citation_index: 0,
+          chunk_id: "chunk-a",
+          provenance: {},
+          source_unavailable: false,
+          paragraph_index: 0,
+          document_title: "AI Agents",
+          pdf_page_number: 25,
+        },
+        {
+          citation_id: "cite-b",
+          citation_index: 1,
+          chunk_id: "chunk-b",
+          provenance: {},
+          source_unavailable: false,
+          paragraph_index: 1,
+          document_title: "AI Agents",
+          pdf_page_number: 40,
+        },
+      ],
+    });
+    const blocks = screen.getAllByTestId("paragraph-citations");
+    expect(blocks).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Citation 0, AI Agents · PDF page 25" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Citation 1, AI Agents · PDF page 40" }),
+    ).toBeInTheDocument();
+    expect(blocks[0]).toHaveTextContent("PDF page 25");
+    expect(blocks[0]).not.toHaveTextContent("PDF page 40");
+    expect(blocks[1]).toHaveTextContent("PDF page 40");
+    expect(blocks[1]).not.toHaveTextContent("PDF page 25");
+  });
+
+  it("can show two source chips on one paragraph", () => {
+    renderSurface({
+      answerOrigin: "company_documents",
+      answer: "Refunds close in 30 days.",
+      citations: [
+        {
+          citation_id: "cite-a",
+          citation_index: 0,
+          chunk_id: "chunk-a",
+          provenance: {},
+          source_unavailable: false,
+          paragraph_index: 0,
+          document_title: "Policy",
+          pdf_page_number: 10,
+        },
+        {
+          citation_id: "cite-b",
+          citation_index: 1,
+          chunk_id: "chunk-b",
+          provenance: {},
+          source_unavailable: false,
+          paragraph_index: 0,
+          document_title: "Handbook",
+          pdf_page_number: 11,
+        },
+      ],
+    });
+    const row = screen.getByTestId("paragraph-citations");
+    expect(
+      screen.getByRole("button", { name: "Citation 0, Policy · PDF page 10" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Citation 1, Handbook · PDF page 11" }),
+    ).toBeInTheDocument();
+    expect(row.querySelectorAll("button")).toHaveLength(2);
+  });
+
+  it("keeps unmapped citations in the legacy footer", () => {
+    renderSurface({
+      answerOrigin: "company_documents",
+      answer: "Refunds close in 30 days.",
+      citations: [
+        {
+          citation_id: "cite-legacy",
+          citation_index: 3,
+          chunk_id: "chunk-l",
+          provenance: {},
+          source_unavailable: false,
+          paragraph_index: null,
+          document_title: "AI Agents",
+          pdf_page_number: 25,
+        },
+      ],
+    });
+    expect(
+      screen.getByText("Legacy run sources (not mapped to a paragraph)"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("paragraph-citations")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Citation 3, AI Agents · PDF page 25",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides chips until the paced-reveal paragraph is fully visible", () => {
+    renderSurface({
+      answerOrigin: "company_documents",
+      answer: "Refunds close in 30 days.\n\nAppeals go to finance.",
+      visibleAnswer: "Refunds close",
+      revealing: true,
+      citations: [
+        {
+          citation_id: "cite-a",
+          citation_index: 0,
+          chunk_id: "chunk-a",
+          provenance: {},
+          source_unavailable: false,
+          paragraph_index: 0,
+          document_title: "AI Agents",
+          pdf_page_number: 25,
+        },
+      ],
+    });
+    expect(screen.getByText("Refunds close")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Citation 0/ })).toBeNull();
+  });
+
+  it("uses historical message citations instead of the live run list", () => {
+    renderSurface({
+      messages: [
+        {
+          message_id: "a1",
+          role: "assistant",
+          content: "Historical refunds close in 30 days.",
+          created_at: "2026-08-27T11:00:00Z",
+          citations: [
+            {
+              citation_id: "hist-1",
+              citation_index: 0,
+              chunk_id: "chunk-h",
+              provenance: {},
+              source_unavailable: false,
+              paragraph_index: 0,
+              document_title: "History Book",
+              pdf_page_number: 8,
+            },
+          ],
+        },
+      ],
+      question: "",
+      answer: "",
+      terminal: null,
+      citations: [
+        {
+          citation_id: "live-secret",
+          citation_index: 9,
+          chunk_id: "chunk-live",
+          provenance: {},
+          source_unavailable: false,
+          paragraph_index: 0,
+          document_title: "Live Book",
+          pdf_page_number: 99,
+        },
+      ],
+    });
+    expect(
+      screen.getByRole("button", {
+        name: "Citation 0, History Book · PDF page 8",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Live Book")).not.toBeInTheDocument();
   });
 });
 

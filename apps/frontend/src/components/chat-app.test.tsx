@@ -426,6 +426,9 @@ describe("ChatApp SSE limitation families and reconnect", () => {
         chunk_id: "chunk-1",
         provenance: { page_number: 3, snippet: "should already be stripped" },
         source_unavailable: false,
+        document_title: null,
+        pdf_page_number: 3,
+        paragraph_index: 0,
       },
     ]);
     vi.stubGlobal("fetch", stubChatFetch({ events: routingLimitationSse() }));
@@ -448,7 +451,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     expect(await screen.findByText("<script>x</script>")).toBeInTheDocument();
     expect(document.querySelector("script")).toBeNull();
     expect(screen.queryByText("SECRET PASSAGE")).toBeNull();
-    expect(await screen.findByRole("button", { name: "Citation 1, p. 3" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Citation 1, Source · PDF page 3" })).toBeInTheDocument();
     const diagnostics = screen.getByTestId("advanced-diagnostics");
     expect(diagnostics).toHaveTextContent("future_metric");
     expect(diagnostics).toHaveTextContent("Combined");
@@ -838,7 +841,7 @@ describe("ChatApp Ask workspace", () => {
     await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.type(screen.getByLabelText("Message"), "What is our refund period?");
     await user.click(screen.getByRole("button", { name: "Send" }));
-    expect(await screen.findByRole("button", { name: "Citation 1" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Citation 1/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Citation 1" })).toBeNull();
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("Company documents");
     expect(screen.getByTestId("answer-route")).toHaveTextContent("Composite");

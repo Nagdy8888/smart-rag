@@ -11,6 +11,7 @@ from smart_rag_core.query_answer.models import (
     VerifierLinkVerdict,
     VerifierPayload,
 )
+from smart_rag_core.query_answer.paragraphs import drop_unsupported_paragraphs
 from smart_rag_core.query_answer.versions import MAX_VERIFIER_CALLS, MAX_VERIFIER_LINKS
 
 VerifierCaller = Callable[[tuple[AtomicLink, ...]], VerifierPayload]
@@ -50,41 +51,23 @@ def apply_verifier_payload(
     payload: AnswerPayload,
     verdicts: VerifierPayload,
 ) -> AnswerPayload:
-    """Remove or refuse links the verifier marked unsupported.
+    """Remove unsupported links and any paragraph that depends on them.
 
     Args:
         payload: Answer after deterministic checks.
         verdicts: One structured verifier batch.
 
     Returns:
-        Answer with unsupported links omitted, not softened.
+        Answer with unsupported links omitted. Paragraphs that named a
+        rejected link are dropped and ``answer_text`` is rebuilt. When
+        no paragraph survives, the original prose is replaced by a
+        citation-free refusal.
     """
 
     unsupported = {
         item.link_id for item in verdicts.link_verdicts if not item.supported
     }
-    if not unsupported:
-        return payload
-    kept = tuple(
-        item for item in payload.atomic_links if item.link_id not in unsupported
-    )
-    refused = tuple(dict.fromkeys((*payload.refused_links, *sorted(unsupported))))
-    conclusion = payload.composed_conclusion
-    if conclusion is not None and any(
-        link_id in unsupported for link_id in conclusion.link_ids
-    ):
-        conclusion = None
-    status = payload.status
-    if status == "complete":
-        status = "partial"
-    return payload.model_copy(
-        update={
-            "atomic_links": kept,
-            "composed_conclusion": conclusion,
-            "refused_links": refused,
-            "status": status,
-        }
-    )
+    return drop_unsupported_paragraphs(payload, frozenset(unsupported))
 
 
 def run_verifier_batch(
@@ -111,11 +94,16 @@ def run_verifier_batch(
         raise AnswerError("verifier_loop")
     selected, omitted = select_material_links(payload.atomic_links)
     if not selected or caller is None:
-        return _force_partial_if_omitted(payload, omitted), 0, omitted
+        skipped = payload
+        if payload.paragraphs:
+            skipped = drop_unsupported_paragraphs(payload, frozenset(omitted))
+        return _force_partial_if_omitted(skipped, omitted), 0, omitted
     verdicts = caller(selected)
     if len(verdicts.link_verdicts) > MAX_VERIFIER_LINKS:
         raise AnswerError("verifier_batch_cap")
     updated = apply_verifier_payload(payload, verdicts)
+    if updated.paragraphs:
+        updated = drop_unsupported_paragraphs(updated, frozenset(omitted))
     return _force_partial_if_omitted(updated, omitted), 1, omitted
 
 

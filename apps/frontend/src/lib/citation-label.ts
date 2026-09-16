@@ -1,9 +1,20 @@
 /**
  * Human citation locators. Page/title/section only; never passage text.
+ *
+ * Company PDF chips use typed `document_title` and `pdf_page_number`. They
+ * never call `citationDisplayPage()` or printed `page_label`.
  */
 
 import { displayText } from "./safe-text";
 import type { CitationResponse } from "./types";
+
+/** Footer copy for citations that are not mapped to a verified paragraph. */
+export const LEGACY_RUN_SOURCES_LABEL =
+  "Legacy run sources (not mapped to a paragraph)";
+
+/** Drawer copy when an authorized row has no stored paragraph span. */
+export const LEGACY_EXCERPT_COPY =
+  "Paragraph-level source text was not recorded for that run.";
 
 export type CitationLocatorField = {
   /** Stable field id for tests and keys. */
@@ -49,6 +60,8 @@ export function citationPageLabel(value: unknown): string {
  * Prefers the PDF `/PageLabels` value (printed roman or arabic) over the
  * 1-based file index. File index is a fallback when the PDF has no labels.
  *
+ * Company PDF chips must not call this helper.
+ *
  * @param provenance - Citation provenance mapping.
  * @returns Printed or file page text, or empty.
  */
@@ -75,11 +88,116 @@ export function citationHeading(value: unknown): string {
 }
 
 /**
- * Return a chip label from locator provenance.
+ * Split verified answer text on blank lines. Do not trim paragraphs.
  *
- * Prefers document title, printed page, then heading or sheet/range. Falls
- * back to "Evidence" rather than a UUID. Unavailable sources stay labeled
- * as such.
+ * @param answerText - Authoritative verified answer.
+ * @returns Paragraph strings, or empty when the answer is empty.
+ */
+export function splitVerifiedParagraphs(answerText: string): string[] {
+  if (answerText === "") {
+    return [];
+  }
+  return answerText.split("\n\n");
+}
+
+/**
+ * Return whether this row is a company PDF (not web, not a sheet).
+ *
+ * @param citation - Authorized citation row.
+ * @returns True when chips must use typed PDF page fields.
+ */
+export function isCompanyPdfCitation(citation: CitationResponse): boolean {
+  const kind = citation.source_kind ?? "company_document";
+  if (kind === "web") {
+    return false;
+  }
+  return locatorString(citation.provenance.sheet_name) === "";
+}
+
+/**
+ * Return the typed PDF toolbar page, or `unavailable`.
+ *
+ * @param citation - Authorized citation row.
+ * @returns Decimal page text. Never printed `page_label`.
+ */
+export function pdfPageDisplay(citation: CitationResponse): string {
+  const page = citation.pdf_page_number;
+  if (typeof page === "number" && Number.isInteger(page) && page >= 1) {
+    return String(page);
+  }
+  return "unavailable";
+}
+
+/**
+ * Return the typed book/source title, or `Source`.
+ *
+ * @param citation - Authorized citation row.
+ * @returns Display title from the typed field only.
+ */
+export function companyPdfBookTitle(citation: CitationResponse): string {
+  const title = locatorString(citation.document_title);
+  return title === "" ? "Source" : title;
+}
+
+/**
+ * Return citations mapped to one verified paragraph.
+ *
+ * @param citations - Authorized citation rows.
+ * @param paragraphIndex - 0-based paragraph.
+ * @returns Rows whose `paragraph_index` equals the paragraph.
+ */
+export function citationsForParagraph(
+  citations: readonly CitationResponse[],
+  paragraphIndex: number,
+): CitationResponse[] {
+  return citations.filter((item) => item.paragraph_index === paragraphIndex);
+}
+
+/**
+ * Return citations that must not attach to a rendered paragraph.
+ *
+ * @param citations - Authorized citation rows.
+ * @param paragraphCount - Number of `\n\n`-split paragraphs.
+ * @returns Null-index rows and mappings past the last paragraph.
+ */
+export function unmappedCitations(
+  citations: readonly CitationResponse[],
+  paragraphCount: number,
+): CitationResponse[] {
+  return citations.filter((item) => {
+    const index = item.paragraph_index;
+    if (typeof index !== "number") {
+      return true;
+    }
+    return index < 0 || index >= paragraphCount;
+  });
+}
+
+/**
+ * Return the drawer heading. Company PDFs never use printed `page_label`.
+ *
+ * @param citation - Authorized citation row.
+ * @returns Visible dialog title.
+ */
+export function citationDrawerTitle(citation: CitationResponse): string {
+  if (citation.source_unavailable) {
+    return `Citation ${String(citation.citation_index)}`;
+  }
+  if (isCompanyPdfCitation(citation)) {
+    return `${companyPdfBookTitle(citation)} — PDF page ${pdfPageDisplay(citation)}`;
+  }
+  const page = citationDisplayPage(citation.provenance);
+  return page === ""
+    ? `Citation ${String(citation.citation_index)}`
+    : `Page ${page}`;
+}
+
+/**
+ * Return a chip label from typed PDF fields or locator provenance.
+ *
+ * Company PDF chips are `<title> · PDF page N` and never call
+ * `citationDisplayPage()`. Sheets and web keep the previous locators.
+ * Unavailable sources stay labeled as such.
  *
  * @param citation - Authorized citation row.
  * @returns Visible source label without passage text.
@@ -99,6 +217,9 @@ export function citationSourceLabel(citation: CitationResponse): string {
       return url;
     }
     return "Web source";
+  }
+  if (isCompanyPdfCitation(citation)) {
+    return `${companyPdfBookTitle(citation)} · PDF page ${pdfPageDisplay(citation)}`;
   }
   const provenance = citation.provenance;
   const title = locatorString(provenance.document_title);
@@ -129,8 +250,8 @@ export function citationSourceLabel(citation: CitationResponse): string {
 /**
  * Return labeled locator rows for the sources drawer.
  *
- * Printed `page_label` is "Page". The 1-based file index is "PDF page" when
- * it differs from the printed label, or when no printed label exists.
+ * Company PDFs use typed Book/source and PDF page. Printed `page_label` is
+ * omitted for those rows. Unavailable citations omit stale locators.
  *
  * @param citation - Authorized citation row.
  * @returns Locator rows then technical ids. Omits empty values.
@@ -138,6 +259,31 @@ export function citationSourceLabel(citation: CitationResponse): string {
 export function citationLocatorFields(
   citation: CitationResponse,
 ): { locators: CitationLocatorField[]; technical: CitationLocatorField[] } {
+  const technical = citationTechnicalFields(citation);
+  if (citation.source_unavailable) {
+    return { locators: [], technical };
+  }
+  if (isCompanyPdfCitation(citation)) {
+    const locators: CitationLocatorField[] = [
+      {
+        key: "document_title",
+        label: "Book/source",
+        value: companyPdfBookTitle(citation),
+      },
+      {
+        key: "pdf_page_number",
+        label: "PDF page",
+        value: pdfPageDisplay(citation),
+      },
+    ];
+    const section = citationSectionParts(citation.provenance.section_path).join(
+      " / ",
+    );
+    if (section) {
+      locators.push({ key: "section_path", label: "Section", value: section });
+    }
+    return { locators, technical };
+  }
   const provenance = citation.provenance;
   const locators: CitationLocatorField[] = [];
   const isWeb = citation.source_kind === "web";
@@ -192,6 +338,18 @@ export function citationLocatorFields(
   if (url) {
     locators.push({ key: "url", label: "URL", value: url });
   }
+  return { locators, technical };
+}
+
+/**
+ * Return technical identity rows for the drawer.
+ *
+ * @param citation - Authorized citation row.
+ * @returns Citation and chunk ids.
+ */
+function citationTechnicalFields(
+  citation: CitationResponse,
+): CitationLocatorField[] {
   const technical: CitationLocatorField[] = [
     { key: "citation_id", label: "Citation id", value: citation.citation_id },
   ];
@@ -202,7 +360,7 @@ export function citationLocatorFields(
       value: citation.chunk_id,
     });
   }
-  return { locators, technical };
+  return technical;
 }
 
 /**

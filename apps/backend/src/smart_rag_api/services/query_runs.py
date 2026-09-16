@@ -30,20 +30,23 @@ STREAM_PATH_TEMPLATE = "/runs/{run_id}/events"
 
 
 def escape_run_citation(item: RunCitationRecord) -> RunCitationRecord:
-    """HTML-escape provenance strings without dropping Web metadata.
+    """HTML-escape provenance, title, and excerpt strings.
 
     Args:
         item: Citation row from ``list_run_citations``.
 
     Returns:
         Escaped record. ``source_kind`` and ``web_source_id`` are preserved.
-        Excerpt and span are never added.
+        Excerpt stays on the dedicated field and is never copied into
+        ``provenance``.
     """
 
     provenance = {
         str(key): isolate_untrusted_text(value) if isinstance(value, str) else value
         for key, value in item.provenance.items()
     }
+    title = item.document_title
+    excerpt = item.evidence_excerpt
     return RunCitationRecord(
         citation_id=item.citation_id,
         citation_index=item.citation_index,
@@ -52,6 +55,10 @@ def escape_run_citation(item: RunCitationRecord) -> RunCitationRecord:
         source_unavailable=item.source_unavailable,
         source_kind=item.source_kind,
         web_source_id=item.web_source_id,
+        paragraph_index=item.paragraph_index,
+        document_title=None if title is None else isolate_untrusted_text(title),
+        pdf_page_number=item.pdf_page_number,
+        evidence_excerpt=None if excerpt is None else isolate_untrusted_text(excerpt),
     )
 
 
@@ -195,15 +202,18 @@ class QueryRunService:
     def citations(
         self, caller: CallerContext, *, run_id: UUID
     ) -> tuple[RunCitationRecord, ...]:
-        """Return citation IDs with escaped provenance strings.
+        """Return citation IDs with escaped provenance, title, and excerpt.
 
         Args:
             caller: Authenticated caller.
             run_id: Run id.
 
         Returns:
-            Citation records without passage, excerpt, or span text.
-            ``source_kind`` and ``web_source_id`` are preserved.
+            Citation records. Excerpt is the dedicated ACL-checked field.
+            SSE preview remains ID/ordinal metadata only.
+
+        Raises:
+            QueryAdmissionError: ``not_found`` for missing or foreign runs.
         """
 
         with connect_postgres(self._postgres_url) as connection:

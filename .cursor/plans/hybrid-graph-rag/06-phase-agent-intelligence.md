@@ -55,7 +55,7 @@ Complete these in order. A checked box requires committed implementation evidenc
 7. [x] [Implement Supabase checkpoints/store memory, idempotency/run-event GC, full governance enforcement, trace redaction, prompt versions, usage accounting, feedback, and immediate conversation deletion.](./06-phase-agent-intelligence/packets/07-memory-governance-evaluation.md)
 8. [x] [Ship the thin authenticated developer UI and prove route, fallback, injection, idempotency, budget, outage, event-loop, and privacy gates.](./06-phase-agent-intelligence/packets/08-thin-developer-ui.md)
 
-Packets P06-09 through P06-43 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract. P06-17 and P06-18 are the 2026-09-09 private-PDF agent evaluation and holdout overlay; they do not start until Packet 9 is accepted and Packet 10 includes the production rerank/scope contract. Packets P06-19 through P06-26 are the 2026-09-10 local PDF evaluation workspace overlay. Packets P06-27 through P06-36 are the 2026-09-10 hosted webapp evaluation amendment. Packets P06-37 through P06-43 are the 2026-09-10 advanced web research overlay. Integrity requires contiguous packet numbers, so Web packets follow P06-36. After P06-43, resume P06-17. Do not reuse P06-27 through P06-36 for Web.
+Packets P06-09 through P06-48 are additive after the completed historical packets. Do not uncheck packets 1–8. P06-14 is a Phase 6/Phase 8 co-owned UI amendment and must not renumber active P08-22/P08-23. P06-16 is the co-owned custom-progress and paced-reveal contract. P06-17 and P06-18 are the 2026-09-09 private-PDF agent evaluation and holdout overlay; they do not start until Packet 9 is accepted and Packet 10 includes the production rerank/scope contract. Packets P06-19 through P06-26 are the 2026-09-10 local PDF evaluation workspace overlay. Packets P06-27 through P06-36 are the 2026-09-10 hosted webapp evaluation amendment. Packets P06-37 through P06-43 are the 2026-09-10 advanced web research overlay. Packets P06-44 through P06-48 are the 2026-09-15 PDF paragraph-citation overlay. Integrity requires contiguous packet numbers, so Web packets follow P06-36 and citation packets follow P06-43. After P06-41, execute P06-44 through P06-48, then resume P06-42, P06-43, then P06-17. Do not reuse P06-27 through P06-43 for citations.
 
 9. [x] [Canonical amendment for general-chat strict-split, ADR, and packets P06-10 through P06-15.](./06-phase-agent-intelligence/packets/09-canonical-general-chat-amendment.md)
 10. [x] [Implement typed knowledge-scope classification, the live profile gateway, and deterministic route compilation.](./06-phase-agent-intelligence/packets/10-knowledge-scope-routing.md)
@@ -92,6 +92,11 @@ Packets P06-09 through P06-43 are additive after the completed historical packet
 41. [x] [Implement bounded iterative Web research graph, synthesis, verification, and fail-closed routes.](./06-phase-agent-intelligence/packets/41-web-research-graph.md)
 42. [x] [Implement four-option Ask dropdown, Web origin, progress, citations, and resume.](./06-phase-agent-intelligence/packets/42-four-mode-ask-ux.md)
 43. [x] [Verify integrated Web gates, then resume P06-17.](./06-phase-agent-intelligence/packets/43-web-research-gates.md)
+44. [x] [Authorize PDF paragraph-citation overlay, ADR, and packets P06-45 through P06-48.](./06-phase-agent-intelligence/packets/44-pdf-paragraph-citations-amendment.md)
+45. [ ] [Implement structured paragraph mappings, exact spans, and fail-closed verification.](./06-phase-agent-intelligence/packets/45-pdf-paragraph-grounding.md)
+46. [ ] [Persist ACL-safe PDF citation traces, page repair, and conversation history.](./06-phase-agent-intelligence/packets/46-pdf-citation-persistence.md)
+47. [ ] [Render book title, PDF viewer page, and exact excerpt beside each answer paragraph.](./06-phase-agent-intelligence/packets/47-inline-pdf-citation-ui.md)
+48. [ ] [Prove PDF citation accuracy across regression, authorization, history, and UI gates.](./06-phase-agent-intelligence/packets/48-pdf-citation-gates.md)
 
 ## Approved planned deviation: general-chat strict split
 
@@ -135,6 +140,17 @@ User approval on 2026-09-10: add Ask dropdown Auto, Company documents, General, 
 - Never blend company documents and Web. Never fall back from insufficient company evidence to Web.
 - Rollback sets `WEB_SEARCH_ENABLED=false`. Do not down-migrate populated Web tables.
 
+## Approved planned deviation: PDF paragraph citations
+
+User approval on 2026-09-15: company-PDF answers cite each factual paragraph with the canonical document title, the 1-based PDF viewer file page (`page_index + 1`), and an ACL-checked exact supporting excerpt of at most 1000 characters. Printed `page_label` stays in locators and must not drive the chat page. General, user-text, deterministic, and Web answers stay unchanged.
+
+- Recorded in [`docs/adr/ADR-pdf-paragraph-citations.md`](../../../docs/adr/ADR-pdf-paragraph-citations.md).
+- Integrity keeps packet numbers contiguous after P06-43, so overlay packets are P06-44 through P06-48. Do not reuse P06-37 through P06-43.
+- Execute after P06-41, then resume P06-42, P06-43, then P06-17.
+- Creator-owned citation GET may return the bounded excerpt only after live run-ownership and chunk ACL/current-version/deletion recheck. SSE stays ID/ordinal metadata.
+- Missing, ambiguous, unsupported, or uncontained mappings fail closed. Retrieval is not citation proof. Legacy null-span rows stay unmapped.
+- Rollback stops using `answer_v2` and `list_run_citations_v4` in application code. Do not down-migrate populated citation rows. Do not present `page_label` as the PDF viewer page.
+
 ## Phase sequence requirement
 
 **Program sequence item 6:** Agent intelligence covers deadline-bounded LangGraph, complete composable route matrix, escalation, deterministic Combined fusion/ablation, inference verification, optional-tool disclosure, memory, resumable streaming, reserve-once durable budgets, Valkey-down rate behavior, bounded CPU offload/event-loop telemetry, conversation deletion, traces, and thin UI.
@@ -167,7 +183,7 @@ Do not set `status: complete` until every `Done when` item below is proven.
 
 ## Canonical detailed requirements
 
-The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Additive packet P06-16 records the co-owned LangGraph custom SSE progress and paced verified-answer presentation contract. Additive packets P06-19 through P06-26 record the 2026-09-10 local PDF evaluation workspace overlay. Additive packets P06-27 through P06-36 record the 2026-09-10 hosted webapp evaluation workspace. Additive packets P06-37 through P06-43 record the 2026-09-10 advanced web research overlay. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
+The Phase 6 runtime Hybrid dependency contract and legacy Sections 8–11 are redistributed into the shared contract and eight historical packets. Additive packets P06-09 through P06-15 record the approved general-chat strict-split amendment. Additive packet P06-16 records the co-owned LangGraph custom SSE progress and paced verified-answer presentation contract. Additive packets P06-19 through P06-26 record the 2026-09-10 local PDF evaluation workspace overlay. Additive packets P06-27 through P06-36 record the 2026-09-10 hosted webapp evaluation workspace. Additive packets P06-37 through P06-43 record the 2026-09-10 advanced web research overlay. Additive packets P06-44 through P06-48 record the 2026-09-15 PDF paragraph-citation overlay. Every linked file remains normative; this wrapper intentionally does not duplicate the former monolithic body. Legacy section numbers remain mapped through the [section map](../hybrid-graph-rag_ab5281ef.plan.md#legacy-section-map).
 
 ### Phase 6 runtime Hybrid dependency contract
 

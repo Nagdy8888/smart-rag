@@ -20,7 +20,7 @@ from smart_rag_core.query_profile.extract import (
     DeterministicExtract,
     extract_deterministic,
 )
-from smart_rag_core.query_routing.knowledge_web import (
+from smart_rag_core.query_routing.knowledge_scope_web import (
     has_web_intent,
     has_web_privacy_risk,
 )
@@ -570,7 +570,7 @@ def no_retrieval_mode_for_scope(scope: KnowledgeScope) -> NoRetrievalAnswerMode 
     return mapping[scope]
 
 
-from smart_rag_core.query_routing.knowledge_scope_override import (  # noqa: E402
+from smart_rag_core.query_routing.knowledge_scope_preference import (  # noqa: E402
     apply_requested_search_scope,
 )
 

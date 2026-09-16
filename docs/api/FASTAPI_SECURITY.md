@@ -67,13 +67,13 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | POST/GET | `/conversations` | authenticated | creator insert / `list_user_conversations_page` | COST_MUTATION on create; GET `limit` default 50 max 200; keyset `cursor` |
 | GET | `/conversations/{id}` | creator or owner/admin | non-deleted | 404 otherwise |
 | DELETE | `/conversations/{id}` | creator or owner/admin | **204**; foreign/tombstoned **404** | Immediate purge; see [MEMORY_DELETION.md](../agent/MEMORY_DELETION.md) |
-| GET | `/conversations/{id}/messages` | creator | `app.list_conversation_messages` | `limit` default 50 max 100; `before` UUID keyset. 200 `{items:[{message_id, role, content, created_at}], next_before_id}`. Roles `user`/`assistant` only. Full content, HTML-escaped. Foreign/deleted/missing → generic **404** `not_found`. LOW_RISK_READ. |
+| GET | `/conversations/{id}/messages` | creator | `app.list_conversation_messages_v2` plus one bounded `list_conversation_citations_v1` | `limit` default 50 max 100; `before` UUID keyset. 200 `{items:[{message_id, role, content, created_at, run_id, citations}], next_before_id}`. Roles `user`/`assistant` only. Full content, HTML-escaped. Citations are ACL-rechecked; foreign run IDs omitted. Foreign/deleted/missing → generic **404** `not_found`. LOW_RISK_READ. |
 | POST | `/conversations/{id}/title` | creator | `app.get_conversation_title_source` then optional `app.update_conversation_title` | COST_MUTATION. One bounded `conversation_title_v1` call while the stored title is still the first-prompt fallback. Model failure keeps the fallback. JSON includes `prompt_tokens` and `completion_tokens` for this call (0 when skipped). Same generic **404** as GET. See [ADR-llm-conversation-titles.md](../adr/ADR-llm-conversation-titles.md). |
 | POST | `/conversations/{id}/messages` | creator | handshake then idempotent admit | **Requires** `Idempotency-Key` header or body `idempotency_key` (400 if missing). Body `search_scope` defaults to `auto` (exactly one of `auto` / `company_documents` / `general_knowledge` / `web`; invalid is 422). Auto still reserves **composite**; forced `web` reserves **web_research** via `app.admit_query_run_v3` (v2 remains). Forced Web when search is disabled or unconfigured is **503** `web_search_disabled` / `web_search_unconfigured` with no reservation. JSON Accept → 202 `{run_id, stream_path, requested_search_scope}`; `Accept: text/event-stream` streams immediately. See [SSE.md](./SSE.md) and [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) |
 | GET | `/runs/{run_id}` | creator only | IDOR → 404 | Not audit-visible to other members |
 | POST | `/runs/{run_id}/cancel` | creator | pending/running | Stops live SSE, persists `cancelled` |
 | GET | `/runs/{run_id}/events` | creator only | Bearer resume; no handshake | `after` / `Last-Event-ID`; tombstone → 404 |
-| GET | `/runs/{run_id}/citations` | creator | IDs/provenance escaped | No snippet/passage/excerpt/span. Company ACL + current-version recheck via `list_run_citations_v3`; failed recheck → `source_unavailable` and `chunk_id` null. Web rows add `source_kind=web` and `web_source_id` with url/title/`content_hash` only |
+| GET | `/runs/{run_id}/citations` | creator | IDs, typed title/PDF page, optional ACL-safe excerpt | Company ACL + current-version + locator/span recheck via `list_run_citations_v4` (v3 remains). Failed recheck → `source_unavailable` and null title/page/excerpt. SSE `citation_preview` still omits excerpts. Web rows add `source_kind=web` and `web_source_id` with url/title/`content_hash` only |
 | POST | `/runs/{run_id}/feedback` | creator | thumbs 1 or 5 | Comment escaped |
 | GET | `/graph/entities/search` | authenticated | ACL SQL, 3s timeout | LOW_RISK_READ. No vendor prose |
 | POST | `/graph/inspect` | authenticated | existing inspect | FastAPI `COST_MUTATION`. Preauth `/graph` prefix is owned by the API-hardening agent |
@@ -167,22 +167,24 @@ See [SSE.md](./SSE.md). Handshake (`X-Client-Version`) is enforced on
 ### Conversation transcript
 
 `GET /conversations/{conversation_id}/messages` is a creator-only read of
-persisted `app.messages` rows. It does not invent history: only `user` and
-`assistant` roles are returned, with full HTML-escaped `content`. Query
-parameters: `limit` (default 50, minimum 1, maximum 100) and optional
-`before` (UUID of the previous page's last `message_id`). Response
-`next_before_id` is that last id when the page is full, otherwise `null`.
-Missing, deleted, and foreign conversations return the same generic
-`404 {"detail":"not_found"}` as `GET /conversations/{id}`.
+persisted `app.messages` rows plus one bounded
+`app.list_conversation_citations_v1` batch. It does not invent history:
+only `user` and `assistant` roles are returned, with full HTML-escaped
+`content` and ACL-rechecked `citations`. Query parameters: `limit`
+(default 50, minimum 1, maximum 100) and optional `before` (UUID of the
+previous page's last `message_id`). Response `next_before_id` is that
+last id when the page is full, otherwise `null`. Missing, deleted, and
+foreign conversations return the same generic `404 {"detail":"not_found"}`
+as `GET /conversations/{id}`.
 
 ```mermaid
 sequenceDiagram
     participant Browser
     participant API as FastAPI
-    participant Rpc as app.list_conversation_messages
+    participant Rpc as app.list_conversation_messages_v2
     Browser->>API: GET /conversations/{id}/messages?limit=50
-    API->>Rpc: creator-only keyset page
-    Rpc-->>API: newest-first user/assistant rows
+    API->>Rpc: creator-only keyset page plus citation batch
+    Rpc-->>API: newest-first user/assistant rows with citations
     API-->>Browser: 200 items plus next_before_id
     opt Older page
         Browser->>API: GET .../messages?before=next_before_id

@@ -1,4 +1,4 @@
-"""Client search-scope overrides applied after automatic knowledge classification."""
+"""Apply a client search-scope preference onto an automatic scope decision."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from smart_rag_core.query_routing.knowledge_scope import (
     company_intent_signal,
     has_company_phrase,
 )
-from smart_rag_core.query_routing.knowledge_web import has_web_privacy_risk
+from smart_rag_core.query_routing.knowledge_scope_web import has_web_privacy_risk
 from smart_rag_core.query_routing.signals import (
     is_greeting,
     is_product_help,

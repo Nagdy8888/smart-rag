@@ -206,12 +206,12 @@ source-preview/download HTTP route.
 | GET | `/conversations/{conversation_id}` | creator or owner/admin; else 404 |
 | DELETE | `/conversations/{conversation_id}` | **204**; foreign/tombstone **404**; immediate purge |
 | POST | `/conversations/{conversation_id}/messages` | handshake + admit; **requires** Idempotency-Key or body key |
-| GET | `/conversations/{conversation_id}/messages` | creator-only transcript; `limit` 1–100 default 50; `before` keyset; 200 `{items, next_before_id}`; foreign/deleted **404** |
+| GET | `/conversations/{conversation_id}/messages` | creator-only transcript plus ACL-rechecked `citations`; `limit` 1–100 default 50; `before` keyset; 200 `{items, next_before_id}`; foreign/deleted **404** |
 | POST | `/conversations/{conversation_id}/title` | creator-only LLM session title; 200 same shape as GET conversation plus `prompt_tokens`/`completion_tokens` for this call (0 when skipped); no-op when title is already a summary; foreign/deleted **404** |
 | GET | `/runs/{run_id}` | creator only; IDOR 404 |
 | POST | `/runs/{run_id}/cancel` | creator |
 | GET | `/runs/{run_id}/events` | Bearer SSE resume |
-| GET | `/runs/{run_id}/citations` | `citation_id`, `citation_index`, `chunk_id?`, `provenance`, `source_unavailable`; **no snippets** |
+| GET | `/runs/{run_id}/citations` | `citation_id`, `citation_index`, `chunk_id?`, typed `document_title`/`pdf_page_number`, optional ACL-safe `evidence_excerpt`, `provenance` without snippets, `source_unavailable` |
 | POST | `/runs/{run_id}/feedback` | `thumbs_up`, `tag` (exact catalog), `comment?` |
 
 Feedback tags (byte-for-byte). Thumbs up: `helpful answer`,
@@ -339,7 +339,7 @@ mocks. Stitch may show an honest unavailable/blocked state.
 | GAP-07-06 | MFA enroll/challenge UI | Phase 7/8 UI | Auth-direct TOTP; thin UI only shows 403 banner |
 | GAP-07-07 | MFA recovery HTTP | Phase 2/6 | Service only; recovery UI blocked until a router exists |
 | GAP-07-08 | Owner bootstrap HTTP | Phase 2 | SQL/service only; first-owner UI blocked |
-| GAP-07-09 | Signed source preview/download + restricted-read audit HTTP | Phase 6 | Locator provenance (printed page_label, file PDF page, title/section) plus technical IDs; no drawer fetch; do not embed Storage privileged URLs |
+| GAP-07-09 | Signed source preview/download + restricted-read audit HTTP | Phase 6 | Typed PDF title/page plus optional excerpt after ACL recheck; no drawer fetch; do not embed Storage privileged URLs |
 | GAP-07-10 | Graph backlog rolling ETA/cost HTTP | Phase 5/6 | Show `graph_handoff` counts + `graphNotReadyCopy(n)` only; never unauthorized counts |
 | GAP-07-11 | Budget policy read/write HTTP | Phase 6 | Show 402 `budget_exhausted`; no budget editor |
 | GAP-07-12 | Audit list/export HTTP | Phase 2/6 | Chain exists; no viewer API; do not mock events |
@@ -415,8 +415,8 @@ where listed.
 | F Coverage | score | `coverage.coverage_score` | creator | null hidden |
 | F Tools | chips | `optional_tool_disclosure.tool_keys` | creator | n/a |
 | F Heartbeat | count | `heartbeat` 15s | creator | not assertive |
-| F Citations | chips | `citation_preview` then `GET /runs/{id}/citations` | creator | locators; no snippets |
-| F Source drawer | preview/download | GAP-07-09 | — | printed page plus PDF page when they differ; title/section plus technical IDs |
+| F Citations | chips | `citation_preview` then `GET /runs/{id}/citations`; history uses message `citations` | creator | typed title/PDF page; no provenance snippets |
+| F Source drawer | preview/download | GAP-07-09 | — | book title, PDF toolbar page, optional section, supporting passage; no Storage URL |
 | F Feedback | thumbs + tag | `POST /runs/{id}/feedback` | creator | polarity catalogs, unmerged |
 | F Save to quiz | owner/admin draft | `POST /admin/pdf-eval/cases` run id only | owner/admin + `pdf_eval_workspace` | `idempotency_key`; never replaces thumbs |
 | F Quiz score | citation overlap | `POST /admin/pdf-eval/cases/{id}/compare-run` `{ run_id }` | owner/admin | not Recall@10; drafts from this run cannot score it |

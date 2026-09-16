@@ -78,7 +78,7 @@ def _admit_run(
         insert_user_profile(cursor, user_id=user_id, role=role)
         conversation_id = insert_conversation(cursor, user_id=user_id)
         version = authorization_version(cursor)
-    caller = caller_context(user_id=user_id, role=role, authorization_version=version)
+    caller = caller_context(user_id, role, version)
     result, _key = admit(
         connection,
         caller=caller,

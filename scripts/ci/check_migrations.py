@@ -95,6 +95,7 @@ ALLOWED_MIGRATION_PREFIXES = (
     "20260913170000_eval_exam_report_read_v1.sql",
     "20260914120000_web_research_evidence_v1.sql",
     "20260915120000_query_run_admission_web_v3.sql",
+    "20260915140000_pdf_paragraph_citations_v1.sql",
 )
 
 DESTRUCTIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

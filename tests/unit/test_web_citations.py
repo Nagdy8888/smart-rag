@@ -89,6 +89,10 @@ def test_citation_response_schema_omits_excerpt_and_span() -> None:
     props = CitationResponse.model_json_schema()["properties"]
     assert "source_kind" in props
     assert "web_source_id" in props
+    assert "evidence_excerpt" in props
+    assert "document_title" in props
+    assert "pdf_page_number" in props
+    assert "paragraph_index" in props
     assert "excerpt" not in props
     assert "span" not in props
     assert "html" not in props

@@ -27,10 +27,12 @@ from smart_rag_core.query_routing.fidelity import score_rewrite_fidelity
 from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScope,
     ScopeDegradationReason,
-    apply_requested_search_scope,
     classify_knowledge_scope,
     company_intent_signal,
     scope_requires_model,
+)
+from smart_rag_core.query_routing.knowledge_scope_preference import (
+    apply_requested_search_scope,
 )
 from smart_rag_core.query_routing.models import (
     REQUIRED_PREPARATION_FIELDS,

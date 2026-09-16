@@ -23,8 +23,10 @@ from smart_rag_core.query_routing.knowledge_scope import (
     KnowledgeScopeDecision,
     NoRetrievalAnswerMode,
     ScopeDegradationReason,
-    apply_requested_search_scope,
     classify_knowledge_scope,
+)
+from smart_rag_core.query_routing.knowledge_scope_preference import (
+    apply_requested_search_scope,
 )
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.memory import load_authorized_memory

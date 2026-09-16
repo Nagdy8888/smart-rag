@@ -41,7 +41,7 @@ class QueryGraphDeps:
         query_profile_prompt_text: Pinned ``query_profile_v1`` body when a
             live or mock profile adapter runs.
         profile_model_id: Provider model id recorded on profile usage.
-        answer_prompt_text: Pinned ``answer_v1`` body when a live adapter runs.
+        answer_prompt_text: Pinned ``answer_v2`` body when a live adapter runs.
         general_chat_prompt_text: Pinned ``general_chat_v1`` body when a live
             general-chat adapter runs.
         verifier_prompt_text: Pinned ``verifier_v1`` body when a live adapter runs.
