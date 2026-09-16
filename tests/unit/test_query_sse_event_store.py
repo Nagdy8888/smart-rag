@@ -224,6 +224,20 @@ def test_postgres_event_store_discards_on_error_without_append_replay(
     append_count = {"n": 0}
     connection = SimpleNamespace(closed=False)
 
+    def _none() -> None:
+        """Return no fetchone row."""
+
+        return None
+
+    def _empty_rows() -> list[object]:
+        """Return no fetchall rows.
+
+        Returns:
+            Empty list.
+        """
+
+        return []
+
     class _Boom(psycopg.OperationalError):
         """Transient append failure."""
 
@@ -255,7 +269,7 @@ def test_postgres_event_store_discards_on_error_without_append_replay(
         if "append_run_event" in statement:
             append_count["n"] += 1
             raise _Boom()
-        return SimpleNamespace(fetchone=lambda: None, fetchall=lambda: [])
+        return SimpleNamespace(fetchone=_none, fetchall=_empty_rows)
 
     def _commit() -> None:
         """Record commit."""
@@ -314,7 +328,7 @@ def test_postgres_event_store_discards_on_error_without_append_replay(
     assert connect_count["n"] == 1
     assert "ROLLBACK" in calls
     assert "CLOSE" in calls
-    assert store._connection is None
+    assert typed_attr(store, "_connection") is None
 
 
 def test_postgres_event_store_list_after_retries_before_rows(
@@ -329,6 +343,20 @@ def test_postgres_event_store_list_after_retries_before_rows(
 
     list_attempts = {"n": 0}
     connection = SimpleNamespace(closed=False)
+
+    def _none() -> None:
+        """Return no fetchone row."""
+
+        return None
+
+    def _empty_rows() -> list[object]:
+        """Return no fetchall rows.
+
+        Returns:
+            Empty list.
+        """
+
+        return []
 
     class _Boom(psycopg.OperationalError):
         """Transient list failure."""
@@ -361,16 +389,31 @@ def test_postgres_event_store_list_after_retries_before_rows(
             list_attempts["n"] += 1
             if list_attempts["n"] == 1:
                 raise _Boom()
-            return SimpleNamespace(fetchall=lambda: [])
-        return SimpleNamespace(fetchall=lambda: [], fetchone=lambda: None)
+            return SimpleNamespace(fetchall=_empty_rows)
+        return SimpleNamespace(fetchall=_empty_rows, fetchone=_none)
 
     connection.execute = _execute
     connection.commit = lambda: None
     connection.rollback = lambda: None
     connection.close = lambda: setattr(connection, "closed", True)
+
+    def _connect(url: str, **kwargs: object) -> object:
+        """Return the fake connection.
+
+        Args:
+            url: DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Fake connection.
+        """
+
+        del url, kwargs
+        return connection
+
     monkeypatch.setattr(
         "smart_rag_core.settings.postgres_connect.psycopg.connect",
-        lambda url, **kwargs: connection,
+        _connect,
     )
     store = PostgresRunEventStore("postgresql://hosted")
     caller = CallerContext(

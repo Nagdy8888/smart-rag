@@ -8,6 +8,7 @@ import json
 import logging
 import threading
 from collections.abc import Callable
+from types import TracebackType
 from typing import Any
 
 import httpx
@@ -689,38 +690,25 @@ def test_create_request_close_share_one_event_loop() -> None:
     class _TrackedClient(httpx.AsyncClient):
         """Record close on the running loop."""
 
-        async def __aexit__(self, *args: object) -> bool | None:
+        async def __aexit__(
+            self,
+            exc_type: type[BaseException] | None = None,
+            exc_value: BaseException | None = None,
+            traceback: TracebackType | None = None,
+        ) -> None:
             """Close after recording the loop identity.
 
             Args:
-                *args: Context-manager exception triplet.
+                exc_type: Exception type.
+                exc_value: Exception value.
+                traceback: Traceback.
 
             Returns:
-                Superclass exit result.
+                None.
             """
 
             loops.append(("close", id(asyncio.get_running_loop())))
-            return await super().__aexit__(*args)
-
-    def _open(self: ExaSearchGateway, *, timeout: httpx.Timeout) -> httpx.AsyncClient:
-        """Open a tracked client on the running loop.
-
-        Args:
-            self: Gateway.
-            timeout: Attempt timeout.
-
-        Returns:
-            Tracked async client.
-        """
-
-        loops.append(("create", id(asyncio.get_running_loop())))
-        return _TrackedClient(
-            base_url=EXA_API_ORIGIN,
-            timeout=timeout,
-            transport=self._transport,
-            headers={"Accept": "application/json"},
-            limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
-        )
+            await super().__aexit__(exc_type, exc_value, traceback)
 
     def handler(_request: httpx.Request) -> httpx.Response:
         """Return one mocked Exa HTTP response.
@@ -734,9 +722,32 @@ def test_create_request_close_share_one_event_loop() -> None:
 
         return httpx.Response(200, json=_success_payload())
 
+    tracking = _TrackingTransport(handler)
+
+    def _open(self: ExaSearchGateway, *, timeout: httpx.Timeout) -> httpx.AsyncClient:
+        """Open a tracked client on the running loop.
+
+        Args:
+            self: Gateway.
+            timeout: Attempt timeout.
+
+        Returns:
+            Tracked async client.
+        """
+
+        del self
+        loops.append(("create", id(asyncio.get_running_loop())))
+        return _TrackedClient(
+            base_url=EXA_API_ORIGIN,
+            timeout=timeout,
+            transport=tracking,
+            headers={"Accept": "application/json"},
+            limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
+        )
+
     gateway = ExaSearchGateway(
         api_key=SecretStr(CANARY_KEY),
-        transport=_TrackingTransport(handler),
+        transport=tracking,
     )
     gateway._open_client = _open.__get__(gateway, ExaSearchGateway)  # type: ignore[method-assign]
 

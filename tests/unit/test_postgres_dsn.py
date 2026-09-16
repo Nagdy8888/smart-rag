@@ -158,9 +158,10 @@ def test_connect_postgres_retries_transient_then_succeeds(
     assert delays == [0.1]
     assert len(caplog.records) == 1
     record = caplog.records[0]
-    assert record.operation == "connect_postgres"
-    assert record.attempt == 1
-    assert record.reason == "transient_connect"
+    extra = record.__dict__
+    assert extra.get("operation") == "connect_postgres"
+    assert extra.get("attempt") == 1
+    assert extra.get("reason") == "transient_connect"
     text = caplog.text.casefold()
     assert "postgresql://" not in text
     assert "super-secret" not in text

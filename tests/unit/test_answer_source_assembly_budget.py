@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import cast
 from uuid import UUID
 
 from smart_rag_agents.prompts import answer_prompt_text
@@ -318,11 +319,13 @@ def test_q15_generate_calls_gateway_once_with_bounded_records() -> None:
     assert out["status"] not in {"gateway_failed"}
     assert out["detail"] != "empty_answer"
     diagnostics = out["answer_context_fit"]
+    assert isinstance(diagnostics, dict)
     assert diagnostics["trim_reason"] == "answer_context_trimmed"
     payload = AnswerPayload.model_validate(out["answer"])
     assert payload.answer_text.strip()
-    for dropped in diagnostics["dropped_chunk_ids"]:
-        assert dropped not in gateway.last_chunk_ids
+    dropped = cast(list[str], diagnostics["dropped_chunk_ids"])
+    for dropped_id in dropped:
+        assert dropped_id not in gateway.last_chunk_ids
 
 
 def _runtime(*, deadline_at: datetime) -> dict[str, object]:

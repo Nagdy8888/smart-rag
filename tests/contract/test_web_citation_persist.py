@@ -439,7 +439,7 @@ def test_web_citation_detail_requires_https_and_returns_excerpt(
         db_connection,
         caller=caller,
         run_id=run_id,
-        citation_id=UUID(inserted.citation_id),
+        citation_id=inserted,
     )
     db_connection.execute("RESET ROLE")
     assert detail.citation.source_kind == "web"
