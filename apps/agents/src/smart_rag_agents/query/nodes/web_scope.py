@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import logging
 import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Literal, cast
 
 from langgraph.config import get_stream_writer
 from smart_rag_core.gateways.crawl_proxy import CrawlProxyGateway
@@ -16,6 +18,7 @@ from smart_rag_core.gateways.exa_search import (
     ExaSearchGateway,
     ExaSearchResponse,
 )
+from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.preparation import caller_from_runtime
 from smart_rag_core.web_research.bound_store import BoundWebStore
@@ -28,8 +31,12 @@ from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.nodes.shared import runtime_from_state, skip_closed_nodes
 from smart_rag_agents.query.state import QueryGraphState
 
+LOGGER = logging.getLogger(__name__)
 
-def _await_exa(factory: Callable[[], object], *, cancel_check: Callable[[], bool] | None) -> object:
+
+def _await_exa(
+    factory: Callable[[], object], *, cancel_check: Callable[[], bool] | None
+) -> object:
     """Run one Exa coroutine without rewriting typed ``ExaSearchError``.
 
     Args:
@@ -61,6 +68,8 @@ def _await_exa(factory: Callable[[], object], *, cancel_check: Callable[[], bool
         """Complete the awaitable on a dedicated loop."""
 
         def _inner() -> None:
+            """Run the factory on this copied context."""
+
             try:
                 produced = factory()
                 if asyncio.iscoroutine(produced):
@@ -175,14 +184,32 @@ def _deadline_seconds(state: QueryGraphState) -> float:
     return max(0.1, (deadline - datetime.now(UTC)).total_seconds())
 
 
-def _memory_snippets(state: QueryGraphState) -> tuple[str, ...]:
-    """Return conversation memory strings that must never reach Exa."""
+def forbidden_web_memory_snippets(state: QueryGraphState) -> tuple[str, ...]:
+    """Return prior conversation strings that must never reach Exa.
 
+    Admission persists the current user turn before ``load_memory``. That
+    record must not be treated as a company passage or ``sanitize_exa_query``
+    refuses the Ask text and never calls Exa.
+
+    Args:
+        state: Planned Web-research state.
+
+    Returns:
+        Prior memory bodies of at least 24 characters, excluding the
+        current ``user_query`` and rewrite.
+    """
+
+    current_query = str(state.get("user_query") or "").strip()
+    rewrite = _exa_query(state)
+    skip = {item for item in (current_query, rewrite) if len(item) >= 24}
     snippets: list[str] = []
     for record in state.get("memory_records") or []:
         content = record.get("content")
         if isinstance(content, str) and len(content.strip()) >= 24:
-            snippets.append(content.strip())
+            stripped = content.strip()
+            if stripped in skip:
+                continue
+            snippets.append(stripped)
     return tuple(snippets)
 
 
@@ -202,6 +229,36 @@ def _exa_query(state: QueryGraphState) -> str:
         if isinstance(rewrite, str) and rewrite.strip():
             return rewrite.strip()
     return str(state.get("user_query") or "")
+
+
+def _fail_closed(
+    state: QueryGraphState,
+    *,
+    status: Literal["routing_rejected", "insufficient_evidence"],
+    detail: str,
+) -> QueryGraphState:
+    """Return a typed Web fail-closed node update.
+
+    Args:
+        state: Current graph state.
+        status: Terminal graph status.
+        detail: Published ``web_*`` / ``web_search_*`` reason. Never a
+            query, URL, or key.
+
+    Returns:
+        State with no answer draft.
+    """
+
+    LOGGER.info(
+        "web research failed closed status=%s detail=%s",
+        status[:64],
+        detail[:64],
+        extra={"event": "query.web_scope.failed"},
+    )
+    return cast(
+        QueryGraphState,
+        {**state, "status": status, "detail": detail, "answer": None},
+    )
 
 
 def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphState:
@@ -241,29 +298,29 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
 
     if skip_closed_nodes(state):
         return state
+    context = runtime_from_state(state)
+    LOGGER.info(
+        "web research node entered enabled=%s configured=%s gateway=%s conn=%s ctx=%s",
+        int(bool(deps.web_search_enabled)),
+        int(bool(deps.web_search_configured)),
+        int(isinstance(deps.exa_search_gateway, ExaSearchGateway)),
+        int(deps.connection is not None),
+        int(context is not None),
+        extra={"event": "query.web_scope.entered"},
+    )
     if not deps.web_search_enabled:
-        return {
-            **state,
-            "status": "routing_rejected",
-            "detail": "web_search_disabled",
-            "answer": None,
-        }
+        return _fail_closed(
+            state, status="routing_rejected", detail="web_search_disabled"
+        )
     gateway = deps.exa_search_gateway
     if not deps.web_search_configured or not isinstance(gateway, ExaSearchGateway):
-        return {
-            **state,
-            "status": "routing_rejected",
-            "detail": "web_search_unconfigured",
-            "answer": None,
-        }
-    context = runtime_from_state(state)
+        return _fail_closed(
+            state, status="routing_rejected", detail="web_search_unconfigured"
+        )
     if deps.connection is None or context is None:
-        return {
-            **state,
-            "status": "routing_rejected",
-            "detail": "web_search_unconfigured",
-            "answer": None,
-        }
+        return _fail_closed(
+            state, status="routing_rejected", detail="web_search_unconfigured"
+        )
     fetch = None
     if isinstance(deps.crawl_proxy_gateway, CrawlProxyGateway):
         fetch = CrawlProxyCandidateFetch(deps.crawl_proxy_gateway)
@@ -282,12 +339,14 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             remaining_deadline_seconds=lambda: _deadline_seconds(state),
             cancel_check=deps.cancel_check,
             progress=_emit_progress,
-            forbidden_snippets=_memory_snippets(state),
+            forbidden_snippets=forbidden_web_memory_snippets(state),
             critique=propose_follow_ups,
         )
     except WebResearchError as exc:
         port.aclose()
-        status = "insufficient_evidence"
+        status: Literal["insufficient_evidence", "routing_rejected"] = (
+            "insufficient_evidence"
+        )
         if exc.reason.startswith("web_search_") or exc.reason in {
             "web_operation:ambiguous",
             "web_operation:conflict",
@@ -297,23 +356,38 @@ def web_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGraphSt
             status = "routing_rejected"
         if exc.reason == "web_content_unavailable":
             status = "insufficient_evidence"
-        return {
-            **state,
-            "status": status,
-            "detail": exc.reason,
-            "answer": None,
-        }
+        return _fail_closed(state, status=status, detail=exc.reason)
+    except QueryAdmissionError as exc:
+        port.aclose()
+        reason = str(getattr(exc, "reason", "") or "web_operation:conflict")[:64]
+        return _fail_closed(state, status="routing_rejected", detail=reason)
+    except Exception as exc:
+        port.aclose()
+        LOGGER.info(
+            "web research unexpected failure",
+            extra={
+                "event": "query.web_scope.failed",
+                "status": "routing_rejected",
+                "detail": type(exc).__name__[:64],
+            },
+        )
+        return _fail_closed(
+            state, status="routing_rejected", detail="web_search_transport_failed"
+        )
     port.aclose()
     answer = result.answer
     if answer.answer_origin is not KnowledgeScope.WEB:
         answer = answer.model_copy(update={"answer_origin": KnowledgeScope.WEB})
-    return {
-        **state,
-        "status": "answered",
-        "detail": "web_research_draft",
-        "answer": answer.model_dump(mode="json"),
-        "web_sources": [item.model_dump(mode="json") for item in result.sources],
-        "answer_call_count": 1,
-        "fusion": None,
-        "table_composition": None,
-    }
+    return cast(
+        QueryGraphState,
+        {
+            **state,
+            "status": "answered",
+            "detail": "web_research_draft",
+            "answer": answer.model_dump(mode="json"),
+            "web_sources": [item.model_dump(mode="json") for item in result.sources],
+            "answer_call_count": 1,
+            "fusion": None,
+            "table_composition": None,
+        },
+    )

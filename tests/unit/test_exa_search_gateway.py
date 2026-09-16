@@ -6,6 +6,8 @@ import asyncio
 import inspect
 import json
 import logging
+import threading
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -16,6 +18,7 @@ from smart_rag_core.gateways.exa_search import (
     EXA_MAX_RESULTS,
     ExaSearchError,
     ExaSearchGateway,
+    ExaSearchResponse,
     create_exa_search_gateway,
 )
 from smart_rag_core.settings.base import SharedSettings
@@ -23,7 +26,7 @@ from smart_rag_core.settings.base import SharedSettings
 CANARY_KEY = "exa-unit-canary-key-do-not-log"
 
 
-def _gateway(handler: Any) -> ExaSearchGateway:
+def _gateway(handler: Callable[[httpx.Request], httpx.Response]) -> ExaSearchGateway:
     """Build a gateway with a MockTransport.
 
     Args:
@@ -108,6 +111,15 @@ def test_happy_path_returns_bounded_immutable_dtos() -> None:
     captured: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         captured.append(request)
         return httpx.Response(200, json=_success_payload())
 
@@ -135,6 +147,15 @@ def test_nullable_metadata_is_accepted() -> None:
     """Missing optional provider fields stay None."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         return httpx.Response(
             200,
             json={
@@ -153,6 +174,15 @@ def test_malformed_json_maps_to_invalid_response() -> None:
     """Non-JSON 200 bodies fail closed."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         return httpx.Response(200, content=b"not-json")
 
     with pytest.raises(ExaSearchError, match="web_search_invalid_response"):
@@ -163,6 +193,15 @@ def test_unsupported_url_is_dropped() -> None:
     """Loopback and credentialed URLs never become candidates."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         return httpx.Response(
             200,
             json={
@@ -182,6 +221,15 @@ def test_too_many_results_are_clamped() -> None:
     """A thirteenth hit is dropped."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         results = [
             {"url": f"https://example.com/r{index}"}
             for index in range(EXA_MAX_RESULTS + 3)
@@ -196,9 +244,27 @@ def test_error_envelopes_do_not_leak_into_exceptions() -> None:
     """Both documented error shapes map to status reasons without bodies."""
 
     def error_handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         return httpx.Response(400, json={"error": "Invalid request"})
 
     def message_handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         return httpx.Response(402, json={"message": "Payment required"})
 
     with pytest.raises(ExaSearchError, match="web_search_invalid_response") as invalid:
@@ -226,6 +292,15 @@ def test_status_codes_map_to_stable_reasons(status: int, reason: str) -> None:
     attempts = {"count": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         attempts["count"] += 1
         return httpx.Response(status, json={"error": "nope"})
 
@@ -243,6 +318,15 @@ def test_connect_failure_retries_once() -> None:
     attempts = {"count": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         attempts["count"] += 1
         raise httpx.ConnectError("denied", request=request)
 
@@ -257,6 +341,15 @@ def test_post_send_read_timeout_does_not_retry() -> None:
     attempts = {"count": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         attempts["count"] += 1
         raise httpx.ReadTimeout("slow", request=request)
 
@@ -271,6 +364,15 @@ def test_exactly_one_retry_on_429_then_success() -> None:
     attempts = {"count": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         attempts["count"] += 1
         if attempts["count"] == 1:
             return httpx.Response(429, json={"error": "slow down"})
@@ -287,6 +389,15 @@ def test_deadline_exhaustion_sends_no_request() -> None:
     attempts = {"count": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         attempts["count"] += 1
         return httpx.Response(200, json=_success_payload())
 
@@ -303,10 +414,21 @@ def test_cancellation_is_not_retried() -> None:
     attempts = {"count": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         attempts["count"] += 1
         raise asyncio.CancelledError
 
     async def _run() -> None:
+        """Run the bounded gateway call under test."""
+
         gateway = _gateway(handler)
         try:
             await gateway.search(query="q", remaining_deadline_seconds=5)
@@ -322,6 +444,8 @@ def test_get_contents_rejects_urls_outside_allow_list() -> None:
     """Contents may only fetch current-run search URLs."""
 
     async def _run() -> None:
+        """Run the bounded gateway call under test."""
+
         gateway = _gateway(
             lambda request: httpx.Response(
                 200,
@@ -352,6 +476,8 @@ def test_get_contents_happy_path() -> None:
     """Allowed URLs return bounded contents items."""
 
     async def _run() -> None:
+        """Run the bounded gateway call under test."""
+
         gateway = _gateway(
             lambda request: httpx.Response(
                 200,
@@ -389,8 +515,46 @@ def test_client_close_prevents_further_requests() -> None:
 
     gateway = _gateway(lambda request: httpx.Response(200, json=_success_payload()))
     asyncio.run(gateway.aclose())
-    with pytest.raises((ExaSearchError, RuntimeError, httpx.HTTPError)):
+    with pytest.raises(ExaSearchError, match="web_search_transport_failed"):
         asyncio.run(gateway.search(query="q", remaining_deadline_seconds=5))
+
+
+def test_search_from_worker_thread_while_caller_loop_running() -> None:
+    """LangGraph web_scope runs Exa via asyncio.run on a dedicated loop.
+
+    A process-scoped AsyncClient would stay bound to the caller loop and
+    raise RuntimeError. Each request must open a client on the running loop.
+    """
+
+    gateway = _gateway(lambda request: httpx.Response(200, json=_success_payload()))
+
+    async def _outer() -> None:
+        """Drive Exa from an already-running event loop."""
+
+        box: dict[str, object] = {}
+        errors: dict[str, BaseException] = {}
+
+        def _worker() -> None:
+            """Search Exa on a dedicated worker thread."""
+
+            try:
+                box["value"] = asyncio.run(
+                    gateway.search(query="q", remaining_deadline_seconds=5)
+                )
+            except BaseException as exc:
+                errors["exc"] = exc
+
+        thread = threading.Thread(target=_worker, name="exa-loop-test", daemon=True)
+        thread.start()
+        thread.join(timeout=10)
+        assert not thread.is_alive()
+        assert "exc" not in errors, errors.get("exc")
+        result = box["value"]
+        assert isinstance(result, ExaSearchResponse)
+        assert len(result.candidates) == 1
+        await gateway.aclose()
+
+    asyncio.run(_outer())
 
 
 def test_disabled_settings_build_no_live_gateway(
@@ -411,6 +575,15 @@ def test_logs_omit_canary_query_and_urls(caplog: pytest.LogCaptureFixture) -> No
     caplog.set_level(logging.INFO, logger="smart_rag_core.gateways.exa_search")
 
     def handler(request: httpx.Request) -> httpx.Response:
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         return httpx.Response(200, json=_success_payload())
 
     asyncio.run(_search(_gateway(handler)))

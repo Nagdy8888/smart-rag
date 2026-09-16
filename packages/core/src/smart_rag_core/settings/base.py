@@ -246,9 +246,10 @@ class SharedSettings(BaseSettings):
         default=False,
         validation_alias="WEB_SEARCH_ENABLED",
         description=(
-            "Local-only Exa web research. Python default false. Staging and "
-            "production reject true. Production Web stays disabled until a "
-            "paid budget and managed egress are approved."
+            "Public Exa web research at https://api.exa.ai. Python default "
+            "false. Allowed only when APP_ENV=local (workstation Compose). "
+            "Staging and production reject true. This is not company-document "
+            "search."
         ),
         json_schema_extra={"security": "public"},
     )

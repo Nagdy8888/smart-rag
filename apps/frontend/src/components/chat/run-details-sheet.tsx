@@ -19,6 +19,7 @@ import {
   runStatusLabel,
   runStatusSummary,
   runStatusTone,
+  searchModeRoute,
 } from "../../lib/run-details";
 import { displayText } from "../../lib/safe-text";
 import { Button } from "../ui/button";
@@ -192,8 +193,9 @@ export function RunDetailsSheet({
       ? null
       : runStatusSummary(chat.terminal, chat.progress.verificationCompleted);
   const effectiveRoute = diagnostics.effectiveRoute ?? chat.routeFamily;
-  const searchMode = routeLabel(effectiveRoute);
-  const searchSummary = routeSummary(effectiveRoute);
+  const searchRoute = searchModeRoute(chat);
+  const searchMode = routeLabel(searchRoute);
+  const searchSummary = routeSummary(searchRoute);
   const requested = routeLabel(diagnostics.requestedRoute);
   const showStartedAs =
     requested !== null &&
@@ -239,7 +241,7 @@ export function RunDetailsSheet({
       {searchMode ? (
         <section className={styles.card} data-tone="search" aria-label="Search mode">
           <div className={styles.iconTile} aria-hidden="true">
-            <Icon name={routeIcon(effectiveRoute)} />
+            <Icon name={routeIcon(searchRoute)} />
           </div>
           <div>
             <p className={styles.kicker}>Search mode</p>

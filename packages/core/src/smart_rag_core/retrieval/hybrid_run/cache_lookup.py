@@ -25,6 +25,7 @@ from smart_rag_core.retrieval.profiles import (
 from smart_rag_core.retrieval.recheck import recheck_retrieval_candidates
 from smart_rag_core.retrieval.types import RetrievalCandidate
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.settings.postgres_connect import connect_postgres
 
 
 class HybridCacheLookupMixin:
@@ -145,7 +146,7 @@ class HybridCacheLookupMixin:
             )
         if self._supabase_dsn:
             try:
-                with psycopg.connect(self._supabase_dsn) as connection:
+                with connect_postgres(self._supabase_dsn) as connection:
                     return recheck_retrieval_candidates(
                         connection,
                         caller=caller,

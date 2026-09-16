@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from smart_rag_agents.prompts import verifier_prompt_text
 from smart_rag_agents.query.deps import QueryGraphDeps
@@ -22,6 +24,24 @@ from smart_rag_core.query_fusion.models import (
     PassageOrigin,
     ScoredPassage,
 )
+
+
+def _object_map(value: object) -> dict[str, object]:
+    """Return a string-keyed mapping from one JSON object.
+
+    Args:
+        value: Parsed JSON object.
+
+    Returns:
+        Mapping with string keys.
+
+    Raises:
+        AssertionError: When ``value`` is not a mapping.
+    """
+
+    assert isinstance(value, dict)
+    typed = cast(dict[object, object], value)
+    return {str(key): item for key, item in typed.items()}
 
 
 def _fusion() -> FusionResult:
@@ -178,16 +198,11 @@ def test_verifier_json_schema_bounds_reason() -> None:
     """OpenAI structured output must cap reason length to the Pydantic field."""
 
     schema = verifier_json_schema(("l1",))
-    properties = schema["properties"]
-    assert isinstance(properties, dict)
-    verdicts = properties["link_verdicts"]
-    assert isinstance(verdicts, dict)
-    items = verdicts["items"]
-    assert isinstance(items, dict)
-    item_properties = items["properties"]
-    assert isinstance(item_properties, dict)
-    reason = item_properties["reason"]
-    assert isinstance(reason, dict)
+    properties = _object_map(schema["properties"])
+    verdicts = _object_map(properties["link_verdicts"])
+    items = _object_map(verdicts["items"])
+    item_properties = _object_map(items["properties"])
+    reason = _object_map(item_properties["reason"])
     assert reason["minLength"] == 1
     assert reason["maxLength"] == 128
 
@@ -245,4 +260,6 @@ def test_verify_answer_node_invalid_answer_payload_is_partial() -> None:
     verified = verify_answer_node(state, QueryGraphDeps())
     assert verified["status"] == "verified_partial"
     assert verified["detail"] == "payload_schema_invalid"
-    assert verified["answer"]["answer_text"] == "kept"
+    answer = verified["answer"]
+    assert isinstance(answer, dict)
+    assert answer["answer_text"] == "kept"

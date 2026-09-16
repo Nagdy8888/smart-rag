@@ -371,6 +371,11 @@ def _log_event(
 class ExaSearchGateway:
     """Async Exa REST client with one retry and a fixed origin.
 
+    Each HTTP call opens an ``httpx.AsyncClient`` on the running loop.
+    LangGraph ``web_scope`` invokes search from ``asyncio.run`` in a
+    worker thread; a process-scoped client would stay bound to uvicorn's
+    loop and fail closed as ``web_search_transport_failed``.
+
     Args:
         api_key: Server-only Exa credential.
         transport: Optional httpx transport for tests.
@@ -385,7 +390,7 @@ class ExaSearchGateway:
         transport: httpx.AsyncBaseTransport | None = None,
         timeout: httpx.Timeout | None = None,
     ) -> None:
-        """Bind one lifespan-scoped HTTP client.
+        """Store credential and transport. Clients are opened per request.
 
         Args:
             api_key: ``EXA_API_KEY``. Stored as ``SecretStr``.
@@ -400,16 +405,29 @@ class ExaSearchGateway:
         if not secret:
             raise ExaSearchError("web_search_unconfigured")
         self._api_key = api_key
-        resolved_timeout = timeout or httpx.Timeout(
+        self._transport = transport
+        self._closed = False
+        self._timeout = timeout or httpx.Timeout(
             connect=EXA_CONNECT_TIMEOUT_SECONDS,
             read=EXA_READ_TIMEOUT_SECONDS,
             write=EXA_WRITE_TIMEOUT_SECONDS,
             pool=EXA_POOL_TIMEOUT_SECONDS,
         )
-        self._client = httpx.AsyncClient(
+
+    def _open_client(self, *, timeout: httpx.Timeout) -> httpx.AsyncClient:
+        """Open one client bound to the current running loop.
+
+        Args:
+            timeout: Per-attempt timeout clamped to the remaining deadline.
+
+        Returns:
+            A new ``AsyncClient`` targeting ``https://api.exa.ai``.
+        """
+
+        return httpx.AsyncClient(
             base_url=EXA_API_ORIGIN,
-            timeout=resolved_timeout,
-            transport=transport,
+            timeout=timeout,
+            transport=self._transport,
             headers={"Accept": "application/json"},
             limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
         )
@@ -434,13 +452,15 @@ class ExaSearchGateway:
         await self.aclose()
 
     async def aclose(self) -> None:
-        """Close the owned ``httpx.AsyncClient``.
+        """Mark the gateway closed so later requests fail without HTTP.
 
         Side Effects:
-            Releases pooled connections. Further requests fail closed.
+            Further ``search`` / ``get_contents`` calls raise
+            ``web_search_transport_failed``. Per-request clients are closed
+            by their own context managers.
         """
 
-        await self._client.aclose()
+        self._closed = True
 
     async def search(
         self,
@@ -666,6 +686,8 @@ class ExaSearchGateway:
             asyncio.CancelledError: Caller cancellation.
         """
 
+        if self._closed:
+            raise ExaSearchError("web_search_transport_failed")
         deadline = time.monotonic() + remaining_deadline_seconds
         last_reason = "web_search_transport_failed"
         for attempt in range(1, EXA_MAX_ATTEMPTS + 1):
@@ -680,72 +702,79 @@ class ExaSearchGateway:
             )
             started = time.monotonic()
             try:
-                response = await self._client.post(
-                    path,
-                    json=body,
-                    headers={"x-api-key": self._api_key.get_secret_value()},
-                    timeout=timeout,
-                )
-            except asyncio.CancelledError:
-                raise
-            except httpx.ConnectError:
-                last_reason = "web_search_transport_failed"
-                elapsed_ms = int((time.monotonic() - started) * 1000)
-                _log_event(
-                    f"{event}_connect_failed",
-                    request_id=None,
-                    status_code=None,
-                    attempt=attempt,
-                    result_count=None,
-                    elapsed_ms=elapsed_ms,
-                    cost=None,
-                )
-                if attempt < EXA_MAX_ATTEMPTS and _retry_fits(deadline):
-                    await asyncio.sleep(EXA_RETRY_BACKOFF_SECONDS)
-                    continue
-                raise ExaSearchError(last_reason) from None
-            except httpx.ConnectTimeout:
-                last_reason = "web_search_timeout"
-                if attempt < EXA_MAX_ATTEMPTS and _retry_fits(deadline):
-                    await asyncio.sleep(EXA_RETRY_BACKOFF_SECONDS)
-                    continue
-                raise ExaSearchError("web_search_timeout") from None
-            except httpx.ReadTimeout:
-                raise ExaSearchError("web_search_timeout") from None
-            except httpx.TimeoutException:
-                raise ExaSearchError("web_search_timeout") from None
-            except httpx.HTTPError:
-                raise ExaSearchError("web_search_transport_failed") from None
+                async with self._open_client(timeout=self._timeout) as client:
+                    try:
+                        response = await client.post(
+                            path,
+                            json=body,
+                            headers={"x-api-key": self._api_key.get_secret_value()},
+                            timeout=timeout,
+                        )
+                    except asyncio.CancelledError:
+                        raise
+                    except RuntimeError:
+                        last_reason = "web_search_transport_failed"
+                        raise ExaSearchError(last_reason) from None
+                    except httpx.ConnectError:
+                        last_reason = "web_search_transport_failed"
+                        elapsed_ms = int((time.monotonic() - started) * 1000)
+                        _log_event(
+                            f"{event}_connect_failed",
+                            request_id=None,
+                            status_code=None,
+                            attempt=attempt,
+                            result_count=None,
+                            elapsed_ms=elapsed_ms,
+                            cost=None,
+                        )
+                        if attempt < EXA_MAX_ATTEMPTS and _retry_fits(deadline):
+                            await asyncio.sleep(EXA_RETRY_BACKOFF_SECONDS)
+                            continue
+                        raise ExaSearchError(last_reason) from None
+                    except httpx.ConnectTimeout:
+                        last_reason = "web_search_timeout"
+                        if attempt < EXA_MAX_ATTEMPTS and _retry_fits(deadline):
+                            await asyncio.sleep(EXA_RETRY_BACKOFF_SECONDS)
+                            continue
+                        raise ExaSearchError("web_search_timeout") from None
+                    except httpx.ReadTimeout:
+                        raise ExaSearchError("web_search_timeout") from None
+                    except httpx.TimeoutException:
+                        raise ExaSearchError("web_search_timeout") from None
+                    except httpx.HTTPError:
+                        raise ExaSearchError("web_search_transport_failed") from None
 
-            elapsed_ms = int((time.monotonic() - started) * 1000)
-            status = response.status_code
-            if status == 200:
-                try:
-                    decoded: object = response.json()
-                except json.JSONDecodeError as exc:
-                    raise ExaSearchError("web_search_invalid_response") from exc
-                mapped = _mapping(decoded)
-                if mapped is None:
-                    raise ExaSearchError("web_search_invalid_response")
-                return mapped
-            last_reason = _reason_for_status(status)
-            _log_event(
-                f"{event}_http_error",
-                request_id=None,
-                status_code=status,
-                attempt=attempt,
-                result_count=None,
-                elapsed_ms=elapsed_ms,
-                cost=None,
-            )
-            if (
-                status in EXA_RETRY_STATUSES
-                and attempt < EXA_MAX_ATTEMPTS
-                and _retry_fits(deadline)
-            ):
-                await asyncio.sleep(EXA_RETRY_BACKOFF_SECONDS)
-                continue
-            raise ExaSearchError(last_reason)
+                    elapsed_ms = int((time.monotonic() - started) * 1000)
+                    status = response.status_code
+                    if status == 200:
+                        try:
+                            decoded: object = response.json()
+                        except json.JSONDecodeError as exc:
+                            raise ExaSearchError("web_search_invalid_response") from exc
+                        mapped = _mapping(decoded)
+                        if mapped is None:
+                            raise ExaSearchError("web_search_invalid_response")
+                        return mapped
+                    last_reason = _reason_for_status(status)
+                    _log_event(
+                        f"{event}_http_error",
+                        request_id=None,
+                        status_code=status,
+                        attempt=attempt,
+                        result_count=None,
+                        elapsed_ms=elapsed_ms,
+                        cost=None,
+                    )
+                    if (
+                        status in EXA_RETRY_STATUSES
+                        and attempt < EXA_MAX_ATTEMPTS
+                        and _retry_fits(deadline)
+                    ):
+                        await asyncio.sleep(EXA_RETRY_BACKOFF_SECONDS)
+                        continue
+                    raise ExaSearchError(last_reason)
+            except ExaSearchError:
+                raise
         raise ExaSearchError(last_reason)
 
 

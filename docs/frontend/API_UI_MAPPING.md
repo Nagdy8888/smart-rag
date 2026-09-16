@@ -78,7 +78,8 @@ and optional `search_scope` (`auto` | `company_documents` |
 Admission is Auto Composite (`route_family` is server-derived) unless
 forced `web` reserves `web_research`. Manual Hybrid/Combined/table/inspection
 controls are [GAP-07-01](#gap-register). Ask labels are Auto, Company
-documents, General, Web. Web is hidden unless `web_search_enabled` is true.
+documents, General, Web. Web is always listed. Forced Web still
+requires `web_search_enabled`; the API returns 503 when the flag is false.
 
 ## SSE catalog
 
@@ -131,6 +132,8 @@ Those are [GAP-07-02](#gap-register).
 | --- | --- | --- |
 | `rate_limited` | 429 + `Retry-After` | FastAPI limiter |
 | `limiter_unavailable` | 503 + `Retry-After` | Mutation limiter fail-closed |
+| `web_search_disabled` | 503 + `Retry-After` | Forced Web while `WEB_SEARCH_ENABLED` is false; no reservation |
+| `web_search_unconfigured` | 503 + `Retry-After` | Forced Web while Exa is missing; no reservation |
 | `authorization_rejected` / `forbidden` | 403 | Role/capability |
 | `MFA required` | removed | Backend P08-11 + frontend P08-12: no MFA kind, route, or banner |
 | `not_found` | 404 | Missing, unauthorized, tombstone, IDOR |

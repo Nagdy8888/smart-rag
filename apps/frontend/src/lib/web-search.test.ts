@@ -32,11 +32,12 @@ describe("webSearchCapability", () => {
 });
 
 describe("visibleSearchScopes", () => {
-  it("hides Web when the flag is false and keeps catalog order", () => {
+  it("always lists Web in catalog order", () => {
     expect(visibleSearchScopes(false)).toEqual([
       "auto",
       "company_documents",
       "general_knowledge",
+      "web",
     ]);
     expect(visibleSearchScopes(true)).toEqual([
       "auto",
@@ -48,8 +49,8 @@ describe("visibleSearchScopes", () => {
 });
 
 describe("visibleRequestedSearchScope", () => {
-  it("clamps stored Web to Auto when the option is hidden", () => {
-    expect(visibleRequestedSearchScope("web", false)).toBe("auto");
+  it("keeps stored Web when the server flag is off", () => {
+    expect(visibleRequestedSearchScope("web", false)).toBe("web");
     expect(visibleRequestedSearchScope("web", true)).toBe("web");
     expect(visibleRequestedSearchScope("company_documents", false)).toBe(
       "company_documents",

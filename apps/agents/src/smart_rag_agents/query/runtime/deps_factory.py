@@ -8,7 +8,11 @@ from typing import cast
 import psycopg
 from smart_rag_core.gateways.crawl_proxy import CrawlProxyGateway
 from smart_rag_core.gateways.embedding import create_embedding_gateway
-from smart_rag_core.gateways.exa_search import ExaSearchError, create_exa_search_gateway
+from smart_rag_core.gateways.exa_search import (
+    ExaSearchError,
+    ExaSearchGateway,
+    create_exa_search_gateway,
+)
 from smart_rag_core.gateways.model import (
     ModelGatewayUnavailableError,
     create_model_gateway,
@@ -21,6 +25,7 @@ from smart_rag_core.query_routing.branches import (
 from smart_rag_core.retrieval.cache_store import RetrievalCacheStore
 from smart_rag_core.runtime.valkey import ValkeyClient
 from smart_rag_core.settings import SharedSettings, load_backend_settings
+from smart_rag_core.settings.postgres_connect import connect_postgres
 
 from smart_rag_agents.prompts import (
     answer_prompt_text,
@@ -240,6 +245,46 @@ def build_query_graph_deps(
     )
 
 
+def refresh_web_search_deps(deps: QueryGraphDeps, settings: object) -> QueryGraphDeps:
+    """Copy current process Web flags onto run deps.
+
+    Process Hybrid bindings are cached for the API lifetime. Compose
+    ``env_file`` snapshots can leave that cache with ``web_search_enabled``
+    false after the operator enables public Exa. Per-run assembly must
+    reread ``WEB_SEARCH_ENABLED`` / ``EXA_API_KEY`` from the settings
+    object used for this Ask.
+
+    Args:
+        deps: Mutable per-run adapters. Not frozen.
+        settings: Backend or shared settings for this process.
+
+    Returns:
+        The same ``deps`` instance with Web flags and gateway refreshed.
+
+    Side Effects:
+        May construct an ``ExaSearchGateway`` bound to ``https://api.exa.ai``.
+        Never logs the key.
+    """
+
+    enabled = bool(getattr(settings, "web_search_enabled", False))
+    configured = secret_url(getattr(settings, "exa_api_key", None)) is not None
+    gateway = deps.exa_search_gateway
+    if not enabled:
+        gateway = None
+    elif not isinstance(gateway, ExaSearchGateway):
+        try:
+            if isinstance(settings, SharedSettings):
+                gateway = create_exa_search_gateway(settings)
+            else:
+                gateway = None
+        except ExaSearchError:
+            gateway = None
+    deps.web_search_enabled = enabled
+    deps.web_search_configured = configured
+    deps.exa_search_gateway = gateway
+    return deps
+
+
 def open_run_app_api_connection(supabase_dsn: str) -> psycopg.Connection:
     """Open one ``app_api`` connection for counted model calls on this run.
 
@@ -253,11 +298,13 @@ def open_run_app_api_connection(supabase_dsn: str) -> psycopg.Connection:
         QueryGraphRuntimeError: If the connection cannot be opened.
 
     Side Effects:
-        Opens a Postgres session. Caller must close it.
+        Opens a Postgres session with automatic prepares disabled so
+        hosted transaction poolers cannot raise
+        ``DuplicatePreparedStatement``. Caller must close it.
     """
 
     try:
-        connection = psycopg.connect(supabase_dsn)
+        connection = connect_postgres(supabase_dsn)
         connection.execute("SET ROLE app_api")
     except (psycopg.Error, OSError) as exc:
         raise QueryGraphRuntimeError("app_api_connection_unbound") from exc

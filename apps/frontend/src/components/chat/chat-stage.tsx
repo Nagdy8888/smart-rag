@@ -77,7 +77,7 @@ export type ChatStageProps = {
   feedbackPending: boolean;
   showSaveToQuiz?: boolean;
   quiz?: SaveToQuizSheetProps | null;
-  /** `/api/meta` Web flag. Hidden chrome is not authorization. */
+  /** `/api/meta` Web flag. Chrome always lists Web; the API still authorizes. */
   webSearchEnabled?: boolean;
 };
 
@@ -163,10 +163,7 @@ export function ChatStage(props: ChatStageProps) {
               disabled={run.sending || (chat.runId !== null && chat.terminal === null)}
               onChange={(event) => {
                 const next = event.target.value;
-                if (
-                  isRequestedSearchScope(next) &&
-                  (next !== "web" || webSearchEnabled)
-                ) {
+                if (isRequestedSearchScope(next)) {
                   run.setSearchScope(next);
                 }
               }}

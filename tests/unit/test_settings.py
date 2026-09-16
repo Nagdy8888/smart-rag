@@ -37,6 +37,7 @@ def configure_hosted_backend_env(
     monkeypatch.setenv("VALKEY_LIMITS_URL", "redis://:unit@127.0.0.1:6379/0")
     monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://app.example")
     monkeypatch.setenv("ALLOW_TEST_IDENTITY", "false")
+    monkeypatch.setenv("WEB_SEARCH_ENABLED", "false")
 
 
 def test_deployable_settings_are_typed_and_share_secure_defaults(

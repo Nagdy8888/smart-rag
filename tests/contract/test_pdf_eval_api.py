@@ -291,9 +291,7 @@ class _FakeQuizRepo:
         )
         return self.detail.case_id, self.detail.row_version
 
-    def delete(
-        self, caller: CallerContext, *, case_id: UUID, row_version: int
-    ) -> None:
+    def delete(self, caller: CallerContext, *, case_id: UUID, row_version: int) -> None:
         """Delete the seeded case."""
 
         del caller

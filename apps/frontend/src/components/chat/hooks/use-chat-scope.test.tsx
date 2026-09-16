@@ -45,7 +45,7 @@ describe("useChatScope", () => {
     expect(result.current.scope).toBe("general_knowledge");
   });
 
-  it("restores Web when enabled and clamps to Auto when hidden", () => {
+  it("keeps Web selected when the server flag is off", () => {
     const { result, rerender } = renderHook(
       ({ enabled }: { enabled: boolean }) => useChatScope("conv-web", enabled),
       { initialProps: { enabled: true } },
@@ -55,10 +55,10 @@ describe("useChatScope", () => {
     });
     expect(result.current.scope).toBe("web");
     rerender({ enabled: false });
-    expect(result.current.scope).toBe("auto");
+    expect(result.current.scope).toBe("web");
     act(() => {
       result.current.setScope("web");
     });
-    expect(result.current.scope).toBe("auto");
+    expect(result.current.scope).toBe("web");
   });
 });

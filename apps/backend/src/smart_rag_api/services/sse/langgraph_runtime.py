@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Protocol, cast
@@ -12,26 +13,26 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.settings import SharedSettings
 
+LOGGER = logging.getLogger(__name__)
+
 
 class StreamCancelFlag(Protocol):
     """Cooperative cancel handle used while opening ``astream``."""
 
     def is_set(self) -> bool:
-        """Return whether the owner cancelled the live run.
+        """Return whether cooperative cancel is set.
 
         Returns:
-            True when deps should observe cooperative cancel.
+            True when deps should observe cancel.
         """
-
         ...
 
 
 class LangGraphRuntimeFactory:
     """Process-reusable LangGraph bindings for one executor instance.
 
-    Hybrid, memory store, async checkpointer, and compiled graph are opened
-    once per factory. ``PostgresSaver.setup()``, ``AsyncPostgresSaver.setup()``,
-    and ``PostgresStore.setup()`` are never called.
+    Hybrid, store, and compiled graph open once. ``PostgresSaver.setup()``
+    is never called.
     """
 
     def __init__(self) -> None:
@@ -239,15 +240,20 @@ async def open_langgraph_astream(
 
     Returns:
         ``(connection, stream_iter, deps)``.
-    """
 
-    from smart_rag_agents.query.deps import QueryGraphContext
+    Side Effects:
+        Binds run-local Web flags and ``QueryGraphDeps``, and opens one
+        ``app_api`` connection. The executor owns ``astream`` ``aclose``.
+    """
+    from smart_rag_agents.query.deps import QueryGraphContext, bind_query_run_deps
     from smart_rag_agents.query.graph import pending_query_state
+    from smart_rag_agents.query.runtime.deps_factory import refresh_web_search_deps
 
     from smart_rag_api.services.query_graph_runtime import (
         build_query_graph_deps,
         open_run_app_api_connection,
     )
+    from smart_rag_api.services.sse.stream_dispatch import production_astream_options
 
     bindings = process_bindings(settings)
     connection = open_run_app_api_connection(bindings.supabase_dsn)
@@ -263,6 +269,14 @@ async def open_langgraph_astream(
         store_get=store_get,
         store_put=store_put,
     )
+    refresh_web_search_deps(deps, settings)
+    LOGGER.info(
+        "query graph deps bound web_enabled=%s web_configured=%s gateway=%s",
+        int(bool(getattr(deps, "web_search_enabled", False))),
+        int(bool(getattr(deps, "web_search_configured", False))),
+        type(getattr(deps, "exa_search_gateway", None)).__name__,
+        extra={"event": "query.graph.deps_bound"},
+    )
     checkpointer = await ensure_async_checkpointer(settings)
     compiled = compiled_query_graph(checkpointer)
     state = pending_query_state(
@@ -273,16 +287,14 @@ async def open_langgraph_astream(
         "recursion_limit": context.recursion_limit,
         "configurable": {"thread_id": str(context.conversation_id)},
     }
-    from smart_rag_api.services.sse.stream_dispatch import production_astream_options
-
-    stream_method: Callable[..., AsyncIterator[object]] = compiled.astream  # type: ignore[reportUnknownMemberType]
     stream_iter = cast(
         AsyncIterator[object],
-        stream_method(
+        compiled.astream(  # type: ignore[reportUnknownMemberType]
             state,
             cast(Any, config),
             context=QueryGraphContext(deps=deps),
             **production_astream_options(),
         ),
     )
+    bind_query_run_deps(deps)
     return connection, stream_iter, deps

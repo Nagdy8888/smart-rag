@@ -15,6 +15,7 @@ from smart_rag_agents.query.runtime.deps_factory import (
     build_query_graph_deps,
     build_query_process_bindings,
     open_run_app_api_connection,
+    refresh_web_search_deps,
     secret_url,
 )
 
@@ -29,5 +30,6 @@ __all__ = [
     "build_query_process_bindings",
     "context_loader",
     "open_run_app_api_connection",
+    "refresh_web_search_deps",
     "secret_url",
 ]

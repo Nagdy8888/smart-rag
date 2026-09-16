@@ -21,6 +21,7 @@ from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.runtime.valkey import ValkeyClient
 from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.settings.postgres_connect import connect_postgres
 
 from smart_rag_api.services.auth_rate_limits import (
     AuthRateLimitExceededError,
@@ -120,7 +121,7 @@ def admit_query_run_for_caller(
         requested_search_scope=requested_search_scope,
     )
     try:
-        with psycopg.connect(postgres_url) as connection:
+        with connect_postgres(postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             result = admit_query_run(
                 connection,

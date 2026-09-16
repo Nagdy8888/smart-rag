@@ -308,6 +308,24 @@ def test_company_query_without_evidence_never_uses_world_knowledge() -> None:
     assert "Insufficient authorized evidence." in payload.answer_text
 
 
+def test_company_query_with_blank_citation_text_refuses() -> None:
+    """Empty citation_text is not usable evidence and must not reach the model."""
+
+    payload = generate_answer(
+        fusion=_fusion(""),
+        tables=(),
+        user_query="What is LCEL?",
+        caller=None,
+        already_generated=0,
+        company_claim_forbidden=False,
+        graph_as_answer_forbidden=False,
+        knowledge_scope=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    assert payload.status == "refused"
+    assert payload.citations == ()
+    assert "Insufficient authorized evidence." in payload.answer_text
+
+
 def test_company_query_with_evidence_stays_cited() -> None:
     """Document answers still cite supplied IDs and keep company origin."""
 

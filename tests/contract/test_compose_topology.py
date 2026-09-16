@@ -135,10 +135,11 @@ def _env_file_paths(service: dict[str, object]) -> list[str]:
 
 
 def test_api_and_worker_load_compose_env_file_for_tracing() -> None:
-    """LangSmith flags come from .env.compose, not host-interpolated defaults.
+    """Provider flags come from .env.compose, not host-interpolated defaults.
 
-    Host leftover ``LANGSMITH_TRACING=false`` from pytest must not override
-    the operator compose file. Those keys stay out of ``environment:``.
+    Host leftover ``LANGSMITH_TRACING=false`` or ``WEB_SEARCH_ENABLED=false``
+    from pytest must not override the operator compose file. Those keys stay
+    out of ``environment:``.
     """
 
     for name in ("api", "worker"):
@@ -151,6 +152,8 @@ def test_api_and_worker_load_compose_env_file_for_tracing() -> None:
             "LANGSMITH_PROJECT",
             "MOCK_MODEL_MODE",
             "OPENAI_API_KEY",
+            "WEB_SEARCH_ENABLED",
+            "EXA_API_KEY",
         ):
             assert key not in environment, f"{name} interpolates {key} from the host"
 

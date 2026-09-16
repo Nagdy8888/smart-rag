@@ -20,6 +20,7 @@ from smart_rag_agents.query.runtime.deps_factory import (
     build_query_graph_deps,
     build_query_process_bindings,
     open_run_app_api_connection,
+    refresh_web_search_deps,
 )
 from smart_rag_agents.query.runtime.deps_factory import (
     secret_url as _secret_url,
@@ -39,4 +40,5 @@ __all__ = [
     "fetch_authorized_chunk_context",
     "open_run_app_api_connection",
     "psycopg",
+    "refresh_web_search_deps",
 ]

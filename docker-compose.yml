@@ -168,8 +168,11 @@ services:
         required: false
     environment:
       APP_ENV: local
-      # MOCK_MODEL_MODE, OPENAI_API_KEY, and LANGSMITH_* come from
-      # .env.compose so leftover host pytest flags cannot disable tracing.
+      # MOCK_MODEL_MODE, OPENAI_API_KEY, LANGSMITH_*, WEB_SEARCH_ENABLED,
+      # and EXA_API_KEY come from .env.compose so leftover host pytest flags
+      # cannot disable tracing or public Exa research (api.exa.ai, not
+      # company documents). Recreate `api` after changing those keys; Compose
+      # does not refresh env_file snapshots on a no-op up.
       # Hosted Auth JWKS origin. No local Docker GoTrue fallback.
       SUPABASE_URL: ${SUPABASE_URL:?set hosted SUPABASE_URL}
       # app_api is NOLOGIN. Use LOGIN wrapper app_runtime (SET ROLE app_api).
@@ -231,8 +234,9 @@ services:
         required: false
     environment:
       APP_ENV: local
-      # MOCK_MODEL_MODE, OPENAI_API_KEY, and LANGSMITH_* come from
-      # .env.compose so leftover host pytest flags cannot disable tracing.
+      # MOCK_MODEL_MODE, OPENAI_API_KEY, LANGSMITH_*, WEB_SEARCH_ENABLED,
+      # and EXA_API_KEY come from .env.compose. Query Web research runs in
+      # `api`; keep the same snapshot on worker so process settings match.
       # app_worker is NOLOGIN. Same LOGIN wrapper; runtime SET ROLE app_worker.
       # Do not reuse host pytest SUPABASE_DB_URL when that DSN is postgres superuser.
       SUPABASE_DB_URL: "${WORKER_SUPABASE_DB_URL:?set WORKER_SUPABASE_DB_URL}"

@@ -2162,7 +2162,7 @@
         "type": "object"
       },
       "MetaResponse": {
-        "description": "Compatibility handshake fields. Packet 6 owns enforcement.\n\n``web_search_enabled`` is the hosted/runtime flag. It is never the Exa\nkey. Hosted environments reject ``WEB_SEARCH_ENABLED=true`` at settings\nload, so this field stays false in staging and production.",
+        "description": "Compatibility handshake fields. Packet 6 owns enforcement.\n\n``web_search_enabled`` is the runtime flag for public Exa web research.\nIt is never the Exa key and never means company-document search.\nHosted environments reject ``WEB_SEARCH_ENABLED=true`` at settings\nload, so this field stays false in staging and production.",
         "properties": {
           "api_version": {
             "title": "Api Version",

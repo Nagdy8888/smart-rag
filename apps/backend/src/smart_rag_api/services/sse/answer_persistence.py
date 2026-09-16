@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Protocol
 import psycopg
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryAdmissionError
+from smart_rag_core.settings.postgres_connect import connect_postgres
 
 if TYPE_CHECKING:
     from smart_rag_api.services.query_sse_mapping import QuerySseMapper
@@ -145,7 +146,7 @@ class AnswerPersistenceMixin:
 
             store.put_compact(namespace, key, payload)
 
-        with psycopg.connect(postgres_url) as connection:
+        with connect_postgres(postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             maybe_generate_conversation_summary(
                 connection,
@@ -187,7 +188,7 @@ class AnswerPersistenceMixin:
         if postgres_url is None:
             return
         try:
-            with psycopg.connect(postgres_url) as connection:
+            with connect_postgres(postgres_url) as connection:
                 connection.execute("SET ROLE app_api")
                 append_query_message(
                     connection,

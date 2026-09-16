@@ -20,33 +20,34 @@ export function webSearchCapability(
 }
 
 /**
- * Clamp a stored preference when Web is not advertised.
+ * Return a stored Answer-source preference for the dropdown.
+ *
+ * Web stays selectable even when `/api/meta` `web_search_enabled` is
+ * false. Hidden chrome is not authorization; admit still refuses Web
+ * when the server flag is off.
  *
  * @param scope - Session or resume preference.
- * @param webSearchEnabled - `/api/meta` flag.
- * @returns `auto` when `web` is stored but the option is hidden.
+ * @param webSearchEnabled - Server capability. Unused; hidden chrome is not
+ *   authorization.
+ * @returns The same catalog value.
  */
 export function visibleRequestedSearchScope(
   scope: RequestedSearchScope,
   webSearchEnabled: boolean,
 ): RequestedSearchScope {
-  if (scope === "web" && !webSearchEnabled) {
-    return "auto";
-  }
+  void webSearchEnabled;
   return scope;
 }
 
 /**
  * Return Ask dropdown values in catalog order.
  *
- * @param webSearchEnabled - `/api/meta` flag.
- * @returns Auto, Company documents, General, and Web only when enabled.
+ * @param webSearchEnabled - Server capability. Unused; Web stays listed.
+ * @returns Auto, Company documents, General, and Web.
  */
 export function visibleSearchScopes(
   webSearchEnabled: boolean,
 ): readonly RequestedSearchScope[] {
-  if (webSearchEnabled) {
-    return REQUESTED_SEARCH_SCOPES;
-  }
-  return REQUESTED_SEARCH_SCOPES.filter((scope) => scope !== "web");
+  void webSearchEnabled;
+  return REQUESTED_SEARCH_SCOPES;
 }

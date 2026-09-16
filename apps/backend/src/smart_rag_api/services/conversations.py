@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-import psycopg
 from smart_rag_agents.prompts import conversation_title_prompt_text
 from smart_rag_core.conversations import (
     ConversationRecord,
@@ -33,6 +32,7 @@ from smart_rag_core.query_answer.versions import (
     CONVERSATION_TITLE_PROMPT_VERSION,
 )
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.settings.postgres_connect import connect_postgres
 
 from smart_rag_api.services.keyset import parse_created_at_id_cursor
 
@@ -93,7 +93,7 @@ class ConversationService:
             QueryAdmissionError: Authorization or insert failure.
         """
 
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             record = create_conversation(connection, caller=caller, title=title)
             connection.commit()
@@ -120,7 +120,7 @@ class ConversationService:
             QueryAdmissionError: Authorization or cursor failure.
         """
 
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             cursor_created_at, cursor_id = parse_created_at_id_cursor(cursor)
             return list_conversations(
@@ -148,7 +148,7 @@ class ConversationService:
                 for members/viewers.
         """
 
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             return get_conversation(
                 connection, caller=caller, conversation_id=conversation_id
@@ -170,7 +170,7 @@ class ConversationService:
             LangSmith deletion request.
         """
 
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             delete_conversation(
                 connection, caller=caller, conversation_id=conversation_id
@@ -206,7 +206,7 @@ class ConversationService:
             Title tokens are not reserved against the query-run envelope.
         """
 
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             source = get_conversation_title_source(
                 connection, caller=caller, conversation_id=conversation_id
@@ -245,7 +245,7 @@ class ConversationService:
             OSError,
         ):
             return ConversationTitleResult(record=current)
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             record = update_conversation_title(
                 connection,

@@ -26,6 +26,7 @@ from smart_rag_core.retrieval.source_scope import (
     resolve_retrieval_scope,
 )
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.settings.postgres_connect import connect_postgres
 
 
 class _DsnChannelMarker:
@@ -105,7 +106,7 @@ class DsnBm25Retriever:
             Opens and closes one ParadeDB connection.
         """
 
-        with psycopg.connect(self._parade_dsn, connect_timeout=8) as parade:
+        with connect_postgres(self._parade_dsn, connect_timeout=8) as parade:
             return Bm25Retriever(parade).retrieve_variants(
                 supabase=supabase,
                 caller=caller,
@@ -294,7 +295,7 @@ class ProcessHybridRetriever:
         raw_class = profile.query_type.value
         query_class = raw_class if isinstance(raw_class, str) else None
         try:
-            with psycopg.connect(self._supabase_dsn) as connection:
+            with connect_postgres(self._supabase_dsn) as connection:
                 connection.execute("SET ROLE app_api")
                 return resolve_retrieval_scope(
                     caller=caller,
@@ -403,7 +404,7 @@ def context_loader(
             Authorized rows. Unauthorized IDs are omitted.
         """
 
-        with psycopg.connect(supabase_dsn) as connection:
+        with connect_postgres(supabase_dsn) as connection:
             return fetch_authorized_chunk_context(
                 connection,
                 caller=caller,

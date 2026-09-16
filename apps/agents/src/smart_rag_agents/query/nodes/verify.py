@@ -124,9 +124,8 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             continue
         web_records.append(record)
         web_excerpts[record.web_source_id] = record.excerpt
-    is_web = (
-        payload.answer_origin is KnowledgeScope.WEB
-        or (plan is not None and plan.knowledge_scope is KnowledgeScope.WEB)
+    is_web = payload.answer_origin is KnowledgeScope.WEB or (
+        plan is not None and plan.knowledge_scope is KnowledgeScope.WEB
     )
     if is_web and not web_excerpts:
         return {

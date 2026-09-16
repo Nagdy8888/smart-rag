@@ -202,9 +202,7 @@ class QuizCaseQueries(Protocol):
         """Named-human reject."""
         ...
 
-    def delete(
-        self, caller: CallerContext, *, case_id: UUID, row_version: int
-    ) -> None:
+    def delete(self, caller: CallerContext, *, case_id: UUID, row_version: int) -> None:
         """Immediate delete."""
         ...
 
@@ -238,7 +236,9 @@ def quiz_error_code(exc: BaseException) -> str:
         ``quiz_schema_missing`` or an ``eval_quiz`` suffix.
     """
 
-    if isinstance(exc, (psycopg.errors.UndefinedFunction, psycopg.errors.UndefinedTable)):
+    if isinstance(
+        exc, (psycopg.errors.UndefinedFunction, psycopg.errors.UndefinedTable)
+    ):
         return "quiz_schema_missing"
     match = _EVAL_QUIZ_CODE.search(str(exc))
     if match is not None:
@@ -377,7 +377,12 @@ def _parse_gold(raw: object) -> tuple[QuizGoldLocator, ...]:
         chunk_id = mapped.get("chunk_id")
         document_id = mapped.get("document_id")
         version_id = mapped.get("version_id")
-        if ordinal is None or chunk_id is None or document_id is None or version_id is None:
+        if (
+            ordinal is None
+            or chunk_id is None
+            or document_id is None
+            or version_id is None
+        ):
             continue
         locators.append(
             QuizGoldLocator(
@@ -819,9 +824,7 @@ class QuizCaseRepository:
         row = _cells(fetched)
         return _as_uuid(row[0]), _as_int(row[1])
 
-    def delete(
-        self, caller: CallerContext, *, case_id: UUID, row_version: int
-    ) -> None:
+    def delete(self, caller: CallerContext, *, case_id: UUID, row_version: int) -> None:
         """Immediate delete.
 
         Args:

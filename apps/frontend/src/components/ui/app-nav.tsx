@@ -57,7 +57,7 @@ function NavList({
         const current = navItemIsCurrent(pathname, item.href);
         return (
           <li key={item.href} className={styles.navRow}>
-            <Tooltip text={item.label}>
+            <Tooltip text={item.label} placement="end">
               <Link
                 href={item.href}
                 aria-current={current ? "page" : undefined}

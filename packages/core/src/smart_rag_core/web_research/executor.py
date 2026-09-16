@@ -146,11 +146,15 @@ def run_web_research(
     counters = _Counters()
 
     def _cancel() -> None:
+        """Abort remaining Exa work when the caller cancelled."""
+
         if cancel_check is not None and cancel_check():
             search.aclose()
             raise WebResearchError("cancelled")
 
     def _bump() -> None:
+        """Consume one external operation slot or fail closed."""
+
         if counters.ops >= WEB_MAX_EXTERNAL_OPS:
             raise WebResearchError("web_round_exhausted")
         counters.ops += 1
@@ -160,6 +164,14 @@ def run_web_research(
     candidates_by_url: dict[str, ExaSearchCandidate] = {}
 
     def _search_one(formulation: str, key: str, *, round_index: int) -> None:
+        """Run one recorded Exa search for a sanitized formulation.
+
+        Args:
+            formulation: Sanitized Exa query.
+            key: Durable operation key.
+            round_index: 1-based research round.
+        """
+
         _cancel()
         if round_index > WEB_MAX_ROUNDS:
             raise WebResearchError("web_round_exhausted")
@@ -171,6 +183,8 @@ def run_web_research(
             progress(WEB_PROGRESS_SEARCH)
 
         def _worker() -> None:
+            """Execute one Exa search and merge allow-listed candidates."""
+
             try:
                 response = search.search(
                     query=formulation,
@@ -219,6 +233,8 @@ def run_web_research(
             progress(WEB_PROGRESS_READ)
 
         def _contents() -> None:
+            """Fetch bounded contents for the current allow-listed URLs."""
+
             try:
                 response = search.get_contents(
                     urls=urls,
@@ -257,7 +273,11 @@ def run_web_research(
             if item is not None
             else candidates_by_url[url].published_date
         )
-        if not text.strip() and fetch is not None and counters.ops < WEB_MAX_EXTERNAL_OPS:
+        if (
+            not text.strip()
+            and fetch is not None
+            and counters.ops < WEB_MAX_EXTERNAL_OPS
+        ):
             _cancel()
             _bump()
             counters.fetches += 1
@@ -265,6 +285,15 @@ def run_web_research(
                 progress(WEB_PROGRESS_READ)
 
             def _fetch(target: str = url) -> str | None:
+                """Fetch one allow-listed page through the crawl proxy.
+
+                Args:
+                    target: Candidate URL.
+
+                Returns:
+                    Extracted text, or None when empty.
+                """
+
                 return fetch.fetch_text(target, allowed_urls=frozenset(allowed))
 
             fetched = run_recorded_operation(

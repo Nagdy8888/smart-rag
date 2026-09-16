@@ -723,7 +723,7 @@ def test_channel_supabase_opens_dedicated_connection_from_full_dsn(
         return _Conn()
 
     monkeypatch.setattr(
-        "smart_rag_core.retrieval.hybrid_run.jobs.psycopg.connect",
+        "smart_rag_core.retrieval.hybrid_run.jobs.connect_postgres",
         _connect,
     )
     dsn = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -798,7 +798,7 @@ def test_load_temporal_records_uses_app_api_role(
         return _Conn()
 
     monkeypatch.setattr(
-        "smart_rag_core.retrieval.hybrid_run.jobs.psycopg.connect",
+        "smart_rag_core.retrieval.hybrid_run.jobs.connect_postgres",
         _connect,
     )
     retriever = HybridRetriever(

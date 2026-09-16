@@ -53,6 +53,12 @@ def test_exa_search_live_local_only(caplog: pytest.LogCaptureFixture) -> None:
     gateway = ExaSearchGateway(api_key=SecretStr(raw))
 
     async def _run() -> int:
+        """Execute one live Exa search and count HTTP(S) hits.
+
+        Returns:
+            Count of http or https candidate URLs.
+        """
+
         try:
             response = await gateway.search(
                 query=LIVE_QUERY,

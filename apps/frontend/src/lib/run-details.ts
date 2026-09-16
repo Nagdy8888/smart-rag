@@ -226,6 +226,42 @@ export function routeIcon(route: string | null | undefined): IconName {
   return "spark";
 }
 
+export type SearchModeChatSlice = {
+  requestedSearchScope: string | null;
+  answerOrigin: string | null;
+  routeFamily: string | null;
+  diagnostics: { effectiveRoute: string | null };
+};
+
+/**
+ * Return the user-facing search-mode catalog key for Run details.
+ *
+ * Composite is the Auto envelope, not the operator-facing source. General
+ * and Web answers must not inherit “Searches documents…” copy from that
+ * envelope.
+ *
+ * @param chat - Scope, origin, and envelope diagnostics for the current run.
+ * @returns Catalog route key, or null when nothing real is present.
+ */
+export function searchModeRoute(chat: SearchModeChatSlice): string | null {
+  const origin = chat.answerOrigin;
+  const scope = chat.requestedSearchScope;
+  if (
+    origin === "general_knowledge" ||
+    scope === "general_knowledge" ||
+    origin === "user_supplied_text" ||
+    scope === "user_supplied_text" ||
+    origin === "ambiguous" ||
+    origin === "deterministic"
+  ) {
+    return "no_retrieval";
+  }
+  if (origin === "web" || scope === "web") {
+    return "web_research";
+  }
+  return chat.diagnostics.effectiveRoute ?? chat.routeFamily;
+}
+
 /**
  * Return operator-facing copy for a cache diagnostic.
  *

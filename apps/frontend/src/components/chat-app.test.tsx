@@ -25,6 +25,7 @@ import { SessionProvider } from "../lib/auth/session-provider";
 import { CHAT_RUN_POINTER_KEY } from "../lib/chat-pointer";
 import { MIXED_SCOPE_CLARIFICATION } from "../lib/answer-origin";
 import { handshakeBelowMinCopy } from "../lib/handshake";
+import { WEB_SEARCH_DISABLED_COPY } from "../lib/failure-copy";
 import { limitationCopy } from "../lib/limitations";
 
 vi.mock("next/navigation", () => ({
@@ -204,7 +205,7 @@ describe("ChatApp Auto chrome", () => {
     expect(screen.getByRole("option", { name: "Auto" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Company documents" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "General" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Web" })).toBeNull();
+    expect(screen.getByRole("option", { name: "Web" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Company files" })).toBeNull();
     expect(screen.queryByRole("option", { name: "General knowledge" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
@@ -282,6 +283,8 @@ function stubChatFetch(options: {
   deleteCalls?: string[];
   messagePosts?: string[];
   messageBodies?: string[];
+  messageStatus?: number;
+  messageDetail?: string;
 }): typeof fetch {
   return async (input, init) => {
     const url = String(input);
@@ -303,6 +306,17 @@ function stubChatFetch(options: {
         payload.search_scope === "company_documents"
           ? payload.search_scope
           : "auto";
+      if (options.messageStatus !== undefined && options.messageStatus >= 400) {
+        return new Response(
+          JSON.stringify({
+            detail: options.messageDetail ?? "request_rejected",
+          }),
+          {
+            status: options.messageStatus,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
       return new Response(
         JSON.stringify({
           run_id: "run-1",
@@ -829,6 +843,72 @@ describe("ChatApp Ask workspace", () => {
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("Company documents");
     expect(screen.getByTestId("answer-route")).toHaveTextContent("Composite");
     expect(screen.getByRole("button", { name: "Sources (1)" })).toBeInTheDocument();
+  });
+
+  it("offers Web when meta disables it and still posts search_scope web", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    const messageBodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events:
+          'event: status\nid: 1\ndata: {"stage":"web_search","status":"running","phase":"started"}\n\n',
+        messagePosts: [],
+        messageBodies,
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
+    const source = await screen.findByLabelText("Answer source");
+    expect(await screen.findByRole("option", { name: "Web" })).toBeInTheDocument();
+    await user.selectOptions(source, "web");
+    expect(source).toHaveValue("web");
+    await user.type(screen.getByLabelText("Message"), "latest public briefing");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => {
+      expect(messageBodies).toHaveLength(1);
+    });
+    expect(JSON.parse(messageBodies[0] ?? "{}")).toMatchObject({
+      message: "latest public briefing",
+      search_scope: "web",
+    });
+  });
+
+  it("shows Web-disabled copy instead of limiter fail-closed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        messageStatus: 503,
+        messageDetail: "web_search_disabled",
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
+    const source = await screen.findByLabelText("Answer source");
+    await user.selectOptions(source, "web");
+    await user.type(screen.getByLabelText("Message"), "latest public briefing");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(WEB_SEARCH_DISABLED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(/Limiter fail-closed/)).toBeNull();
   });
 
   it("offers Web when meta enables it and posts search_scope web", async () => {

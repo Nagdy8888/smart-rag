@@ -22,6 +22,7 @@ from smart_rag_core.runtime.valkey import ValkeyClient
 from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.security.untrusted import isolate_untrusted_text
+from smart_rag_core.settings.postgres_connect import connect_postgres
 
 from smart_rag_api.services.query_admission import admit_query_run_for_caller
 
@@ -125,7 +126,7 @@ class QueryRunService:
             valkey_client=self._valkey_client,
         )
         try:
-            with psycopg.connect(self._postgres_url) as connection:
+            with connect_postgres(self._postgres_url) as connection:
                 connection.execute("SET ROLE app_api")
                 append_query_message(
                     connection,
@@ -137,7 +138,7 @@ class QueryRunService:
                 )
                 connection.commit()
         except (psycopg.Error, QueryAdmissionError) as exc:
-            with psycopg.connect(self._postgres_url) as connection:
+            with connect_postgres(self._postgres_url) as connection:
                 connection.execute("SET ROLE app_api")
                 try:
                     fail_query_run(
@@ -167,7 +168,7 @@ class QueryRunService:
             QueryAdmissionError: ``not_found`` for missing or foreign runs.
         """
 
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             return get_query_run(connection, caller=caller, run_id=run_id)
 
@@ -185,7 +186,7 @@ class QueryRunService:
             QueryAdmissionError: Ownership or state failures.
         """
 
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             record = cancel_query_run(connection, caller=caller, run_id=run_id)
             connection.commit()
@@ -205,7 +206,7 @@ class QueryRunService:
             ``source_kind`` and ``web_source_id`` are preserved.
         """
 
-        with psycopg.connect(self._postgres_url) as connection:
+        with connect_postgres(self._postgres_url) as connection:
             connection.execute("SET ROLE app_api")
             records = list_run_citations(connection, caller=caller, run_id=run_id)
         return tuple(escape_run_citation(item) for item in records)

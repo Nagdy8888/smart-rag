@@ -5,6 +5,8 @@ import {
   chatRunFailureBanner,
   GENERIC_PRODUCTION_ERROR,
   mutationFailureBanner,
+  WEB_SEARCH_DISABLED_COPY,
+  WEB_SEARCH_UNCONFIGURED_COPY,
 } from "./failure-copy";
 
 describe("generic production errors", () => {
@@ -66,6 +68,21 @@ describe("approved HTTP failure copy", () => {
         classifyApiError(503, { detail: "limiter_unavailable" })!,
       ),
     ).toContain("fail-closed");
+    expect(
+      apiFailureBanner(
+        classifyApiError(503, { detail: "web_search_disabled" })!,
+      ),
+    ).toBe(WEB_SEARCH_DISABLED_COPY);
+    expect(
+      apiFailureBanner(
+        classifyApiError(503, { detail: "web_search_unconfigured" })!,
+      ),
+    ).toBe(WEB_SEARCH_UNCONFIGURED_COPY);
+    expect(
+      apiFailureBanner(
+        classifyApiError(503, { detail: "web_search_disabled" })!,
+      ),
+    ).not.toMatch(/Limiter fail-closed/);
   });
 
   it("maps empty completion protocol failure without traces", () => {

@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
+from smart_rag_agents.query.deps import QueryGraphDeps
 from smart_rag_agents.query.graph import compile_query_graph as _compile_query_graph
 from smart_rag_api.services.sse_stream import (
     LangGraphQueryRunExecutor,
@@ -263,6 +264,8 @@ def _patch_recording_executor(
             subprocessor_matrix_verified=True,
             allows_unsigned_local_live_providers=_allow_unsigned,
             supabase_db_url=None,
+            web_search_enabled=False,
+            exa_api_key=None,
         )
 
     def _permit_export(**kwargs: object) -> None:
@@ -325,18 +328,18 @@ def _patch_recording_executor(
 
         return SimpleNamespace(commit=_commit, close=_close)
 
-    def _deps(**kwargs: object) -> object:
-        """Return a dummy graph-deps object.
+    def _deps(**kwargs: object) -> QueryGraphDeps:
+        """Return empty run-scoped graph deps.
 
         Args:
             **kwargs: Unused builder arguments.
 
         Returns:
-            Opaque deps stand-in.
+            Default ``QueryGraphDeps`` with Web research disabled.
         """
 
         del kwargs
-        return object()
+        return QueryGraphDeps()
 
     def _bindings(settings: object) -> SimpleNamespace:
         """Return process bindings with a dummy DSN.

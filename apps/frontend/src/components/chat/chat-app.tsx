@@ -74,6 +74,7 @@ export function ChatApp() {
     terminal: run.chat.terminal !== null,
   });
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [compactAsk, setCompactAsk] = useState(false);
   const [feedbackTag, setFeedbackTag] = useState<FeedbackTag>(FEEDBACK_TAGS_UP[0]);
   const [feedbackComment, setFeedbackComment] = useState("");
   const [thumbsUp, setThumbsUp] = useState(true);
@@ -81,18 +82,25 @@ export function ChatApp() {
   const [feedbackStatus, setFeedbackStatus] = useState<string | null>(null);
   const [feedbackPending, setFeedbackPending] = useState(false);
   const citationTriggerRef = useRef<HTMLElement | null>(null);
+  const presentationKey = `${selection.conversationId ?? "none"}:${run.chat.runId ?? "none"}`;
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = (): void => setReducedMotion(media.matches);
+    if (typeof window.matchMedia !== "function") return;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const compact = window.matchMedia("(max-width: 1279px)");
+    const sync = (): void => {
+      setReducedMotion(motion.matches);
+      setCompactAsk(compact.matches);
+    };
     sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
+    motion.addEventListener("change", sync);
+    compact.addEventListener("change", sync);
+    return () => {
+      motion.removeEventListener("change", sync);
+      compact.removeEventListener("change", sync);
+    };
   }, []);
   const reveal = useVerifiedAnswerReveal({
-    presentationKey: `${selection.conversationId ?? "none"}:${run.chat.runId ?? "none"}`,
+    presentationKey,
     authoritativeText: run.chat.answerText,
     animate: run.liveRunCreated,
     reducedMotion,
@@ -121,13 +129,8 @@ export function ChatApp() {
     setLoadingEarlier(actions.loadingEarlier);
   }
   const meFailure = useMemo((): ApiFailure | null => {
-    if (liveQueries.currentUserError === null || liveQueries.currentUserError === undefined) {
-      return null;
-    }
-    if (isClassifiedApiError(liveQueries.currentUserError)) {
-      return liveQueries.currentUserError.failure;
-    }
-    return null;
+    const error = liveQueries.currentUserError;
+    return isClassifiedApiError(error) ? error.failure : null;
   }, [liveQueries.currentUserError]);
   const visibleFailure = run.failure ?? meFailure;
   const meError = queries.currentUserError ?? liveQueries.currentUserError;
@@ -171,7 +174,6 @@ export function ChatApp() {
     citations: visibleCitations,
     onFillComposer: selection.fillComposer,
   });
-
   const sendFeedback = useCallback(async () => {
     if (queries.auth === null || run.chat.runId === null) return;
     setFeedbackPending(true);
@@ -184,7 +186,6 @@ export function ChatApp() {
       setFeedbackPending(false);
     }
   }, [feedbackComment, feedbackTag, queries.auth, run.chat.runId, thumbsUp]);
-
   const handleSelectCitation = (citation: CitationResponse, trigger: HTMLButtonElement) => {
     citationTriggerRef.current = trigger;
     setSelectedCitation(citation);
@@ -192,7 +193,7 @@ export function ChatApp() {
   if (!session.ready) {
     return (
       <ChatRestoringGate
-        sessionsExpanded={selection.sessionsExpanded}
+        sessionsExpanded={compactAsk || selection.sessionsExpanded}
         onToggleExpanded={selection.toggleSessionsExpanded}
       />
     );
@@ -212,7 +213,6 @@ export function ChatApp() {
     onDelete: actions.handleDeleteConversation,
     deletePending: actions.deletePending,
   };
-
   return (
     <div className={chatStyles.page}>
       <HandshakeBanner />
@@ -243,9 +243,9 @@ export function ChatApp() {
         rail={
           <ConversationRail
             {...railProps}
-            expanded={selection.sessionsExpanded}
+            expanded={compactAsk || selection.sessionsExpanded}
             onToggleExpanded={selection.toggleSessionsExpanded}
-            showCollapseToggle
+            showCollapseToggle={!compactAsk}
           />
         }
         stage={
@@ -261,7 +261,7 @@ export function ChatApp() {
             onLoadEarlier={() => void actions.handleLoadEarlier()}
             visibleAnswer={reveal.visibleText}
             revealing={reveal.isRevealing}
-            presentationKey={`${selection.conversationId ?? "none"}:${run.chat.runId ?? "none"}`}
+            presentationKey={presentationKey}
             onShowFullAnswer={reveal.showFullAnswer}
             citations={visibleCitations}
             conversationRef={scroll.containerRef}
@@ -284,16 +284,14 @@ export function ChatApp() {
             onTag={setFeedbackTag}
             feedbackComment={feedbackComment}
             onComment={setFeedbackComment}
-            onFeedback={() => {
-              void sendFeedback();
-            }}
+            onFeedback={() => void sendFeedback()}
             feedbackPending={feedbackPending}
             showSaveToQuiz={showSaveToQuiz}
             quiz={toSaveToQuizSheetProps(quiz, run.lastUserMessage, visibleCitations)}
             webSearchEnabled={webSearchEnabled}
           />
         }
-        sessionsExpanded={selection.sessionsExpanded}
+        sessionsExpanded={compactAsk || selection.sessionsExpanded}
       />
       {selection.conversationsOpen ? (
         <Sheet title="Sessions" side="left" onClose={() => selection.setSessionsOpen(false)}>
@@ -304,10 +302,9 @@ export function ChatApp() {
         open={selection.sourcesOpen}
         onClose={() => selection.setSourcesOpen(false)}
         citations={visibleCitations}
-        hrefForCitation={(citation) => hrefForCitationRecord(citation)}
+        hrefForCitation={hrefForCitationRecord}
         onSelectCitation={(citation, trigger) => {
-          citationTriggerRef.current = trigger;
-          setSelectedCitation(citation);
+          handleSelectCitation(citation, trigger);
           selection.setSourcesOpen(false);
         }}
       />

@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { RequestedSearchScope } from "../../../lib/types";
 import { visibleRequestedSearchScope } from "../../../lib/web-search";
 
@@ -27,7 +27,8 @@ export type UseChatScopeResult = {
  *
  * New chats default to Auto. The conversation map is session-local and is
  * not erased on New chat. Requested scope is never treated as origin.
- * Stored `web` clamps to Auto when `/api/meta` hides the Web option.
+ * Web remains selectable when `/api/meta` `web_search_enabled` is false;
+ * the API still refuses unauthorized Web admits.
  *
  * @param activeConversationId - Selected conversation, or null on a blank chat.
  * @param webSearchEnabled - `/api/meta` `web_search_enabled`. Default false.
@@ -52,12 +53,6 @@ export function useChatScope(
     },
     [webSearchEnabled],
   );
-
-  useEffect(() => {
-    if (!webSearchEnabled && scopeRef.current === "web") {
-      applyScope(DEFAULT_SCOPE, activeConversationId);
-    }
-  }, [webSearchEnabled, activeConversationId, applyScope]);
 
   const setScope = useCallback(
     (next: RequestedSearchScope) => {

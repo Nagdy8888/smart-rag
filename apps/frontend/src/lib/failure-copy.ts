@@ -14,6 +14,14 @@ import { displayText } from "./safe-text";
 /** Unknown 5xx and unclassified failures. Never exception text. */
 export const GENERIC_PRODUCTION_ERROR = "Something went wrong.";
 
+/** Forced Web when `WEB_SEARCH_ENABLED` is false. Not a limiter outage. */
+export const WEB_SEARCH_DISABLED_COPY =
+  "Web search is not enabled. Forced Web was refused with no reservation.";
+
+/** Forced Web when Exa is missing. Not a limiter outage. */
+export const WEB_SEARCH_UNCONFIGURED_COPY =
+  "Web search is not configured. Forced Web was refused with no reservation.";
+
 /**
  * Map a classified API failure to English chrome.
  *
@@ -43,6 +51,14 @@ export function apiFailureBanner(failure: ApiFailure): string {
     }
     case "fail_closed":
       return `Limiter fail-closed (${displayText(failure.detail)}). Approved reads may degrade; cost mutations are denied.`;
+    case "unavailable":
+      if (failure.detail === "web_search_disabled") {
+        return WEB_SEARCH_DISABLED_COPY;
+      }
+      if (failure.detail === "web_search_unconfigured") {
+        return WEB_SEARCH_UNCONFIGURED_COPY;
+      }
+      return `Service unavailable (${displayText(failure.detail)}).`;
     case "deleted":
       return "Conversation deleted. Reads, resume, and citations are denied. No source text is shown.";
     case "conflict":

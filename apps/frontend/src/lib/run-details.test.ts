@@ -12,6 +12,7 @@ import {
   runStatusLabel,
   runStatusSummary,
   runStatusTone,
+  searchModeRoute,
 } from "./run-details";
 
 describe("isRealDetailValue", () => {
@@ -52,6 +53,35 @@ describe("routeSummary", () => {
     );
     expect(routeSummary("custom_family")).toBeNull();
     expect(routeSummary(null)).toBeNull();
+  });
+});
+
+describe("searchModeRoute", () => {
+  it("prefers General and Web origin over the Composite envelope", () => {
+    expect(
+      searchModeRoute({
+        requestedSearchScope: "general_knowledge",
+        answerOrigin: "general_knowledge",
+        routeFamily: "composite",
+        diagnostics: { effectiveRoute: "composite" },
+      }),
+    ).toBe("no_retrieval");
+    expect(
+      searchModeRoute({
+        requestedSearchScope: "web",
+        answerOrigin: "web",
+        routeFamily: "composite",
+        diagnostics: { effectiveRoute: "web_research" },
+      }),
+    ).toBe("web_research");
+    expect(
+      searchModeRoute({
+        requestedSearchScope: "company_documents",
+        answerOrigin: "company_documents",
+        routeFamily: "composite",
+        diagnostics: { effectiveRoute: "composite" },
+      }),
+    ).toBe("composite");
   });
 });
 

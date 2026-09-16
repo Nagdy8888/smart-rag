@@ -58,10 +58,10 @@ def _content(url: str, text: str | None) -> ExaContentItem:
 class FakeSearch:
     """Recording Exa port."""
 
-    queries: list[str] = field(default_factory=list)
+    queries: list[str] = field(default_factory=list[str])
     closed: bool = False
     search_error: str | None = None
-    contents_text: dict[str, str | None] = field(default_factory=dict)
+    contents_text: dict[str, str | None] = field(default_factory=dict[str, str | None])
     contents_error: str | None = None
 
     def search(
@@ -121,7 +121,7 @@ class FakeStore:
     begins: int = 0
     sent: int = 0
     completed: int = 0
-    sources: list[WebSourceRecord] = field(default_factory=list)
+    sources: list[WebSourceRecord] = field(default_factory=list[WebSourceRecord])
     ambiguous_on_sent: bool = False
     force_status: str = "planned"
 
@@ -190,7 +190,7 @@ class FakeStore:
 class FakeFetch:
     """Recording crawl-proxy fallback."""
 
-    urls: list[str] = field(default_factory=list)
+    urls: list[str] = field(default_factory=list[str])
     text: str = "Fallback excerpt from the candidate page."
 
     def fetch_text(self, url: str, *, allowed_urls: frozenset[str]) -> str | None:
@@ -210,6 +210,16 @@ def test_two_round_happy_path_caps_sources_and_empty_company_citations() -> None
     critique_calls: list[int] = []
 
     def _critique(query: str, titles: tuple[str, ...]) -> tuple[str, ...]:
+        """Return bounded follow-up Web formulations.
+
+        Args:
+            query: Sanitized user query.
+            titles: Candidate titles.
+
+        Returns:
+            Follow-up formulations.
+        """
+
         del query, titles
         critique_calls.append(1)
         return ("latest rainfall totals", "follow up weather desks")
@@ -239,6 +249,16 @@ def test_third_round_never_attempted() -> None:
     store = FakeStore()
 
     def _critique(query: str, titles: tuple[str, ...]) -> tuple[str, ...]:
+        """Return bounded follow-up Web formulations.
+
+        Args:
+            query: Sanitized user query.
+            titles: Candidate titles.
+
+        Returns:
+            Follow-up formulations.
+        """
+
         del query, titles
         return ("follow-a", "follow-b", "follow-c", "follow-d")
 
@@ -327,11 +347,15 @@ def test_crawl_proxy_not_called_for_non_candidate() -> None:
 
     fetch = FakeFetch()
     with pytest.raises(WebResearchError, match="web_search_invalid_response"):
-        fetch.fetch_text("https://evil.example/not-a-hit", allowed_urls=frozenset({_PAGE}))
+        fetch.fetch_text(
+            "https://evil.example/not-a-hit", allowed_urls=frozenset({_PAGE})
+        )
     assert fetch.urls == []
     proxy = CrawlProxyCandidateFetch.__new__(CrawlProxyCandidateFetch)
     with pytest.raises(WebResearchError, match="web_search_invalid_response"):
-        proxy.fetch_text("https://evil.example/not-a-hit", allowed_urls=frozenset({_PAGE}))
+        proxy.fetch_text(
+            "https://evil.example/not-a-hit", allowed_urls=frozenset({_PAGE})
+        )
 
 
 def test_crawl_fallback_only_for_exa_failed_candidate() -> None:
@@ -463,6 +487,16 @@ def test_follow_up_company_passage_never_searched() -> None:
     search = FakeSearch()
 
     def _critique(query: str, titles: tuple[str, ...]) -> tuple[str, ...]:
+        """Return bounded follow-up Web formulations.
+
+        Args:
+            query: Sanitized user query.
+            titles: Candidate titles.
+
+        Returns:
+            Follow-up formulations.
+        """
+
         del query, titles
         return ("latest news chunk_id=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",)
 
@@ -497,6 +531,23 @@ def test_web_scope_disabled_never_drafts() -> None:
     assert unconfigured["status"] == "routing_rejected"
     assert unconfigured["detail"] == "web_search_unconfigured"
     assert unconfigured["answer"] is None
+
+
+def test_current_user_turn_is_not_a_forbidden_web_snippet() -> None:
+    """The just-admitted user message must not block public Exa search."""
+
+    from smart_rag_agents.query.nodes.web_scope import forbidden_web_memory_snippets
+    from smart_rag_agents.query.state import pending_query_state
+
+    query = "What is the Exa search API according to public documentation?"
+    state = pending_query_state(user_query=query)
+    state["memory_records"] = [
+        {"content": query, "role": "user"},
+        {"content": "Our refund period is thirty calendar days.", "role": "assistant"},
+    ]
+    snippets = forbidden_web_memory_snippets(state)
+    assert query not in snippets
+    assert "Our refund period is thirty calendar days." in snippets
 
 
 def test_verify_answer_node_web_skips_model_verifier() -> None:

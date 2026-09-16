@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from smart_rag_agents.ingestion.checkpointer import open_ingestion_checkpointer
 from smart_rag_agents.query.store import open_query_memory_store
+from smart_rag_core.settings.postgres_connect import connect_postgres
 from smart_rag_core.settings.postgres_dsn import (
     TransactionPoolerDsnError,
     is_transaction_pooler_dsn,
@@ -54,3 +55,33 @@ def test_store_factory_rejects_pooler_before_connect() -> None:
     with pytest.raises(TransactionPoolerDsnError) as exc_info:
         open_query_memory_store(_PGBOUNCER, max_size=1)
     assert "super-secret-pooler-password" not in str(exc_info.value)
+
+
+def test_connect_postgres_disables_automatic_prepares(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Query retrieve/persist must not name prepares on a transaction pooler."""
+
+    captured: dict[str, object] = {}
+
+    def _connect(dsn: str, **kwargs: object) -> object:
+        """Record connect kwargs.
+
+        Args:
+            dsn: Caller DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Dummy connection.
+        """
+
+        del dsn
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
+    connect_postgres(_SESSION)
+    assert captured["prepare_threshold"] is None

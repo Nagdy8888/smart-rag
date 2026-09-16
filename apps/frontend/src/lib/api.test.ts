@@ -105,11 +105,21 @@ describe("classifyApiError", () => {
     });
   });
 
-  it("maps 503 to limiter fail-closed", () => {
+  it("maps 503 limiter_unavailable to fail-closed and Web details to unavailable", () => {
     expect(classifyApiError(503, { detail: "limiter_unavailable" })).toEqual({
       kind: "fail_closed",
       status: 503,
       detail: "limiter_unavailable",
+    });
+    expect(classifyApiError(503, { detail: "web_search_disabled" })).toEqual({
+      kind: "unavailable",
+      status: 503,
+      detail: "web_search_disabled",
+    });
+    expect(classifyApiError(503, { detail: "web_search_unconfigured" })).toEqual({
+      kind: "unavailable",
+      status: 503,
+      detail: "web_search_unconfigured",
     });
   });
 
