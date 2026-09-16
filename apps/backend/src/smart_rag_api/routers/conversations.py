@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import (
@@ -30,7 +30,6 @@ from smart_rag_api.dependencies.services import (
     get_valkey_limits_client,
 )
 from smart_rag_api.schemas.fastapi_security import (
-    CitationResponse,
     ConversationCreateRequest,
     ConversationMessage,
     ConversationMessagesResponse,
@@ -82,6 +81,25 @@ def _conversation_response(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
     )
+
+
+def _transcript_source_kind(
+    value: str | None,
+) -> Literal["company_document", "web"] | None:
+    """Narrow transcript source_kind to the OpenAPI literal union.
+
+    Args:
+        value: RPC text, or None when mixed or absent.
+
+    Returns:
+        ``company_document``, ``web``, or None.
+    """
+
+    if value == "company_document":
+        return "company_document"
+    if value == "web":
+        return "web"
+    return None
 
 
 def get_conversation_service(
@@ -352,22 +370,9 @@ def list_conversation_messages_route(
             content=item.content,
             created_at=item.created_at,
             run_id=item.run_id,
-            citations=[
-                CitationResponse(
-                    citation_id=citation.citation_id,
-                    citation_index=citation.citation_index,
-                    chunk_id=citation.chunk_id,
-                    provenance=citation.provenance,
-                    source_unavailable=citation.source_unavailable,
-                    source_kind=citation.source_kind,
-                    web_source_id=citation.web_source_id,
-                    paragraph_index=citation.paragraph_index,
-                    document_title=citation.document_title,
-                    pdf_page_number=citation.pdf_page_number,
-                    evidence_excerpt=citation.evidence_excerpt,
-                )
-                for citation in item.citations
-            ],
+            citation_count=item.citation_count,
+            source_kind=_transcript_source_kind(item.source_kind),
+            citations=[],
         )
         for item in records
     ]

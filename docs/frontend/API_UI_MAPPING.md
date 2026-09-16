@@ -208,12 +208,13 @@ source-preview/download HTTP route.
 | GET | `/conversations/{conversation_id}` | creator or owner/admin; else 404 |
 | DELETE | `/conversations/{conversation_id}` | **204**; foreign/tombstone **404**; immediate purge |
 | POST | `/conversations/{conversation_id}/messages` | handshake + admit; **requires** Idempotency-Key or body key |
-| GET | `/conversations/{conversation_id}/messages` | creator-only transcript plus ACL-rechecked `citations`; `limit` 1–100 default 50; `before` keyset; 200 `{items, next_before_id}`; foreign/deleted **404** |
+| GET | `/conversations/{conversation_id}/messages` | creator-only transcript; `run_id`, `citation_count` 0..50, nullable `source_kind`; `citations` always `[]`; `limit` 1–100 default 50; `before` keyset; 200 `{items, next_before_id}`; foreign/deleted **404** |
 | POST | `/conversations/{conversation_id}/title` | creator-only LLM session title; 200 same shape as GET conversation plus `prompt_tokens`/`completion_tokens` for this call (0 when skipped); no-op when title is already a summary; foreign/deleted **404** |
 | GET | `/runs/{run_id}` | creator only; IDOR 404 |
 | POST | `/runs/{run_id}/cancel` | creator |
 | GET | `/runs/{run_id}/events` | Bearer SSE resume |
 | GET | `/runs/{run_id}/citations` | `citation_id`, `citation_index`, `chunk_id?`, typed `document_title`/`pdf_page_number`, optional ACL-safe `evidence_excerpt`, `provenance` without snippets, `source_unavailable` |
+| GET | `/runs/{run_id}/citations/{citation_id}` | one owned citation; company excerpt after live ACL/current-version recheck (1–1000); Web excerpt/URL only for fragment-free HTTPS; unavailable omits excerpt |
 | POST | `/runs/{run_id}/feedback` | `thumbs_up`, `tag` (exact catalog), `comment?` |
 
 Feedback tags (byte-for-byte). Thumbs up: `helpful answer`,

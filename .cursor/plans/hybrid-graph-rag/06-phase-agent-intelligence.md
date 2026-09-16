@@ -101,7 +101,7 @@ Packets P06-09 through P06-57 are additive after the completed historical packet
 50. [x] [Implement deterministic evidence fitting, exact duplicate suppression, typed overflow handling, and answer/deadline reserves with Q15 regressions.](./06-phase-agent-intelligence/packets/50-bound-answer-context.md)
 51. [x] [Version answer/verifier prompts, release only supported atomic claims, and remove all-fusion citation backfill with MCP regressions.](./06-phase-agent-intelligence/packets/51-grounded-claim-release.md)
 52. [x] [Map insufficient evidence/refusal/deadline to one truthful partial outcome and unify visible/accessibility copy.](./06-phase-agent-intelligence/packets/52-graceful-terminals.md)
-53. [ ] [Add additive transcript-v2 run metadata and ACL-safe bounded citation-detail contracts.](./06-phase-agent-intelligence/packets/53-run-linked-transcript.md)
+53. [x] [Add additive transcript-v2 run metadata and ACL-safe bounded citation-detail contracts.](./06-phase-agent-intelligence/packets/53-run-linked-transcript.md)
 54. [ ] [Restore per-turn citations and feedback after reload and add accessible conversation deletion confirmation.](./06-phase-agent-intelligence/packets/54-restore-frontend-state.md)
 55. [ ] [Add bounded transient reconnect behavior, stale SSE connection retirement, and honest query-runtime readiness.](./06-phase-agent-intelligence/packets/55-postgres-readiness.md)
 56. [ ] [Use the approved local host-worker parser topology and prove sequential Exa runs without cross-loop cleanup errors.](./06-phase-agent-intelligence/packets/56-worker-async-lifecycle.md)

@@ -127,6 +127,120 @@
         "title": "ChunkTableDiagnostics",
         "type": "object"
       },
+      "CitationDetailResponse": {
+        "description": "One citation with a bounded ACL-checked excerpt or HTTPS Web URL.",
+        "properties": {
+          "chunk_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunk Id"
+          },
+          "citation_id": {
+            "format": "uuid",
+            "title": "Citation Id",
+            "type": "string"
+          },
+          "citation_index": {
+            "title": "Citation Index",
+            "type": "integer"
+          },
+          "document_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Title"
+          },
+          "evidence_excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Excerpt"
+          },
+          "paragraph_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paragraph Index"
+          },
+          "pdf_page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Page Number"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "source_kind": {
+            "default": "company_document",
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "source_unavailable": {
+            "default": false,
+            "title": "Source Unavailable",
+            "type": "boolean"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "web_source_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Source Id"
+          }
+        },
+        "required": [
+          "citation_id",
+          "citation_index"
+        ],
+        "title": "CitationDetailResponse",
+        "type": "object"
+      },
       "CitationResponse": {
         "description": "Citation identifiers plus ACL-checked title, PDF page, and excerpt.",
         "properties": {
@@ -253,6 +367,13 @@
       "ConversationMessage": {
         "description": "One creator-owned transcript message. Content is escaped untrusted text.",
         "properties": {
+          "citation_count": {
+            "default": 0,
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Citation Count",
+            "type": "integer"
+          },
           "citations": {
             "items": {
               "$ref": "#/components/schemas/CitationResponse"
@@ -293,6 +414,21 @@
               }
             ],
             "title": "Run Id"
+          },
+          "source_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "company_document",
+                  "web"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Kind"
           }
         },
         "required": [
@@ -9198,6 +9334,156 @@
           }
         },
         "summary": "List Citations Route",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/runs/{run_id}/citations/{citation_id}": {
+      "get": {
+        "description": "Return one owned citation with a bounded ACL-checked excerpt.\n\nArgs:\n    request: Active request.\n    run_id: Run id.\n    citation_id: Citation id on that run.\n    caller: Authenticated caller.\n    service: Injected service.\n\nReturns:\n    Escaped detail payload. Web URLs are HTTPS only. Unavailable\n    sources omit the excerpt.\n\nRaises:\n    HTTPException: 404 for missing, foreign, or mismatched IDs.",
+        "operationId": "get_citation_detail_route_runs__run_id__citations__citation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "citation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Citation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-User-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-User-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Role"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Authorization-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Authorization-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-Email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Test-AAL",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Test-Aal"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitationDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Citation Detail Route",
         "tags": [
           "chat"
         ]

@@ -125,6 +125,14 @@ class CitationResponse(BaseModel):
     evidence_excerpt: str | None = None
 
 
+class CitationDetailResponse(CitationResponse):
+    """One citation with a bounded ACL-checked excerpt or HTTPS Web URL."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source_url: str | None = None
+
+
 def _empty_citation_responses() -> list[CitationResponse]:
     """Return an empty citation list for additive HTTP defaults.
 
@@ -145,6 +153,8 @@ class ConversationMessage(BaseModel):
     content: str
     created_at: datetime
     run_id: UUID | None = None
+    citation_count: int = Field(default=0, ge=0, le=50)
+    source_kind: Literal["company_document", "web"] | None = None
     citations: list[CitationResponse] = Field(default_factory=_empty_citation_responses)
 
 

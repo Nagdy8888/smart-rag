@@ -93,8 +93,10 @@ locator `page_index + 1`) and canonical `document_title`. Printed
 resolves one leaf chunk that contains the exact span. Two matching
 children, multi-page locators, or a missing span fail closed. HTTP
 `evidence_excerpt` is disclosed only after live ACL and current-version
-recheck. SSE `citation_preview` still carries IDs only. History loads
-citations with `list_conversation_citations_v1` on the messages payload.
+recheck. SSE `citation_preview` still carries IDs only. History listings
+expose `run_id`, `citation_count`, and `source_kind` without excerpts.
+One-citation `GET /runs/{run_id}/citations/{citation_id}` rechecks ACL or
+HTTPS before returning a 1–1000 character excerpt.
 Legacy rows with null `paragraph_index` stay in a footer. Evaluation
 scores resolved leaf IDs and `pdf_page_number` versus gold
 `page_number`, never `page_label`. The AI Agents fixture (viewer page 25,

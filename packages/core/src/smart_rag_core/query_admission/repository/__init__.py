@@ -12,9 +12,11 @@ from smart_rag_core.query_admission.repository.lifecycle import (
 )
 from smart_rag_core.query_admission.repository.records import (
     QueryRunRecord,
+    RunCitationDetail,
     RunCitationRecord,
     RunUsageSummary,
     get_query_run,
+    get_run_citation_detail,
     list_conversation_citations,
     list_run_citations,
     load_query_run_runtime,
@@ -38,6 +40,7 @@ __all__ = [
     "QueryAdmissionResult",
     "QueryRunRecord",
     "ReservationConsumeResult",
+    "RunCitationDetail",
     "RunCitationRecord",
     "RunUsageSummary",
     "TrueUpResult",
@@ -47,6 +50,7 @@ __all__ = [
     "enqueue_query_reservation_true_up_job",
     "fail_query_run",
     "get_query_run",
+    "get_run_citation_detail",
     "heartbeat_query_run",
     "list_conversation_citations",
     "list_run_citations",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
 from uuid import UUID
 
 import psycopg
@@ -11,11 +12,14 @@ from smart_rag_core.query_admission.exceptions import QueryAdmissionError
 from smart_rag_core.query_admission.messages import append_query_message
 from smart_rag_core.query_admission.service import (
     QueryRunRecord,
+    RunCitationDetail,
     RunCitationRecord,
     cancel_query_run,
     fail_query_run,
     get_query_run,
+    get_run_citation_detail,
     list_run_citations,
+    record_run_restricted_evidence,
 )
 from smart_rag_core.query_profile.phase6_map import Phase6RouteFamily
 from smart_rag_core.runtime.valkey import ValkeyClient
@@ -60,6 +64,29 @@ def escape_run_citation(item: RunCitationRecord) -> RunCitationRecord:
         pdf_page_number=item.pdf_page_number,
         evidence_excerpt=None if excerpt is None else isolate_untrusted_text(excerpt),
     )
+
+
+def _safe_https_url(url: str | None) -> str | None:
+    """Return ``url`` only when it is a fragment-free HTTPS locator.
+
+    Args:
+        url: Candidate Web source URL.
+
+    Returns:
+        The URL, or ``None`` when the scheme is not HTTPS or the locator
+        includes userinfo or a fragment.
+    """
+
+    if url is None or url == "":
+        return None
+    parsed = urlsplit(url)
+    if parsed.scheme.lower() != "https":
+        return None
+    if parsed.username or parsed.password or parsed.fragment:
+        return None
+    if parsed.hostname is None:
+        return None
+    return url
 
 
 class QueryRunService:
@@ -220,3 +247,79 @@ class QueryRunService:
             connection.execute("SET ROLE app_api")
             records = list_run_citations(connection, caller=caller, run_id=run_id)
         return tuple(escape_run_citation(item) for item in records)
+
+    def citation_detail(
+        self,
+        caller: CallerContext,
+        *,
+        run_id: UUID,
+        citation_id: UUID,
+    ) -> RunCitationDetail:
+        """Return one owned citation with a bounded excerpt.
+
+        Restricted company documents append a restricted-read audit row.
+        Web rows require a validated HTTPS URL.
+
+        Args:
+            caller: Authenticated caller.
+            run_id: Run id.
+            citation_id: Citation id on that run.
+
+        Returns:
+            Detail record. Excerpt is omitted when unauthorized or unsafe.
+
+        Raises:
+            QueryAdmissionError: ``not_found`` for missing or foreign rows.
+        """
+
+        with connect_postgres(self._postgres_url) as connection:
+            connection.execute("SET ROLE app_api")
+            detail = get_run_citation_detail(
+                connection,
+                caller=caller,
+                run_id=run_id,
+                citation_id=citation_id,
+            )
+            citation = escape_run_citation(detail.citation)
+            source_url = _safe_https_url(detail.source_url)
+            if citation.source_kind == "web" and source_url is None:
+                citation = RunCitationRecord(
+                    citation_id=citation.citation_id,
+                    citation_index=citation.citation_index,
+                    chunk_id=citation.chunk_id,
+                    provenance=citation.provenance,
+                    source_unavailable=True,
+                    source_kind=citation.source_kind,
+                    web_source_id=citation.web_source_id,
+                    paragraph_index=citation.paragraph_index,
+                    document_title=citation.document_title,
+                    pdf_page_number=citation.pdf_page_number,
+                    evidence_excerpt=None,
+                )
+            if (
+                citation.source_kind == "company_document"
+                and not citation.source_unavailable
+                and citation.evidence_excerpt
+                and detail.document_visibility == "restricted"
+                and detail.document_id is not None
+                and detail.version_id is not None
+            ):
+                session_id = caller.session_id or str(run_id)
+                record_run_restricted_evidence(
+                    connection,
+                    caller=caller,
+                    run_id=run_id,
+                    document_id=detail.document_id,
+                    version_id=detail.version_id,
+                    session_id=session_id,
+                    citation_id=citation.citation_id,
+                    purpose="preview",
+                )
+            connection.commit()
+        return RunCitationDetail(
+            citation=citation,
+            source_url=source_url if not citation.source_unavailable else None,
+            document_id=detail.document_id,
+            version_id=detail.version_id,
+            document_visibility=detail.document_visibility,
+        )

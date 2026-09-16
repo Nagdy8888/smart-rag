@@ -80,6 +80,26 @@ class RunCitationRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class RunCitationDetail:
+    """One citation with ACL-checked excerpt metadata for the detail GET.
+
+    Attributes:
+        citation: Identifier and excerpt payload. Excerpt is omitted when
+            unauthorized or the Web URL is not safe HTTPS.
+        source_url: Validated HTTPS URL for Web rows, else None.
+        document_id: Company document when the live chunk is readable.
+        version_id: Current version id for restricted-read audit.
+        document_visibility: Live visibility, or None for Web/unavailable.
+    """
+
+    citation: RunCitationRecord
+    source_url: str | None = None
+    document_id: UUID | None = None
+    version_id: UUID | None = None
+    document_visibility: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RunUsageSummary:
     """Billed usage totals for one owned query run.
 
@@ -389,6 +409,93 @@ def list_conversation_citations(
             )
         )
     return tuple(records)
+
+
+def get_run_citation_detail(
+    connection: psycopg.Connection,
+    *,
+    caller: CallerContext,
+    run_id: UUID,
+    citation_id: UUID,
+) -> RunCitationDetail:
+    """Return one owned citation with a bounded ACL-checked excerpt.
+
+    Args:
+        connection: Open ``app_api`` connection.
+        caller: Server-derived owner.
+        run_id: Run primary key.
+        citation_id: Citation primary key on that run.
+
+    Returns:
+        Detail record. Web rows include a validated HTTPS URL only.
+
+    Raises:
+        QueryAdmissionError: ``not_found`` for missing, foreign, or
+            mismatched citation IDs.
+    """
+
+    try:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                """
+                SELECT citation_id, citation_index, chunk_id, provenance,
+                       source_unavailable, source_kind, web_source_id,
+                       paragraph_index, document_title, pdf_page_number,
+                       evidence_excerpt, source_url, document_id, version_id,
+                       document_visibility
+                FROM app.get_run_citation_detail_v1(%s, %s, %s, %s, %s)
+                """,
+                (
+                    caller.user_id,
+                    caller.rpc_role(),
+                    caller.rpc_authorization_version(),
+                    run_id,
+                    citation_id,
+                ),
+            )
+            row = cursor.fetchone()
+    except psycopg.Error as exc:
+        message = str(exc)
+        if "query_admission:not_found" in message:
+            raise QueryAdmissionError("not_found") from exc
+        raise_admission(exc)
+    if row is None:
+        raise QueryAdmissionError("not_found")
+    provenance_raw = row.get("provenance")
+    provenance: dict[str, object] = (
+        cast(dict[str, object], provenance_raw)
+        if isinstance(provenance_raw, dict)
+        else {}
+    )
+    unavailable = bool(row.get("source_unavailable"))
+    chunk = row.get("chunk_id")
+    web_raw = row.get("web_source_id")
+    excerpt = _optional_str(row.get("evidence_excerpt"))
+    source_url = _optional_str(row.get("source_url"))
+    if excerpt is not None and len(excerpt) > 1000:
+        excerpt = excerpt[:1000]
+    citation = RunCitationRecord(
+        citation_id=UUID(str(row["citation_id"])),
+        citation_index=int(str(row["citation_index"])),
+        chunk_id=None if unavailable or chunk is None else UUID(str(chunk)),
+        provenance=provenance,
+        source_unavailable=unavailable,
+        source_kind=str(row.get("source_kind") or "company_document"),
+        web_source_id=None if web_raw is None else UUID(str(web_raw)),
+        paragraph_index=_optional_int(row.get("paragraph_index")),
+        document_title=_optional_str(row.get("document_title")),
+        pdf_page_number=_optional_int(row.get("pdf_page_number")),
+        evidence_excerpt=None if unavailable else excerpt,
+    )
+    document_raw = row.get("document_id")
+    version_raw = row.get("version_id")
+    return RunCitationDetail(
+        citation=citation,
+        source_url=None if unavailable else source_url,
+        document_id=None if document_raw is None else UUID(str(document_raw)),
+        version_id=None if version_raw is None else UUID(str(version_raw)),
+        document_visibility=_optional_str(row.get("document_visibility")),
+    )
 
 
 def _optional_int(value: object) -> int | None:

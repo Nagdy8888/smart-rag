@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 53
-status: pending
+status: complete
 title: "Add additive transcript-v2 run metadata and ACL-safe bounded citation-detail contracts."
 requirement_ids: [P06-53]
 ---
