@@ -53,7 +53,7 @@ flowchart TD
 - [chat-restore.ts](../../../apps/frontend/src/lib/chat-restore.ts)
 - [use-chat-queries.ts](../../../apps/frontend/src/components/chat/hooks/use-chat-queries.ts)
 - [use-chat-restore.ts](../../../apps/frontend/src/components/chat/hooks/use-chat-restore.ts)
-- [use-conversation-actions.ts](../../../apps/frontend/src/components/chat/hooks/use-conversation-actions.ts)
+- [use-conversation-actions.tsx](../../../apps/frontend/src/components/chat/hooks/use-conversation-actions.tsx)
 - [chat-app.tsx](../../../apps/frontend/src/components/chat/chat-app.tsx)
 - [answer-surface.tsx](../../../apps/frontend/src/components/chat/answer-surface.tsx)
 - [CORE_RAG_SURFACES.md](../../frontend/CORE_RAG_SURFACES.md)
