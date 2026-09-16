@@ -6,6 +6,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
+  fetchCitationDetail,
   fetchMeta,
   fetchUsageMe,
   listCitations,
@@ -31,6 +32,12 @@ export type UseChatQueriesInput = {
   conversationId: string | null;
   runId: string | null;
   terminal: boolean;
+  /** Historical turn whose Sources sheet is open. */
+  viewingRunId?: string | null;
+  /** True while the Sources sheet is open. */
+  sourcesOpen?: boolean;
+  /** Selected chip; detail fetch stays 1:1 with this id. */
+  selectedCitationId?: string | null;
 };
 
 export type UseChatQueriesResult = {
@@ -46,6 +53,8 @@ export type UseChatQueriesResult = {
   messagesPending: boolean;
   messagesError: boolean;
   citations: readonly CitationResponse[];
+  viewingCitations: readonly CitationResponse[];
+  citationDetail: CitationResponse | null;
   usage: UsageResponse | null;
   meta: Awaited<ReturnType<typeof fetchMeta>> | undefined;
   metaPending: boolean;
@@ -57,18 +66,28 @@ export type UseChatQueriesResult = {
 /**
  * Load handshake, identity, sessions, transcript, usage, and citations.
  *
- * Live citations load once for the current terminal run. Historical chips
- * come from `ConversationMessage.citations` and are never fetched N+1.
+ * Live citations load once for the current terminal run. Historical Sources
+ * fetch one run list when the sheet opens, then one detail for the selected
+ * chip. Transcript rows never trigger per-message detail requests.
  *
- * @param input - Token, conversation, and run identity. No stream ownership.
+ * @param input - Token, conversation, run, and optional viewing identity.
  * @returns Explicit pending/error/data fields. Never a ReadableStream.
  */
 export function useChatQueries(input: UseChatQueriesInput): UseChatQueriesResult {
-  const { accessToken, conversationId, runId, terminal } = input;
+  const {
+    accessToken,
+    conversationId,
+    runId,
+    terminal,
+    viewingRunId = null,
+    sourcesOpen = false,
+    selectedCitationId = null,
+  } = input;
   const auth = useApiAuth();
   const keys = sessionQueryKeys(accessToken);
   const currentUser = useCurrentUser();
   const readiness = useConsoleReadiness();
+  const detailRunId = viewingRunId ?? (terminal ? runId : null);
 
   const metaQuery = useQuery({
     queryKey: publicQueryKeys.meta,
@@ -102,6 +121,22 @@ export function useChatQueries(input: UseChatQueriesInput): UseChatQueriesResult
     queryFn: () => listCitations(auth as ApiAuth, runId as string),
     enabled: auth !== null && runId !== null && terminal,
   });
+  const viewingCitationsQuery = useQuery({
+    queryKey: keys.citations(viewingRunId),
+    queryFn: () => listCitations(auth as ApiAuth, viewingRunId as string),
+    enabled: auth !== null && viewingRunId !== null && sourcesOpen,
+  });
+  const citationDetailQuery = useQuery({
+    queryKey: keys.citationDetail(detailRunId, selectedCitationId),
+    queryFn: () =>
+      fetchCitationDetail(
+        auth as ApiAuth,
+        detailRunId as string,
+        selectedCitationId as string,
+      ),
+    enabled:
+      auth !== null && detailRunId !== null && selectedCitationId !== null,
+  });
 
   return {
     keys,
@@ -116,6 +151,8 @@ export function useChatQueries(input: UseChatQueriesInput): UseChatQueriesResult
     messagesPending: messagesQuery.isLoading,
     messagesError: messagesQuery.isError,
     citations: citationsQuery.data ?? [],
+    viewingCitations: viewingCitationsQuery.data ?? [],
+    citationDetail: citationDetailQuery.data ?? null,
     usage: usageQuery.data ?? null,
     meta: metaQuery.data,
     metaPending: metaQuery.isPending,

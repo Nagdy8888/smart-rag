@@ -50,6 +50,7 @@ export function parseCitationItem(item: unknown): CitationResponse | null {
       provenance[key] = value;
     }
   }
+  const sourceUrl = parseHttpsSourceUrl(row.source_url);
   return {
     citation_id: citationId,
     citation_index: Number(row.citation_index ?? 0),
@@ -65,7 +66,37 @@ export function parseCitationItem(item: unknown): CitationResponse | null {
     document_title: parseOptionalString(row.document_title),
     pdf_page_number: parsePdfPageNumber(row.pdf_page_number),
     evidence_excerpt: parseEvidenceExcerpt(row.evidence_excerpt),
+    ...(sourceUrl === null ? {} : { source_url: sourceUrl }),
   };
+}
+
+/**
+ * Parse a fragment-free HTTPS locator from citation detail.
+ *
+ * http, userinfo, and fragment values are dropped. Company rows omit this.
+ *
+ * @param value - Raw `source_url`.
+ * @returns Canonical HTTPS URL, or null.
+ */
+export function parseHttpsSourceUrl(value: unknown): string | null {
+  if (typeof value !== "string" || value === "") {
+    return null;
+  }
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") {
+      return null;
+    }
+    if (parsed.username !== "" || parsed.password !== "") {
+      return null;
+    }
+    if (parsed.hash !== "") {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -169,6 +200,37 @@ export async function listCitations(
   return parsed
     .map(parseCitationItem)
     .filter((item): item is CitationResponse => item !== null);
+}
+
+/**
+ * Fetch one owned citation after live ACL or HTTPS recheck.
+ *
+ * @param auth - Access token.
+ * @param runId - Owning run UUID.
+ * @param citationId - Citation UUID.
+ * @param fetchImpl - Injected fetch.
+ * @returns Detail row with optional excerpt and HTTPS `source_url`.
+ * @throws ClassifiedApiError on non-OK responses.
+ */
+export async function fetchCitationDetail(
+  auth: ApiAuth,
+  runId: string,
+  citationId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CitationResponse> {
+  const response = await fetchImpl(
+    apiUrl(`/runs/${runId}/citations/${citationId}`),
+    { headers: resumeHeaders(auth) },
+  );
+  const body = await readJsonObject(response);
+  throwIfNotOk(response, body);
+  const parsed = parseCitationItem(body);
+  if (parsed === null) {
+    throw new ClassifiedApiError(
+      classifiedOrGenericFailure(response.status, body, response.headers),
+    );
+  }
+  return parsed;
 }
 
 /**

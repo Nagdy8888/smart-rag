@@ -89,6 +89,8 @@ export function sessionQueryKeys(accessToken: string | null) {
     conversationMessages: (conversationId: string | null) =>
       ["conversation-messages", scope, conversationId] as const,
     citations: (runId: string | null) => ["citations", scope, runId] as const,
+    citationDetail: (runId: string | null, citationId: string | null) =>
+      ["citation-detail", scope, runId, citationId] as const,
     document: (documentId: string | null) =>
       ["document", scope, documentId] as const,
     tables: ["tables", scope] as const,

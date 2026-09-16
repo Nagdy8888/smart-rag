@@ -89,6 +89,8 @@ export type AnswerSurfaceProps = {
   presentationKey?: string;
   /** Complete the live reveal immediately. */
   onShowFullAnswer?: () => void;
+  /** Open Sources for a historical assistant's owned run. */
+  onOpenTurnSources?: (runId: string) => void;
   /** Safe copy when Load earlier failed. */
   loadEarlierError?: string | null;
   /** Relative time for the live assistant meta row. */
@@ -374,6 +376,7 @@ export const AnswerSurface = memo(function AnswerSurface({
   liveCreatedAt = null,
   promptTokens = 0,
   completionTokens = 0,
+  onOpenTurnSources,
 }: AnswerSurfaceProps) {
   const note = answerTerminalNote(terminal, answer, chat?.status ?? null);
   const originLabel = answerOriginLabel(answerOrigin);
@@ -460,7 +463,7 @@ export const AnswerSurface = memo(function AnswerSurface({
               <AnswerParagraphs
                 answerText={item.content}
                 visibleText={item.content}
-                citations={item.citations ?? []}
+                citations={[]}
                 answerOrigin={null}
                 hrefForCitation={hrefForCitation}
                 onSelectCitation={onSelectCitation}
@@ -468,6 +471,24 @@ export const AnswerSurface = memo(function AnswerSurface({
             </LiveRegion>
             <p className={styles.messageMeta}>
               {formatRelativeTime(item.created_at)}
+              {(item.citation_count ?? 0) > 0 && item.run_id ? (
+                <>
+                  {" · "}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="compact"
+                    data-action-id="ask.turn_sources"
+                    onClick={() => {
+                      if (item.run_id) {
+                        onOpenTurnSources?.(item.run_id);
+                      }
+                    }}
+                  >
+                    {`Sources (${String(item.citation_count)})`}
+                  </Button>
+                </>
+              ) : null}
             </p>
           </div>
         ),

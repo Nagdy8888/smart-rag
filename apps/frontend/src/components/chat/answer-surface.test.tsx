@@ -469,7 +469,8 @@ describe("AnswerSurface paragraph citations", () => {
     expect(screen.queryByRole("button", { name: /Citation 0/ })).toBeNull();
   });
 
-  it("uses historical message citations instead of the live run list", () => {
+  it("shows Sources (citation_count) for historical assistants without live chips", () => {
+    const onOpenTurnSources = vi.fn();
     renderSurface({
       messages: [
         {
@@ -477,6 +478,9 @@ describe("AnswerSurface paragraph citations", () => {
           role: "assistant",
           content: "Historical refunds close in 30 days.",
           created_at: "2026-08-27T11:00:00Z",
+          run_id: "run-hist",
+          citation_count: 1,
+          source_kind: "company_document",
           citations: [
             {
               citation_id: "hist-1",
@@ -487,6 +491,7 @@ describe("AnswerSurface paragraph citations", () => {
               paragraph_index: 0,
               document_title: "History Book",
               pdf_page_number: 8,
+              evidence_excerpt: "should not render from list",
             },
           ],
         },
@@ -494,6 +499,7 @@ describe("AnswerSurface paragraph citations", () => {
       question: "",
       answer: "",
       terminal: null,
+      onOpenTurnSources,
       citations: [
         {
           citation_id: "live-secret",
@@ -507,12 +513,32 @@ describe("AnswerSurface paragraph citations", () => {
         },
       ],
     });
-    expect(
-      screen.getByRole("button", {
-        name: "Citation 0, History Book · PDF page 8",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sources (1)" })).toBeInTheDocument();
+    expect(screen.queryByText("History Book")).not.toBeInTheDocument();
     expect(screen.queryByText("Live Book")).not.toBeInTheDocument();
+    expect(screen.queryByText("should not render from list")).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "Sources (1)" }).click();
+    expect(onOpenTurnSources).toHaveBeenCalledWith("run-hist");
+  });
+
+  it("hides Sources for a historical general answer with citation_count 0", () => {
+    renderSurface({
+      messages: [
+        {
+          message_id: "a1",
+          role: "assistant",
+          content: "Paris is the capital of France.",
+          created_at: "2026-08-27T11:00:00Z",
+          run_id: "run-general",
+          citation_count: 0,
+          source_kind: null,
+        },
+      ],
+      question: "",
+      answer: "",
+      terminal: null,
+    });
+    expect(screen.queryByRole("button", { name: /Sources/ })).toBeNull();
   });
 });
 

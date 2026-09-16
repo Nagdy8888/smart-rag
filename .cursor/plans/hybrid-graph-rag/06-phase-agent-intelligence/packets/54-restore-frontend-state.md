@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 54
-status: pending
+status: complete
 title: "Restore per-turn citations and feedback after reload and add accessible conversation deletion confirmation."
 requirement_ids: [P06-54]
 ---

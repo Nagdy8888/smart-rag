@@ -21,15 +21,22 @@ export type UseChatSelectionResult = {
   setSourcesOpen: (open: boolean) => void;
   detailsOpen: boolean;
   setDetailsOpen: (open: boolean) => void;
+  viewingRunId: string | null;
+  setViewingRunId: (id: string | null) => void;
+  selectedCitationId: string | null;
+  setSelectedCitationId: (id: string | null) => void;
 };
 
 /**
  * Own selected IDs and chrome toggles. Does not fetch or stream.
  *
+ * Conversation changes clear viewing/citation/source restore state. They
+ * never write a historical run into the reconnect pointer.
+ *
  * @returns Selection state and reset-safe setters.
  */
 export function useChatSelection(): UseChatSelectionResult {
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationIdState] = useState<string | null>(null);
   const [composerSeed, setComposerSeed] = useState({ text: "", key: 0 });
   const [sessionsExpanded, setSessionsExpanded] = useLayoutPreference(
     SESSIONS_EXPANDED_STORAGE_KEY,
@@ -38,6 +45,10 @@ export function useChatSelection(): UseChatSelectionResult {
   const [conversationsOpen, setSessionsOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [viewingRunId, setViewingRunId] = useState<string | null>(null);
+  const [selectedCitationId, setSelectedCitationId] = useState<string | null>(
+    null,
+  );
 
   const fillComposer = useCallback((text: string) => {
     setComposerSeed((current) => ({ text, key: current.key + 1 }));
@@ -46,6 +57,13 @@ export function useChatSelection(): UseChatSelectionResult {
   const toggleSessionsExpanded = useCallback((): void => {
     setSessionsExpanded(!sessionsExpanded);
   }, [sessionsExpanded, setSessionsExpanded]);
+
+  const setConversationId = useCallback((id: string | null) => {
+    setConversationIdState(id);
+    setViewingRunId(null);
+    setSelectedCitationId(null);
+    setSourcesOpen(false);
+  }, []);
 
   return {
     conversationId,
@@ -60,5 +78,9 @@ export function useChatSelection(): UseChatSelectionResult {
     setSourcesOpen,
     detailsOpen,
     setDetailsOpen,
+    viewingRunId,
+    setViewingRunId,
+    selectedCitationId,
+    setSelectedCitationId,
   };
 }

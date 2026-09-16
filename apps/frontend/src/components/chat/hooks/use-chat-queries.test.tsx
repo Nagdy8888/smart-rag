@@ -4,6 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import {
+  fetchCitationDetail,
+  fetchConversationMessages,
+  listCitations,
+} from "../../../lib/api";
 import { SessionProvider } from "../../../lib/auth/session-provider";
 import { sessionQueryKeys } from "../../../lib/query-keys";
 import { useChatQueries } from "./use-chat-queries";
@@ -66,6 +71,9 @@ vi.mock("../../../lib/api", async () => {
       usage_rows: 0,
     })),
     listCitations: vi.fn(async () => []),
+    fetchCitationDetail: vi.fn(async () => {
+      throw new Error("citation detail should not prefetch");
+    }),
   };
 });
 
@@ -95,5 +103,129 @@ describe("useChatQueries", () => {
       );
     });
     expect(JSON.stringify(result.current.keys)).not.toContain("jwt-token");
+  });
+
+  it("does not fetch citation detail for transcript rows", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>
+        <SessionProvider>{children}</SessionProvider>
+      </QueryClientProvider>
+    );
+    vi.mocked(fetchConversationMessages).mockResolvedValue({
+      items: [
+        {
+          message_id: "a1",
+          role: "assistant",
+          content: "one",
+          created_at: "t1",
+          run_id: "run-a",
+          citation_count: 2,
+        },
+        {
+          message_id: "a2",
+          role: "assistant",
+          content: "two",
+          created_at: "t2",
+          run_id: "run-b",
+          citation_count: 1,
+        },
+        {
+          message_id: "a3",
+          role: "assistant",
+          content: "three",
+          created_at: "t3",
+          run_id: "run-c",
+          citation_count: 3,
+        },
+      ],
+      next_before_id: null,
+    });
+    renderHook(
+      () =>
+        useChatQueries({
+          accessToken: "jwt-token",
+          conversationId: "conv-1",
+          runId: null,
+          terminal: false,
+        }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(fetchConversationMessages).toHaveBeenCalled();
+    });
+    expect(fetchCitationDetail).not.toHaveBeenCalled();
+    expect(listCitations).not.toHaveBeenCalled();
+  });
+
+  it("loads one viewing list then one detail only after selection", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>
+        <SessionProvider>{children}</SessionProvider>
+      </QueryClientProvider>
+    );
+    vi.mocked(listCitations).mockResolvedValue([
+      {
+        citation_id: "cite-1",
+        citation_index: 0,
+        chunk_id: "c1",
+        provenance: {},
+        source_unavailable: false,
+      },
+    ]);
+    vi.mocked(fetchCitationDetail).mockResolvedValue({
+      citation_id: "cite-1",
+      citation_index: 0,
+      chunk_id: "c1",
+      provenance: {},
+      source_unavailable: false,
+      evidence_excerpt: "span",
+    });
+    const { rerender } = renderHook(
+      ({
+        viewingRunId,
+        sourcesOpen,
+        selectedCitationId,
+      }: {
+        viewingRunId: string | null;
+        sourcesOpen: boolean;
+        selectedCitationId: string | null;
+      }) =>
+        useChatQueries({
+          accessToken: "jwt-token",
+          conversationId: "conv-1",
+          runId: null,
+          terminal: false,
+          viewingRunId,
+          sourcesOpen,
+          selectedCitationId,
+        }),
+      {
+        wrapper,
+        initialProps: {
+          viewingRunId: "run-hist" as string | null,
+          sourcesOpen: true,
+          selectedCitationId: null as string | null,
+        },
+      },
+    );
+    await waitFor(() => {
+      expect(listCitations).toHaveBeenCalledTimes(1);
+    });
+    expect(fetchCitationDetail).not.toHaveBeenCalled();
+    rerender({
+      viewingRunId: "run-hist",
+      sourcesOpen: true,
+      selectedCitationId: "cite-1",
+    });
+    await waitFor(() => {
+      expect(fetchCitationDetail).toHaveBeenCalledTimes(1);
+    });
+    expect(listCitations).toHaveBeenCalledTimes(1);
   });
 });

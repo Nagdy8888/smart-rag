@@ -14,6 +14,8 @@ import {
   fetchMe,
   fetchMeta,
   listCitations,
+  fetchCitationDetail,
+  submitFeedback,
   fetchConversation,
   listConversations,
   fetchConversationMessages,
@@ -120,6 +122,10 @@ vi.mock("../lib/api", async () => {
       usage_rows: 0,
     })),
     listCitations: vi.fn(async () => []),
+    fetchCitationDetail: vi.fn(async () => {
+      throw new Error("citation detail should not prefetch");
+    }),
+    submitFeedback: vi.fn(async () => ({ feedback_id: "fb-1" })),
     fetchConversationMessages: vi.fn(async () => ({
       items: [],
       next_before_id: null,
@@ -149,6 +155,8 @@ afterEach(() => {
   vi.mocked(fetchMeta).mockResolvedValue(defaultMeta);
   vi.mocked(listConversations).mockResolvedValue([]);
   vi.mocked(listCitations).mockResolvedValue([]);
+  vi.mocked(fetchCitationDetail).mockReset();
+  vi.mocked(submitFeedback).mockClear();
   vi.mocked(fetchConversationMessages).mockResolvedValue({
     items: [],
     next_before_id: null,
@@ -579,7 +587,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
   });
 
-  it("Delete conversation issues DELETE and shows deleted copy", async () => {
+  it("Delete conversation confirms before DELETE and Cancel sends zero requests", async () => {
     const user = userEvent.setup();
     vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
     vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
@@ -589,6 +597,19 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     await user.click(await screen.findByRole("button", { name: "Chat" }));
     await user.click(screen.getByRole("button", { name: "Conversation actions" }));
     await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+    expect(
+      await screen.findByRole("dialog", { name: "Delete conversation?" }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    });
+    expect(deleteCalls).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Delete conversation?" })).toBeNull();
+    expect(deleteCalls).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Conversation actions" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(
       await screen.findByText(
         "Conversation deleted. Reads, resume, and citations are denied. No source text is shown.",
@@ -798,7 +819,7 @@ describe("ChatApp Ask workspace", () => {
     expect(screen.getByTestId("answer-route")).toHaveTextContent("Composite");
     expect(screen.queryByTestId("answer-citations")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Citation 1" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Sources (0)" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sources (0)" })).toBeNull();
     expect(screen.getByTestId("answer-token-usage")).toHaveTextContent(
       "412 prompt · 88 completion",
     );
@@ -1050,7 +1071,7 @@ describe("ChatApp Ask workspace", () => {
     expect(await screen.findByText(MIXED_SCOPE_CLARIFICATION)).toBeInTheDocument();
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("Needs clarification");
     expect(screen.queryByTestId("answer-citations")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sources (0)" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sources (0)" })).toBeNull();
   });
 
   it("exposes labeled Sessions and Conversation regions", async () => {
@@ -1167,6 +1188,123 @@ describe("ChatApp Ask workspace", () => {
         "Continuing this session. Earlier messages are not available in this client.",
       ),
     ).toBeNull();
+  });
+
+  it("restores historical Sources from citation_count without N+1 detail", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(fetchConversationMessages).mockResolvedValue({
+      items: [
+        {
+          message_id: "a1",
+          role: "assistant",
+          content: "Refunds close in 30 days.",
+          created_at: "2026-08-17T00:01:00Z",
+          run_id: "run-hist",
+          citation_count: 2,
+          source_kind: "company_document",
+          citations: [],
+        },
+        {
+          message_id: "u1",
+          role: "user",
+          content: "refunds?",
+          created_at: "2026-08-17T00:00:00Z",
+        },
+      ],
+      next_before_id: null,
+    });
+    vi.mocked(listCitations).mockResolvedValue([
+      {
+        citation_id: "cite-1",
+        citation_index: 0,
+        chunk_id: "c1",
+        provenance: {},
+        source_unavailable: false,
+        document_title: "Policy",
+        pdf_page_number: 3,
+      },
+    ]);
+    vi.mocked(fetchCitationDetail).mockResolvedValue({
+      citation_id: "cite-1",
+      citation_index: 0,
+      chunk_id: "c1",
+      provenance: {},
+      source_unavailable: false,
+      document_title: "Policy",
+      pdf_page_number: 3,
+      evidence_excerpt: "close in 30 days",
+    });
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
+    const turnSources = await screen.findByRole("button", { name: "Sources (2)" });
+    expect(fetchCitationDetail).not.toHaveBeenCalled();
+    await user.click(turnSources);
+    await waitFor(() => {
+      expect(listCitations).toHaveBeenCalledWith(
+        { accessToken: "jwt-token" },
+        "run-hist",
+      );
+    });
+    expect(fetchCitationDetail).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: /Citation 0/ }));
+    await waitFor(() => {
+      expect(fetchCitationDetail).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("posts reload feedback to the settled transcript run, not a reconnect pointer", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    sessionStorage.setItem(
+      CHAT_RUN_POINTER_KEY,
+      JSON.stringify({
+        conversationId: "conv-1",
+        runId: "run-reconnect",
+        lastSequence: 4,
+      }),
+    );
+    vi.mocked(fetchConversationMessages).mockResolvedValue({
+      items: [
+        {
+          message_id: "a1",
+          role: "assistant",
+          content: "Settled answer.",
+          created_at: "2026-08-17T00:01:00Z",
+          run_id: "run-settled",
+          citation_count: 0,
+        },
+        {
+          message_id: "u1",
+          role: "user",
+          content: "hello",
+          created_at: "2026-08-17T00:00:00Z",
+        },
+      ],
+      next_before_id: null,
+    });
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
+    await user.click(await screen.findByRole("button", { name: "Give feedback" }));
+    await user.click(screen.getByRole("button", { name: "Submit feedback" }));
+    await waitFor(() => {
+      expect(submitFeedback).toHaveBeenCalledWith(
+        { accessToken: "jwt-token" },
+        "run-settled",
+        true,
+        "helpful answer",
+        null,
+      );
+    });
+    expect(submitFeedback).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "run-reconnect",
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it("shows Generating then Verifying then inserts the verified answer without a caret", async () => {

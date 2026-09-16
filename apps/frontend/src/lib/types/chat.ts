@@ -22,9 +22,13 @@ export type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
   created_at: string;
-  /** Owning run when the message was persisted with a citation batch. */
+  /** Owning run when the message and run share creator/conversation. */
   run_id?: string | null;
-  /** ACL-rechecked citations for this message. Never fetched N+1 from history. */
+  /** Persisted citation rows for that run, clamped 0..50. */
+  citation_count?: number;
+  /** `company_document`, `web`, or null when mixed/none. */
+  source_kind?: "company_document" | "web" | null;
+  /** Always empty on the list path. Excerpts use citation detail. */
   citations?: CitationResponse[];
 };
 
@@ -80,6 +84,8 @@ export type CitationResponse = {
   pdf_page_number?: number | null;
   /** Exact supporting span. Top-level only; never read from provenance. */
   evidence_excerpt?: string | null;
+  /** HTTPS Web locator from citation detail. Company rows omit this. */
+  source_url?: string | null;
 };
 
 export const ANSWER_ORIGINS = [

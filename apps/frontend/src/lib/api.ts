@@ -57,7 +57,7 @@ export {
   generateConversationTitle,
   listConversations,
 } from "./api/chat";
-export { cancelRun, listCitations, parseCitationItem, submitFeedback } from "./api/chat-run";
+export { cancelRun, fetchCitationDetail, listCitations, parseCitationItem, parseHttpsSourceUrl, submitFeedback } from "./api/chat-run";
 export { deleteDocument, fetchDocument, fetchVersionStatus, listDocuments, type DocumentFetchResult } from "./api/documents";
 export {
   enqueueWebsiteCrawl,

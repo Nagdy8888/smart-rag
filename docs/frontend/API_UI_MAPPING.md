@@ -214,7 +214,7 @@ source-preview/download HTTP route.
 | POST | `/runs/{run_id}/cancel` | creator |
 | GET | `/runs/{run_id}/events` | Bearer SSE resume |
 | GET | `/runs/{run_id}/citations` | `citation_id`, `citation_index`, `chunk_id?`, typed `document_title`/`pdf_page_number`, optional ACL-safe `evidence_excerpt`, `provenance` without snippets, `source_unavailable` |
-| GET | `/runs/{run_id}/citations/{citation_id}` | one owned citation; company excerpt after live ACL/current-version recheck (1–1000); Web excerpt/URL only for fragment-free HTTPS; unavailable omits excerpt |
+| GET | `/runs/{run_id}/citations/{citation_id}` | one owned citation; company excerpt after live ACL/current-version recheck (1–1000); Web excerpt/URL only for fragment-free HTTPS; unavailable omits excerpt. Ask fetches this only after the user selects a chip. Transcript rows never N+1 this path |
 | POST | `/runs/{run_id}/feedback` | `thumbs_up`, `tag` (exact catalog), `comment?` |
 
 Feedback tags (byte-for-byte). Thumbs up: `helpful answer`,

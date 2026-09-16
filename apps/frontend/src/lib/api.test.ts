@@ -39,6 +39,8 @@ import {
   fetchRun,
   fetchConversation,
   fetchConversationMessages,
+  fetchCitationDetail,
+  parseHttpsSourceUrl,
   submitFeedback,
   createPdfEvalCase,
   comparePdfEvalRun,
@@ -1739,7 +1741,7 @@ describe("listCitations without snippets", () => {
 });
 
 describe("fetchConversationMessages citations", () => {
-  it("parses message run_id and citations without N+1 fields", async () => {
+  it("parses message run_id and citation_count without list excerpts", async () => {
     const fetchImpl: typeof fetch = async (input) => {
       expect(String(input)).toContain("/conversations/conv-1/messages");
       return new Response(
@@ -1751,6 +1753,8 @@ describe("fetchConversationMessages citations", () => {
               content: "Refunds close in 30 days.",
               created_at: "2026-09-15T00:00:00Z",
               run_id: "run-1",
+              citation_count: 1,
+              source_kind: "company_document",
               citations: [
                 {
                   citation_id: "cite-1",
@@ -1778,11 +1782,43 @@ describe("fetchConversationMessages citations", () => {
       fetchImpl,
     );
     expect(page.items[0]?.run_id).toBe("run-1");
-    expect(page.items[0]?.citations?.[0]?.pdf_page_number).toBe(25);
-    expect(page.items[0]?.citations?.[0]?.evidence_excerpt).toBe(
-      "close in 30 days",
-    );
+    expect(page.items[0]?.citation_count).toBe(1);
+    expect(page.items[0]?.source_kind).toBe("company_document");
+    expect(page.items[0]?.citations).toEqual([]);
+    expect(page.items[0]).not.toHaveProperty("evidence_excerpt");
     expect(JSON.stringify(page)).not.toContain("NESTED");
+  });
+});
+
+describe("fetchCitationDetail", () => {
+  it("keeps HTTPS source_url and drops http, userinfo, and fragments", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      expect(String(input)).toContain("/runs/run-1/citations/cite-1");
+      return new Response(
+        JSON.stringify({
+          citation_id: "cite-1",
+          citation_index: 0,
+          chunk_id: null,
+          source_kind: "web",
+          source_url: "https://example.test/brief",
+          evidence_excerpt: "public span",
+          provenance: { title: "Brief" },
+          source_unavailable: false,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+    const detail = await fetchCitationDetail(
+      { accessToken: "jwt-token" },
+      "run-1",
+      "cite-1",
+      fetchImpl,
+    );
+    expect(detail.source_url).toBe("https://example.test/brief");
+    expect(detail.evidence_excerpt).toBe("public span");
+    expect(parseHttpsSourceUrl("http://example.test/brief")).toBeNull();
+    expect(parseHttpsSourceUrl("https://user:pass@example.test/brief")).toBeNull();
+    expect(parseHttpsSourceUrl("https://example.test/brief#frag")).toBeNull();
   });
 });
 

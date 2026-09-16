@@ -56,6 +56,7 @@ describe("overlaySettledTurns", () => {
       ["user", "hi"],
       ["assistant", "Hello! How can I assist you today?"],
     ]);
+    expect(overlay[1]?.run_id).toBe("run-1");
   });
 
   it("keeps later live answers when sending the next question", () => {
