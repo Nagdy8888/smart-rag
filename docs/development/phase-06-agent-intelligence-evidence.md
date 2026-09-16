@@ -82,6 +82,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-53 — Run-linked transcript citations (2026-09-16) | [phase-06/p06-53-run-linked-transcript-2026-09-16.md](./phase-06/p06-53-run-linked-transcript-2026-09-16.md) | 111 |
 | P06-54 — Restore frontend citations, feedback, and delete safety (2026-09-16) | [phase-06/p06-54-restore-frontend-state-2026-09-16.md](./phase-06/p06-54-restore-frontend-state-2026-09-16.md) | 90 |
 | P06-55 — Postgres reconnect, idle SSE retirement, and query readiness (2026-09-16) | [phase-06/p06-55-postgres-readiness-2026-09-16.md](./phase-06/p06-55-postgres-readiness-2026-09-16.md) | 96 |
+| P06-56 — Host-worker parser topology and Exa lifecycle (2026-09-16) | [phase-06/p06-56-worker-async-lifecycle-2026-09-16.md](./phase-06/p06-56-worker-async-lifecycle-2026-09-16.md) | 85 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

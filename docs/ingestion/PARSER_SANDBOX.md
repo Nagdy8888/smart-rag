@@ -2,7 +2,7 @@
 title: Parser sandbox fail-closed
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-08-19
+last-reviewed: 2026-09-16
 audience: engineering, security, ops
 ---
 
@@ -39,6 +39,25 @@ Worker start fails when Docker is unavailable and in-process is not permitted.
 If in-process would be used, the worker also refuses to start when
 `SUPABASE_STORAGE_ADMIN_SECRET` is set.
 
+Laptop ingest uses the host launcher
+`scripts/ops/run_laptop_ingest_worker.py` because the distroless Compose
+`worker` has no Docker CLI. That Compose service stays behind the
+non-default `compose-worker` profile. Default `.\scripts\dev.ps1` builds
+the parser image with `parser-build`, starts sidecars plus packet8
+loopback ports, and records gitignored PID/start-time metadata. Parser
+containers remain `docker run --network none`, non-root, read-only, and
+secret-free. The Compose `parser-sandbox` service uses `network_mode:
+none`.
+
+```mermaid
+flowchart LR
+  dev[dev.ps1] --> parserBuild["profile parser-build"]
+  dev --> compose["api frontend paradedb valkey clamav crawl-proxy"]
+  dev --> host["host run_laptop_ingest_worker.py"]
+  host --> sandbox["docker run --network none"]
+  composeWorker["profile compose-worker"] -.->|not default| distroless[distroless worker]
+```
+
 ## Input path and ZIP bombs
 
 Sandbox host files are always named `input.bin`. Original filenames are format
@@ -56,7 +75,7 @@ parent-traversing member names fail closed. Timed-out containers are
 ## Verification
 
 ```bash
-uv run pytest tests/unit/test_parser_sandbox.py tests/contract/test_parser_sandbox.py tests/contract/test_privileged_secrets_absent.py -q
+uv run pytest tests/unit/test_parser_sandbox.py tests/contract/test_parser_sandbox.py tests/contract/test_compose_topology.py tests/contract/test_privileged_secrets_absent.py -q
 ```
 
 ## Failure modes

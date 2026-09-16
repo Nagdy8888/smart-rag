@@ -2,7 +2,7 @@
 title: Local setup
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-16
 audience: engineering
 ---
 
@@ -31,8 +31,15 @@ flowchart LR
    `LANGGRAPH_CHECKPOINT_URL`, and `LIGHTRAG_DB_URL` into `.env.compose`
    without printing secrets. Also set `NEXT_PUBLIC_SUPABASE_URL` and
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` before building the frontend image.
-5. Run `.\scripts\dev.ps1`. It starts Compose sidecars only and fails
-   closed if hosted names are missing. Then run `.\scripts\verify-local.ps1`.
+5. Run `.\scripts\dev.ps1`. It validates `.env.compose` names without
+   printing values, builds `smart-rag-parser-sandbox:local` with profile
+   `parser-build`, starts ParadeDB, both Valkeys, ClamAV, crawl-proxy,
+   api, and frontend via base plus packet8 loopback binds, then launches
+   `scripts/ops/run_laptop_ingest_worker.py` with gitignored logs and
+   PID/start-time metadata. It does not start the distroless Compose
+   `worker`. Then run `.\scripts\verify-local.ps1`. `.\scripts\stop.ps1`
+   stops that host PID only when command line and start time match this
+   launcher.
    Do not leave a loopback `SUPABASE_URL` in `.env` while Compose is running.
    That value wins interpolation over `.env.compose`, so Ask returns 401
    `unauthorized` after a hosted sign-in.
@@ -47,7 +54,8 @@ flowchart LR
    URL. Select `query_studio`. See [LANGGRAPH_STUDIO.md](./LANGGRAPH_STUDIO.md).
 
 `dev.ps1` fails closed without hosted `.env.compose`. `stop.ps1` stops
-Compose only.
+the matching host ingest worker PID, then Compose. Unrelated PIDs are
+left untouched.
 
 The optional PDF evaluation workspace (`PDF_EVAL_WORKSPACE_ENABLED`,
 local Compose default `true`) uses hosted quiz RPCs through `app_api`.

@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 56
-status: pending
+status: complete
 title: "Use the approved local host-worker parser topology and prove sequential Exa runs without cross-loop cleanup errors."
 requirement_ids: [P06-56]
 ---

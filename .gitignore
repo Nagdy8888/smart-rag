@@ -68,6 +68,7 @@ test-results/
 
 # Docker / local data volumes dumps
 *.log
+logs/*.meta.json
 
 # Terraform local state (reviewed *.tf stays committed)
 **/.terraform/

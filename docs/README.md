@@ -55,7 +55,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [development/phase-06-query-agent-cleanup-baseline.md](./development/phase-06-query-agent-cleanup-baseline.md) | engineering-lead | draft | 2026-08-26 | eng, reviewers |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-08-18 | eng |
+| [architecture/02-containers.md](./architecture/02-containers.md) | engineering-lead | draft | 2026-09-16 | eng |
 | [architecture/03-components.md](./architecture/03-components.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [architecture/04-deployment.md](./architecture/04-deployment.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [architecture/05-database-connections.md](./architecture/05-database-connections.md) | engineering-lead | proven | 2026-09-16 | eng, ops |
@@ -89,7 +89,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [development/LANGSMITH_TRACING.md](./development/LANGSMITH_TRACING.md) | engineering-lead | draft | 2026-08-27 | eng, ops, security |
 | [development/LANGGRAPH_STUDIO.md](./development/LANGGRAPH_STUDIO.md) | engineering-lead | draft | 2026-08-25 | eng |
 | [development/RISK_REGISTER.md](./development/RISK_REGISTER.md) | engineering-lead | draft | 2026-08-12 | eng, client |
-| [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-09-13 | eng |
+| [development/LOCAL_SETUP.md](./development/LOCAL_SETUP.md) | engineering-lead | draft | 2026-09-16 | eng |
 | [development/WORKSPACE_BOUNDARIES.md](./development/WORKSPACE_BOUNDARIES.md) | engineering-lead | draft | 2026-08-12 | eng |
 | [development/QUALITY_COMMANDS.md](./development/QUALITY_COMMANDS.md) | engineering-lead | draft | 2026-08-25 | eng |
 | [development/hybrid-pdf-accuracy-remediation.md](./development/hybrid-pdf-accuracy-remediation.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
@@ -141,10 +141,10 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [retrieval/PROHIBITED_V1_METHODS.md](./retrieval/PROHIBITED_V1_METHODS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [ingestion/CHUNKING_CONTRACT.md](./ingestion/CHUNKING_CONTRACT.md) | engineering-lead | accepted | 2026-09-15 | eng |
-| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-10 | eng, ops |
+| [ingestion/INGESTION_LIMITS.md](./ingestion/INGESTION_LIMITS.md) | engineering-lead | draft | 2026-09-16 | eng, ops |
 | [ingestion/JOB_STATE_MACHINE.md](./ingestion/JOB_STATE_MACHINE.md) | engineering-lead | draft | 2026-08-27 | eng |
 | [ingestion/SCAN_BEFORE_INDEX.md](./ingestion/SCAN_BEFORE_INDEX.md) | engineering-lead | draft | 2026-08-19 | eng, security |
-| [ingestion/PARSER_SANDBOX.md](./ingestion/PARSER_SANDBOX.md) | engineering-lead | draft | 2026-08-19 | eng, security, ops |
+| [ingestion/PARSER_SANDBOX.md](./ingestion/PARSER_SANDBOX.md) | engineering-lead | draft | 2026-09-16 | eng, security, ops |
 | [runbooks/CLAMAV_SCAN_AND_PROMOTION.md](./runbooks/CLAMAV_SCAN_AND_PROMOTION.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [ingestion/CRAWL_POLICY.md](./ingestion/CRAWL_POLICY.md) | engineering-lead | draft | 2026-08-19 | eng, security |
 | [runbooks/CRAWL_EGRESS_AND_PROXY.md](./runbooks/CRAWL_EGRESS_AND_PROXY.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
@@ -172,7 +172,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [runbooks/alert-routing.md](./runbooks/alert-routing.md) | engineering-lead | draft | 2026-08-18 | eng, ops, security |
 | [runbooks/storage-db-reconciliation.md](./runbooks/storage-db-reconciliation.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [runbooks/bm25-rebuild.md](./runbooks/bm25-rebuild.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
-| [runbooks/demo-local-ingest-aws-ask.md](./runbooks/demo-local-ingest-aws-ask.md) | engineering-lead | draft | 2026-08-25 | eng, ops |
+| [runbooks/demo-local-ingest-aws-ask.md](./runbooks/demo-local-ingest-aws-ask.md) | engineering-lead | draft | 2026-09-16 | eng, ops |
 | [datasets/MovieSummaries/DEMO_SLICES.md](./datasets/MovieSummaries/DEMO_SLICES.md) | engineering-lead | draft | 2026-08-19 | eng, ops |
 | [runbooks/instance-rebuild.md](./runbooks/instance-rebuild.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [security/OPENAI_DATA_GOVERNANCE.md](./security/OPENAI_DATA_GOVERNANCE.md) | product-owner | accepted | 2026-09-10 | client, security |

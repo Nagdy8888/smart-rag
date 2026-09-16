@@ -104,7 +104,7 @@ Packets P06-09 through P06-57 are additive after the completed historical packet
 53. [x] [Add additive transcript-v2 run metadata and ACL-safe bounded citation-detail contracts.](./06-phase-agent-intelligence/packets/53-run-linked-transcript.md)
 54. [x] [Restore per-turn citations and feedback after reload and add accessible conversation deletion confirmation.](./06-phase-agent-intelligence/packets/54-restore-frontend-state.md)
 55. [x] [Add bounded transient reconnect behavior, stale SSE connection retirement, and honest query-runtime readiness.](./06-phase-agent-intelligence/packets/55-postgres-readiness.md)
-56. [ ] [Use the approved local host-worker parser topology and prove sequential Exa runs without cross-loop cleanup errors.](./06-phase-agent-intelligence/packets/56-worker-async-lifecycle.md)
+56. [x] [Use the approved local host-worker parser topology and prove sequential Exa runs without cross-loop cleanup errors.](./06-phase-agent-intelligence/packets/56-worker-async-lifecycle.md)
 57. [ ] [Run full deterministic/live/browser gates and existing P06-17 development/qualification without opening holdout.](./06-phase-agent-intelligence/packets/57-integrated-qualification.md)
 
 ## Approved planned deviation: general-chat strict split

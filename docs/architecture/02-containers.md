@@ -2,7 +2,7 @@
 title: C4 — Containers
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-07
+last-reviewed: 2026-09-16
 audience: engineering
 ---
 
@@ -15,25 +15,25 @@ flowchart TB
   subgraph edge ["edge network"]
     fe["frontend:3000"]
     api["api:8000"]
-    workerEdge["worker no host port"]
   end
   subgraph private ["private internal network"]
-    pdb["paradedb no host port"]
+    pdb["paradedb no host port in base compose"]
     vl["valkey-limits"]
     vc["valkey-cache"]
     cp["crawl-proxy"]
-    workerPriv["worker"]
   end
+  hostWorker["host run_laptop_ingest_worker.py"]
   fe --> api
   api --> pdb
   api --> vl
   api --> vc
-  workerPriv --> pdb
-  workerPriv --> cp
-  workerEdge --> cloudDb["CloudSupabase Auth and Postgres"]
+  hostWorker --> pdb
+  hostWorker --> cp
+  hostWorker --> cloudDb["CloudSupabase Auth and Postgres"]
+  api --> cloudDb
 ```
 
-Published developer ports only: frontend and API. ParadeDB, both Valkey instances, ClamAV, crawl-proxy, and the worker have **no host ports** in `docker-compose.yml`. Auth/Postgres/Storage are the cloud project; Compose `private` is `internal: true` and cannot route to the Docker host gateway.
+Published developer ports only: frontend and API. ParadeDB, both Valkey instances, ClamAV, crawl-proxy, and the distroless Compose `worker` have **no host ports** in `docker-compose.yml`. The Compose `worker` is behind the non-default `compose-worker` profile because it cannot launch `--network none` parser containers. Local ingest uses `scripts/ops/run_laptop_ingest_worker.py`. Auth/Postgres/Storage are the cloud project; Compose `private` is `internal: true` and cannot route to the Docker host gateway.
 
 Application images use a split base: CPython services build on official
 `python:3.11-slim-trixie` and copy onto `gcr.io/distroless/cc-debian13:nonroot`
@@ -56,7 +56,7 @@ flowchart TD
   builder --> runtime
 ```
 
-Packet 8 local proof uses the optional overlay [`docker-compose.packet8.yml`](../../docker-compose.packet8.yml). It attaches ClamAV and ParadeDB to a non-internal `packet8-host` bridge and publishes ClamAV `:13310`, ParadeDB `:54329`, and crawl-proxy `:18080` so host pytest can reach them. The default `private` network stays `internal: true`. Do not apply that overlay in staging or production.
+Packet 8 local proof uses the optional overlay [`docker-compose.packet8.yml`](../../docker-compose.packet8.yml). It attaches ClamAV and ParadeDB to a non-internal `packet8-host` bridge and publishes ClamAV `127.0.0.1:13310`, ParadeDB `127.0.0.1:54329`, and crawl-proxy `127.0.0.1:18080` so the host worker and host pytest can reach them. The default `private` network stays `internal: true`. Do not apply that overlay in staging or production.
 
 ## Staging / production (Packet 1 IaC)
 

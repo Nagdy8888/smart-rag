@@ -316,3 +316,26 @@ def test_parser_package_init_is_sandbox_importable() -> None:
     assert not any("service" in name for name in imported)
     assert not any("governance" in name for name in imported)
     assert not any("jwks" in name for name in imported)
+
+
+def test_unrelated_pid_does_not_match_host_worker_identity() -> None:
+    """Stop/verify must not kill a reused PID that is not this launcher."""
+
+    from scripts.ops.run_laptop_ingest_worker import (
+        LAUNCHER_PATH,
+        WorkerProcessIdentity,
+        identities_match,
+    )
+
+    recorded = WorkerProcessIdentity(
+        pid=4242,
+        start_time="2026-09-16T12:00:00.0000000Z",
+        command_line=f"uv run python {LAUNCHER_PATH}",
+    )
+    reused = WorkerProcessIdentity(
+        pid=4242,
+        start_time="2026-09-16T12:05:00.0000000Z",
+        command_line="uv run python other_tool.py",
+    )
+    assert identities_match(recorded, recorded) is True
+    assert identities_match(recorded, reused) is False

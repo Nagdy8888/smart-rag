@@ -2,6 +2,10 @@
 <#
 .SYNOPSIS
   Verify Phase 1 local foundation health without claiming later-phase readiness.
+.DESCRIPTION
+  Requires the host ingest worker started by ``scripts/dev.ps1``, the
+  parser sandbox image, and Compose sidecars. Does not exec the
+  distroless Compose worker.
 #>
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -14,7 +18,7 @@ $EnvFile = if (Test-Path "$Root\.env.compose") {
   throw "No Compose environment file found. Run .\scripts\dev.ps1 first."
 }
 
-Write-Host "Using env file: $EnvFile"
+Write-Host "Using env file names from: $EnvFile"
 
 function Assert-HttpOk([string]$Url, [string]$ExpectSubstring) {
   $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 15
@@ -49,15 +53,51 @@ function Assert-ValkeyPolicy(
   Write-Host "OK $Service authenticated with $ExpectedPolicy policy"
 }
 
+$image = docker image inspect smart-rag-parser-sandbox:local 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $image) {
+  throw "Parser sandbox image smart-rag-parser-sandbox:local is missing. Run .\scripts\dev.ps1."
+}
+Write-Host "OK parser sandbox image"
+
+$metaPath = Join-Path $Root "logs\laptop-ingest-worker.meta.json"
+$logPath = Join-Path $Root "logs\laptop-ingest-worker.log"
+$errPath = Join-Path $Root "logs\laptop-ingest-worker.err.log"
+$launcher = "scripts/ops/run_laptop_ingest_worker.py"
+if (-not (Test-Path $metaPath)) {
+  throw "Host ingest worker is absent (missing logs/laptop-ingest-worker.meta.json)."
+}
+$meta = Get-Content $metaPath -Raw | ConvertFrom-Json
+$workerPid = [int]$meta.pid
+$live = Get-Process -Id $workerPid -ErrorAction SilentlyContinue
+if (-not $live) {
+  throw ("Host ingest worker pid={0} is absent." -f $workerPid)
+}
+$liveStart = $live.StartTime.ToUniversalTime().ToString("o")
+$liveCmd = (Get-CimInstance Win32_Process -Filter ("ProcessId={0}" -f $workerPid)).CommandLine
+if ($liveStart -ne [string]$meta.start_time -or ($liveCmd -notlike "*$launcher*")) {
+  throw ("Host ingest worker pid={0} does not match this repository launcher." -f $workerPid)
+}
+Write-Host ("OK host ingest worker pid={0}" -f $workerPid)
+
+foreach ($path in @($logPath, $errPath)) {
+  if (Test-Path $path) {
+    $sandboxFail = Select-String -Path $path -Pattern "parser_sandbox_docker_required" -SimpleMatch -ErrorAction SilentlyContinue
+    if ($sandboxFail) {
+      throw "Host ingest worker logs contain parser_sandbox_docker_required."
+    }
+  }
+}
+Write-Host "OK host ingest worker logs omit parser_sandbox_docker_required"
+
 # Published endpoints
 Assert-HttpOk "http://127.0.0.1:8000/health/live" "live"
 Assert-HttpOk "http://127.0.0.1:8000/health/ready" "unconfigured"
 Assert-HttpOk "http://127.0.0.1:3000" "Smart RAG"
 
-# Private ports must not be published
-$ports = docker compose --env-file $EnvFile ps --format json | ConvertFrom-Json
-$private = @("paradedb", "valkey-limits", "valkey-cache", "crawl-proxy")
-foreach ($name in $private) {
+# Valkey must not publish host ports. Packet8 loopback-only publish is
+# allowed for ParadeDB, ClamAV, and crawl-proxy.
+$ports = docker compose --env-file $EnvFile -f docker-compose.yml -f docker-compose.packet8.yml ps --format json | ConvertFrom-Json
+foreach ($name in @("valkey-limits", "valkey-cache")) {
   $svc = $ports | Where-Object { $_.Service -eq $name -or $_.Name -match $name }
   if (-not $svc) { throw "Required private service missing from Compose: $name" }
   $publish = @($svc.Publishers)
@@ -66,6 +106,20 @@ foreach ($name in $private) {
     throw "Private service $name has published ports: $($hostPublished | ConvertTo-Json -Compress)"
   }
   Write-Host "OK private (no host publish): $name"
+}
+foreach ($name in @("paradedb", "clamav", "crawl-proxy")) {
+  $svc = $ports | Where-Object { $_.Service -eq $name -or $_.Name -match $name }
+  if (-not $svc) { throw "Required packet8 service missing from Compose: $name" }
+  $publish = @($svc.Publishers)
+  foreach ($item in $publish) {
+    if ($item.PublishedPort -and ([int]$item.PublishedPort) -gt 0) {
+      $bind = [string]$item.URL
+      if ($bind -and $bind -notmatch "^127\.0\.0\.1") {
+        throw "Packet8 service $name published off loopback: $bind"
+      }
+    }
+  }
+  Write-Host "OK packet8 loopback publish: $name"
 }
 
 # Authenticated Valkey behavior and independent eviction policies
@@ -88,8 +142,8 @@ except urllib.error.HTTPError as e:
 if ($deny.Trim() -ne "403") { throw "crawl proxy did not deny: $deny" }
 Write-Host "OK crawl-proxy deny-by-default"
 
-# Non-root application users
-foreach ($service in @("api", "worker", "frontend")) {
+# Non-root application users (host worker is not a Compose service)
+foreach ($service in @("api", "frontend")) {
   $user = docker compose --env-file $EnvFile exec -T $service id -u
   if ($user.Trim() -ne "10001") { throw "$service not running as uid 10001: $user" }
   Write-Host "OK $service non-root uid 10001"
