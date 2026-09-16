@@ -8,6 +8,7 @@ import psycopg
 from pydantic import BaseModel, ConfigDict, Field
 from smart_rag_core.runtime.valkey import ValkeyClient, ValkeyTimeoutError
 from smart_rag_core.settings import BackendSettings
+from smart_rag_core.settings.postgres_connect import connect_postgres
 from smart_rag_core.settings.postgres_dsn import TransactionPoolerDsnError
 
 
@@ -32,10 +33,11 @@ class ReadinessResponse(BaseModel):
         status: ``unconfigured``, ``not_ready``, ``degraded``, or ``ready``.
         query_ready: True only when the core Hybrid query path, durable
             checkpointer/store, Valkey, and real models are healthy. Mock
-            mode never sets this true. Missing LightRAG is a typed
-            degraded dependency and does not clear ``query_ready``.
-            ParadeDB down is reported but does not block ``query_ready``;
-            Hybrid then degrades to dense+term.
+            mode never sets this true. ``query_ready`` also requires
+            query-runtime warmup and a ready run-event store. Missing
+            LightRAG is a typed degraded dependency and does not clear
+            ``query_ready``. ParadeDB down is reported but does not
+            block ``query_ready``; Hybrid then degrades to dense+term.
         detail: Short operator-facing reason.
         rate_limit_degraded: True while the emergency limiter is still
             in use. Cleared after Valkey probes succeed again.
@@ -64,11 +66,34 @@ def _probe_postgres(url: str | None) -> str:
     if url is None:
         return "unconfigured"
     try:
-        with psycopg.connect(url, connect_timeout=1) as connection:
+        with connect_postgres(url, connect_timeout=1) as connection:
             connection.execute("SELECT 1")
-    except psycopg.Error:
+    except (psycopg.Error, OSError, TimeoutError, ConnectionError):
         return "down"
     return "ok"
+
+
+def _probe_run_event_store(store: object | None, url: str | None) -> str:
+    """Probe the SSE run-event store without leaking exception text.
+
+    Args:
+        store: Bound store, or None when Ask has not opened one yet.
+        url: Optional ``app_api`` DSN used when the store is unbound.
+
+    Returns:
+        ``unconfigured``, ``ok``, or ``down``.
+    """
+
+    if store is not None:
+        probe = getattr(store, "probe", None)
+        if callable(probe):
+            try:
+                probe()
+            except Exception:
+                return "down"
+            return "ok"
+        return "down"
+    return _probe_postgres(url)
 
 
 def _probe_paradedb(url: str | None) -> str:
@@ -138,6 +163,9 @@ def build_readiness(
     postgres_probe: str | None = None,
     paradedb_probe: str | None = None,
     checkpoint_probe: str | None = None,
+    query_runtime_warmed: bool = False,
+    run_event_store_ready: bool | None = None,
+    run_event_store: object | None = None,
 ) -> ReadinessResponse:
     """Compose an honest readiness document.
 
@@ -152,13 +180,17 @@ def build_readiness(
         paradedb_probe: Optional precomputed ParadeDB probe for tests.
         checkpoint_probe: Optional precomputed checkpointer/store probe
             for tests.
+        query_runtime_warmed: True after Hybrid/checkpointer/graph warmup.
+        run_event_store_ready: Optional precomputed event-store flag.
+        run_event_store: Bound store probed when the flag is omitted.
 
     Returns:
         Readiness payload. ``query_ready`` is true when the core Hybrid
-        path, durable checkpointer/store, Valkey, and real models are
-        usable. Mock mode never sets it true. Missing LightRAG degrades
-        graph but does not clear ``query_ready``. ParadeDB ``down`` is
-        visible and does not by itself clear ``query_ready``.
+        path, durable checkpointer/store, Valkey, real models, query
+        warmup, and the run-event store are usable. Mock mode never
+        sets it true. Missing LightRAG degrades graph but does not
+        clear ``query_ready``. ParadeDB ``down`` is visible and does
+        not by itself clear ``query_ready``.
     """
 
     if settings is None:
@@ -172,6 +204,8 @@ def build_readiness(
                 DependencyStatus(name="valkey_cache", status="unconfigured"),
                 DependencyStatus(name="paradedb", status="unconfigured"),
                 DependencyStatus(name="langgraph_checkpoint", status="unconfigured"),
+                DependencyStatus(name="query_runtime", status="unconfigured"),
+                DependencyStatus(name="run_event_store", status="unconfigured"),
                 DependencyStatus(name="model_gateway", status="unconfigured"),
                 DependencyStatus(name="lightrag", status="unconfigured"),
             ),
@@ -206,12 +240,21 @@ def build_readiness(
     cache = _probe_valkey(valkey_cache)
     model = "mock" if settings.mock_model_mode else "ok"
     graph = "attached" if lightrag_attached else "unconfigured"
+    query_runtime = "ok" if query_runtime_warmed else "down"
+    if run_event_store_ready is True:
+        event_store = "ok"
+    elif run_event_store_ready is False:
+        event_store = "down"
+    else:
+        event_store = _probe_run_event_store(run_event_store, db_url)
     dependencies = (
         DependencyStatus(name="database", status=database),
         DependencyStatus(name="valkey_limits", status=limits),
         DependencyStatus(name="valkey_cache", status=cache),
         DependencyStatus(name="paradedb", status=paradedb),
         DependencyStatus(name="langgraph_checkpoint", status=checkpoint),
+        DependencyStatus(name="query_runtime", status=query_runtime),
+        DependencyStatus(name="run_event_store", status=event_store),
         DependencyStatus(name="model_gateway", status=model),
         DependencyStatus(name="lightrag", status=graph),
     )
@@ -222,6 +265,8 @@ def build_readiness(
         and limits == "ok"
         and cache == "ok"
         and model == "ok"
+        and query_runtime == "ok"
+        and event_store == "ok"
         and not rate_limit_degraded
     )
     if database == "unconfigured":
@@ -236,6 +281,12 @@ def build_readiness(
     elif checkpoint == "unconfigured":
         status_value = "degraded"
         detail = "Checkpointer DSN unset; query path cannot persist runs."
+    elif query_runtime != "ok":
+        status_value = "not_ready"
+        detail = "Query runtime warmup failed."
+    elif event_store != "ok":
+        status_value = "not_ready"
+        detail = "Run event store probe failed."
     elif query_ready and graph != "attached" and paradedb == "down":
         status_value = "degraded"
         detail = (

@@ -2,7 +2,7 @@
 title: Foundation configuration contract
 owner: engineering-lead
 status: verified
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: developers, operators
 ---
 
@@ -248,7 +248,7 @@ Browser bundles may only contain publishable values. See
 | `NEXT_PUBLIC_SUPABASE_URL` | HTTP origin | public | Browser-direct Auth. Never a service-role URL. Docker image **build-arg**. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | publishable anon key | public | Browser Auth only. Never the service role. Docker image **build-arg**. |
 
-`GET /health/ready` is bounded (Postgres and checkpointer probes use a 1s connect timeout). The browser client aborts the public probe after 8000ms (`HEALTH_READY_TIMEOUT_MS`).
+`GET /health/ready` is bounded (Postgres and checkpointer probes use a 1s connect timeout; Postgres connect retries at most once inside 1.0s for SQLSTATE class `08` or wrapped socket/DNS failures). `query_ready` also requires query-runtime warmup and a ready run-event store. The browser client aborts the public probe after 8000ms (`HEALTH_READY_TIMEOUT_MS`). Public `detail` stays `ok` / `not_query_ready` and never includes DSN or exception text. `/health/live` remains process liveness.
 
 ## Failure and security behavior
 

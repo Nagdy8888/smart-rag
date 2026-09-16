@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 55
-status: pending
+status: complete
 title: "Add bounded transient reconnect behavior, stale SSE connection retirement, and honest query-runtime readiness."
 requirement_ids: [P06-55]
 ---

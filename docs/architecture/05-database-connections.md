@@ -2,7 +2,7 @@
 title: Database connections and pool budgets
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, ops
 phase_packet: Phase 2 Packet 6
 ---
@@ -98,19 +98,31 @@ persist, or conversation RPC.
 Runtime rule: every FastAPI/query `psycopg.connect` that may use
 `API_SUPABASE_DB_URL` / `SUPABASE_DB_URL` must go through
 `smart_rag_core.settings.postgres_connect.connect_postgres`, which sets
-`prepare_threshold=None`. SSE event-store and LangGraph checkpointer already
+`prepare_threshold=None`. The helper retries at most once inside a 1.0s
+budget when SQLSTATE class `08` or a wrapped socket/DNS/connect error
+has no SQLSTATE. The delay is at most 100 ms and never exceeds remaining
+budget. Authentication failures (`28P01`) are not retried. Logs include
+only operation, attempt, and a fixed `transient_connect` reason.
+
+SSE `PostgresRunEventStore` reuses a session idle for less than 60
+seconds, then closes/discards it. Any operation error rolls back
+best-effort, discards the session, and re-raises. Read-only `list_after`
+may retry once before any row is returned. Append and terminal writes
+never auto-replay.
+
+SSE event-store and LangGraph checkpointer already
 disable prepares (`prepare_threshold=None` / `0`). asyncpg LightRAG uses
 `statement_cache_size=0`. Do not add named prepares on pooler DSNs.
 
 ```mermaid
 flowchart LR
-  api["FastAPI / query retrieve"] --> helper["connect_postgres\nprepare_threshold=None"]
+  api["FastAPI / query retrieve"] --> helper["connect_postgres\nprepare_threshold=None\nmax 2 attempts"]
   helper --> pooler["Supavisor txn 6543"]
-  sse["SSE event store"] --> pooler
+  sse["SSE event store\nidle less than 60s"] --> helper
   checkpointer["LangGraph checkpointer"] --> session["Session/direct 5432"]
 ```
 
-Verification: `uv run pytest tests/unit/test_postgres_dsn.py tests/unit/test_hybrid_run.py tests/unit/test_general_chat_generate.py -q`
+Verification: `uv run pytest tests/unit/test_postgres_dsn.py tests/unit/test_hybrid_run.py tests/unit/test_general_chat_generate.py tests/unit/test_query_sse_event_store.py tests/unit/test_readiness.py -q`
 
 ## Role timeouts / work_mem / application_name
 

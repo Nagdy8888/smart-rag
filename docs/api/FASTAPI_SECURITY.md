@@ -51,7 +51,7 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | Method | Path | Caller | Authorization | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/health/live` | public | process up | Async; no dependency probe. Must not wait on readiness threads. |
-| GET | `/health/ready` | public | `{status, query_ready, detail}` only | Coarse `detail` (`ok` / `not_query_ready`). Never names ParadeDB/Valkey/LightRAG/checkpointer. Mock mode keeps `query_ready=false`. Missing LightRAG may still be query-ready when Hybrid is healthy. Clears a stale `rate_limit_degraded` latch when both Valkey probes are `ok`. |
+| GET | `/health/ready` | public | `{status, query_ready, detail}` only | Coarse `detail` (`ok` / `not_query_ready`). Never names ParadeDB/Valkey/LightRAG/checkpointer/query runtime/event store. Never echoes DSN or exception text. Mock mode keeps `query_ready=false`. `query_ready` requires Hybrid deps plus query-runtime warmup and a ready run-event store. Missing LightRAG may still be query-ready when Hybrid is healthy. Clears a stale `rate_limit_degraded` latch when both Valkey probes are `ok`. |
 | GET | `/ops/ready` | owner/admin | named dependency probes | Full operator payload |
 | GET | `/api/meta` | public | handshake fields | Packet 6 enforces `min_client_version`. Additive `web_search_enabled` (default false) never includes keys |
 | GET | `/me` | authenticated | live profile role | Client role claims ignored |

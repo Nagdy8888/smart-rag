@@ -66,7 +66,10 @@ def test_postgres_event_store_reuses_and_closes_session(monkeypatch: Any) -> Non
     connection.commit = _commit
     connection.rollback = _rollback
     connection.close = _close
-    monkeypatch.setattr("smart_rag_core.sse.store.psycopg.connect", _connect)
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
     store = PostgresRunEventStore("postgresql://hosted")
 
     with typed_attr(store, "_transaction")():
@@ -118,3 +121,263 @@ def test_raise_store_error_maps_lock_sqlstates() -> None:
             _CancelError("statement timeout")
         )
     assert cancel_exc.value.reason == "statement_timeout"
+
+
+class _Clock:
+    """Injectable monotonic clock for idle-reuse tests."""
+
+    def __init__(self) -> None:
+        """Start at t=0."""
+
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        """Return the current fake time.
+
+        Returns:
+            Seconds.
+        """
+
+        return self.now
+
+
+def test_postgres_event_store_replaces_connection_after_61s_idle(
+    monkeypatch: Any,
+) -> None:
+    """Idle sessions at or beyond 60 seconds are discarded."""
+
+    calls: list[str] = []
+    connection = SimpleNamespace(closed=False)
+
+    def _execute(statement: str) -> None:
+        """Record SQL.
+
+        Args:
+            statement: SQL statement.
+        """
+
+        calls.append(statement)
+
+    def _commit() -> None:
+        """Record commit."""
+
+        calls.append("COMMIT")
+
+    def _rollback() -> None:
+        """Record rollback."""
+
+        calls.append("ROLLBACK")
+
+    def _close() -> None:
+        """Mark closed."""
+
+        connection.closed = True
+        calls.append("CLOSE")
+
+    def _connect(url: str, **kwargs: object) -> object:
+        """Return the fake connection and mark it open.
+
+        Args:
+            url: DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Fake connection.
+        """
+
+        connection.closed = False
+        calls.append(f"CONNECT {url} PREPARE {kwargs.get('prepare_threshold')}")
+        return connection
+
+    connection.execute = _execute
+    connection.commit = _commit
+    connection.rollback = _rollback
+    connection.close = _close
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
+    clock = _Clock()
+    store = PostgresRunEventStore("postgresql://hosted", monotonic_clock=clock)
+    with typed_attr(store, "_transaction")():
+        pass
+    clock.now = 61.0
+    with typed_attr(store, "_transaction")():
+        pass
+    store.close()
+    assert calls.count("CONNECT postgresql://hosted PREPARE None") == 2
+    assert calls.count("CLOSE") == 2
+
+
+def test_postgres_event_store_discards_on_error_without_append_replay(
+    monkeypatch: Any,
+) -> None:
+    """Operation errors discard the session and never replay append."""
+
+    from uuid import uuid4
+
+    import psycopg
+    from smart_rag_core.security.identity import CallerContext, UserRole
+
+    calls: list[str] = []
+    connect_count = {"n": 0}
+    append_count = {"n": 0}
+    connection = SimpleNamespace(closed=False)
+
+    class _Boom(psycopg.OperationalError):
+        """Transient append failure."""
+
+        @property
+        def sqlstate(self) -> str:
+            """Return class 08 SQLSTATE.
+
+            Returns:
+                ``08006``.
+            """
+
+            return "08006"
+
+    def _execute(statement: str, *_args: object) -> Any:
+        """Fail append_run_event once.
+
+        Args:
+            statement: SQL statement.
+            *_args: Bound parameters.
+
+        Returns:
+            Cursor stand-in.
+
+        Raises:
+            _Boom: When appending.
+        """
+
+        calls.append(statement)
+        if "append_run_event" in statement:
+            append_count["n"] += 1
+            raise _Boom()
+        return SimpleNamespace(fetchone=lambda: None, fetchall=lambda: [])
+
+    def _commit() -> None:
+        """Record commit."""
+
+        calls.append("COMMIT")
+
+    def _rollback() -> None:
+        """Record rollback."""
+
+        calls.append("ROLLBACK")
+
+    def _close() -> None:
+        """Mark closed."""
+
+        connection.closed = True
+        calls.append("CLOSE")
+
+    def _connect(url: str, **kwargs: object) -> object:
+        """Count connects.
+
+        Args:
+            url: DSN.
+            **kwargs: Driver kwargs.
+
+        Returns:
+            Fake connection.
+        """
+
+        connect_count["n"] += 1
+        calls.append(f"CONNECT {url} PREPARE {kwargs.get('prepare_threshold')}")
+        connection.closed = False
+        return connection
+
+    connection.execute = _execute
+    connection.commit = _commit
+    connection.rollback = _rollback
+    connection.close = _close
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        _connect,
+    )
+    store = PostgresRunEventStore("postgresql://hosted")
+    caller = CallerContext(
+        user_id=str(uuid4()),
+        role=UserRole.MEMBER,
+        authorization_version=1,
+    )
+    with pytest.raises(QueryAdmissionError):
+        store.append(
+            caller,
+            run_id=uuid4(),
+            event_type="schema",
+            payload={"sse_schema_version": "1"},
+        )
+    assert append_count["n"] == 1
+    assert connect_count["n"] == 1
+    assert "ROLLBACK" in calls
+    assert "CLOSE" in calls
+    assert store._connection is None
+
+
+def test_postgres_event_store_list_after_retries_before_rows(
+    monkeypatch: Any,
+) -> None:
+    """Read-only replay retries once when no row was returned."""
+
+    from uuid import uuid4
+
+    import psycopg
+    from smart_rag_core.security.identity import CallerContext, UserRole
+
+    list_attempts = {"n": 0}
+    connection = SimpleNamespace(closed=False)
+
+    class _Boom(psycopg.OperationalError):
+        """Transient list failure."""
+
+        @property
+        def sqlstate(self) -> str:
+            """Return class 08 SQLSTATE.
+
+            Returns:
+                ``08006``.
+            """
+
+            return "08006"
+
+    def _execute(statement: str, *_args: object) -> Any:
+        """Fail the first list RPC.
+
+        Args:
+            statement: SQL statement.
+            *_args: Bound parameters.
+
+        Returns:
+            Cursor stand-in.
+
+        Raises:
+            _Boom: First list_run_events_after call.
+        """
+
+        if "list_run_events_after" in statement:
+            list_attempts["n"] += 1
+            if list_attempts["n"] == 1:
+                raise _Boom()
+            return SimpleNamespace(fetchall=lambda: [])
+        return SimpleNamespace(fetchall=lambda: [], fetchone=lambda: None)
+
+    connection.execute = _execute
+    connection.commit = lambda: None
+    connection.rollback = lambda: None
+    connection.close = lambda: setattr(connection, "closed", True)
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.psycopg.connect",
+        lambda url, **kwargs: connection,
+    )
+    store = PostgresRunEventStore("postgresql://hosted")
+    caller = CallerContext(
+        user_id=str(uuid4()),
+        role=UserRole.MEMBER,
+        authorization_version=1,
+    )
+    events = store.list_after(caller, run_id=uuid4(), after=0)
+    assert events == ()
+    assert list_attempts["n"] == 2

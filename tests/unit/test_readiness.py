@@ -23,6 +23,8 @@ def test_unconfigured_readiness_lists_paradedb() -> None:
     names = {item.name: item.status for item in payload.dependencies}
     assert names["paradedb"] == "unconfigured"
     assert names["langgraph_checkpoint"] == "unconfigured"
+    assert names["query_runtime"] == "unconfigured"
+    assert names["run_event_store"] == "unconfigured"
     assert payload.query_ready is False
 
 
@@ -71,6 +73,8 @@ def test_public_readiness_omits_named_dependencies() -> None:
     assert "lightrag" not in serialized
     assert "langgraph" not in serialized
     assert "checkpointer" not in serialized
+    assert "query_runtime" not in serialized
+    assert "run_event_store" not in serialized
     assert "dependencies" not in public
 
 
@@ -93,6 +97,8 @@ def test_public_http_ready_omits_named_dependencies() -> None:
     assert "valkey" not in serialized
     assert "lightrag" not in serialized
     assert "langgraph" not in serialized
+    assert "query_runtime" not in serialized
+    assert "run_event_store" not in serialized
 
 
 def test_live_and_meta_are_async_event_loop_handlers() -> None:
@@ -151,10 +157,14 @@ def test_core_healthy_without_lightrag_is_query_ready() -> None:
         postgres_probe="ok",
         paradedb_probe="ok",
         checkpoint_probe="ok",
+        query_runtime_warmed=True,
+        run_event_store_ready=True,
     )
     names = {item.name: item.status for item in payload.dependencies}
     assert names["lightrag"] == "unconfigured"
     assert names["langgraph_checkpoint"] == "ok"
+    assert names["query_runtime"] == "ok"
+    assert names["run_event_store"] == "ok"
     assert payload.query_ready is True
     assert payload.status == "degraded"
     assert "lightrag" in payload.detail.casefold()
@@ -183,6 +193,8 @@ def test_checkpoint_down_blocks_query_ready() -> None:
         postgres_probe="ok",
         paradedb_probe="ok",
         checkpoint_probe="down",
+        query_runtime_warmed=True,
+        run_event_store_ready=True,
     )
     assert payload.query_ready is False
     assert payload.status == "not_ready"
@@ -254,3 +266,139 @@ def test_rate_limit_degraded_latch_stays_when_valkey_is_down() -> None:
         response = as_openapi_client(raw).get("/health/ready")
         assert response.status_code == 200
         assert state.rate_limit_degraded is True
+
+
+def _query_ready_settings() -> BackendSettings:
+    """Build real-model settings for query-ready unit cases.
+
+    Returns:
+        Backend settings with a dummy OpenAI key.
+    """
+
+    from pydantic import SecretStr
+
+    return BackendSettings(
+        mock_model_mode=False,
+        openai_api_key=SecretStr("sk-unit-not-a-real-key"),
+    )
+
+
+def test_warmup_failure_clears_query_ready() -> None:
+    """Query-runtime warmup is required for query_ready."""
+
+    valkey = _ReadyValkey()
+    payload = build_readiness(
+        _query_ready_settings(),
+        valkey_limits=valkey,  # type: ignore[arg-type]
+        valkey_cache=valkey,  # type: ignore[arg-type]
+        lightrag_attached=True,
+        rate_limit_degraded=False,
+        postgres_probe="ok",
+        paradedb_probe="ok",
+        checkpoint_probe="ok",
+        query_runtime_warmed=False,
+        run_event_store_ready=True,
+    )
+    names = {item.name: item.status for item in payload.dependencies}
+    assert names["query_runtime"] == "down"
+    assert payload.query_ready is False
+    assert payload.status == "not_ready"
+    assert "warmup" in payload.detail.casefold()
+
+
+def test_event_store_failure_clears_query_ready() -> None:
+    """Run-event store failure clears query_ready."""
+
+    valkey = _ReadyValkey()
+    payload = build_readiness(
+        _query_ready_settings(),
+        valkey_limits=valkey,  # type: ignore[arg-type]
+        valkey_cache=valkey,  # type: ignore[arg-type]
+        lightrag_attached=True,
+        rate_limit_degraded=False,
+        postgres_probe="ok",
+        paradedb_probe="ok",
+        checkpoint_probe="ok",
+        query_runtime_warmed=True,
+        run_event_store_ready=False,
+    )
+    names = {item.name: item.status for item in payload.dependencies}
+    assert names["run_event_store"] == "down"
+    assert payload.query_ready is False
+    assert payload.status == "not_ready"
+
+
+def test_warmup_and_store_recovery_restores_query_ready() -> None:
+    """Recovery of warmup and event-store flags restores query_ready."""
+
+    valkey = _ReadyValkey()
+    failed = build_readiness(
+        _query_ready_settings(),
+        valkey_limits=valkey,  # type: ignore[arg-type]
+        valkey_cache=valkey,  # type: ignore[arg-type]
+        lightrag_attached=True,
+        rate_limit_degraded=False,
+        postgres_probe="ok",
+        paradedb_probe="ok",
+        checkpoint_probe="ok",
+        query_runtime_warmed=False,
+        run_event_store_ready=False,
+    )
+    recovered = build_readiness(
+        _query_ready_settings(),
+        valkey_limits=valkey,  # type: ignore[arg-type]
+        valkey_cache=valkey,  # type: ignore[arg-type]
+        lightrag_attached=True,
+        rate_limit_degraded=False,
+        postgres_probe="ok",
+        paradedb_probe="ok",
+        checkpoint_probe="ok",
+        query_runtime_warmed=True,
+        run_event_store_ready=True,
+    )
+    assert failed.query_ready is False
+    assert recovered.query_ready is True
+    assert recovered.status == "ready"
+
+
+def test_public_ready_omits_event_store_exception_text() -> None:
+    """``GET /health/ready`` never echoes DSN or exception text."""
+
+    from fastapi.testclient import TestClient
+    from smart_rag_api.main import create_app
+
+    from tests.unit.typed_openapi import (
+        as_openapi_client,
+        client_app_state,
+        json_object,
+    )
+
+    class _BoomStore:
+        """Store whose probe leaks a secret in the exception."""
+
+        def probe(self) -> None:
+            """Raise a secret-bearing error.
+
+            Raises:
+                RuntimeError: Always, including a fake DSN.
+            """
+
+            raise RuntimeError(
+                "password=super-secret postgresql://unit:secret@host/db boom"
+            )
+
+    with TestClient(create_app()) as raw:
+        state = client_app_state(raw)
+        state.query_runtime_warmed = True
+        state.run_event_store = _BoomStore()
+        response = as_openapi_client(raw).get("/health/ready")
+    body = json_object(response.json())
+    assert response.status_code == 200
+    assert body["query_ready"] is False
+    assert body["detail"] == "not_query_ready"
+    serialized = str(body).casefold()
+    assert "postgresql" not in serialized
+    assert "password" not in serialized
+    assert "super-secret" not in serialized
+    assert "boom" not in serialized
+    assert "exception" not in serialized

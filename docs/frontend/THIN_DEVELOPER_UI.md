@@ -2,7 +2,7 @@
 title: Thin authenticated developer UI
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, frontend
 ---
 
@@ -92,7 +92,8 @@ The login page polls it so query-not-ready is visible without naming ParadeDB,
 Valkey, LightRAG, or the checkpointer. The browser aborts that probe after
 8000ms. Signed-in owner/admin consoles merge named probes from
 `GET /ops/ready`. `query_ready` is true when the Hybrid path, durable
-checkpointer/store, Valkey, and real models are usable. Missing LightRAG is a
+checkpointer/store, Valkey, real models, query-runtime warmup, and the
+run-event store are usable. Missing LightRAG is a
 typed degraded dependency and does not fake graph readiness or block Hybrid
 chat. Signed `bm25_unavailable` and `graph_outage` copy is always
 on the console; live SSE still owns per-run codes. Host uvicorn without
