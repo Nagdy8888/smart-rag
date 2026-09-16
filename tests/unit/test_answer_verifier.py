@@ -660,7 +660,9 @@ def test_link_only_multiline_pdf_passage_still_maps_mcp_span() -> None:
     )
     bound = bind_company_atomic_links(payload, fusion=fusion)
     assert bound.citations
-    assert bound.citations[0].span in fusion.evidence[0].citation_text
+    source_text = fusion.evidence[0].citation_text or ""
+    span = bound.citations[0].span or ""
+    assert span in source_text
     checked, failures = deterministic_check_answer(
         bound,
         fusion=fusion,
@@ -736,8 +738,10 @@ def test_gateway_answer_binds_omitted_paragraphs_from_live_links() -> None:
     assert completion_tokens == 8
     assert payload.paragraphs
     assert payload.citations
-    assert payload.citations[0].span in fusion.evidence[0].citation_text
-    assert "Model Context Protocol" in (payload.citations[0].span or "")
+    source_text = fusion.evidence[0].citation_text or ""
+    span = payload.citations[0].span or ""
+    assert span in source_text
+    assert "Model Context Protocol" in span
 
 
 def test_free_prose_mcp_expansion_cannot_stay_verified() -> None:
