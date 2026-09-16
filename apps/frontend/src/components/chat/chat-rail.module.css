@@ -192,9 +192,11 @@
   .workspaceSessionsExpanded,
   .workspaceSessionsCollapsed {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(8rem, 28vh) minmax(0, 1fr);
   }
 
   .workspace > .rail {
-    display: none;
+    display: flex;
+    max-height: 28vh;
   }
 }

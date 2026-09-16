@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
+from typing import cast
 
 import psycopg
 from smart_rag_core.query_profile.versions import PROFILE_MODEL_ID
@@ -107,23 +109,102 @@ class QueryGraphContext:
     deps: QueryGraphDeps
 
 
+_QUERY_RUN_DEPS: ContextVar[QueryGraphDeps | None] = ContextVar(
+    "smart_rag_query_run_deps", default=None
+)
+
+
+def bind_query_run_deps(deps: QueryGraphDeps) -> Token[QueryGraphDeps | None]:
+    """Bind per-run deps onto this task for LangGraph worker threads.
+
+    LangGraph ``astream`` runs sync nodes through ``run_in_executor``.
+    ``Runtime.context`` is the primary injection path. This contextvar is
+    the fail-closed fallback when a tick restores a Runtime without
+    ``QueryGraphDeps``.
+
+    Args:
+        deps: Run-local adapters for the active SSE stream.
+
+    Returns:
+        Token that ``reset_query_run_deps`` must consume.
+
+    Side Effects:
+        Sets a task-local ContextVar. Does not log secrets or DSNs.
+    """
+
+    return _QUERY_RUN_DEPS.set(deps)
+
+
+def reset_query_run_deps(token: Token[QueryGraphDeps | None]) -> None:
+    """Restore the previous per-run deps binding.
+
+    Args:
+        token: Value returned by ``bind_query_run_deps``.
+    """
+
+    _QUERY_RUN_DEPS.reset(token)
+
+
+def _deps_from_context(context: object) -> QueryGraphDeps | None:
+    """Return ``QueryGraphDeps`` from a Runtime context object or mapping.
+
+    Args:
+        context: ``QueryGraphContext``, a mapping with ``deps``, or any
+            object with a ``deps`` attribute.
+
+    Returns:
+        Run deps when the value is a ``QueryGraphDeps`` instance.
+    """
+
+    if isinstance(context, QueryGraphContext):
+        return context.deps
+    if isinstance(context, Mapping):
+        typed_context = cast(Mapping[str, object], context)
+        deps = typed_context.get("deps")
+        return deps if isinstance(deps, QueryGraphDeps) else None
+    deps = getattr(context, "deps", None)
+    return deps if isinstance(deps, QueryGraphDeps) else None
+
+
 def deps_from_runtime(runtime: object, fallback: QueryGraphDeps) -> QueryGraphDeps:
     """Read run-scoped deps from LangGraph ``Runtime.context``.
 
     Args:
-        runtime: Injected ``langgraph.runtime.Runtime`` or any object with
-            an optional ``context.deps`` attribute.
+        runtime: Injected ``langgraph.runtime.Runtime``, a mapping with
+            ``context``, or any object with an optional ``context.deps``
+            attribute.
         fallback: Topology-compile default. Must be empty for a process
             cache; tests may pass bound deps when they invoke without
             ``context=``.
 
     Returns:
-        The invocation's ``QueryGraphDeps`` when present, otherwise
-        ``fallback``. Never a prior run's captured object.
+        The invocation's ``QueryGraphDeps`` when present, otherwise the
+        task-local binding, otherwise ``fallback``. Never a prior run's
+        compiled-graph capture.
     """
 
     context = getattr(runtime, "context", None)
-    deps = getattr(context, "deps", None) if context is not None else None
-    if isinstance(deps, QueryGraphDeps):
-        return deps
+    if context is None and isinstance(runtime, Mapping):
+        typed_runtime = cast(Mapping[str, object], runtime)
+        context = typed_runtime.get("context")
+        if context is None:
+            configurable = typed_runtime.get("configurable")
+            if isinstance(configurable, Mapping):
+                typed_configurable = cast(Mapping[str, object], configurable)
+                context = typed_configurable.get("context")
+    found = _deps_from_context(context) if context is not None else None
+    if found is not None:
+        return found
+    try:
+        from langgraph.runtime import get_runtime
+
+        injected = get_runtime(QueryGraphContext)
+        found = _deps_from_context(getattr(injected, "context", None))
+        if found is not None:
+            return found
+    except (RuntimeError, LookupError, AttributeError, TypeError, KeyError):
+        pass
+    current = _QUERY_RUN_DEPS.get()
+    if isinstance(current, QueryGraphDeps):
+        return current
     return fallback

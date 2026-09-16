@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 42
-status: pending
+status: complete
 title: "Implement four-option Ask dropdown, Web origin, progress, citations, and resume."
 requirement_ids: [P06-42]
 ---

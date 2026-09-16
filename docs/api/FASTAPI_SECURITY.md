@@ -53,7 +53,7 @@ See [IDENTITY_PROPAGATION.md](../security/IDENTITY_PROPAGATION.md).
 | GET | `/health/live` | public | process up | Async; no dependency probe. Must not wait on readiness threads. |
 | GET | `/health/ready` | public | `{status, query_ready, detail}` only | Coarse `detail` (`ok` / `not_query_ready`). Never names ParadeDB/Valkey/LightRAG/checkpointer. Mock mode keeps `query_ready=false`. Missing LightRAG may still be query-ready when Hybrid is healthy. Clears a stale `rate_limit_degraded` latch when both Valkey probes are `ok`. |
 | GET | `/ops/ready` | owner/admin | named dependency probes | Full operator payload |
-| GET | `/api/meta` | public | handshake fields | Packet 6 enforces `min_client_version` |
+| GET | `/api/meta` | public | handshake fields | Packet 6 enforces `min_client_version`. Additive `web_search_enabled` (default false) never includes keys |
 | GET | `/me` | authenticated | live profile role | Client role claims ignored |
 | GET | `/admin/users` | owner/admin | `app.list_workspace_members` + `app.list_pending_team_invitations` | LOW_RISK_READ 120. Max 200 each. No `token_hash`. Members 403. See [ADR-workspace-member-list.md](../adr/ADR-workspace-member-list.md) |
 | POST | `/admin/invitations` | owner/admin | live role + privileged Auth settings | AUTH_ADJACENT. JSON omits `raw_token` (mail only). Only **owner** may invite `owner`. `APP_ENV=test` may set `X-Test-Invitation-Token` |

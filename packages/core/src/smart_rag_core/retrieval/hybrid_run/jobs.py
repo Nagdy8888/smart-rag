@@ -27,6 +27,7 @@ from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.retrieval.temporal import TemporalDocument
 from smart_rag_core.retrieval.types import Bm25RetrievalResult, RetrievalCandidate
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.settings.postgres_connect import connect_postgres
 
 
 class HybridChannelJobsMixin:
@@ -220,14 +221,16 @@ class HybridChannelJobsMixin:
             RuntimeError: If ``supabase_dsn`` is missing.
 
         Side Effects:
-            Opens and closes one connection. Does not use the bound
+            Opens and closes one connection with automatic prepares
+            disabled so hosted transaction poolers cannot raise
+            ``DuplicatePreparedStatement``. Does not use the bound
             ``supabase`` connection, which stays idle for context RPC.
         """
 
         dsn = self._supabase_dsn
         if not dsn:
             raise RuntimeError("hybrid_channel_requires_supabase_dsn")
-        connection = psycopg.connect(dsn)
+        connection = connect_postgres(dsn)
         try:
             yield connection
         finally:

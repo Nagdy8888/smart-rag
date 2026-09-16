@@ -323,6 +323,7 @@ class CheckRunner:
                         "playwright",
                         "test",
                     ),
+                    extra_environ=_FRONTEND_PUBLIC_BUILD_ENV,
                 ),
             ),
             "fast": (),

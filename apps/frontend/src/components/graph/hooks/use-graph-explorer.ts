@@ -37,7 +37,8 @@ import type {
  * List and canvas share one `selectNode` callback. Chip count never exceeds
  * `GRAPH_INSPECT_MAX_ENTITIES` (12).
  *
- * @returns Explorer controller. Inspect remains a paid FastAPI mutation.
+ * @returns Explorer controller. Inspect remains a paid FastAPI mutation
+ *   and stays disabled until API auth exists.
  */
 export function useGraphExplorer() {
   const session = useSession();
@@ -166,7 +167,9 @@ export function useGraphExplorer() {
     seededDocument,
     depth,
     setDepth: (value: number) => setDepth(clampGraphInspectDepth(value)),
-    canInspect: selectedHits.length > 0 || Boolean(seededDocument?.trim()),
+    canInspect:
+      auth !== null &&
+      (selectedHits.length > 0 || Boolean(seededDocument?.trim())),
     inspect: () => inspectMutation.mutate(),
     inspectPending: inspectMutation.isPending,
     inspectResult: inspect,

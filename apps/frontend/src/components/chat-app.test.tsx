@@ -25,6 +25,7 @@ import { SessionProvider } from "../lib/auth/session-provider";
 import { CHAT_RUN_POINTER_KEY } from "../lib/chat-pointer";
 import { MIXED_SCOPE_CLARIFICATION } from "../lib/answer-origin";
 import { handshakeBelowMinCopy } from "../lib/handshake";
+import { WEB_SEARCH_DISABLED_COPY } from "../lib/failure-copy";
 import { limitationCopy } from "../lib/limitations";
 
 vi.mock("next/navigation", () => ({
@@ -200,10 +201,13 @@ describe("ChatApp Auto chrome", () => {
     renderChat(<ChatApp />);
     const send = await screen.findByRole("button", { name: "Send" });
     const source = screen.getByLabelText("Answer source") as HTMLSelectElement;
-    expect(source).toHaveValue("company_documents");
-    expect(screen.getByRole("option", { name: "Company files" })).toBeInTheDocument();
+    expect(source).toHaveValue("auto");
     expect(screen.getByRole("option", { name: "Auto" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "General knowledge" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Company documents" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "General" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Web" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Company files" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "General knowledge" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Hybrid" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Combined" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Inspect" })).toBeNull();
@@ -279,6 +283,8 @@ function stubChatFetch(options: {
   deleteCalls?: string[];
   messagePosts?: string[];
   messageBodies?: string[];
+  messageStatus?: number;
+  messageDetail?: string;
 }): typeof fetch {
   return async (input, init) => {
     const url = String(input);
@@ -288,16 +294,38 @@ function stubChatFetch(options: {
       options.messageBodies?.push(String(init?.body ?? ""));
       const headers = init?.headers as Record<string, string>;
       expect(headers["X-Test-Role"]).toBeUndefined();
-      expect(JSON.parse(String(init?.body ?? "{}")).route).toBeUndefined();
+      const payload = JSON.parse(String(init?.body ?? "{}")) as {
+        route?: unknown;
+        search_scope?: string;
+      };
+      expect(payload.route).toBeUndefined();
+      const requested =
+        payload.search_scope === "web" ||
+        payload.search_scope === "auto" ||
+        payload.search_scope === "general_knowledge" ||
+        payload.search_scope === "company_documents"
+          ? payload.search_scope
+          : "auto";
+      if (options.messageStatus !== undefined && options.messageStatus >= 400) {
+        return new Response(
+          JSON.stringify({
+            detail: options.messageDetail ?? "request_rejected",
+          }),
+          {
+            status: options.messageStatus,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
       return new Response(
         JSON.stringify({
           run_id: "run-1",
           stream_path: "/runs/run-1/events",
           reconnect: false,
           reservation_id: "res-1",
-          route_family: "composite",
+          route_family: requested === "web" ? "web_research" : "composite",
           status: "pending",
-          requested_search_scope: "company_documents",
+          requested_search_scope: requested,
         }),
         { status: 202, headers: { "Content-Type": "application/json" } },
       );
@@ -645,7 +673,7 @@ describe("ChatApp SSE limitation families and reconnect", () => {
     );
     renderChat(<ChatApp />);
     const source = await screen.findByLabelText("Answer source");
-    expect(source).toHaveValue("company_documents");
+    expect(source).toHaveValue("auto");
     expect(source).toBeEnabled();
     await user.selectOptions(source, "general_knowledge");
     expect(source).toHaveValue("general_knowledge");
@@ -792,8 +820,9 @@ describe("ChatApp Ask workspace", () => {
         citation_id: "cite-1",
         citation_index: 1,
         chunk_id: "chunk-1",
-        provenance: {},
+        provenance: { url: "https://storage.example/secret" },
         source_unavailable: false,
+        source_kind: "company_document",
       },
     ]);
     vi.stubGlobal(
@@ -813,9 +842,173 @@ describe("ChatApp Ask workspace", () => {
     await user.type(screen.getByLabelText("Message"), "What is our refund period?");
     await user.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByRole("button", { name: /Citation 1/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Citation 1" })).toBeNull();
     expect(screen.getByTestId("answer-origin")).toHaveTextContent("Company documents");
     expect(screen.getByTestId("answer-route")).toHaveTextContent("Composite");
     expect(screen.getByRole("button", { name: "Sources (1)" })).toBeInTheDocument();
+  });
+
+  it("offers Web when meta disables it and still posts search_scope web", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    const messageBodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events:
+          'event: status\nid: 1\ndata: {"stage":"web_search","status":"running","phase":"started"}\n\n',
+        messagePosts: [],
+        messageBodies,
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
+    const source = await screen.findByLabelText("Answer source");
+    expect(await screen.findByRole("option", { name: "Web" })).toBeInTheDocument();
+    await user.selectOptions(source, "web");
+    expect(source).toHaveValue("web");
+    await user.type(screen.getByLabelText("Message"), "latest public briefing");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => {
+      expect(messageBodies).toHaveLength(1);
+    });
+    expect(JSON.parse(messageBodies[0] ?? "{}")).toMatchObject({
+      message: "latest public briefing",
+      search_scope: "web",
+    });
+  });
+
+  it("shows Web-disabled copy instead of limiter fail-closed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue(ALLOWED_META);
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        messageStatus: 503,
+        messageDetail: "web_search_disabled",
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
+    const source = await screen.findByLabelText("Answer source");
+    await user.selectOptions(source, "web");
+    await user.type(screen.getByLabelText("Message"), "latest public briefing");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(WEB_SEARCH_DISABLED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(/Limiter fail-closed/)).toBeNull();
+  });
+
+  it("offers Web when meta enables it and posts search_scope web", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue({
+      ...ALLOWED_META,
+      web_search_enabled: true,
+    });
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    const messageBodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events:
+          'event: status\nid: 1\ndata: {"stage":"web_search","status":"running","phase":"started"}\n\n',
+        messagePosts: [],
+        messageBodies,
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
+    const source = await screen.findByLabelText("Answer source");
+    expect(await screen.findByRole("option", { name: "Web" })).toBeInTheDocument();
+    await user.selectOptions(source, "web");
+    expect(source).toHaveValue("web");
+    await user.type(screen.getByLabelText("Message"), "latest public briefing");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => {
+      expect(messageBodies).toHaveLength(1);
+    });
+    expect(JSON.parse(messageBodies[0] ?? "{}")).toMatchObject({
+      message: "latest public briefing",
+      search_scope: "web",
+    });
+    expect(await screen.findAllByText("Searching…")).not.toHaveLength(0);
+  });
+
+  it("shows Web origin URL chips and keeps company citations non-clickable", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchMeta).mockResolvedValue({
+      ...ALLOWED_META,
+      web_search_enabled: true,
+    });
+    vi.mocked(loadConsoleReadiness).mockResolvedValue({
+      status: "ok",
+      query_ready: true,
+      detail: "ready",
+      rate_limit_degraded: false,
+      dependencies: [],
+    });
+    vi.mocked(listConversations).mockResolvedValue([CONVERSATION]);
+    vi.mocked(listCitations).mockResolvedValue([
+      {
+        citation_id: "cite-web",
+        citation_index: 1,
+        chunk_id: null,
+        provenance: {
+          title: "Public briefing",
+          url: "https://example.test/brief",
+        },
+        source_unavailable: false,
+        source_kind: "web",
+        web_source_id: "ws-1",
+      },
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      stubChatFetch({
+        events: [
+          'event: answer_origin\nid: 1\ndata: {"origin":"web"}\n\n',
+          'event: citation_preview\nid: 2\ndata: {"citation_ids":["cite-web"]}\n\n',
+          'event: status\nid: 3\ndata: {"stage":"verify_answer","status":"verified","phase":"completed"}\n\n',
+          'event: token_delta\nid: 4\ndata: {"delta":"The briefing is public."}\n\n',
+          "event: completed\nid: 5\ndata: {}\n\n",
+        ].join(""),
+      }),
+    );
+    renderChat(<ChatApp />);
+    await user.click(await screen.findByRole("button", { name: "Chat" }));
+    expect(await screen.findByRole("option", { name: "Web" })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Answer source"), "web");
+    await user.type(screen.getByLabelText("Message"), "public briefing");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    const chip = await screen.findByRole("link", {
+      name: "Citation 1, Public briefing",
+    });
+    expect(chip).toHaveAttribute("href", "https://example.test/brief");
+    expect(chip).toHaveAttribute("rel", "noreferrer");
+    expect(screen.getByTestId("answer-origin")).toHaveTextContent("Web");
+    expect(screen.getByTestId("answer-route")).toHaveTextContent("Web research");
   });
 
   it("shows clarification and no citation chips for an ambiguous origin", async () => {

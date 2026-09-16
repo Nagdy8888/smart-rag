@@ -206,6 +206,18 @@ export function citationSourceLabel(citation: CitationResponse): string {
   if (citation.source_unavailable) {
     return "Source unavailable";
   }
+  if (citation.source_kind === "web") {
+    const provenance = citation.provenance;
+    const title = locatorString(provenance.title);
+    if (title) {
+      return title;
+    }
+    const url = locatorString(provenance.url ?? provenance.source_url);
+    if (url) {
+      return url;
+    }
+    return "Web source";
+  }
   if (isCompanyPdfCitation(citation)) {
     return `${companyPdfBookTitle(citation)} · PDF page ${pdfPageDisplay(citation)}`;
   }
@@ -274,7 +286,10 @@ export function citationLocatorFields(
   }
   const provenance = citation.provenance;
   const locators: CitationLocatorField[] = [];
-  const title = locatorString(provenance.document_title);
+  const isWeb = citation.source_kind === "web";
+  const title = locatorString(
+    isWeb ? provenance.title : provenance.document_title,
+  );
   const printed = citationPageLabel(provenance.page_label);
   const filePage = citationPageNumber(provenance.page_number ?? provenance.page);
   const section = citationSectionParts(provenance.section_path).join(" / ");
@@ -285,7 +300,11 @@ export function citationLocatorFields(
     ? provenance.source_ranges.map(String).filter((item) => item.trim() !== "")
     : [];
   if (title) {
-    locators.push({ key: "document_title", label: "Document", value: title });
+    locators.push({
+      key: isWeb ? "title" : "document_title",
+      label: isWeb ? "Title" : "Document",
+      value: title,
+    });
   }
   if (printed) {
     locators.push({ key: "page_label", label: "Page", value: printed });

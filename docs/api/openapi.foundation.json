@@ -2225,7 +2225,7 @@
         "type": "object"
       },
       "MetaResponse": {
-        "description": "Compatibility handshake fields. Packet 6 owns enforcement.",
+        "description": "Compatibility handshake fields. Packet 6 owns enforcement.\n\n``web_search_enabled`` is the runtime flag for public Exa web research.\nIt is never the Exa key and never means company-document search.\nHosted environments reject ``WEB_SEARCH_ENABLED=true`` at settings\nload, so this field stays false in staging and production.",
         "properties": {
           "api_version": {
             "title": "Api Version",
@@ -2243,6 +2243,12 @@
           "sse_schema_version": {
             "title": "Sse Schema Version",
             "type": "string"
+          },
+          "web_search_enabled": {
+            "default": false,
+            "description": "When true, the Ask dropdown may offer Web. Never includes keys.",
+            "title": "Web Search Enabled",
+            "type": "boolean"
           }
         },
         "required": [
@@ -5635,7 +5641,7 @@
     },
     "/api/meta": {
       "get": {
-        "description": "Publish version handshake fields. Packet 6 owns enforcement.\n\nThis handler is async so a full sync thread pool cannot stall the\nAsk compatibility handshake.\n\nArgs:\n    request: Request with settings.\n\nReturns:\n    api_version, sse_schema_version, min_client_version,\n    pdf_eval_workspace.",
+        "description": "Publish version handshake fields. Packet 6 owns enforcement.\n\nThis handler is async so a full sync thread pool cannot stall the\nAsk compatibility handshake.\n\nArgs:\n    request: Request with settings.\n\nReturns:\n    api_version, sse_schema_version, min_client_version,\n    pdf_eval_workspace, web_search_enabled. Never includes keys.",
         "operationId": "api_meta_api_meta_get",
         "responses": {
           "200": {

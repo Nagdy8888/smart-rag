@@ -14,13 +14,16 @@ describe("answer origin helpers", () => {
     expect(answerOriginLabel("user_supplied_text")).toBe("Your text");
     expect(answerOriginLabel("deterministic")).toBe("Assistant");
     expect(answerOriginLabel("ambiguous")).toBe("Needs clarification");
+    expect(answerOriginLabel("web")).toBe("Web");
     expect(answerOriginTone("company_documents")).toBe("success");
+    expect(answerOriginTone("web")).toBe("success");
     expect(answerOriginTone("ambiguous")).toBe("warning");
     expect(answerOriginTone("general_knowledge")).toBe("neutral");
   });
 
-  it("shows citations only for company origin or a missing origin", () => {
+  it("shows citations for company, web, or a missing origin", () => {
     expect(shouldShowCitations("company_documents")).toBe(true);
+    expect(shouldShowCitations("web")).toBe(true);
     expect(shouldShowCitations(null)).toBe(true);
     expect(shouldShowCitations("general_knowledge")).toBe(false);
     expect(shouldShowCitations("user_supplied_text")).toBe(false);

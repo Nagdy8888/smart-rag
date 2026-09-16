@@ -291,7 +291,7 @@ def test_context_loader_keeps_connection_idle_for_retrieval_transaction(
         return ()
 
     monkeypatch.setattr(
-        "smart_rag_agents.query.runtime.adapters_hybrid.psycopg.connect",
+        "smart_rag_agents.query.runtime.adapters_hybrid.connect_postgres",
         _connect,
     )
     monkeypatch.setattr(

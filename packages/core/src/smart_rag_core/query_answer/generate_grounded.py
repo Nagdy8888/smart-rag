@@ -26,6 +26,30 @@ from smart_rag_core.query_fusion.models import FusionResult
 from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 from smart_rag_core.query_routing.models import TableEvidenceRecord
 
+
+def _has_usable_company_evidence(
+    fusion: FusionResult,
+    tables: tuple[TableEvidenceRecord, ...],
+) -> bool:
+    """Return whether grounded generation has citable company evidence.
+
+    Fusion rows with empty ``citation_text`` are not usable: the live model
+    can invent prose while the Sources tab stays empty.
+
+    Args:
+        fusion: Combined or Hybrid-effective evidence.
+        tables: Deterministic table snapshots.
+
+    Returns:
+        True when at least one passage has non-empty citation text or a
+        table snapshot is present.
+    """
+
+    if tables:
+        return True
+    return any(item.citation_text.strip() for item in fusion.evidence)
+
+
 AnswerCaller = Callable[
     [str, FusionResult, tuple[TableEvidenceRecord, ...]], AnswerPayload
 ]
@@ -50,10 +74,11 @@ def generate_grounded_answer(
         Structured answer citing only supplied IDs.
 
     Raises:
-        None. Empty evidence is a typed company refusal.
+        None. Empty evidence, or fusion rows with empty citation text and
+        no tables, is a typed company refusal.
     """
 
-    if not fusion.evidence and not tables:
+    if not _has_usable_company_evidence(fusion, tables):
         return empty_no_retrieval(
             "Insufficient authorized evidence.",
             status="refused",

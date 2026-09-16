@@ -6,7 +6,7 @@
 
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   CLIENT_NAV_IS_NOT_AUTHORIZATION,
   hiddenNavImpliesForbidden,
@@ -39,12 +39,30 @@ export type AppShellProps = {
  * Security: omitting nav items does not imply HTTP 403.
  * `CLIENT_NAV_IS_NOT_AUTHORIZATION` is true. The desktop expand state is
  * stored in localStorage after hydration via `useLayoutPreference`.
+ * Below 1024px the ink rail is CSS-hidden and marked `inert` so
+ * Playwright and assistive tech use the topbar Menu sheet instead.
  */
 export function AppShell({ children }: AppShellProps) {
   const [navExpanded, setNavExpanded] = useLayoutPreference(
     NAV_EXPANDED_STORAGE_KEY,
     defaultNavExpanded(),
   );
+  const [desktopNav, setDesktopNav] = useState(true);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const media = window.matchMedia("(min-width: 1024px)");
+    const sync = (): void => {
+      setDesktopNav(media.matches);
+    };
+    sync();
+    media.addEventListener("change", sync);
+    return () => {
+      media.removeEventListener("change", sync);
+    };
+  }, []);
 
   /**
    * Toggle the desktop console rail and persist the choice.
@@ -69,6 +87,8 @@ export function AppShell({ children }: AppShellProps) {
           aria-label="Console"
           data-testid="app-shell-nav"
           data-expanded={navExpanded ? "true" : "false"}
+          inert={desktopNav ? undefined : true}
+          aria-hidden={desktopNav ? undefined : true}
         >
           <div className={styles.brand}>
             <span className={styles.brandMark} aria-hidden="true">

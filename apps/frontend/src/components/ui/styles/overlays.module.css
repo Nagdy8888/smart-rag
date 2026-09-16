@@ -125,6 +125,15 @@
   pointer-events: none;
 }
 
+.tooltipPanelEnd {
+  position: fixed;
+  z-index: 80;
+  margin-top: 0;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  max-width: none;
+}
+
 .menuItem,
 .menuItemDanger {
   display: block;

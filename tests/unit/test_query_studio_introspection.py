@@ -47,11 +47,27 @@ def test_introspection_opens_zero_sockets(monkeypatch: pytest.MonkeyPatch) -> No
         boom,
     )
     monkeypatch.setattr(
+        "smart_rag_agents.query.runtime.adapters.connect_postgres",
+        boom,
+    )
+    monkeypatch.setattr(
         "smart_rag_agents.query.runtime.adapters_hybrid.psycopg.connect",
         boom,
     )
     monkeypatch.setattr(
+        "smart_rag_agents.query.runtime.adapters_hybrid.connect_postgres",
+        boom,
+    )
+    monkeypatch.setattr(
         "smart_rag_agents.query.runtime.deps_factory.psycopg.connect",
+        boom,
+    )
+    monkeypatch.setattr(
+        "smart_rag_agents.query.runtime.deps_factory.connect_postgres",
+        boom,
+    )
+    monkeypatch.setattr(
+        "smart_rag_core.settings.postgres_connect.connect_postgres",
         boom,
     )
     monkeypatch.setattr(

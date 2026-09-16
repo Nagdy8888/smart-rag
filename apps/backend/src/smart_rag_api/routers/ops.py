@@ -135,7 +135,7 @@ async def api_meta(request: Request) -> MetaResponse:
 
     Returns:
         api_version, sse_schema_version, min_client_version,
-        pdf_eval_workspace.
+        pdf_eval_workspace, web_search_enabled. Never includes keys.
     """
 
     settings: BackendSettings | None = getattr(request.app.state, "settings", None)
@@ -145,6 +145,7 @@ async def api_meta(request: Request) -> MetaResponse:
             sse_schema_version="1",
             min_client_version="0.1.0",
             pdf_eval_workspace=False,
+            web_search_enabled=False,
         )
     enabled = bool(settings.pdf_eval_workspace_enabled) and settings.app_env in {
         Environment.LOCAL,
@@ -155,4 +156,5 @@ async def api_meta(request: Request) -> MetaResponse:
         sse_schema_version=settings.sse_schema_version,
         min_client_version=settings.min_client_version,
         pdf_eval_workspace=enabled,
+        web_search_enabled=bool(settings.web_search_enabled),
     )

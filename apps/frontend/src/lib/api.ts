@@ -14,6 +14,7 @@ export type {
   FailClosedFailure,
   HandshakeFailure,
   ProtocolFailure,
+  UnavailableFailure,
   RateFailure,
   ServerFailure,
   ValidationFailure,

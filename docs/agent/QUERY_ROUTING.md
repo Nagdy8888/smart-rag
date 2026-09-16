@@ -63,7 +63,10 @@ It is not authorization, not `route_family`, and not effective
 `knowledge_scope`. Values: `auto`, `company_documents`, `general_knowledge`,
 `web`. Omitted requests stay Auto. Exactly one source is selected; company
 and web never blend. Company-insufficient evidence never falls back to web
-or general.
+or general. Ask labels are Auto, Company documents, General, and Web.
+New chats default Auto. Web is always listed. Forced Web still 503s when
+`/api/meta` `web_search_enabled` is false. Hidden chrome is not
+authorization.
 
 ```mermaid
 flowchart TD
@@ -83,7 +86,7 @@ flowchart TD
 Precedence after classification:
 
 1. Pure greetings, small talk, product-help, and user-text transforms keep
-   their current handling even when Company files is selected.
+   their current handling even when Company documents is selected.
 2. Other substantive prompts with `company_documents` force
    `KnowledgeScope.COMPANY_DOCUMENTS` and the existing company matrix.
 3. Other substantive prompts with `general_knowledge` force
@@ -107,7 +110,18 @@ formulations, twelve candidates per round, six sources, twelve citations,
 five external operations, 50s. Empty or unsafe evidence is
 `web_evidence_insufficient` or `web_content_unavailable`. Ambiguous
 durable operations do not retry. Company passages, memory, IDs, JWTs, and
-signed URLs are never sent to Exa.
+signed URLs are never sent to Exa. Ask Web searches the public internet at
+`https://api.exa.ai` when `WEB_SEARCH_ENABLED=true` and `APP_ENV=local`.
+That flag is the workstation Compose gate, not company-document search.
+The current user turn is persisted before memory load and is excluded from
+Exa forbidden snippets so Ask Web is not fail-closed as
+`company_passage_forbidden`. Prior memory and company markers still block
+leakage. The Exa gateway opens a fresh `httpx.AsyncClient` per request on the
+running loop; a process-scoped client would stay bound to uvicorn and fail
+inside `web_scope`. Per-run `QueryGraphDeps` (Exa gateway, `app_api`
+connection) are injected through `QueryGraphContext` and a task-local
+binding so worker-thread nodes cannot fall back to the empty compile-time
+deps.
 
 Requested Company never manufactures `company_signal=True`. Explicit Company
 or General does not spend the profile model merely to decide company versus

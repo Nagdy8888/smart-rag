@@ -31,6 +31,8 @@ export type UseChatRunInput = {
   onConversationId: (id: string | null) => void;
   handshake: HandshakeDecision;
   ready: ReadinessResponse | null;
+  /** `/api/meta` Web flag. Hidden chrome is not authorization. */
+  webSearchEnabled?: boolean;
 };
 
 export type UseChatRunResult = {
@@ -59,11 +61,12 @@ export type UseChatRunResult = {
 /**
  * Drive one paid Ask run. Parses no SSE bytes; `consumeSse` remains the engine.
  *
- * @param input - Auth, conversation id, and handshake/readiness gates.
+ * @param input - Auth, conversation id, handshake/readiness, and Web flag.
  * @returns Chat view plus send/resume/cancel controls.
  */
 export function useChatRun(input: UseChatRunInput): UseChatRunResult {
-  const { auth, conversationId, onConversationId, handshake, ready } = input;
+  const { auth, conversationId, onConversationId, handshake, ready, webSearchEnabled = false } =
+    input;
   const queryClient = useQueryClient();
   const [chat, setChat] = useState<ChatViewState>(() =>
     createChatViewState(newIdempotencyKey()),
@@ -95,7 +98,7 @@ export function useChatRun(input: UseChatRunInput): UseChatRunResult {
     activateConversation,
     restoreConversationScope,
     resetForNewChat,
-  } = useChatScope(conversationId);
+  } = useChatScope(conversationId, webSearchEnabled);
   const chatRef = useRef(chat);
   const sequenceRef = useRef(chat.lastSequence);
   const failureRef = useRef(failure);

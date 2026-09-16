@@ -210,7 +210,16 @@ def test_two_round_happy_path_caps_sources_and_empty_company_citations() -> None
     critique_calls: list[int] = []
 
     def _critique(query: str, titles: tuple[str, ...]) -> tuple[str, ...]:
-        """Return bounded follow-up search formulations."""
+        """Return bounded follow-up Web formulations.
+
+        Args:
+            query: Sanitized user query.
+            titles: Candidate titles.
+
+        Returns:
+            Follow-up formulations.
+        """
+
         del query, titles
         critique_calls.append(1)
         return ("latest rainfall totals", "follow up weather desks")
@@ -240,7 +249,16 @@ def test_third_round_never_attempted() -> None:
     store = FakeStore()
 
     def _critique(query: str, titles: tuple[str, ...]) -> tuple[str, ...]:
-        """Return bounded follow-up search formulations."""
+        """Return bounded follow-up Web formulations.
+
+        Args:
+            query: Sanitized user query.
+            titles: Candidate titles.
+
+        Returns:
+            Follow-up formulations.
+        """
+
         del query, titles
         return ("follow-a", "follow-b", "follow-c", "follow-d")
 
@@ -469,7 +487,16 @@ def test_follow_up_company_passage_never_searched() -> None:
     search = FakeSearch()
 
     def _critique(query: str, titles: tuple[str, ...]) -> tuple[str, ...]:
-        """Return bounded follow-up search formulations."""
+        """Return bounded follow-up Web formulations.
+
+        Args:
+            query: Sanitized user query.
+            titles: Candidate titles.
+
+        Returns:
+            Follow-up formulations.
+        """
+
         del query, titles
         return ("latest news chunk_id=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",)
 
@@ -504,6 +531,23 @@ def test_web_scope_disabled_never_drafts() -> None:
     assert unconfigured["status"] == "routing_rejected"
     assert unconfigured["detail"] == "web_search_unconfigured"
     assert unconfigured["answer"] is None
+
+
+def test_current_user_turn_is_not_a_forbidden_web_snippet() -> None:
+    """The just-admitted user message must not block public Exa search."""
+
+    from smart_rag_agents.query.nodes.web_scope import forbidden_web_memory_snippets
+    from smart_rag_agents.query.state import pending_query_state
+
+    query = "What is the Exa search API according to public documentation?"
+    state = pending_query_state(user_query=query)
+    state["memory_records"] = [
+        {"content": query, "role": "user"},
+        {"content": "Our refund period is thirty calendar days.", "role": "assistant"},
+    ]
+    snippets = forbidden_web_memory_snippets(state)
+    assert query not in snippets
+    assert "Our refund period is thirty calendar days." in snippets
 
 
 def test_verify_answer_node_web_skips_model_verifier() -> None:

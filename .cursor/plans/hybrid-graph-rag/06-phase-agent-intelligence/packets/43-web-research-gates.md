@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 43
-status: pending
+status: complete
 title: "Verify integrated Web gates, then resume P06-17."
 requirement_ids: [P06-43]
 ---

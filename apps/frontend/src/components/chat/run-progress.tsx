@@ -20,6 +20,9 @@ export const STAGE_LABELS: Readonly<Record<string, string>> = {
   disclose_optional_tools: "Optional tools",
   generate_answer: "Generating…",
   verify_answer: "Verifying…",
+  web_scope: "Searching…",
+  web_search: "Searching…",
+  web_read: "Reading…",
 };
 
 /**
@@ -36,14 +39,20 @@ export function progressLabel(key: string): string {
  * Return the idle-hidden status line for an in-flight run.
  *
  * @param chat - Current view.
- * @returns Exactly one of Preparing…, Retrieving…, Generating…, Verifying…,
- *   or null when idle.
+ * @returns Exactly one of Preparing…, Retrieving…, Searching…, Reading…,
+ *   Generating…, Verifying…, or null when idle.
  */
 export function runStatusLine(chat: ChatViewState): string | null {
   if (chat.terminal !== null || chat.runId === null) {
     return null;
   }
   const raw = (chat.stage ?? "").toLowerCase();
+  if (raw.includes("web_search") || raw.includes("web_scope")) {
+    return "Searching…";
+  }
+  if (raw.includes("web_read")) {
+    return "Reading…";
+  }
   if (raw.includes("verif")) {
     return "Verifying…";
   }

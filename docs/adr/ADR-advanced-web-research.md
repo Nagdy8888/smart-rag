@@ -3,7 +3,7 @@ title: ADR — Advanced web research mode
 adr_id: ADR-advanced-web-research
 status: accepted
 owner: engineering-lead
-last-reviewed: 2026-09-14
+last-reviewed: 2026-09-15
 approver: "user (Cursor chat; no legal name provided)"
 approval_date: "2026-09-10"
 audience: engineering, reviewers, security, frontend
@@ -52,6 +52,12 @@ User named/date approvals on 2026-09-10:
 2. **Exactly one source.** Auto selects company RAG, general knowledge, or
    Web. Company-plus-web conflict returns clarification. No blended answer.
 3. **Exa.** Search uses Exa REST through pinned `httpx`. No `exa-py`.
+   Each call opens an ``AsyncClient`` on the running loop so LangGraph
+   ``web_scope`` (``asyncio.run`` in a worker thread) cannot reuse a
+   uvicorn-bound client. Per-run deps are injected via
+   ``QueryGraphContext`` plus a task-local binding so Ask Web cannot
+   silently use the empty compile-time fallback. `APP_ENV=local` is the
+   workstation gate for `WEB_SEARCH_ENABLED`; it is not local-file search.
 4. **Local/free-tier only.** `WEB_SEARCH_ENABLED` defaults false. Staging
    and production reject `true`. The existing local `EXA_API_KEY` is
    server-only and never logged or committed. Production Web stays disabled

@@ -14,7 +14,13 @@ from smart_rag_core.tables.plan import TableQueryPlan
 
 
 class MetaResponse(BaseModel):
-    """Compatibility handshake fields. Packet 6 owns enforcement."""
+    """Compatibility handshake fields. Packet 6 owns enforcement.
+
+    ``web_search_enabled`` is the runtime flag for public Exa web research.
+    It is never the Exa key and never means company-document search.
+    Hosted environments reject ``WEB_SEARCH_ENABLED=true`` at settings
+    load, so this field stays false in staging and production.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -22,6 +28,10 @@ class MetaResponse(BaseModel):
     sse_schema_version: str
     min_client_version: str
     pdf_eval_workspace: bool = False
+    web_search_enabled: bool = Field(
+        default=False,
+        description=("When true, the Ask dropdown may offer Web. Never includes keys."),
+    )
 
 
 class CurrentUserResponse(BaseModel):

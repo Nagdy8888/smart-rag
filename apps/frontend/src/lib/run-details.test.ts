@@ -12,6 +12,7 @@ import {
   runStatusLabel,
   runStatusSummary,
   runStatusTone,
+  searchModeRoute,
 } from "./run-details";
 
 describe("isRealDetailValue", () => {
@@ -35,6 +36,7 @@ describe("routeLabel", () => {
     expect(routeLabel("combined")).toBe("Combined");
     expect(routeLabel("structured_table")).toBe("Tables");
     expect(routeLabel("graph_inspection")).toBe("Graph inspection");
+    expect(routeLabel("web_research")).toBe("Web research");
     expect(routeLabel("<script>x</script>")).toBe("<script>x</script>");
     expect(routeLabel(null)).toBeNull();
     expect(routeLabel("none")).toBeNull();
@@ -46,8 +48,40 @@ describe("routeSummary", () => {
     expect(routeSummary("composite")).toBe(
       "Searches documents, tables, and relationships.",
     );
+    expect(routeSummary("web_research")).toBe(
+      "Searches the public web. Does not search company documents.",
+    );
     expect(routeSummary("custom_family")).toBeNull();
     expect(routeSummary(null)).toBeNull();
+  });
+});
+
+describe("searchModeRoute", () => {
+  it("prefers General and Web origin over the Composite envelope", () => {
+    expect(
+      searchModeRoute({
+        requestedSearchScope: "general_knowledge",
+        answerOrigin: "general_knowledge",
+        routeFamily: "composite",
+        diagnostics: { effectiveRoute: "composite" },
+      }),
+    ).toBe("no_retrieval");
+    expect(
+      searchModeRoute({
+        requestedSearchScope: "web",
+        answerOrigin: "web",
+        routeFamily: "composite",
+        diagnostics: { effectiveRoute: "web_research" },
+      }),
+    ).toBe("web_research");
+    expect(
+      searchModeRoute({
+        requestedSearchScope: "company_documents",
+        answerOrigin: "company_documents",
+        routeFamily: "composite",
+        diagnostics: { effectiveRoute: "composite" },
+      }),
+    ).toBe("composite");
   });
 });
 

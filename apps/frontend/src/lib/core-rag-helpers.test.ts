@@ -1,12 +1,49 @@
 import { describe, expect, it } from "vitest";
-import { citationChipHref } from "./citation-drawer";
+import { citationChipHref, hrefForCitationRecord } from "./citation-drawer";
 import { COMPOSER_MAX_CHARS, composerDraftIsSendable } from "./composer";
 import { objectNameForUpload } from "./upload-client";
 
 describe("citationChipHref", () => {
-  it("never returns a privileged or public href (GAP-07-09)", () => {
+  it("never returns a privileged or public href for company citations (GAP-07-09)", () => {
     expect(citationChipHref("https://storage.example/secret")).toBeNull();
+    expect(
+      citationChipHref("https://example.test/doc", "company_document"),
+    ).toBeNull();
     expect(citationChipHref("javascript:alert(1)")).toBeNull();
+  });
+
+  it("returns a safe http(s) href only for web citations", () => {
+    expect(citationChipHref("https://example.test/page", "web")).toBe(
+      "https://example.test/page",
+    );
+    expect(citationChipHref("http://example.test/page", "web")).toBe(
+      "http://example.test/page",
+    );
+    expect(citationChipHref("javascript:alert(1)", "web")).toBeNull();
+    expect(citationChipHref("/relative", "web")).toBeNull();
+  });
+
+  it("never turns a company citation into an href even with https provenance", () => {
+    expect(
+      hrefForCitationRecord({
+        citation_id: "c1",
+        citation_index: 1,
+        chunk_id: "ch1",
+        provenance: { url: "https://storage.example/secret" },
+        source_unavailable: false,
+        source_kind: "company_document",
+      }),
+    ).toBeUndefined();
+    expect(
+      hrefForCitationRecord({
+        citation_id: "c2",
+        citation_index: 1,
+        chunk_id: null,
+        provenance: { url: "https://example.test/page" },
+        source_unavailable: false,
+        source_kind: "web",
+      }),
+    ).toBe("https://example.test/page");
   });
 });
 

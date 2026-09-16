@@ -2,7 +2,7 @@
 title: Database connections and pool budgets
 owner: engineering-lead
 status: proven
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-15
 audience: engineering, ops
 phase_packet: Phase 2 Packet 6
 ---
@@ -88,6 +88,30 @@ Transaction pooling must not carry session GUC identity; checkpointer and
 LightRAG never use transaction mode. `app.validate_caller_context` takes typed
 arguments only (contract: `tests/contract/test_connection_budgets.py`).
 
+## Prepared statements on the transaction pooler
+
+Supavisor transaction mode (port `6543`) reuses backend sessions across
+clients. Psycopg 3 names prepared statements by default; a later checkout
+then raises `DuplicatePreparedStatement` during Hybrid retrieve, citation
+persist, or conversation RPC.
+
+Runtime rule: every FastAPI/query `psycopg.connect` that may use
+`API_SUPABASE_DB_URL` / `SUPABASE_DB_URL` must go through
+`smart_rag_core.settings.postgres_connect.connect_postgres`, which sets
+`prepare_threshold=None`. SSE event-store and LangGraph checkpointer already
+disable prepares (`prepare_threshold=None` / `0`). asyncpg LightRAG uses
+`statement_cache_size=0`. Do not add named prepares on pooler DSNs.
+
+```mermaid
+flowchart LR
+  api["FastAPI / query retrieve"] --> helper["connect_postgres\nprepare_threshold=None"]
+  helper --> pooler["Supavisor txn 6543"]
+  sse["SSE event store"] --> pooler
+  checkpointer["LangGraph checkpointer"] --> session["Session/direct 5432"]
+```
+
+Verification: `uv run pytest tests/unit/test_postgres_dsn.py tests/unit/test_hybrid_run.py tests/unit/test_general_chat_generate.py -q`
+
 ## Role timeouts / work_mem / application_name
 
 Applied in `20260813150000_audit_chain_role_timeouts_v1.sql` and introspected via
@@ -132,4 +156,5 @@ uv run pytest tests/contract/test_connection_budgets.py -q
 
 Related: [06-database-workload-isolation.md](./06-database-workload-isolation.md) ·
 [08-data-dictionary.md](./08-data-dictionary.md) ·
-[AUDIT_CHAIN.md](../security/AUDIT_CHAIN.md)
+[AUDIT_CHAIN.md](../security/AUDIT_CHAIN.md) ·
+[CONFIGURATION.md](../development/CONFIGURATION.md)

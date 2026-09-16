@@ -13,6 +13,7 @@ const ROUTE_LABELS: Readonly<Record<string, string>> = {
   composite: "Composite",
   structured_table: "Tables",
   graph_inspection: "Graph inspection",
+  web_research: "Web research",
   no_retrieval: "No document search",
   NoRetrieval: "No document search",
 };
@@ -23,6 +24,7 @@ const ROUTE_SUMMARIES: Readonly<Record<string, string>> = {
   composite: "Searches documents, tables, and relationships.",
   structured_table: "Reads authorized spreadsheet and table values.",
   graph_inspection: "Inspects the graph only. This is not an answering mode.",
+  web_research: "Searches the public web. Does not search company documents.",
   no_retrieval: "Did not search company documents.",
   NoRetrieval: "Did not search company documents.",
 };
@@ -218,10 +220,46 @@ export function routeIcon(route: string | null | undefined): IconName {
   if (route === "graph_inspection") {
     return "graph";
   }
-  if (route === "hybrid" || route === "combined" || route === "composite") {
+  if (route === "hybrid" || route === "combined" || route === "composite" || route === "web_research") {
     return "search";
   }
   return "spark";
+}
+
+export type SearchModeChatSlice = {
+  requestedSearchScope: string | null;
+  answerOrigin: string | null;
+  routeFamily: string | null;
+  diagnostics: { effectiveRoute: string | null };
+};
+
+/**
+ * Return the user-facing search-mode catalog key for Run details.
+ *
+ * Composite is the Auto envelope, not the operator-facing source. General
+ * and Web answers must not inherit “Searches documents…” copy from that
+ * envelope.
+ *
+ * @param chat - Scope, origin, and envelope diagnostics for the current run.
+ * @returns Catalog route key, or null when nothing real is present.
+ */
+export function searchModeRoute(chat: SearchModeChatSlice): string | null {
+  const origin = chat.answerOrigin;
+  const scope = chat.requestedSearchScope;
+  if (
+    origin === "general_knowledge" ||
+    scope === "general_knowledge" ||
+    origin === "user_supplied_text" ||
+    scope === "user_supplied_text" ||
+    origin === "ambiguous" ||
+    origin === "deterministic"
+  ) {
+    return "no_retrieval";
+  }
+  if (origin === "web" || scope === "web") {
+    return "web_research";
+  }
+  return chat.diagnostics.effectiveRoute ?? chat.routeFamily;
 }
 
 /**

@@ -568,3 +568,31 @@ def no_retrieval_mode_for_scope(scope: KnowledgeScope) -> NoRetrievalAnswerMode 
         KnowledgeScope.WEB: None,
     }
     return mapping[scope]
+
+
+from smart_rag_core.query_routing.knowledge_scope_preference import (  # noqa: E402
+    apply_requested_search_scope,
+)
+
+__all__ = [
+    "SCOPE_CONFIDENCE_THRESHOLD",
+    "KnowledgeScope",
+    "KnowledgeScopeDecision",
+    "MemoryLike",
+    "NoRetrievalAnswerMode",
+    "ScopeDegradationReason",
+    "apply_requested_search_scope",
+    "classify_knowledge_scope",
+    "company_intent_signal",
+    "general_intent_signal",
+    "has_company_fixture",
+    "has_company_followup_memory",
+    "has_company_phrase",
+    "has_general_fixture",
+    "has_web_intent",
+    "has_web_privacy_risk",
+    "mock_profile_knowledge_scope",
+    "no_retrieval_mode_for_scope",
+    "parse_model_knowledge_scope",
+    "scope_requires_model",
+]

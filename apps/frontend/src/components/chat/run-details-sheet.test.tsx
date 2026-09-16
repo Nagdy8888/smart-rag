@@ -89,7 +89,7 @@ describe("RunDetailsSheet", () => {
     expect(details).toHaveTextContent("Verified and ready.");
     expect(details).toHaveTextContent("Composite");
     expect(details).toHaveTextContent("Requested source");
-    expect(details).toHaveTextContent("Company files");
+    expect(details).toHaveTextContent("Company documents");
     expect(details).toHaveTextContent("Answer origin");
     expect(details).toHaveTextContent("Company documents");
     expect(details).toHaveTextContent("Searches documents, tables, and relationships.");
@@ -176,5 +176,22 @@ describe("RunDetailsSheet", () => {
     expect(thisChat).toHaveTextContent("1,064");
     expect(details).toHaveTextContent("This run 258 prompt · 32 completion");
     expect(details).toHaveTextContent("This chat 958 prompt · 106 completion");
+  });
+
+  it("labels a General answer as no document search, not Composite", () => {
+    const chat: ChatViewState = {
+      ...completedComposite(),
+      requestedSearchScope: "general_knowledge",
+      answerOrigin: "general_knowledge",
+    };
+    renderSheet(chat);
+    const details = screen.getByTestId("advanced-diagnostics");
+    expect(details).toHaveTextContent("No document search");
+    expect(details).toHaveTextContent("Did not search company documents.");
+    expect(details).toHaveTextContent("Requested source");
+    expect(details).toHaveTextContent("General");
+    expect(details).not.toHaveTextContent(
+      "Searches documents, tables, and relationships.",
+    );
   });
 });

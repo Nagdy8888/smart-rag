@@ -146,14 +146,14 @@ def run_web_research(
     counters = _Counters()
 
     def _cancel() -> None:
-        """Abort when the caller cancelled this Web research run."""
+        """Abort remaining Exa work when the caller cancelled."""
 
         if cancel_check is not None and cancel_check():
             search.aclose()
             raise WebResearchError("cancelled")
 
     def _bump() -> None:
-        """Count one external operation or fail when the budget is exhausted."""
+        """Consume one external operation slot or fail closed."""
 
         if counters.ops >= WEB_MAX_EXTERNAL_OPS:
             raise WebResearchError("web_round_exhausted")
@@ -164,7 +164,7 @@ def run_web_research(
     candidates_by_url: dict[str, ExaSearchCandidate] = {}
 
     def _search_one(formulation: str, key: str, *, round_index: int) -> None:
-        """Execute one recorded search operation.
+        """Run one recorded Exa search for a sanitized formulation.
 
         Args:
             formulation: Sanitized Exa query.
@@ -183,7 +183,7 @@ def run_web_research(
             progress(WEB_PROGRESS_SEARCH)
 
         def _worker() -> None:
-            """Call Exa search and merge allow-listed candidates."""
+            """Execute one Exa search and merge allow-listed candidates."""
 
             try:
                 response = search.search(
@@ -233,7 +233,7 @@ def run_web_research(
             progress(WEB_PROGRESS_READ)
 
         def _contents() -> None:
-            """Call Exa contents for the current allow-listed URLs."""
+            """Fetch bounded contents for the current allow-listed URLs."""
 
             try:
                 response = search.get_contents(
@@ -285,13 +285,13 @@ def run_web_research(
                 progress(WEB_PROGRESS_READ)
 
             def _fetch(target: str = url) -> str | None:
-                """Fetch one allow-listed URL through the crawl proxy.
+                """Fetch one allow-listed page through the crawl proxy.
 
                 Args:
-                    target: Candidate URL, defaulting to the current loop URL.
+                    target: Candidate URL.
 
                 Returns:
-                    Extracted text, or None when the proxy returns nothing.
+                    Extracted text, or None when empty.
                 """
 
                 return fetch.fetch_text(target, allowed_urls=frozenset(allowed))

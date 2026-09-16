@@ -88,13 +88,15 @@ export const ANSWER_ORIGINS = [
   "user_supplied_text",
   "deterministic",
   "ambiguous",
+  "web",
 ] as const;
 
 /** Client source preference. Not authorization and not answer origin. */
 export const REQUESTED_SEARCH_SCOPES = [
-  "company_documents",
   "auto",
+  "company_documents",
   "general_knowledge",
+  "web",
 ] as const;
 
 /** One catalog answer origin. Unknown values are tolerated at the reducer. */
@@ -102,6 +104,14 @@ export type AnswerOrigin = (typeof ANSWER_ORIGINS)[number];
 
 /** Source preference sent on paid POST and echoed on the admitted run. */
 export type RequestedSearchScope = (typeof REQUESTED_SEARCH_SCOPES)[number];
+
+/** Exact Ask dropdown labels. Origin banners use ``answerOriginLabel``. */
+export const SEARCH_SCOPE_LABELS: Record<RequestedSearchScope, string> = {
+  auto: "Auto",
+  company_documents: "Company documents",
+  general_knowledge: "General",
+  web: "Web",
+};
 
 /** Exact unmerged thumbs-up tags. */
 export const FEEDBACK_TAGS_UP = [
@@ -148,7 +158,7 @@ export function feedbackTagsFor(thumbsUp: boolean): readonly FeedbackTag[] {
  * Return whether a value is a known requested search scope.
  *
  * @param value - Untrusted string.
- * @returns True for the three catalog values.
+ * @returns True for the four catalog values.
  */
 export function isRequestedSearchScope(
   value: string,
@@ -168,11 +178,5 @@ export function requestedSearchScopeLabel(
   if (scope === null) {
     return null;
   }
-  if (scope === "company_documents") {
-    return "Company files";
-  }
-  if (scope === "auto") {
-    return "Auto";
-  }
-  return "General knowledge";
+  return SEARCH_SCOPE_LABELS[scope];
 }

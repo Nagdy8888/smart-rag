@@ -106,11 +106,21 @@ describe("classifyApiError", () => {
     });
   });
 
-  it("maps 503 to limiter fail-closed", () => {
+  it("maps 503 limiter_unavailable to fail-closed and Web details to unavailable", () => {
     expect(classifyApiError(503, { detail: "limiter_unavailable" })).toEqual({
       kind: "fail_closed",
       status: 503,
       detail: "limiter_unavailable",
+    });
+    expect(classifyApiError(503, { detail: "web_search_disabled" })).toEqual({
+      kind: "unavailable",
+      status: 503,
+      detail: "web_search_disabled",
+    });
+    expect(classifyApiError(503, { detail: "web_search_unconfigured" })).toEqual({
+      kind: "unavailable",
+      status: 503,
+      detail: "web_search_unconfigured",
     });
   });
 
@@ -1594,6 +1604,55 @@ describe("listCitations without snippets", () => {
     ]);
     expect(JSON.stringify(citations)).not.toContain("SECRET");
     expect(JSON.stringify(citations)).not.toContain("snippet");
+  });
+
+  it("keeps web source_kind and URL while dropping excerpt", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            citation_id: "cite-web",
+            citation_index: 0,
+            chunk_id: null,
+            provenance: {
+              source_kind: "web",
+              url: "https://example.test/brief",
+              title: "Brief",
+              excerpt: "SECRET PASSAGE",
+            },
+            source_unavailable: false,
+            source_kind: "web",
+            web_source_id: "ws-1",
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const citations = await listCitations(
+      { accessToken: "jwt-token" },
+      "run-web",
+      fetchImpl,
+    );
+    expect(citations).toEqual([
+      {
+        citation_id: "cite-web",
+        citation_index: 0,
+        chunk_id: null,
+        provenance: {
+          source_kind: "web",
+          url: "https://example.test/brief",
+          title: "Brief",
+        },
+        source_unavailable: false,
+        source_kind: "web",
+        web_source_id: "ws-1",
+        paragraph_index: null,
+        document_title: null,
+        pdf_page_number: null,
+        evidence_excerpt: null,
+      },
+    ]);
+    expect(JSON.stringify(citations)).not.toContain("SECRET");
+    expect(citations[0]?.provenance).not.toHaveProperty("excerpt");
   });
 
   it("keeps top-level evidence_excerpt and drops provenance excerpt copies", async () => {

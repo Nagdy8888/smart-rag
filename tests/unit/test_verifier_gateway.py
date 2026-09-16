@@ -31,6 +31,24 @@ from smart_rag_core.query_fusion.models import (
 )
 
 
+def _object_map(value: object) -> dict[str, object]:
+    """Return a string-keyed mapping from one JSON object.
+
+    Args:
+        value: Parsed JSON object.
+
+    Returns:
+        Mapping with string keys.
+
+    Raises:
+        AssertionError: When ``value`` is not a mapping.
+    """
+
+    assert isinstance(value, dict)
+    typed = cast(dict[object, object], value)
+    return {str(key): item for key, item in typed.items()}
+
+
 def _fusion() -> FusionResult:
     """Return Hybrid-effective fusion with one canonical passage.
 
@@ -199,12 +217,11 @@ def test_verifier_json_schema_bounds_reason() -> None:
     """OpenAI structured output must cap reason length to the Pydantic field."""
 
     schema = verifier_json_schema(("l1",))
-    properties = schema["properties"]
-    assert isinstance(properties, dict)
-    verdicts = cast(dict[str, object], properties["link_verdicts"])
-    items = cast(dict[str, object], verdicts["items"])
-    item_properties = cast(dict[str, object], items["properties"])
-    reason = cast(dict[str, object], item_properties["reason"])
+    properties = _object_map(schema["properties"])
+    verdicts = _object_map(properties["link_verdicts"])
+    items = _object_map(verdicts["items"])
+    item_properties = _object_map(items["properties"])
+    reason = _object_map(item_properties["reason"])
     assert reason["minLength"] == 1
     assert reason["maxLength"] == 128
 
@@ -262,6 +279,6 @@ def test_verify_answer_node_invalid_answer_payload_is_partial() -> None:
     verified = verify_answer_node(state, QueryGraphDeps())
     assert verified["status"] == "verified_partial"
     assert verified["detail"] == "payload_schema_invalid"
-    answer_payload = verified["answer"]
-    assert isinstance(answer_payload, dict)
-    assert answer_payload["answer_text"] == "kept"
+    answer = verified["answer"]
+    assert isinstance(answer, dict)
+    assert answer["answer_text"] == "kept"

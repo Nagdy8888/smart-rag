@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
@@ -185,7 +185,9 @@ describe("GraphExplorer", () => {
   it("inspects from a document seed without entity chips", async () => {
     navState.search = new URLSearchParams("documentId=11111111-1111-4111-8111-111111111111");
     renderSurface(<GraphExplorer />);
-    fireEvent.click(await screen.findByRole("button", { name: "Inspect graph" }));
+    const inspect = await screen.findByRole("button", { name: "Inspect graph" });
+    await waitFor(() => expect(inspect).toBeEnabled());
+    fireEvent.click(inspect);
     await screen.findByText("hop 1");
     const body = inspectGraph.mock.calls[0]?.[1] as { document_id: string; entity_keys: string[] };
     expect(body.document_id).toBe("11111111-1111-4111-8111-111111111111");

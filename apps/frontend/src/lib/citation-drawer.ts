@@ -1,9 +1,11 @@
 /**
  * Source-drawer contract (GAP-07-09). Citation ids and provenance text only.
- * No privileged Storage URL. Preview/download are unavailable.
+ * Company Storage URLs stay non-href. Preview/download are unavailable.
+ * Web chips may use a public http(s) URL after `isSafeHttpUrl`.
  */
 
 import { isSafeHttpUrl } from "./safe-text";
+import type { CitationResponse } from "./types";
 
 /** Honest GAP copy. No preview HTTP. */
 export const SOURCE_PREVIEW_UNAVAILABLE =
@@ -17,17 +19,39 @@ export const INFERENCE_LINKS_UNAVAILABLE =
 export const DOCUMENT_NOT_FOUND_COPY = "Not found.";
 
 /**
- * Return a citation chip href. Always `null` in this packet so privileged
- * Storage URLs cannot leak into `href`.
+ * Return a citation chip href for Web sources only.
  *
- * Public http(s) provenance URLs are shown as text, not as anchors.
+ * Company rows always return null so privileged Storage URLs cannot leak
+ * into `href`. Web rows require `isSafeHttpUrl`.
  *
- * @param _url - Provenance URL candidate. Ignored for `href`.
- * @returns Always `null`.
+ * @param url - Provenance URL candidate.
+ * @param sourceKind - Citation discriminator. Defaults to company.
+ * @returns Safe http(s) URL, or null.
  */
-export function citationChipHref(_url: unknown): null {
-  void _url;
-  return null;
+export function citationChipHref(
+  url: unknown,
+  sourceKind: CitationResponse["source_kind"] = "company_document",
+): string | null {
+  if (sourceKind !== "web") {
+    return null;
+  }
+  if (typeof url !== "string" || !isSafeHttpUrl(url)) {
+    return null;
+  }
+  return url;
+}
+
+/**
+ * Return a chip href from a citation row.
+ *
+ * @param citation - Authorized citation. Hostile provenance.
+ * @returns Safe Web URL, or undefined for company and unsafe URLs.
+ */
+export function hrefForCitationRecord(
+  citation: CitationResponse,
+): string | undefined {
+  const url = citation.provenance.url ?? citation.provenance.source_url;
+  return citationChipHref(url, citation.source_kind) ?? undefined;
 }
 
 /**

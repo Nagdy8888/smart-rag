@@ -755,7 +755,7 @@
       "contract_owner": "fastapi-sse",
       "contract": "POST /conversations/{id}/messages search_scope",
       "role": "authenticated",
-      "success_state": "company files, auto, or general knowledge",
+      "success_state": "auto, company documents, general, or web when /api/meta web_search_enabled",
       "failure_state": "422 validation_failed",
       "idempotency": "bound to Idempotency-Key",
       "disposition": "keep",

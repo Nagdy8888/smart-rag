@@ -150,7 +150,7 @@ export async function loadConsoleReadiness(
  * GET `/api/meta` without authentication.
  *
  * @param fetchImpl - Injected fetch.
- * @returns Handshake fields.
+ * @returns Handshake fields. Capability flags default false.
  * @throws Error when the response is not ok, unparsable, or times out after 8s.
  */
 export async function fetchMeta(
@@ -172,6 +172,7 @@ export async function fetchMeta(
     sse_schema_version: String(body.sse_schema_version ?? ""),
     min_client_version: minClientVersion,
     pdf_eval_workspace: body.pdf_eval_workspace === true,
+    web_search_enabled: body.web_search_enabled === true,
   };
 }
 

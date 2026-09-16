@@ -60,7 +60,7 @@ appear in `NEXT_PUBLIC_*`. UI role hiding is convenience only.
 
 | Concern | Contract | Source |
 | --- | --- | --- |
-| Publish | `GET /api/meta` → `api_version`, `sse_schema_version`, `min_client_version` | `MetaResponse` |
+| Publish | `GET /api/meta` → `api_version`, `sse_schema_version`, `min_client_version`, additive `pdf_eval_workspace`, additive `web_search_enabled` (default false; never keys) | `MetaResponse` |
 | Enforce | `X-Client-Version` on `POST /conversations/{conversation_id}/messages` only | `enforce_client_handshake` |
 | Below minimum | HTTP **426** `client_version_unsupported` before reserve | `client_handshake.py` |
 | Client pin | Frontend `CLIENT_VERSION` = `0.1.0` | `apps/frontend/src/lib/client-version.ts` |
@@ -74,9 +74,12 @@ appear in `NEXT_PUBLIC_*`. UI role hiding is convenience only.
 
 `SubmitMessageRequest` fields are `message`, optional `idempotency_key`,
 and optional `search_scope` (`auto` | `company_documents` |
-`general_knowledge`). There is **no** client route override. Admission is
-Auto Composite (`route_family` is server-derived). Manual
-Hybrid/Combined/table/inspection controls are [GAP-07-01](#gap-register).
+`general_knowledge` | `web`). There is **no** client route override.
+Admission is Auto Composite (`route_family` is server-derived) unless
+forced `web` reserves `web_research`. Manual Hybrid/Combined/table/inspection
+controls are [GAP-07-01](#gap-register). Ask labels are Auto, Company
+documents, General, Web. Web is always listed. Forced Web still
+requires `web_search_enabled`; the API returns 503 when the flag is false.
 
 ## SSE catalog
 
@@ -129,6 +132,8 @@ Those are [GAP-07-02](#gap-register).
 | --- | --- | --- |
 | `rate_limited` | 429 + `Retry-After` | FastAPI limiter |
 | `limiter_unavailable` | 503 + `Retry-After` | Mutation limiter fail-closed |
+| `web_search_disabled` | 503 + `Retry-After` | Forced Web while `WEB_SEARCH_ENABLED` is false; no reservation |
+| `web_search_unconfigured` | 503 + `Retry-After` | Forced Web while Exa is missing; no reservation |
 | `authorization_rejected` / `forbidden` | 403 | Role/capability |
 | `MFA required` | removed | Backend P08-11 + frontend P08-12: no MFA kind, route, or banner |
 | `not_found` | 404 | Missing, unauthorized, tombstone, IDOR |

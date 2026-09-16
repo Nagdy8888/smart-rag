@@ -199,4 +199,34 @@ describe("paragraph citation grouping", () => {
     expect(citationsForParagraph([mapped, legacy], 0)).toEqual([mapped]);
     expect(unmappedCitations([mapped, legacy], 1)).toEqual([legacy]);
   });
+
+  it("labels web citations with title and URL, never a company document title", () => {
+    expect(
+      citationSourceLabel(
+        citation({
+          source_kind: "web",
+          chunk_id: null,
+          provenance: {
+            title: "Example briefing",
+            url: "https://example.test/brief",
+          },
+        }),
+      ),
+    ).toBe("Example briefing");
+    expect(
+      citationLocatorFields(
+        citation({
+          source_kind: "web",
+          chunk_id: null,
+          provenance: {
+            title: "Example briefing",
+            url: "https://example.test/brief",
+          },
+        }),
+      ).locators,
+    ).toEqual([
+      { key: "title", label: "Title", value: "Example briefing" },
+      { key: "url", label: "URL", value: "https://example.test/brief" },
+    ]);
+  });
 });

@@ -38,19 +38,16 @@ FIXTURE_SHA256 = {
 
 
 def _sha256(path: Path) -> str:
-    """Return the LF-normalized hex digest of a fixture file.
-
-    Git may check the same JSON out with CRLF on Windows. The pin is the
-    committed LF bytes so Linux CI and local Windows agree.
+    """Return the hex digest of a fixture file.
 
     Args:
         path: Fixture path.
 
     Returns:
-        SHA-256 hex digest of LF-normalized bytes.
+        SHA-256 hex digest.
     """
 
-    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_official_docs_pins_are_current() -> None:
@@ -101,7 +98,15 @@ def test_search_request_body_matches_documented_fields() -> None:
     captured: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        """Return a mocked Exa HTTP response."""
+        """Return one mocked Exa HTTP response.
+
+        Args:
+            request: Mock transport request.
+
+        Returns:
+            Synthetic HTTP response.
+        """
+
         captured["url"] = str(request.url)
         captured["body"] = json.loads(request.content.decode("utf-8"))
         payload = json.loads(
@@ -110,7 +115,8 @@ def test_search_request_body_matches_documented_fields() -> None:
         return httpx.Response(200, json=payload)
 
     async def _run() -> None:
-        """Exercise one mocked gateway call."""
+        """Run the bounded gateway call under test."""
+
         gateway = ExaSearchGateway(
             api_key=SecretStr("contract-key"),
             transport=httpx.MockTransport(handler),

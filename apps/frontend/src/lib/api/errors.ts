@@ -20,6 +20,24 @@ export type FailClosedFailure = {
   detail: string;
 };
 
+/**
+ * Service-unavailable admission that is not Valkey limiter fail-closed.
+ *
+ * Forced Web uses 503 `web_search_disabled` / `web_search_unconfigured`.
+ * Limiter outages stay `fail_closed`.
+ */
+export type UnavailableFailure = {
+  kind: "unavailable";
+  status: number;
+  detail: string;
+};
+
+/** Admission 503s that are not Valkey limiter fail-closed. */
+const UNAVAILABLE_DETAILS = new Set([
+  "web_search_disabled",
+  "web_search_unconfigured",
+]);
+
 export type BudgetFailure = {
   kind: "budget";
   detail: string;
@@ -59,6 +77,7 @@ export type ApiFailure =
   | HandshakeFailure
   | AuthFailure
   | FailClosedFailure
+  | UnavailableFailure
   | BudgetFailure
   | RateFailure
   | DeletedFailure
@@ -192,10 +211,14 @@ export function classifyApiError(
     };
   }
   if (status === 503) {
+    const detail = sanitizedDetail(body, "limiter_unavailable");
+    if (UNAVAILABLE_DETAILS.has(detail)) {
+      return { kind: "unavailable", status, detail };
+    }
     return {
       kind: "fail_closed",
       status,
-      detail: sanitizedDetail(body, "limiter_unavailable"),
+      detail,
     };
   }
   if (status === 404) {

@@ -35,7 +35,11 @@ from smart_rag_core.query_routing.knowledge_scope_preference import (
     apply_requested_search_scope,
 )
 from smart_rag_core.query_routing.matrix import compile_retrieval_plan
-from smart_rag_core.query_routing.models import BranchKind
+from smart_rag_core.query_routing.models import (
+    BranchKind,
+    QueryPreparation,
+    RetrievalPlan,
+)
 from smart_rag_core.query_routing.preparation import prepare_query
 from smart_rag_core.search_scope import RequestedSearchScope
 from smart_rag_core.security.identity import CallerContext, UserRole
@@ -45,6 +49,24 @@ from smart_rag_core.tools.constants import CORE_FORBIDDEN_TOOL_KEYS
 
 from tests.support.scope_graph import COMPANY_ONLY_NODES, SpyHybrid
 from tests.support.typed_graph import compile_state_graph
+
+
+def _object_map(value: object) -> dict[str, object]:
+    """Return a string-keyed mapping from one JSON object.
+
+    Args:
+        value: Parsed JSON object.
+
+    Returns:
+        Mapping with string keys.
+
+    Raises:
+        AssertionError: When ``value`` is not a mapping.
+    """
+
+    assert isinstance(value, dict)
+    typed = cast(dict[object, object], value)
+    return {str(key): item for key, item in typed.items()}
 
 
 def _runtime(
@@ -94,35 +116,34 @@ def _runtime(
     )
 
 
-def _schema_mapping(value: object) -> dict[str, object]:
-    """Copy a JSON object into a string-keyed mapping.
+def _prep(
+    query: str,
+    *,
+    requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
+    route_family: Phase6RouteFamily = Phase6RouteFamily.COMPOSITE,
+    runtime: AuthorizedRuntimeContext | None = None,
+) -> QueryPreparation:
+    """Prepare one query on the deterministic path.
 
     Args:
-        value: Untrusted schema fragment.
+        query: Original user text.
+        requested_search_scope: Client source preference.
+        route_family: Reserved family.
+        runtime: Optional admission envelope. Built when omitted.
 
     Returns:
-        A shallow dict copy, or empty when ``value`` is not a mapping.
+        Frozen query preparation.
     """
 
-    if isinstance(value, dict):
-        typed = cast(dict[object, object], value)
-        return {str(key): item for key, item in typed.items()}
-    return {}
-
-
-def _schema_enum(value: object) -> list[object]:
-    """Copy a JSON array used as a schema enum.
-
-    Args:
-        value: Untrusted schema fragment.
-
-    Returns:
-        A list copy, or empty when ``value`` is not a list.
-    """
-
-    if isinstance(value, list):
-        return list(cast(list[object], value))
-    return []
+    bound_runtime = runtime or _runtime(
+        requested_search_scope=requested_search_scope,
+        route_family=route_family,
+    )
+    return prepare_query(
+        query,
+        runtime=bound_runtime,
+        requested_search_scope=requested_search_scope,
+    )
 
 
 def _plan(
@@ -130,7 +151,7 @@ def _plan(
     *,
     requested_search_scope: RequestedSearchScope = RequestedSearchScope.AUTO,
     route_family: Phase6RouteFamily = Phase6RouteFamily.COMPOSITE,
-):
+) -> RetrievalPlan:
     """Compile a retrieval plan for one query.
 
     Args:
@@ -147,10 +168,11 @@ def _plan(
         route_family=route_family,
     )
     return compile_retrieval_plan(
-        prepare_query(
+        _prep(
             query,
-            runtime=runtime,
             requested_search_scope=requested_search_scope,
+            route_family=route_family,
+            runtime=runtime,
         ),
         runtime,
     )
@@ -345,7 +367,7 @@ def test_web_envelope_never_hybrid_clamps() -> None:
     """A Web plan that cannot fit the reservation rejects instead of Hybrid."""
 
     runtime = _runtime(route_family=Phase6RouteFamily.HYBRID)
-    prep = prepare_query("search the web for latest news", runtime=runtime)
+    prep = _prep("search the web for latest news", runtime=runtime)
     with pytest.raises(QueryRoutingError, match="web_envelope_cannot_fit"):
         compile_retrieval_plan(prep, runtime)
     composite = _runtime(route_family=Phase6RouteFamily.COMPOSITE)
@@ -365,26 +387,29 @@ def test_web_envelope_never_hybrid_clamps() -> None:
 def test_openapi_includes_web_scope_and_answer_origin() -> None:
     """Public contracts accept ``web`` search scope and ``answer_origin=web``."""
 
-    schema = SubmitMessageRequest.model_json_schema()
-    defs = _schema_mapping(schema.get("$defs") or schema.get("definitions"))
-    scope = _schema_mapping(defs.get("RequestedSearchScope")) or _schema_mapping(schema)
-    enum_values = _schema_enum(scope.get("enum"))
+    schema = _object_map(SubmitMessageRequest.model_json_schema())
+    defs_candidate: object = schema.get("$defs") or schema.get("definitions") or {}
+    defs = _object_map(defs_candidate)
+    scope_candidate: object = defs.get("RequestedSearchScope") or schema
+    scope = _object_map(scope_candidate)
+    enum_values = scope.get("enum")
+    assert isinstance(enum_values, list)
     assert "web" in enum_values
     assert "auto" in enum_values
     origin = AnswerOriginPayload(origin="web")
     assert origin.origin == "web"
-    properties = _schema_mapping(query_profile_json_schema().get("properties"))
-    knowledge = _schema_mapping(properties.get("knowledge_scope"))
-    any_of = knowledge.get("anyOf")
-    assert isinstance(any_of, list)
+    properties = _object_map(query_profile_json_schema()["properties"])
+    knowledge = _object_map(properties["knowledge_scope"])
+    any_of_raw = knowledge["anyOf"]
+    assert isinstance(any_of_raw, list)
     string_enum: dict[str, object] | None = None
-    for raw in cast(list[object], any_of):
-        mapping = _schema_mapping(raw)
-        if "enum" in mapping:
-            string_enum = mapping
+    for item in cast(list[object], any_of_raw):
+        mapped = _object_map(item)
+        if "enum" in mapped:
+            string_enum = mapped
             break
     assert string_enum is not None
-    assert "web" in _schema_enum(string_enum.get("enum"))
+    assert "web" in cast(list[object], string_enum["enum"])
 
 
 def test_optional_catalog_still_has_no_web_search() -> None:

@@ -28,6 +28,7 @@ from smart_rag_core.query_routing.models import (
 )
 from smart_rag_core.query_routing.preparation import PrepModelCaller
 from smart_rag_core.security.identity import CallerContext
+from smart_rag_core.settings.postgres_connect import connect_postgres
 from smart_rag_core.tables.executor import TableSandboxError
 from smart_rag_core.tables.refusals import TableQueryRefusal
 from smart_rag_core.tables.resolver import PostgresTableResolver, TableResolveError
@@ -239,7 +240,7 @@ def bind_table_executor(postgres_url: str) -> TableExecuteLike:
         if plan is None:
             return None
         try:
-            with psycopg.connect(postgres_url) as connection:
+            with connect_postgres(postgres_url) as connection:
                 connection.execute("SET ROLE app_api")
                 resolver = PostgresTableResolver(connection, local_root=Path("."))
                 return structured_table_query(plan, caller=caller, resolver=resolver)

@@ -33,7 +33,8 @@ export type CitationChipProps = {
  * @returns Anchor when `href` is set, otherwise a button or span.
  * @remarks
  * Security: `href` is not validated here. Do not pass `javascript:` URLs.
- * GAP-07-09 keeps production `href` null. Passage text is never rendered.
+ * Callers set `href` only for `source_kind=web` after `isSafeHttpUrl`.
+ * Company chips stay buttons. Passage text is never rendered.
  */
 export function CitationChip({
   index,

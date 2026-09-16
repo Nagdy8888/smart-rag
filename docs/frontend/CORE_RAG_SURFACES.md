@@ -36,7 +36,7 @@ Related: [ADR-ink-indigo-visual-refresh.md](../adr/ADR-ink-indigo-visual-refresh
 
 | Route | Surface |
 | --- | --- |
-| `/` | Ask workspace. 280px Sessions rail, persisted transcript, composer card, citation drawers |
+| `/` | Ask workspace. 280px Sessions rail at `>=1280px`; stacked compact rail below that; persisted transcript, composer card, citation drawers |
 | `/documents` | Library, import/upload/crawl, keyset pagination, owner/admin delete |
 | `/documents/[documentId]` | Metadata, shared IngestionStatus timeline, graph seed, tables list |
 | `/graph` | Search → chips → Inspect graph; list-first plus optional React Flow |
@@ -78,7 +78,7 @@ flowchart TD
 | --- | --- |
 | GAP-07-01 | Auto envelope only. Advanced panel is display-only of `route_family` and `route_correction`. No Hybrid/Combined/Table/Inspect send buttons. `search_scope` is allowed |
 | GAP-07-02 | SSE catalog only. Inference-chain objects are absent; citation chips only |
-| GAP-07-09 | Source drawer: company PDFs show typed book title, toolbar PDF page, optional section, and supporting passage. Printed `page_label` is not the chip/drawer page. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
+| GAP-07-09 | Source drawer: company PDFs show typed book title, toolbar PDF page, optional section, and supporting passage. Printed `page_label` is not the chip/drawer page. Web chips may be http(s) href after `isSafeHttpUrl`; company citations stay non-href. No ACME fixture. No privileged Storage URL. Preview/download unavailable |
 | GAP-07-10 | No rolling ETA/cost. Authorized `graph_handoff` counts + `graphNotReadyCopy(n)` only |
 | GAP-07-12 | No anomaly toast counts or audit tabs |
 | GAP-07-14 | `DELETE /documents/{id}` is wired for owner/admin with confirmation. Members still 403. No source preview/download |
@@ -88,9 +88,15 @@ flowchart TD
 - `SubmitMessageRequest` is `{ message, idempotency_key?, search_scope? }`.
   Omitted `search_scope` is `auto`. There is still **no** client
   `route_family` (GAP-07-01). New chats default the Answer source selector
-  to Company files. The selector is disabled while sending or while a
-  run is admitted and non-terminal. Run Details show **Requested source**
-  separately from SSE **Answer origin**.
+  to **Auto**. Labels are exactly Auto, Company documents, General, and
+  Web. Web is always listed. Forced Web still 503s when
+  `/api/meta` `web_search_enabled` is false. Hidden chrome is not
+  authorization. Exactly one source; company and web never blend. The
+  selector is disabled while sending or while a run is admitted and
+  non-terminal. Run Details show **Requested source** separately from
+  SSE **Answer origin**. `answer_origin=web` shows origin Web and URL
+  chips. Company chips stay non-clickable. Progress copy includes
+  Searching…, Reading…, and Verifying… for Web runs.
 - Local `signed_url` is **null**. `upload_method` is `supabase_storage_jwt`.
 - Reserve is never Hybrid Ready.
 - Graph Pending is warning, distinct from ACL blindness. ACL copy is
@@ -152,7 +158,7 @@ flowchart TD
 | Signal | UI |
 | --- | --- |
 | Handshake below min / unreachable | Send disabled; 426 banner |
-| 402 / 429 / 503 | Budget / rate / fail-closed banners |
+| 402 / 429 / 503 | Budget / rate / limiter fail-closed banners. Forced Web 503 `web_search_disabled` / `web_search_unconfigured` uses Web-unavailable copy, not limiter fail-closed |
 | Document 404 | "Not found." No title |
 | Ingestion status 5xx / missing RPC | List Search/Graph stay **Not indexed**; detail Processing says it could not be loaded |
 | Storage upload fail | Honest error. Do not finalize a fake success |

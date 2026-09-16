@@ -6,7 +6,7 @@
 
 import { useMemo, type RefObject } from "react";
 import { shouldShowCitations } from "../../lib/answer-origin";
-import { citationChipHref } from "../../lib/citation-drawer";
+import { hrefForCitationRecord } from "../../lib/citation-drawer";
 import type { ChatViewState } from "../../lib/chat-view";
 import { paidSendBlockReason, type HandshakeDecision } from "../../lib/handshake";
 import {
@@ -16,7 +16,8 @@ import {
 } from "../../lib/limitations";
 import { MAX_RECONNECT_ATTEMPTS } from "../../lib/stream-reconnect";
 import type { CitationResponse, ConversationMessage, ReadinessResponse } from "../../lib/types";
-import { REQUESTED_SEARCH_SCOPES } from "../../lib/types";
+import { SEARCH_SCOPE_LABELS, isRequestedSearchScope } from "../../lib/types";
+import { visibleSearchScopes } from "../../lib/web-search";
 import { Button } from "../ui/button";
 import { LimitationCallout } from "../ui/limitation-callout";
 import { AnswerSurface } from "./answer-surface";
@@ -76,12 +77,14 @@ export type ChatStageProps = {
   feedbackPending: boolean;
   showSaveToQuiz?: boolean;
   quiz?: SaveToQuizSheetProps | null;
+  /** `/api/meta` Web flag. Chrome always lists Web; the API still authorizes. */
+  webSearchEnabled?: boolean;
 };
 
 /**
  * Compose the live answer column.
  *
- * @param props - Run view, transcript, and composer bindings.
+ * @param props - Run view, transcript, composer bindings, and Web flag.
  * @returns Stage section.
  */
 export function ChatStage(props: ChatStageProps) {
@@ -124,6 +127,7 @@ export function ChatStage(props: ChatStageProps) {
     feedbackPending,
     showSaveToQuiz = false,
     quiz = null,
+    webSearchEnabled = false,
   } = props;
   const running = chat.terminal === null && chat.runId !== null;
   const sendBlockReason = paidSendBlockReason(
@@ -140,10 +144,10 @@ export function ChatStage(props: ChatStageProps) {
     historyMessages.length === 0;
   const bm25Limitation = chat.diagnostics.limitationCodes.includes("bm25_unavailable");
   const hrefForCitation = useMemo(
-    () => (citation: CitationResponse) =>
-      citationChipHref(citation.provenance.url) ?? undefined,
+    () => (citation: CitationResponse) => hrefForCitationRecord(citation),
     [],
   );
+  const scopeOptions = visibleSearchScopes(webSearchEnabled);
 
   return (
     <section className={chatStyles.stage} aria-label="Answer">
@@ -159,22 +163,14 @@ export function ChatStage(props: ChatStageProps) {
               disabled={run.sending || (chat.runId !== null && chat.terminal === null)}
               onChange={(event) => {
                 const next = event.target.value;
-                if (
-                  next === "company_documents" ||
-                  next === "auto" ||
-                  next === "general_knowledge"
-                ) {
+                if (isRequestedSearchScope(next)) {
                   run.setSearchScope(next);
                 }
               }}
             >
-              {REQUESTED_SEARCH_SCOPES.map((scope) => (
+              {scopeOptions.map((scope) => (
                 <option key={scope} value={scope}>
-                  {scope === "company_documents"
-                    ? "Company files"
-                    : scope === "auto"
-                      ? "Auto"
-                      : "General knowledge"}
+                  {SEARCH_SCOPE_LABELS[scope]}
                 </option>
               ))}
             </select>

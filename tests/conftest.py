@@ -100,6 +100,24 @@ def isolate_host_langsmith_flags(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def isolate_host_web_search_flags(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep constructors on fail-closed Web research defaults.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+
+    Side Effects:
+        Forces ``WEB_SEARCH_ENABLED=false`` and drops ``EXA_API_KEY``.
+        Leftover operator flags from ``.env`` / ``.env.compose`` otherwise
+        make ``APP_ENV=test`` and hosted settings invalid. Tests that need
+        Web search set the variables themselves.
+    """
+
+    monkeypatch.setenv("WEB_SEARCH_ENABLED", "false")
+    monkeypatch.delenv("EXA_API_KEY", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def isolate_unit_session_dsns(
     request: pytest.FixtureRequest,
     monkeypatch: pytest.MonkeyPatch,

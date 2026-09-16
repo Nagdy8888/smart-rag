@@ -44,6 +44,7 @@ describe("AnswerSurface origin chrome", () => {
       ["user_supplied_text", "Your text"],
       ["deterministic", "Assistant"],
       ["ambiguous", "Needs clarification"],
+      ["web", "Web"],
     ] as const;
     for (const [origin, label] of labels) {
       const { unmount } = renderSurface({
@@ -64,8 +65,20 @@ describe("AnswerSurface origin chrome", () => {
     }
   });
 
-  it("shows citations for company origin and for a null legacy origin", () => {
+  it("shows citations for company origin, web origin, and a null legacy origin", () => {
     const { rerender } = renderSurface({ answerOrigin: "company_documents" });
+    expect(screen.getByTestId("answer-citations")).toBeInTheDocument();
+    rerender(
+      <AnswerSurface
+        question="q"
+        answer="a"
+        citations={[CITATION]}
+        terminal="completed"
+        hrefForCitation={() => undefined}
+        onSelectCitation={vi.fn()}
+        answerOrigin="web"
+      />,
+    );
     expect(screen.getByTestId("answer-citations")).toBeInTheDocument();
     rerender(
       <AnswerSurface
