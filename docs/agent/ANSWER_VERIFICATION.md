@@ -76,12 +76,16 @@ text is dropped. Company `answer_v2` passage citations require an exact
 1–1000 character span contained in canonical text. Empty spans are
 legacy whole-passage only when paragraph mappings are not required.
 
-Prompt versions: `answer_v2`, `answer_v1` (historical), `verifier_v1`,
+Prompt versions: `answer_v3` (current), `answer_v2` and `answer_v1`
+(historical), `verifier_v2` (current), `verifier_v1` (historical),
 `web_critique_v1`, and `web_answer_v1` under
 `apps/agents/src/smart_rag_agents/prompts/`. Company hashes are
 LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Live
-company answers derive `answer_text` from ordered paragraphs. Fusion
-passages are never backfilled as citations.
+company answers derive released `answer_text` from surviving atomic-link
+claims, then a composed conclusion only when the complete chain
+survived. Fusion passages are never backfilled as citations. Acronym
+expansions and fact literals are fail-closed even when a mock verifier
+marks a cited ID supported.
 
 Company PDF chat chips use the typed toolbar page (`pdf_page_number` =
 locator `page_index + 1`) and canonical `document_title`. Printed

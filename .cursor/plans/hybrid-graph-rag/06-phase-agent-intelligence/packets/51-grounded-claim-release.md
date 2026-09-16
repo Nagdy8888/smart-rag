@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 51
-status: pending
+status: complete
 title: "Version answer/verifier prompts, release only supported atomic claims, and remove all-fusion citation backfill with MCP regressions."
 requirement_ids: [P06-51]
 ---

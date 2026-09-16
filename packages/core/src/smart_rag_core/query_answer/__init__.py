@@ -17,6 +17,7 @@ from smart_rag_core.query_answer.models import (
     TableComposition,
     VerificationResult,
 )
+from smart_rag_core.query_answer.release import render_verified_company_answer
 from smart_rag_core.query_answer.tables import compose_tables
 from smart_rag_core.query_answer.verifier import (
     mock_verifier_payload,
@@ -51,6 +52,7 @@ __all__ = [
     "mock_answer_payload",
     "mock_verifier_payload",
     "persist_answer_citations",
+    "render_verified_company_answer",
     "run_verifier_batch",
     "select_material_links",
 ]

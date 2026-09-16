@@ -4,17 +4,25 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
+from smart_rag_agents.query.deps import QueryGraphDeps
+from smart_rag_agents.query.nodes.verify import verify_answer_node
+from smart_rag_agents.query.state import pending_query_state
 from smart_rag_core.query_answer.citations import citation_provenance_payload
 from smart_rag_core.query_answer.deterministic import deterministic_check_answer
 from smart_rag_core.query_answer.exceptions import AnswerError
 from smart_rag_core.query_answer.generate import mock_answer_payload
 from smart_rag_core.query_answer.models import (
     AnswerCitation,
+    AnswerParagraph,
     AnswerPayload,
     AtomicLink,
     ComposedConclusion,
     VerifierLinkVerdict,
     VerifierPayload,
+)
+from smart_rag_core.query_answer.release import (
+    company_release_applies,
+    render_verified_company_answer,
 )
 from smart_rag_core.query_answer.verifier import (
     mock_verifier_payload,
@@ -38,6 +46,7 @@ from smart_rag_core.query_fusion.models import (
     PassageOrigin,
     ScoredPassage,
 )
+from smart_rag_core.query_routing.knowledge_scope import KnowledgeScope
 
 from tests.support.answer_verifier import (
     verifier_fusion,
@@ -46,16 +55,23 @@ from tests.support.answer_verifier import (
     verifier_table,
     verifier_uid,
 )
+from tests.support.query_runtime import RefusingHybridRetriever
 
 
 def test_answer_and_verifier_prompt_hashes() -> None:
     """Pinned hashes match LF-normalized prompt files."""
 
-    assert ANSWER_PROMPT_VERSION == "answer_v2"
-    assert VERIFIER_PROMPT_VERSION == "verifier_v1"
+    assert ANSWER_PROMPT_VERSION == "answer_v3"
+    assert VERIFIER_PROMPT_VERSION == "verifier_v2"
     assert GENERAL_CHAT_PROMPT_VERSION == "general_chat_v1"
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v2.md")
-    assert VERIFIER_PROMPT_SHA256 == verifier_prompt_digest("verifier_v1.md")
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v3.md")
+    assert VERIFIER_PROMPT_SHA256 == verifier_prompt_digest("verifier_v2.md")
+    assert verifier_prompt_digest("answer_v2.md") == (
+        "20d55af652815a9829e477ed9d791d49386923da3c11d5dbdf1faa8081a37765"
+    )
+    assert verifier_prompt_digest("verifier_v1.md") == (
+        "626d240ef39dc54825bb704d1812e0960539dee21449ffbe2713e8421f506962"
+    )
     assert GENERAL_CHAT_PROMPT_SHA256 == verifier_prompt_digest("general_chat_v1.md")
     assert CONVERSATION_TITLE_PROMPT_SHA256 == verifier_prompt_digest(
         "conversation_title_v1.md"
@@ -350,3 +366,327 @@ def test_citation_provenance_uses_existing_jsonb() -> None:
     assert payload["document_id"] == verifier_uid(10_001)
     assert "citation_text" not in payload
     assert "snippet" not in payload
+
+
+def _mcp_fusion() -> FusionResult:
+    """Return a source that spells MCP as Model Context Protocol.
+
+    Returns:
+        Hybrid-effective fusion with one passage.
+    """
+
+    return verifier_fusion(
+        verifier_passage(
+            1,
+            text="MCP (Model Context Protocol) lets models call tools.",
+        )
+    )
+
+
+def _supporting_mock_verifier(
+    batch: tuple[AtomicLink, ...],
+) -> VerifierPayload:
+    """Mark every cited link supported, matching the untrusted mock verifier.
+
+    Args:
+        batch: Selected links.
+
+    Returns:
+        All-supported verdicts.
+    """
+
+    return VerifierPayload(
+        link_verdicts=tuple(
+            VerifierLinkVerdict(
+                link_id=item.link_id, supported=True, reason="supported"
+            )
+            for item in batch
+        )
+    )
+
+
+def test_wrong_mcp_expansion_in_link_is_rejected_despite_mock_verifier() -> None:
+    """A wrong MCP expansion is dropped even when the mock verifier agrees."""
+
+    fusion = _mcp_fusion()
+    chunk_id = fusion.evidence[0].chunk_id
+    payload = AnswerPayload(
+        answer_text="MCP is the Method Call Protocol.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="MCP is the Method Call Protocol.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="MCP (Model Context Protocol)",
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim="MCP is the Method Call Protocol.",
+                chunk_ids=(chunk_id,),
+                kind="fact",
+                priority=1,
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    updated, call_count, _omitted = run_verifier_batch(
+        payload, caller=_supporting_mock_verifier, already_called=0
+    )
+    assert call_count == 1
+    released = render_verified_company_answer(updated, fusion=fusion, tables=())
+    assert "Method Call Protocol" not in released.answer_text
+    assert released.status == "refused"
+    assert released.citations == ()
+
+
+def test_correct_mcp_expansion_passes() -> None:
+    """The source-spelled MCP expansion remains in the released company answer."""
+
+    fusion = _mcp_fusion()
+    chunk_id = fusion.evidence[0].chunk_id
+    claim = "MCP (Model Context Protocol) lets models call tools."
+    payload = AnswerPayload(
+        answer_text=claim,
+        paragraphs=(
+            AnswerParagraph(paragraph_index=0, text=claim, link_ids=("l1",)),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="MCP (Model Context Protocol)",
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim=claim,
+                chunk_ids=(chunk_id,),
+                kind="fact",
+                priority=1,
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    released = render_verified_company_answer(payload, fusion=fusion, tables=())
+    assert "Model Context Protocol" in released.answer_text
+    assert "Method Call Protocol" not in released.answer_text
+    assert released.status == "complete"
+    assert released.citations[0].atomic_link_id == "l1"
+
+
+def test_free_prose_mcp_expansion_cannot_stay_verified() -> None:
+    """Unsupported Method Call Protocol prose cannot remain in a verified answer."""
+
+    fusion = _mcp_fusion()
+    chunk_id = fusion.evidence[0].chunk_id
+    claim = "MCP lets models call tools."
+    payload = AnswerPayload(
+        answer_text="MCP is the Method Call Protocol used for tools.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="MCP is the Method Call Protocol used for tools.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="MCP (Model Context Protocol) lets models call tools.",
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim=claim,
+                chunk_ids=(chunk_id,),
+                kind="fact",
+                priority=1,
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    released = render_verified_company_answer(payload, fusion=fusion, tables=())
+    assert "Method Call Protocol" not in released.answer_text
+    assert claim in released.answer_text
+    assert released.status != "complete"
+
+
+def test_one_supported_link_produces_one_citation() -> None:
+    """Released citations come from surviving links, not every fusion passage."""
+
+    fusion = verifier_fusion(
+        verifier_passage(1, text="The refund period is 30 days."),
+        verifier_passage(2, text="Unused later passage stays uncited."),
+    )
+    first = fusion.evidence[0].chunk_id
+    payload = AnswerPayload(
+        answer_text="The refund period is 30 days.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="The refund period is 30 days.",
+                link_ids=("keep",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=first,
+                span="The refund period is 30 days.",
+                paragraph_index=0,
+                atomic_link_id="keep",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="keep",
+                claim="The refund period is 30 days.",
+                chunk_ids=(first,),
+                kind="fact",
+                priority=1,
+            ),
+            AtomicLink(
+                link_id="drop",
+                claim="Unused later passage stays uncited.",
+                chunk_ids=(fusion.evidence[1].chunk_id,),
+                kind="fact",
+                priority=2,
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    updated, _, _ = run_verifier_batch(
+        payload,
+        caller=lambda batch: VerifierPayload(
+            link_verdicts=tuple(
+                VerifierLinkVerdict(
+                    link_id=item.link_id,
+                    supported=item.link_id == "keep",
+                    reason="supported" if item.link_id == "keep" else "unsupported_link",
+                )
+                for item in batch
+            )
+        ),
+        already_called=0,
+    )
+    released = render_verified_company_answer(updated, fusion=fusion, tables=())
+    assert [item.atomic_link_id for item in released.citations] == ["keep"]
+    assert fusion.evidence[1].chunk_id not in {
+        item.chunk_id for item in released.citations
+    }
+    assert "drop" not in {item.link_id for item in released.atomic_links}
+
+
+def test_composed_inference_is_appended_when_chain_survives() -> None:
+    """A fully supported inference conclusion is released after unique claims."""
+
+    fusion = verifier_fusion(
+        verifier_passage(1, text="Atlas Controller is a Project Atlas product."),
+        verifier_passage(2, text="Supplier A manufactures the Atlas Controller."),
+    )
+    payload = AnswerPayload(
+        answer_text="Supplier A supplies a Project Atlas product.",
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim="Atlas Controller is a Project Atlas product.",
+                chunk_ids=(verifier_uid(1),),
+                kind="inference_link",
+                priority=1,
+            ),
+            AtomicLink(
+                link_id="l2",
+                claim="Supplier A manufactures the Atlas Controller.",
+                chunk_ids=(verifier_uid(2),),
+                kind="inference_link",
+                priority=2,
+            ),
+        ),
+        composed_conclusion=ComposedConclusion(
+            text="Supplier A supplies a Project Atlas product.",
+            link_ids=("l1", "l2"),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    released = render_verified_company_answer(payload, fusion=fusion, tables=())
+    assert released.composed_conclusion is not None
+    assert "Supplier A supplies a Project Atlas product." in released.answer_text
+    assert released.citations[0].atomic_link_id == "l1"
+    assert released.citations[1].atomic_link_id == "l2"
+
+
+def test_general_answers_are_not_rewritten_by_company_release() -> None:
+    """General-knowledge prose is unchanged and receives no company citations."""
+
+    payload = AnswerPayload(
+        answer_text="Hello from general knowledge.",
+        status="complete",
+        answer_origin=KnowledgeScope.GENERAL_KNOWLEDGE,
+    )
+    assert company_release_applies(payload, is_web=False) is False
+    assert payload.citations == ()
+    assert payload.answer_text == "Hello from general knowledge."
+
+
+def test_verify_node_rejects_ungrounded_mcp_expansion() -> None:
+    """SSE terminal cannot stay verified when Method Call Protocol was invented."""
+
+    fusion = _mcp_fusion()
+    chunk_id = fusion.evidence[0].chunk_id
+    state = pending_query_state(user_query="What is MCP?")
+    state["status"] = "answered"
+    state["remaining_model_calls"] = 8
+    state["fusion"] = fusion.model_dump(mode="json")
+    state["answer"] = AnswerPayload(
+        answer_text="MCP is the Method Call Protocol.",
+        paragraphs=(
+            AnswerParagraph(
+                paragraph_index=0,
+                text="MCP is the Method Call Protocol.",
+                link_ids=("l1",),
+            ),
+        ),
+        citations=(
+            AnswerCitation(
+                chunk_id=chunk_id,
+                span="MCP (Model Context Protocol)",
+                paragraph_index=0,
+                atomic_link_id="l1",
+            ),
+        ),
+        atomic_links=(
+            AtomicLink(
+                link_id="l1",
+                claim="MCP is the Method Call Protocol.",
+                chunk_ids=(chunk_id,),
+                kind="fact",
+                priority=1,
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    ).model_dump(mode="json")
+    verified = verify_answer_node(
+        state, QueryGraphDeps(hybrid_retriever=RefusingHybridRetriever())
+    )
+    payload = AnswerPayload.model_validate(verified["answer"])
+    assert verified["status"] != "verified"
+    assert "Method Call Protocol" not in payload.answer_text

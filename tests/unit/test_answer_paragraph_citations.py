@@ -117,15 +117,25 @@ def _mapped_payload() -> tuple[
     return payload, fusion, ()
 
 
-def test_answer_v2_is_registered_and_hashed() -> None:
-    """Pinned answer_v2 hash matches the immutable prompt file."""
+def test_answer_v2_remains_registered_and_hashed() -> None:
+    """Historical answer_v2 stays immutable and loadable."""
 
     entry = load_prompt("answer_v2", environment="dev")
-    assert ANSWER_PROMPT_VERSION == "answer_v2"
-    assert entry.sha256 == ANSWER_PROMPT_SHA256
-    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v2.md")
+    assert entry.sha256 == verifier_prompt_digest("answer_v2.md")
     body = prompt_text("answer_v2")
     assert "Do not author `answer_text`" in body
+
+
+def test_answer_v3_is_current_and_hashed() -> None:
+    """Pinned answer_v3 hash matches the immutable prompt file."""
+
+    entry = load_prompt("answer_v3", environment="dev")
+    assert ANSWER_PROMPT_VERSION == "answer_v3"
+    assert entry.sha256 == ANSWER_PROMPT_SHA256
+    assert ANSWER_PROMPT_SHA256 == verifier_prompt_digest("answer_v3.md")
+    body = prompt_text("answer_v3")
+    assert "Do not author `answer_text`" in body
+    assert "acronym" in body.lower()
     schema = answer_json_schema()
     properties = schema["properties"]
     required = schema["required"]
