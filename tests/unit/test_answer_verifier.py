@@ -21,6 +21,7 @@ from smart_rag_core.query_answer.models import (
     VerifierPayload,
 )
 from smart_rag_core.query_answer.release import (
+    bind_company_atomic_links,
     company_release_applies,
     render_verified_company_answer,
 )
@@ -554,6 +555,26 @@ def test_paragraphs_without_atomic_links_still_release_grounded_mcp() -> None:
     assert "Model Context Protocol" in released.answer_text
     assert released.citations
     assert released.atomic_links
+    paraphrased = payload.model_copy(
+        update={
+            "citations": (
+                payload.citations[0].model_copy(
+                    update={"span": "MCP is a made-up paraphrased span."}
+                ),
+            )
+        }
+    )
+    checked, failures = deterministic_check_answer(
+        bind_company_atomic_links(paraphrased, fusion=fusion),
+        fusion=fusion,
+        tables=(),
+        require_paragraphs=True,
+    )
+    assert checked.atomic_links
+    assert "paragraph_unmapped" not in failures
+    assert "citation_span_mismatch" not in failures
+    assert checked.citations
+    assert "Model Context Protocol" in (checked.citations[0].span or "")
 
 
 def test_free_prose_mcp_expansion_cannot_stay_verified() -> None:

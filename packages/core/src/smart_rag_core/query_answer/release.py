@@ -72,6 +72,135 @@ def company_release_applies(payload: AnswerPayload, *, is_web: bool) -> bool:
     return bool(payload.paragraphs or payload.atomic_links)
 
 
+def bind_company_atomic_links(
+    payload: AnswerPayload,
+    *,
+    fusion: FusionResult | None = None,
+) -> AnswerPayload:
+    """Fill omitted atomic links, citation ids, and exact source spans.
+
+    Live ``answer_v3`` payloads sometimes emit grounded paragraphs
+    without ``atomic_links``, or paraphrase citation spans. Deterministic
+    paragraph mapping requires those links and contained spans before
+    verification. Invented span text is never persisted; a misaligned
+    span is replaced with a bounded excerpt copied from canonical
+    ``citation_text``.
+
+    Args:
+        payload: Company answer after invented-ID filtering.
+        fusion: Fitted canonical evidence used to copy exact spans.
+            Omitted when the caller only needs link synthesis.
+
+    Returns:
+        Payload with synthesized fact links, citation ``atomic_link_id``
+        values, and contained spans when they can be derived.
+        Unchanged when paragraphs are ungrounded.
+    """
+
+    paragraphs = tuple(_paragraph_with_link_id(item) for item in payload.paragraphs)
+    citations = tuple(
+        _citation_with_link_id(citation, paragraphs) for citation in payload.citations
+    )
+    table_citations = tuple(
+        _citation_with_link_id(citation, paragraphs)
+        for citation in payload.table_citations
+    )
+    working = payload.model_copy(
+        update={
+            "paragraphs": paragraphs,
+            "citations": citations,
+            "table_citations": table_citations,
+        }
+    )
+    if not working.atomic_links:
+        synthesized = _links_from_paragraphs(working)
+        if synthesized:
+            working = working.model_copy(update={"atomic_links": synthesized})
+    if fusion is None:
+        return working
+    return _align_citation_spans(working, fusion)
+
+
+def _paragraph_with_link_id(paragraph: AnswerParagraph) -> AnswerParagraph:
+    """Copy a paragraph, filling a synthetic link id when omitted.
+
+    Args:
+        paragraph: Company paragraph from the model payload.
+
+    Returns:
+        The paragraph, or a copy with ``p{index}`` as its only link id.
+    """
+
+    if paragraph.link_ids:
+        return paragraph
+    return paragraph.model_copy(update={"link_ids": (f"p{paragraph.paragraph_index}",)})
+
+
+def _align_citation_spans(
+    payload: AnswerPayload,
+    fusion: FusionResult,
+) -> AnswerPayload:
+    """Replace missing or non-substring spans with exact source excerpts.
+
+    Args:
+        payload: Company answer after link binding.
+        fusion: Fitted canonical passages.
+
+    Returns:
+        Payload whose passage citation spans are empty-or-contained
+        substrings of authorized ``citation_text``. Unauthorized chunk
+        IDs are left unchanged for later fail-closed checks.
+    """
+
+    passages = {item.chunk_id: item for item in fusion.evidence}
+    aligned: list[AnswerCitation] = []
+    for citation in payload.citations:
+        chunk_id = citation.chunk_id
+        if chunk_id is None or chunk_id not in passages:
+            aligned.append(citation)
+            continue
+        text = passages[chunk_id].citation_text
+        span = citation.span
+        if span and span in text:
+            aligned.append(citation)
+            continue
+        replacement = exact_source_span(text)
+        if not replacement:
+            aligned.append(citation)
+            continue
+        aligned.append(citation.model_copy(update={"span": replacement}))
+    return payload.model_copy(update={"citations": tuple(aligned)})
+
+
+def _citation_with_link_id(
+    citation: AnswerCitation,
+    paragraphs: tuple[AnswerParagraph, ...],
+) -> AnswerCitation:
+    """Copy a citation, filling ``atomic_link_id`` from its paragraph.
+
+    Args:
+        citation: Passage or table citation.
+        paragraphs: Ordered company paragraphs.
+
+    Returns:
+        The citation, or a copy with the paragraph's first link id.
+    """
+
+    if citation.atomic_link_id:
+        return citation
+    paragraph = next(
+        (
+            item
+            for item in paragraphs
+            if item.paragraph_index == citation.paragraph_index
+        ),
+        None,
+    )
+    if paragraph is None or not paragraph.link_ids:
+        return citation
+    return citation.model_copy(update={"atomic_link_id": paragraph.link_ids[0]})
+
+
 def render_verified_company_answer(
     payload: AnswerPayload,
     *,
@@ -95,11 +224,7 @@ def render_verified_company_answer(
         refusal when no supported material link remains.
     """
 
-    working = payload
-    if not working.atomic_links:
-        synthesized = _links_from_paragraphs(working)
-        if synthesized:
-            working = working.model_copy(update={"atomic_links": synthesized})
+    working = bind_company_atomic_links(payload, fusion=fusion)
     guarded = drop_ungrounded_literals(working, fusion=fusion, tables=tables)
     surviving = tuple(
         sorted(guarded.atomic_links, key=lambda item: (item.priority, item.link_id))

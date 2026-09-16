@@ -82,6 +82,18 @@ flowchart TD
 - Company insufficient evidence still never falls back to world
   knowledge or Web.
 
+## Follow-up (2026-09-16 bind/span)
+
+Live MCP after `answer_v3` still refused with `verifier_call_count=0`
+because omitted `atomic_links` and paraphrased spans emptied the
+paragraph contract before the verifier. `bind_company_atomic_links`
+now synthesizes fact links from grounded paragraphs, fills
+`atomic_link_id`, and replaces missing or non-substring spans with
+`exact_source_span` of authorized `citation_text`. Direct
+`deterministic_check_answer` still records `citation_span_mismatch`
+when that bind step is skipped. Wrong `Method Call Protocol`
+expansions remain refused.
+
 ## Unverified
 
 - Live hosted Q3 against OpenAI. Packet 57 re-runs live qualification.

@@ -80,7 +80,12 @@ Prompt versions: `answer_v3` (current), `answer_v2` and `answer_v1`
 (historical), `verifier_v2` (current), `verifier_v1` (historical),
 `web_critique_v1`, and `web_answer_v1` under
 `apps/agents/src/smart_rag_agents/prompts/`. Company hashes are
-LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Live
+LF-normalized SHA-256 in `smart_rag_core.query_answer.versions`. Before
+deterministic paragraph mapping, company payloads bind omitted atomic
+links from paragraphs and replace missing or non-substring spans with
+bounded exact excerpts copied from authorized `citation_text`. Invented
+span text is never persisted. Direct `deterministic_check_answer` still
+fail-closes unaligned spans that skip that bind step. Live
 company answers derive released `answer_text` from surviving atomic-link
 claims, then a composed conclusion only when the complete chain
 survived. Fusion passages are never backfilled as citations. Acronym

@@ -25,6 +25,7 @@ from smart_rag_core.query_answer.models import (
     VerifierPayload,
 )
 from smart_rag_core.query_answer.release import (
+    bind_company_atomic_links,
     company_release_applies,
     render_verified_company_answer,
 )
@@ -141,8 +142,9 @@ def verify_answer_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "detail": "web_evidence_insufficient",
             "answer": payload.model_dump(mode="json"),
         }
+    prepared = payload if is_web else bind_company_atomic_links(payload, fusion=fusion)
     checked, failures = deterministic_check_answer(
-        payload,
+        prepared,
         fusion=fusion,
         tables=tables.records,
         evidence_required=route_needs_retrieval(plan) and not is_web,
