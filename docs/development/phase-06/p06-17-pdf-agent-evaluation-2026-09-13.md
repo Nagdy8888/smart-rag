@@ -2,7 +2,7 @@
 title: P06-17 PDF Hybrid agent evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-16
 audience: engineering, reviewers
 ---
 
@@ -22,8 +22,8 @@ canonical queue returns here. Holdout (P06-18) remains unopened.
 ```mermaid
 flowchart TD
   impl["eval_pdf_agent.py plus eval_pdf_judge_v1"] --> unit["synthetic unit fixtures"]
-  unit --> live["live development/qualification"]
-  live --> blocked["blocked live_agent_eval_required"]
+  unit --> live["live development"]
+  live --> blocked["blocked long_document_runtime denied"]
   blocked --> holdout["P06-18 not started"]
 ```
 
@@ -48,6 +48,19 @@ Live development/qualification numbers are **not** claimed. Overlay
 (`blocked=live_agent_eval_required`) and Hybrid `gates_pass=false`.
 This close-out did not open holdout, did not freeze Hybrid pins, and did
 not run a live judge against private pages.
+
+## 2026-09-16 leftover run (P06-57)
+
+P06-57 executed the packet command against the sealed local labels.
+It did not open holdout and did not freeze `hybrid_long_document_v1`.
+
+| Command | Exit | Notes |
+| --- | --- | --- |
+| `uv run python scripts/eval_pdf_agent.py --live --split development` | 2 | `blocked=frozen_profile_and_human_seal_required`; `human_sealed=true`; `long_document_runtime=denied`; `holdout_opened=false` |
+
+Qualification was not run. Candidate hashes were not rewritten.
+Deterministic and judge aggregates were not produced because runtime
+deny stopped the split before retrieve/answer/judge.
 
 Packet 17 remains **pending** until a live development then qualification
 run meets signed citation/faithfulness/routing gates with

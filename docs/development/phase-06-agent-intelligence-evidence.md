@@ -83,6 +83,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-54 — Restore frontend citations, feedback, and delete safety (2026-09-16) | [phase-06/p06-54-restore-frontend-state-2026-09-16.md](./phase-06/p06-54-restore-frontend-state-2026-09-16.md) | 90 |
 | P06-55 — Postgres reconnect, idle SSE retirement, and query readiness (2026-09-16) | [phase-06/p06-55-postgres-readiness-2026-09-16.md](./phase-06/p06-55-postgres-readiness-2026-09-16.md) | 96 |
 | P06-56 — Host-worker parser topology and Exa lifecycle (2026-09-16) | [phase-06/p06-56-worker-async-lifecycle-2026-09-16.md](./phase-06/p06-56-worker-async-lifecycle-2026-09-16.md) | 85 |
+| P06-57 — Integrated qualification (2026-09-16) | [phase-06/p06-57-integrated-qualification-2026-09-16.md](./phase-06/p06-57-integrated-qualification-2026-09-16.md) | 127 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |
@@ -91,7 +92,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-14 — Main chat origin UX (closed 2026-09-13) | [phase-06/p06-14-main-chat-origin-ux-2026-08-25.md](./phase-06/p06-14-main-chat-origin-ux-2026-08-25.md) | 75 |
 | P06-15 — Integrated verification (closed 2026-09-13) | [phase-06/p06-15-integrated-verification-2026-08-25.md](./phase-06/p06-15-integrated-verification-2026-08-25.md) | 145 |
 | P06-16 — Custom SSE progress and paced-reveal contract (closed 2026-09-13) | [phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md](./phase-06/p06-16-sse-custom-progress-amendment-2026-08-26.md) | 42 |
-| P06-17 — PDF Hybrid agent evaluation (live qualification blocked) | [phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md](./phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md) | 57 |
+| P06-17 — PDF Hybrid agent evaluation (live qualification blocked) | [phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md](./phase-06/p06-17-pdf-agent-evaluation-2026-09-13.md) | 70 |
 | P06-18 — Private-PDF holdout (blocked; not opened) | [phase-06/p06-18-pdf-holdout-blocked-2026-09-13.md](./phase-06/p06-18-pdf-holdout-blocked-2026-09-13.md) | 22 |
 | LangSmith hosted online evaluators (2026-08-26) | [phase-06/langsmith-hosted-online-evaluators-2026-08-26.md](./phase-06/langsmith-hosted-online-evaluators-2026-08-26.md) | 105 |
 | BR-1A — Brain-repair governance amendment (2026-08-26, pending acceptance) | [phase-06/br-1a-brain-repair-governance-amendment-2026-08-26-pending-acceptance.md](./phase-06/br-1a-brain-repair-governance-amendment-2026-08-26-pending-acceptance.md) | 65 |
