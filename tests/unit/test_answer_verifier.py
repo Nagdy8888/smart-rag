@@ -577,6 +577,58 @@ def test_paragraphs_without_atomic_links_still_release_grounded_mcp() -> None:
     assert "Model Context Protocol" in (checked.citations[0].span or "")
 
 
+def test_atomic_links_without_paragraphs_still_release_grounded_mcp() -> None:
+    """Link-only live payloads synthesize paragraphs before verification."""
+
+    fusion = _mcp_fusion()
+    chunk_id = fusion.evidence[0].chunk_id
+    payload = AnswerPayload(
+        answer_text="",
+        paragraphs=(),
+        citations=(),
+        atomic_links=(
+            AtomicLink(
+                link_id="0001",
+                claim="MCP (Model Context Protocol) lets models call tools.",
+                chunk_ids=(chunk_id,),
+            ),
+        ),
+        status="complete",
+        answer_origin=KnowledgeScope.COMPANY_DOCUMENTS,
+    )
+    bound = bind_company_atomic_links(payload, fusion=fusion)
+    assert bound.paragraphs
+    assert bound.citations
+    checked, failures = deterministic_check_answer(
+        bound,
+        fusion=fusion,
+        tables=(),
+        require_paragraphs=True,
+    )
+    assert checked.atomic_links
+    assert "paragraph_unmapped" not in failures
+    released = render_verified_company_answer(checked, fusion=fusion, tables=())
+    assert "Model Context Protocol" in released.answer_text
+    invented = payload.model_copy(
+        update={
+            "atomic_links": (
+                AtomicLink(
+                    link_id="0001",
+                    claim="MCP stands for Multi-Channel Protocol.",
+                    chunk_ids=(chunk_id,),
+                ),
+            )
+        }
+    )
+    released_wrong = render_verified_company_answer(
+        bind_company_atomic_links(invented, fusion=fusion),
+        fusion=fusion,
+        tables=(),
+    )
+    assert released_wrong.status == "refused"
+    assert "Multi-Channel Protocol" not in released_wrong.answer_text
+
+
 def test_free_prose_mcp_expansion_cannot_stay_verified() -> None:
     """Unsupported Method Call Protocol prose cannot remain in a verified answer."""
 
