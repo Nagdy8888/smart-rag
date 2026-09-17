@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -20,6 +20,15 @@ hashed artifact ``retrieval/frozen/hybrid_default_v1.json``. Packet 8 froze
 those values as the winning profile and recorded a holdout **no-go**. Holdout is never
 used for tuning. Unequal RRF weights and a different ``rrf_k`` were **not**
 selected. Frozen profile values in this file were **not** retuned after Packet 9.
+
+## Source selectors and duplicate copies
+
+Named authorized titles are scope selectors only. After an exact-one
+authorized match, the title is stripped from the ranking query so selector
+tokens cannot dominate dense or BM25 ranking. Ambiguous and unauthorized
+names stay unscoped and indistinguishable. Exact duplicate citation text is
+collapsed after ACL and current-version recheck; documents are never deleted
+automatically.
 
 ## Claim hygiene (Packet 9 metrics)
 

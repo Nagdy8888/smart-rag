@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 60
-status: pending
+status: complete
 title: "Implement authorized source resolution, ranking-query title stripping, and post-ACL duplicate collapse."
 requirement_ids: [P06-60]
 ---

@@ -108,7 +108,7 @@ Packets P06-09 through P06-64 are additive after the completed historical packet
 57. [x] [Run full deterministic/live/browser gates and existing P06-17 development/qualification without opening holdout.](./06-phase-agent-intelligence/packets/57-integrated-qualification.md)
 58. [x] [Authorize general Hybrid retrieval accuracy overlay, ADR, and packets P06-59 through P06-64.](./06-phase-agent-intelligence/packets/58-hybrid-retrieval-accuracy-amendment.md)
 59. [x] [Create a tested, private-safe dual-metric and stage-attribution retrieval baseline.](./06-phase-agent-intelligence/packets/59-dual-metric-stage-baseline.md)
-60. [ ] [Implement authorized source resolution, ranking-query title stripping, and post-ACL duplicate collapse.](./06-phase-agent-intelligence/packets/60-source-aware-ranking.md)
+60. [x] [Implement authorized source resolution, ranking-query title stripping, and post-ACL duplicate collapse.](./06-phase-agent-intelligence/packets/60-source-aware-ranking.md)
 61. [ ] [Repair term and BM25 candidate generation and selectively enrich indexed search terms.](./06-phase-agent-intelligence/packets/61-term-bm25-candidate-repair.md)
 62. [ ] [Repair retrieve-time durable call accounting and qualify a measured immutable long-document profile.](./06-phase-agent-intelligence/packets/62-rerank-accounting-long-document.md)
 63. [ ] [Exclude source-selector false refusals and require a measured, revalidated correction.](./06-phase-agent-intelligence/packets/63-coverage-correction-semantics.md)

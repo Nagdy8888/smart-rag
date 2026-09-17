@@ -10,6 +10,21 @@ audience: engineering, reviewers, client-approver
 
 Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed` | `accepted` | `verified`.
 
+## Read in this order
+
+1. [System context](./architecture/01-system-context.md)
+2. [Containers](./architecture/02-containers.md)
+3. [Local setup](./development/LOCAL_SETUP.md)
+4. [Authorization](./security/AUTHORIZATION_MODEL.md)
+5. [Hybrid retrieval](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md)
+6. [Quality targets](./QUALITY_TARGETS.md)
+7. [Company-documents Ask baseline](./evaluation/COMPANY_DOCUMENTS_RAG_100.md)
+8. [Dual-metric scoring](./evaluation/DUAL_METRIC_SCORING.md)
+
+The table below is the complete maintained map. Packet evidence under
+[development/phase-06/](./development/phase-06/) is indexed from
+[phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md).
+
 | Document | Owner | Status | Last reviewed | Audience |
 | --- | --- | --- | --- | --- |
 | [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-18 | client, engineering |
@@ -50,8 +65,8 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [deployment/MANAGED_STAGING.md](./deployment/MANAGED_STAGING.md) | engineering-lead | draft | 2026-08-19 | eng, ops, reviewers |
 | [development/phase-09-local-release-candidate-evidence.md](./development/phase-09-local-release-candidate-evidence.md) | engineering-lead | accepted | 2026-08-18 | eng, reviewers |
 | [development/phase-10-managed-staging-evidence.md](./development/phase-10-managed-staging-evidence.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
-| [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-09-16 | eng, reviewers |
-| [development/phase-06/](./development/phase-06/) | engineering-lead | draft | 2026-09-16 | eng, reviewers |
+| [development/phase-06-agent-intelligence-evidence.md](./development/phase-06-agent-intelligence-evidence.md) | engineering-lead | pending | 2026-09-17 | eng, reviewers |
+| [development/phase-06/](./development/phase-06/) | engineering-lead | draft | 2026-09-17 | eng, reviewers |
 | [development/phase-06-query-agent-cleanup-baseline.md](./development/phase-06-query-agent-cleanup-baseline.md) | engineering-lead | draft | 2026-08-26 | eng, reviewers |
 | [architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md](./architecture/AVAILABILITY_AND_ISOLATION_TRIGGERS.md) | engineering-lead | accepted | 2026-08-12 | eng, ops |
 | [architecture/01-system-context.md](./architecture/01-system-context.md) | engineering-lead | draft | 2026-08-12 | eng |
@@ -136,7 +151,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-vision-captioning.md](./adr/ADR-vision-captioning.md) | product-owner | proposed | 2026-08-12 | client, eng |
 | [adr/ADR-embedding-model-dimension.md](./adr/ADR-embedding-model-dimension.md) | engineering-lead | accepted | 2026-08-12 | eng |
 | [retrieval/ARABIC_NORMALIZATION.md](./retrieval/ARABIC_NORMALIZATION.md) | engineering-lead | draft | 2026-08-12 | eng |
-| [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers |
+| [retrieval/HYBRID_RETRIEVAL_CONTRACT.md](./retrieval/HYBRID_RETRIEVAL_CONTRACT.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers |
 | [retrieval/BM25_PROJECTION_CONTRACT.md](./retrieval/BM25_PROJECTION_CONTRACT.md) | engineering-lead | draft | 2026-09-09 | eng |
 | [retrieval/STRUCTURED_TABLE.md](./retrieval/STRUCTURED_TABLE.md) | engineering-lead | draft | 2026-08-14 | eng, security, reviewers |
 | [retrieval/HYBRID_TUNING.md](./retrieval/HYBRID_TUNING.md) | engineering-lead | draft | 2026-08-14 | eng |

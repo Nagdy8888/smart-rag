@@ -86,6 +86,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-57 — Integrated qualification (2026-09-16) | [phase-06/p06-57-integrated-qualification-2026-09-16.md](./phase-06/p06-57-integrated-qualification-2026-09-16.md) | 127 |
 | P06-58 — General Hybrid retrieval accuracy overlay (2026-09-17) | [phase-06/p06-58-hybrid-retrieval-accuracy-amendment-2026-09-17.md](./phase-06/p06-58-hybrid-retrieval-accuracy-amendment-2026-09-17.md) | 90 |
 | P06-59 — Dual-metric and stage-attribution baseline (2026-09-17) | [phase-06/p06-59-dual-metric-stage-baseline-2026-09-17.md](./phase-06/p06-59-dual-metric-stage-baseline-2026-09-17.md) | 80 |
+| P06-60 — Source-aware ranking and post-ACL duplicate collapse (2026-09-17) | [phase-06/p06-60-source-aware-ranking-2026-09-17.md](./phase-06/p06-60-source-aware-ranking-2026-09-17.md) | 75 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

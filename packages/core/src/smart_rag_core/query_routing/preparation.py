@@ -329,6 +329,8 @@ def prepare_query(
     )
     profile = result.profile
     if payload is not None and payload.requested_sources:
+        # Titles stay profile selectors. Ranking-query stripping happens
+        # after exact-one authorized resolution in Hybrid retrieve.
         profile = profile.model_copy(
             update={
                 "requested_sources": ProfileField(
