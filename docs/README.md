@@ -30,7 +30,7 @@ The table below is the complete maintained map. Packet evidence under
 | [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-18 | client, engineering |
 | [agent/QUERY_ADMISSION.md](./agent/QUERY_ADMISSION.md) | engineering-lead | draft | 2026-09-15 | eng, security |
 | [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-09-17 | eng |
-| [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-09-15 | eng, reviewers |
+| [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers |
 | [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-09-16 | eng, reviewers |
 | [agent/OPTIONAL_TOOLS.md](./agent/OPTIONAL_TOOLS.md) | engineering-lead | draft | 2026-08-16 | eng, reviewers |
@@ -166,7 +166,7 @@ The table below is the complete maintained map. Packet evidence under
 | [runbooks/CRAWL_EGRESS_AND_PROXY.md](./runbooks/CRAWL_EGRESS_AND_PROXY.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [evaluation/QUERY_PROFILE_EVAL.md](./evaluation/QUERY_PROFILE_EVAL.md) | engineering-lead | draft | 2026-08-14 | eng |
 | [evaluation/RERANK_COUNTERFACTUAL.md](./evaluation/RERANK_COUNTERFACTUAL.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
-| [evaluation/COVERAGE_CALIBRATION.md](./evaluation/COVERAGE_CALIBRATION.md) | engineering-lead | draft | 2026-09-09 | eng, reviewers |
+| [evaluation/COVERAGE_CALIBRATION.md](./evaluation/COVERAGE_CALIBRATION.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers |
 | [evaluation/COVERAGE_QUALIFICATION.md](./evaluation/COVERAGE_QUALIFICATION.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [evaluation/PHASE4_FREEZE.md](./evaluation/PHASE4_FREEZE.md) | engineering-lead | draft | 2026-08-15 | eng, reviewers, client-approver |
 | [evaluation/PHASE4_ABLATIONS.md](./evaluation/PHASE4_ABLATIONS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |

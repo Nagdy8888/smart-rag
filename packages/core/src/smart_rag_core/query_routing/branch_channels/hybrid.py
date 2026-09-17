@@ -22,6 +22,7 @@ from smart_rag_core.query_routing.models import (
     QueryPreparation,
 )
 from smart_rag_core.query_routing.protocols import HybridRetrieveLike
+from smart_rag_core.retrieval.cache_store import RetrievalCacheMode
 from smart_rag_core.retrieval.context import ContextFn
 from smart_rag_core.retrieval.context_loader import ChunkContext
 from smart_rag_core.security.identity import CallerContext
@@ -65,12 +66,19 @@ def run_hybrid(
             status="degraded",
             fallback_reason=FALLBACK_RETRIEVERS_UNBOUND,
         )
-    outcome = hybrid_retriever.retrieve(
-        query=spec.query_text,
-        caller=caller,
-        profile=prep.profile,
-        deadline_seconds=min(remaining, 8.0),
-    )
+    retrieve_kwargs: dict[str, object] = {
+        "query": spec.query_text,
+        "caller": caller,
+        "profile": prep.profile,
+        "deadline_seconds": min(remaining, 8.0),
+    }
+    if spec.bypass_retrieval_cache:
+        retrieve_kwargs["cache_mode"] = RetrievalCacheMode.COLD_BYPASS
+    try:
+        outcome = hybrid_retriever.retrieve(**retrieve_kwargs)
+    except TypeError:
+        retrieve_kwargs.pop("cache_mode", None)
+        outcome = hybrid_retriever.retrieve(**retrieve_kwargs)
     ranked = ranked_ids(outcome)
     coverage_score, ratio, uncovered = coverage_bits(outcome, whole_document)
     status: Literal["ok", "degraded", "refused", "failed"] = "ok"

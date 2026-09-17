@@ -256,6 +256,7 @@ class ProcessHybridRetriever:
             deadline_seconds=deadline_seconds,
             restrict_version_id=restrict_version_id,
             cache_mode=cache_mode,
+            source_selectors=scope.selector_texts if scope is not None else (),
         )
 
     def _resolve_version_id(

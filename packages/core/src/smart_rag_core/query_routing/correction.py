@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from smart_rag_core.query_admission.ceilings import assert_correction_available
 from smart_rag_core.query_admission.context import AuthorizedRuntimeContext
 from smart_rag_core.query_admission.exceptions import QueryCeilingError
@@ -22,7 +24,13 @@ from smart_rag_core.query_routing.models import (
     QueryPreparation,
     RetrievalPlan,
 )
+from smart_rag_core.retrieval.coverage_score import (
+    coverage_term_key,
+    exclude_source_selector_terms,
+)
 from smart_rag_core.retrieval.frozen_profile import coverage_threshold_for
+from smart_rag_core.retrieval.hybrid_run.profile_fields import str_list_field
+from smart_rag_core.retrieval.source_scope import strip_source_selectors
 
 
 def decide_correction(
@@ -105,6 +113,17 @@ def decide_correction(
             already_applied=True,
         )
     if not retained:
+        cached = hybrid.query_text if hybrid is not None else prep.original
+        alternate = alternate_retry_query(prep, cached)
+        if alternate is None:
+            return CorrectionDecision(
+                applied=False,
+                kind=CorrectionKind.NONE,
+                reason="identical_retry_rejected",
+                remaining_corrections=remaining_corrections,
+                exhausted_status="insufficient_evidence",
+                already_applied=False,
+            )
         try:
             remaining = assert_correction_available(remaining_corrections)
         except QueryCeilingError as exc:
@@ -116,6 +135,7 @@ def decide_correction(
             routing_correction=ROUTING_CORRECTION_SAME_ROUTE_RETRY,
             remaining_corrections=remaining,
             already_applied=True,
+            alternate_query=alternate,
         )
     return CorrectionDecision(
         applied=False,
@@ -174,16 +194,20 @@ def apply_correction_to_plan(
             }
         )
     if decision.kind is CorrectionKind.SAME_ROUTE_RETRY:
+        alternate = decision.alternate_query
+        if alternate is None:
+            raise QueryRoutingError("identical_retry")
         extra = BranchSpec(
             branch_id="corr-retry",
             kind=BranchKind.HYBRID,
             family=plan.effective_route
             if plan.effective_route is not Phase6RouteFamily.COMBINED
             else Phase6RouteFamily.HYBRID,
-            query_text=prep.rewrite or prep.original,
+            query_text=alternate,
             parallel_group=0,
             hl_keywords=prep.hl_keywords,
             ll_keywords=prep.ll_keywords,
+            bypass_retrieval_cache=True,
         )
         return plan.model_copy(
             update={
@@ -206,6 +230,77 @@ def refuse_second_correction(already_applied: bool) -> None:
 
     if already_applied:
         raise QueryRoutingError("second_correction")
+
+
+def alternate_retry_query(prep: QueryPreparation, cached_query: str) -> str | None:
+    """Return one ranking-different retry query, or None when none exists.
+
+    Args:
+        prep: Typed preparation.
+        cached_query: Ranking query already retrieved on this run.
+
+    Returns:
+        A variant, rewrite, decomposition, or term-focused query whose
+        selector-stripped normalized form differs from ``cached_query``.
+    """
+
+    selectors = str_list_field(prep.profile, "requested_sources")
+    cached = _ranking_form(cached_query, selectors)
+    seen = {cached}
+    candidates: list[str] = []
+    raw_variants = prep.profile.variants.value
+    if isinstance(raw_variants, list):
+        candidates.extend(str(item) for item in raw_variants if str(item).strip())
+    if prep.rewrite:
+        candidates.append(prep.rewrite)
+    candidates.extend(item for item in prep.decomposition if item.strip())
+    focused = _term_focused_query(prep, selectors)
+    if focused is not None:
+        candidates.append(focused)
+    for raw in candidates:
+        ranked = _ranking_form(raw, selectors)
+        if ranked in seen or len(ranked) < 3:
+            continue
+        seen.add(ranked)
+        return raw
+    return None
+
+
+def _ranking_form(text: str, selectors: Sequence[str]) -> str:
+    """Normalize a query the same way ranking and coverage do.
+
+    Args:
+        text: Candidate retry or cached query.
+        selectors: High-confidence requested source names.
+
+    Returns:
+        Selector-stripped ``arabic_norm_v1`` key.
+    """
+
+    stripped = strip_source_selectors(text, selectors) if selectors else text
+    return coverage_term_key(stripped)
+
+
+def _term_focused_query(
+    prep: QueryPreparation, selectors: Sequence[str]
+) -> str | None:
+    """Build a focused retry from profile codes and entities.
+
+    Args:
+        prep: Typed preparation.
+        selectors: Source-selector texts to exclude.
+
+    Returns:
+        Space-joined answer terms, or None when empty.
+    """
+
+    terms = exclude_source_selector_terms(
+        (*prep.exact_terms, *prep.entities, *prep.approved_aliases, *prep.numbers),
+        selectors,
+    )
+    if not terms:
+        return None
+    return " ".join(terms[:8])
 
 
 def _hybrid_result(results: tuple[BranchResult, ...]) -> BranchResult | None:

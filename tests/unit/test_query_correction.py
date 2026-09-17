@@ -22,6 +22,7 @@ from smart_rag_core.query_routing.matrix import compile_retrieval_plan
 from smart_rag_core.query_routing.models import (
     BranchKind,
     BranchResult,
+    CorrectionDecision,
     CorrectionKind,
 )
 from smart_rag_core.query_routing.preparation import prepare_query
@@ -156,6 +157,49 @@ def test_same_route_retry_without_relationship() -> None:
         (_hybrid_result(runtime, coverage=0.20, query=query),),
     )
     assert any(branch.branch_id == "corr-retry" for branch in updated.branches)
+    retry = next(branch for branch in updated.branches if branch.branch_id == "corr-retry")
+    assert retry.query_text != query
+    assert retry.bypass_retrieval_cache is True
+    assert decision.alternate_query == retry.query_text
+
+
+def test_identical_cached_retry_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The one correction cannot replay the cached ranking query."""
+
+    runtime = _runtime()
+    query = "What is the status of INV-SR-1001?"
+    prep = prepare_query(query, runtime=runtime)
+    plan = compile_retrieval_plan(prep, runtime)
+    monkeypatch.setattr(
+        "smart_rag_core.query_routing.correction.alternate_retry_query",
+        lambda _prep, _cached: None,
+    )
+    decision = decide_correction(
+        plan,
+        prep,
+        (_hybrid_result(runtime, coverage=0.20, query=query),),
+        runtime=runtime,
+        remaining_corrections=1,
+        already_applied=False,
+    )
+    assert decision.applied is False
+    assert decision.reason == "identical_retry_rejected"
+    assert decision.exhausted_status == "insufficient_evidence"
+    forged = CorrectionDecision(
+        applied=True,
+        kind=CorrectionKind.SAME_ROUTE_RETRY,
+        reason="coverage_below_threshold_same_route",
+        remaining_corrections=0,
+        already_applied=True,
+        alternate_query=None,
+    )
+    with pytest.raises(QueryRoutingError, match="identical_retry"):
+        apply_correction_to_plan(
+            plan,
+            prep,
+            forged,
+            (_hybrid_result(runtime, coverage=0.20, query=query),),
+        )
 
 
 def test_no_second_correction() -> None:
@@ -367,3 +411,28 @@ def test_insufficient_evidence_after_correction_ends() -> None:
     assert route_after_correction(state) == "end"
     state["status"] = "correction_applied"
     assert route_after_correction(state) == "fuse_evidence"
+
+
+def test_post_correction_coverage_is_recomputed_before_answer() -> None:
+    """A retry that stays below 0.65 cannot proceed to answer generation."""
+
+    from smart_rag_agents.query.deps import QueryGraphDeps
+    from smart_rag_agents.query.nodes.correction import apply_correction_node
+    from smart_rag_agents.query.state import pending_query_state
+
+    runtime = _runtime()
+    query = "What is the status of INV-SR-1001?"
+    prep = prepare_query(query, runtime=runtime)
+    plan = compile_retrieval_plan(prep, runtime)
+    results = (_hybrid_result(runtime, coverage=0.20, query=query),)
+    state = pending_query_state(runtime.model_dump(mode="json"), user_query=query)
+    state["status"] = "retrieved"
+    state["remaining_corrections"] = 1
+    state["remaining_model_calls"] = 6
+    state["retrieval_plan"] = plan.model_dump(mode="json")
+    state["preparation"] = prep.model_dump(mode="json")
+    state["branch_results"] = [item.model_dump(mode="json") for item in results]
+    out = apply_correction_node(state, QueryGraphDeps(hybrid_retriever=_FakeHybrid()))
+    assert out["status"] == "insufficient_evidence"
+    assert out["detail"] == "coverage_below_threshold_after_correction"
+    assert plan.knowledge_scope.value != "general_knowledge"

@@ -10,7 +10,11 @@ from smart_rag_core.query_routing.correction import (
     decide_correction,
 )
 from smart_rag_core.query_routing.exceptions import QueryRoutingError
-from smart_rag_core.query_routing.models import BranchResult
+from smart_rag_core.query_routing.models import (
+    BranchKind,
+    BranchResult,
+    CorrectionKind,
+)
 from smart_rag_core.query_routing.serde import (
     branch_results_from_state,
     plan_from_state,
@@ -39,7 +43,8 @@ def apply_correction_node(
     State outputs:
         ``correction``, possibly extra branch results, ``corrected_route``,
         ``remaining_model_calls`` after any extra retrieve, and
-        ``insufficient_evidence`` when exhausted.
+        ``insufficient_evidence`` when exhausted or post-correction
+        coverage is still below the frozen threshold.
 
     Persistence writes:
         None. ``routing_correction`` is stored on graph state for packet 3.
@@ -151,6 +156,16 @@ def apply_correction_node(
     if whole_refused:
         terminal = "insufficient_evidence"
         detail = "section_coverage_ratio below 1.0; scoped refusal"
+    if (
+        decision.applied
+        and decision.kind is CorrectionKind.SAME_ROUTE_RETRY
+        and extra
+        and extra[-1].kind is BranchKind.HYBRID
+        and extra[-1].coverage_score is not None
+        and extra[-1].coverage_score < updated.coverage_threshold
+    ):
+        terminal = "insufficient_evidence"
+        detail = "coverage_below_threshold_after_correction"
     return cast(
         QueryGraphState,
         {

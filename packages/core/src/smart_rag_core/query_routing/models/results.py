@@ -121,6 +121,8 @@ class CorrectionDecision(BaseModel):
         exhausted_status: ``insufficient_evidence`` when the budget is spent
             without enough coverage.
         already_applied: Guard against a second correction or loop.
+        alternate_query: Measured retry query when ``same_route_retry``.
+            None for Combined escalation or skipped correction.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -132,3 +134,4 @@ class CorrectionDecision(BaseModel):
     remaining_corrections: int = Field(ge=0, le=1)
     exhausted_status: str | None = None
     already_applied: bool = False
+    alternate_query: str | None = Field(default=None, max_length=2000)
