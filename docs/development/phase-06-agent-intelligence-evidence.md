@@ -2,7 +2,7 @@
 title: Phase 6 agent-intelligence evidence index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 ---
 
@@ -84,6 +84,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-55 — Postgres reconnect, idle SSE retirement, and query readiness (2026-09-16) | [phase-06/p06-55-postgres-readiness-2026-09-16.md](./phase-06/p06-55-postgres-readiness-2026-09-16.md) | 96 |
 | P06-56 — Host-worker parser topology and Exa lifecycle (2026-09-16) | [phase-06/p06-56-worker-async-lifecycle-2026-09-16.md](./phase-06/p06-56-worker-async-lifecycle-2026-09-16.md) | 85 |
 | P06-57 — Integrated qualification (2026-09-16) | [phase-06/p06-57-integrated-qualification-2026-09-16.md](./phase-06/p06-57-integrated-qualification-2026-09-16.md) | 127 |
+| P06-58 — General Hybrid retrieval accuracy overlay (2026-09-17) | [phase-06/p06-58-hybrid-retrieval-accuracy-amendment-2026-09-17.md](./phase-06/p06-58-hybrid-retrieval-accuracy-amendment-2026-09-17.md) | 90 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

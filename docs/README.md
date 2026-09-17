@@ -2,7 +2,7 @@
 title: Documentation index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-17
 audience: engineering, reviewers, client-approver
 ---
 
@@ -123,6 +123,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [adr/ADR-advanced-web-research.md](./adr/ADR-advanced-web-research.md) | engineering-lead | accepted | 2026-09-15 | eng, reviewers, security, frontend |
 | [adr/ADR-pdf-paragraph-citations.md](./adr/ADR-pdf-paragraph-citations.md) | engineering-lead | accepted | 2026-09-15 | eng, reviewers, security, frontend |
 | [adr/ADR-live-rag-failure-remediation.md](./adr/ADR-live-rag-failure-remediation.md) | engineering-lead | accepted | 2026-09-16 | eng, reviewers, security, frontend |
+| [adr/ADR-hybrid-retrieval-accuracy.md](./adr/ADR-hybrid-retrieval-accuracy.md) | engineering-lead | accepted | 2026-09-17 | eng, reviewers, security |
 | [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-09 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
 | [adr/ADR-local-langsmith-export-io.md](./adr/ADR-local-langsmith-export-io.md) | engineering-lead | accepted | 2026-08-26 | eng, security |
@@ -158,6 +159,7 @@ Canonical map for Smart RAG docs. Status values: `planned` | `draft` | `proposed
 | [evaluation/PHASE4_RANKED_IDS.md](./evaluation/PHASE4_RANKED_IDS.md) | engineering-lead | draft | 2026-09-09 | eng, reviewers |
 | [evaluation/PDF_HYBRID_EVALUATION.md](./evaluation/PDF_HYBRID_EVALUATION.md) | engineering-lead | draft | 2026-09-13 | eng, reviewers |
 | [evaluation/PDF_EVAL_WORKSPACE.md](./evaluation/PDF_EVAL_WORKSPACE.md) | engineering-lead | draft | 2026-09-14 | eng, reviewers, security, frontend |
+| [evaluation/COMPANY_DOCUMENTS_RAG_100.md](./evaluation/COMPANY_DOCUMENTS_RAG_100.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers, client-approver |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |
 | [security/LOCAL_ADMIN_ALERT_CONTRACT.md](./security/LOCAL_ADMIN_ALERT_CONTRACT.md) | engineering-lead | draft | 2026-08-14 | eng, ops |

@@ -17,6 +17,7 @@ Related: [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy
 [ADR-local-pdf-evaluation-workspace.md](../adr/ADR-local-pdf-evaluation-workspace.md) ·
 [ADR-hosted-webapp-evaluation-workspace.md](../adr/ADR-hosted-webapp-evaluation-workspace.md) ·
 [PDF_EVAL_WORKSPACE.md](./PDF_EVAL_WORKSPACE.md) ·
+[COMPANY_DOCUMENTS_RAG_100.md](./COMPANY_DOCUMENTS_RAG_100.md) ·
 [PARSER_BAKEOFF.md](./PARSER_BAKEOFF.md) ·
 [docs index](../README.md)
 
