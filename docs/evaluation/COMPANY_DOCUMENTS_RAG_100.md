@@ -25,6 +25,8 @@ Related: [PDF_HYBRID_EVALUATION.md](./PDF_HYBRID_EVALUATION.md) ·
 [SSE.md](../api/SSE.md) ·
 [AUTH_AND_STREAMING.md](../frontend/AUTH_AND_STREAMING.md) ·
 [ADR-live-rag-failure-remediation.md](../adr/ADR-live-rag-failure-remediation.md) ·
+[ADR-hybrid-retrieval-accuracy.md](../adr/ADR-hybrid-retrieval-accuracy.md) ·
+[DUAL_METRIC_SCORING.md](./DUAL_METRIC_SCORING.md) ·
 [docs index](../README.md)
 
 ```mermaid
@@ -48,14 +50,23 @@ sequenceDiagram
 
 ## Verdict
 
-The agent often refuses or paraphrases past the gold phrase. Strict pass is
-37%. Another 1% was partial. The rest missed because retrieval returned no
-authorized evidence (33), the answer used different wording than the book
-(21), or the run hit the product time-limit message (8), mostly late in a
-long chat.
+The 2026-09-17 Ask run is a **strict-substring baseline**, not semantic
+ground truth and not proven empty retrieval. Strict pass is 37%. Another
+1% was partial. Live traces fused evidence and applied a correction on
+every question. The 33 rows previously labeled “no evidence” are
+**verifier-stage refusals after fusion**, not a proof that Hybrid returned
+zero authorized survivors. Eight rows hit the product deadline reserve
+while sharing one long conversation. Twenty-one answered with nearby or
+paraphrased wording that missed the lexical gold phrase.
 
-This run does **not** claim generalization to other PDFs, web search, Combined
-scope, or graph-only questions.
+The live corpus also had **multiple current copies** of the same bytes and
+upload titles that do not match the document’s canonical name, so named
+source scope stayed unscoped.
+
+This run does **not** claim generalization to other PDFs, web search,
+Combined scope, or graph-only questions. Re-runs must use the dual-metric
+scorer in [DUAL_METRIC_SCORING.md](./DUAL_METRIC_SCORING.md), a fresh
+conversation per question, and environment-sourced credentials.
 
 ## How the test was run
 
@@ -66,7 +77,7 @@ scope, or graph-only questions.
 | Answer source | `company_documents` only |
 | Route family | `composite` on every question |
 | Client | Ask HTTP + SSE (`X-Client-Version: 0.1.0`), same path as the UI |
-| Conversation | `d2c5e8e1-a5f2-4372-8dfd-e91d2bcc21ad` |
+| Conversation | `d2c5e8e1-a5f2-4372-8dfd-e91d2bcc21ad` (shared; **not** the P06-59 policy) |
 | Corpus | Uploaded O’Reilly book already in the company-documents index |
 | Gold set | 100 short, single-intent questions; 143 required fact phrases |
 | HTTP | 100 / 100 accepted as `202` |
@@ -87,17 +98,25 @@ was about **$0.08**.
 ## Scoring contract
 
 Each gold item has one or more **required** phrases taken from the book
-(short facts, not page excerpts). The scorer HTML-unescapes the streamed
-answer, casefolds it, and checks whether every required phrase is a
-substring.
+(short facts, not page excerpts). The 2026-09-17 tables below used
+casefold substring matching on a truncated excerpt and a shared
+conversation. That remains the historical strict baseline.
+
+P06-59 replaces duplicated scoring with one tested scorer that:
+
+- HTML-unescapes and scores the **full** answer
+- reports strict phrase match separately from approved-alias fact coverage
+- counts product-deadline failures as a first-class metric
+- attributes verifier refusals after fusion separately from empty retrieval
 
 | Status | Meaning |
 | --- | --- |
 | Pass | Every required phrase appears in the answer |
 | Partial | At least one required phrase appears, but not all |
-| No evidence | Product limitation `insufficient_evidence`, or the answer is the authorized-evidence refusal, and no gold phrase hit |
+| Verifier refusal after fusion | Product limitation `insufficient_evidence` after fused evidence |
+| Empty retrieval | Proven only when fused count is zero and channels missed |
 | Wrong phrasing | The agent answered, but none of the required phrases appear |
-| Timeout | The answer is the product time-limit message (or a deadline limitation) and no gold phrase hit |
+| Timeout | The answer is the product time-limit message (or a deadline limitation) |
 | Error | Terminal `error` and no gold phrase hit |
 
 Credit score = (pass + 0.5 × partial) / 100 = **0.375**.
@@ -106,10 +125,10 @@ Credit score = (pass + 0.5 × partial) / 100 = **0.375**.
 
 - Matching is **lexical**, not semantic. Question 22 said “enumerate all
   decision branches in advance” but missed gold `known branches`.
-- Only the captured **answer excerpt** (about the first 500 characters) is
-  scored. Facts that appear only later in a long answer can be missed.
-- When the product tags `insufficient_evidence` and no gold phrase hits, the
-  row is “No evidence” even if some text was generated (question 51).
+- The 2026-09-17 tables scored a captured **answer excerpt** (about the
+  first 500 characters). P06-59 scores the full answer.
+- When the product tags `insufficient_evidence` after fusion, the row is a
+  verifier-stage refusal even if some text was generated (question 51).
 - Truncated agent answers in this file are for comparison. They are not a
   substitute for the PDF and are not a license to copy book chapters.
 
@@ -121,7 +140,8 @@ Credit score = (pass + 0.5 × partial) / 100 = **0.375**.
 | Strict pass | 37 / 100 (37%) |
 | Pass or partial | 38 / 100 (38%) |
 | Partial | 1 / 100 |
-| No authorized evidence | 33 / 100 |
+| No authorized evidence (legacy label) | 33 / 100 |
+| Verifier refusal after fusion (corrected) | 33 / 100; empty retrieval **not proven** |
 | Wrong phrasing | 21 / 100 |
 | Timeout | 8 / 100 |
 | Error | 0 / 100 |
@@ -131,7 +151,7 @@ Credit score = (pass + 0.5 × partial) / 100 = **0.375**.
 ```mermaid
 flowchart TB
   asked["100 company-document questions"] --> pass["Pass 37"]
-  asked --> none["No evidence 33"]
+  asked --> none["Verifier refusal after fusion 33"]
   asked --> wrong["Wrong phrasing 21"]
   asked --> timeout["Timeout 8"]
   asked --> partial["Partial 1"]
@@ -142,7 +162,7 @@ flowchart TB
 | Outcome | Count | Share | Median time (s) |
 | --- | --- | ---: | ---: |
 | Pass | 37 | 37% | 43.1 |
-| No evidence | 33 | 33% | 43.0 |
+| No evidence (legacy) | 33 | 33% | 43.0 |
 | Wrong phrasing | 21 | 21% | 45.8 |
 | Timeout | 8 | 8% | 53.1 |
 | Partial | 1 | 1% | 47.4 |
@@ -195,18 +215,21 @@ Pass IDs: 1, 2, 4, 5, 6, 7, 8, 11, 12, 13, 14, 19, 28, 29, 30, 40, 44, 45,
 
 ## Failure modes
 
-### No authorized evidence (33)
+### Verifier refusal after fusion (33)
 
-The company-documents refusal fired even though the gold pages are in the
-uploaded book. Typical misses: subtitle, Arun Rao blurb, “agentic system”,
-The Information, HELM, rolling context windows, interaction modalities,
-MCP expansion / server / client / JSON-RPC, planner-executor, self-ask,
-GraphRAG name, Reflexion “without ever retraining”, A2A Agent Card, ELK,
-SigNoz, DSPy, Lakera PINT, MAESTRO expansion, executor-to-governor roles.
+The company-documents refusal fired **after fusion**. These rows were
+mis-labeled “no authorized evidence” in the first report. They are not a
+proof that retrieval returned zero survivors. Typical lexical misses after
+refusal: subtitle, Arun Rao blurb, “agentic system”, The Information, HELM,
+rolling context windows, interaction modalities, MCP expansion / server /
+client / JSON-RPC, planner-executor, self-ask, GraphRAG name, Reflexion
+“without ever retraining”, A2A Agent Card, ELK, SigNoz, DSPy, Lakera PINT,
+MAESTRO expansion, executor-to-governor roles.
 
-This is the largest bucket. Retrieval did not surface a passage the
-authorizer would treat as sufficient, so the agent correctly refused rather
-than guessing from the public web.
+This is the largest bucket. The verifier did not treat the fused passages
+as sufficient for the required fact, so the agent refused rather than
+guessing from the public web. Stage-level channel ranks belong in the
+private dual-metric summary, not in this public table.
 
 ### Wrong phrasing or swapped chunk (21)
 
@@ -259,9 +282,9 @@ substring `Costs` missed, so the row is Partial (3 / 4 facts).
 ## Security and privacy
 
 Scope was forced to company documents. The agent did not use web research for
-these 100 questions. Insufficient-evidence refusals are an authorization
-success when retrieval is empty; they are an accuracy failure against gold
-that exists in the corpus.
+these 100 questions. Insufficient-evidence refusals after fusion are a
+grounding success against hallucination and an accuracy failure against gold
+that exists in the corpus. They are not proven empty retrieval.
 
 Do not commit the PDF, page extracts, or full streamed answers. This report
 keeps short gold phrases and truncated agent text only. The live result JSON
