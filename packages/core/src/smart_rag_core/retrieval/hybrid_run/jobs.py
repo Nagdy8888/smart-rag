@@ -25,7 +25,11 @@ from smart_rag_core.retrieval.hybrid_run.types import (
 )
 from smart_rag_core.retrieval.profiles import RetrievalFallbackReason
 from smart_rag_core.retrieval.temporal import TemporalDocument
-from smart_rag_core.retrieval.types import Bm25RetrievalResult, RetrievalCandidate
+from smart_rag_core.retrieval.types import (
+    Bm25RetrievalResult,
+    RetrievalCandidate,
+    TermRetrievalResult,
+)
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.settings.postgres_connect import connect_postgres
 
@@ -196,16 +200,32 @@ class HybridChannelJobsMixin:
                     from smart_rag_core.retrieval.terms import TermRetriever
 
                     with self._channel_supabase() as connection:
-                        return collect_term_lists(
-                            TermRetriever(connection).retrieve,
-                            caller=caller,
-                            texts=texts,
-                        )
-                return collect_term_lists(
-                    term_retriever.retrieve,
-                    caller=caller,
-                    texts=texts,
-                )
+                        try:
+                            return collect_term_lists(
+                                TermRetriever(connection).retrieve,
+                                caller=caller,
+                                texts=texts,
+                            )
+                        except Exception:
+                            return TermRetrievalResult(
+                                candidates=(),
+                                query_normalized="",
+                                empty_channel=True,
+                                fallback_reason=RetrievalFallbackReason.TERM_UNAVAILABLE,
+                            )
+                try:
+                    return collect_term_lists(
+                        term_retriever.retrieve,
+                        caller=caller,
+                        texts=texts,
+                    )
+                except Exception:
+                    return TermRetrievalResult(
+                        candidates=(),
+                        query_normalized="",
+                        empty_channel=True,
+                        fallback_reason=RetrievalFallbackReason.TERM_UNAVAILABLE,
+                    )
 
             jobs["term"] = _term_job
         return jobs

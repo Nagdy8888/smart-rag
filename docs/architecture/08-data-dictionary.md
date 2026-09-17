@@ -2,7 +2,7 @@
 title: Data dictionary
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 ---
 
@@ -181,7 +181,9 @@ See [ADR-upload-capability-and-storage-privilege.md](../adr/ADR-upload-capabilit
   `recheck_retrieval_candidates`, `fetch_authorized_chunk_context`,
   `list_authorized_eval_passages`, and `resolve_structured_table` are
   `SECURITY INVOKER` for `app_api` only. Authorization predicates run before
-  rank/limit or artifact return. Context fetch may return non-representative
+  rank/limit or artifact return. `retrieve_term_candidates` accepts an
+  optional bound `text[]` of extra needles (max 8) in addition to the
+  ranking sentence. Context fetch may return non-representative
   parent rows and trailing `provenance jsonb` (sheet/range/URL locators).
   Eval passages return current, authorized, representative rows only (limit 60).
   Table paths never come from the client or model.

@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 61
-status: pending
+status: complete
 title: "Repair term and BM25 candidate generation and selectively enrich indexed search terms."
 requirement_ids: [P06-61]
 ---

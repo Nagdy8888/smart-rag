@@ -28,7 +28,9 @@ authorized match, the title is stripped from the ranking query so selector
 tokens cannot dominate dense or BM25 ranking. Ambiguous and unauthorized
 names stay unscoped and indistinguishable. Exact duplicate citation text is
 collapsed after ACL and current-version recheck; documents are never deleted
-automatically.
+automatically. The term channel searches the ranking sentence plus bounded
+extracted codes, acronyms, entities, and aliases. BM25 unique capping
+round-robins variants so one variant cannot consume the survivor cap.
 
 ## Claim hygiene (Packet 9 metrics)
 

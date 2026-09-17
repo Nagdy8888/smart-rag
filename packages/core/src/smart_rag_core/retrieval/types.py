@@ -65,11 +65,15 @@ class TermRetrievalResult:
         candidates: Ordered authorized term matches.
         query_normalized: ``arabic_norm_v1`` form used for the query.
         empty_channel: True when no terms/aliases matched.
+        extra_terms: Bounded needles searched in addition to the sentence.
+        fallback_reason: ``term_unavailable`` when the RPC fails closed.
     """
 
     candidates: tuple[RetrievalCandidate, ...]
     query_normalized: str
     empty_channel: bool
+    extra_terms: tuple[str, ...] = ()
+    fallback_reason: RetrievalFallbackReason = RetrievalFallbackReason.NONE
 
 
 @dataclass(frozen=True, slots=True)

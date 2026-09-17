@@ -75,7 +75,7 @@ The table below is the complete maintained map. Packet evidence under
 | [architecture/04-deployment.md](./architecture/04-deployment.md) | engineering-lead | draft | 2026-08-18 | eng, ops |
 | [architecture/05-database-connections.md](./architecture/05-database-connections.md) | engineering-lead | proven | 2026-09-16 | eng, ops |
 | [architecture/06-database-workload-isolation.md](./architecture/06-database-workload-isolation.md) | engineering-lead | proven | 2026-09-09 | eng, ops |
-| [architecture/08-data-dictionary.md](./architecture/08-data-dictionary.md) | engineering-lead | draft | 2026-09-16 | eng |
+| [architecture/08-data-dictionary.md](./architecture/08-data-dictionary.md) | engineering-lead | draft | 2026-09-17 | eng |
 | [development/phase-01-foundation-evidence.md](./development/phase-01-foundation-evidence.md) | engineering-lead | accepted | 2026-08-13 | eng, reviewers |
 | [development/phase-02-identity-data-evidence.md](./development/phase-02-identity-data-evidence.md) | engineering-lead | accepted | 2026-08-13 | eng, reviewers |
 | [development/phase-03-ingestion-evidence.md](./development/phase-03-ingestion-evidence.md) | engineering-lead | accepted | 2026-09-09 | eng, reviewers |
