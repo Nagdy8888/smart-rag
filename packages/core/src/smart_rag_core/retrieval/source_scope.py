@@ -82,8 +82,8 @@ class ResolvedRetrievalScope:
         representative_count: Authorized representative passages for the
             resolved version, else 0.
         query_class: Optional evaluation class id.
-        candidate_profile_id: Frozen default, or long-document after freeze
-            when exact-one and representative_count > 5.
+        candidate_profile_id: Frozen default, or ``hybrid_long_document_v2``
+            when exact-one, representative_count > 5, and the v2 pin exists.
         eligibility_reason: Why the long-document candidate was or was not
             eligible.
         resolution: Unscoped, exact-one, or ambiguous.

@@ -29,7 +29,7 @@ The table below is the complete maintained map. Packet evidence under
 | --- | --- | --- | --- | --- |
 | [QUALITY_TARGETS.md](./QUALITY_TARGETS.md) | product-owner | accepted | 2026-08-18 | client, engineering |
 | [agent/QUERY_ADMISSION.md](./agent/QUERY_ADMISSION.md) | engineering-lead | draft | 2026-09-15 | eng, security |
-| [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-09-15 | eng |
+| [agent/QUERY_BUDGETS.md](./agent/QUERY_BUDGETS.md) | engineering-lead | draft | 2026-09-17 | eng |
 | [agent/QUERY_ROUTING.md](./agent/QUERY_ROUTING.md) | engineering-lead | draft | 2026-09-15 | eng, reviewers |
 | [agent/COMBINED_FUSION.md](./agent/COMBINED_FUSION.md) | engineering-lead | draft | 2026-08-19 | eng, reviewers |
 | [agent/ANSWER_VERIFICATION.md](./agent/ANSWER_VERIFICATION.md) | engineering-lead | draft | 2026-09-16 | eng, reviewers |
@@ -139,7 +139,7 @@ The table below is the complete maintained map. Packet evidence under
 | [adr/ADR-pdf-paragraph-citations.md](./adr/ADR-pdf-paragraph-citations.md) | engineering-lead | accepted | 2026-09-15 | eng, reviewers, security, frontend |
 | [adr/ADR-live-rag-failure-remediation.md](./adr/ADR-live-rag-failure-remediation.md) | engineering-lead | accepted | 2026-09-16 | eng, reviewers, security, frontend |
 | [adr/ADR-hybrid-retrieval-accuracy.md](./adr/ADR-hybrid-retrieval-accuracy.md) | engineering-lead | accepted | 2026-09-17 | eng, reviewers, security |
-| [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-09 | eng, reviewers, security |
+| [adr/ADR-hybrid-long-document-profile.md](./adr/ADR-hybrid-long-document-profile.md) | engineering-lead | proposed | 2026-09-17 | eng, reviewers, security |
 | [adr/ADR-detector-finding-reviews.md](./adr/ADR-detector-finding-reviews.md) | engineering-lead | accepted | 2026-09-09 | eng, security, reviewers |
 | [adr/ADR-local-langsmith-export-io.md](./adr/ADR-local-langsmith-export-io.md) | engineering-lead | accepted | 2026-08-26 | eng, security |
 | [adr/ADR-llm-conversation-titles.md](./adr/ADR-llm-conversation-titles.md) | engineering-lead | accepted | 2026-08-26 | frontend, eng, security |
@@ -172,7 +172,7 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/PHASE4_ABLATIONS.md](./evaluation/PHASE4_ABLATIONS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [evaluation/PHASE4_HOLDOUT.md](./evaluation/PHASE4_HOLDOUT.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers, client-approver |
 | [evaluation/PHASE4_RANKED_IDS.md](./evaluation/PHASE4_RANKED_IDS.md) | engineering-lead | draft | 2026-09-09 | eng, reviewers |
-| [evaluation/PDF_HYBRID_EVALUATION.md](./evaluation/PDF_HYBRID_EVALUATION.md) | engineering-lead | draft | 2026-09-13 | eng, reviewers |
+| [evaluation/PDF_HYBRID_EVALUATION.md](./evaluation/PDF_HYBRID_EVALUATION.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers |
 | [evaluation/PDF_EVAL_WORKSPACE.md](./evaluation/PDF_EVAL_WORKSPACE.md) | engineering-lead | draft | 2026-09-14 | eng, reviewers, security, frontend |
 | [evaluation/COMPANY_DOCUMENTS_RAG_100.md](./evaluation/COMPANY_DOCUMENTS_RAG_100.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers, client-approver |
 | [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers |

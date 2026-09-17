@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from uuid import UUID, uuid4
 
+import pytest
 from smart_rag_agents.prompts import eval_pdf_judge_prompt_text
 from smart_rag_agents.prompts.registry import prompt_text
 from smart_rag_core.evaluation.classes import QueryClass
@@ -23,6 +24,7 @@ from smart_rag_core.retrieval.context_loader import ChunkContext
 from smart_rag_core.retrieval.frozen_profile import (
     FROZEN_HYBRID_PROFILE_SHA256,
     LONG_DOCUMENT_PROFILE_ID,
+    PRIOR_LONG_DOCUMENT_PROFILE_ID,
     UnknownRetrievalProfileError,
     canonical_profile_digest,
     load_evaluation_profile,
@@ -34,7 +36,10 @@ from smart_rag_core.retrieval.hybrid_run.channels import (
     collect_dense_lists,
     dense_retrieve_mode,
 )
-from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
+from smart_rag_core.retrieval.profiles import (
+    HYBRID_DEFAULT_PROFILE_ID,
+    RERANK_RESERVED_SECONDS,
+)
 from smart_rag_core.retrieval.rerank import (
     RerankFallbackReason,
     RerankPassage,
@@ -238,11 +243,10 @@ def test_long_document_profile_can_select_more_than_two_children() -> None:
     ]
     assert len(long_from_doc) > 2
     assert long_profile.document_quota == 12
-    try:
-        load_frozen_profile(LONG_DOCUMENT_PROFILE_ID)
-        raise AssertionError("unfrozen long document must stay runtime-denied")
-    except UnknownRetrievalProfileError:
-        pass
+    frozen_long = load_frozen_profile(LONG_DOCUMENT_PROFILE_ID)
+    assert frozen_long.profile_id == LONG_DOCUMENT_PROFILE_ID
+    with pytest.raises(UnknownRetrievalProfileError):
+        load_frozen_profile(PRIOR_LONG_DOCUMENT_PROFILE_ID)
 
 
 def test_ranked_ids_are_post_selection_not_fused() -> None:
@@ -426,11 +430,11 @@ def test_retrieve_slice_excludes_embedding_time() -> None:
     result = retriever.retrieve(
         query="annual leave policy",
         caller=_caller(),
-        deadline_seconds=0.05,
+        deadline_seconds=RERANK_RESERVED_SECONDS + 0.5,
         channel_jobs={"dense": lambda: (first, second)},
     )
     assert remaining_seen
-    assert remaining_seen[0] > 0.04
+    assert remaining_seen[0] > RERANK_RESERVED_SECONDS + 0.4
     assert result.rerank_call_count == 1
 
 

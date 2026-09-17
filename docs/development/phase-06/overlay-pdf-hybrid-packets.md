@@ -2,7 +2,7 @@
 title: Overlay PDF Hybrid packets (P13, P15, P16)
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 ---
 
@@ -55,7 +55,8 @@ flowchart LR
 ### Blocked
 
 - Development/qualification agent metrics on this PDF. Frozen
-  `hybrid_long_document_v1` remains runtime-denied.
+  `hybrid_long_document_v1` remains runtime-denied. P06-62 later pinned
+  `hybrid_long_document_v2` for exact-one long documents; v1 stays denied.
 
 ## Packet 16 — holdout close
 

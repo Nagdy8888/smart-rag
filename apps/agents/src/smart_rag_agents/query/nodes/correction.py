@@ -105,7 +105,7 @@ def apply_correction_node(
         )
     extra: list[BranchResult] = []
     updated = plan
-    query_budget = retrieve_budget(state, context)
+    query_budget = retrieve_budget(state, context, connection=deps.connection)
     if decision.applied:
         updated = apply_correction_to_plan(plan, prep, decision, results)
         new_specs = updated.branches[len(plan.branches) :]

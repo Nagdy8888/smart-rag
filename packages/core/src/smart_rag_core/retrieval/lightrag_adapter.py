@@ -36,7 +36,10 @@ from smart_rag_core.query_admission.ceilings import (
     debit_retrieve_budget,
     usage_kind_caps,
 )
-from smart_rag_core.query_admission.exceptions import TimeoutAfterSendError
+from smart_rag_core.query_admission.exceptions import (
+    QueryBudgetError,
+    TimeoutAfterSendError,
+)
 from smart_rag_core.query_admission.service import (
     consume_query_reservation,
     record_query_llm_usage,
@@ -632,7 +635,8 @@ async def _counted_query_callback(
 
     Raises:
         QueryCeilingError: When remaining model calls cannot cover the kind.
-        QueryBudgetError: When remaining USD cannot cover the kind cap.
+        QueryBudgetError: When remaining USD cannot cover the kind cap,
+            or a bound run/reservation is missing a database connection.
 
     Side Effects:
         Debits the ContextVar budget when bound and records provider
@@ -652,11 +656,13 @@ async def _counted_query_callback(
     caller = budget.caller
     run_id = budget.run_id
     reservation_id = budget.reservation_id
+    durable_required = isinstance(run_id, UUID) and isinstance(reservation_id, UUID)
+    if durable_required and not isinstance(connection, psycopg.Connection):
+        raise QueryBudgetError("retrieve_accounting_connection_missing")
     if (
         isinstance(connection, psycopg.Connection)
         and isinstance(caller, CallerContext)
-        and isinstance(run_id, UUID)
-        and isinstance(reservation_id, UUID)
+        and durable_required
     ):
         usd_cap, prompt_cap, completion_cap = usage_kind_caps(usage_kind)
         typed_connection = cast(psycopg.Connection[Any], connection)

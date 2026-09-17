@@ -95,13 +95,19 @@ def skip_closed_nodes(state: QueryGraphState) -> bool:
 
 
 def retrieve_budget(
-    state: QueryGraphState, context: AuthorizedRuntimeContext
+    state: QueryGraphState,
+    context: AuthorizedRuntimeContext,
+    *,
+    connection: object | None = None,
 ) -> QueryRetrieveBudget:
     """Start retrieve remaining from graph state, not the original ceiling.
 
     Args:
         state: Graph state after profile or other prior counted calls.
         context: Frozen admit context.
+        connection: Per-run ``app_api`` connection used for durable
+            embedding, rerank, and verifier accounting. Missing on a
+            counted retrieve with reservation ids fails closed.
 
     Returns:
         Mutable ledger whose remaining model calls the retrieve node
@@ -111,6 +117,7 @@ def retrieve_budget(
     return QueryRetrieveBudget(
         remaining_model_calls=int(state["remaining_model_calls"]),
         remaining_usd=context.remaining_usd,
+        connection=connection,
         caller=caller_from_runtime(context),
         run_id=context.run_id,
         reservation_id=context.reservation_id,

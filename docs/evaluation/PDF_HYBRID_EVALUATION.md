@@ -2,7 +2,7 @@
 title: PDF Hybrid evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 ---
 
@@ -29,6 +29,20 @@ flowchart LR
   retrieve --> qualify["Qualification once"]
   qualify --> holdout["One immutable holdout"]
 ```
+
+## P06-62 runtime pin (2026-09-17)
+
+Exact-one authorized long documents now execute immutable
+`hybrid_long_document_v2` (SHA-256
+`9565a14152c9c530ad5a07ba221f9d944a872c6b6f417e71ef30cab0486c95b1`).
+The failed `hybrid_long_document_v1` digest
+`d9e154747a88a94c0c75e87935a1f977e1c1802e2e80f9e12825bd24e1d15d22`
+stays unfrozen. Frozen `hybrid_default_v1` bytes are unchanged
+(`def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c`).
+OpenAI rerank starts only when remaining retrieve-slice seconds are at
+least `RERANK_RESERVED_SECONDS` (2.0). That reserve is inside the existing
+8s retrieve slice and is not `ANSWER_STAGE_MIN_SECONDS` (8.0). Live
+grounded-fact qualification of this pin remains Packet 64.
 
 ## Current gates (2026-09-10)
 
@@ -117,7 +131,9 @@ with a btree id list and `chunk_id = ANY(...)` on the BM25 key field.
 
 `ProcessHybridRetriever` now binds `rerank_pool` and `rerank_v1` under
 `hybrid_default_v1`. Identity output cannot satisfy the live-rerank gate.
-Unfrozen `hybrid_long_document_v1` stays rejected by `load_frozen_profile()`.
+Pinned `hybrid_long_document_v2` is runtime-allow-listed for exact-one
+authorized versions above the representative-count gate. Unfrozen
+`hybrid_long_document_v1` stays rejected by `load_frozen_profile()`.
 
 `HybridRunResult.ranked_ids` is the post-rerank/MMR/parent/trim order.
 `fused_ids` preserves historical fused occupancy for synthetic compact-corpus
@@ -131,14 +147,16 @@ count-only tokens. BM25 snippets are never diagnostics.
 | --- | --- |
 | PDF heading extraction | `parser_v1_pdf_headings_v2` live `graph_ineligible` (1045 chunks, 274 distinct `section_path`) |
 | Human reseal | operator-owned; labels remain 2/24 grounded |
-| `FROZEN_LONG_DOCUMENT_PROFILE_SHA256` | empty; `runtime_allow_listed=false` |
+| `FROZEN_LONG_DOCUMENT_PROFILE_SHA256` | `hybrid_long_document_v2` pin; v1 remains denied |
 | Invalid JSON rerank | typed `rerank_schema_invalid` → RRF fallback |
 | Retrieval cache | ID/rank only; recheck on hit; outage is a miss |
 | `qt_eval_009_status` | `unverified` (no disjoint graph-eligible live set) |
 | `holdout_opened` | `false` |
 
-Do not retune from the 2026-09-10 2/24 ungrounded baseline. Do not freeze
-`hybrid_long_document_v1` without live development and qualification reports.
+Do not retune from the 2026-09-10 2/24 ungrounded baseline. Do not pin
+`hybrid_long_document_v1`. Live promotion of `hybrid_long_document_v2`
+still requires Packet 64 disjoint qualification and the 100-question
+regression.
 
 P06-27 authorizes a hosted webapp exam that measures **production-corpus**
 Hybrid Recall@10 (all required gold chunks in the examiner's production

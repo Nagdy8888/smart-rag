@@ -278,6 +278,29 @@ def select_hybrid_context(
             usage=None,
             skipped_counterfactual=True,
         )
+    from smart_rag_core.retrieval.profiles import RERANK_RESERVED_SECONDS
+
+    if remaining_deadline_seconds < RERANK_RESERVED_SECONDS:
+        mmr_selected, dropped = apply_mmr(
+            pool,
+            query=query,
+            lambda_mult=mmr_lambda,
+            document_quota=document_quota,
+            section_quota=section_quota,
+            limit=evidence_max,
+            candidate_depth=mmr_depth,
+        )
+        expanded, parent_ids = expand_parents(mmr_selected, load_context, pool=pool)
+        trimmed = trim_token_budget(expanded, budget=token_budget, limit=evidence_max)
+        return ContextSelection(
+            passages=trimmed,
+            rerank_order=tuple(item.candidate.chunk_id for item in pool),
+            fallback_reason=RerankFallbackReason.TIMEOUT,
+            mmr_dropped=dropped,
+            expanded_parent_ids=parent_ids,
+            usage=None,
+            skipped_counterfactual=False,
+        )
     rankings, usage, reason = rerank(query, pool, remaining_deadline_seconds)
     ordered = pool
     fallback = reason

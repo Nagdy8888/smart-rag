@@ -16,14 +16,18 @@ PROFILE_FILENAME = "hybrid_default_v1.json"
 PROFILE_DIR = Path(__file__).resolve().parent / "frozen"
 FROZEN_PROFILE_PATH = PROFILE_DIR / PROFILE_FILENAME
 ROLLBACK_PROFILE_ID = "hybrid_packet5_v1"
-LONG_DOCUMENT_PROFILE_ID = "hybrid_long_document_v1"
+LONG_DOCUMENT_PROFILE_ID = "hybrid_long_document_v2"
+PRIOR_LONG_DOCUMENT_PROFILE_ID = "hybrid_long_document_v1"
 CANDIDATE_PROFILE_PATH = PROFILE_DIR / f"{LONG_DOCUMENT_PROFILE_ID}.json"
+PRIOR_LONG_DOCUMENT_PROFILE_PATH = PROFILE_DIR / f"{PRIOR_LONG_DOCUMENT_PROFILE_ID}.json"
 COVERAGE_SCORE_BASELINE = 0.65
 FROZEN_HYBRID_PROFILE_SHA256 = (
     "def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c"
 )
-FROZEN_LONG_DOCUMENT_PROFILE_SHA256 = ""
-"""Non-empty after Packet 16 qualification. Empty keeps runtime deny."""
+FROZEN_LONG_DOCUMENT_PROFILE_SHA256 = (
+    "9565a14152c9c530ad5a07ba221f9d944a872c6b6f417e71ef30cab0486c95b1"
+)
+"""Pinned after P06-62 development ablations. Not the unfrozen v1 digest."""
 
 
 class UnknownRetrievalProfileError(ValueError):
@@ -98,13 +102,26 @@ def canonical_profile_digest(payload: dict[str, Any]) -> str:
 
 
 def long_document_runtime_enabled() -> bool:
-    """Return whether the long-document profile is frozen for runtime.
+    """Return whether the measured long-document profile is frozen for runtime.
 
     Returns:
-        True when Packet 16 pinned a digest.
+        True when P06-62 pinned a non-empty digest for ``hybrid_long_document_v2``.
     """
 
     return bool(FROZEN_LONG_DOCUMENT_PROFILE_SHA256)
+
+
+def runtime_profile_ids() -> frozenset[str]:
+    """Return profile ids that retrieve may cache and execute.
+
+    Returns:
+        Default plus the pinned long-document id when enabled.
+    """
+
+    ids = {HYBRID_DEFAULT_PROFILE_ID}
+    if long_document_runtime_enabled():
+        ids.add(LONG_DOCUMENT_PROFILE_ID)
+    return frozenset(ids)
 
 
 def load_frozen_profile(profile_id: str) -> FrozenHybridProfile:
@@ -112,10 +129,10 @@ def load_frozen_profile(profile_id: str) -> FrozenHybridProfile:
 
     Args:
         profile_id: Requested runtime profile. ``hybrid_default_v1`` is
-            always executable. ``hybrid_long_document_v1`` is executable
-            only after Packet 16 pins its digest.
-            ``hybrid_packet5_v1`` is documented rollback, not a second
-            live default.
+            always allow-listed. ``hybrid_long_document_v2`` is executable
+            after P06-62 pins its digest. ``hybrid_long_document_v1``
+            stays unfrozen. ``hybrid_packet5_v1`` is documented rollback,
+            not a second live default.
 
     Returns:
         Validated frozen profile.
@@ -160,10 +177,11 @@ def load_evaluation_profile(profile_id: str) -> FrozenHybridProfile:
     """Load an evaluation candidate. Runtime retrieve must not call this.
 
     Args:
-        profile_id: ``hybrid_default_v1`` or ``hybrid_long_document_v1``.
+        profile_id: ``hybrid_default_v1`` or ``hybrid_long_document_v2``.
 
     Returns:
-        Validated profile. Long-document is not on the runtime allow-list.
+        Validated profile. Evaluation may load the long-document file
+        without the runtime pin; retrieve uses ``load_frozen_profile``.
 
     Raises:
         UnknownRetrievalProfileError: Unknown id.
