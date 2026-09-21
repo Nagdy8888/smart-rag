@@ -61,7 +61,7 @@ BEGIN
       || COALESCE(p_extra_terms[1:8], ARRAY[]::text[])
     ) AS raw_term
     WHERE btrim(COALESCE(raw_term, '')) <> ''
-      AND position(E'\x00' IN raw_term) = 0
+      AND position(chr(0) IN raw_term) = 0
       AND char_length(search.normalize_arabic_v1(btrim(raw_term)))
         BETWEEN 2 AND 256
   ),

@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 66
-status: pending
+status: complete
 title: "Deploy the reviewed seven-argument term RPC and prove live term_unavailable is gone."
 requirement_ids: [P06-66]
 ---
