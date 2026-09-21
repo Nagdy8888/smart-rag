@@ -2,7 +2,7 @@
 title: Query budget engineering defaults
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering
 phase_packet: Phase 6 Packet 1
 ---
@@ -67,7 +67,11 @@ must leave `ANSWER_STAGE_RESERVED_MODEL_CALLS` (2) and
 `ANSWER_STAGE_MIN_SECONDS` (8.0). Retrieve-time OpenAI rerank additionally
 requires `RERANK_RESERVED_SECONDS` (2.0) remaining in the existing 8s
 Hybrid retrieve slice; when that reserve is unmet, retrieve records
-`rerank_timeout` and continues with RRF. The answer-stage eight-second
+`rerank_timeout` and continues with RRF. Version-scoped exact dense
+additionally requires `EXACT_START_MIN_SLICE_SECONDS` (25.0) remaining
+in the retrieve slice; otherwise ANN starts first so the 25s Hybrid
+Ask envelope is not consumed by an exact scan of a large version. The
+Hybrid deadline is not raised. The answer-stage eight-second
 reserve is not spent on retrieval. Exhaustion returns a non-empty
 partial/refusal and does not call the answer provider. General, user-text,
 and Web ceilings are unchanged.

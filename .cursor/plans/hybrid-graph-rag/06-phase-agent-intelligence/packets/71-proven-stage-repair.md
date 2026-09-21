@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 71
-status: pending
+status: complete
 title: "Implement one bounded repair for the proven dominant stage."
 requirement_ids: [P06-71]
 ---

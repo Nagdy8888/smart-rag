@@ -14,6 +14,7 @@ from smart_rag_core.retrieval.profiles import (
     DENSE_CANDIDATE_CAP,
     DENSE_UNDERFILL_FLOOR,
     EXACT_FALLBACK_AUTHORIZED_ROW_CAP,
+    EXACT_START_MIN_SLICE_SECONDS,
     TERM_CANDIDATE_CAP,
     DenseMode,
     HnswProfileId,
@@ -96,29 +97,52 @@ def _invoke_dense(
         return retrieve(caller=caller, query_embedding=query_embedding)
 
 
+def exact_dense_admitted(remaining_slice_seconds: float | None) -> bool:
+    """Admit an exact dense scan only when the retrieve slice can hold it.
+
+    Args:
+        remaining_slice_seconds: Channel-plus-rerank remainder, or ``None``
+            when the caller did not measure a slice.
+
+    Returns:
+        True only when remaining seconds are at least
+        ``EXACT_START_MIN_SLICE_SECONDS``. Unmeasured slices stay on ANN
+        so production Ask cannot start exact by omission.
+    """
+
+    if remaining_slice_seconds is None:
+        return False
+    return remaining_slice_seconds >= EXACT_START_MIN_SLICE_SECONDS
+
+
 def dense_retrieve_mode(
     *,
     version_id: UUID | None,
     profile: object | None,
+    remaining_slice_seconds: float | None = None,
 ) -> DenseMode:
     """Select ANN or exact dense for one Hybrid channel job.
 
     Version-scoped exact is a long-document evaluation candidate. The
     default profile stays on ANN. Exact still honors the 10,000-row
-    admission ceiling inside ``DenseRetriever``.
+    admission ceiling inside ``DenseRetriever``. P06-71 additionally
+    requires a retrieve slice of at least the Hybrid envelope so exact
+    cannot starve the 25s Ask deadline.
 
     Args:
         version_id: Resolved current version, or ``None`` when unscoped.
         profile: Frozen or evaluation Hybrid profile, or ``None``.
+        remaining_slice_seconds: Channel-plus-rerank remainder.
 
     Returns:
-        ``exact`` only when the profile asks for it and a version is set.
+        ``exact`` only when the profile asks for it, a version is set,
+        and the remaining slice admits exact work.
     """
 
     if version_id is None or profile is None:
         return DenseMode.ANN
     mode = getattr(profile, "dense_mode_when_version_scoped", "ann")
-    if mode == "exact":
+    if mode == "exact" and exact_dense_admitted(remaining_slice_seconds):
         return DenseMode.EXACT
     return DenseMode.ANN
 
@@ -131,12 +155,14 @@ def collect_dense_lists(
     vectors: tuple[tuple[float, ...], ...],
     version_id: UUID | None = None,
     dense_mode: DenseMode = DenseMode.ANN,
+    remaining_slice_seconds: float | None = None,
 ) -> VariantLists:
     """Run dense retrieve once per fused query vector.
 
     Escalation is at most one HIGH ANN per variant, then exact only when
-    ``authorized_count * vector_count`` is at or below 10,000. When
-    ``dense_mode`` is already exact, ANN/HIGH retries are skipped.
+    ``authorized_count * vector_count`` is at or below 10,000 and the
+    remaining retrieve slice admits exact work. When ``dense_mode`` is
+    already exact, ANN/HIGH retries are skipped.
 
     Args:
         retrieve: Bound ``DenseRetriever.retrieve`` or a test double.
@@ -145,6 +171,8 @@ def collect_dense_lists(
         vectors: Query embeddings.
         version_id: Optional current-version filter inside ranking.
         dense_mode: Initial dense execution mode.
+        remaining_slice_seconds: Channel-plus-rerank remainder used to
+            admit or refuse exact escalation.
 
     Returns:
         Per-variant dense candidate lists after the global unique cap.
@@ -196,6 +224,7 @@ def collect_dense_lists(
         if (
             len(unique) < DENSE_UNDERFILL_FLOOR
             and work <= EXACT_FALLBACK_AUTHORIZED_ROW_CAP
+            and exact_dense_admitted(remaining_slice_seconds)
         ):
             exact: list[CandidateList] = []
             for _text, vector in zip(texts, vectors, strict=False):

@@ -531,14 +531,20 @@ def test_collect_dense_lists_exact_skips_ann_escalation() -> None:
 
 
 def test_long_document_candidate_prefers_exact_when_version_scoped() -> None:
-    """The evaluation candidate may select exact dense; default stays ANN."""
+    """Exact starts only when a full Hybrid slice is granted; default stays ANN."""
 
     long_profile = load_evaluation_profile(LONG_DOCUMENT_PROFILE_ID)
     assert long_profile.dense_mode_when_version_scoped == "exact"
     default = load_frozen_profile(HYBRID_DEFAULT_PROFILE_ID)
     assert default.dense_mode_when_version_scoped == "ann"
+    assert dense_retrieve_mode(version_id=uuid4(), profile=long_profile) is DenseMode.ANN
     assert (
-        dense_retrieve_mode(version_id=uuid4(), profile=long_profile) is DenseMode.EXACT
+        dense_retrieve_mode(
+            version_id=uuid4(),
+            profile=long_profile,
+            remaining_slice_seconds=25.0,
+        )
+        is DenseMode.EXACT
     )
     assert dense_retrieve_mode(version_id=None, profile=long_profile) is DenseMode.ANN
     assert dense_retrieve_mode(version_id=uuid4(), profile=default) is DenseMode.ANN
