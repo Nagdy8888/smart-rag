@@ -181,6 +181,49 @@ def validate_index_lease(
     return {**state, "status": "index_pending", "detail": "lease validated"}
 
 
+def refresh_indexed_title_search_terms(
+    connection: psycopg.Connection,
+    *,
+    version_id: UUID,
+) -> int:
+    """Insert the current document title onto representative search terms.
+
+    Used when ``hybrid_index`` is requeued for an already-indexed version.
+    The path does not re-parse bytes, change version status, or delete
+    chunks.
+
+    Args:
+        connection: Open ``app_worker`` connection.
+        version_id: Already-indexed version.
+
+    Returns:
+        Number of inserted ``document_search_terms`` rows.
+
+    Side Effects:
+        Calls ``app.sync_document_title_search_terms``.
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT d.id, d.title
+            FROM app.document_versions AS v
+            INNER JOIN app.documents AS d ON d.id = v.document_id
+            WHERE v.id = %s
+            """,
+            (version_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return 0
+        cursor.execute(
+            "SELECT app.sync_document_title_search_terms(%s, %s)",
+            (row[0], row[1]),
+        )
+        inserted = cursor.fetchone()
+    return int(inserted[0]) if inserted and inserted[0] is not None else 0
+
+
 def mark_parsing_for_index(
     state: IngestionIndexState, config: RunnableConfig
 ) -> IngestionIndexState:
@@ -190,10 +233,13 @@ def mark_parsing_for_index(
         ``version_id``, optional ``crawl_run_id`` / ``content_hash``.
 
     State outputs:
-        ``status`` ``parsing`` or ``index_failed``.
+        ``status`` ``parsing``, ``indexed``, or ``index_failed``.
 
     Persistence writes:
-        ``app.transition_document_version_status`` to ``parsing``.
+        ``app.transition_document_version_status`` to ``parsing`` for
+        ``uploaded`` / ``scanning``. Already-indexed statuses call
+        ``app.sync_document_title_search_terms`` and leave the version
+        status unchanged.
 
     External/model calls:
         None.
@@ -205,6 +251,7 @@ def mark_parsing_for_index(
         ``uploaded`` without a current clean scan fails closed (except
         explicit ``APP_ENV=test`` fixtures that set
         ``allow_index_without_scan``). Missing/dirty scans fail the job.
+        Already-indexed versions skip parse/scan and return ``indexed``.
     """
 
     if configurable_lease_lost(config):
@@ -242,6 +289,17 @@ def mark_parsing_for_index(
         if current_status == "parsing":
             connection.rollback()
             return {**state, "status": "parsing", "detail": "status already parsing"}
+        if current_status in {"hybrid_ready", "graph_ineligible"}:
+            inserted = refresh_indexed_title_search_terms(
+                connection,
+                version_id=UUID(state["version_id"]),
+            )
+            connection.commit()
+            return {
+                **state,
+                "status": "indexed",
+                "detail": f"search_terms_refreshed:{inserted}",
+            }
         if current_status not in {"uploaded", "scanning"}:
             connection.rollback()
             return {

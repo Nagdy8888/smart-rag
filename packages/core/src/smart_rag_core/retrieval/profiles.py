@@ -47,6 +47,11 @@ HYBRID_DEADLINE_SECONDS = 25
 RETRIEVAL_SLICE_SECONDS = RETRIEVAL_STATEMENT_TIMEOUT_MS / 1000.0
 RERANK_RESERVED_SECONDS = 2.0
 """Minimum remaining slice seconds required to start OpenAI rerank."""
+EXACT_START_MIN_SLICE_SECONDS = HYBRID_DEADLINE_SECONDS
+"""Exact dense starts only when the retrieve slice is at least the Hybrid
+envelope. Production Ask remaining is below this after profile/embed, so
+ANN starts first. P06-70 named ``deadline_budget`` after exact-from-start
+exhausted the 25s Ask envelope. The ceiling is not raised."""
 CHANNEL_WEIGHT_DENSE = 1.0
 CHANNEL_WEIGHT_BM25 = 1.0
 CHANNEL_WEIGHT_TERM = 1.0

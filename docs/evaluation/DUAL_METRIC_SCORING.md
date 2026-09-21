@@ -2,7 +2,7 @@
 title: Dual-metric company Ask scoring
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering, reviewers
 ---
 
@@ -44,7 +44,12 @@ flowchart TD
 
 - Credentials come from `SMART_RAG_EVAL_EMAIL`,
   `SMART_RAG_EVAL_PASSWORD`, and `SMART_RAG_EVAL_BASE_URL`.
-- Each question uses a **fresh conversation**.
+- Each question uses a **fresh conversation** and records `run_id`.
+- Stage fields come from checkpoint `HybridBranchDiagnostics` plus
+  `llm_usage` via `scripts/eval_ask_stage_export.py`. Missing required
+  fields are `unknown` and increment `unknown_required_fields`.
+- `run_company_ask.py` must not hard-code `source_resolution`,
+  `bm25_degraded_explicit`, or `rerank_accounting_ok`.
 - Private gold stays under gitignored `.private-eval/`.
 - Redacted summaries persist outcomes and counts only.
 
@@ -52,8 +57,9 @@ flowchart TD
 
 ```powershell
 uv run python -m pytest tests/unit/test_retrieval_dual_metric_scorer.py tests/unit/test_accuracy_promotion.py -q
-uv run python scripts/run_company_ask.py --gold .private-eval/pdf-gold-100.json --out .private-eval/p06-64-dual-summary.json --credentials .private-eval/eval-credentials.json
-uv run python scripts/rescore_company_ask.py --gold .private-eval/gold.json --answers .private-eval/answers.json --out .private-eval/dual-summary.json
+uv run python scripts/run_company_ask.py --gold .private-eval/pdf-gold-100.json --out .private-eval/p06-64-dual-summary.json --credentials .private-eval/eval-credentials.json --answers-out .private-eval/p06-64-answers.json --stage-export .private-eval/p06-68-stage-export.json
+uv run python scripts/eval_ask_stage_export.py --answers .private-eval/p06-64-answers.json --out .private-eval/p06-68-stage-export.json
+uv run python scripts/rescore_company_ask.py --gold .private-eval/gold.json --answers .private-eval/answers.json --stage-export .private-eval/p06-68-stage-export.json --out .private-eval/dual-summary.json
 ```
 
 Do not paste passwords, DSNs, or unrestricted source text into docs or
@@ -64,3 +70,5 @@ committed tests.
 This scorer does not replace citation, Recall@10, faithfulness, ACL,
 latency, or cost gates. Generalization remains unverified until disjoint
 real documents are scored. Packet 64 records that claim explicitly.
+Packet 72 records the 2026-09-21 honest overlay 100-question Ask:
+grounded 28/100, deadlines 9, promotion false. P06-17 remains open.

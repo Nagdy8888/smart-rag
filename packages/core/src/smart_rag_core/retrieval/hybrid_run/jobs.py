@@ -45,7 +45,8 @@ class HybridChannelJobsMixin:
         _supabase: Bound canonical connection used when no DSN is provided.
         _supabase_dsn: Full Postgres URL for one idle connection per thread.
         _retrieval_profile: Optional frozen or evaluation profile. Version
-            scoped exact dense is read from this object.
+            scoped exact dense is admitted only when the remaining retrieve
+            slice is at least the Hybrid envelope.
     """
 
     _dense: object | None
@@ -64,6 +65,7 @@ class HybridChannelJobsMixin:
         texts: tuple[str, ...],
         vectors: tuple[tuple[float, ...], ...],
         version_id: UUID | None = None,
+        remaining_slice_seconds: float | None = None,
     ) -> dict[str, ChannelJob]:
         """Build parallel dense/BM25/term jobs from bound retrievers.
 
@@ -73,6 +75,8 @@ class HybridChannelJobsMixin:
             texts: At most three query forms for dense/term lists.
             vectors: Embeddings aligned with ``texts``.
             version_id: Optional current-version filter pushed inside ranking.
+            remaining_slice_seconds: Channel-plus-rerank remainder used to
+                admit or refuse exact dense.
 
         Returns:
             Zero-argument jobs for ``run_channels_parallel``.
@@ -83,6 +87,7 @@ class HybridChannelJobsMixin:
         dense_mode = dense_retrieve_mode(
             version_id=version_id,
             profile=getattr(self, "_retrieval_profile", None),
+            remaining_slice_seconds=remaining_slice_seconds,
         )
         if dense is not None:
             dense_retriever = cast(DenseRetrieverLike, dense)
@@ -105,6 +110,7 @@ class HybridChannelJobsMixin:
                             vectors=vectors,
                             version_id=version_id,
                             dense_mode=dense_mode,
+                            remaining_slice_seconds=remaining_slice_seconds,
                         )
                 return collect_dense_lists(
                     dense_retriever.retrieve,
@@ -113,6 +119,7 @@ class HybridChannelJobsMixin:
                     vectors=vectors,
                     version_id=version_id,
                     dense_mode=dense_mode,
+                    remaining_slice_seconds=remaining_slice_seconds,
                 )
 
             jobs["dense"] = _dense_job

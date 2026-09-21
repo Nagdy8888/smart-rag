@@ -78,6 +78,7 @@ from tests.unit.typed_openapi import (
 _REPO = Path(__file__).resolve().parents[2]
 _OWNER = "00000000-0000-4000-8000-000000000001"
 _MEMBER = "00000000-0000-4000-8000-000000000002"
+_ADMIN = "00000000-0000-4000-8000-000000000003"
 _VIEWER = "00000000-0000-4000-8000-000000000003"
 _PACKET5_ROUTERS = (
     "auth_team.py",
@@ -958,6 +959,41 @@ class _FakeDocumentService:
         if caller.role not in {UserRole.OWNER, UserRole.ADMIN}:
             raise QueryAdmissionError("forbidden")
 
+    def update_title(
+        self,
+        caller: CallerContext,
+        *,
+        document_id: UUID,
+        title: str,
+    ) -> DocumentRecord:
+        """Reject members; accept owner/admin with a generic title.
+
+        Args:
+            caller: Authenticated caller.
+            document_id: Document id.
+            title: Already-trimmed title.
+
+        Returns:
+            Updated record.
+
+        Raises:
+            QueryAdmissionError: ``forbidden`` for members/viewers;
+                ``not_found`` for a reserved missing title token.
+        """
+
+        if title.casefold() == "missing-document":
+            raise QueryAdmissionError("not_found")
+        if caller.role not in {UserRole.OWNER, UserRole.ADMIN}:
+            raise QueryAdmissionError("forbidden")
+        return DocumentRecord(
+            document_id=document_id,
+            title=title,
+            visibility="company_visible",
+            current_version_id=None,
+            visibility_generation=1,
+            created_at=datetime.now(tz=UTC),
+        )
+
 
 class _FakeAuthTeamService:
     """Invitation create stand-in that never opens Postgres or mail."""
@@ -1177,6 +1213,87 @@ def test_document_delete_is_owner_admin_only(
     )
     invite_props = json_object(invite_schema.get("properties", {}))
     assert "raw_token" not in invite_props
+
+
+def test_document_title_patch_is_owner_admin_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Owner and admin PATCH succeed; members receive 403.
+
+    Empty, whitespace, and over-long titles are 422. Foreign and deleted
+    sentinels share not-found. Tests use generic titles only.
+    """
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("ALLOW_TEST_IDENTITY", "true")
+    monkeypatch.setattr(
+        "smart_rag_api.routers.documents.enforce_rate_limit",
+        _noop_rate_limit,
+    )
+    application = create_app()
+    application.dependency_overrides[get_postgres_url] = lambda: "postgresql://unused"
+    application.dependency_overrides[get_document_service] = lambda: (
+        _FakeDocumentService()
+    )
+    document_id = uuid4()
+    missing_id = uuid4()
+    deleted_id = uuid4()
+    body = {"title": "Canonical Source Title"}
+    with TestClient(application) as raw:
+        client = as_openapi_client(raw)
+        owner = client.patch(
+            f"/documents/{document_id}",
+            headers=_identity(_OWNER, "owner"),
+            json=body,
+        )
+        admin = client.patch(
+            f"/documents/{document_id}",
+            headers=_identity(_ADMIN, "admin"),
+            json=body,
+        )
+        member = client.patch(
+            f"/documents/{document_id}",
+            headers=_identity(_MEMBER, "member"),
+            json=body,
+        )
+        empty = client.patch(
+            f"/documents/{document_id}",
+            headers=_identity(_OWNER, "owner"),
+            json={"title": ""},
+        )
+        whitespace = client.patch(
+            f"/documents/{document_id}",
+            headers=_identity(_OWNER, "owner"),
+            json={"title": "   "},
+        )
+        too_long = client.patch(
+            f"/documents/{document_id}",
+            headers=_identity(_OWNER, "owner"),
+            json={"title": "A" * 513},
+        )
+        foreign = client.patch(
+            f"/documents/{missing_id}",
+            headers=_identity(_OWNER, "owner"),
+            json={"title": "missing-document"},
+        )
+        deleted = client.patch(
+            f"/documents/{deleted_id}",
+            headers=_identity(_OWNER, "owner"),
+            json={"title": "missing-document"},
+        )
+        schema = json_object(client.get("/openapi.json").json())
+    assert owner.status_code == 200
+    assert admin.status_code == 200
+    assert member.status_code == 403
+    assert empty.status_code == 422
+    assert whitespace.status_code == 422
+    assert too_long.status_code == 422
+    assert foreign.status_code == 404
+    assert deleted.status_code == 404
+    assert foreign.json() == deleted.json()
+    paths = json_object(schema.get("paths", {}))
+    document_path = json_object(paths["/documents/{document_id}"])
+    assert "patch" in document_path
 
 
 def test_citation_and_transcript_schemas_include_pdf_trace_fields() -> None:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 import psycopg
@@ -249,7 +249,7 @@ class ProcessHybridRetriever:
         )
         budget = query_budget if query_budget is not None else self.query_budget
         inner.query_budget = budget  # type: ignore[assignment]
-        return inner.retrieve(
+        result = inner.retrieve(
             query=ranking_query,
             caller=caller,
             profile=typed_profile,
@@ -258,6 +258,12 @@ class ProcessHybridRetriever:
             cache_mode=cache_mode,
             source_selectors=scope.selector_texts if scope is not None else (),
         )
+        resolution = (
+            scope.resolution.value
+            if scope is not None
+            else SourceResolution.UNSCOPED.value
+        )
+        return replace(result, source_resolution=resolution)
 
     def _resolve_version_id(
         self,

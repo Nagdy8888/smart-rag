@@ -2,7 +2,7 @@
 title: Phase 6 agent-intelligence evidence index
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering, reviewers
 ---
 
@@ -87,10 +87,18 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-58 — General Hybrid retrieval accuracy overlay (2026-09-17) | [phase-06/p06-58-hybrid-retrieval-accuracy-amendment-2026-09-17.md](./phase-06/p06-58-hybrid-retrieval-accuracy-amendment-2026-09-17.md) | 90 |
 | P06-59 — Dual-metric and stage-attribution baseline (2026-09-17) | [phase-06/p06-59-dual-metric-stage-baseline-2026-09-17.md](./phase-06/p06-59-dual-metric-stage-baseline-2026-09-17.md) | 80 |
 | P06-60 — Source-aware ranking and post-ACL duplicate collapse (2026-09-17) | [phase-06/p06-60-source-aware-ranking-2026-09-17.md](./phase-06/p06-60-source-aware-ranking-2026-09-17.md) | 75 |
-| P06-61 — Term and BM25 candidate repair (2026-09-17) | [phase-06/p06-61-term-bm25-candidate-repair-2026-09-17.md](./phase-06/p06-61-term-bm25-candidate-repair-2026-09-17.md) | 84 |
+| P06-61 — Term and BM25 candidate repair (2026-09-17) | [phase-06/p06-61-term-bm25-candidate-repair-2026-09-17.md](./phase-06/p06-61-term-bm25-candidate-repair-2026-09-17.md) | 100 |
 | P06-62 — Retrieve accounting and long-document profile (2026-09-17) | [phase-06/p06-62-rerank-accounting-long-document-2026-09-17.md](./phase-06/p06-62-rerank-accounting-long-document-2026-09-17.md) | 93 |
 | P06-63 — Coverage and correction semantics (2026-09-17) | [phase-06/p06-63-coverage-correction-semantics-2026-09-17.md](./phase-06/p06-63-coverage-correction-semantics-2026-09-17.md) | 88 |
 | P06-64 — Live qualification and redacted evidence (2026-09-17) | [phase-06/p06-64-live-qualification-evidence-2026-09-17.md](./phase-06/p06-64-live-qualification-evidence-2026-09-17.md) | 129 |
+| P06-65 — Honest RAG accuracy overlay (2026-09-21) | [phase-06/p06-65-honest-rag-accuracy-amendment-2026-09-21.md](./phase-06/p06-65-honest-rag-accuracy-amendment-2026-09-21.md) | 95 |
+| P06-66 — Live extra-terms term RPC (2026-09-21) | [phase-06/p06-66-term-rpc-live-2026-09-21.md](./phase-06/p06-66-term-rpc-live-2026-09-21.md) | 158 |
+| P06-67 — Canonical document title rename (2026-09-21) | [phase-06/p06-67-canonical-document-title-2026-09-21.md](./phase-06/p06-67-canonical-document-title-2026-09-21.md) | 134 |
+| P06-68 — Stage diagnostics and measured promotion (2026-09-21) | [phase-06/p06-68-stage-diagnostics-2026-09-21.md](./phase-06/p06-68-stage-diagnostics-2026-09-21.md) | 141 |
+| P06-69 — Private gold seal (2026-09-21) | [phase-06/p06-69-seal-private-gold-2026-09-21.md](./phase-06/p06-69-seal-private-gold-2026-09-21.md) | 89 |
+| P06-70 — Four-arm stage isolation (2026-09-21) | [phase-06/p06-70-stage-isolation-2026-09-21.md](./phase-06/p06-70-stage-isolation-2026-09-21.md) | 154 |
+| P06-71 — Deadline-budget exact admission repair (2026-09-21) | [phase-06/p06-71-proven-stage-repair-2026-09-21.md](./phase-06/p06-71-proven-stage-repair-2026-09-21.md) | 90 |
+| P06-72 — Live qualification (2026-09-21) | [phase-06/p06-72-live-qualification-2026-09-21.md](./phase-06/p06-72-live-qualification-2026-09-21.md) | 147 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

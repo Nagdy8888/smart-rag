@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -40,7 +40,14 @@ version scope with more than five representatives. Trivial exact lookups
 stay on `hybrid_default_v1`. Ambiguous and unauthorized names stay
 unscoped. The failed `hybrid_long_document_v1.json` digest stays
 unfrozen. OpenAI rerank starts only when remaining retrieve-slice
-seconds are at least `RERANK_RESERVED_SECONDS` (2.0).
+seconds are at least `RERANK_RESERVED_SECONDS` (2.0). Version-scoped
+exact dense starts only when the retrieve slice is at least
+`EXACT_START_MIN_SLICE_SECONDS` (25, equal to `HYBRID_DEADLINE_SECONDS`).
+Production Ask remaining is below that after profile and embedding, so
+ANN starts first. The 25s Hybrid ceiling is not raised. The P06-70
+gate that required this admission is
+[p06-70-stage-isolation-2026-09-21.md](../development/phase-06/p06-70-stage-isolation-2026-09-21.md)
+(`deadline_budget`).
 
 ## Claim hygiene (Packet 9 metrics)
 

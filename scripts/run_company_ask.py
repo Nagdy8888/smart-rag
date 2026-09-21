@@ -16,6 +16,7 @@ from typing import cast
 from uuid import uuid4
 
 import httpx
+import psycopg
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -38,6 +39,11 @@ from smart_rag_core.evaluation.dual_metric import (  # noqa: E402
 )
 from smart_rag_core.sse.catalog import TERMINAL_SSE_EVENT_TYPES  # noqa: E402
 
+from scripts.eval_ask_stage_export import (  # noqa: E402
+    export_ask_stages,
+    operator_url,
+)
+
 _RUN_TIMEOUT_S = 125.0
 _CLIENT_VERSION = "0.1.0"
 _SEARCH_SCOPE = "company_documents"
@@ -45,6 +51,11 @@ _SEARCH_SCOPE = "company_documents"
 
 def main(argv: list[str] | None = None) -> int:
     """Run the company Ask regression with dual-metric scoring.
+
+    The ready probe and Ask HTTP client use a 60 s timeout. Conversation
+    create and admit retries survive hosted Auth/readiness blips. A second
+    TimeoutException, TransportError, or RuntimeError records a timeout
+    row instead of aborting remaining questions.
 
     Args:
         argv: Optional CLI arguments.
@@ -70,6 +81,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--progress", type=Path, default=None)
     parser.add_argument("--answers-out", type=Path, default=None)
+    parser.add_argument(
+        "--stage-export",
+        type=Path,
+        default=None,
+        help="Private JSON for measured Hybrid stage fields.",
+    )
     args = parser.parse_args(argv)
     try:
         environ = _credentials_environ(args.credentials)
@@ -78,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     except (AskRegressionConfigError, OSError, json.JSONDecodeError) as exc:
         print(f"blocked={exc}", file=sys.stderr)
         return 2
-    ready = httpx.get(f"{creds.base_url}/health/ready", timeout=10.0)
+    ready = httpx.get(f"{creds.base_url}/health/ready", timeout=60.0)
     ready_payload: object = ready.json() if ready.status_code == 200 else {}
     body = _json_mapping(ready_payload)
     if body.get("query_ready") is not True:
@@ -93,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
                 for key, value in cast(dict[object, object], existing_obj).items()
                 if isinstance(value, dict)
             }
-    with httpx.Client() as client:
+    with httpx.Client(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
         token = _login(client, environ)
         token_started = time.monotonic()
         pending = [item for item in questions if item.question_id not in answers]
@@ -101,14 +118,40 @@ def main(argv: list[str] | None = None) -> int:
             if time.monotonic() - token_started > 2400:
                 token = _login(client, environ)
                 token_started = time.monotonic()
-            conversation_id = _create_conversation(client, creds.base_url, token)
-            streamed = _ask_one(
-                client,
-                creds.base_url,
-                token,
-                conversation_id,
-                question.prompt,
-            )
+            streamed: dict[str, object]
+            conversation_id = ""
+            try:
+                conversation_id = _create_conversation(client, creds.base_url, token)
+                streamed = _ask_one(
+                    client,
+                    creds.base_url,
+                    token,
+                    conversation_id,
+                    question.prompt,
+                )
+            except (httpx.TimeoutException, httpx.TransportError, RuntimeError):
+                token = _login(client, environ)
+                token_started = time.monotonic()
+                try:
+                    conversation_id = _create_conversation(
+                        client, creds.base_url, token
+                    )
+                    streamed = _ask_one(
+                        client,
+                        creds.base_url,
+                        token,
+                        conversation_id,
+                        question.prompt,
+                    )
+                except (httpx.TimeoutException, httpx.TransportError, RuntimeError):
+                    streamed = {
+                        "answer": "",
+                        "terminal": "timeout",
+                        "limitation": "timeout",
+                        "origin": "",
+                        "run_id": "",
+                        "http_status": 0,
+                    }
             if streamed.get("http_status") in {401, 403}:
                 token = _login(client, environ)
                 token_started = time.monotonic()
@@ -126,8 +169,9 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "reason": str(streamed.get("limitation") or ""),
                 "conversation_id": conversation_id,
+                "run_id": str(streamed.get("run_id") or ""),
                 "origin": str(streamed.get("origin") or ""),
-                "stages": streamed.get("stages") or {},
+                "stages": {},
             }
             done = len(answers)
             if args.progress is not None:
@@ -156,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             if index < len(pending):
                 time.sleep(3.0)
+    stage_export = _join_stage_export(answers, args.stage_export)
+    _apply_stage_export(answers, stage_export)
     parsed_answers, stages, statuses, reasons = _answers_for_scorer(answers, questions)
     results = run_scored_questions(
         questions,
@@ -181,11 +227,12 @@ def main(argv: list[str] | None = None) -> int:
     decision = decide_accuracy_promotion(
         summary,
         acl_leaks=origin_leaks,
-        bm25_degraded_explicit=True,
+        bm25_degraded_explicit=bool(stage_export.get("bm25_degraded_explicit")),
         holdout_opened=False,
         disjoint_real_document_count=0,
         sample_gold_in_production=False,
-        rerank_accounting_ok=True,
+        rerank_accounting_ok=bool(stage_export.get("rerank_accounting_ok")),
+        unknown_required_fields=unknown_required_count(stage_export, len(questions)),
     )
     print(
         "questions={questions} strict_pass={strict_pass} "
@@ -315,6 +362,10 @@ def _login(client: httpx.Client, environ: Mapping[str, str]) -> str:
 def _create_conversation(client: httpx.Client, base_url: str, token: str) -> str:
     """Create one conversation for a single question.
 
+    Retries read timeouts (5 s pause) and HTTP 429 (Retry-After, capped at
+    90 s) up to six attempts. Each POST uses a 60 s timeout so a slow
+    ``/health/ready`` path cannot abort the 100-question loop.
+
     Args:
         client: HTTP client.
         base_url: Ask origin.
@@ -322,16 +373,24 @@ def _create_conversation(client: httpx.Client, base_url: str, token: str) -> str
 
     Returns:
         Conversation id.
+
+    Raises:
+        RuntimeError: All six attempts timed out or were rate-limited.
+        httpx.HTTPStatusError: The last response was a non-429 HTTP error.
     """
 
     last: httpx.Response | None = None
     for _attempt in range(6):
-        last = client.post(
-            f"{base_url}/conversations",
-            headers=_auth_headers(token, paid=True),
-            json={"title": "Company Ask regression"},
-            timeout=30.0,
-        )
+        try:
+            last = client.post(
+                f"{base_url}/conversations",
+                headers=_auth_headers(token, paid=True),
+                json={"title": "Company Ask regression"},
+                timeout=60.0,
+            )
+        except httpx.TimeoutException:
+            time.sleep(5.0)
+            continue
         if last.status_code == 429:
             retry_after = float(last.headers.get("Retry-After") or 60)
             time.sleep(min(retry_after, 90.0))
@@ -374,7 +433,7 @@ def _ask_one(
                 "idempotency_key": idempotency,
                 "search_scope": _SEARCH_SCOPE,
             },
-            timeout=30.0,
+            timeout=60.0,
         )
         if admit.status_code == 429:
             retry_after = float(admit.headers.get("Retry-After") or 60)
@@ -387,12 +446,14 @@ def _ask_one(
                 "terminal": "error",
                 "limitation": "",
                 "origin": "",
+                "run_id": "",
                 "stages": {},
             }
         admit_body = _json_mapping(admit.json())
         run_id = str(admit_body.get("run_id") or "")
         streamed = _read_sse(client, base_url, token, run_id)
         streamed["http_status"] = admit.status_code
+        streamed["run_id"] = run_id
         return streamed
     return {
         "http_status": 429,
@@ -400,6 +461,7 @@ def _ask_one(
         "terminal": "error",
         "limitation": "rate_limited",
         "origin": "",
+        "run_id": "",
         "stages": {},
     }
 
@@ -428,7 +490,6 @@ def _read_sse(
     limitation = ""
     origin = ""
     coverage_score: float | None = None
-    citation_count = 0
     correction = "none"
     with client.stream(
         "GET",
@@ -463,10 +524,6 @@ def _read_sse(
                             raw_score, bool
                         ):
                             coverage_score = float(raw_score)
-                    elif event_name == "citation_preview":
-                        ids = payload.get("citation_ids")
-                        if isinstance(ids, list):
-                            citation_count = len(cast(list[object], ids))
                     elif event_name == "route_correction":
                         correction = str(payload.get("reason") or "applied_alternate")
                     elif event_name in TERMINAL_SSE_EVENT_TYPES:
@@ -481,23 +538,85 @@ def _read_sse(
                 event_name = raw[6:].strip()
             elif raw.startswith("data:"):
                 data_lines.append(raw[5:].lstrip())
-    fused_count = citation_count
-    if fused_count == 0 and coverage_score is not None:
-        fused_count = 1
     return {
         "answer": "".join(answer_parts).strip(),
         "terminal": terminal or "timeout",
         "limitation": limitation,
         "origin": origin,
         "stages": {
-            "source_resolution": SourceResolutionStage.UNSCOPED.value,
-            "fused_count": fused_count,
             "coverage_score": coverage_score,
             "correction_outcome": correction,
             "verifier_status": limitation or terminal,
-            "retrieval_empty": fused_count == 0 and terminal == "error",
         },
     }
+
+
+def _join_stage_export(
+    answers: Mapping[str, Mapping[str, object]],
+    destination: Path | None,
+) -> dict[str, object]:
+    """Load measured Hybrid diagnostics for recorded runs.
+
+    Args:
+        answers: Question rows with ``run_id`` and ``conversation_id``.
+        destination: Optional private JSON path.
+
+    Returns:
+        Export mapping. Missing operator access yields unknown counts.
+    """
+
+    unknown: dict[str, object] = {
+        "runs": {},
+        "unknown_required_fields": len(answers),
+        "rerank_accounting_ok": False,
+        "bm25_degraded_explicit": False,
+    }
+    try:
+        url = operator_url()
+        payload = export_ask_stages(answers, postgres_url=url)
+    except (RuntimeError, OSError, psycopg.Error):
+        payload = unknown
+    if destination is not None:
+        if ".private-eval" not in {
+            part.casefold() for part in destination.resolve().parts
+        }:
+            return unknown
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return payload
+
+
+def _apply_stage_export(
+    answers: dict[str, dict[str, object]],
+    stage_export: Mapping[str, object],
+) -> None:
+    """Copy measured stage fields onto answer rows.
+
+    Args:
+        answers: Mutable question rows.
+        stage_export: Export from :func:`export_ask_stages`.
+    """
+
+    runs = stage_export.get("runs")
+    if not isinstance(runs, Mapping):
+        return
+    runs_map = cast(Mapping[str, object], runs)
+    for question_id, row in answers.items():
+        exported = runs_map.get(question_id)
+        if not isinstance(exported, Mapping):
+            continue
+        exported_map = cast(Mapping[str, object], exported)
+        existing = row.get("stages")
+        stages: dict[str, object] = (
+            dict(cast(Mapping[str, object], existing))
+            if isinstance(existing, Mapping)
+            else {}
+        )
+        for key, value in exported_map.items():
+            if key == "run_id":
+                continue
+            stages[str(key)] = value
+        row["stages"] = stages
 
 
 def _auth_headers(
@@ -564,16 +683,17 @@ def _answers_for_scorer(
             stages[key] = RetrievalStageAttribution()
             continue
         stage_raw = _json_mapping(cast(object, stage_raw_obj))
-        resolution = str(stage_raw.get("source_resolution", "unscoped"))
-        try:
-            source_resolution = SourceResolutionStage(resolution)
-        except ValueError:
-            source_resolution = SourceResolutionStage.UNSCOPED
         coverage = stage_raw.get("coverage_score")
-        fused_count = stage_raw.get("fused_count", 0)
+        fused_ids = stage_raw.get("fused_ids")
+        fused_count = (
+            len(cast(list[object], fused_ids)) if isinstance(fused_ids, list) else 0
+        )
+        retrieval_empty = stage_raw.get("retrieval_empty")
         stages[key] = RetrievalStageAttribution(
-            source_resolution=source_resolution,
-            fused_count=_as_int(fused_count),
+            source_resolution=_measured_source_resolution(
+                stage_raw.get("source_resolution")
+            ),
+            fused_count=fused_count,
             coverage_score=(
                 float(coverage)
                 if isinstance(coverage, (int, float)) and not isinstance(coverage, bool)
@@ -585,7 +705,13 @@ def _answers_for_scorer(
                 if stage_raw.get("verifier_status")
                 else None
             ),
-            retrieval_empty=bool(stage_raw.get("retrieval_empty", False)),
+            retrieval_empty=retrieval_empty is True,
+            rerank_fallback=(
+                str(stage_raw["rerank_fallback"])
+                if stage_raw.get("rerank_fallback")
+                and str(stage_raw.get("rerank_fallback")) != "unknown"
+                else None
+            ),
         )
     return parsed, stages, statuses, reasons
 
@@ -606,23 +732,40 @@ def _json_mapping(value: object) -> dict[str, object]:
     return {str(key): item for key, item in typed.items()}
 
 
-def _as_int(value: object) -> int:
-    """Coerce a JSON number to int.
+def unknown_required_count(
+    stage_export: Mapping[str, object],
+    question_count: int,
+) -> int:
+    """Read the measured unknown-field count without treating zero as missing.
 
     Args:
-        value: Parsed JSON value.
+        stage_export: Export from :func:`export_ask_stages`.
+        question_count: Fallback when the export omitted the count.
 
     Returns:
-        Integer, or ``0`` when the value is missing or not numeric.
+        Non-negative unknown-field count.
     """
 
-    if isinstance(value, bool) or value is None:
-        return 0
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str) and value.strip():
-        return int(value)
-    return 0
+    value = stage_export.get("unknown_required_fields")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return question_count
+    return max(value, 0)
+
+
+def _measured_source_resolution(value: object) -> SourceResolutionStage:
+    """Map a measured resolution token, or keep the dataclass default.
+
+    Args:
+        value: Exported ``source_resolution``.
+
+    Returns:
+        Named stage when the token is one of the known values.
+    """
+
+    try:
+        return SourceResolutionStage(str(value or ""))
+    except ValueError:
+        return SourceResolutionStage.UNSCOPED
 
 
 if __name__ == "__main__":

@@ -26,6 +26,7 @@ _ADMISSION_STATUS: dict[str, int] = {
     "concurrency_limit": status.HTTP_429_TOO_MANY_REQUESTS,
     "run_not_cancellable": status.HTTP_409_CONFLICT,
     "forbidden": status.HTTP_403_FORBIDDEN,
+    "invalid_title": status.HTTP_422_UNPROCESSABLE_ENTITY,
     "invalid_rating": status.HTTP_422_UNPROCESSABLE_ENTITY,
     "invalid_tag": status.HTTP_422_UNPROCESSABLE_ENTITY,
     "tag_required": status.HTTP_422_UNPROCESSABLE_ENTITY,

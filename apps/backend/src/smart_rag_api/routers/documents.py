@@ -16,6 +16,7 @@ from smart_rag_api.schemas.fastapi_security import (
     FinalizeUploadHttpResponse,
     SignedUploadRequest,
     SignedUploadResponse,
+    UpdateDocumentTitleRequest,
 )
 from smart_rag_api.services.auth_rate_limits import RateLimitKind
 from smart_rag_api.services.documents_http import (
@@ -216,6 +217,56 @@ def get_document_route(
     )
     try:
         record = service.get(caller, document_id=document_id)
+    except QueryAdmissionError as exc:
+        raise_admission_http(exc)
+    return DocumentResponse(
+        document_id=record.document_id,
+        title=record.title,
+        visibility=record.visibility,
+        current_version_id=record.current_version_id,
+        visibility_generation=record.visibility_generation,
+        created_at=record.created_at,
+    )
+
+
+@router.patch("/{document_id}", response_model=DocumentResponse)
+def update_document_title_route(
+    request: Request,
+    document_id: UUID,
+    body: UpdateDocumentTitleRequest,
+    caller: CallerContextDep,
+    service: Annotated[DocumentService, Depends(get_document_service)],
+) -> DocumentResponse:
+    """Rename one document. Owner/admin only.
+
+    Args:
+        request: Active request for rate limits.
+        document_id: Document id.
+        body: Trimmed title, 1-512 characters.
+        caller: Authenticated caller.
+        service: Injected service.
+
+    Returns:
+        Updated document summary.
+
+    Raises:
+        HTTPException: 404 when missing or unauthorized; 403 when a visible
+            document is not owner/admin-renamable; 422 when the title is
+            empty or too long.
+    """
+
+    enforce_rate_limit(
+        request,
+        bucket_key=f"doc-title:{caller.user_id}",
+        kind=RateLimitKind.COST_MUTATION,
+        max_attempts=20,
+    )
+    try:
+        record = service.update_title(
+            caller,
+            document_id=document_id,
+            title=body.title,
+        )
     except QueryAdmissionError as exc:
         raise_admission_http(exc)
     return DocumentResponse(

@@ -261,6 +261,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 texts=texts[:FUSION_LIST_CAP],
                 vectors=vectors[:FUSION_LIST_CAP],
                 version_id=restrict_version_id,
+                remaining_slice_seconds=slice_seconds,
             )
         channel_started = time.perf_counter()
         completed, timed_out, exhausted = run_channels_parallel(

@@ -2,7 +2,7 @@
 title: ADR index and backlog
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering
 ---
 
@@ -40,6 +40,7 @@ audience: engineering
 | PDF paragraph citations | accepted | 6 overlay | [ADR-pdf-paragraph-citations.md](./ADR-pdf-paragraph-citations.md) |
 | Live RAG failure remediation | accepted | 6 overlay | [ADR-live-rag-failure-remediation.md](./ADR-live-rag-failure-remediation.md) |
 | General Hybrid retrieval accuracy | accepted | 6 overlay | [ADR-hybrid-retrieval-accuracy.md](./ADR-hybrid-retrieval-accuracy.md) |
+| Honest RAG accuracy repair | accepted | 6 overlay | [ADR-honest-rag-accuracy.md](./ADR-honest-rag-accuracy.md) |
 | LightRAG identical-content collapse | superseded | 5 | [ADR-lightrag-identical-content-collapse.md](./ADR-lightrag-identical-content-collapse.md) |
 | Identity-bound LightRAG source envelope | accepted | 5 | [ADR-graph-source-identity-envelope.md](./ADR-graph-source-identity-envelope.md) |
 | Canonical-passage LightRAG sources | accepted | 5 | [ADR-canonical-passage-lightrag-sources.md](./ADR-canonical-passage-lightrag-sources.md) |

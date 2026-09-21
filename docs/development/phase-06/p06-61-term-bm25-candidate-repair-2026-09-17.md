@@ -2,7 +2,7 @@
 title: P06-61 term and BM25 candidate repair
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering, reviewers
 ---
 
@@ -66,10 +66,27 @@ Do not requeue every duplicate copy in this packet.
 - Needle-in-index gaps for parenthetical acronyms and mixed-case tokens
   are filled generically.
 
+## Hosted application (updated 2026-09-21)
+
+Applied on `smart-rag` `qsjivtwtmlmtksufqjik` from commit `d1376ad`
+code plus the P06-66 operator apply. Prompt pins `answer_v3` /
+`verifier_v2`. Profiles `hybrid_default_v1`
+`def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c` and
+`hybrid_long_document_v2`
+`9565a14152c9c530ad5a07ba221f9d944a872c6b6f417e71ef30cab0486c95b1`.
+
+Hosted `pg_proc` is seven-argument `SECURITY INVOKER` with
+`search_path=pg_catalog, app, extensions, search`, `EXECUTE` for
+`app_api` only, `functiondef_md5=ad1db6b68caa0ec1236b9c6d5caa6770`.
+Three-question Smoke A recorded `term_unavailable=0`.
+
+Live reindex of one canonical test version completed in P06-67
+(`hybrid_index_done`; search terms 3871 → 4913). See
+[p06-67-canonical-document-title-2026-09-21.md](./p06-67-canonical-document-title-2026-09-21.md).
+
 ## Unverified
 
-- Hosted application of `20260917120000_retrieve_term_candidates_extra_terms_v1.sql`.
-- Live reindex of one canonical test version.
+- Ask-path checkpoint diagnostics (P06-68).
 
 ## Rollback
 

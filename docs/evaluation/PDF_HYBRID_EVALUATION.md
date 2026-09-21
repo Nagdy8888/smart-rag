@@ -2,7 +2,7 @@
 title: PDF Hybrid evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering, reviewers
 ---
 
@@ -72,6 +72,15 @@ explicit degradation.
 The 100-question Ask dual-metric rerun did **not** promote: grounded fact
 35%, four deadline failures, generalization unverified. See
 [COMPANY_DOCUMENTS_RAG_100.md](./COMPANY_DOCUMENTS_RAG_100.md).
+
+## P06-72 honest overlay Ask (2026-09-21)
+
+100 fresh `company_documents` conversations after the P06-71
+deadline-budget repair. Dual-metric grounded **28 / 100**, strict
+**28 / 100**, deadlines **9**, verifier refusals **33**, origin leaks
+**0**, `holdout_opened=false`. Sample promotion is **false**. P06-17
+stays open. P06-62/63/64 stay unchecked. Details:
+[p06-72-live-qualification-2026-09-21.md](../development/phase-06/p06-72-live-qualification-2026-09-21.md).
 
 ## Current gates (2026-09-10)
 

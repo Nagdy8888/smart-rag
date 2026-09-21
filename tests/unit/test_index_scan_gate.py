@@ -12,6 +12,7 @@ from smart_rag_agents.ingestion.index_graph import (
     declared_category_disposition,
     index_scan_gate_allows,
     load_external_processing_input,
+    mark_parsing_for_index,
     provider_matrix_verified,
 )
 from smart_rag_core.ingestion.limits import EXTERNAL_PROCESSING_POLICY_VERSION
@@ -142,3 +143,185 @@ def test_index_scan_gate_fixture_bypass(
         configurable={"allow_index_without_scan": True},
     )
     assert allowed is True
+
+
+class _StatusCursor:
+    """Cursor that returns one version status."""
+
+    def __init__(self, status: str) -> None:
+        """Store the status returned by ``fetchone``.
+
+        Args:
+            status: Public document-version status.
+        """
+
+        self._status = status
+
+    def execute(self, query: str, params: object = None) -> None:
+        """Ignore SQL. Unit tests do not open Postgres.
+
+        Args:
+            query: Unused SQL.
+            params: Unused bind parameters.
+        """
+
+        del query, params
+
+    def fetchone(self) -> tuple[str]:
+        """Return the scripted status.
+
+        Returns:
+            One-element status tuple.
+        """
+
+        return (self._status,)
+
+    def __enter__(self) -> _StatusCursor:
+        """Return the cursor.
+
+        Returns:
+            This cursor.
+        """
+
+        return self
+
+    def __exit__(self, *_exc: object) -> bool:
+        """Do not suppress errors.
+
+        Returns:
+            False.
+        """
+
+        return False
+
+
+class _StatusConnection:
+    """Connection that reports one version status and records commits."""
+
+    def __init__(self, status: str) -> None:
+        """Store the scripted status.
+
+        Args:
+            status: Public document-version status.
+        """
+
+        self.status = status
+        self.commits = 0
+        self.rollbacks = 0
+
+    def execute(self, query: str, params: object = None) -> _StatusConnection:
+        """Ignore SET ROLE and unused statements.
+
+        Args:
+            query: Unused SQL.
+            params: Unused bind parameters.
+
+        Returns:
+            This connection.
+        """
+
+        del query, params
+        return self
+
+    def cursor(self) -> _StatusCursor:
+        """Return a cursor that yields the scripted status.
+
+        Returns:
+            Status cursor.
+        """
+
+        return _StatusCursor(self.status)
+
+    def commit(self) -> None:
+        """Record a commit."""
+
+        self.commits += 1
+
+    def rollback(self) -> None:
+        """Record a rollback."""
+
+        self.rollbacks += 1
+
+    def __enter__(self) -> _StatusConnection:
+        """Return the connection.
+
+        Returns:
+            This connection.
+        """
+
+        return self
+
+    def __exit__(self, *_exc: object) -> bool:
+        """Do not suppress errors.
+
+        Returns:
+            False.
+        """
+
+        return False
+
+
+def test_mark_parsing_refreshes_already_indexed_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """graph_ineligible skips parse/scan and returns indexed after term sync."""
+
+    connection = _StatusConnection("graph_ineligible")
+
+    def _connect(_url: str) -> _StatusConnection:
+        """Return the fake scan-gate connection.
+
+        Args:
+            _url: Ignored DSN.
+
+        Returns:
+            The prepared status connection.
+        """
+
+        return connection
+
+    monkeypatch.setattr(
+        "smart_rag_agents.ingestion.index_graph.psycopg.connect",
+        _connect,
+    )
+    version_id = uuid4()
+    captured: dict[str, object] = {}
+
+    def fake_refresh(
+        connected: object,
+        *,
+        version_id: object,
+    ) -> int:
+        """Record the refresh call.
+
+        Args:
+            connected: Fake connection.
+            version_id: Version passed by the node.
+
+        Returns:
+            Inserted-term count.
+        """
+
+        captured["connection"] = connected
+        captured["version_id"] = version_id
+        return 12
+
+    monkeypatch.setattr(
+        "smart_rag_agents.ingestion.index_graph.refresh_indexed_title_search_terms",
+        fake_refresh,
+    )
+    state = _index_state(
+        attestation=EXTERNAL_PROCESSING_POLICY_VERSION,
+        category="internal",
+    )
+    state["status"] = "index_pending"
+    state["version_id"] = str(version_id)
+    result = mark_parsing_for_index(
+        state,
+        {"configurable": {"postgres_url": "postgresql://unused"}},
+    )
+    assert result["status"] == "indexed"
+    assert result["detail"] == "search_terms_refreshed:12"
+    assert captured["version_id"] == version_id
+    assert connection.commits == 1
+    assert connection.rollbacks == 0

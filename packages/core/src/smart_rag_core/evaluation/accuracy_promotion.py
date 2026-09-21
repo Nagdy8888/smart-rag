@@ -34,6 +34,8 @@ class AccuracyPromotionDecision:
         strict_rate: Reported strict phrase rate. Never sufficient alone.
         deadline_failures: Product deadline failures on the sample.
         holdout_opened: Must stay false.
+        unknown_required_fields: Count of required promotion inputs that
+            were not measured.
     """
 
     sample_promoted: bool
@@ -43,6 +45,7 @@ class AccuracyPromotionDecision:
     strict_rate: float
     deadline_failures: int
     holdout_opened: bool
+    unknown_required_fields: int
 
 
 def decide_accuracy_promotion(
@@ -54,6 +57,7 @@ def decide_accuracy_promotion(
     disjoint_real_document_count: int,
     sample_gold_in_production: bool,
     rerank_accounting_ok: bool,
+    unknown_required_fields: int = 0,
 ) -> AccuracyPromotionDecision:
     """Decide whether the sample may be promoted and generalization claimed.
 
@@ -68,6 +72,8 @@ def decide_accuracy_promotion(
             production modules.
         rerank_accounting_ok: Durable retrieve accounting and rerank reserve
             gates passed.
+        unknown_required_fields: Count of required measured fields that are
+            missing. Any positive count blocks promotion.
 
     Returns:
         Promotion decision. Generalization stays unverified without disjoint
@@ -99,6 +105,8 @@ def decide_accuracy_promotion(
         reasons.append("bm25_degradation_not_explicit")
     if not rerank_accounting_ok:
         reasons.append("rerank_accounting_unproven")
+    if unknown_required_fields > 0:
+        reasons.append("unknown_required_fields")
     if strict >= MIN_GROUNDED_FACT_RATE and grounded < MIN_GROUNDED_FACT_RATE:
         raise AccuracyPromotionError("strict_score_alone")
     sample_promoted = not reasons
@@ -115,4 +123,5 @@ def decide_accuracy_promotion(
         strict_rate=strict,
         deadline_failures=deadlines,
         holdout_opened=False,
+        unknown_required_fields=unknown_required_fields,
     )
