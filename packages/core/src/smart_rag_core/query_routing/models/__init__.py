@@ -17,6 +17,7 @@ from smart_rag_core.query_routing.models.preparation import (
 from smart_rag_core.query_routing.models.results import (
     BranchResult,
     CorrectionDecision,
+    HybridBranchDiagnostics,
     TableEvidenceRecord,
 )
 
@@ -27,6 +28,7 @@ __all__ = [
     "BranchSpec",
     "CorrectionDecision",
     "CorrectionKind",
+    "HybridBranchDiagnostics",
     "MemoryRecord",
     "Phase6Extension",
     "PreparationModelPayload",

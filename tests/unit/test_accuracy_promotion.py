@@ -92,3 +92,22 @@ def test_generalization_unverified_without_disjoint_documents() -> None:
     assert decision.generalization_claimed is False
     assert "generalization_unverified" in decision.reasons
     assert decision.holdout_opened is False
+    assert decision.unknown_required_fields == 0
+
+
+def test_unknown_required_fields_block_promotion() -> None:
+    """Missing measured promotion inputs are a hard refusal."""
+
+    decision = decide_accuracy_promotion(
+        _summary(grounded=0.99, strict=0.90, deadlines=0),
+        acl_leaks=0,
+        bm25_degraded_explicit=True,
+        holdout_opened=False,
+        disjoint_real_document_count=3,
+        sample_gold_in_production=False,
+        rerank_accounting_ok=True,
+        unknown_required_fields=2,
+    )
+    assert decision.sample_promoted is False
+    assert "unknown_required_fields" in decision.reasons
+    assert decision.unknown_required_fields == 2

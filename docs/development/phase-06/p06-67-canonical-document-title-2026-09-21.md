@@ -117,7 +117,8 @@ DSN with `SET ROLE app_api`.
 ## Unverified
 
 - Local contract RPC execution (Supabase unreachable in this run).
-- Ask-path checkpoint diagnostics (P06-68).
+- Ask-path checkpoint diagnostics are proven in
+  [p06-68-stage-diagnostics-2026-09-21.md](./p06-68-stage-diagnostics-2026-09-21.md).
 - 100-question accuracy (P06-72).
 
 ## Rollback

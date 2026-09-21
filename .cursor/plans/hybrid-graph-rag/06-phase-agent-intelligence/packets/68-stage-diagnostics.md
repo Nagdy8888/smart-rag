@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 68
-status: pending
+status: complete
 title: "Persist ID-only Hybrid branch diagnostics and de-hardcode promotion inputs."
 requirement_ids: [P06-68]
 ---

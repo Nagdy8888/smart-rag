@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID
 
 import psycopg
@@ -19,6 +19,7 @@ from smart_rag_core.retrieval.context_loader import (
 )
 from smart_rag_core.retrieval.frozen_profile import load_frozen_profile
 from smart_rag_core.retrieval.hybrid_run import HybridRetriever
+from smart_rag_core.retrieval.hybrid_run.types import HybridRunResult
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.retrieval.reranker import rerank_pool
 from smart_rag_core.retrieval.source_scope import (
@@ -249,7 +250,7 @@ class ProcessHybridRetriever:
         )
         budget = query_budget if query_budget is not None else self.query_budget
         inner.query_budget = budget  # type: ignore[assignment]
-        return inner.retrieve(
+        result = inner.retrieve(
             query=ranking_query,
             caller=caller,
             profile=typed_profile,
@@ -258,6 +259,14 @@ class ProcessHybridRetriever:
             cache_mode=cache_mode,
             source_selectors=scope.selector_texts if scope is not None else (),
         )
+        resolution = (
+            scope.resolution.value
+            if scope is not None
+            else SourceResolution.UNSCOPED.value
+        )
+        if isinstance(result, HybridRunResult):
+            return replace(result, source_resolution=resolution)
+        return result
 
     def _resolve_version_id(
         self,

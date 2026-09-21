@@ -61,10 +61,21 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         help="Redacted summary JSON destination.",
     )
+    parser.add_argument(
+        "--stage-export",
+        type=Path,
+        default=None,
+        help="Private measured stage JSON from eval_ask_stage_export.py.",
+    )
     args = parser.parse_args(argv)
     try:
         questions = load_private_gold(args.gold)
         answers_payload = json.loads(args.answers.read_text(encoding="utf-8"))
+        if args.stage_export is not None:
+            answers_payload = _overlay_stage_export(
+                answers_payload,
+                json.loads(args.stage_export.read_text(encoding="utf-8")),
+            )
         answers, stages, statuses, reasons = _parse_answers(answers_payload, questions)
         results = run_scored_questions(
             questions,
@@ -132,6 +143,40 @@ def _parse_answers(
     return answers, stages, statuses, reasons
 
 
+def _overlay_stage_export(payload: object, export: object) -> object:
+    """Copy measured stage fields from a private export onto answer rows.
+
+    Args:
+        payload: Answers JSON object.
+        export: Stage-export JSON object.
+
+    Returns:
+        The same payload, mutated when both values are objects.
+    """
+
+    if not isinstance(payload, dict) or not isinstance(export, dict):
+        return payload
+    runs = export.get("runs")
+    if not isinstance(runs, Mapping):
+        return payload
+    typed = cast(dict[object, object], payload)
+    for key, raw in typed.items():
+        if not isinstance(raw, dict):
+            continue
+        exported = runs.get(str(key))
+        if not isinstance(exported, Mapping):
+            continue
+        row = cast(dict[str, object], raw)
+        stages = row.get("stages")
+        merged = dict(stages) if isinstance(stages, Mapping) else {}
+        for field, value in exported.items():
+            if field == "run_id":
+                continue
+            merged[str(field)] = value
+        row["stages"] = merged
+    return payload
+
+
 def _stage_from_mapping(raw: object) -> RetrievalStageAttribution:
     """Parse optional stage attribution.
 
@@ -145,11 +190,18 @@ def _stage_from_mapping(raw: object) -> RetrievalStageAttribution:
     if not isinstance(raw, Mapping):
         return RetrievalStageAttribution()
     mapping = _json_mapping(cast(object, raw))
-    resolution = str(mapping.get("source_resolution", "unscoped"))
     try:
-        source_resolution = SourceResolutionStage(resolution)
+        source_resolution = SourceResolutionStage(
+            str(mapping.get("source_resolution") or "")
+        )
     except ValueError:
         source_resolution = SourceResolutionStage.UNSCOPED
+    fused_ids = mapping.get("fused_ids")
+    fused_count = (
+        len(fused_ids)
+        if isinstance(fused_ids, list)
+        else _as_int(mapping.get("fused_count"))
+    )
     return RetrievalStageAttribution(
         source_resolution=source_resolution,
         dense_hit=_optional_bool(mapping.get("dense_hit")),
@@ -158,16 +210,19 @@ def _stage_from_mapping(raw: object) -> RetrievalStageAttribution:
         fused_rank=_optional_int(mapping.get("fused_rank")),
         rerank_rank=_optional_int(mapping.get("rerank_rank")),
         rerank_fallback=(
-            str(mapping["rerank_fallback"]) if mapping.get("rerank_fallback") else None
+            str(mapping["rerank_fallback"])
+            if mapping.get("rerank_fallback")
+            and str(mapping.get("rerank_fallback")) != "unknown"
+            else None
         ),
         post_mmr_rank=_optional_int(mapping.get("post_mmr_rank")),
         coverage_score=_optional_float(mapping.get("coverage_score")),
         correction_outcome=str(mapping.get("correction_outcome", "none")),
-        fused_count=_as_int(mapping.get("fused_count", 0)),
+        fused_count=fused_count,
         verifier_status=(
             str(mapping["verifier_status"]) if mapping.get("verifier_status") else None
         ),
-        retrieval_empty=bool(mapping.get("retrieval_empty", False)),
+        retrieval_empty=mapping.get("retrieval_empty") is True,
     )
 
 

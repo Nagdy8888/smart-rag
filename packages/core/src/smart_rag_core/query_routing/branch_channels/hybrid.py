@@ -19,6 +19,7 @@ from smart_rag_core.query_routing.constants import (
 from smart_rag_core.query_routing.models import (
     BranchResult,
     BranchSpec,
+    HybridBranchDiagnostics,
     QueryPreparation,
 )
 from smart_rag_core.query_routing.protocols import HybridRetrieveLike
@@ -93,6 +94,11 @@ def run_hybrid(
             query_text=spec.query_text,
             status="degraded",
             fallback_reason=FALLBACK_RETRIEVERS_UNBOUND,
+            hybrid_diagnostics=hybrid_diagnostics_from_outcome(
+                None,
+                effective_route=spec.family.value,
+                fallback_reason=FALLBACK_RETRIEVERS_UNBOUND,
+            ),
         )
     deadline_seconds = min(remaining, 8.0)
     outcome: object
@@ -143,7 +149,104 @@ def run_hybrid(
         bm25_snippets_used=False,
         graph_prose_used=False,
         hybrid_evidence=hybrid_evidence(outcome, chunk_loader=chunk_loader),
+        hybrid_diagnostics=hybrid_diagnostics_from_outcome(
+            outcome,
+            effective_route=spec.family.value,
+            fallback_reason=fallback_text or "none",
+        ),
     )
+
+
+def hybrid_diagnostics_from_outcome(
+    outcome: object | None,
+    *,
+    effective_route: str,
+    fallback_reason: str | None,
+) -> HybridBranchDiagnostics | None:
+    """Build ID-only Hybrid diagnostics from one retrieve outcome.
+
+    Args:
+        outcome: Hybrid retrieve result, or ``None`` when unbound.
+        effective_route: Executed branch family.
+        fallback_reason: Named retrieve fallback already chosen by the
+            branch.
+
+    Returns:
+        Frozen diagnostics, or ``None`` when required tokens are missing.
+
+    Raises:
+        ValueError: When an ID is not a UUID string.
+    """
+
+    coverage = getattr(outcome, "coverage", None) if outcome is not None else None
+    source_resolution = ""
+    profile_id = ""
+    rerank_fallback = "none"
+    if outcome is not None:
+        source_resolution = str(getattr(outcome, "source_resolution", "") or "")
+        profile_id = str(getattr(outcome, "retrieval_profile_id", "") or "")
+        raw_rerank = str(getattr(outcome, "rerank_fallback", "") or "").strip()
+        rerank_fallback = raw_rerank or "none"
+    if not source_resolution or not profile_id or not fallback_reason:
+        return None
+    return HybridBranchDiagnostics(
+        source_resolution=source_resolution,
+        retrieval_profile_id=profile_id,
+        fallback_reason=str(fallback_reason),
+        rerank_fallback=rerank_fallback,
+        rerank_call_count=int(getattr(outcome, "rerank_call_count", 0) or 0)
+        if outcome is not None
+        else 0,
+        embedding_call_count=int(getattr(outcome, "embedding_call_count", 0) or 0)
+        if outcome is not None
+        else 0,
+        first_evidence_ms=float(getattr(outcome, "first_evidence_ms", 0.0) or 0.0)
+        if outcome is not None
+        else 0.0,
+        dense_ids=_uuid_ids(getattr(outcome, "dense_ids", ()), 100)
+        if outcome is not None
+        else (),
+        bm25_ids=_uuid_ids(getattr(outcome, "bm25_ids", ()), 75)
+        if outcome is not None
+        else (),
+        term_ids=_uuid_ids(getattr(outcome, "term_ids", ()), 30)
+        if outcome is not None
+        else (),
+        fused_ids=_uuid_ids(getattr(outcome, "fused_ids", ()), 100)
+        if outcome is not None
+        else (),
+        selected_ids=_uuid_ids(getattr(outcome, "selected_ids", ()), 12)
+        if outcome is not None
+        else (),
+        coverage_score=getattr(coverage, "coverage_score", None),
+        term_coverage=getattr(coverage, "term_coverage", None),
+        subquestion_coverage=getattr(coverage, "subquestion_coverage", None),
+        evidence_ratio=getattr(coverage, "evidence_ratio", None),
+        support_confidence=getattr(coverage, "support_confidence", None),
+        effective_route=effective_route,
+    )
+
+
+def _uuid_ids(values: object, cap: int) -> tuple[str, ...]:
+    """Copy UUID identifiers up to ``cap``.
+
+    Args:
+        values: Sequence of UUID or UUID strings.
+        cap: Maximum retained IDs.
+
+    Returns:
+        UUID strings. Non-UUID items are omitted.
+    """
+
+    kept: list[str] = []
+    for item in tuple(values or ())[:cap]:
+        text = str(item)
+        try:
+            UUID(text)
+        except ValueError:
+            continue
+        kept.append(text)
+    return tuple(kept)
 
 
 def chunk_loader(

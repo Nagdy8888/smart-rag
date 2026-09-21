@@ -93,7 +93,8 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-64 — Live qualification and redacted evidence (2026-09-17) | [phase-06/p06-64-live-qualification-evidence-2026-09-17.md](./phase-06/p06-64-live-qualification-evidence-2026-09-17.md) | 129 |
 | P06-65 — Honest RAG accuracy overlay (2026-09-21) | [phase-06/p06-65-honest-rag-accuracy-amendment-2026-09-21.md](./phase-06/p06-65-honest-rag-accuracy-amendment-2026-09-21.md) | 95 |
 | P06-66 — Live extra-terms term RPC (2026-09-21) | [phase-06/p06-66-term-rpc-live-2026-09-21.md](./phase-06/p06-66-term-rpc-live-2026-09-21.md) | 158 |
-| P06-67 — Canonical document title rename (2026-09-21) | [phase-06/p06-67-canonical-document-title-2026-09-21.md](./phase-06/p06-67-canonical-document-title-2026-09-21.md) | 133 |
+| P06-67 — Canonical document title rename (2026-09-21) | [phase-06/p06-67-canonical-document-title-2026-09-21.md](./phase-06/p06-67-canonical-document-title-2026-09-21.md) | 134 |
+| P06-68 — Stage diagnostics and measured promotion (2026-09-21) | [phase-06/p06-68-stage-diagnostics-2026-09-21.md](./phase-06/p06-68-stage-diagnostics-2026-09-21.md) | 141 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

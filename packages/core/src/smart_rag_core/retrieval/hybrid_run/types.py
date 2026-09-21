@@ -167,6 +167,8 @@ class HybridRunResult:
         dense_ids: Authorized dense IDs after recheck.
         bm25_ids: Authorized BM25 IDs after recheck. Never snippets.
         term_ids: Authorized term IDs after recheck.
+        source_resolution: Server-derived scope token. Empty when the
+            retrieve path did not attach one.
     """
 
     ranked_ids: tuple[UUID, ...]
@@ -187,3 +189,4 @@ class HybridRunResult:
     dense_ids: tuple[UUID, ...] = ()
     bm25_ids: tuple[UUID, ...] = ()
     term_ids: tuple[UUID, ...] = ()
+    source_resolution: str = ""
