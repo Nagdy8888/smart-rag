@@ -70,3 +70,5 @@ committed tests.
 This scorer does not replace citation, Recall@10, faithfulness, ACL,
 latency, or cost gates. Generalization remains unverified until disjoint
 real documents are scored. Packet 64 records that claim explicitly.
+Packet 72 records the 2026-09-21 honest overlay 100-question Ask:
+grounded 28/100, deadlines 9, promotion false. P06-17 remains open.

@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 from uuid import UUID
@@ -112,7 +112,7 @@ def export_ask_stages(
                 conversation_id=conversation_id,
             )
             usage = _usage_kinds(connection, run_id)
-            record = _stage_record(diagnostics, usage)
+            record = stage_record(diagnostics, usage)
             unknown = [name for name in REQUIRED_FIELDS if record[name] == "unknown"]
             record["unknown_fields"] = unknown
             unknown_total += len(unknown)
@@ -166,17 +166,20 @@ def _hybrid_diagnostics(
     if row is None or row[1] is None:
         return None
     payload = serde.loads_typed((str(row[0]), bytes(row[1])))
-    branches = payload if isinstance(payload, list) else []
+    branches: list[object] = (
+        cast(list[object], payload) if isinstance(payload, list) else []
+    )
     for item in branches:
         if not isinstance(item, Mapping):
             continue
-        family = str(item.get("family") or "")
-        kind = str(item.get("kind") or "")
+        mapped = cast(Mapping[str, object], item)
+        family = str(mapped.get("family") or "")
+        kind = str(mapped.get("kind") or "")
         if family not in HYBRID_FAMILIES and kind != "hybrid":
             continue
-        diagnostics = item.get("hybrid_diagnostics")
+        diagnostics = mapped.get("hybrid_diagnostics")
         if isinstance(diagnostics, Mapping):
-            return diagnostics
+            return cast(Mapping[str, object], diagnostics)
     return None
 
 
@@ -209,7 +212,7 @@ def _usage_kinds(connection: psycopg.Connection, run_id: str) -> set[str]:
     return {str(row[0]) for row in rows}
 
 
-def _stage_record(
+def stage_record(
     diagnostics: Mapping[str, object] | None,
     usage: set[str],
 ) -> dict[str, object]:
@@ -307,8 +310,9 @@ def _id_list_or_unknown(value: object) -> list[str] | str:
         return "unknown"
     if not isinstance(value, list | tuple):
         return "unknown"
+    items = cast(Sequence[object], value)
     ids: list[str] = []
-    for item in value:
+    for item in items:
         text = str(item)
         try:
             UUID(text)
@@ -335,13 +339,13 @@ def main(argv: list[str] | None = None) -> int:
     if ".private-eval" not in {part.casefold() for part in args.out.resolve().parts}:
         print("blocked=out_not_private")
         return 2
-    raw = json.loads(args.answers.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
+    raw_obj: object = json.loads(args.answers.read_text(encoding="utf-8"))
+    if not isinstance(raw_obj, dict):
         print("blocked=answers_not_object")
         return 2
     answers = {
         str(key): cast(dict[str, object], value)
-        for key, value in raw.items()
+        for key, value in cast(dict[object, object], raw_obj).items()
         if isinstance(value, dict)
     }
     try:

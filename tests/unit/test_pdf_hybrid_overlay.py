@@ -537,7 +537,9 @@ def test_long_document_candidate_prefers_exact_when_version_scoped() -> None:
     assert long_profile.dense_mode_when_version_scoped == "exact"
     default = load_frozen_profile(HYBRID_DEFAULT_PROFILE_ID)
     assert default.dense_mode_when_version_scoped == "ann"
-    assert dense_retrieve_mode(version_id=uuid4(), profile=long_profile) is DenseMode.ANN
+    assert (
+        dense_retrieve_mode(version_id=uuid4(), profile=long_profile) is DenseMode.ANN
+    )
     assert (
         dense_retrieve_mode(
             version_id=uuid4(),

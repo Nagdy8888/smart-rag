@@ -19,7 +19,6 @@ from smart_rag_core.retrieval.context_loader import (
 )
 from smart_rag_core.retrieval.frozen_profile import load_frozen_profile
 from smart_rag_core.retrieval.hybrid_run import HybridRetriever
-from smart_rag_core.retrieval.hybrid_run.types import HybridRunResult
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.retrieval.reranker import rerank_pool
 from smart_rag_core.retrieval.source_scope import (
@@ -264,9 +263,7 @@ class ProcessHybridRetriever:
             if scope is not None
             else SourceResolution.UNSCOPED.value
         )
-        if isinstance(result, HybridRunResult):
-            return replace(result, source_resolution=resolution)
-        return result
+        return replace(result, source_resolution=resolution)
 
     def _resolve_version_id(
         self,

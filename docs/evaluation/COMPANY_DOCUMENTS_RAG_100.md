@@ -2,7 +2,7 @@
 title: Company-documents RAG accuracy (100 atomic questions)
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-17
+last-reviewed: 2026-09-21
 audience: engineering, reviewers, client-approver
 ---
 
@@ -87,25 +87,42 @@ flowchart TB
   asked --> error["Error 3"]
 ```
 
-| Metric | Historical 2026-09-17 | P06-64 rebuilt API |
-| --- | ---: | ---: |
-| Strict pass | 37 / 100 | 35 / 100 |
-| Grounded fact pass | not scored | 35 / 100 |
-| Deadline failures | 8 | 4 |
-| Verifier refusal after fusion | 33 (legacy “no evidence”) | 5 |
-| Wrong phrasing | 21 | 50 |
-| Empty retrieval proven | not proven | 0 (3 error terminals had no SSE coverage) |
-| Fresh conversation per question | no | yes |
-| `holdout_opened` | false | false |
-| Sample promoted (≥95% grounded, 0 deadlines) | n/a | **false** |
-| Generalization | unverified | unverified |
+| Metric | Historical 2026-09-17 | P06-64 rebuilt API | P06-72 honest overlay |
+| --- | ---: | ---: | ---: |
+| Strict pass | 37 / 100 | 35 / 100 | 28 / 100 |
+| Grounded fact pass | not scored | 35 / 100 | 28 / 100 |
+| Deadline failures | 8 | 4 | 9 |
+| Verifier refusal after fusion | 33 (legacy “no evidence”) | 5 | 33 |
+| Wrong phrasing | 21 | 50 | 24 |
+| Empty retrieval proven | not proven | 0 (3 error terminals had no SSE coverage) | 0 |
+| Fresh conversation per question | no | yes | yes |
+| `holdout_opened` | false | false | false |
+| Sample promoted (≥95% grounded, 0 deadlines) | n/a | **false** | **false** |
+| Generalization | unverified | unverified | unverified |
 
-Promotion failed: grounded fact rate `0.35` is below `0.95`, and four
-product-deadline failures remain. Remaining misses are attributed as
-wrong phrasing (candidate/ranking), verifier refusal after fusion
+P06-64 promotion failed: grounded fact rate `0.35` is below `0.95`, and
+four product-deadline failures remain. Remaining misses are attributed
+as wrong phrasing (candidate/ranking), verifier refusal after fusion
 (coverage), deadline (retrieve/answer envelope), and three error
 terminals without a streamed answer. Company-to-Web fallback was not
 observed: every question requested `company_documents`.
+
+## P06-72 honest overlay Ask (2026-09-21)
+
+Live Ask on 2026-09-21 after the P06-71 deadline-budget repair. Each
+question used a **fresh conversation**. Gold stayed under gitignored
+`.private-eval/`. Credentials were not committed. The coding model is
+not the semantic reviewer.
+
+P06-72 promotion failed: grounded fact rate `0.28` is below `0.95`,
+and nine product-deadline failures remain. `unknown_required_fields=84`
+also blocks promotion. P06-62, P06-63, and P06-64 stay unchecked.
+Remaining misses are attributed as verifier refusal after fusion (33),
+wrong phrasing (24), deadline (9), error (4), and partial (2).
+Company-to-Web fallback was not observed. Exact-one scope and
+`hybrid_long_document_v2` held on 94/100 measured diagnostics. Rerank
+timed out to RRF on 93 runs. Evidence:
+[p06-72-live-qualification-2026-09-21.md](../development/phase-06/p06-72-live-qualification-2026-09-21.md).
 
 Disjoint real documents besides this sample were not available, so
 generalization stays **unverified**. Synthetic query-class fixtures exist

@@ -39,14 +39,14 @@ from smart_rag_core.retrieval.hybrid_run import HybridRetriever  # noqa: E402
 from smart_rag_core.settings import SharedSettings  # noqa: E402
 
 from scripts.eval_ask_oracle_context import (  # noqa: E402
-    _json_mapping,
-    _load_credentials_email,
+    json_mapping,
+    load_credentials_email,
     lookup_eval_caller,
     resolve_eval_user_id,
 )
 from scripts.pdf_eval_cli import apply_merged_env, operator_url  # noqa: E402
 from scripts.pdf_eval_runtime import (  # noqa: E402
-    _DsnChannelMarker,
+    DsnChannelMarker,
     bind_live_rerank,
     load_profile_for_eval,
     query_profile_for_retrieve,
@@ -89,6 +89,29 @@ def _require_private(path: Path) -> Path:
     return resolved
 
 
+def _as_int(value: object) -> int:
+    """Coerce a JSON number to ``int``.
+
+    Args:
+        value: Parsed JSON value.
+
+    Returns:
+        The integer value, or ``0`` when the value is not an int or digit
+        string. Booleans are not treated as integers.
+    """
+
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
+
+
 def _write_json(path: Path, payload: object) -> None:
     """Write pretty JSON to a private path.
 
@@ -98,7 +121,9 @@ def _write_json(path: Path, payload: object) -> None:
     """
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _load_json(path: Path) -> object:
@@ -158,7 +183,7 @@ def prepare_gold(
     if not isinstance(slice_rows, list):
         raise AskRegressionConfigError("slice must be a JSON array")
     wanted = {
-        str(_json_mapping(item).get("id") or "")
+        str(json_mapping(cast(object, item)).get("id") or "")
         for item in cast(list[object], slice_rows)
         if isinstance(item, dict)
     }
@@ -166,11 +191,11 @@ def prepare_gold(
     selected = [item for item in questions if item.question_id in wanted]
     if len(selected) != 12:
         raise AskRegressionConfigError(f"slice_count_{len(selected)}")
-    slice_gold = []
-    aprime = []
+    slice_gold: list[dict[str, object]] = []
+    aprime: list[dict[str, object]] = []
     stripped = 0
     for item in selected:
-        facts = [
+        facts: list[dict[str, object]] = [
             {
                 "id": fact.fact_id,
                 "canonical": list(fact.canonical_phrases),
@@ -241,7 +266,7 @@ def exam_retrieve(
     gold_by_id: dict[str, list[str]] = {}
     if isinstance(slice_rows, list):
         for raw in cast(list[object], slice_rows):
-            row = _json_mapping(raw)
+            row = json_mapping(raw)
             qid = str(row.get("id") or "")
             chunks = row.get("chunk_ids")
             if qid and isinstance(chunks, list):
@@ -250,17 +275,15 @@ def exam_retrieve(
     if not parade:
         raise RuntimeError("paradedb_url_missing")
     operator_dsn = operator_url(env)
-    email = _load_credentials_email(credentials)
-    caller = lookup_eval_caller(
-        operator_dsn, resolve_eval_user_id(operator_dsn, email)
-    )
+    email = load_credentials_email(credentials)
+    caller = lookup_eval_caller(operator_dsn, resolve_eval_user_id(operator_dsn, email))
     settings = SharedSettings()
     if settings.mock_model_mode:
         raise RuntimeError("mock_embeddings_not_live_hybrid")
     long_profile = load_profile_for_eval(LONG_DOCUMENT_PROFILE_ID)
     bm25 = DsnBm25Retriever(parade)
     outcomes: list[dict[str, object]] = []
-    loss = Counter()
+    loss: Counter[str] = Counter()
     for question in questions:
         typed_profile = query_profile_for_retrieve(question.prompt)
         wanted_profile = long_profile
@@ -269,9 +292,9 @@ def exam_retrieve(
             supabase=None,
             paradedb=None,
             supabase_dsn=operator_dsn,
-            dense=_DsnChannelMarker(),
+            dense=DsnChannelMarker(),
             bm25=bm25,
-            term=_DsnChannelMarker(),
+            term=DsnChannelMarker(),
             load_context=context_loader(operator_dsn, caller),
             rerank=bind_live_rerank(settings),  # type: ignore[arg-type]
             retrieval_profile=wanted_profile,  # type: ignore[arg-type]
@@ -332,7 +355,7 @@ def exam_retrieve(
             loss["fused"] += 1
         if gold_ids and not flags["selected"]:
             loss["selected"] += 1
-        coverage = result.coverage.decision if result.coverage is not None else None
+        coverage = result.coverage.decision
         outcomes.append(
             {
                 "question_id": question.question_id,
@@ -351,13 +374,11 @@ def exam_retrieve(
                 **{f"gold_in_{name}": value for name, value in flags.items()},
             }
         )
-    report = {
+    report: dict[str, object] = {
         "cache_mode": RetrievalCacheMode.COLD_BYPASS.value,
         "questions": len(outcomes),
         "gold_loss_histogram": dict(loss),
-        "any_channel_gold": sum(
-            1 for row in outcomes if bool(row["any_channel_gold"])
-        ),
+        "any_channel_gold": sum(1 for row in outcomes if bool(row["any_channel_gold"])),
         "outcomes": outcomes,
         "holdout_opened": False,
     }
@@ -384,7 +405,7 @@ def _outcome_by_id(payload: Mapping[str, object]) -> dict[str, dict[str, object]
         return {}
     out: dict[str, dict[str, object]] = {}
     for raw in cast(list[object], rows):
-        row = _json_mapping(raw)
+        row = json_mapping(raw)
         qid = str(row.get("question_id") or row.get("id") or "")
         if qid:
             out[qid] = row
@@ -419,7 +440,7 @@ def assign_stage(
     if bool(ask.get("deadline_failure")):
         return "deadline"
     arm_b_grounded = bool(arm_b.get("grounded_fact_pass"))
-    arm_b_authorized = int(arm_b.get("authorized_gold") or 0)
+    arm_b_authorized = _as_int(arm_b.get("authorized_gold"))
     if not arm_b_grounded:
         if arm_b_authorized > 0 and str(arm_b.get("answer_status") or "") == "refused":
             return "verifier/release"
@@ -446,7 +467,10 @@ def assign_stage(
         if aprime_grounded and not ask_grounded and ask_empty:
             return "scope/selector"
     if not a_any and not ap_any:
-        if ask_source in {"none", "zero", "unscoped"} or ask_fallback == "retrieval_empty":
+        if (
+            ask_source in {"none", "zero", "unscoped"}
+            or ask_fallback == "retrieval_empty"
+        ):
             return "index"
         return "channel_candidate"
     if a_any and not a_fused:
@@ -458,7 +482,7 @@ def assign_stage(
     if a_selected and not ask_grounded:
         if bool(exam_a.get("refused")):
             return "coverage/correction"
-        if int(ask.get("citation_count") or 0) == 0:
+        if _as_int(ask.get("citation_count")) == 0:
             return "context_fit"
         return "answer"
     if ask_route and ask_route.casefold() not in {"hybrid", "company_documents"}:
@@ -542,13 +566,13 @@ def _merge_stage_export(
 
     if stage_path is None:
         return
-    payload = _json_mapping(_load_json(stage_path))
+    payload = json_mapping(_load_json(stage_path))
     runs = payload.get("runs")
     if not isinstance(runs, dict):
         return
     for key, raw in cast(dict[object, object], runs).items():
         row = ask_rows.setdefault(str(key), {})
-        staged = _json_mapping(raw)
+        staged = json_mapping(raw)
         for field in (
             "source_resolution",
             "fallback_reason",
@@ -596,17 +620,17 @@ def assign_report(
     gold_counts: dict[str, int] = {}
     if isinstance(slice_rows, list):
         for raw in cast(list[object], slice_rows):
-            row = _json_mapping(raw)
+            row = json_mapping(raw)
             qid = str(row.get("id") or "")
             if qid:
-                gold_counts[qid] = int(row.get("gold_chunk_count") or 0)
-    ask_a_rows = _outcome_by_id(_json_mapping(_load_json(ask_a)))
-    ask_ap_rows = _outcome_by_id(_json_mapping(_load_json(ask_ap)))
+                gold_counts[qid] = _as_int(row.get("gold_chunk_count"))
+    ask_a_rows = _outcome_by_id(json_mapping(_load_json(ask_a)))
+    ask_ap_rows = _outcome_by_id(json_mapping(_load_json(ask_ap)))
     _merge_stage_export(ask_a_rows, stage_a)
     _merge_stage_export(ask_ap_rows, stage_ap)
-    exam_a_rows = _outcome_by_id(_json_mapping(_load_json(exam_a)))
-    exam_ap_rows = _outcome_by_id(_json_mapping(_load_json(exam_ap)))
-    arm_b_rows = _outcome_by_id(_json_mapping(_load_json(arm_b)))
+    exam_a_rows = _outcome_by_id(json_mapping(_load_json(exam_a)))
+    exam_ap_rows = _outcome_by_id(json_mapping(_load_json(exam_ap)))
+    arm_b_rows = _outcome_by_id(json_mapping(_load_json(arm_b)))
     missing = [
         qid
         for qid in gold_counts
@@ -637,7 +661,7 @@ def assign_report(
     if len(assigned) != 12:
         raise RuntimeError(f"assignment_count_{len(assigned)}")
     gate = name_gate(histogram)
-    report = {
+    report: dict[str, object] = {
         "rows": assigned,
         "histogram": dict(histogram),
         "gate_branch": gate,
@@ -698,7 +722,7 @@ def main(argv: list[str] | None = None) -> int:
                 aprime_out=args.aprime_out,
             )
         elif args.command == "exam-retrieve":
-            ids_payload = _json_mapping(_load_json(args.ids))
+            ids_payload = json_mapping(_load_json(args.ids))
             version_id = UUID(str(ids_payload.get("version_id") or ""))
             summary = exam_retrieve(
                 gold_path=args.gold,
@@ -719,7 +743,13 @@ def main(argv: list[str] | None = None) -> int:
                 stage_a=args.stage_a,
                 stage_ap=args.stage_ap,
             )
-    except (AskRegressionConfigError, RuntimeError, OSError, ValueError, json.JSONDecodeError) as exc:
+    except (
+        AskRegressionConfigError,
+        RuntimeError,
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
         print(f"blocked={exc}", file=sys.stderr)
         return 2
     print(json.dumps(summary, sort_keys=True))

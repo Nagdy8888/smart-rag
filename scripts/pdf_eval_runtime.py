@@ -108,7 +108,7 @@ def query_profile_for_retrieve(query: str) -> ExpectedProfile:
     return profile_query_sync(query).profile
 
 
-class _DsnChannelMarker:
+class DsnChannelMarker:
     """Truthy Hybrid channel flag. Per-channel jobs open their own DSN connections."""
 
     retrieve = None
@@ -464,9 +464,9 @@ class PdfEvalRuntime:
                 supabase=None,
                 paradedb=None,
                 supabase_dsn=self._supabase_url,
-                dense=_DsnChannelMarker(),
+                dense=DsnChannelMarker(),
                 bm25=bm25,
-                term=_DsnChannelMarker(),
+                term=DsnChannelMarker(),
                 load_context=context_loader(self._supabase_url, caller),
                 rerank=self._rerank,  # type: ignore[arg-type]
                 retrieval_profile=profile,  # type: ignore[arg-type]

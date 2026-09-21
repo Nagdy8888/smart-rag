@@ -52,6 +52,11 @@ _SEARCH_SCOPE = "company_documents"
 def main(argv: list[str] | None = None) -> int:
     """Run the company Ask regression with dual-metric scoring.
 
+    The ready probe and Ask HTTP client use a 60 s timeout. Conversation
+    create and admit retries survive hosted Auth/readiness blips. A second
+    TimeoutException, TransportError, or RuntimeError records a timeout
+    row instead of aborting remaining questions.
+
     Args:
         argv: Optional CLI arguments.
 
@@ -105,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
                 for key, value in cast(dict[object, object], existing_obj).items()
                 if isinstance(value, dict)
             }
-    with httpx.Client() as client:
+    with httpx.Client(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
         token = _login(client, environ)
         token_started = time.monotonic()
         pending = [item for item in questions if item.question_id not in answers]
@@ -113,14 +118,40 @@ def main(argv: list[str] | None = None) -> int:
             if time.monotonic() - token_started > 2400:
                 token = _login(client, environ)
                 token_started = time.monotonic()
-            conversation_id = _create_conversation(client, creds.base_url, token)
-            streamed = _ask_one(
-                client,
-                creds.base_url,
-                token,
-                conversation_id,
-                question.prompt,
-            )
+            streamed: dict[str, object]
+            conversation_id = ""
+            try:
+                conversation_id = _create_conversation(client, creds.base_url, token)
+                streamed = _ask_one(
+                    client,
+                    creds.base_url,
+                    token,
+                    conversation_id,
+                    question.prompt,
+                )
+            except (httpx.TimeoutException, httpx.TransportError, RuntimeError):
+                token = _login(client, environ)
+                token_started = time.monotonic()
+                try:
+                    conversation_id = _create_conversation(
+                        client, creds.base_url, token
+                    )
+                    streamed = _ask_one(
+                        client,
+                        creds.base_url,
+                        token,
+                        conversation_id,
+                        question.prompt,
+                    )
+                except (httpx.TimeoutException, httpx.TransportError, RuntimeError):
+                    streamed = {
+                        "answer": "",
+                        "terminal": "timeout",
+                        "limitation": "timeout",
+                        "origin": "",
+                        "run_id": "",
+                        "http_status": 0,
+                    }
             if streamed.get("http_status") in {401, 403}:
                 token = _login(client, environ)
                 token_started = time.monotonic()
@@ -201,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         disjoint_real_document_count=0,
         sample_gold_in_production=False,
         rerank_accounting_ok=bool(stage_export.get("rerank_accounting_ok")),
-        unknown_required_fields=_unknown_required_count(stage_export, len(questions)),
+        unknown_required_fields=unknown_required_count(stage_export, len(questions)),
     )
     print(
         "questions={questions} strict_pass={strict_pass} "
@@ -331,6 +362,10 @@ def _login(client: httpx.Client, environ: Mapping[str, str]) -> str:
 def _create_conversation(client: httpx.Client, base_url: str, token: str) -> str:
     """Create one conversation for a single question.
 
+    Retries read timeouts (5 s pause) and HTTP 429 (Retry-After, capped at
+    90 s) up to six attempts. Each POST uses a 60 s timeout so a slow
+    ``/health/ready`` path cannot abort the 100-question loop.
+
     Args:
         client: HTTP client.
         base_url: Ask origin.
@@ -338,16 +373,24 @@ def _create_conversation(client: httpx.Client, base_url: str, token: str) -> str
 
     Returns:
         Conversation id.
+
+    Raises:
+        RuntimeError: All six attempts timed out or were rate-limited.
+        httpx.HTTPStatusError: The last response was a non-429 HTTP error.
     """
 
     last: httpx.Response | None = None
     for _attempt in range(6):
-        last = client.post(
-            f"{base_url}/conversations",
-            headers=_auth_headers(token, paid=True),
-            json={"title": "Company Ask regression"},
-            timeout=30.0,
-        )
+        try:
+            last = client.post(
+                f"{base_url}/conversations",
+                headers=_auth_headers(token, paid=True),
+                json={"title": "Company Ask regression"},
+                timeout=60.0,
+            )
+        except httpx.TimeoutException:
+            time.sleep(5.0)
+            continue
         if last.status_code == 429:
             retry_after = float(last.headers.get("Retry-After") or 60)
             time.sleep(min(retry_after, 90.0))
@@ -390,7 +433,7 @@ def _ask_one(
                 "idempotency_key": idempotency,
                 "search_scope": _SEARCH_SCOPE,
             },
-            timeout=30.0,
+            timeout=60.0,
         )
         if admit.status_code == 429:
             retry_after = float(admit.headers.get("Retry-After") or 60)
@@ -522,7 +565,7 @@ def _join_stage_export(
         Export mapping. Missing operator access yields unknown counts.
     """
 
-    unknown = {
+    unknown: dict[str, object] = {
         "runs": {},
         "unknown_required_fields": len(answers),
         "rerank_accounting_ok": False,
@@ -557,16 +600,22 @@ def _apply_stage_export(
     runs = stage_export.get("runs")
     if not isinstance(runs, Mapping):
         return
+    runs_map = cast(Mapping[str, object], runs)
     for question_id, row in answers.items():
-        exported = runs.get(question_id)
+        exported = runs_map.get(question_id)
         if not isinstance(exported, Mapping):
             continue
+        exported_map = cast(Mapping[str, object], exported)
         existing = row.get("stages")
-        stages = dict(existing) if isinstance(existing, Mapping) else {}
-        for key, value in exported.items():
+        stages: dict[str, object] = (
+            dict(cast(Mapping[str, object], existing))
+            if isinstance(existing, Mapping)
+            else {}
+        )
+        for key, value in exported_map.items():
             if key == "run_id":
                 continue
-            stages[key] = value
+            stages[str(key)] = value
         row["stages"] = stages
 
 
@@ -636,7 +685,9 @@ def _answers_for_scorer(
         stage_raw = _json_mapping(cast(object, stage_raw_obj))
         coverage = stage_raw.get("coverage_score")
         fused_ids = stage_raw.get("fused_ids")
-        fused_count = len(fused_ids) if isinstance(fused_ids, list) else 0
+        fused_count = (
+            len(cast(list[object], fused_ids)) if isinstance(fused_ids, list) else 0
+        )
         retrieval_empty = stage_raw.get("retrieval_empty")
         stages[key] = RetrievalStageAttribution(
             source_resolution=_measured_source_resolution(
@@ -681,7 +732,7 @@ def _json_mapping(value: object) -> dict[str, object]:
     return {str(key): item for key, item in typed.items()}
 
 
-def _unknown_required_count(
+def unknown_required_count(
     stage_export: Mapping[str, object],
     question_count: int,
 ) -> int:

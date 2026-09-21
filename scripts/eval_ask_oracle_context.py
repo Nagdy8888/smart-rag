@@ -90,7 +90,7 @@ from scripts.pdf_eval_cli import apply_merged_env, operator_url  # noqa: E402
 _CITATION_CAP = 16_000
 
 
-def _json_mapping(value: object) -> dict[str, object]:
+def json_mapping(value: object) -> dict[str, object]:
     """Coerce a JSON object to a string-keyed mapping.
 
     Args:
@@ -129,7 +129,7 @@ def load_slice_chunk_ids(path: Path) -> dict[str, tuple[UUID, ...]]:
     for raw in cast(list[object], payload_obj):
         if not isinstance(raw, dict):
             raise AskRegressionConfigError("slice row must be an object")
-        row = _json_mapping(raw)
+        row = json_mapping(cast(object, raw))
         question_id = str(row.get("id") or "").strip()
         chunk_raw = row.get("chunk_ids")
         if not question_id or not isinstance(chunk_raw, list):
@@ -535,7 +535,7 @@ def score_oracle_answer(
     )
 
 
-def _load_credentials_email(path: Path) -> str:
+def load_credentials_email(path: Path) -> str:
     """Read the evaluator email from a private credentials file.
 
     Args:
@@ -551,7 +551,7 @@ def _load_credentials_email(path: Path) -> str:
     resolved = path.resolve()
     if ".private-eval" not in {part.casefold() for part in resolved.parts}:
         raise AskRegressionConfigError("credentials must live under .private-eval")
-    payload = _json_mapping(json.loads(resolved.read_text(encoding="utf-8")))
+    payload = json_mapping(json.loads(resolved.read_text(encoding="utf-8")))
     email = str(payload.get("email") or "").strip()
     if not email:
         raise AskRegressionConfigError("credentials email missing")
@@ -583,7 +583,7 @@ def main(argv: list[str] | None = None) -> int:
         env = apply_merged_env()
         questions = load_private_gold(args.gold)
         slice_ids = load_slice_chunk_ids(args.slice)
-        email = _load_credentials_email(args.credentials)
+        email = load_credentials_email(args.credentials)
         operator_dsn = operator_url(env)
         user_id = resolve_eval_user_id(operator_dsn, email)
         caller = lookup_eval_caller(operator_dsn, user_id)
@@ -591,7 +591,12 @@ def main(argv: list[str] | None = None) -> int:
         if settings.mock_model_mode:
             print("blocked=mock_model_mode", file=sys.stderr)
             return 2
-    except (AskRegressionConfigError, OSError, json.JSONDecodeError, RuntimeError) as exc:
+    except (
+        AskRegressionConfigError,
+        OSError,
+        json.JSONDecodeError,
+        RuntimeError,
+    ) as exc:
         print(f"blocked={exc}", file=sys.stderr)
         return 2
 

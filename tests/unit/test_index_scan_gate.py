@@ -267,6 +267,23 @@ def test_mark_parsing_refreshes_already_indexed_version(
     """graph_ineligible skips parse/scan and returns indexed after term sync."""
 
     connection = _StatusConnection("graph_ineligible")
+
+    def _connect(_url: str) -> _StatusConnection:
+        """Return the fake scan-gate connection.
+
+        Args:
+            _url: Ignored DSN.
+
+        Returns:
+            The prepared status connection.
+        """
+
+        return connection
+
+    monkeypatch.setattr(
+        "smart_rag_agents.ingestion.index_graph.psycopg.connect",
+        _connect,
+    )
     version_id = uuid4()
     captured: dict[str, object] = {}
 
@@ -289,10 +306,6 @@ def test_mark_parsing_refreshes_already_indexed_version(
         captured["version_id"] = version_id
         return 12
 
-    monkeypatch.setattr(
-        "smart_rag_agents.ingestion.index_graph.psycopg.connect",
-        lambda _url: connection,
-    )
     monkeypatch.setattr(
         "smart_rag_agents.ingestion.index_graph.refresh_indexed_title_search_terms",
         fake_refresh,

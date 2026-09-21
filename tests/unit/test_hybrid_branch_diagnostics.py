@@ -20,8 +20,8 @@ from smart_rag_core.query_routing.models import (
 from smart_rag_core.retrieval.coverage import CoverageSignal, HybridCoverage
 from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 
-from scripts.eval_ask_stage_export import _stage_record
-from scripts.run_company_ask import _unknown_required_count
+from scripts.eval_ask_stage_export import stage_record
+from scripts.run_company_ask import unknown_required_count
 
 _FORBIDDEN_TEXT_FIELDS = frozenset(
     {
@@ -212,22 +212,22 @@ def test_stage_record_measures_accounting_and_bm25_explicit() -> None:
         "selected_ids": [chunk],
         "effective_route": "hybrid",
     }
-    ok = _stage_record(diagnostics, {"embedding", "rerank"})
+    ok = stage_record(diagnostics, {"embedding", "rerank"})
     assert ok["rerank_accounting_ok"] is True
     assert ok["bm25_degraded_explicit"] is True
     assert ok["retrieval_empty"] is False
-    masked = _stage_record(
+    masked = stage_record(
         {**diagnostics, "fallback_reason": "term_unavailable"},
         {"embedding", "rerank"},
     )
     assert masked["bm25_degraded_explicit"] is False
-    named = _stage_record(
+    named = stage_record(
         {**diagnostics, "fallback_reason": "bm25_unavailable"},
         {"embedding"},
     )
     assert named["bm25_degraded_explicit"] is True
     assert named["rerank_accounting_ok"] is False
-    missing = _stage_record(None, set())
+    missing = stage_record(None, set())
     assert missing["source_resolution"] == "unknown"
     assert missing["rerank_accounting_ok"] == "unknown"
 
@@ -235,5 +235,5 @@ def test_stage_record_measures_accounting_and_bm25_explicit() -> None:
 def test_unknown_required_count_keeps_measured_zero() -> None:
     """A measured zero must not be replaced with the question count."""
 
-    assert _unknown_required_count({"unknown_required_fields": 0}, 3) == 0
-    assert _unknown_required_count({}, 3) == 3
+    assert unknown_required_count({"unknown_required_fields": 0}, 3) == 0
+    assert unknown_required_count({}, 3) == 3

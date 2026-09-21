@@ -155,26 +155,33 @@ def _overlay_stage_export(payload: object, export: object) -> object:
     """
 
     if not isinstance(payload, dict) or not isinstance(export, dict):
-        return payload
-    runs = export.get("runs")
+        return cast(object, payload)
+    typed_export = cast(dict[str, object], export)
+    runs = typed_export.get("runs")
     if not isinstance(runs, Mapping):
-        return payload
+        return cast(object, payload)
+    runs_map = cast(Mapping[str, object], runs)
     typed = cast(dict[object, object], payload)
     for key, raw in typed.items():
         if not isinstance(raw, dict):
             continue
-        exported = runs.get(str(key))
+        exported = runs_map.get(str(key))
         if not isinstance(exported, Mapping):
             continue
+        exported_map = cast(Mapping[str, object], exported)
         row = cast(dict[str, object], raw)
         stages = row.get("stages")
-        merged = dict(stages) if isinstance(stages, Mapping) else {}
-        for field, value in exported.items():
+        merged: dict[str, object] = (
+            dict(cast(Mapping[str, object], stages))
+            if isinstance(stages, Mapping)
+            else {}
+        )
+        for field, value in exported_map.items():
             if field == "run_id":
                 continue
             merged[str(field)] = value
         row["stages"] = merged
-    return payload
+    return cast(object, payload)
 
 
 def _stage_from_mapping(raw: object) -> RetrievalStageAttribution:
@@ -198,7 +205,7 @@ def _stage_from_mapping(raw: object) -> RetrievalStageAttribution:
         source_resolution = SourceResolutionStage.UNSCOPED
     fused_ids = mapping.get("fused_ids")
     fused_count = (
-        len(fused_ids)
+        len(cast(list[object], fused_ids))
         if isinstance(fused_ids, list)
         else _as_int(mapping.get("fused_count"))
     )

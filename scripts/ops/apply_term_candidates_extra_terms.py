@@ -178,16 +178,19 @@ def count_hybrid_fallback_reasons(
         except Exception:
             decode_errors += 1
             continue
-        branches = payload if isinstance(payload, list) else []
+        branches: list[object] = (
+            cast(list[object], payload) if isinstance(payload, list) else []
+        )
         for item in branches:
             if not isinstance(item, Mapping):
                 continue
-            family = str(item.get("family") or "")
-            kind = str(item.get("kind") or "")
+            mapped = cast(Mapping[str, object], item)
+            family = str(mapped.get("family") or "")
+            kind = str(mapped.get("kind") or "")
             if family not in HYBRID_FAMILIES and kind != "hybrid":
                 continue
             hybrid_branches += 1
-            counts[_reason_label(item.get("fallback_reason"))] += 1
+            counts[_reason_label(mapped.get("fallback_reason"))] += 1
     return {
         "company_threads_with_blobs": len(rows),
         "hybrid_branches": hybrid_branches,
@@ -340,16 +343,19 @@ def count_smoke_reasons(
         if blob is None:
             continue
         payload = serde.loads_typed((str(type_name), bytes(blob)))
-        branches = payload if isinstance(payload, list) else []
+        branches: list[object] = (
+            cast(list[object], payload) if isinstance(payload, list) else []
+        )
         for item in branches:
             if not isinstance(item, Mapping):
                 continue
-            family = str(item.get("family") or "")
-            kind = str(item.get("kind") or "")
+            mapped = cast(Mapping[str, object], item)
+            family = str(mapped.get("family") or "")
+            kind = str(mapped.get("kind") or "")
             if family not in HYBRID_FAMILIES and kind != "hybrid":
                 continue
             hybrid_branches += 1
-            counts[_reason_label(item.get("fallback_reason"))] += 1
+            counts[_reason_label(mapped.get("fallback_reason"))] += 1
     return {
         "conversations": len(conversation_ids),
         "blobs": len(rows),
@@ -390,7 +396,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Gitignored Ask answers JSON whose conversation ids are counted.",
     )
     args = parser.parse_args(argv)
-    print(f"project_ref=qsjivtwtmlmtksufqjik")
+    print("project_ref=qsjivtwtmlmtksufqjik")
     print(f"migration={MIGRATION.name}")
     print(f"migration_sha256={migration_sha256()}")
     try:
@@ -445,9 +451,10 @@ def main(argv: list[str] | None = None) -> int:
                 print("blocked=smoke_answers_not_object")
                 return 2
             conversation_ids: list[UUID] = []
-            for question_id, row in cast(dict[object, object], payload_obj).items():
-                if not isinstance(row, dict):
+            for question_id, row_obj in cast(dict[object, object], payload_obj).items():
+                if not isinstance(row_obj, dict):
                     continue
+                row = cast(dict[str, object], row_obj)
                 raw_id = str(row.get("conversation_id") or "").strip()
                 if raw_id:
                     conversation_ids.append(UUID(raw_id))

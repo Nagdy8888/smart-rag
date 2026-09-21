@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 72
-status: pending
+status: complete
 title: "Qualify live accuracy, publish redacted evidence, and leave leftover P06-17 open."
 requirement_ids: [P06-72]
 ---

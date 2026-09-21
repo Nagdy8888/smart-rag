@@ -282,7 +282,7 @@ def test_term_outage_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_extra_terms_sql_rejects_nul_without_embedded_escape() -> None:
-    """Hosted CREATE FUNCTION rejects ``E'\\x00'`` as an invalid UTF-8 NUL.
+    r"""Hosted CREATE FUNCTION rejects ``E'\\x00'`` as an invalid UTF-8 NUL.
 
     The reviewed extra-terms body must keep the NUL filter as ``chr(0)`` so
     operator apply can compile the function.

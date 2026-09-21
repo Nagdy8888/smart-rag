@@ -173,9 +173,9 @@ The table below is the complete maintained map. Packet evidence under
 | [evaluation/PHASE4_ABLATIONS.md](./evaluation/PHASE4_ABLATIONS.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers |
 | [evaluation/PHASE4_HOLDOUT.md](./evaluation/PHASE4_HOLDOUT.md) | engineering-lead | draft | 2026-08-14 | eng, reviewers, client-approver |
 | [evaluation/PHASE4_RANKED_IDS.md](./evaluation/PHASE4_RANKED_IDS.md) | engineering-lead | draft | 2026-09-09 | eng, reviewers |
-| [evaluation/PDF_HYBRID_EVALUATION.md](./evaluation/PDF_HYBRID_EVALUATION.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers |
+| [evaluation/PDF_HYBRID_EVALUATION.md](./evaluation/PDF_HYBRID_EVALUATION.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers |
 | [evaluation/PDF_EVAL_WORKSPACE.md](./evaluation/PDF_EVAL_WORKSPACE.md) | engineering-lead | draft | 2026-09-14 | eng, reviewers, security, frontend |
-| [evaluation/COMPANY_DOCUMENTS_RAG_100.md](./evaluation/COMPANY_DOCUMENTS_RAG_100.md) | engineering-lead | draft | 2026-09-17 | eng, reviewers, client-approver |
+| [evaluation/COMPANY_DOCUMENTS_RAG_100.md](./evaluation/COMPANY_DOCUMENTS_RAG_100.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers, client-approver |
 | [evaluation/DUAL_METRIC_SCORING.md](./evaluation/DUAL_METRIC_SCORING.md) | engineering-lead | draft | 2026-09-21 | eng, reviewers |
 | [evaluation/PARSER_BAKEOFF.md](./evaluation/PARSER_BAKEOFF.md) | engineering-lead | draft | 2026-09-10 | eng, reviewers, security |
 | [adr/ADR-anydoc-local-parser-bakeoff.md](./adr/ADR-anydoc-local-parser-bakeoff.md) | engineering-lead | accepted | 2026-09-10 | eng, security, reviewers |

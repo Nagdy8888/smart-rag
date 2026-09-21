@@ -238,8 +238,14 @@ def _uuid_ids(values: object, cap: int) -> tuple[str, ...]:
         UUID strings. Non-UUID items are omitted.
     """
 
+    if isinstance(values, list):
+        raw_items = tuple(cast(list[object], values))
+    elif isinstance(values, tuple):
+        raw_items = cast(tuple[object, ...], values)
+    else:
+        return ()
     kept: list[str] = []
-    for item in tuple(values or ())[:cap]:
+    for item in raw_items[:cap]:
         text = str(item)
         try:
             UUID(text)

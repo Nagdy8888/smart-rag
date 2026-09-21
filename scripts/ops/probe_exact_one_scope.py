@@ -11,6 +11,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import cast
 from uuid import UUID
 
 import psycopg
@@ -58,17 +59,23 @@ def _questions(path: Path) -> list[str]:
         Question texts. Empty when the file is missing or malformed.
     """
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(payload, list):
-        rows = payload
-    elif isinstance(payload, dict):
-        rows = payload.get("questions") or payload.get("items") or []
+    payload_obj: object = json.loads(path.read_text(encoding="utf-8"))
+    rows: list[object]
+    if isinstance(payload_obj, list):
+        rows = cast(list[object], payload_obj)
+    elif isinstance(payload_obj, dict):
+        payload_map = cast(dict[str, object], payload_obj)
+        nested_obj: object = payload_map.get("questions")
+        if not isinstance(nested_obj, list):
+            nested_obj = payload_map.get("items")
+        rows = cast(list[object], nested_obj) if isinstance(nested_obj, list) else []
     else:
         return []
     questions: list[str] = []
-    for row in rows:
-        if not isinstance(row, dict):
+    for row_obj in rows:
+        if not isinstance(row_obj, dict):
             continue
+        row = cast(dict[str, object], row_obj)
         text = row.get("question") or row.get("text")
         if isinstance(text, str) and text.strip():
             questions.append(text.strip())
