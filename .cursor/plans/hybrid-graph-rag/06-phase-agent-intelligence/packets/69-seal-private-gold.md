@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 69
-status: pending
+status: complete
 title: "Seal private aliases, isolation-slice gold, and the frozen 30-question acceptance sample."
 requirement_ids: [P06-69]
 ---
