@@ -13,6 +13,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from smart_rag_core.evaluation.schema import ExpectedProfile, QueryType
+from smart_rag_core.ingestion.chunking.normalize import content_hash
 from smart_rag_core.retrieval.profiles import (
     DOCUMENT_QUOTA,
     FINAL_EVIDENCE_MAX,
@@ -244,7 +245,7 @@ def rerank_preload_ids(
 
     Returns:
         Distinct chunk IDs, at most ``pool_size``, matching
-        ``build_rerank_pool`` membership.
+        ``build_rerank_pool`` membership before content collapse.
     """
 
     seen: set[UUID] = set()
@@ -264,6 +265,38 @@ def rerank_preload_ids(
     return tuple(selected)
 
 
+def collapse_exact_duplicate_passages(
+    passages: Sequence[RerankPassage],
+) -> tuple[RerankPassage, ...]:
+    """Keep the first authorized copy of exact duplicate content.
+
+    Collapse happens after ACL and current-version recheck because callers
+    pass ``RerankPassage`` rows built from rechecked context. Documents are
+    not deleted.
+
+    Args:
+        passages: Authorized passages in fused rank order.
+
+    Returns:
+        Passages with later exact-normalized duplicates removed.
+    """
+
+    seen_chunks: set[UUID] = set()
+    seen_content: set[str] = set()
+    selected: list[RerankPassage] = []
+    for item in passages:
+        chunk_id = item.candidate.chunk_id
+        if chunk_id in seen_chunks:
+            continue
+        digest = content_hash(item.raw_text)
+        if digest in seen_content:
+            continue
+        seen_chunks.add(chunk_id)
+        seen_content.add(digest)
+        selected.append(item)
+    return tuple(selected)
+
+
 def build_rerank_pool(
     passages: tuple[RerankPassage, ...],
     *,
@@ -273,7 +306,11 @@ def build_rerank_pool(
     query: str | None = None,
     excerpt_strategy: str = "prefix",
 ) -> tuple[RerankPassage, ...]:
-    """Collapse duplicates and cap the pool with per-document limits.
+    """Collapse exact-content duplicates and cap the pool with per-document limits.
+
+    Exact duplicate collapse is by normalized citation text after ACL
+    recheck, not by document id. Duplicate files therefore cannot consume
+    independent document quotas. Documents are not deleted.
 
     Args:
         passages: Fused-order authorized passages with canonical text.
@@ -284,17 +321,23 @@ def build_rerank_pool(
         excerpt_strategy: ``prefix`` or ``query_aware``.
 
     Returns:
-        Pool in fused order after per-document and global caps.
+        Pool in fused order after exact-content collapse, per-document, and
+        global caps.
     """
 
     seen: set[UUID] = set()
+    seen_content: set[str] = set()
     per_document: dict[UUID, int] = {}
     selected: list[RerankPassage] = []
-    for item in passages:
+    for item in collapse_exact_duplicate_passages(passages):
         chunk_id = item.candidate.chunk_id
         if chunk_id in seen:
             continue
+        digest = content_hash(item.raw_text)
+        if digest in seen_content:
+            continue
         seen.add(chunk_id)
+        seen_content.add(digest)
         document_id = item.candidate.document_id
         used = per_document.get(document_id, 0)
         if used >= max_per_document:

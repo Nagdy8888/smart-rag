@@ -24,6 +24,7 @@ from smart_rag_core.retrieval.rerank import (
     RerankPassage,
     RerankRanking,
 )
+from smart_rag_core.retrieval.term_needles import expand_term_texts
 from smart_rag_core.retrieval.types import (
     Bm25RetrievalResult,
     DenseRetrievalResult,
@@ -221,7 +222,7 @@ def collect_term_lists(
     caller: CallerContext,
     texts: tuple[str, ...],
 ) -> VariantLists:
-    """Run term retrieve once per fused query text.
+    """Run term retrieve on ranking texts plus bounded extracted needles.
 
     Args:
         retrieve: Bound ``TermRetriever.retrieve`` or a test double.
@@ -229,11 +230,11 @@ def collect_term_lists(
         texts: Query forms.
 
     Returns:
-        Per-variant term candidate lists.
+        Per-variant term candidate lists, unique-capped across variants.
     """
 
     lists: list[CandidateList] = []
-    for text in texts:
+    for text in expand_term_texts(texts):
         result = retrieve(caller=caller, query_text=text)
         if isinstance(result, TermRetrievalResult):
             lists.append(result.candidates)
@@ -307,10 +308,10 @@ def cap_unique_across_variants(
     lists: VariantLists,
     cap: int,
 ) -> VariantLists:
-    """Keep at most ``cap`` unique chunk IDs across all variant lists.
+    """Keep at most ``cap`` unique chunk IDs with round-robin variant fairness.
 
-    First-seen IDs win. Later duplicates remain only when they already
-    survived the global unique set. Per-list slicing is not sufficient.
+    One variant cannot consume the entire cap before later variants are
+    considered. Later exact duplicates of an already kept ID are dropped.
 
     Args:
         lists: Per-variant candidate lists.
@@ -320,18 +321,26 @@ def cap_unique_across_variants(
         Variant lists reconstructed from the global survivor set.
     """
 
+    if not lists or cap <= 0:
+        return tuple(() for _ in lists)
     allowed: list[UUID] = []
     seen: set[UUID] = set()
-    for variant in lists:
-        for item in variant:
-            if item.chunk_id in seen:
-                continue
-            seen.add(item.chunk_id)
-            allowed.append(item.chunk_id)
+    indexes = [0] * len(lists)
+    progressed = True
+    while len(allowed) < cap and progressed:
+        progressed = False
+        for ordinal, variant in enumerate(lists):
+            while indexes[ordinal] < len(variant):
+                item = variant[indexes[ordinal]]
+                indexes[ordinal] += 1
+                if item.chunk_id in seen:
+                    continue
+                seen.add(item.chunk_id)
+                allowed.append(item.chunk_id)
+                progressed = True
+                break
             if len(allowed) >= cap:
                 break
-        if len(allowed) >= cap:
-            break
     allowed_set = set(allowed)
     return tuple(
         tuple(item for item in variant if item.chunk_id in allowed_set)
@@ -437,7 +446,7 @@ def unpack_term(
     if value is None:
         return (), RetrievalFallbackReason.NONE
     if isinstance(value, TermRetrievalResult):
-        return (value.candidates,), RetrievalFallbackReason.NONE
+        return (value.candidates,), value.fallback_reason
     if _is_candidate_tuple(value):
         if not value:
             return (), RetrievalFallbackReason.NONE

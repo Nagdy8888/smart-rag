@@ -2,7 +2,7 @@
 title: Hybrid retrieval contract
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-10
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 phase_packet: Phase 4 Packets 2-8
 ---
@@ -20,6 +20,27 @@ hashed artifact ``retrieval/frozen/hybrid_default_v1.json``. Packet 8 froze
 those values as the winning profile and recorded a holdout **no-go**. Holdout is never
 used for tuning. Unequal RRF weights and a different ``rrf_k`` were **not**
 selected. Frozen profile values in this file were **not** retuned after Packet 9.
+
+## Source selectors and duplicate copies
+
+Named authorized titles are scope selectors only. After an exact-one
+authorized match, the title is stripped from the ranking query so selector
+tokens cannot dominate dense or BM25 ranking. Ambiguous and unauthorized
+names stay unscoped and indistinguishable. Exact duplicate citation text is
+collapsed after ACL and current-version recheck; documents are never deleted
+automatically. The term channel searches the ranking sentence plus bounded
+extracted codes, acronyms, entities, and aliases. BM25 unique capping
+round-robins variants so one variant cannot consume the survivor cap.
+
+## Long-document runtime profile (P06-62)
+
+`hybrid_long_document_v2` is the measured immutable long-document
+profile. Runtime retrieve loads it only after an exact-one authorized
+version scope with more than five representatives. Trivial exact lookups
+stay on `hybrid_default_v1`. Ambiguous and unauthorized names stay
+unscoped. The failed `hybrid_long_document_v1.json` digest stays
+unfrozen. OpenAI rerank starts only when remaining retrieve-slice
+seconds are at least `RERANK_RESERVED_SECONDS` (2.0).
 
 ## Claim hygiene (Packet 9 metrics)
 

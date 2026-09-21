@@ -122,7 +122,7 @@ def _upload_pdf(
             "declared_category": "allowed",
             "attestation_policy_version": EXTERNAL_PROCESSING_POLICY_VERSION,
             "idempotency_key": idempotency_key,
-            "document_title": f"private-pdf-{digest[:12]}",
+            "document_title": path.name,
         },
     )
     if finalized.status_code >= 400:

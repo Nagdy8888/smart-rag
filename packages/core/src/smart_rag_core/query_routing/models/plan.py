@@ -80,6 +80,8 @@ class BranchSpec(BaseModel):
         max_graph_expansions: At most three global steering expansions.
         inherit_run_id: Branch must copy the admitted run id.
         inherit_reservation: Branch must copy the run-local reservation.
+        bypass_retrieval_cache: True for the one correction retry so a
+            cached identical ranking cannot be reused.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -99,6 +101,7 @@ class BranchSpec(BaseModel):
     )
     inherit_run_id: bool = True
     inherit_reservation: bool = True
+    bypass_retrieval_cache: bool = False
 
     @model_validator(mode="after")
     def _never_graph_evidence(self) -> BranchSpec:

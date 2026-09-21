@@ -230,7 +230,8 @@ def remaining_slice_seconds(*, slice_seconds: float, slice_started: float) -> fl
     """Return unused seconds in the channel-plus-rerank slice.
 
     Embedding runs before ``slice_started`` and is not subtracted from the
-    8s bound. The 8s value itself is not raised.
+    8s bound. The 8s value itself is not raised. OpenAI rerank starts only
+    when this remainder is at least ``RERANK_RESERVED_SECONDS``.
 
     Args:
         slice_seconds: Channel-plus-rerank bound.

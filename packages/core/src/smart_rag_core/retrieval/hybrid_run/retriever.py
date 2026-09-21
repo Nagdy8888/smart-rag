@@ -20,7 +20,10 @@ from smart_rag_core.retrieval.context_loader import (
     ChunkContext,
     heading_inventory_from_contexts,
 )
-from smart_rag_core.retrieval.coverage_score import attach_numeric_coverage
+from smart_rag_core.retrieval.coverage_score import (
+    attach_numeric_coverage,
+    exclude_source_selector_terms,
+)
 from smart_rag_core.retrieval.frozen_profile import FrozenHybridProfile
 from smart_rag_core.retrieval.hybrid import run_channels_parallel
 from smart_rag_core.retrieval.hybrid_run.assemble import (
@@ -175,6 +178,7 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         channel_jobs: dict[str, ChannelJob] | None = None,
         restrict_version_id: UUID | None = None,
         cache_mode: RetrievalCacheMode = RetrievalCacheMode.NORMAL,
+        source_selectors: tuple[str, ...] = (),
     ) -> HybridRunResult:
         """Run one Hybrid retrieve and return ranked IDs plus locators.
 
@@ -192,9 +196,11 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 document version in a single retrieve.
             cache_mode: ``cold_bypass`` skips ID/rank cache get/put without
                 changing ranking. Exam retrieve must pass ``cold_bypass``.
+            source_selectors: Authorized titles excluded from coverage
+                required terms.
 
         Returns:
-            Ranked authorized IDs, ≤12 evidence units, coverage, fallback,
+            Ranked authorized IDs, ?12 evidence units, coverage, fallback,
             ``first_evidence_ms``, and call counts.
 
         Side Effects:
@@ -318,12 +324,16 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
         }
         temporal_intent = temporal_intent_field(profile)
         target = target_date_field(profile)
-        required_terms = (
+        required_terms = exclude_source_selector_terms(
             str_list_field(profile, "codes")
             + str_list_field(profile, "exact_terms")
             + str_list_field(profile, "quoted_phrases")
             + str_list_field(profile, "entities")
-            + str_list_field(profile, "approved_aliases")
+            + str_list_field(profile, "approved_aliases"),
+            (
+                *source_selectors,
+                *str_list_field(profile, "requested_sources"),
+            ),
         )
         subquestions = str_list_field(profile, "subquestions")[:3]
         subquestion_count = len(subquestions)
@@ -454,6 +464,10 @@ class HybridRetriever(HybridCacheLookupMixin, HybridChannelJobsMixin):
                 query_type=query_type,
                 required_terms=required_terms,
                 matched_terms=matched_terms,
+                source_selectors=(
+                    *source_selectors,
+                    *str_list_field(resolved_profile, "requested_sources"),
+                ),
                 subquestion_count=subquestion_count,
                 supported_subquestions=supported,
                 rerank_top_support=rerank_top_support,

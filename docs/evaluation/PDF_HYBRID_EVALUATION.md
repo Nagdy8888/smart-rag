@@ -2,7 +2,7 @@
 title: PDF Hybrid evaluation
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-13
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 ---
 
@@ -17,6 +17,8 @@ Related: [hybrid-pdf-accuracy-remediation.md](../development/hybrid-pdf-accuracy
 [ADR-local-pdf-evaluation-workspace.md](../adr/ADR-local-pdf-evaluation-workspace.md) ·
 [ADR-hosted-webapp-evaluation-workspace.md](../adr/ADR-hosted-webapp-evaluation-workspace.md) ·
 [PDF_EVAL_WORKSPACE.md](./PDF_EVAL_WORKSPACE.md) ·
+[COMPANY_DOCUMENTS_RAG_100.md](./COMPANY_DOCUMENTS_RAG_100.md) ·
+[DUAL_METRIC_SCORING.md](./DUAL_METRIC_SCORING.md) ·
 [PARSER_BAKEOFF.md](./PARSER_BAKEOFF.md) ·
 [docs index](../README.md)
 
@@ -27,6 +29,49 @@ flowchart LR
   retrieve --> qualify["Qualification once"]
   qualify --> holdout["One immutable holdout"]
 ```
+
+## P06-62 runtime pin (2026-09-17)
+
+Exact-one authorized long documents now execute immutable
+`hybrid_long_document_v2` (SHA-256
+`9565a14152c9c530ad5a07ba221f9d944a872c6b6f417e71ef30cab0486c95b1`).
+The failed `hybrid_long_document_v1` digest
+`d9e154747a88a94c0c75e87935a1f977e1c1802e2e80f9e12825bd24e1d15d22`
+stays unfrozen. Frozen `hybrid_default_v1` bytes are unchanged
+(`def45b691e64707d07d3c7ea47f45eb1b23b5d2d2546c37a19a514f316c5940c`).
+OpenAI rerank starts only when remaining retrieve-slice seconds are at
+least `RERANK_RESERVED_SECONDS` (2.0). That reserve is inside the existing
+8s retrieve slice and is not `ANSWER_STAGE_MIN_SECONDS` (8.0). Live
+grounded-fact qualification of this pin remains Packet 64. Packet 64 did
+not promote the sample: CLI Recall@10 stayed 0.0 and Ask grounded fact
+stayed 35%. `holdout_opened=false`.
+
+## P06-64 live retrieve and Ask gates (2026-09-17)
+
+`scripts/eval_pdf_hybrid.py --split development --live` against pinned
+`hybrid_long_document_v2` digest
+`9565a14152c9c530ad5a07ba221f9d944a872c6b6f417e71ef30cab0486c95b1`:
+
+| Token | Value |
+| --- | --- |
+| `case_count` | 28 |
+| `hybrid_recall_at_10` | 0.0 |
+| `gold_loss_histogram` | `{absent_all_channels: 28}` |
+| `acl_leaks` | 0 |
+| `eligible_rerank_ones` | 15 / 28 |
+| `rerank_fallback_histogram` | `{none: 10, rerank_timeout: 13, rerank_schema_invalid: 5}` |
+| `first_evidence_p95_ms` | 3110 |
+| `gates_pass` | false |
+| `holdout_opened` | false |
+| `runtime_allow_listed` | true |
+
+`--fault paradedb` recorded `bm25_fallback=retrieval_timeout`,
+`dense_term_degraded=true`, `full_hybrid=false`. BM25 outage is an
+explicit degradation.
+
+The 100-question Ask dual-metric rerun did **not** promote: grounded fact
+35%, four deadline failures, generalization unverified. See
+[COMPANY_DOCUMENTS_RAG_100.md](./COMPANY_DOCUMENTS_RAG_100.md).
 
 ## Current gates (2026-09-10)
 
@@ -115,7 +160,9 @@ with a btree id list and `chunk_id = ANY(...)` on the BM25 key field.
 
 `ProcessHybridRetriever` now binds `rerank_pool` and `rerank_v1` under
 `hybrid_default_v1`. Identity output cannot satisfy the live-rerank gate.
-Unfrozen `hybrid_long_document_v1` stays rejected by `load_frozen_profile()`.
+Pinned `hybrid_long_document_v2` is runtime-allow-listed for exact-one
+authorized versions above the representative-count gate. Unfrozen
+`hybrid_long_document_v1` stays rejected by `load_frozen_profile()`.
 
 `HybridRunResult.ranked_ids` is the post-rerank/MMR/parent/trim order.
 `fused_ids` preserves historical fused occupancy for synthetic compact-corpus
@@ -129,14 +176,16 @@ count-only tokens. BM25 snippets are never diagnostics.
 | --- | --- |
 | PDF heading extraction | `parser_v1_pdf_headings_v2` live `graph_ineligible` (1045 chunks, 274 distinct `section_path`) |
 | Human reseal | operator-owned; labels remain 2/24 grounded |
-| `FROZEN_LONG_DOCUMENT_PROFILE_SHA256` | empty; `runtime_allow_listed=false` |
+| `FROZEN_LONG_DOCUMENT_PROFILE_SHA256` | `hybrid_long_document_v2` pin; v1 remains denied |
 | Invalid JSON rerank | typed `rerank_schema_invalid` → RRF fallback |
 | Retrieval cache | ID/rank only; recheck on hit; outage is a miss |
 | `qt_eval_009_status` | `unverified` (no disjoint graph-eligible live set) |
 | `holdout_opened` | `false` |
 
-Do not retune from the 2026-09-10 2/24 ungrounded baseline. Do not freeze
-`hybrid_long_document_v1` without live development and qualification reports.
+Do not retune from the 2026-09-10 2/24 ungrounded baseline. Do not pin
+`hybrid_long_document_v1`. Live promotion of `hybrid_long_document_v2`
+still requires Packet 64 disjoint qualification and the 100-question
+regression.
 
 P06-27 authorizes a hosted webapp exam that measures **production-corpus**
 Hybrid Recall@10 (all required gold chunks in the examiner's production
@@ -160,6 +209,7 @@ uv run python scripts/eval_pdf_holdout.py --labels .private-eval/holdout/labels.
 ```
 
 Draft writes counts and hashes only. Seal of generated-only rows exits `2`.
-Live development Hybrid on 2026-09-10 ran after a named locator-bound seal
-and reported `gates_pass=false` after two retrieve repairs. Qualification,
-freeze, agent eval, and holdout stay closed. They never open holdout.
+Live development Hybrid on 2026-09-17 used allow-listed
+`hybrid_long_document_v2` and still reported `gates_pass=false`
+(`hybrid_recall_at_10=0.0`, gold absent from every channel). Qualification,
+agent eval, and holdout stay closed. They never open holdout.

@@ -74,7 +74,7 @@ def company_scope_node(state: QueryGraphState, deps: QueryGraphDeps) -> QueryGra
             "status": "routing_rejected",
             "detail": str(exc) or "invalid_plan",
         }
-    query_budget = retrieve_budget(state, context)
+    query_budget = retrieve_budget(state, context, connection=deps.connection)
     try:
         results = execute_branches(
             plan,

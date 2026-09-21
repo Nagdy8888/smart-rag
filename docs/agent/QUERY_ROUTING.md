@@ -2,7 +2,7 @@
 title: Query routing matrix
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-15
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 phase_packet: Phase 6 Packet 2
 ---
@@ -266,7 +266,7 @@ sequenceDiagram
     alt coverage below 0.65 and relationship retained
       Corr->>Corr: one Hybrid to Combined reuse Hybrid IDs
     else coverage below 0.65 no relationship
-      Corr->>Corr: one same-route retry
+      Corr->>Corr: one ranking-different retry then recompute coverage
     else exhausted
       Corr->>Corr: insufficient_evidence END
     else continue
@@ -279,7 +279,10 @@ sequenceDiagram
 ```
 
 Independent required branches run with `BRANCH_CONCURRENCY=2`. A fourth
-subquestion is rejected. Catalog-search LLMs and hidden LightRAG keyword
+subquestion is rejected. The one same-route retry must use a measured
+alternate query (variant, rewrite, or term-focused form) and bypass the
+retrieval cache. Identical ranking queries are rejected. Coverage is
+recomputed after that retry before answer generation. Catalog-search LLMs and hidden LightRAG keyword
 extraction are forbidden; empty `hl_keywords`/`ll_keywords` fail closed.
 Combined degrades to Hybrid with `graph_unavailable` when the graph adapter
 is missing. Hybrid/table failure never falls back to graph prose. ACL

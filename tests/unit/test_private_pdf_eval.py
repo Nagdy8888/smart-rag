@@ -35,6 +35,7 @@ from smart_rag_core.evaluation.private_pdf import (
 )
 from smart_rag_core.retrieval.frozen_profile import (
     LONG_DOCUMENT_PROFILE_ID,
+    PRIOR_LONG_DOCUMENT_PROFILE_ID,
     UnknownRetrievalProfileError,
     load_frozen_profile,
 )
@@ -331,17 +332,19 @@ def test_eval_runtime_binds_query_profile() -> None:
     assert profile.original_query.startswith("What is")
 
 
-def test_long_document_profile_rejected_at_runtime() -> None:
-    """Unfrozen candidate is not executable."""
+def test_prior_long_document_profile_rejected_at_runtime() -> None:
+    """The failed v1 candidate is not executable; v2 is pinned."""
 
     with pytest.raises(UnknownRetrievalProfileError):
-        load_frozen_profile(LONG_DOCUMENT_PROFILE_ID)
+        load_frozen_profile(PRIOR_LONG_DOCUMENT_PROFILE_ID)
     default = load_frozen_profile(HYBRID_DEFAULT_PROFILE_ID)
     assert default.profile_id == HYBRID_DEFAULT_PROFILE_ID
+    pinned = load_frozen_profile(LONG_DOCUMENT_PROFILE_ID)
+    assert pinned.profile_id == LONG_DOCUMENT_PROFILE_ID
 
 
 def test_source_scope_fails_closed_to_default() -> None:
-    """Ambiguous sources never become hard filters; long profile stays denied."""
+    """Ambiguous sources never become hard filters."""
 
     caller = CallerContext(
         user_id="00000000-0000-0000-0000-000000000099",
@@ -652,8 +655,8 @@ def test_gold_in_fused_any_is_not_recall_gate() -> None:
     assert retrieve_gates_pass(report) is False
 
 
-def test_select_runtime_profile_stays_default_until_freeze() -> None:
-    """Exact-one long documents stay on default until the pin exists."""
+def test_select_runtime_profile_uses_pinned_long_document() -> None:
+    """Exact-one long documents use the pinned v2 profile."""
 
     from smart_rag_core.retrieval.source_scope import (
         SourceResolution,
@@ -666,8 +669,8 @@ def test_select_runtime_profile_stays_default_until_freeze() -> None:
         representative_count=40,
         query_class="factual_definition",
     )
-    assert profile_id == HYBRID_DEFAULT_PROFILE_ID
-    assert reason == "unfrozen_long_document_denied"
+    assert profile_id == LONG_DOCUMENT_PROFILE_ID
+    assert reason == "long_document_eligible"
 
 
 def test_review_apply_requires_locator_flag() -> None:

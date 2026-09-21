@@ -21,6 +21,8 @@ Related: [ADR-hybrid-long-document-profile.md](../adr/ADR-hybrid-long-document-p
 [PDF_EVAL_WORKSPACE.md](../evaluation/PDF_EVAL_WORKSPACE.md) ·
 [PHASE4_RANKED_IDS.md](../evaluation/PHASE4_RANKED_IDS.md) ·
 [PDF_HYBRID_EVALUATION.md](../evaluation/PDF_HYBRID_EVALUATION.md) ·
+[COMPANY_DOCUMENTS_RAG_100.md](../evaluation/COMPANY_DOCUMENTS_RAG_100.md) ·
+[DUAL_METRIC_SCORING.md](../evaluation/DUAL_METRIC_SCORING.md) ·
 [OPENAI_DATA_GOVERNANCE.md](../security/OPENAI_DATA_GOVERNANCE.md) ·
 [SUBPROCESSOR_GOVERNANCE.md](../security/SUBPROCESSOR_GOVERNANCE.md) ·
 [docs index](../README.md)

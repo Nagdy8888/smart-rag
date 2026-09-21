@@ -3,7 +3,7 @@ title: ADR — Allow-listed long-document Hybrid profile
 adr_id: ADR-hybrid-long-document-profile
 status: proposed
 owner: engineering-lead
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-17
 approver: pending
 approval_date: pending
 audience: engineering, reviewers, security
@@ -55,11 +55,19 @@ document quota, and a global quota change would retune every workspace.
 
 ## Consequences
 
-- Overlay Packets 9–12 may inject an evaluation candidate. Runtime allow-list
-  change is Packet 14 only.
+- Overlay Packets 9–12 may inject an evaluation candidate. Runtime
+  allow-list of `hybrid_long_document_v2` is Packet 62. The failed
+  `hybrid_long_document_v1` digest stays unfrozen.
 - Phase 6 Packet 10 binds the OpenAI reranker and source resolver. Until
   freeze, that binding is proven under `hybrid_default_v1`.
 - Qualification of this PDF is not generalization to other documents.
+
+## P06-62 addendum (2026-09-17)
+
+Pin `hybrid_long_document_v2` rather than the failed v1 file. Values
+remain the ADR long-document derivation (document quota 12, per-document
+rerank cap 20, query-aware 800-character excerpts, exact dense when
+version-scoped). Live grounded-fact qualification is Packet 64.
 
 ## Links
 

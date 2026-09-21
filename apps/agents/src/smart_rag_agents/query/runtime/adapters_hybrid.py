@@ -23,7 +23,10 @@ from smart_rag_core.retrieval.profiles import HYBRID_DEFAULT_PROFILE_ID
 from smart_rag_core.retrieval.reranker import rerank_pool
 from smart_rag_core.retrieval.source_scope import (
     ResolvedRetrievalScope,
+    SourceResolution,
+    high_confidence_source_names,
     resolve_retrieval_scope,
+    strip_source_selectors,
 )
 from smart_rag_core.security.identity import CallerContext
 from smart_rag_core.settings.postgres_connect import connect_postgres
@@ -185,8 +188,18 @@ class ProcessHybridRetriever:
         """
 
         typed_profile = profile if isinstance(profile, ExpectedProfile) else None
-        scope = self._resolve_scope(caller, typed_profile)
+        scope = self._resolve_scope(caller, typed_profile, query=query)
         restrict_version_id = scope.version_id if scope is not None else None
+        ranking_query = query
+        if (
+            scope is not None
+            and scope.resolution is SourceResolution.EXACT_ONE
+            and scope.selector_texts
+        ):
+            ranking_query = strip_source_selectors(query, scope.selector_texts)
+            typed_profile = _profile_without_source_selectors(
+                typed_profile, scope.selector_texts
+            )
         profile_id = HYBRID_DEFAULT_PROFILE_ID
         if scope is not None:
             profile_id = scope.candidate_profile_id
@@ -237,12 +250,13 @@ class ProcessHybridRetriever:
         budget = query_budget if query_budget is not None else self.query_budget
         inner.query_budget = budget  # type: ignore[assignment]
         return inner.retrieve(
-            query=query,
+            query=ranking_query,
             caller=caller,
             profile=typed_profile,
             deadline_seconds=deadline_seconds,
             restrict_version_id=restrict_version_id,
             cache_mode=cache_mode,
+            source_selectors=scope.selector_texts if scope is not None else (),
         )
 
     def _resolve_version_id(
@@ -263,36 +277,41 @@ class ProcessHybridRetriever:
             One current version id, or ``None`` when unscoped or ambiguous.
         """
 
-        scope = self._resolve_scope(caller, profile)
+        scope = self._resolve_scope(caller, profile, query="")
         return None if scope is None else scope.version_id
 
     def _resolve_scope(
         self,
         caller: CallerContext,
         profile: ExpectedProfile | None,
+        *,
+        query: str,
     ) -> ResolvedRetrievalScope | None:
         """Resolve source scope and the frozen Hybrid profile.
+
+        Low-confidence requested names are ignored. Authorized titles that
+        appear inside ``query`` can still uniquely scope retrieve. Missing
+        and unauthorized titles stay indistinguishable.
 
         Args:
             caller: Server-derived identity.
             profile: Typed query profile.
+            query: Original branch query used for contained-title matching.
 
         Returns:
-            Resolved scope, or None when names are absent/low-confidence.
+            Resolved scope, or None when names are absent and no title is
+            contained in the query.
         """
 
-        if profile is None:
+        names: tuple[str, ...] = ()
+        if profile is not None:
+            names = high_confidence_source_names(
+                profile_strings(profile.requested_sources),
+                profile.requested_sources.confidence,
+            )
+        if profile is None and not query.strip():
             return None
-        if profile.requested_sources.confidence < 0.80:
-            return None
-        names = tuple(
-            item.strip()[:256]
-            for item in profile_strings(profile.requested_sources)
-            if item.strip()
-        )[:8]
-        if not names:
-            return None
-        raw_class = profile.query_type.value
+        raw_class = None if profile is None else profile.query_type.value
         query_class = raw_class if isinstance(raw_class, str) else None
         try:
             with connect_postgres(self._supabase_dsn) as connection:
@@ -303,6 +322,7 @@ class ProcessHybridRetriever:
                     whole_document=False,
                     query_class=query_class,
                     connection=connection,
+                    query_text=query,
                 )
         except psycopg.Error:
             return None
@@ -412,3 +432,35 @@ def context_loader(
             )
 
     return load
+
+
+def _profile_without_source_selectors(
+    profile: ExpectedProfile | None,
+    selectors: tuple[str, ...],
+) -> ExpectedProfile | None:
+    """Strip source-selector phrases from profile variants used for ranking.
+
+    Args:
+        profile: Typed profile, if any.
+        selectors: Authorized titles already used as scope selectors.
+
+    Returns:
+        Copied profile with stripped variants, or the original when there
+        are no variants.
+    """
+
+    if profile is None or not selectors:
+        return profile
+    raw = profile.variants.value
+    if not isinstance(raw, list):
+        return profile
+    stripped = [
+        strip_source_selectors(str(item), selectors)
+        for item in raw
+        if str(item).strip()
+    ]
+    return profile.model_copy(
+        update={
+            "variants": profile.variants.model_copy(update={"value": stripped}),
+        }
+    )

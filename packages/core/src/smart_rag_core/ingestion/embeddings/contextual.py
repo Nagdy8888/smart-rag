@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from uuid import UUID
 
 from smart_rag_core.ingestion.chunking.types import CanonicalChunk
+from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
 _CODE_PATTERNS = (
     re.compile(
@@ -17,6 +19,12 @@ _CODE_PATTERNS = (
     re.compile(r"\bPRJ-[A-Z]{5,12}\b"),
     re.compile(r"\bP4-[A-Z]{2}-\d{3}\b"),
 )
+_ACRONYM_PAREN = re.compile(r"\b([A-Z]{2,8})\s+\(([^)]{3,80})\)")
+_DEF_PAREN_ACRONYM = re.compile(
+    r"\b((?:[A-Z][A-Za-z]+(?:[-][A-Z]?[A-Za-z]+)*)"
+    r"(?:\s+[A-Z][A-Za-z]+(?:[-][A-Z]?[A-Za-z]+)*){1,6})\s+\(([A-Z]{2,8})\)"
+)
+_CAMEL_TOKEN = re.compile(r"\b[A-Z][a-z]+[A-Z][A-Za-z0-9]{1,40}\b")
 
 
 def build_contextual_embedding_text(
@@ -48,10 +56,12 @@ def extract_deterministic_search_terms(
     filename: str | None,
     chunks: tuple[CanonicalChunk, ...],
 ) -> dict[UUID, tuple[str, ...]]:
-    """Populate search terms from title, headings, filename, and code patterns.
+    """Populate search terms from titles, headings, codes, and acronyms.
 
     Phase 4 identifier rules INV-SR-####, SKU-P4-xxx, PRJ- names, and P4-xx-###
     are included alongside the original PO/INV/TKT/REF/SKU/SN/ID extractor.
+    Parenthetical acronyms and mixed-case tokens are added only as generic
+    parse-gap terms.
 
     Args:
         document_title: Document title.
@@ -81,5 +91,58 @@ def extract_deterministic_search_terms(
         for pattern in _CODE_PATTERNS:
             for match in pattern.findall(chunk.raw_text):
                 terms.add(match.strip())
+        terms.update(_acronym_and_mixed_case_terms(chunk.raw_text))
         result[chunk.chunk_id] = tuple(sorted(terms))
     return result
+
+
+def needle_in_index_gaps(
+    needles: Sequence[str],
+    indexed_terms: Sequence[str],
+) -> tuple[str, ...]:
+    """Return needles that are absent from an indexed term list.
+
+    Args:
+        needles: Query or audit tokens.
+        indexed_terms: Terms already stored for a chunk or version.
+
+    Returns:
+        Needles whose normalized form is missing from the index.
+    """
+
+    indexed = {
+        normalize_arabic_v1(item).casefold() for item in indexed_terms if item.strip()
+    }
+    missing: list[str] = []
+    seen: set[str] = set()
+    for needle in needles:
+        key = normalize_arabic_v1(needle).casefold()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        if key not in indexed:
+            missing.append(needle)
+    return tuple(missing)
+
+
+def _acronym_and_mixed_case_terms(text: str) -> set[str]:
+    """Extract parenthetical acronyms and mixed-case tokens.
+
+    Args:
+        text: Canonical citation text. Never mutated.
+
+    Returns:
+        Extra search terms proven useful when a needle-in-index audit misses
+        the acronym or mixed-case form.
+    """
+
+    terms: set[str] = set()
+    for match in _ACRONYM_PAREN.finditer(text):
+        terms.add(match.group(1).strip())
+        terms.add(match.group(2).strip())
+    for match in _DEF_PAREN_ACRONYM.finditer(text):
+        terms.add(match.group(1).strip())
+        terms.add(match.group(2).strip())
+    for match in _CAMEL_TOKEN.finditer(text):
+        terms.add(match.group(0).strip())
+    return {item for item in terms if item}

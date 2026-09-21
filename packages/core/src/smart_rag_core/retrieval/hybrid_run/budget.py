@@ -107,8 +107,10 @@ def counted_retrieve_send(
         Debits ``budget`` remaining and records provider tokens on the
         ledger. When connection and reservation ids are present, consumes
         via ``execute_counted_model_call`` so reserved USD cannot be
-        silently exceeded. Token totals still accumulate when the durable
-        path is unbound so Ask Run Details can match provider traces.
+        silently exceeded. A bound run/reservation without a connection
+        raises ``retrieve_accounting_connection_missing`` instead of
+        skipping durable writes. Token totals still accumulate when the
+        durable path is unbound so Ask Run Details can match provider traces.
     """
 
     if budget is None:
@@ -123,11 +125,13 @@ def counted_retrieve_send(
     caller = budget.caller
     run_id = budget.run_id
     reservation_id = budget.reservation_id
+    durable_required = isinstance(run_id, UUID) and isinstance(reservation_id, UUID)
+    if durable_required and not isinstance(connection, psycopg.Connection):
+        raise QueryBudgetError("retrieve_accounting_connection_missing")
     if (
         isinstance(connection, psycopg.Connection)
         and isinstance(caller, CallerContext)
-        and isinstance(run_id, UUID)
-        and isinstance(reservation_id, UUID)
+        and durable_required
     ):
         assert_retrieve_kind_available(
             remaining_model_calls=budget.remaining_model_calls,
@@ -137,8 +141,8 @@ def counted_retrieve_send(
         result, consumed, _usage_id = execute_counted_model_call(
             cast("psycopg.Connection[tuple[Any, ...]]", connection),
             caller=caller,
-            run_id=run_id,
-            reservation_id=reservation_id,
+            run_id=cast(UUID, run_id),
+            reservation_id=cast(UUID, reservation_id),
             expected_version=budget.expected_version,
             usage_kind=usage_kind,
             model_id=model_id,

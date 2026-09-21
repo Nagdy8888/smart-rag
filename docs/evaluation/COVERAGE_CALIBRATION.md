@@ -2,7 +2,7 @@
 title: Coverage and refusal calibration
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-09
+last-reviewed: 2026-09-17
 audience: engineering, reviewers
 ---
 
@@ -28,7 +28,12 @@ coverage_score = min(
 )
 ```
 
-Development baseline `0.65`. False-supported
+Development baseline `0.65`. Packet 63 keeps that freeze. Source-selector
+titles are excluded from required-term coverage so naming a document
+cannot force a refusal. Coverage term matching uses `arabic_norm_v1`.
+The one allowed correction must use a ranking-different query and
+recompute coverage before answer generation; identical cached retries
+are rejected. False-supported
 answers carry loss weight 2; unnecessary refusals carry weight 1.
 Unequal RRF channel weights were **not selected** (no ranked-ID
 evidence to retune `rrf_k=60` or equal weights). When the profile has

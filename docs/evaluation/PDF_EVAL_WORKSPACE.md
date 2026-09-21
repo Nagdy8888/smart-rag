@@ -23,6 +23,7 @@ fall back to that directory. This is not a holdout opener.
 Related: [ADR-hosted-webapp-evaluation-workspace.md](../adr/ADR-hosted-webapp-evaluation-workspace.md) ·
 [ADR-local-pdf-evaluation-workspace.md](../adr/ADR-local-pdf-evaluation-workspace.md) ·
 [PDF_HYBRID_EVALUATION.md](./PDF_HYBRID_EVALUATION.md) ·
+[COMPANY_DOCUMENTS_RAG_100.md](./COMPANY_DOCUMENTS_RAG_100.md) ·
 [ADMINISTRATION.md](../frontend/ADMINISTRATION.md) ·
 [AUTHORIZATION_MODEL.md](../security/AUTHORIZATION_MODEL.md) ·
 [CONFIGURATION.md](../development/CONFIGURATION.md) ·

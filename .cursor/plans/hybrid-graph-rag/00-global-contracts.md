@@ -325,10 +325,21 @@ User approval on 2026-09-16: bound company evidence to the existing model input 
 
 - Recorded in `docs/adr/ADR-live-rag-failure-remediation.md`.
 - Integrity keeps packet numbers contiguous after P06-48, so overlay packets are P06-49 through P06-57. Do not reuse P06-44 through P06-48.
-- Execute after P06-48, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
+- Execute after P06-48, then P06-58 through P06-64, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
 - New company prompt pins are `answer_v3` and `verifier_v2` because `answer_v2` already owns PDF paragraph citations. Transcript SQL is `app.list_conversation_messages_v3` because v2 already returns `run_id`.
 - Company insufficient evidence never falls back to Web or general knowledge. SSE and transcript listings stay excerpt-free. Parser isolation stays `--network none` with no raw Docker socket.
 - Rollback stops using the fit/renderer/v3 transcript/citation-detail/reconnect/host-worker overlay in application code. Do not down-migrate populated rows.
+
+## Approved planned deviation: general Hybrid retrieval accuracy
+
+User approval on 2026-09-17: repair the general Hybrid retrieval path for future company-document questions without embedding the sample PDF, its 100 prompts, or its answers in production logic. Dual metrics, authorized source resolution, ranking-query title stripping, post-ACL exact-duplicate collapse, term/BM25 candidate repair, retrieve-time accounting, a measured long-document profile, and coverage/correction repair stay inside existing security, grounding, deadline, and cost gates.
+
+- Recorded in `docs/adr/ADR-hybrid-retrieval-accuracy.md`.
+- Integrity keeps packet numbers contiguous after P06-57, so overlay packets are P06-58 through P06-64. Do not reuse P06-49 through P06-57.
+- Execute after P06-57, then leftover P06-17. Do not mark P06-17, P06-18, or Phase 6 complete. Do not open P06-18.
+- Production code, prompts, profiles, migrations, and tests must contain no sample-PDF hash, book title, question ID, gold phrase, expected answer, page number, or benchmark-specific alias.
+- Do not mutate frozen `hybrid_default_v1` bytes in place. Do not pin the failed `hybrid_long_document_v1.json` digest. Do not raise `MODEL_INPUT_MAX_CHARS`. Company insufficient evidence never falls back to Web or general knowledge. Do not delete documents automatically.
+- Rollback disables the overlay in application code and restores prior frozen Hybrid pins. Do not down-migrate populated rows.
 
 ## Approved planned deviation: paced verified-answer reveal and custom progress
 

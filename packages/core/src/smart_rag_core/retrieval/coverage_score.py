@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -17,6 +18,7 @@ from smart_rag_core.retrieval.frozen_profile import (
     coverage_threshold_for,
 )
 from smart_rag_core.retrieval.types import RetrievalCandidate
+from smart_rag_core.text.arabic_normalize import normalize_arabic_v1
 
 _REFUSAL_SIGNALS = frozenset(
     {
@@ -97,6 +99,64 @@ def support_confidence(
     return 0.60
 
 
+def coverage_term_key(text: str) -> str:
+    """Return the retrieval-normalized key used for coverage term matching.
+
+    Args:
+        text: Required term, alias, or evidence token.
+
+    Returns:
+        ``arabic_norm_v1`` form, casefolded. Empty when the term vanishes.
+    """
+
+    return normalize_arabic_v1(text).casefold()
+
+
+def exclude_source_selector_terms(
+    required: Sequence[str],
+    selectors: Sequence[str],
+) -> tuple[str, ...]:
+    """Drop required terms that only name a source selector.
+
+    Naming an authorized document cannot force a coverage refusal. Codes
+    and identifiers that contain digits stay required even when they also
+    appear in a title.
+
+    Args:
+        required: Profile exact terms, codes, entities, and aliases.
+        selectors: Authorized titles or high-confidence requested names.
+
+    Returns:
+        Required terms that must appear in answer evidence.
+    """
+
+    phrases: set[str] = set()
+    tokens: set[str] = set()
+    for raw in selectors:
+        key = coverage_term_key(raw)
+        if not key:
+            continue
+        phrases.add(key)
+        tokens.update(part for part in key.split() if part)
+    kept: list[str] = []
+    seen: set[str] = set()
+    for term in required:
+        key = coverage_term_key(term)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        parts = [part for part in key.split() if part]
+        selector_only = key in phrases or (
+            bool(parts) and all(part in tokens for part in parts)
+        )
+        if selector_only and not any(
+            any(ch.isdigit() for ch in part) for part in parts
+        ):
+            continue
+        kept.append(term)
+    return tuple(kept)
+
+
 def coverage_score(components: CoverageComponents) -> float:
     """Compute ``min`` of the four plan coverage terms.
 
@@ -148,9 +208,13 @@ def build_coverage_components(
     documents = {item.document_id for item in fused}
     distinct = max(len(fused), len(documents))
     if required_terms:
-        required_set = {item.casefold() for item in required_terms}
-        matched_set = {item.casefold() for item in matched_terms}
-        term_coverage = len(required_set & matched_set) / len(required_set)
+        required_set = {coverage_term_key(item) for item in required_terms}
+        required_set.discard("")
+        matched_set = {coverage_term_key(item) for item in matched_terms}
+        matched_set.discard("")
+        term_coverage = (
+            len(required_set & matched_set) / len(required_set) if required_set else 1.0
+        )
     else:
         term_coverage = 1.0
     if subquestion_count <= 0:
@@ -247,6 +311,7 @@ def attach_numeric_coverage(
     query_class: QueryClass | None = None,
     required_terms: tuple[str, ...] = (),
     matched_terms: tuple[str, ...] = (),
+    source_selectors: tuple[str, ...] = (),
     subquestion_count: int = 0,
     supported_subquestions: int | None = None,
     rerank_top_support: float | None = None,
@@ -271,6 +336,8 @@ def attach_numeric_coverage(
         query_class: Evaluation class for the frozen threshold.
         required_terms: Required codes/entities/terms.
         matched_terms: Required terms found in evidence.
+        source_selectors: Authorized titles excluded from answer-evidence
+            requirements.
         subquestion_count: Decomposition size. ``0`` means no decomposition
             and subquestion coverage is ``1.0``.
         supported_subquestions: Supported subquestions; defaults to ``0``
@@ -292,11 +359,13 @@ def attach_numeric_coverage(
     elif fused:
         winner_channels = 1
     supported = supported_subquestions if supported_subquestions is not None else 0
+    answer_terms = exclude_source_selector_terms(required_terms, source_selectors)
+    answer_matched = exclude_source_selector_terms(matched_terms, source_selectors)
     components = build_coverage_components(
         fused=fused,
         query_type=query_type,
-        required_terms=required_terms,
-        matched_terms=matched_terms,
+        required_terms=answer_terms,
+        matched_terms=answer_matched,
         subquestion_count=subquestion_count,
         supported_subquestions=supported,
         rerank_top_support=rerank_top_support,

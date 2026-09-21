@@ -2,7 +2,7 @@
 title: Query budget engineering defaults
 owner: engineering-lead
 status: draft
-last-reviewed: 2026-09-16
+last-reviewed: 2026-09-17
 audience: engineering
 phase_packet: Phase 6 Packet 1
 ---
@@ -64,7 +64,11 @@ embed + rerank). Envelope USD stays `model_call_ceiling ×` the family max
 kind cap and is not enlarged. Company answer plus verifier reserve two
 model calls and eight seconds: optional profile/correction/retrieve spends
 must leave `ANSWER_STAGE_RESERVED_MODEL_CALLS` (2) and
-`ANSWER_STAGE_MIN_SECONDS` (8.0). Exhaustion returns a non-empty
+`ANSWER_STAGE_MIN_SECONDS` (8.0). Retrieve-time OpenAI rerank additionally
+requires `RERANK_RESERVED_SECONDS` (2.0) remaining in the existing 8s
+Hybrid retrieve slice; when that reserve is unmet, retrieve records
+`rerank_timeout` and continues with RRF. The answer-stage eight-second
+reserve is not spent on retrieval. Exhaustion returns a non-empty
 partial/refusal and does not call the answer provider. General, user-text,
 and Web ceilings are unchanged.
 

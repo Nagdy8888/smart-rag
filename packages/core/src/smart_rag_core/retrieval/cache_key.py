@@ -46,9 +46,9 @@ def hybrid_cache_key(
         ValueError: If the retrieval profile is not allow-listed.
     """
 
-    from smart_rag_core.retrieval.profiles import ALLOWED_RETRIEVAL_PROFILE_IDS
+    from smart_rag_core.retrieval.frozen_profile import runtime_profile_ids
 
-    if retrieval_profile_id not in ALLOWED_RETRIEVAL_PROFILE_IDS:
+    if retrieval_profile_id not in runtime_profile_ids():
         raise ValueError("unknown_retrieval_profile")
     payload = {
         "principal_scope_hash": principal_scope_hash,
