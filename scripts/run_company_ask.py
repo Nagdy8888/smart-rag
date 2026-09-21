@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     except (AskRegressionConfigError, OSError, json.JSONDecodeError) as exc:
         print(f"blocked={exc}", file=sys.stderr)
         return 2
-    ready = httpx.get(f"{creds.base_url}/health/ready", timeout=10.0)
+    ready = httpx.get(f"{creds.base_url}/health/ready", timeout=60.0)
     ready_payload: object = ready.json() if ready.status_code == 200 else {}
     body = _json_mapping(ready_payload)
     if body.get("query_ready") is not True:

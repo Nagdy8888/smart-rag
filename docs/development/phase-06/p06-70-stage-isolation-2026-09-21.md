@@ -6,92 +6,149 @@ last-reviewed: 2026-09-21
 audience: engineering, reviewers
 ---
 
-# P06-70 — Four-arm isolation (2026-09-21)
+# P06-70 — Name the owning failure stage (2026-09-21)
 
 Parent index:
 [phase-06-agent-intelligence-evidence.md](../phase-06-agent-intelligence-evidence.md).
 
-Requirement ID: `P06-70`. Quote: run Arms A, A-prime, B, and C on the
-12-question slice, assign one first-failing stage per case, and name
+Requirement ID: `P06-70`. Quote: run the four-arm 12-question
+experiment, assign exactly one first-failing stage per case, and name
 the decision-gate branch.
+
+Packet checkbox:
+[Run the four-arm isolation experiment and name the owning failure
+stage.](../../../.cursor/plans/hybrid-graph-rag/06-phase-agent-intelligence.md).
+
+Acceptance: twelve rows, one stage each; count-only histogram; named
+gate; Arm B ACL/current-version recheck; holdout sealed. Production
+retrieval, prompts, profiles, and thresholds were not tuned.
 
 ```mermaid
 flowchart TD
-  gold["Sealed 12-row slice"] --> arma["Arm A titled Ask"]
-  gold --> aprime["Arm A-prime title stripped"]
-  gold --> armb["Arm B ACL oracle"]
-  gold --> armc["Arm C extractive review"]
-  arma --> examA["Exam retrieve titled"]
-  aprime --> examAp["Exam retrieve stripped"]
-  arma --> assign["One first-fail stage"]
-  examA --> assign
-  examAp --> assign
-  armb --> assign
-  assign --> gate["earliest_majority_deadline"]
+  slice["12-question sealed slice"] --> armA["Arm A production Ask"]
+  slice --> armAp["Arm A-prime title stripped"]
+  slice --> exam["Exam retrieve cold_bypass"]
+  slice --> armB["Arm B ACL gold oracle"]
+  armA --> armC["Arm C lexical scores"]
+  armA --> assign["One first-fail stage"]
+  armAp --> assign
+  exam --> assign
+  armB --> assign
+  armC --> assign
+  assign --> gate["deadline_budget"]
 ```
 
-Private reports stay under gitignored `.private-eval/`. Counts only.
+## Gate result
+
+| Field | Value |
+| --- | --- |
+| Named branch | **`deadline_budget`** |
+| Owning stage | `deadline` |
+| Histogram | `deadline=12` |
+| Holdout opened | `false` |
+| Arm B ACL recheck | `true` on 12/12 gold ID sets |
+| Sample gold in production | `false` |
+
+Every Arm A Ask terminal was the server `partial` event with
+`reason=deadline_exhausted`. First-fail assignment therefore cannot
+claim retrieval, fusion, or answer wording. Packet 71 may repair only
+the deadline/budget path.
 
 ## Arm counts
 
-| Arm | Questions | Grounded | Strict | Deadlines | ACL empty | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| A titled Ask (post-heal) | 12 | 0 | 0 | 11 | 0 | 1 verifier refusal after fusion |
-| A-prime title stripped | 12 | 0 | 0 | 2 | 0 | 6 verifier refusals; 1 empty retrieval |
-| B oracle + ACL recheck | 12 | 8 | 8 | 0 | 0 | `authorized_ok=12`; `answer_v3` / `verifier_v2` |
-| C extractive review | 12 | 0 | 0 | 11 | 0 | Session-owner lexical review of Arm A; no semantic invention |
+Canonical version after P06-67 restore:
+`exact_title_current=1`, `old_24char_current=4`,
+`version_status=graph_ineligible`, `hybrid_verified=true`,
+`search_terms=10837`, `query_ready=true`.
 
-Arm B used `fetch_authorized_chunk_context` (SECURITY INVOKER,
-current-version + retrievable status). No sample literal entered
-production. `holdout_opened=false`.
+| Arm | Questions | Grounded | Strict | Other measured |
+| --- | ---: | ---: | ---: | --- |
+| A production Ask | 12 | 0 | 0 | `deadline_failures=12`, `empty_retrieval=0` |
+| A-prime stripped Ask | 12 | 0 | 0 | `deadline_failures=5`, `verifier_refusal_after_fusion=7` |
+| B gold oracle | 12 | 8 | 8 | `authorized_ok=12`, `acl_empty=0`, 10 complete / 2 refused |
+| C Arm A lexical | 12 | 0 | 0 | semantic support not scored |
 
-Exam retrieve (production Hybrid, `cold_bypass`) after the canonical
-version became retrievable:
+Arm C used dual-metric strict phrase and approved aliases on Arm A
+answers. Those answers are deadline terminals, so lexical coverage is
+zero. Blinded human semantic review was not run: the coding model is
+not the semantic reviewer, and deadline copy is not an answer to
+support.
 
-| Exam | Any-channel gold | Dense gold loss | Fused gold loss | Selected gold loss |
-| --- | ---: | ---: | ---: | ---: |
-| A titled | 11 | 2 | 1 | 6 |
-| A-prime | 5 | 9 | 8 | 11 |
+Arm A-prime source resolution was `unscoped` on 11/12 titled-stripped
+questions. Arm A was `exact_one` on 8/12 with four unknown diagnostic
+rows after deadline. Selector corruption is not the first-fail stage
+because Arm A died on deadline before a grounded answer.
 
-Pre-heal titled exam had `any_channel_gold=0` because the unique titled
-copy was still `parsing` and retrieve RPCs exclude that status. That is
-an earlier index observation, not the assigned first-fail after heal.
+## Exam retrieve (`cold_bypass`, restrict canonical version)
 
-## First-fail histogram
+| Channel gold loss | Arm A titled | Arm A-prime |
+| --- | ---: | ---: |
+| any channel gold hit | 11 | 11 |
+| dense miss | 2 | 2 |
+| BM25 miss | 11 | 7 |
+| term miss | 12 | 12 |
+| fused miss | 1 | 1 |
+| selected miss | 6 | 6 |
+| holdout opened | false | false |
 
-| Stage | Rows |
-| --- | ---: |
-| deadline | 11 |
-| context_fit | 1 |
-| all other catalog stages | 0 |
+Dense currently holds gold for 10/12. Term never held gold in this
+slice. Selection drops gold on six questions. Those later-stage losses
+are recorded and **must not** be repaired in Packet 71 while the named
+gate is `deadline_budget`.
 
-Twelve rows. Exactly one stage each. Gate branch:
-**`earliest_majority_deadline`**. Deadline is not a named six-row
-retrieval/answer bucket, so the earliest largest failing stage wins.
+## Arm B ACL proof
 
-Arm B passing (8/12 grounded, 12/12 authorized) forbids an
-answer/verifier-only packet. Owning stage for P06-71 is **deadline**:
-version-scoped exact dense on 1044 representatives exhausted the
-Hybrid 25s envelope before a grounded release.
+`eval_ask_oracle_context.py` loads approved IDs through
+`fetch_authorized_chunk_context` (ACL and current-version recheck),
+builds `HybridPassage`s, then runs production `answer_v3` /
+`verifier_v2` and `render_verified_company_answer`. No sample literal
+enters production modules. One `OpenAIAnswerError` was mapped to a
+refused payload; the other eleven oracle calls completed. Gold context
+is answerable for 8/12 facts, so retrieval tuning is forbidden by the
+packet decision gate.
+
+## Evaluator changes
+
+Allowed evaluator-only scripts:
+
+- `scripts/eval_ask_oracle_context.py`
+- `scripts/eval_ask_stage_isolation.py`
+- `tests/unit/test_eval_ask_stage_isolation.py`
+
+`scripts/run_company_ask.py` ready-probe timeout is 60s. `/health/ready`
+measured ~17s on this host; a 10s probe timed out before any Ask. That
+is not a retrieval, prompt, profile, or threshold change.
 
 ## Negative checks
 
-`tests/unit/test_eval_ask_stage_isolation.py` rejects two first-fail
-stages on one case. This packet did not change production retrieval,
-prompts, profiles, or thresholds. A majority claim without the 12-row
-histogram is rejected.
+| Check | Result |
+| --- | --- |
+| Two first-fail stages on one case | `bind_first_fail_stage` raises |
+| Majority claimed without 12 rows | `assign` raises `assignment_count_*` |
+| Production Hybrid/prompt/profile edit | none in this packet |
+| Holdout | sealed |
 
 ## Verification
 
 | Command | Exit |
 | --- | --- |
-| `uv run python -m pytest tests/unit/test_eval_ask_stage_isolation.py -q` | 0 (8 passed) |
-| `uv run python scripts/eval_ask_stage_isolation.py assign` | 0; `earliest_majority_deadline` |
-| `uv run python scripts/check.py --tier docs` | 0 |
-| `git diff --check` | 0 |
+| `uv run python -m pytest tests/unit/test_eval_ask_stage_isolation.py -q` | 0 |
+| `uv run python scripts/eval_ask_stage_isolation.py assign ...` | 0 |
+| `uv run python scripts/check.py --tier docs` | recorded below |
+| `git diff --check` | recorded below |
+
+Private reports stay under `.private-eval/`. None are staged.
+
+## Rollback
+
+Delete evaluator scripts added here and restore
+`scripts/run_company_ask.py` ready timeout to 10s. Do not reopen
+holdout. Do not delete hosted documents.
 
 ## Handoff to P06-71
 
-Quote: `earliest_majority_deadline`. Implement one bounded deadline
-admission repair. Do not raise `MODEL_INPUT_MAX_CHARS` or the 25s
-Hybrid ceiling. Do not mutate `hybrid_default_v1` bytes.
+Quote: named gate **`deadline_budget`**, owning stage **`deadline`**.
+Load only `implement-query-agent`. Repair the Ask deadline/budget
+path. Do not edit candidate, fusion, rerank, coverage, or prompts.
+Rerun the same 12-question four-arm slice. Stop if deadline failures
+do not fall.

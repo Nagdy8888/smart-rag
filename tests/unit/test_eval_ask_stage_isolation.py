@@ -192,9 +192,7 @@ def test_name_gate_majority_and_earliest_fallback() -> None:
     assert name_gate({"context_fit": 5, "coverage/correction": 4, "label": 3}) == (
         "earliest_majority_context_fit"
     )
-    assert name_gate({"deadline": 11, "context_fit": 1}) == (
-        "earliest_majority_deadline"
-    )
+    assert name_gate({"deadline": 11, "context_fit": 1}) == "deadline_budget"
 
 
 def test_ask_deadline_owns_first_fail_before_later_stages() -> None:
