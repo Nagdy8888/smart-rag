@@ -118,7 +118,7 @@ Packets P06-09 through P06-72 are additive after the completed historical packet
 67. [x] [Add owner/admin document title rename and reindex one canonical copy.](./06-phase-agent-intelligence/packets/67-canonical-document-title.md)
 68. [x] [Persist ID-only Hybrid branch diagnostics and de-hardcode promotion inputs.](./06-phase-agent-intelligence/packets/68-stage-diagnostics.md)
 69. [x] [Seal private aliases, isolation-slice gold, and the frozen 30-question acceptance sample.](./06-phase-agent-intelligence/packets/69-seal-private-gold.md)
-70. [ ] [Run the four-arm isolation experiment and name the owning failure stage.](./06-phase-agent-intelligence/packets/70-stage-isolation.md)
+70. [x] [Run the four-arm isolation experiment and name the owning failure stage.](./06-phase-agent-intelligence/packets/70-stage-isolation.md)
 71. [ ] [Implement one bounded repair for the proven dominant stage.](./06-phase-agent-intelligence/packets/71-proven-stage-repair.md)
 72. [ ] [Qualify live accuracy, publish redacted evidence, and leave leftover P06-17 open.](./06-phase-agent-intelligence/packets/72-live-qualification.md)
 

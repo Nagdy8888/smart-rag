@@ -96,6 +96,7 @@ Related: [QUERY_ADMISSION.md](../agent/QUERY_ADMISSION.md) ·
 | P06-67 — Canonical document title rename (2026-09-21) | [phase-06/p06-67-canonical-document-title-2026-09-21.md](./phase-06/p06-67-canonical-document-title-2026-09-21.md) | 134 |
 | P06-68 — Stage diagnostics and measured promotion (2026-09-21) | [phase-06/p06-68-stage-diagnostics-2026-09-21.md](./phase-06/p06-68-stage-diagnostics-2026-09-21.md) | 141 |
 | P06-69 — Private gold seal (2026-09-21) | [phase-06/p06-69-seal-private-gold-2026-09-21.md](./phase-06/p06-69-seal-private-gold-2026-09-21.md) | 89 |
+| P06-70 — Four-arm stage isolation (2026-09-21) | [phase-06/p06-70-stage-isolation-2026-09-21.md](./phase-06/p06-70-stage-isolation-2026-09-21.md) | 97 |
 
 | P06-10 — Typed knowledge-scope routing (accepted 2026-09-10) | [phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md](./phase-06/p06-10-typed-knowledge-scope-routing-2026-08-25.md) | 73 |
 | P06-11 — SSE stream lifecycle and LangSmith tracing (closed 2026-09-13) | [phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md](./phase-06/p06-11-sse-stream-lifecycle-and-langsmith-tracing-2026-08-25.md) | 80 |

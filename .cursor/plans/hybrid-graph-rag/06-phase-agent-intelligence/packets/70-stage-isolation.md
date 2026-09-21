@@ -1,7 +1,7 @@
 ---
 phase: 6
 packet: 70
-status: pending
+status: complete
 title: "Run the four-arm isolation experiment and name the owning failure stage."
 requirement_ids: [P06-70]
 ---
